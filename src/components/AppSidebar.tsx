@@ -147,7 +147,7 @@ export function AppSidebar() {
                       onClick={handleLinkClick}
                     >
                       <item.icon className="h-4 w-4" />
-                      {sidebarOpen && <span>{item.title}</span>}
+                      <span>{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -165,14 +165,12 @@ export function AppSidebar() {
                       }`}
                     >
                       <Trophy className="h-4 w-4" />
-                      {sidebarOpen && <span>Sports</span>}
-                      {sidebarOpen && (
-                        <ChevronDown
-                          className={`ml-auto h-4 w-4 transition-transform ${
-                            sportsOpen ? "rotate-180" : ""
-                          }`}
-                        />
-                      )}
+                      <span>Sports</span>
+                      <ChevronDown
+                        className={`ml-auto h-4 w-4 transition-transform ${
+                          sportsOpen ? "rotate-180" : ""
+                        }`}
+                      />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
 
@@ -187,7 +185,7 @@ export function AppSidebar() {
                             activeClassName="bg-muted text-primary font-medium"
                             onClick={handleLinkClick}
                           >
-                            {sidebarOpen && <span>AFL</span>}
+                            <span>AFL</span>
                           </NavLink>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
@@ -200,7 +198,7 @@ export function AppSidebar() {
                               activeClassName="bg-muted text-primary font-medium"
                               onClick={handleLinkClick}
                             >
-                              {sidebarOpen && <span>{subItem.title}</span>}
+                              <span>{subItem.title}</span>
                             </NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
@@ -216,7 +214,7 @@ export function AppSidebar() {
                             activeClassName="bg-muted text-primary font-medium"
                             onClick={handleLinkClick}
                           >
-                            {sidebarOpen && <span>EPL</span>}
+                            <span>EPL</span>
                           </NavLink>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
@@ -229,7 +227,7 @@ export function AppSidebar() {
                               activeClassName="bg-muted text-primary font-medium"
                               onClick={handleLinkClick}
                             >
-                              {sidebarOpen && <span>{subItem.title}</span>}
+                              <span>{subItem.title}</span>
                             </NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
@@ -244,7 +242,7 @@ export function AppSidebar() {
                             activeClassName="bg-muted text-primary font-medium"
                             onClick={handleLinkClick}
                           >
-                            {sidebarOpen && <span>NBA</span>}
+                            <span>NBA</span>
                           </NavLink>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
@@ -257,7 +255,7 @@ export function AppSidebar() {
                               activeClassName="bg-muted text-primary font-medium"
                               onClick={handleLinkClick}
                             >
-                              {sidebarOpen && <span>{subItem.title}</span>}
+                              <span>{subItem.title}</span>
                             </NavLink>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
@@ -278,7 +276,7 @@ export function AppSidebar() {
                       onClick={handleLinkClick}
                     >
                       <item.icon className="h-4 w-4" />
-                      {sidebarOpen && <span>{item.title}</span>}
+                      <span>{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -305,7 +303,7 @@ export function AppSidebar() {
                       onClick={handleLinkClick}
                     >
                       <item.icon className="h-4 w-4" />
-                      {sidebarOpen && <span>{item.title}</span>}
+                      <span>{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -322,7 +320,7 @@ export function AppSidebar() {
                       onClick={handleLinkClick}
                     >
                       <item.icon className="h-4 w-4" />
-                      {sidebarOpen && <span>{item.title}</span>}
+                      <span>{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
