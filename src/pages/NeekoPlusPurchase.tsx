@@ -89,13 +89,14 @@ export default function NeekoPlusPurchase() {
   ];
 
   const benefits = [
-    "Unlimited access to all player stats",
-    "Full AI insights and predictions",
-    "Advanced team analytics",
-    "Match center with live data",
-    "Export and download features",
-    "Ad-free experience",
-    "Cancel anytime, no commitment"
+    "Access to full AFL, EPL & NBA player stats",
+    "Advanced team performance breakdowns",
+    "Full AI-powered match analysis",
+    "Deeper insights across all leagues (no blur or gating)",
+    "Early access to new analytics and features",
+    "Priority processing for AI analysis refresh",
+    "Ad-free browsing",
+    "Cancel anytime — no lock-in"
   ];
 
   return (
