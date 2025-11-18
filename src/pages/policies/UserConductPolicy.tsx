@@ -165,7 +165,7 @@ export default function UserConductPolicy() {
               If you witness or experience conduct that violates this policy, please report it immediately:
             </p>
             <ul className="list-disc pl-6 space-y-2">
-              <li>Email: Neekotrading@gmail.com</li>
+              <li>Email: admin@neekostats.com.au</li>
               <li>Include relevant details: date, time, user involved, and description of the violation</li>
               <li>Attach screenshots or evidence if available</li>
             </ul>
@@ -204,7 +204,7 @@ export default function UserConductPolicy() {
               If you believe your account was suspended or banned in error, you may submit an appeal:
             </p>
             <ul className="list-disc pl-6 space-y-2">
-              <li>Contact us at Neekotrading@gmail.com within 14 days of the action</li>
+              <li>Contact us at admin@neekostats.com.au within 14 days of the action</li>
               <li>Include your account email and a detailed explanation</li>
               <li>Appeals are reviewed within 5-7 business days</li>
               <li>Our decision on appeals is final</li>
@@ -235,7 +235,7 @@ export default function UserConductPolicy() {
               For questions or concerns about this User Conduct Policy:
             </p>
             <p className="mt-3">
-              <strong>Email:</strong> Neekotrading@gmail.com<br />
+              <strong>Email:</strong> admin@neekostats.com.au<br />
               <strong>Address:</strong> Melbourne, Victoria, Australia
             </p>
           </CardContent>

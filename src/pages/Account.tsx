@@ -266,7 +266,7 @@ export default function Account() {
           </Card>
         )}
 
-        {/* Admin Section - Only visible to neekotrading@gmail.com */}
+        {/* Admin Section - Only visible to admin@neekostats.com.au */}
         {isAdmin && (
           <Card className="border-primary bg-primary/5">
             <CardHeader>

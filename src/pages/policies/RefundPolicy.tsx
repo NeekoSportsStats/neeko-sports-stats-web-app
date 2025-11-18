@@ -124,7 +124,7 @@ export default function RefundPolicy() {
               To request a refund:
             </p>
             <ul className="list-disc pl-6 space-y-2">
-              <li>Contact us at Neekotrading@gmail.com within 14 days of the charge</li>
+              <li>Contact us at admin@neekostats.com.au within 14 days of the charge</li>
               <li>Include your account email and transaction date</li>
               <li>Provide a detailed explanation of why you believe a refund is warranted</li>
               <li>Include any supporting evidence (screenshots, error messages, etc.)</li>
@@ -226,7 +226,7 @@ export default function RefundPolicy() {
               For refund requests or billing questions:
             </p>
             <p className="mt-3">
-              <strong>Email:</strong> Neekotrading@gmail.com<br />
+              <strong>Email:</strong> admin@neekostats.com.au<br />
               <strong>Address:</strong> Melbourne, Victoria, Australia
             </p>
           </CardContent>

@@ -218,7 +218,7 @@ export default function TermsConditions() {
               If you have any questions about these Terms and Conditions, please contact us at:
             </p>
             <p className="mt-3">
-              <strong>Email:</strong> Neekotrading@gmail.com<br />
+              <strong>Email:</strong> admin@neekostats.com.au<br />
               <strong>Address:</strong> Melbourne, Victoria, Australia
             </p>
           </CardContent>

@@ -155,7 +155,7 @@ export default function PrivacyPolicy() {
               <li><strong>Opt-Out:</strong> Unsubscribe from marketing emails at any time</li>
             </ul>
             <p className="mt-3">
-              To exercise these rights, contact us at Neekotrading@gmail.com with your request.
+              To exercise these rights, contact us at admin@neekostats.com.au with your request.
             </p>
           </CardContent>
         </Card>
@@ -208,7 +208,7 @@ export default function PrivacyPolicy() {
               If you have questions or concerns about this Privacy Policy or how your data is handled, please contact us:
             </p>
             <p className="mt-3">
-              <strong>Email:</strong> Neekotrading@gmail.com<br />
+              <strong>Email:</strong> admin@neekostats.com.au<br />
               <strong>Address:</strong> Melbourne, Victoria, Australia
             </p>
           </CardContent>

@@ -93,8 +93,8 @@ export default function Policies() {
           </p>
           <p className="text-sm text-muted-foreground mt-2">
             For questions about our policies, contact us at{" "}
-            <a href="mailto:Neekotrading@gmail.com" className="text-primary hover:underline">
-              Neekotrading@gmail.com
+            <a href="mailto:admin@neekostats.com.au" className="text-primary hover:underline">
+              admin@neekostats.com.au
             </a>
           </p>
         </Card>

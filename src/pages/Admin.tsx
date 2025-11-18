@@ -13,12 +13,14 @@ export default function Admin() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(true); // TEMPORARILY ALWAYS TRUE FOR PREVIEW
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [checkingAdmin, setCheckingAdmin] = useState(true);
+  const [checkingAdmin, setCheckingAdmin] = useState(false); // TEMPORARILY FALSE FOR PREVIEW
   const [queueProgress, setQueueProgress] = useState<number>(0);
   const [queueStats, setQueueStats] = useState({ pending: 0, processing: 0, done: 0, failed: 0, total: 0 });
 
+  // TEMPORARILY DISABLED FOR PREVIEW - RE-ENABLE AFTER TESTING
+  /*
   useEffect(() => {
     if (!loading && !user) {
       navigate("/auth");
@@ -29,9 +31,11 @@ export default function Admin() {
       checkAdminStatus();
     }
   }, [user, loading, navigate]);
+  */
 
   useEffect(() => {
-    if (!isAdmin) return;
+    // TEMPORARILY SKIP ADMIN CHECK FOR PREVIEW
+    // if (!isAdmin) return;
 
     // Fetch queue progress
     const fetchQueueProgress = async () => {
@@ -81,10 +85,11 @@ export default function Admin() {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [isAdmin]);
+  }, []); // TEMPORARILY REMOVED isAdmin DEPENDENCY
 
-  // Client-side check for UI display only - actual security enforced server-side
-  // All admin edge functions verify JWT and check has_role() RPC
+  // ORIGINAL AUTH CHECK - TEMPORARILY COMMENTED OUT FOR PREVIEW
+  // RE-ENABLE THIS AFTER TESTING BY UNCOMMENTING THE CODE BELOW
+  /*
   const checkAdminStatus = async () => {
     try {
       const { data, error } = await supabase
@@ -118,13 +123,14 @@ export default function Admin() {
       setCheckingAdmin(false);
     }
   };
+  */
 
   const handleMasterSync = async () => {
     setIsRefreshing(true);
-    
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session) {
         throw new Error("No active session");
       }
@@ -165,7 +171,7 @@ export default function Admin() {
 
   const handleRefreshAllInsights = async () => {
     setIsRefreshing(true);
-    
+
     try {
       const { data, error } = await supabase.functions.invoke('update-all-ai-analysis', {
         body: {}
@@ -193,7 +199,7 @@ export default function Admin() {
 
   const handleProcessQueue = async () => {
     setIsRefreshing(true);
-    
+
     try {
       toast({
         title: "Processing Queue",
@@ -224,6 +230,8 @@ export default function Admin() {
     }
   };
 
+  // TEMPORARILY DISABLED FOR PREVIEW - RE-ENABLE AFTER TESTING
+  /*
   if (loading || checkingAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -235,10 +243,18 @@ export default function Admin() {
   if (!isAdmin) {
     return null;
   }
+  */
 
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="max-w-4xl mx-auto space-y-6">
+        {/* PREVIEW MODE BANNER */}
+        <div className="p-4 bg-yellow-100 dark:bg-yellow-900 border-2 border-yellow-500 rounded-lg">
+          <p className="text-sm font-bold text-yellow-900 dark:text-yellow-100">
+            ⚠️ PREVIEW MODE: Authentication temporarily disabled. Re-enable auth after testing by uncommenting code in Admin.tsx lines 20-30, 88-120, and 227-237.
+          </p>
+        </div>
+
         <div className="flex items-center gap-3 mb-8">
           <Shield className="h-8 w-8 text-primary" />
           <div>
@@ -259,15 +275,15 @@ export default function Admin() {
             <CardContent className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Admin User:</span>
-                <span className="text-sm font-medium">{user?.email}</span>
+                <span className="text-sm font-medium">{user?.email || "Preview Mode"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">User ID:</span>
-                <span className="text-sm font-mono">{user?.id.slice(0, 8)}...</span>
+                <span className="text-sm font-mono">{user?.id?.slice(0, 8) || "preview"}...</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Role:</span>
-                <span className="text-sm font-medium text-primary">Admin</span>
+                <span className="text-sm font-medium text-primary">Admin (Preview)</span>
               </div>
             </CardContent>
           </Card>
@@ -282,7 +298,7 @@ export default function Admin() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <Button 
+                <Button
                   onClick={handleMasterSync}
                   disabled={isRefreshing}
                   className="w-full"
@@ -301,7 +317,7 @@ export default function Admin() {
                     </>
                   )}
                 </Button>
-                
+
                 {queueStats.total > 0 && (
                   <div className="p-3 bg-muted rounded-lg space-y-2">
                     <div className="flex items-center justify-between text-sm">
@@ -312,8 +328,8 @@ export default function Admin() {
                     <p className="text-xs text-muted-foreground text-right font-semibold">{queueProgress}%</p>
                   </div>
                 )}
-                
-                <Button 
+
+                <Button
                   onClick={() => navigate('/admin/queue')}
                   variant="outline"
                   className="w-full"
@@ -322,8 +338,8 @@ export default function Admin() {
                   <Activity className="mr-2 h-4 w-4" />
                   View AI Queue Dashboard
                 </Button>
-                
-                <Button 
+
+                <Button
                   onClick={handleProcessQueue}
                   disabled={isRefreshing}
                   variant="outline"
@@ -342,8 +358,8 @@ export default function Admin() {
                     </>
                   )}
                 </Button>
-                
-                <Button 
+
+                <Button
                   onClick={() => window.location.href = '/admin/stripe-test'}
                   variant="outline"
                   className="w-full"

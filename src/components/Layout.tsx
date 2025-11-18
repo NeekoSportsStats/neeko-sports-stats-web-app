@@ -30,16 +30,14 @@ export function Layout({ children }: LayoutProps) {
               </div>
 
               <div className="flex items-center gap-2">
-                {!isPremium && user && (
-                  <Link to="/neeko-plus">
-                    <Button variant="default" size="sm" className="gap-2">
-                      <Crown className="h-4 w-4" />
-                      <span className="hidden sm:inline">Upgrade to Neeko+</span>
-                      <span className="sm:hidden">Neeko+</span>
-                    </Button>
-                  </Link>
-                )}
-                
+                {/* Neeko+ link visible to all users */}
+                <Link to="/neeko-plus">
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Crown className="h-4 w-4" />
+                    <span className="hidden sm:inline">Neeko+</span>
+                  </Button>
+                </Link>
+
                 {user && (
                   <Button
                     variant="ghost"
@@ -51,7 +49,7 @@ export function Layout({ children }: LayoutProps) {
                     <span className="hidden sm:inline">Logout</span>
                   </Button>
                 )}
-                
+
                 {!user && (
                   <Link to="/auth">
                     <Button variant="default" size="sm">

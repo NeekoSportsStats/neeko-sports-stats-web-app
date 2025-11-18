@@ -203,7 +203,7 @@ export default function SecurityPolicy() {
               <li>Never share your password or account credentials</li>
               <li>Log out of shared or public devices after use</li>
               <li>Enable email notifications for account changes and logins</li>
-              <li>Report suspicious activity immediately to Neekotrading@gmail.com</li>
+              <li>Report suspicious activity immediately to admin@neekostats.com.au</li>
             </ul>
             <p className="mt-3">
               If you suspect your account has been compromised, change your password immediately and contact support.
@@ -239,7 +239,7 @@ export default function SecurityPolicy() {
               If you discover a security vulnerability in Neeko's Sports Stats:
             </p>
             <ul className="list-disc pl-6 space-y-2">
-              <li>Email us immediately at Neekotrading@gmail.com with subject line "Security Vulnerability"</li>
+              <li>Email us immediately at admin@neekostats.com.au with subject line "Security Vulnerability"</li>
               <li>Include detailed steps to reproduce the issue</li>
               <li>Do not publicly disclose the vulnerability until we have addressed it</li>
               <li>Allow us reasonable time to investigate and fix the issue before disclosure</li>
@@ -287,7 +287,7 @@ export default function SecurityPolicy() {
               For security concerns, vulnerability reports, or questions about data handling:
             </p>
             <p className="mt-3">
-              <strong>Email:</strong> Neekotrading@gmail.com<br />
+              <strong>Email:</strong> admin@neekostats.com.au<br />
               <strong>Address:</strong> Melbourne, Victoria, Australia
             </p>
           </CardContent>
