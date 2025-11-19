@@ -10,104 +10,70 @@ const corsHeaders = {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") as string, {
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
       apiVersion: "2024-11-20.acacia",
     });
 
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: req.headers.get("Authorization")! },
-        },
-      }
+    // Create supabase client WITHOUT forcing the user to be logged in
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")! // IMPORTANT FIX
     );
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    const { email } = await req.json().catch(() => ({}));
 
-    if (userError || !user) {
-      throw new Error("Not authenticated");
+    if (!email) {
+      throw new Error("Missing user email for checkout");
     }
 
     const priceId = Deno.env.get("STRIPE_PRICE_ID");
-    if (!priceId) {
-      throw new Error("STRIPE_PRICE_ID not configured");
-    }
+    if (!priceId) throw new Error("STRIPE_PRICE_ID not configured");
 
-    let customerId: string | undefined;
-
-    const { data: customerData } = await supabaseClient
+    // Check if Stripe customer already exists
+    const { data: existingCustomer } = await supabase
       .from("stripe_customers")
-      .select("customer_id")
-      .eq("user_id", user.id)
-      .single();
+      .select("customer_id, user_email")
+      .eq("user_email", email)
+      .maybeSingle();
 
-    if (customerData?.customer_id) {
-      customerId = customerData.customer_id;
+    let customerId: string;
+
+    if (existingCustomer?.customer_id) {
+      customerId = existingCustomer.customer_id;
     } else {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        metadata: {
-          user_id: user.id,
-        },
-      });
-
+      const customer = await stripe.customers.create({ email });
       customerId = customer.id;
 
-      await supabaseClient
+      await supabase
         .from("stripe_customers")
-        .insert({
-          user_id: user.id,
-          customer_id: customerId,
-        });
+        .insert({ user_email: email, customer_id: customerId });
     }
 
+    const origin = req.headers.get("origin") ?? "https://neekostats.com.au";
+
     const session = await stripe.checkout.sessions.create({
-      customer: customerId,
       mode: "subscription",
+      customer: customerId,
       payment_method_types: ["card"],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      success_url: `${req.headers.get("origin")}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get("origin")}/neeko-plus`,
-      metadata: {
-        user_id: user.id,
-      },
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/neeko-plus`,
+      metadata: { email },
     });
 
-    return new Response(
-      JSON.stringify({ url: session.url }),
-      {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-        status: 200,
-      }
-    );
+    return new Response(JSON.stringify({ url: session.url }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
   } catch (error) {
-    console.error("Create checkout session error:", error);
+    console.error("ERROR:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-        status: 400,
-      }
+      JSON.stringify({ error: error.message }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
     );
   }
 });
