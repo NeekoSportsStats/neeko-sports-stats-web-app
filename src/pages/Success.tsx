@@ -1,12 +1,15 @@
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, Crown, ArrowRight } from "lucide-react";
+import { CheckCircle2, Crown, ArrowRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 
 export default function Success() {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const { refreshPremiumStatus } = useAuth();
   const sessionId = params.get("session_id");
   const [loading, setLoading] = useState(true);
   const [verified, setVerified] = useState(false);
@@ -21,7 +24,16 @@ export default function Success() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
 
-        if (user) {
+        if (!user) {
+          setLoading(false);
+          return;
+        }
+
+        let attempts = 0;
+        const maxAttempts = 10;
+        const checkInterval = 2000;
+
+        const checkSubscription = async () => {
           const { data: subscription } = await supabase
             .from("subscriptions")
             .select("*")
@@ -30,17 +42,34 @@ export default function Success() {
 
           if (subscription && ['active', 'trialing'].includes(subscription.status)) {
             setVerified(true);
+            setLoading(false);
+            await refreshPremiumStatus();
+            return true;
           }
-        }
+          return false;
+        };
+
+        const pollSubscription = async () => {
+          while (attempts < maxAttempts) {
+            const found = await checkSubscription();
+            if (found) return;
+
+            attempts++;
+            await new Promise(resolve => setTimeout(resolve, checkInterval));
+          }
+
+          setLoading(false);
+        };
+
+        await pollSubscription();
       } catch (error) {
         console.error("Error verifying subscription:", error);
-      } finally {
         setLoading(false);
       }
     };
 
     verifySubscription();
-  }, [sessionId]);
+  }, [sessionId, refreshPremiumStatus]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/10 via-background to-background">
@@ -58,8 +87,9 @@ export default function Success() {
         <CardContent className="space-y-6">
           {loading ? (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="mt-4 text-muted-foreground">Verifying your subscription...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+              <p className="mt-4 text-muted-foreground">Activating your subscription...</p>
+              <p className="mt-2 text-sm text-muted-foreground">This usually takes just a few seconds</p>
             </div>
           ) : (
             <>
@@ -78,6 +108,17 @@ export default function Success() {
                 <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
                   <p className="text-sm text-green-900 dark:text-green-100 font-medium">
                     ✓ Subscription verified successfully
+                  </p>
+                </div>
+              )}
+
+              {!verified && (
+                <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                  <p className="text-sm text-amber-900 dark:text-amber-100 font-medium">
+                    Payment received! Your subscription will be active within a few minutes.
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                    If you don't see premium features immediately, try refreshing in a moment.
                   </p>
                 </div>
               )}
@@ -109,7 +150,7 @@ export default function Success() {
                 </Button>
                 <Button asChild variant="outline" className="flex-1">
                   <Link to="/account">
-                    Manage Subscription
+                    View Account
                   </Link>
                 </Button>
               </div>

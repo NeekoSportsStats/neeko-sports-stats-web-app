@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
-import { supabase, _supabase_debug } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 
 interface AuthContextType {
@@ -23,37 +23,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Skip auth initialization if Supabase is not configured
-    if (!_supabase_debug.configured) {
-      console.warn('⚠️ Supabase not configured - running in demo mode');
-      setLoading(false);
-      return;
-    }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
 
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      // Fetch premium status after state update
-      if (session?.user) {
-        setTimeout(() => {
-          fetchPremiumStatus(session.user.id);
-        }, 0);
-      } else {
-        setIsPremium(false);
+        if (session?.user) {
+          await fetchPremiumStatus(session.user.id);
+        } else {
+          setIsPremium(false);
+        }
+
+        if (event === 'SIGNED_IN' && session) {
+          setLoading(false);
+        }
       }
-    });
+    );
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
-        setTimeout(() => {
-          fetchPremiumStatus(session.user.id);
-        }, 0);
+        await fetchPremiumStatus(session.user.id);
       }
       setLoading(false);
     }).catch((error) => {
@@ -65,20 +57,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const fetchPremiumStatus = async (userId: string) => {
-    if (!_supabase_debug.configured) return;
-    
     try {
-      const { data: userRole, error } = await supabase
-        .from('user_roles')
-        .select('role')
+      const { data: subscription, error } = await supabase
+        .from('subscriptions')
+        .select('status, current_period_end')
         .eq('user_id', userId)
         .maybeSingle();
 
-      if (error) throw error;
-      
-      // Premium or admin users have premium access
-      const role = userRole?.role as string;
-      setIsPremium(role === 'premium' || role === 'admin');
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      if (!subscription) {
+        const { data: userRole } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        const role = userRole?.role as string;
+        setIsPremium(role === 'premium' || role === 'admin');
+        return;
+      }
+
+      const isActiveSubscription = ['active', 'trialing'].includes(subscription.status);
+      const periodEnd = new Date(subscription.current_period_end);
+      const isNotExpired = periodEnd > new Date();
+
+      setIsPremium(isActiveSubscription && isNotExpired);
     } catch (error) {
       console.error('Error fetching premium status:', error);
       setIsPremium(false);
@@ -92,32 +98,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const checkAdminRole = async (): Promise<boolean> => {
-    if (!user || !_supabase_debug.configured) return false;
-    
+    if (!user) return false;
+
     try {
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
         .maybeSingle();
-      
-      if (error) {
-        console.error('Error checking admin role');
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking admin role:', error);
         return false;
       }
-      
+
       const role = data?.role as string;
       return role === 'admin';
     } catch (error) {
-      console.error('Error checking admin role');
+      console.error('Error checking admin role:', error);
       return false;
     }
   };
 
   const signOut = async () => {
-    if (_supabase_debug.configured) {
-      await supabase.auth.signOut();
-    }
+    await supabase.auth.signOut();
     setIsPremium(false);
     navigate("/auth");
   };

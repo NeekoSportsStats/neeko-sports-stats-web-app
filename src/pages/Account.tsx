@@ -5,18 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Crown, Calendar, CreditCard, User, LogOut, ArrowLeft, RefreshCw, Settings } from "lucide-react";
+import { Loader2, Crown, Calendar, User, LogOut, ArrowLeft, RefreshCw, Settings } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
 import { createPortalSession } from "@/lib/stripe";
+import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 
 export default function Account() {
   const { user, loading: authLoading, signOut, checkAdminRole, refreshPremiumStatus } = useAuth();
+  const { status, subscriptionData, refresh: refreshSubscription } = useSubscriptionStatus();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [updateLoading, setUpdateLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
@@ -30,6 +30,7 @@ export default function Account() {
         description: "Your subscription is now active. Welcome to Neeko+!",
       });
       refreshPremiumStatus();
+      refreshSubscription();
     }
   }, [searchParams]);
 
@@ -41,32 +42,9 @@ export default function Account() {
 
   useEffect(() => {
     if (user) {
-      fetchProfile();
       checkAdminRole().then(setIsAdmin);
     }
   }, [user]);
-
-  const fetchProfile = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user?.id)
-        .single();
-
-      if (error) throw error;
-      setProfile(data);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load account information",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleManageSubscription = async () => {
     setActionLoading(true);
@@ -138,7 +116,7 @@ export default function Account() {
     }
   };
 
-  if (authLoading || loading) {
+  if (authLoading || status === "loading") {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -150,17 +128,19 @@ export default function Account() {
     return null;
   }
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (subscriptionStatus: string) => {
     const variants: any = {
       active: "default",
       trialing: "secondary",
       past_due: "destructive",
       canceled: "destructive",
-      inactive: "outline",
+      free: "outline",
     };
-    const displayStatus = status === 'trialing' ? 'trial' : status;
-    return <Badge variant={variants[status] || "outline"}>{displayStatus.toUpperCase()}</Badge>;
+    const displayStatus = subscriptionStatus === 'trialing' ? 'trial' : subscriptionStatus;
+    return <Badge variant={variants[subscriptionStatus] || "outline"}>{displayStatus.toUpperCase()}</Badge>;
   };
+
+  const isActive = status === "active" || status === "trialing";
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
@@ -179,7 +159,6 @@ export default function Account() {
       </div>
 
       <div className="space-y-6">
-        {/* User Details */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -204,7 +183,6 @@ export default function Account() {
           </CardContent>
         </Card>
 
-        {/* Subscription Status */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -215,10 +193,22 @@ export default function Account() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Current Status</span>
-              {getStatusBadge(profile?.subscription_status || 'inactive')}
+              {getStatusBadge(status)}
             </div>
 
-            {profile?.is_premium ? (
+            {subscriptionData && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Current period ends
+                </span>
+                <span className="font-medium">
+                  {new Date(subscriptionData.current_period_end).toLocaleDateString()}
+                </span>
+              </div>
+            )}
+
+            {isActive ? (
               <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
                 <p className="text-sm font-medium text-primary">✓ You have full Neeko+ access</p>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -244,8 +234,7 @@ export default function Account() {
           </CardContent>
         </Card>
 
-        {/* Subscription Management */}
-        {profile?.is_premium && (
+        {isActive && (
           <Card>
             <CardHeader>
               <CardTitle>Manage Subscription</CardTitle>
@@ -266,7 +255,6 @@ export default function Account() {
           </Card>
         )}
 
-        {/* Admin Section - Only visible to admin@neekostats.com.au */}
         {isAdmin && (
           <Card className="border-primary bg-primary/5">
             <CardHeader>
@@ -287,9 +275,9 @@ export default function Account() {
               <p className="text-xs text-muted-foreground">
                 Syncs all player stats and fixtures from Google Sheets (AFL, EPL, NBA).
               </p>
-              
+
               <Separator />
-              
+
               <Button
                 onClick={handleUpdateAllAI}
                 disabled={updateLoading}
