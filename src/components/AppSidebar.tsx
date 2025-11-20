@@ -2,7 +2,7 @@ import { Home, Trophy, Crown, Users, Share2, ChevronDown, User, Shield, Mail, He
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,

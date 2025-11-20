@@ -6,7 +6,7 @@ import TeamTable from "@/components/dashboard/TeamTable";
 import TeamTiles from "@/components/dashboard/TeamTiles";
 import TeamComparison from "@/components/dashboard/TeamComparison";
 import TopTeamRankings from "@/components/dashboard/TopTeamRankings";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 
 const EPLTeams = () => {
   const navigate = useNavigate();

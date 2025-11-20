@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, AlertCircle, ArrowLeft } from "lucide-react";

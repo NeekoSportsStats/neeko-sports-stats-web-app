@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Shield, Award, Zap } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 
 interface PlayerData {
   player?: string;

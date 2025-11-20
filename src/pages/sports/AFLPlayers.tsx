@@ -7,7 +7,7 @@ import TeamTiles from "@/components/dashboard/TeamTiles";
 import TopTeamRankings from "@/components/dashboard/TopTeamRankings";
 import TeamComparison from "@/components/dashboard/TeamComparison";
 import { useAuth } from "@/lib/auth";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 
 const AFLPlayers = () => {
   const navigate = useNavigate();

@@ -19,13 +19,10 @@ export default function Billing() {
   const handleManageBilling = async () => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-portal-session`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+      const response = await fetch("/api/portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
 
       const data = await response.json();
 
