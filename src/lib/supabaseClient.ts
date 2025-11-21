@@ -1,5 +1,4 @@
-// src/lib/supabaseClient.ts
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from '@supabase/supabase-js';
 
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -9,6 +8,7 @@ export const supabase = createClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-    },
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined
+    }
   }
 );

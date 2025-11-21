@@ -56,6 +56,7 @@ export default function NeekoPlusPurchase() {
       if (data.url) {
         window.location.href = data.url;
       } else {
+        console.error('Checkout error:', data);
         throw new Error("Missing checkout URL");
       }
     } catch (err: any) {
