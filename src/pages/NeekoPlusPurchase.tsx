@@ -27,11 +27,9 @@ export default function NeekoPlusPurchase() {
     setLoading(true);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
 
-      if (!user) {
+      if (!session) {
         toast({
           title: "Please log in first",
           description: "You need to be logged in to subscribe",
@@ -42,22 +40,25 @@ export default function NeekoPlusPurchase() {
         return;
       }
 
-      const response = await fetch("/api/create-checkout-session", {
+      const res = await fetch("https://zbomenuickrogthnsozb.functions.supabase.co/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({
           priceId: import.meta.env.VITE_STRIPE_PRICE_ID,
-          userId: user.id,
         }),
       });
 
-      const data = await response.json();
+      const data = await res.json();
 
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error("Missing checkout URL");
+      if (data.error || !data.url) {
+        console.error("Checkout error:", data.error);
+        throw new Error("Unable to start checkout.");
       }
+
+      window.location.href = data.url;
     } catch (err: any) {
       toast({
         title: "Checkout failed",
