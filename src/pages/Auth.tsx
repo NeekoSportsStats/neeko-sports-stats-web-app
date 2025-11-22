@@ -20,7 +20,7 @@ const passwordSchema = z
   .regex(/[^A-Za-z0-9]/, "Must contain at least one symbol");
 
 const Auth = () => {
-  // "mode" replaces isLogin
+  // 🔥 Single source of truth for mode
   const [mode, setMode] = useState<"login" | "signup">("login");
 
   const [email, setEmail] = useState("");
@@ -51,18 +51,22 @@ const Auth = () => {
     setLoading(true);
 
     try {
+      // basic email validation
       emailSchema.parse(email);
 
       // -------------------------------
       // LOGIN
       // -------------------------------
       if (mode === "login") {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
-        if (error) throw new Error("Incorrect email or password");
+        if (error) {
+          console.error("🔴 LOGIN ERROR:", error);
+          throw new Error("Incorrect email or password");
+        }
 
         toast({ title: "Welcome back!" });
         navigate(redirect);
@@ -73,43 +77,55 @@ const Auth = () => {
       // SIGNUP
       // -------------------------------
       passwordSchema.parse(password);
-      if (password !== confirmPassword) throw new Error("Passwords do not match");
+      if (password !== confirmPassword) {
+        throw new Error("Passwords do not match");
+      }
 
+      console.log("🟦 SIGNUP ATTEMPT", { email });
+
+      // ❗ No emailRedirectTo here – let Supabase use SITE_URL default
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          emailRedirectTo: undefined, // ⛔️ STOP redirect_to problems
-        },
       });
 
-      if (error?.status === 422) {
-        toast({
-          title: "Account already exists",
-          description: "Please sign in instead.",
-          variant: "destructive",
-        });
-        setMode("login");
-        return;
+      if (error) {
+        console.error("🔴 SIGNUP ERROR RAW:", error);
+
+        // 422 is usually "User already registered" or policy issues
+        if (
+          error.status === 422 &&
+          typeof error.message === "string" &&
+          error.message.toLowerCase().includes("already")
+        ) {
+          toast({
+            title: "Account already exists",
+            description: "Please sign in instead.",
+            variant: "destructive",
+          });
+          // 🔥 IMPORTANT: do NOT auto-switch mode – user can click the toggle
+          return;
+        }
+
+        // Any other error: bubble up
+        throw new Error(error.message || "Signup failed");
       }
 
-      if (error) throw error;
-
-      // SUCCESS
+      // 🔥 Signup *success* (even if session is not auto-created)
       toast({
         title: "Account created!",
-        description: "You can now sign in.",
+        description: "You can now sign in with your new account.",
       });
 
-      // Reset form + switch to login
-      setMode("login");
+      // stay in signup mode so it doesn't "slide" to login by itself
+      // (user can click "Already have an account? Sign in" manually)
       setPassword("");
       setConfirmPassword("");
-
     } catch (err: any) {
+      console.error("🔥 AUTH ERROR (catch):", err);
       toast({
         title: "Error",
-        description: err.message,
+        description: err?.message || "Something went wrong",
         variant: "destructive",
       });
     } finally {
@@ -134,15 +150,21 @@ const Auth = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md p-8 space-y-6">
-
-        <Button onClick={() => navigate("/")} variant="ghost" size="sm" className="-mt-2 mb-2">
+        <Button
+          onClick={() => navigate("/")}
+          variant="ghost"
+          size="sm"
+          className="-mt-2 mb-2"
+        >
           <ArrowLeft className="h-4 w-4 mr-2" /> Back
         </Button>
 
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Trophy className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold gradient-text">Neeko's Sports Stats</h1>
+            <h1 className="text-2xl font-bold gradient-text">
+              Neeko&apos;s Sports Stats
+            </h1>
           </div>
 
           <h2 className="text-xl font-semibold">
@@ -168,7 +190,9 @@ const Auth = () => {
               autoComplete="email"
               required
             />
-            {emailError && <p className="text-red-500 text-xs">{emailError}</p>}
+            {emailError && (
+              <p className="text-red-500 text-xs">{emailError}</p>
+            )}
           </div>
 
           {/* PASSWORD */}
@@ -204,19 +228,39 @@ const Auth = () => {
 
             {mode === "signup" && (
               <div className="text-xs space-y-1 mt-2">
-                <p className={passwordChecks.length ? "text-green-500" : "text-red-500"}>
+                <p
+                  className={
+                    passwordChecks.length ? "text-green-500" : "text-red-500"
+                  }
+                >
                   {passwordChecks.length ? "✔" : "✘"} 10+ characters
                 </p>
-                <p className={passwordChecks.upper ? "text-green-500" : "text-red-500"}>
+                <p
+                  className={
+                    passwordChecks.upper ? "text-green-500" : "text-red-500"
+                  }
+                >
                   {passwordChecks.upper ? "✔" : "✘"} Uppercase letter
                 </p>
-                <p className={passwordChecks.lower ? "text-green-500" : "text-red-500"}>
+                <p
+                  className={
+                    passwordChecks.lower ? "text-green-500" : "text-red-500"
+                  }
+                >
                   {passwordChecks.lower ? "✔" : "✘"} Lowercase letter
                 </p>
-                <p className={passwordChecks.digit ? "text-green-500" : "text-red-500"}>
+                <p
+                  className={
+                    passwordChecks.digit ? "text-green-500" : "text-red-500"
+                  }
+                >
                   {passwordChecks.digit ? "✔" : "✘"} Number
                 </p>
-                <p className={passwordChecks.symbol ? "text-green-500" : "text-red-500"}>
+                <p
+                  className={
+                    passwordChecks.symbol ? "text-green-500" : "text-red-500"
+                  }
+                >
                   {passwordChecks.symbol ? "✔" : "✘"} Symbol
                 </p>
               </div>
@@ -245,14 +289,20 @@ const Auth = () => {
             </div>
           )}
 
-          <Button type="submit" className="w-full" disabled={loading || !canSubmit}>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading || !canSubmit}
+          >
             {loading ? "Loading..." : mode === "login" ? "Sign In" : "Sign Up"}
           </Button>
         </form>
 
         <div className="text-center text-sm">
           <button
-            onClick={() => setMode(mode === "login" ? "signup" : "login")}
+            onClick={() =>
+              setMode((prev) => (prev === "login" ? "signup" : "login"))
+            }
             className="text-primary hover:underline"
           >
             {mode === "login"
@@ -260,7 +310,6 @@ const Auth = () => {
               : "Already have an account? Sign in"}
           </button>
         </div>
-
       </Card>
     </div>
   );
