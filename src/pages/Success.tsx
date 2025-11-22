@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CheckCircle2, Crown, ArrowRight, Loader2 } from "lucide-react";
+import { CheckCircle2, Crown, ArrowRight, Loader2, Home } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 
@@ -16,7 +16,6 @@ export default function Success() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
 
-  // Keep reading it safely (unchanged)
   const { refreshPremiumStatus } = useAuth() || {};
 
   const sessionId = params.get("session_id");
@@ -29,41 +28,29 @@ export default function Success() {
 
     const verifyOnce = async () => {
       if (!sessionId) {
-        console.log("❌ No session_id found in URL");
         setLoading(false);
         return;
       }
 
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        console.log("🟣 Supabase user from auth:", user);
 
         if (!user) {
-          console.log("❌ No Supabase user logged in");
           setLoading(false);
           return;
         }
 
-        console.log("📡 Checking profile ONE TIME...");
-
-        const { data: profile, error } = await supabase
+        const { data: profile } = await supabase
           .from("profiles")
           .select("subscription_status")
           .eq("id", user.id)
           .maybeSingle();
 
-        console.log("📄 profiles row:", profile);
-        console.log("🐛 profiles fetch error:", error);
-
         if (profile?.subscription_status === "active") {
-          console.log("🎉 Subscription is ACTIVE in DB");
           setVerified(true);
-        } else {
-          console.log("⚠️ Subscription not active yet");
         }
 
         setLoading(false);
-
       } catch (error) {
         console.error("🔥 Fatal error verifying subscription:", error);
         setLoading(false);
@@ -108,8 +95,7 @@ export default function Success() {
                 </div>
                 <p className="text-sm text-muted-foreground">
                   You now have unlimited access to all AI-powered insights,
-                  advanced analytics, and premium features across AFL, EPL, and
-                  NBA.
+                  advanced analytics, and premium features across AFL, EPL, and NBA.
                 </p>
               </div>
 
@@ -122,12 +108,7 @@ export default function Success() {
               ) : (
                 <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
                   <p className="text-sm text-amber-900 dark:text-amber-100 font-medium">
-                    Payment received! Your subscription will be active within a
-                    few minutes.
-                  </p>
-                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                    If you don't see premium features immediately, try refreshing
-                    in a moment.
+                    Payment received! Your subscription will be active within a few minutes.
                   </p>
                 </div>
               )}
@@ -139,8 +120,13 @@ export default function Success() {
                     Start Exploring
                   </a>
                 </Button>
+
+                {/* ✅ Updated Button — Go Home */}
                 <Button asChild variant="outline" className="flex-1">
-                  <a href="/account">View Account</a>
+                  <a href="/">
+                    <Home className="mr-2 h-4 w-4" />
+                    Go Home
+                  </a>
                 </Button>
               </div>
 
