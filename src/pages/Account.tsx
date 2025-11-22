@@ -25,13 +25,35 @@ import { Separator } from "@/components/ui/separator";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 
 export default function Account() {
-  const { user, loading: authLoading, signOut, isPremium } = useAuth();
-  const { status, subscriptionData, refresh: refreshSubscription } =
-    useSubscriptionStatus();
-  const { toast } = useToast();
+  const { user, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
+  // -----------------------------
+  // 🔥 NEW: Load Supabase profile
+  // -----------------------------
+  const [profile, setProfile] = useState<any>(null);
+
+  useEffect(() => {
+    if (!user) return;
+
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) console.error("Profile fetch error:", error);
+        setProfile(data);
+      });
+  }, [user]);
+
+  // OLD hook still used for billing portal + dates only
+  const { status, subscriptionData, refresh: refreshSubscription } =
+    useSubscriptionStatus();
+
+  // Show toast after successful portal return
   useEffect(() => {
     const success = searchParams.get("success");
     if (success === "true") {
@@ -39,6 +61,7 @@ export default function Account() {
         title: "Success!",
         description: "Your subscription is now active. Welcome to Neeko+!",
       });
+
       refreshSubscription();
     }
   }, [searchParams, refreshSubscription, toast]);
@@ -49,16 +72,20 @@ export default function Account() {
     }
   }, [authLoading, user, navigate]);
 
-  if (authLoading || status === "loading") {
+  // -----------------------------
+  // 🔥 NEW: Our real premium flag
+  // -----------------------------
+  const isPremiumUser =
+    profile?.subscription_tier === "neeko_plus" ||
+    profile?.plan === "neeko_plus" ||
+    profile?.subscription_status === "active";
+
+  if (authLoading || !profile) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
-  }
-
-  if (!user) {
-    return null;
   }
 
   const getStatusBadge = (subscriptionStatus: string) => {
@@ -78,7 +105,10 @@ export default function Account() {
     );
   };
 
-  const isActive = status === "active" || status === "trialing";
+  // -----------------------------
+  // 🔥 REPLACE OLD LOGIC
+  // -----------------------------
+  const isActive = isPremiumUser;
 
   const handleManageSubscription = async () => {
     try {
@@ -97,7 +127,7 @@ export default function Account() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
       });
 
@@ -120,11 +150,7 @@ export default function Account() {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
-      <Button
-        variant="ghost"
-        onClick={() => navigate("/")}
-        className="mb-6"
-      >
+      <Button variant="ghost" onClick={() => navigate("/")} className="mb-6">
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back to Home
       </Button>
@@ -145,18 +171,18 @@ export default function Account() {
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground">Email</p>
-              <p className="text-base font-medium">{user.email}</p>
+              <p className="text-base font-medium">{profile?.email}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Account ID</p>
-              <p className="text-base font-mono text-xs">{user.id}</p>
+              <p className="text-base font-mono text-xs">{profile?.id}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Member Since</p>
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
                 <p className="text-base">
-                  {new Date(user.created_at || "").toLocaleDateString()}
+                  {new Date(profile?.created_at).toLocaleDateString()}
                 </p>
               </div>
             </div>
@@ -173,7 +199,7 @@ export default function Account() {
                   <CardDescription>Your Neeko+ membership</CardDescription>
                 </div>
               </div>
-              {getStatusBadge(status)}
+              {getStatusBadge(isActive ? "active" : "free")}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -183,34 +209,33 @@ export default function Account() {
                   <p className="text-sm text-muted-foreground">Plan</p>
                   <p className="text-base font-medium">Neeko+ Premium</p>
                 </div>
-                {subscriptionData?.current_period_end && (
+
+                {profile?.current_period_end && (
                   <div>
                     <p className="text-sm text-muted-foreground">
-                      {subscriptionData.cancel_at_period_end
-                        ? "Expires on"
-                        : "Next billing date"}
+                      Next billing date
                     </p>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4" />
                       <p className="text-base">
                         {new Date(
-                          subscriptionData.current_period_end
+                          profile.current_period_end
                         ).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
                 )}
+
                 <Separator />
-                <div className="space-y-2">
-                  <Button
-                    onClick={handleManageSubscription}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Manage Subscription
-                  </Button>
-                </div>
+
+                <Button
+                  onClick={handleManageSubscription}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Manage Subscription
+                </Button>
               </>
             ) : (
               <>
@@ -235,11 +260,7 @@ export default function Account() {
             <CardTitle>Account Actions</CardTitle>
           </CardHeader>
           <CardContent>
-            <Button
-              variant="destructive"
-              onClick={signOut}
-              className="w-full"
-            >
+            <Button variant="destructive" onClick={signOut} className="w-full">
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out
             </Button>
