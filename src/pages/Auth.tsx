@@ -65,7 +65,6 @@ const Auth = () => {
           if (error.status === 400 || error.message.includes("Invalid login credentials")) {
             throw new Error("Incorrect email or password");
           }
-
           throw error;
         }
 
@@ -122,6 +121,23 @@ const Auth = () => {
       setLoading(false);
     }
   };
+
+  // --------------------------------------
+  // ✅ FIX ADDED — compute canSubmit
+  // (ONLY NEW CODE ADDED)
+  // --------------------------------------
+  const canSubmit = isLogin
+    ? email !== "" && password !== "" && !emailError
+    : email !== "" &&
+      password !== "" &&
+      confirmPassword !== "" &&
+      !emailError &&
+      passwordChecks.length &&
+      passwordChecks.upper &&
+      passwordChecks.lower &&
+      passwordChecks.digit &&
+      passwordChecks.symbol &&
+      password === confirmPassword;
 
   // --------------------------------------
   // UI
