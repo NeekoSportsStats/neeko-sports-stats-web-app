@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { User, Session } from "@supabase/supabase-js";
+import { User } from "@supabase/supabase-js";
 import { supabase } from "./supabaseClient";
 
 interface AuthContextType {
@@ -31,8 +31,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .eq("id", userId)
         .maybeSingle();
 
-      const active = profile?.subscription_status === "active";
-      setIsPremium(active);
+      setIsPremium(profile?.subscription_status === "active");
     } catch (error) {
       console.error("Premium fetch error:", error);
       setIsPremium(false);
@@ -40,43 +39,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    // 1) Load initial session on mount
     supabase.auth.getSession().then(({ data }) => {
-      const session = data.session as Session | null;
+      const session = data.session;
       const currentUser = session?.user ?? null;
-      setUser(currentUser);
 
-      if (currentUser) {
-        fetchPremiumStatus(currentUser.id);
-      }
+      setUser(currentUser);
+      if (currentUser) fetchPremiumStatus(currentUser.id);
 
       setLoading(false);
     });
 
-    // 2) Subscribe to auth state changes (login / logout / signup)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        const currentUser = session?.user ?? null;
 
-      if (currentUser) {
-        await fetchPremiumStatus(currentUser.id);
-      } else {
-        setIsPremium(false);
+        setUser(currentUser);
+        if (currentUser) {
+          await fetchPremiumStatus(currentUser.id);
+        } else {
+          setIsPremium(false);
+        }
+
+        setLoading(false);
       }
-
-      setLoading(false);
-    });
+    );
 
     return () => {
-      subscription.unsubscribe();
+      listener.subscription.unsubscribe();
     };
   }, []);
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    // Auth state listener will pick up the change and clear user/isPremium
   };
 
   return (
