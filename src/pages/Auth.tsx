@@ -10,13 +10,14 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
 const emailSchema = z.string().email("Invalid email address");
+
 const passwordSchema = z
   .string()
-  .min(12, "Password must be at least 12 characters")
-  .max(128, "Password must be less than 128 characters")
+  .min(10, "Password must be at least 10 characters")
   .regex(/[A-Z]/, "Must contain at least one uppercase letter")
   .regex(/[a-z]/, "Must contain at least one lowercase letter")
-  .regex(/[0-9]/, "Must contain at least one number");
+  .regex(/[0-9]/, "Must contain at least one number")
+  .regex(/[^A-Za-z0-9]/, "Must contain at least one symbol");
 
 const Auth = () => {
   console.log("🔵 Auth page mounted");
@@ -25,9 +26,15 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // NEW ⚡
-  const [passwordError, setPasswordError] = useState<string | null>(null);
+  // Live validation
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordChecks, setPasswordChecks] = useState({
+    length: false,
+    upper: false,
+    lower: false,
+    digit: false,
+    symbol: false,
+  });
 
   const [loading, setLoading] = useState(false);
 
@@ -43,33 +50,46 @@ const Auth = () => {
     });
   }, [navigate, redirect]);
 
-  const validatePasswordLive = (value: string) => {
-    try {
-      passwordSchema.parse(value);
-      setPasswordError(null);
-    } catch (err: any) {
-      setPasswordError(err.errors?.[0]?.message ?? "Invalid password");
-    }
-  };
-
+  // ------------------------------
+  // 🔎 LIVE VALIDATION
+  // ------------------------------
   const validateEmailLive = (value: string) => {
     try {
       emailSchema.parse(value);
       setEmailError(null);
-    } catch (err: any) {
-      setEmailError("Invalid email format");
+    } catch {
+      setEmailError("Invalid email address");
     }
   };
 
-  // PROFILE CREATION
+  const validatePasswordLive = (value: string) => {
+    setPasswordChecks({
+      length: value.length >= 10,
+      upper: /[A-Z]/.test(value),
+      lower: /[a-z]/.test(value),
+      digit: /[0-9]/.test(value),
+      symbol: /[^A-Za-z0-9]/.test(value),
+    });
+  };
+
+  const passwordValid =
+    passwordChecks.length &&
+    passwordChecks.upper &&
+    passwordChecks.lower &&
+    passwordChecks.digit &&
+    passwordChecks.symbol;
+
+  // ------------------------------
+  // 👤 PROFILE CREATION
+  // ------------------------------
   const createOrGetUserProfile = async (userId: string, userEmail: string) => {
-    const { data: existingProfile } = await supabase
+    const { data: existing } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .maybeSingle();
 
-    if (!existingProfile) {
+    if (!existing) {
       await supabase.from("profiles").insert({
         id: userId,
         email: userEmail,
@@ -83,13 +103,16 @@ const Auth = () => {
     }
   };
 
+  // ------------------------------
+  // 🔐 AUTH SUBMIT
+  // ------------------------------
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       emailSchema.parse(email);
-      passwordSchema.parse(password);
+      if (!isLogin) passwordSchema.parse(password);
 
       // LOGIN
       if (isLogin) {
@@ -99,8 +122,8 @@ const Auth = () => {
         });
 
         if (error) throw error;
-
-        if (data.user) await createOrGetUserProfile(data.user.id, data.user.email!);
+        if (data.user)
+          await createOrGetUserProfile(data.user.id, data.user.email!);
 
         toast({ title: "Welcome back!" });
         navigate(redirect);
@@ -119,7 +142,7 @@ const Auth = () => {
       if (error) {
         if (error.message.includes("User already registered")) {
           toast({
-            title: "Account Exists",
+            title: "Account Already Exists",
             description: "Please sign in instead.",
             variant: "destructive",
           });
@@ -129,7 +152,8 @@ const Auth = () => {
         throw error;
       }
 
-      if (data.user) await createOrGetUserProfile(data.user.id, data.user.email!);
+      if (data.user)
+        await createOrGetUserProfile(data.user.id, data.user.email!);
 
       toast({
         title: "Account Created!",
@@ -146,6 +170,9 @@ const Auth = () => {
     }
   };
 
+  // ------------------------------
+  // UI
+  // ------------------------------
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md p-8 space-y-6">
@@ -174,16 +201,14 @@ const Auth = () => {
         <form onSubmit={handleAuth} className="space-y-4">
           {/* EMAIL */}
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label>Email</Label>
             <Input
-              id="email"
-              name="email"
-              autoComplete="email"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
                 validateEmailLive(e.target.value);
               }}
+              autoComplete="email"
               required
             />
             {emailError && (
@@ -193,34 +218,51 @@ const Auth = () => {
 
           {/* PASSWORD */}
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label>Password</Label>
             <Input
-              id="password"
-              name="password"
               type="password"
-              autoComplete={isLogin ? "current-password" : "new-password"}
               value={password}
+              autoComplete={isLogin ? "current-password" : "new-password"}
               onChange={(e) => {
                 setPassword(e.target.value);
                 validatePasswordLive(e.target.value);
               }}
               required
             />
-            {passwordError && (
-              <p className="text-red-500 text-xs mt-1">{passwordError}</p>
+
+            {/* CHECKLIST */}
+            {!isLogin && (
+              <div className="text-xs mt-2 space-y-1">
+                <p className={passwordChecks.length ? "text-green-600" : "text-red-500"}>
+                  {passwordChecks.length ? "✔" : "✘"} At least 10 characters
+                </p>
+                <p className={passwordChecks.upper ? "text-green-600" : "text-red-500"}>
+                  {passwordChecks.upper ? "✔" : "✘"} One uppercase letter
+                </p>
+                <p className={passwordChecks.lower ? "text-green-600" : "text-red-500"}>
+                  {passwordChecks.lower ? "✔" : "✘"} One lowercase letter
+                </p>
+                <p className={passwordChecks.digit ? "text-green-600" : "text-red-500"}>
+                  {passwordChecks.digit ? "✔" : "✘"} One number
+                </p>
+                <p className={passwordChecks.symbol ? "text-green-600" : "text-red-500"}>
+                  {passwordChecks.symbol ? "✔" : "✘"} One symbol
+                </p>
+              </div>
             )}
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading || (!isLogin && !passwordValid)}
+          >
             {loading ? "Loading..." : isLogin ? "Sign In" : "Sign Up"}
           </Button>
         </form>
 
         <div className="text-center text-sm">
-          <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-primary hover:underline"
-          >
+          <button onClick={() => setIsLogin(!isLogin)} className="text-primary hover:underline">
             {isLogin
               ? "Don't have an account? Sign up"
               : "Already have an account? Sign in"}
