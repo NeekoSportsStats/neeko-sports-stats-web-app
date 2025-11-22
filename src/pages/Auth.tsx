@@ -51,56 +51,30 @@ const Auth = () => {
     try {
       emailSchema.parse(email);
 
-      // --------------------------
       // LOGIN
-      // --------------------------
       if (isLogin) {
-        console.log("🔵 LOGIN payload", { email, password });
-
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
-        if (error) {
-          if (error.status === 400 || error.message.includes("Invalid login credentials")) {
-            throw new Error("Incorrect email or password");
-          }
-          throw error;
-        }
-
-        if (data.user) {
-          await supabase.from("profiles").upsert({
-            id: data.user.id,
-            email: data.user.email!,
-          });
-        }
+        if (error) throw new Error("Incorrect email or password");
 
         toast({ title: "Welcome back!" });
         navigate(redirect);
         return;
       }
 
-      // --------------------------
-      // SIGNUP
-      // --------------------------
+      // SIGN UP
       passwordSchema.parse(password);
+      if (password !== confirmPassword) throw new Error("Passwords do not match");
 
-      if (password !== confirmPassword)
-        throw new Error("Passwords do not match");
-
-      console.log("🟦 SIGNUP DEBUG:");
-      console.log("EMAIL:", email);
-      console.log("PASSWORD:", password);
-      console.log("CONFIRM:", confirmPassword);
-
-      // ❌ OLD (broken) — removed:
-      // options: { emailRedirectTo: `${window.location.origin}/auth` }
-
-      // ✅ FIXED — no redirect_to causes 422 anymore
       const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: null, // 🔥 prevents unwanted redirect_to=
+        },
       });
 
       if (error?.status === 422) {
@@ -120,11 +94,10 @@ const Auth = () => {
         description: "You can now sign in.",
       });
 
+      // Switch to login mode — no redirect
       setIsLogin(true);
-      return;
 
     } catch (err: any) {
-      console.error("🔥 AUTH ERROR:", err);
       toast({
         title: "Error",
         description: err.message,
@@ -168,7 +141,7 @@ const Auth = () => {
         </div>
 
         <form onSubmit={handleAuth} className="space-y-4">
-          {/* EMAIL */}
+          {/* Email */}
           <div className="space-y-2">
             <Label>Email</Label>
             <Input
@@ -182,13 +155,12 @@ const Auth = () => {
                   setEmailError("Invalid email address");
                 }
               }}
-              autoComplete="email"
               required
             />
             {emailError && <p className="text-red-500 text-xs">{emailError}</p>}
           </div>
 
-          {/* PASSWORD */}
+          {/* Password */}
           <div className="space-y-2">
             <Label>Password</Label>
 
@@ -240,14 +212,13 @@ const Auth = () => {
             )}
           </div>
 
-          {/* CONFIRM PASSWORD */}
+          {/* Confirm password */}
           {!isLogin && (
             <div className="space-y-2">
               <Label>Confirm Password</Label>
               <div className="relative">
                 <Input
                   type={showConfirm ? "text" : "password"}
-                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
@@ -273,6 +244,7 @@ const Auth = () => {
             {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
           </button>
         </div>
+
       </Card>
     </div>
   );
