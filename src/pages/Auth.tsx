@@ -61,12 +61,13 @@ const Auth = () => {
       if (!existingProfile) {
         console.log("➕ No profile found — creating new profile...");
 
+        // 🔥 FIXED: Correct column name
         const { error: insertError } = await supabase
           .from("profiles")
           .insert({
             id: userId,
             email: userEmail,
-            is_premium: false,
+            subscription_status: "free", // ✅ CORRECTED
           });
 
         if (insertError) {
@@ -149,7 +150,7 @@ const Auth = () => {
             variant: "destructive",
           });
 
-          setIsLogin(true); // switch UI mode
+          setIsLogin(true);
           setLoading(false);
           return;
         }
