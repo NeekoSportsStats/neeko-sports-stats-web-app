@@ -49,62 +49,48 @@ function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* 🔓 Public Auth Pages */}
+        {/* Public auth-only pages */}
         <Route path="/auth" element={<Auth />} />
         <Route path="/create-password" element={<CreatePassword />} />
 
-        {/* 🔓 Public Pages */}
+        {/* Home */}
         <Route path="/" element={<Layout><Index /></Layout>} />
+
+        {/* Neeko+ purchase is NOT protected */}
         <Route path="/neeko-plus" element={<Layout><NeekoPlusPurchase /></Layout>} />
 
-        {/* 🔐 Protected Pages */}
-        <Route
-          path="/account"
-          element={
-            <RequireAuth>
-              <Layout><Account /></Layout>
-            </RequireAuth>
-          }
-        />
+        {/* Protected routes */}
+        <Route path="/account" element={
+          <RequireAuth><Layout><Account /></Layout></RequireAuth>
+        }/>
 
-        <Route
-          path="/billing"
-          element={
-            <RequireAuth>
-              <Layout><Billing /></Layout>
-            </RequireAuth>
-          }
-        />
+        <Route path="/billing" element={
+          <RequireAuth><Layout><Billing /></Layout></RequireAuth>
+        }/>
 
-        {/* 🚫 IMPORTANT: Success + Cancel MUST be public */}
-        <Route path="/success" element={<Layout><Success /></Layout>} />
-        <Route path="/cancel" element={<Layout><Cancel /></Layout>} />
+        <Route path="/success" element={
+          <RequireAuth><Layout><Success /></Layout></RequireAuth>
+        }/>
 
-        {/* 🔐 Admin */}
-        <Route
-          path="/admin"
-          element={
-            <RequireAuth>
-              <Layout><Admin /></Layout>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/admin/queue"
-          element={
-            <RequireAuth>
-              <Layout><AdminQueue /></Layout>
-            </RequireAuth>
-          }
-        />
+        <Route path="/cancel" element={
+          <RequireAuth><Layout><Cancel /></Layout></RequireAuth>
+        }/>
 
-        {/* 🔓 Info Pages */}
+        <Route path="/admin" element={
+          <RequireAuth><Layout><Admin /></Layout></RequireAuth>
+        }/>
+
+        <Route path="/admin/queue" element={
+          <RequireAuth><Layout><AdminQueue /></Layout></RequireAuth>
+        }/>
+
+        {/* Info */}
         <Route path="/about" element={<Layout><About /></Layout>} />
         <Route path="/socials" element={<Layout><Socials /></Layout>} />
         <Route path="/faq" element={<Layout><FAQ /></Layout>} />
         <Route path="/contact" element={<Layout><Contact /></Layout>} />
 
-        {/* 🔓 Policy Pages */}
+        {/* Policies */}
         <Route path="/policies" element={<Layout><Policies /></Layout>} />
         <Route path="/policies/privacy" element={<Layout><PrivacyPolicy /></Layout>} />
         <Route path="/policies/refund" element={<Layout><RefundPolicy /></Layout>} />
@@ -112,7 +98,7 @@ function App() {
         <Route path="/policies/terms" element={<Layout><TermsConditions /></Layout>} />
         <Route path="/policies/user-conduct" element={<Layout><UserConductPolicy /></Layout>} />
 
-        {/* 🔓 Sports Pages */}
+        {/* Sports */}
         <Route path="/sports/afl" element={<Layout><AFLHub /></Layout>} />
         <Route path="/sports/afl/players" element={<Layout><AFLPlayers /></Layout>} />
         <Route path="/sports/afl/teams" element={<Layout><AFLTeams /></Layout>} />
@@ -131,7 +117,7 @@ function App() {
         <Route path="/sports/nba/ai-analysis" element={<Layout><NBACompleteAIAnalysis /></Layout>} />
         <Route path="/sports/nba/match-centre" element={<Layout><NBAMatchCentre /></Layout>} />
 
-        {/* 404 */}
+        {/* Fallback */}
         <Route path="*" element={<Layout><NotFound /></Layout>} />
       </Routes>
     </AuthProvider>
