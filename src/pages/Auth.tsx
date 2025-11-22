@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { z } from "zod";
 import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/lib/auth";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Trophy, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { z } from "zod";
 
 const emailSchema = z.string().email("Invalid email address");
 
@@ -20,7 +22,6 @@ const passwordSchema = z
   .regex(/[^A-Za-z0-9]/, "Must contain at least one symbol");
 
 const Auth = () => {
-  // 🔥 Single source of truth for mode
   const [mode, setMode] = useState<"login" | "signup">("login");
 
   const [email, setEmail] = useState("");
@@ -46,18 +47,24 @@ const Auth = () => {
   const redirect = searchParams.get("redirect") || "/";
   const { toast } = useToast();
 
+  const { user } = useAuth();
+
+  // If already logged in, don't stay on auth page
+  useEffect(() => {
+    if (user) {
+      navigate(redirect, { replace: true });
+    }
+  }, [user, redirect, navigate]);
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // basic email validation
       emailSchema.parse(email);
 
-      // -------------------------------
-      // LOGIN
-      // -------------------------------
       if (mode === "login") {
+        // LOGIN
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -69,13 +76,11 @@ const Auth = () => {
         }
 
         toast({ title: "Welcome back!" });
-        navigate(redirect);
+        // user state will update via auth listener, effect will redirect
         return;
       }
 
-      // -------------------------------
       // SIGNUP
-      // -------------------------------
       passwordSchema.parse(password);
       if (password !== confirmPassword) {
         throw new Error("Passwords do not match");
@@ -83,8 +88,7 @@ const Auth = () => {
 
       console.log("🟦 SIGNUP ATTEMPT", { email });
 
-      // ❗ No emailRedirectTo here – let Supabase use SITE_URL default
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
       });
@@ -92,7 +96,6 @@ const Auth = () => {
       if (error) {
         console.error("🔴 SIGNUP ERROR RAW:", error);
 
-        // 422 is usually "User already registered" or policy issues
         if (
           error.status === 422 &&
           typeof error.message === "string" &&
@@ -103,22 +106,24 @@ const Auth = () => {
             description: "Please sign in instead.",
             variant: "destructive",
           });
-          // 🔥 IMPORTANT: do NOT auto-switch mode – user can click the toggle
+          // Optional: auto-switch to login
+          // setMode("login");
           return;
         }
 
-        // Any other error: bubble up
         throw new Error(error.message || "Signup failed");
       }
 
-      // 🔥 Signup *success* (even if session is not auto-created)
+      // If email confirmation is off, session may be created immediately.
+      // Auth listener + useEffect will redirect when `user` becomes non-null.
       toast({
         title: "Account created!",
-        description: "You can now sign in with your new account.",
+        description:
+          data.session
+            ? "You are now signed in."
+            : "Please check your email to confirm your account.",
       });
 
-      // stay in signup mode so it doesn't "slide" to login by itself
-      // (user can click "Already have an account? Sign in" manually)
       setPassword("");
       setConfirmPassword("");
     } catch (err: any) {
@@ -205,8 +210,8 @@ const Auth = () => {
                 autoComplete={mode === "login" ? "current-password" : "new-password"}
                 value={password}
                 onChange={(e) => {
-                  setPassword(e.target.value);
                   const v = e.target.value;
+                  setPassword(v);
                   setPasswordChecks({
                     length: v.length >= 10,
                     upper: /[A-Z]/.test(v),
