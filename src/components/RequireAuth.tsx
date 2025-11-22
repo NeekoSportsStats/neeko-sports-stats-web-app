@@ -1,36 +1,30 @@
-// --------------------------
-// SIGNUP
-// --------------------------
-passwordSchema.parse(password);
+import { useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/lib/auth";
+import { Loader2 } from "lucide-react";
 
-if (password !== confirmPassword)
-  throw new Error("Passwords do not match");
+export const RequireAuth = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-console.log("🟦 SIGNUP DEBUG:", { email, password, confirmPassword });
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate(`/auth?redirect=${encodeURIComponent(location.pathname)}`);
+    }
+  }, [user, loading, navigate, location]);
 
-// ❗ IMPORTANT: Do NOT include redirect_to
-const { data, error } = await supabase.auth.signUp({
-  email,
-  password
-});
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
-if (error?.status === 422) {
-  toast({
-    title: "Account already exists",
-    description: "Please sign in instead.",
-    variant: "destructive",
-  });
-  return;
-}
+  if (!user) {
+    return null;
+  }
 
-if (error) throw error;
-
-toast({
-  title: "Account created!",
-  description: "You can now sign in.",
-});
-
-// ❗ DON'T SWITCH TO LOGIN AUTOMATICALLY
-// setIsLogin(true);
-
-return;
+  return <>{children}</>;
+};

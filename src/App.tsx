@@ -2,7 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { AuthProvider } from "@/lib/auth";
 
-import RequireAuth from "@/components/RequireAuth";
+import { RequireAuth } from "@/components/RequireAuth";
 
 import Auth from "@/pages/Auth";
 import Index from "@/pages/Index";
