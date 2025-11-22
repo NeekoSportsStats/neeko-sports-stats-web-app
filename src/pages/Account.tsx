@@ -1,3 +1,4 @@
+// src/pages/Account.tsx
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabaseClient";
@@ -24,46 +25,52 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
 
 export default function Account() {
-  const { user, loading: authLoading, signOut, isPremium } = useAuth();
+  const { user, loading: authLoading, signOut, refreshUser } = useAuth();
+  const [profile, setProfile] = useState<any>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
-  const [profile, setProfile] = useState<any>(null);
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) navigate("/auth");
+  }, [authLoading, user, navigate]);
 
-  // Fetch profile
+  // Load profile
   useEffect(() => {
     if (!user) return;
 
-    supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) console.error("Profile fetch error:", error);
-        setProfile(data);
-      });
+    const loadProfile = async () => {
+      setLoadingProfile(true);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      if (error) console.error("Profile error:", error);
+      setProfile(data);
+      setLoadingProfile(false);
+    };
+
+    loadProfile();
   }, [user]);
 
-  // Redirect when logged out
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/auth");
-    }
-  }, [authLoading, user, navigate]);
-
-  // Show success after returning from Stripe Portal
+  // Stripe success return
   useEffect(() => {
     if (searchParams.get("success") === "true") {
       toast({
-        title: "Subscription Updated!",
-        description: "Your Neeko+ membership is active.",
+        title: "Success!",
+        description: "Your subscription is now active.",
       });
-    }
-  }, [searchParams, toast]);
 
-  if (authLoading || !profile) {
+      refreshUser(); // reload session + premium
+    }
+  }, [searchParams, toast, refreshUser]);
+
+  if (authLoading || loadingProfile || !profile) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -71,111 +78,100 @@ export default function Account() {
     );
   }
 
-  const handleManageSubscription = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+  const isActive = profile.subscription_status === "active";
 
-      const res = await fetch("/api/portal", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-    } catch (err) {
-      console.error("Portal error:", err);
-      toast({
-        title: "Error",
-        description: "Unable to open billing portal.",
-        variant: "destructive",
-      });
-    }
+  const getStatusBadge = (s: string) => {
+    const variants: any = {
+      active: "default",
+      trialing: "secondary",
+      past_due: "destructive",
+      canceled: "destructive",
+      free: "outline",
+    };
+    return <Badge variant={variants[s] || "outline"}>{s.toUpperCase()}</Badge>;
   };
 
-  const getStatusBadge = () => {
-    return (
-      <Badge variant={isPremium ? "default" : "outline"}>
-        {isPremium ? "ACTIVE" : "FREE"}
-      </Badge>
-    );
+  const handleManageBilling = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    const res = await fetch("/api/portal", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session?.access_token}`,
+      },
+    });
+
+    const data = await res.json();
+    if (data.url) window.location.href = data.url;
   };
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <Button variant="ghost" onClick={() => navigate("/")} className="mb-6">
         <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Home
+        Back
       </Button>
 
       <div className="space-y-6">
-        {/* ACCOUNT INFO */}
+        {/* Account Info */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
               <User className="h-8 w-8 text-primary" />
               <div>
                 <CardTitle>Account Information</CardTitle>
-                <CardDescription>Your Neeko account details</CardDescription>
+                <CardDescription>Manage your details</CardDescription>
               </div>
             </div>
           </CardHeader>
-
           <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Email</p>
-              <p className="text-base font-medium">{profile.email}</p>
-            </div>
-
-            <div>
-              <p className="text-sm text-muted-foreground">Member Since</p>
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <p>{new Date(profile.created_at).toLocaleDateString()}</p>
-              </div>
-            </div>
+            <p><strong>Email:</strong> {profile.email}</p>
+            <p><strong>ID:</strong> {profile.id}</p>
+            <p>
+              <strong>Member Since:</strong>{" "}
+              {new Date(profile.created_at).toLocaleDateString()}
+            </p>
           </CardContent>
         </Card>
 
-        {/* SUBSCRIPTION STATUS */}
+        {/* Subscription */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Crown className="h-8 w-8 text-primary" />
                 <div>
-                  <CardTitle>Subscription Status</CardTitle>
-                  <CardDescription>Your Neeko+ membership</CardDescription>
+                  <CardTitle>Subscription</CardTitle>
+                  <CardDescription>Your Neeko+ plan</CardDescription>
                 </div>
               </div>
-              {getStatusBadge()}
+              {getStatusBadge(isActive ? "active" : "free")}
             </div>
           </CardHeader>
-
           <CardContent className="space-y-4">
-            {isPremium ? (
+            {isActive ? (
               <>
-                <p className="font-medium">Neeko+ Premium</p>
+                <p>Plan: <strong>Neeko+ Premium</strong></p>
+
+                {profile.current_period_end && (
+                  <p>
+                    Next Billing:{" "}
+                    {new Date(profile.current_period_end).toLocaleDateString()}
+                  </p>
+                )}
 
                 <Separator />
 
-                <Button
-                  onClick={handleManageSubscription}
-                  variant="outline"
-                  className="w-full"
-                >
+                <Button onClick={handleManageBilling} variant="outline" className="w-full">
                   <CreditCard className="h-4 w-4 mr-2" />
-                  Manage Subscription
+                  Manage Billing
                 </Button>
               </>
             ) : (
               <>
-                <p className="text-muted-foreground">
-                  Upgrade to unlock the full Neeko+ experience.
-                </p>
+                <p>You're on the free plan. Upgrade to unlock everything!</p>
+
                 <Button onClick={() => navigate("/neeko-plus")} className="w-full">
                   <Crown className="h-4 w-4 mr-2" />
                   Upgrade to Neeko+
@@ -185,11 +181,9 @@ export default function Account() {
           </CardContent>
         </Card>
 
-        {/* ACTIONS */}
+        {/* Actions */}
         <Card>
-          <CardHeader>
-            <CardTitle>Account Actions</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
           <CardContent>
             <Button variant="destructive" onClick={signOut} className="w-full">
               <LogOut className="h-4 w-4 mr-2" />
