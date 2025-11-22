@@ -41,50 +41,41 @@ export default function Success() {
         const maxAttempts = 10;
         const checkInterval = 2000;
 
-        const checkSubscription = async () => {
-          const { data: subscription } = await supabase
-            .from("subscriptions")
-            .select("*")
-            .eq("user_id", user.id)
+        // 🔥 UPDATED — check profiles table instead of subscriptions
+        const checkProfile = async () => {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("subscription_status")
+            .eq("id", user.id)
             .maybeSingle();
 
-          if (
-            subscription &&
-            ["active", "trialing"].includes(subscription.status)
-          ) {
+          if (profile?.subscription_status === "active") {
             setVerified(true);
             await refreshPremiumStatus();
 
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("*")
-              .eq("id", user.id)
-              .maybeSingle();
-
-            if (profile) {
-              setLoading(false);
-              setTimeout(() => {
-                navigate("/account");
-              }, 2000);
-              return true;
-            }
+            setLoading(false);
+            setTimeout(() => navigate("/account"), 2000);
+            return true;
           }
+
           return false;
         };
 
-        const pollSubscription = async () => {
+        // Poll until webhook updates the profile
+        const poll = async () => {
           while (attempts < maxAttempts) {
-            const found = await checkSubscription();
-            if (found) return;
+            const ok = await checkProfile();
+            if (ok) return;
 
             attempts++;
-            await new Promise((resolve) => setTimeout(resolve, checkInterval));
+            await new Promise((resolve) =>
+              setTimeout(resolve, checkInterval)
+            );
           }
-
           setLoading(false);
         };
 
-        await pollSubscription();
+        await poll();
       } catch (error) {
         console.error("Error verifying subscription:", error);
         setLoading(false);
@@ -125,9 +116,7 @@ export default function Success() {
               <div className="bg-primary/5 border border-primary/20 rounded-lg p-6 space-y-3">
                 <div className="flex items-center gap-2">
                   <Crown className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold">
-                    Your Premium Access is Active
-                  </h3>
+                  <h3 className="font-semibold">Your Premium Access is Active</h3>
                 </div>
                 <p className="text-sm text-muted-foreground">
                   You now have unlimited access to all AI-powered insights,
@@ -152,34 +141,11 @@ export default function Success() {
                     few minutes.
                   </p>
                   <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                    If you don't see premium features immediately, try
-                    refreshing in a moment.
+                    If you don't see premium features immediately, try refreshing
+                    in a moment.
                   </p>
                 </div>
               )}
-
-              <div className="space-y-2">
-                <h4 className="font-semibold">What's Next?</h4>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>
-                      Check your email for a confirmation receipt from Stripe
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Explore all premium features and AI insights</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>
-                      Manage your subscription anytime from your account
-                      settings
-                    </span>
-                  </li>
-                </ul>
-              </div>
 
               <div className="flex flex-col sm:flex-row gap-3 pt-4">
                 <Button asChild className="flex-1">
