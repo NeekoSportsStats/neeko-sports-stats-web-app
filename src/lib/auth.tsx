@@ -39,9 +39,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .eq("id", userId)
         .maybeSingle();
 
-      if (error && error.code !== "PGRST116") {
-        throw error;
-      }
+      if (error && error.code !== "PGRST116") throw error;
 
       const isActive = profile?.subscription_status === "active";
       setIsPremium(isActive);
@@ -59,9 +57,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchPremiumStatus(session.user.id);
-      }
+      if (session?.user) fetchPremiumStatus(session.user.id);
       setLoading(false);
     });
 
@@ -79,6 +75,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // 🔥 REAL-TIME subscription listener (FIXES SUCCESS PAGE ISSUE)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel("premium-status-channel")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log("🟣 Real-time subscription change detected:", payload);
+          fetchPremiumStatus(user.id);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
