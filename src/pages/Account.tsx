@@ -106,7 +106,7 @@ export default function Account() {
   };
 
   // -----------------------------
-  // 🔥 REPLACE OLD LOGIC
+  // 🔥 REPLACE OLD LOG IC
   // -----------------------------
   const isActive = isPremiumUser;
 
