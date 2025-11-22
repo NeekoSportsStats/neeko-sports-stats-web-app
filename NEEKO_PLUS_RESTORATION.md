@@ -6,7 +6,7 @@ The original Neeko+ premium page was stripped down to a minimal 69-line version 
 - No hero section
 - No premium features showcase
 - No benefits list
-- No sports coverage section
+- No sports coverage section   ..
 - No FAQ section
 - Minimal styling
 - Basic centered layout with just title, description, and button
