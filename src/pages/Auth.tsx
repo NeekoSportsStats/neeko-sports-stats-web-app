@@ -135,16 +135,19 @@ const Auth = () => {
         });
 
         if (error) {
-          if (error.message.includes("Invalid login credentials"))
+          // Handle wrong email or password (Supabase returns 422 or Invalid login credentials)
+          if (
+            error.status === 422 ||
+            error.message.includes("Invalid login credentials")
+          ) {
             throw new Error("Incorrect email or password");
+          }
 
-          if (error.message.includes("Email not confirmed"))
+          if (error.message.includes("Email not confirmed")) {
             throw new Error("Please verify your email before logging in");
+          }
 
-          if (error.message.includes("Email not found"))
-            throw new Error("No account exists with that email");
-
-          throw error;
+          throw error; // preserve unknown errors
         }
 
         if (data.user)
