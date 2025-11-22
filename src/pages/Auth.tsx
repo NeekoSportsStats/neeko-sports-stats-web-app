@@ -141,6 +141,9 @@ const Auth = () => {
           if (error.message.includes("Email not confirmed"))
             throw new Error("Please verify your email before logging in");
 
+          if (error.message.includes("Email not found"))
+            throw new Error("No account exists with that email");
+
           throw error;
         }
 
@@ -162,15 +165,21 @@ const Auth = () => {
       });
 
       if (error) {
-        if (error.message.includes("User already registered")) {
+        // Detect existing email by BOTH message + status (422)
+        if (
+          error.message.includes("User already registered") ||
+          error.status === 422
+        ) {
           toast({
             title: "Account Already Exists",
             description: "Please sign in instead.",
             variant: "destructive",
           });
+
           setIsLogin(true);
           return;
         }
+
         throw error;
       }
 
