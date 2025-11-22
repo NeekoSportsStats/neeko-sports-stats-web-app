@@ -149,8 +149,11 @@ const Auth = () => {
 
         <form onSubmit={handleAuth} className="space-y-4">
           <div className="space-y-2">
-            <Label>Email</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
+              id="email"
+              name="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -158,9 +161,12 @@ const Auth = () => {
           </div>
 
           <div className="space-y-2">
-            <Label>Password</Label>
+            <Label htmlFor="password">Password</Label>
             <Input
+              id="password"
+              name="password"
               type="password"
+              autoComplete={isLogin ? "current-password" : "new-password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
