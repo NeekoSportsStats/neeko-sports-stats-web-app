@@ -93,6 +93,9 @@ const Auth = () => {
       emailSchema.parse(email);
       passwordSchema.parse(password);
 
+      //
+      // 🔐 LOGIN
+      //
       if (isLogin) {
         console.log("🔐 Attempting login...");
 
@@ -120,6 +123,9 @@ const Auth = () => {
         return;
       }
 
+      //
+      // 🆕 SIGN-UP
+      //
       console.log("🆕 Attempting sign-up...");
 
       const { data, error } = await supabase.auth.signUp({
@@ -132,7 +138,24 @@ const Auth = () => {
 
       console.log("🔵 Sign-up response:", { data, error });
 
-      if (error) throw error;
+      // 🔥 FIX: Handle "User already registered"
+      if (error) {
+        if (error.message.includes("User already registered")) {
+          console.warn("⚠️ Account already exists — switching to login");
+
+          toast({
+            title: "Account already exists",
+            description: "Please sign in instead.",
+            variant: "destructive",
+          });
+
+          setIsLogin(true); // switch UI mode
+          setLoading(false);
+          return;
+        }
+
+        throw error;
+      }
 
       if (data.user) {
         console.log("✔ Signup successful — creating profile...");
@@ -148,19 +171,6 @@ const Auth = () => {
 
     } catch (error: any) {
       console.error("❌ Auth error:", error);
-
-      // ⭐ ADDED: handle existing registered user
-      if (error?.message?.includes("User already registered")) {
-        toast({
-          title: "Account Already Exists",
-          description:
-            "An account with this email already exists. Please sign in instead.",
-          variant: "destructive",
-        });
-        setIsLogin(true); // switch UI to sign-in mode
-        setLoading(false);
-        return;
-      }
 
       toast({
         title: "Error",
