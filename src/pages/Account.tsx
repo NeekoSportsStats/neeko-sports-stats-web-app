@@ -31,7 +31,7 @@ export default function Account() {
   const [searchParams] = useSearchParams();
 
   // -----------------------------
-  // 🔥 NEW: Load Supabase profile 
+  // 🔥 NEW: Load Supabase profile !
   // -----------------------------
   const [profile, setProfile] = useState<any>(null);
 
