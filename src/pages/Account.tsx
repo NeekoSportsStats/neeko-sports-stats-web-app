@@ -22,19 +22,16 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
-import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 
 export default function Account() {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, isPremium } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
-  // -----------------------------
-  // 🔥 NEW: Load Supabase profile !
-  // -----------------------------
   const [profile, setProfile] = useState<any>(null);
 
+  // Fetch profile
   useEffect(() => {
     if (!user) return;
 
@@ -49,36 +46,22 @@ export default function Account() {
       });
   }, [user]);
 
-  // OLD hook still used for billing portal + dates only
-  const { status, subscriptionData, refresh: refreshSubscription } =
-    useSubscriptionStatus();
-
-  // Show toast after successful portal return
-  useEffect(() => {
-    const success = searchParams.get("success");
-    if (success === "true") {
-      toast({
-        title: "Success!",
-        description: "Your subscription is now active. Welcome to Neeko+!",
-      });
-
-      refreshSubscription();
-    }
-  }, [searchParams, refreshSubscription, toast]);
-
+  // Redirect when logged out
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/auth");
     }
   }, [authLoading, user, navigate]);
 
-  // -----------------------------
-  // 🔥 NEW: Our real premium flag
-  // -----------------------------
-  const isPremiumUser =
-    profile?.subscription_tier === "neeko_plus" ||
-    profile?.plan === "neeko_plus" ||
-    profile?.subscription_status === "active";
+  // Show success after returning from Stripe Portal
+  useEffect(() => {
+    if (searchParams.get("success") === "true") {
+      toast({
+        title: "Subscription Updated!",
+        description: "Your Neeko+ membership is active.",
+      });
+    }
+  }, [searchParams, toast]);
 
   if (authLoading || !profile) {
     return (
@@ -88,40 +71,10 @@ export default function Account() {
     );
   }
 
-  const getStatusBadge = (subscriptionStatus: string) => {
-    const variants: any = {
-      active: "default",
-      trialing: "secondary",
-      past_due: "destructive",
-      canceled: "destructive",
-      free: "outline",
-    };
-    const displayStatus =
-      subscriptionStatus === "trialing" ? "trial" : subscriptionStatus;
-    return (
-      <Badge variant={variants[subscriptionStatus] || "outline"}>
-        {displayStatus.toUpperCase()}
-      </Badge>
-    );
-  };
-
-  // -----------------------------
-  // 🔥 REPLACE OLD LOG IC
-  // -----------------------------
-  const isActive = isPremiumUser;
-
   const handleManageSubscription = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        toast({
-          title: "Error",
-          description: "You must be logged in to manage your subscription",
-          variant: "destructive",
-        });
-        return;
-      }
+      if (!session) return;
 
       const res = await fetch("/api/portal", {
         method: "POST",
@@ -132,20 +85,23 @@ export default function Account() {
       });
 
       const data = await res.json();
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error("Failed to create portal session");
-      }
-    } catch (error) {
-      console.error("Error creating portal session:", error);
+      if (data.url) window.location.href = data.url;
+    } catch (err) {
+      console.error("Portal error:", err);
       toast({
         title: "Error",
-        description: "Failed to open billing portal. Please try again.",
+        description: "Unable to open billing portal.",
         variant: "destructive",
       });
     }
+  };
+
+  const getStatusBadge = () => {
+    return (
+      <Badge variant={isPremium ? "default" : "outline"}>
+        {isPremium ? "ACTIVE" : "FREE"}
+      </Badge>
+    );
   };
 
   return (
@@ -156,39 +112,35 @@ export default function Account() {
       </Button>
 
       <div className="space-y-6">
+        {/* ACCOUNT INFO */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <User className="h-8 w-8 text-primary" />
-                <div>
-                  <CardTitle>Account Information</CardTitle>
-                  <CardDescription>Manage your account details</CardDescription>
-                </div>
+            <div className="flex items-center gap-3">
+              <User className="h-8 w-8 text-primary" />
+              <div>
+                <CardTitle>Account Information</CardTitle>
+                <CardDescription>Your Neeko account details</CardDescription>
               </div>
             </div>
           </CardHeader>
+
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground">Email</p>
-              <p className="text-base font-medium">{profile?.email}</p>
+              <p className="text-base font-medium">{profile.email}</p>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Account ID</p>
-              <p className="text-base font-mono text-xs">{profile?.id}</p>
-            </div>
+
             <div>
               <p className="text-sm text-muted-foreground">Member Since</p>
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                <p className="text-base">
-                  {new Date(profile?.created_at).toLocaleDateString()}
-                </p>
+                <p>{new Date(profile.created_at).toLocaleDateString()}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* SUBSCRIPTION STATUS */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -199,32 +151,14 @@ export default function Account() {
                   <CardDescription>Your Neeko+ membership</CardDescription>
                 </div>
               </div>
-              {getStatusBadge(isActive ? "active" : "free")}
+              {getStatusBadge()}
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {isActive ? (
-              <>
-                <div>
-                  <p className="text-sm text-muted-foreground">Plan</p>
-                  <p className="text-base font-medium">Neeko+ Premium</p>
-                </div>
 
-                {profile?.current_period_end && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Next billing date
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      <p className="text-base">
-                        {new Date(
-                          profile.current_period_end
-                        ).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                )}
+          <CardContent className="space-y-4">
+            {isPremium ? (
+              <>
+                <p className="font-medium">Neeko+ Premium</p>
 
                 <Separator />
 
@@ -240,13 +174,9 @@ export default function Account() {
             ) : (
               <>
                 <p className="text-muted-foreground">
-                  You don't have an active subscription. Upgrade to Neeko+ to
-                  unlock premium features.
+                  Upgrade to unlock the full Neeko+ experience.
                 </p>
-                <Button
-                  onClick={() => navigate("/neeko-plus")}
-                  className="w-full"
-                >
+                <Button onClick={() => navigate("/neeko-plus")} className="w-full">
                   <Crown className="h-4 w-4 mr-2" />
                   Upgrade to Neeko+
                 </Button>
@@ -255,6 +185,7 @@ export default function Account() {
           </CardContent>
         </Card>
 
+        {/* ACTIONS */}
         <Card>
           <CardHeader>
             <CardTitle>Account Actions</CardTitle>
