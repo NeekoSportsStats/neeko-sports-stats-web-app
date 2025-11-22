@@ -9,11 +9,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-
-    // Enables browser persistence
     storage: typeof window !== "undefined" ? window.localStorage : undefined,
-
-    // Prevent Supabase from automatically injecting ?redirect_to=
-    flowType: "pkce", // ensures a clean auth flow
+    flowType: "pkce",
   },
 });
