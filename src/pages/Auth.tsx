@@ -19,6 +19,8 @@ const passwordSchema = z
   .regex(/[0-9]/, "Must contain at least one number");
 
 const Auth = () => {
+  console.log("🔵 Auth page mounted");
+
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,20 +33,34 @@ const Auth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    console.log("🔍 Checking existing Supabase session...");
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate(redirect);
+      console.log("🟣 Supabase session response:", session);
+
+      if (session) {
+        console.log("➡️ User already logged in — redirecting to:", redirect);
+        navigate(redirect);
+      } else {
+        console.log("ℹ️ No active session — staying on auth page");
+      }
     });
   }, [navigate, redirect]);
 
   const createOrGetUserProfile = async (userId: string, userEmail: string) => {
+    console.log("🛠 Creating or fetching user profile:", { userId, userEmail });
+
     try {
-      const { data: existingProfile } = await supabase
+      const { data: existingProfile, error: checkError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
         .maybeSingle();
 
+      console.log("📄 Profile check:", existingProfile, checkError);
+
       if (!existingProfile) {
+        console.log("➕ No profile found — creating new profile...");
+
         const { error: insertError } = await supabase
           .from("profiles")
           .insert({
@@ -53,10 +69,16 @@ const Auth = () => {
             is_premium: false,
           });
 
-        if (insertError) console.error("Error creating profile:", insertError);
+        if (insertError) {
+          console.error("❌ Profile insert error:", insertError);
+        } else {
+          console.log("✅ Profile created successfully");
+        }
+      } else {
+        console.log("✔ Profile already exists — skipping creation");
       }
     } catch (error) {
-      console.error("Error in createOrGetUserProfile:", error);
+      console.error("🔥 Fatal error in createOrGetUserProfile:", error);
     }
   };
 
@@ -64,25 +86,41 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
+    console.log("🟡 Auth form submitted — mode:", isLogin ? "LOGIN" : "SIGN UP");
+    console.log("📧 Email:", email);
+
     try {
       emailSchema.parse(email);
       passwordSchema.parse(password);
 
       if (isLogin) {
+        console.log("🔐 Attempting login...");
+
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
+        console.log("🔵 Login response:", { data, error });
+
         if (error) throw error;
+
         if (data.user) {
+          console.log("✔ Login successful — user:", data.user);
           await createOrGetUserProfile(data.user.id, data.user.email!);
         }
 
-        toast({ title: "Welcome back!", description: "You've successfully logged in." });
+        toast({
+          title: "Welcome back!",
+          description: "You've successfully logged in.",
+        });
+
+        console.log("➡️ Redirecting after login to:", redirect);
         navigate(redirect);
         return;
       }
+
+      console.log("🆕 Attempting sign-up...");
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -92,22 +130,32 @@ const Auth = () => {
         },
       });
 
+      console.log("🔵 Sign-up response:", { data, error });
+
       if (error) throw error;
+
       if (data.user) {
+        console.log("✔ Signup successful — creating profile...");
         await createOrGetUserProfile(data.user.id, data.user.email!);
+      } else {
+        console.log("⚠️ Signup returned no user (email confirmation required?)");
       }
 
       toast({
         title: "Account created!",
         description: "Please check your email to verify your account.",
       });
+
     } catch (error: any) {
+      console.error("❌ Auth error:", error);
+
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
     } finally {
+      console.log("⏳ Auth process finished");
       setLoading(false);
     }
   };
@@ -116,7 +164,10 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md p-8 space-y-6">
         <Button
-          onClick={() => navigate("/")}
+          onClick={() => {
+            console.log("⬅ Back button clicked");
+            navigate("/");
+          }}
           variant="ghost"
           size="sm"
           className="mb-2 -mt-2"
@@ -145,7 +196,10 @@ const Auth = () => {
               name="email"
               autoComplete="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                console.log("✏ Typing email:", e.target.value);
+                setEmail(e.target.value);
+              }}
               required
             />
           </div>
@@ -158,7 +212,10 @@ const Auth = () => {
               type="password"
               autoComplete={isLogin ? "current-password" : "new-password"}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                console.log("🔑 Typing password (hidden)");
+                setPassword(e.target.value);
+              }}
               required
             />
           </div>
@@ -170,7 +227,10 @@ const Auth = () => {
 
         <div className="text-center text-sm">
           <button
-            onClick={() => setIsLogin(!isLogin)}
+            onClick={() => {
+              console.log("🔄 Toggling auth mode:", !isLogin ? "LOGIN" : "SIGNUP");
+              setIsLogin(!isLogin);
+            }}
             className="text-primary hover:underline"
           >
             {isLogin
