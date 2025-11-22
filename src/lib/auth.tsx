@@ -40,41 +40,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    // Load initial session
+    // 1) Load initial session on mount
     supabase.auth.getSession().then(({ data }) => {
-      const session = data.session;
+      const session = data.session as Session | null;
       const currentUser = session?.user ?? null;
       setUser(currentUser);
 
-      if (currentUser) fetchPremiumStatus(currentUser.id);
+      if (currentUser) {
+        fetchPremiumStatus(currentUser.id);
+      }
 
       setLoading(false);
     });
 
-    // Correct subscription
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
+    // 2) Subscribe to auth state changes (login / logout / signup)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
 
-        if (currentUser) {
-          await fetchPremiumStatus(currentUser.id);
-        } else {
-          setIsPremium(false);
-        }
-
-        setLoading(false);
+      if (currentUser) {
+        await fetchPremiumStatus(currentUser.id);
+      } else {
+        setIsPremium(false);
       }
-    );
+
+      setLoading(false);
+    });
 
     return () => {
-      listener.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, []);
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    // UI updates automatically via subscription
+    // Auth state listener will pick up the change and clear user/isPremium
   };
 
   return (
