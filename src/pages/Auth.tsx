@@ -46,14 +46,23 @@ const Auth = () => {
   const navigate = useNavigate();
   const redirect = searchParams.get("redirect") || "/";
   const { toast } = useToast();
-
   const { user } = useAuth();
 
-  // If already logged in, don't stay on auth page
+  // 🚀 NEW REDIRECT LOGIC AFTER LOGIN / SIGNUP
   useEffect(() => {
-    if (user) {
-      navigate(redirect, { replace: true });
+    if (!user) return;
+
+    if (redirect === "checkout") {
+      navigate("/start-checkout", { replace: true });
+      return;
     }
+
+    if (redirect === "account") {
+      navigate("/account", { replace: true });
+      return;
+    }
+
+    navigate(redirect, { replace: true });
   }, [user, redirect, navigate]);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -64,19 +73,16 @@ const Auth = () => {
       emailSchema.parse(email);
 
       if (mode === "login") {
-        // LOGIN
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
         if (error) {
-          console.error("🔴 LOGIN ERROR:", error);
           throw new Error("Incorrect email or password");
         }
 
         toast({ title: "Welcome back!" });
-        // user state will update via auth listener, effect will redirect
         return;
       }
 
@@ -86,48 +92,20 @@ const Auth = () => {
         throw new Error("Passwords do not match");
       }
 
-      console.log("🟦 SIGNUP ATTEMPT", { email });
+      const { data, error } = await supabase.auth.signUp({ email, password });
 
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
+      if (error) throw new Error(error.message);
 
-      if (error) {
-        console.error("🔴 SIGNUP ERROR RAW:", error);
-
-        if (
-          error.status === 422 &&
-          typeof error.message === "string" &&
-          error.message.toLowerCase().includes("already")
-        ) {
-          toast({
-            title: "Account already exists",
-            description: "Please sign in instead.",
-            variant: "destructive",
-          });
-          // Optional: auto-switch to login
-          // setMode("login");
-          return;
-        }
-
-        throw new Error(error.message || "Signup failed");
-      }
-
-      // If email confirmation is off, session may be created immediately.
-      // Auth listener + useEffect will redirect when `user` becomes non-null.
       toast({
         title: "Account created!",
-        description:
-          data.session
-            ? "You are now signed in."
-            : "Please check your email to confirm your account.",
+        description: data.session
+          ? "You are now signed in."
+          : "Check your email to confirm your account.",
       });
 
       setPassword("");
       setConfirmPassword("");
     } catch (err: any) {
-      console.error("🔥 AUTH ERROR (catch):", err);
       toast({
         title: "Error",
         description: err?.message || "Something went wrong",
@@ -195,9 +173,7 @@ const Auth = () => {
               autoComplete="email"
               required
             />
-            {emailError && (
-              <p className="text-red-500 text-xs">{emailError}</p>
-            )}
+            {emailError && <p className="text-red-500 text-xs">{emailError}</p>}
           </div>
 
           {/* PASSWORD */}
@@ -233,39 +209,19 @@ const Auth = () => {
 
             {mode === "signup" && (
               <div className="text-xs space-y-1 mt-2">
-                <p
-                  className={
-                    passwordChecks.length ? "text-green-500" : "text-red-500"
-                  }
-                >
+                <p className={passwordChecks.length ? "text-green-500" : "text-red-500"}>
                   {passwordChecks.length ? "✔" : "✘"} 10+ characters
                 </p>
-                <p
-                  className={
-                    passwordChecks.upper ? "text-green-500" : "text-red-500"
-                  }
-                >
+                <p className={passwordChecks.upper ? "text-green-500" : "text-red-500"}>
                   {passwordChecks.upper ? "✔" : "✘"} Uppercase letter
                 </p>
-                <p
-                  className={
-                    passwordChecks.lower ? "text-green-500" : "text-red-500"
-                  }
-                >
+                <p className={passwordChecks.lower ? "text-green-500" : "text-red-500"}>
                   {passwordChecks.lower ? "✔" : "✘"} Lowercase letter
                 </p>
-                <p
-                  className={
-                    passwordChecks.digit ? "text-green-500" : "text-red-500"
-                  }
-                >
+                <p className={passwordChecks.digit ? "text-green-500" : "text-red-500"}>
                   {passwordChecks.digit ? "✔" : "✘"} Number
                 </p>
-                <p
-                  className={
-                    passwordChecks.symbol ? "text-green-500" : "text-red-500"
-                  }
-                >
+                <p className={passwordChecks.symbol ? "text-green-500" : "text-red-500"}>
                   {passwordChecks.symbol ? "✔" : "✘"} Symbol
                 </p>
               </div>
@@ -294,20 +250,26 @@ const Auth = () => {
             </div>
           )}
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading || !canSubmit}
-          >
+          <Button type="submit" className="w-full" disabled={loading || !canSubmit}>
             {loading ? "Loading..." : mode === "login" ? "Sign In" : "Sign Up"}
           </Button>
         </form>
 
+        {/* 🔥 NEW — FORGOT PASSWORD */}
+        {mode === "login" && (
+          <div className="text-center mt-2">
+            <button
+              onClick={() => navigate("/forgot-password")}
+              className="text-primary text-sm hover:underline"
+            >
+              Forgot your password?
+            </button>
+          </div>
+        )}
+
         <div className="text-center text-sm">
           <button
-            onClick={() =>
-              setMode((prev) => (prev === "login" ? "signup" : "login"))
-            }
+            onClick={() => setMode((prev) => (prev === "login" ? "signup" : "login"))}
             className="text-primary hover:underline"
           >
             {mode === "login"
