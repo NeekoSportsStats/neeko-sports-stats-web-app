@@ -24,6 +24,11 @@ const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  // NEW ⚡
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(false);
 
   const [searchParams] = useSearchParams();
@@ -33,58 +38,48 @@ const Auth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    console.log("🔍 Checking existing Supabase session...");
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log("🟣 Supabase session response:", session);
-
-      if (session) {
-        console.log("➡️ User already logged in — redirecting to:", redirect);
-        navigate(redirect);
-      } else {
-        console.log("ℹ️ No active session — staying on auth page");
-      }
+      if (session) navigate(redirect);
     });
   }, [navigate, redirect]);
 
-  // 🔥 FIXED — COMPLETE & VALID PROFILE CREATION
-  const createOrGetUserProfile = async (userId: string, userEmail: string) => {
-    console.log("🛠 Creating or fetching user profile:", { userId, userEmail });
-
+  const validatePasswordLive = (value: string) => {
     try {
-      const { data: existingProfile, error: checkError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .maybeSingle();
+      passwordSchema.parse(value);
+      setPasswordError(null);
+    } catch (err: any) {
+      setPasswordError(err.errors?.[0]?.message ?? "Invalid password");
+    }
+  };
 
-      console.log("📄 Profile check:", existingProfile, checkError);
+  const validateEmailLive = (value: string) => {
+    try {
+      emailSchema.parse(value);
+      setEmailError(null);
+    } catch (err: any) {
+      setEmailError("Invalid email format");
+    }
+  };
 
-      if (!existingProfile) {
-        console.log("➕ No profile found — creating new profile...");
+  // PROFILE CREATION
+  const createOrGetUserProfile = async (userId: string, userEmail: string) => {
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle();
 
-        const { error: insertError } = await supabase
-          .from("profiles")
-          .insert({
-            id: userId,
-            email: userEmail,
-            subscription_status: "free",   // required
-            subscription_tier: "free",     // required
-            plan: "free",                  // required
-            is_active: true,               // required
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-
-        if (insertError) {
-          console.error("❌ Profile insert error:", insertError);
-        } else {
-          console.log("✅ Profile created successfully");
-        }
-      } else {
-        console.log("✔ Profile already exists — skipping creation");
-      }
-    } catch (error) {
-      console.error("🔥 Fatal error in createOrGetUserProfile:", error);
+    if (!existingProfile) {
+      await supabase.from("profiles").insert({
+        id: userId,
+        email: userEmail,
+        subscription_status: "free",
+        subscription_tier: "free",
+        plan: "free",
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
     }
   };
 
@@ -92,44 +87,27 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
-    console.log("🟡 Auth form submitted — mode:", isLogin ? "LOGIN" : "SIGN UP");
-    console.log("📧 Email:", email);
-
     try {
       emailSchema.parse(email);
       passwordSchema.parse(password);
 
       // LOGIN
       if (isLogin) {
-        console.log("🔐 Attempting login...");
-
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
-        console.log("🔵 Login response:", { data, error });
-
         if (error) throw error;
 
-        if (data.user) {
-          console.log("✔ Login successful — user:", data.user);
-          await createOrGetUserProfile(data.user.id, data.user.email!);
-        }
+        if (data.user) await createOrGetUserProfile(data.user.id, data.user.email!);
 
-        toast({
-          title: "Welcome back!",
-          description: "You've successfully logged in.",
-        });
-
-        console.log("➡️ Redirecting after login to:", redirect);
+        toast({ title: "Welcome back!" });
         navigate(redirect);
         return;
       }
 
-      // SIGN-UP
-      console.log("🆕 Attempting sign-up...");
-
+      // SIGN UP
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -138,46 +116,32 @@ const Auth = () => {
         },
       });
 
-      console.log("🔵 Sign-up response:", { data, error });
-
       if (error) {
         if (error.message.includes("User already registered")) {
-          console.warn("⚠️ Account already exists — switching to login");
-
           toast({
-            title: "Account already exists",
+            title: "Account Exists",
             description: "Please sign in instead.",
             variant: "destructive",
           });
-
           setIsLogin(true);
-          setLoading(false);
           return;
         }
-
         throw error;
       }
 
-      if (data.user) {
-        console.log("✔ Signup successful — creating profile...");
-        await createOrGetUserProfile(data.user.id, data.user.email!);
-      }
+      if (data.user) await createOrGetUserProfile(data.user.id, data.user.email!);
 
       toast({
-        title: "Account created!",
-        description: "Please check your email to verify your account.",
+        title: "Account Created!",
+        description: "Check your email for verification.",
       });
-
     } catch (error: any) {
-      console.error("❌ Auth error:", error);
-
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
     } finally {
-      console.log("⏳ Auth process finished");
       setLoading(false);
     }
   };
@@ -186,10 +150,7 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md p-8 space-y-6">
         <Button
-          onClick={() => {
-            console.log("⬅ Back button clicked");
-            navigate("/");
-          }}
+          onClick={() => navigate("/")}
           variant="ghost"
           size="sm"
           className="mb-2 -mt-2"
@@ -211,6 +172,7 @@ const Auth = () => {
         </div>
 
         <form onSubmit={handleAuth} className="space-y-4">
+          {/* EMAIL */}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -219,13 +181,17 @@ const Auth = () => {
               autoComplete="email"
               value={email}
               onChange={(e) => {
-                console.log("✏ Typing email:", e.target.value);
                 setEmail(e.target.value);
+                validateEmailLive(e.target.value);
               }}
               required
             />
+            {emailError && (
+              <p className="text-red-500 text-xs mt-1">{emailError}</p>
+            )}
           </div>
 
+          {/* PASSWORD */}
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
             <Input
@@ -235,11 +201,14 @@ const Auth = () => {
               autoComplete={isLogin ? "current-password" : "new-password"}
               value={password}
               onChange={(e) => {
-                console.log("🔑 Typing password (hidden)");
                 setPassword(e.target.value);
+                validatePasswordLive(e.target.value);
               }}
               required
             />
+            {passwordError && (
+              <p className="text-red-500 text-xs mt-1">{passwordError}</p>
+            )}
           </div>
 
           <Button type="submit" className="w-full" disabled={loading}>
@@ -249,10 +218,7 @@ const Auth = () => {
 
         <div className="text-center text-sm">
           <button
-            onClick={() => {
-              console.log("🔄 Toggling auth mode:", !isLogin ? "LOGIN" : "SIGNUP");
-              setIsLogin(!isLogin);
-            }}
+            onClick={() => setIsLogin(!isLogin)}
             className="text-primary hover:underline"
           >
             {isLogin
