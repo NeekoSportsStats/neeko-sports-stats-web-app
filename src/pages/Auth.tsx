@@ -32,9 +32,7 @@ const Auth = () => {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate(redirect);
-      }
+      if (session) navigate(redirect);
     });
   }, [navigate, redirect]);
 
@@ -55,9 +53,7 @@ const Auth = () => {
             is_premium: false,
           });
 
-        if (insertError) {
-          console.error("Error creating profile:", insertError);
-        }
+        if (insertError) console.error("Error creating profile:", insertError);
       }
     } catch (error) {
       console.error("Error in createOrGetUserProfile:", error);
@@ -79,16 +75,11 @@ const Auth = () => {
         });
 
         if (error) throw error;
-
         if (data.user) {
           await createOrGetUserProfile(data.user.id, data.user.email!);
         }
 
-        toast({
-          title: "Welcome back!",
-          description: "You've successfully logged in.",
-        });
-
+        toast({ title: "Welcome back!", description: "You've successfully logged in." });
         navigate(redirect);
         return;
       }
@@ -102,7 +93,6 @@ const Auth = () => {
       });
 
       if (error) throw error;
-
       if (data.user) {
         await createOrGetUserProfile(data.user.id, data.user.email!);
       }
