@@ -7,6 +7,7 @@ interface AuthContextType {
   loading: boolean;
   isPremium: boolean;
   signOut: () => Promise<void>;
+  refreshPremiumStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -14,6 +15,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   isPremium: false,
   signOut: async () => {},
+  refreshPremiumStatus: async () => {},
 });
 
 export const useAuth = () => {
@@ -49,6 +51,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const refreshPremiumStatus = async () => {
+    if (!user?.id) return;
+    await fetchPremiumStatus(user.id);
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -80,7 +87,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isPremium, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        isPremium,
+        signOut,
+        refreshPremiumStatus,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
