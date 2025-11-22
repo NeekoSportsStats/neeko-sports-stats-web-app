@@ -65,13 +65,13 @@ const Auth = () => {
         const { error: insertError } = await supabase
           .from("profiles")
           ..insert({
-            id: userId,
-            email: userEmail,
-            subscription_status: "free",        // required
-            subscription_tier: "free",          // required
-            plan: "free",                       // required
-            is_active: true                     // required
-          })
+              id: userId,
+              email: userEmail,
+              subscription_status: "free",        // required
+              subscription_tier: "free",          // required
+              plan: "free",                       // required
+              is_active: true                     // required
+            })
 
 
         if (insertError) {
