@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import type { PlayerRow, StatLens } from "./MasterTable";
 
 /* -------------------------------------------------------------------------- */
-/* 🔒 LOCKED SPACING TOKENS — DO NOT TOUCH                                    */
+/* 🔒 LOCKED SPACING TOKENS                                                   */
 /* -------------------------------------------------------------------------- */
 
 const ROW_H = 84;
@@ -40,14 +40,14 @@ const fakeRate = () => Math.floor(50 + Math.random() * 50);
 /* -------------------------------------------------------------------------- */
 
 function getSeries(row: PlayerRow, lens: StatLens): number[] {
-  // Case 1: lens array directly on row
-  if (Array.isArray((row as any)[lens])) {
-    return (row as any)[lens];
-  }
+  // Case 1: lens array directly on row: row["Fantasy"] = number[]
+  const direct = (row as any)?.[lens];
+  if (Array.isArray(direct)) return direct as number[];
 
-  // Case 2: rounds array
-  if (Array.isArray((row as any).rounds)) {
-    return (row as any).rounds
+  // Case 2: rounds array: row.rounds = [{ Fantasy: 90, ... }, ...]
+  const rounds = (row as any)?.rounds;
+  if (Array.isArray(rounds)) {
+    return rounds
       .map((r: any) => r?.[lens])
       .filter((v: any): v is number => typeof v === "number");
   }
@@ -56,16 +56,24 @@ function getSeries(row: PlayerRow, lens: StatLens): number[] {
 }
 
 /* -------------------------------------------------------------------------- */
+/* COMPONENT                                                                  */
+/* -------------------------------------------------------------------------- */
 
-export default function MasterTableDesktop({
-  rows,
-  lens,
-  isPremium,
-}: {
-  rows: PlayerRow[];
+export default function MasterTableDesktop(props: {
+  rows?: unknown; // accept unknown to prevent runtime crash on bad shape
+  players?: unknown; // allow parent to pass players instead of rows
   lens: StatLens;
   isPremium: boolean;
 }) {
+  const { lens, isPremium } = props;
+
+  // ✅ HARD GUARD: always coerce to array
+  const baseRows: PlayerRow[] = useMemo(() => {
+    if (Array.isArray(props.rows)) return props.rows as PlayerRow[];
+    if (Array.isArray(props.players)) return props.players as PlayerRow[];
+    return [];
+  }, [props.rows, props.players]);
+
   const [showAll, setShowAll] = useState(false);
   const [search, setSearch] = useState("");
   const [compact, setCompact] = useState(false);
@@ -76,23 +84,21 @@ export default function MasterTableDesktop({
   /* ------------------------------------------------------------------------ */
 
   const sorted = useMemo(() => {
-    return [...rows].sort((a, b) => {
+    // baseRows is always an array now, so no “not iterable” possible
+    return [...baseRows].sort((a, b) => {
       const ta = getSeries(a, lens).reduce((s, v) => s + v, 0);
       const tb = getSeries(b, lens).reduce((s, v) => s + v, 0);
       return tb - ta;
     });
-  }, [rows, lens]);
+  }, [baseRows, lens]);
 
   const filtered = useMemo(() => {
-    if (!search) return sorted;
-    return sorted.filter((p) =>
-      p.name.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [sorted, search]);
+    if (!isPremium || !search) return sorted;
+    const q = search.toLowerCase();
+    return sorted.filter((p) => (p?.name ?? "").toLowerCase().includes(q));
+  }, [sorted, search, isPremium]);
 
   const visible = showAll ? filtered : filtered.slice(0, FREE_ROW_LIMIT);
-
-  /* ------------------------------------------------------------------------ */
 
   return (
     <section className="relative rounded-3xl border border-yellow-500/30 bg-black shadow-[0_0_60px_rgba(0,0,0,0.85)]">
@@ -101,7 +107,7 @@ export default function MasterTableDesktop({
       {/* ------------------------------------------------------------------ */}
 
       <div className="px-6 pt-6 pb-4 border-b border-neutral-800">
-        {/* Pill */}
+        {/* Pill (AI Insights style) */}
         <div className="inline-flex items-center rounded-full border border-yellow-500/50 bg-black/80 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-yellow-200">
           Master Table
         </div>
@@ -158,41 +164,36 @@ export default function MasterTableDesktop({
               key={r}
               onMouseEnter={() => setHoverCol(i)}
               onMouseLeave={() => setHoverCol(null)}
-              className={cx(
-                "py-2 text-center",
-                hoverCol === i && COL_HOVER_BG
-              )}
+              className={cx("py-2 text-center", hoverCol === i && COL_HOVER_BG)}
             >
               {r}
             </div>
           ))}
 
           <div className="px-4 py-2 border-l border-neutral-800 sticky right-0 bg-black">
-            Stats & Hit Rate
+            Stats &amp; Hit Rate
           </div>
         </div>
       </div>
 
       {/* ------------------------------------------------------------------ */}
-      {/* ROWS                                                               */}
+      {/* ROWS                                                                */}
       {/* ------------------------------------------------------------------ */}
 
       <div>
         {visible.map((player) => {
           const series = getSeries(player, lens);
 
-          const stats = {
-            avg: series.length
-              ? Math.round(series.reduce((a, b) => a + b, 0) / series.length)
-              : 0,
-            min: series.length ? Math.min(...series) : 0,
-            max: series.length ? Math.max(...series) : 0,
-            gms: series.length,
-          };
+          const avg = series.length
+            ? Math.round(series.reduce((a, b) => a + b, 0) / series.length)
+            : 0;
+          const min = series.length ? Math.min(...series) : 0;
+          const max = series.length ? Math.max(...series) : 0;
+          const gms = series.length;
 
           return (
             <div
-              key={player.id}
+              key={(player as any).id ?? (player as any).name}
               className={cn(
                 "grid border-b border-neutral-800 transition",
                 "hover:bg-neutral-900/40 hover:-translate-y-[1px]"
@@ -210,10 +211,13 @@ export default function MasterTableDesktop({
                     <ChevronRight className="h-4 w-4 text-neutral-500" />
                   </div>
                   <div className="mt-0.5 text-[11px] uppercase tracking-wider text-neutral-500">
-                    {player.team}
-                    {"pos" in player && (player as any).pos && (
+                    {(player as any).team ?? ""}
+                    {"pos" in (player as any) && (player as any).pos ? (
                       <> · {(player as any).pos}</>
-                    )}
+                    ) : null}
+                    {"role" in (player as any) && !(player as any).pos && (player as any).role ? (
+                      <> · {(player as any).role}</>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -233,37 +237,30 @@ export default function MasterTableDesktop({
                 </div>
               ))}
 
-              {/* STATS + HIT RATE */}
+              {/* STATS + HIT RATE (sticky column) */}
               <div className="border-l border-neutral-800 px-3 flex items-center sticky right-0 bg-black">
                 <div className="grid grid-cols-[110px_1px_1fr] w-full items-center">
-                  {/* STATS */}
+                  {/* STATS (tighter label→value spacing) */}
                   <div className={cx("flex flex-col", STAT_STACK_GAP)}>
                     {[
-                      ["AVG", stats.avg],
-                      ["MIN", stats.min],
-                      ["MAX", stats.max],
-                      ["GMS", stats.gms],
+                      ["AVG", avg],
+                      ["MIN", min],
+                      ["MAX", max],
+                      ["GMS", gms],
                     ].map(([label, value]) => (
                       <div
                         key={label}
-                        className={cx(
-                          "flex justify-between",
-                          STAT_ROW_GAP,
-                          STAT_LABEL,
-                          STAT_VALUE
-                        )}
+                        className={cx("flex justify-between", STAT_ROW_GAP, STAT_LABEL, STAT_VALUE)}
                       >
                         <span className="text-neutral-500">{label}</span>
-                        <span
-                          className={label === "AVG" ? "text-yellow-300" : ""}
-                        >
-                          {value}
+                        <span className={label === "AVG" ? "text-yellow-300" : "text-neutral-200"}>
+                          {value as number}
                         </span>
                       </div>
                     ))}
                   </div>
 
-                  {/* DIVIDER */}
+                  {/* Divider */}
                   <div className="h-full bg-yellow-500/10 mx-2" />
 
                   {/* HIT RATE */}
@@ -272,18 +269,14 @@ export default function MasterTableDesktop({
                       const r = fakeRate();
                       return (
                         <div key={t} className="flex items-center gap-2">
-                          <span className="w-6 text-[10px] text-neutral-400">
-                            {t}+
-                          </span>
+                          <span className="w-6 text-[10px] text-neutral-400">{t}+</span>
                           <div className="flex-1 h-1 rounded-full bg-neutral-800 overflow-hidden">
                             <div
                               className="h-full bg-gradient-to-r from-emerald-400 via-yellow-300 to-orange-400"
                               style={{ width: `${r}%` }}
                             />
                           </div>
-                          <span className="w-8 text-right text-[10px] text-neutral-300">
-                            {r}%
-                          </span>
+                          <span className="w-8 text-right text-[10px] text-neutral-300">{r}%</span>
                         </div>
                       );
                     })}
@@ -296,7 +289,7 @@ export default function MasterTableDesktop({
       </div>
 
       {/* ------------------------------------------------------------------ */}
-      {/* SHOW MORE                                                          */}
+      {/* SHOW MORE                                                           */}
       {/* ------------------------------------------------------------------ */}
 
       {!showAll && filtered.length > FREE_ROW_LIMIT && (
@@ -311,7 +304,7 @@ export default function MasterTableDesktop({
       )}
 
       {/* ------------------------------------------------------------------ */}
-      {/* CTA (MATCHES AI INSIGHTS)                                          */}
+      {/* CTA (AI Insights style)                                             */}
       {/* ------------------------------------------------------------------ */}
 
       {!isPremium && (
