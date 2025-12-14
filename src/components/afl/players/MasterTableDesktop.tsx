@@ -178,7 +178,7 @@ export default function MasterTableDesktop({
               style={{ width: RIGHT_COL_W }}
             >
               <div className="px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-                Summary & hit-rate
+                Stats & hit rate
               </div>
 
               {visiblePlayers.map((_, i) => {
@@ -187,62 +187,71 @@ export default function MasterTableDesktop({
                 return (
                   <div
                     key={i}
-                    className="px-4 border-t border-neutral-800 flex flex-col justify-center gap-3"
+                    className="px-4 border-t border-neutral-800 flex items-center"
                     style={{ height: ROW_H }}
                   >
-                    {/* SUMMARY */}
-                    <div className="flex items-center justify-between text-[11px] text-neutral-300">
-                      {["MIN", "MAX", "AVG", "GMS"].map((label, idx) => (
-                        <div
-                          key={label}
-                          className="text-center min-w-[48px]"
-                        >
-                          <div className="text-neutral-500 text-[10px]">
-                            {label}
-                          </div>
-                          {gated ? (
-                            <Skeleton />
-                          ) : (
-                            <div
-                              className={cx(
-                                idx === 2 &&
-                                  "text-yellow-300 font-semibold"
-                              )}
-                            >
-                              {idx === 3 ? 23 : fakeValue()}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* HIT RATES */}
-                    <div className="space-y-1.5">
-                      {[60, 70, 80, 90].map((t) => {
-                        const r = fakeRate();
-                        return (
-                          <div key={t} className="flex items-center gap-2">
-                            <span className="w-8 text-[10px] text-neutral-400">
-                              {t}+
+                    <div className="grid grid-cols-[110px_1fr] gap-3 w-full">
+                      {/* STATS (LEFT) */}
+                      <div className="space-y-1 text-[11px] text-neutral-300">
+                        {[
+                          ["AVG", fakeValue()],
+                          ["MIN", fakeValue()],
+                          ["MAX", fakeValue()],
+                          ["GMS", 23],
+                        ].map(([label, value]) => (
+                          <div
+                            key={label as string}
+                            className="flex items-center justify-between"
+                          >
+                            <span className="text-neutral-500">
+                              {label as string}
                             </span>
-
-                            <div className="flex-1 rounded-full bg-neutral-800 overflow-hidden">
-                              {gated ? (
+                            {gated ? (
+                              <span className="w-10">
                                 <Skeleton />
-                              ) : (
-                                <div
-                                  className="h-1 bg-gradient-to-r from-emerald-400 via-yellow-300 to-orange-400"
-                                  style={{ width: `${r}%` }}
-                                />
-                              )}
-                            </div>
-
-                            <span className="w-10 text-right text-[10px] text-neutral-300">
-                              {gated ? "—" : `${r}%`}
-                            </span>
+                              </span>
+                            ) : (
+                              <span
+                                className={cx(
+                                  label === "AVG" &&
+                                    "text-yellow-300 font-semibold"
+                                )}
+                              >
+                                {value as number}
+                              </span>
+                            )}
                           </div>
-                        );
-                      })}
+                        ))}
+                      </div>
+
+                      {/* HIT RATE (RIGHT) */}
+                      <div className="space-y-1.5">
+                        {[60, 70, 80, 90].map((t) => {
+                          const r = fakeRate();
+                          return (
+                            <div key={t} className="flex items-center gap-2">
+                              <span className="w-8 text-[10px] text-neutral-400">
+                                {t}+
+                              </span>
+
+                              <div className="flex-1 rounded-full bg-neutral-800 overflow-hidden">
+                                {gated ? (
+                                  <Skeleton />
+                                ) : (
+                                  <div
+                                    className="h-1 bg-gradient-to-r from-emerald-400 via-yellow-300 to-orange-400"
+                                    style={{ width: `${r}%` }}
+                                  />
+                                )}
+                              </div>
+
+                              <span className="w-8 text-right text-[10px] text-neutral-300">
+                                {gated ? "—" : `${r}%`}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 );
