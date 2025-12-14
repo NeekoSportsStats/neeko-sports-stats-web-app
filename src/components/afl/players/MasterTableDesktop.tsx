@@ -197,7 +197,8 @@ export default function MasterTableDesktop({
         </div>
 
         {/* FILTER ROW */}
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-1">
+
           {/* TEAM FILTER */}
           <div
             className={cx(
