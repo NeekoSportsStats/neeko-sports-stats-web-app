@@ -88,6 +88,9 @@ export default function MasterTableDesktop({
   const [expanded, setExpanded] = useState(false);
   const [search, setSearch] = useState("");
 
+  // COMPACT MODE (STEP 1 — STATE ONLY)
+  const [compact, setCompact] = useState(false);
+
   /* ---------------- DERIVED ROW DATA ---------------- */
   const rows = useMemo(() => {
     return players
@@ -146,7 +149,7 @@ export default function MasterTableDesktop({
             </p>
           </div>
 
-          {/* STAT LENS */}
+          {/* STAT LENS + COMPACT PILL */}
           <div className="flex gap-2 rounded-full border border-neutral-700 bg-black/80 p-1">
             {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
               <button
@@ -162,10 +165,24 @@ export default function MasterTableDesktop({
                 {s}
               </button>
             ))}
+
+            {/* COMPACT MODE PILL (STEP 1 ONLY) */}
+            <button
+              onClick={() => setCompact((v) => !v)}
+              className={cx(
+                "rounded-full px-4 py-1.5 text-xs transition",
+                compact
+                  ? "bg-neutral-200 text-black"
+                  : "text-neutral-400 hover:bg-neutral-800"
+              )}
+            >
+              Compact
+            </button>
           </div>
         </div>
 
         {/* FILTER ROW */}
+        {/* (unchanged below) */}
         <div className="flex items-center justify-between gap-4">
           {/* TEAM FILTER */}
           <div
