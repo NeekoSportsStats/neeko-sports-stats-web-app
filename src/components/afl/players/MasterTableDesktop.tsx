@@ -12,7 +12,7 @@ const FREE_ROW_LIMIT = 8;
 const LEFT_COL_W = 220;
 const ROUND_COL_W = 48;
 const RIGHT_COL_W = 260;
-const ROW_H = 78;
+const ROW_H = 84; // ⬅ slightly taller rows for breathing room
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
@@ -111,7 +111,10 @@ export default function MasterTableDesktop({
                     disabled={gated}
                     onClick={() => !gated && onSelectPlayer(p)}
                     className={cx(
-                      "group flex w-full items-center justify-between px-5 border-t border-neutral-800",
+                      "group w-full px-5 border-t border-neutral-800 flex items-center justify-between",
+                      "transition-transform duration-200",
+                      !gated &&
+                        "hover:-translate-y-[1px] hover:bg-neutral-900/40",
                       gated && "opacity-50"
                     )}
                     style={{ height: ROW_H }}
@@ -187,12 +190,16 @@ export default function MasterTableDesktop({
                 return (
                   <div
                     key={i}
-                    className="px-4 border-t border-neutral-800 flex items-center"
+                    className={cx(
+                      "px-4 border-t border-neutral-800",
+                      "transition-transform duration-200",
+                      !gated && "hover:-translate-y-[1px]"
+                    )}
                     style={{ height: ROW_H }}
                   >
-                    <div className="grid grid-cols-[110px_1fr] gap-3 w-full">
-                      {/* STATS (LEFT) */}
-                      <div className="space-y-1 text-[11px] text-neutral-300">
+                    <div className="grid grid-cols-[110px_1fr] gap-3 h-full items-center">
+                      {/* STATS */}
+                      <div className="space-y-0.5 text-[11px] text-neutral-300">
                         {[
                           ["AVG", fakeValue()],
                           ["MIN", fakeValue()],
@@ -224,8 +231,8 @@ export default function MasterTableDesktop({
                         ))}
                       </div>
 
-                      {/* HIT RATE (RIGHT) */}
-                      <div className="space-y-1.5">
+                      {/* HIT RATE */}
+                      <div className="space-y-1">
                         {[60, 70, 80, 90].map((t) => {
                           const r = fakeRate();
                           return (
