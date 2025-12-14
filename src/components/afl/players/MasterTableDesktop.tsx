@@ -12,7 +12,7 @@ const FREE_ROW_LIMIT = 8;
 const LEFT_COL_W = 220;
 const ROUND_COL_W = 48;
 const RIGHT_COL_W = 260;
-const ROW_H = 72;
+const ROW_H = 78;
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
@@ -164,11 +164,7 @@ export default function MasterTableDesktop({
                         className="flex items-center justify-center text-sm text-neutral-100"
                         style={{ width: ROUND_COL_W }}
                       >
-                        {gated ? (
-                          <Skeleton />
-                        ) : (
-                          fakeValue()
-                        )}
+                        {gated ? <Skeleton /> : fakeValue()}
                       </div>
                     ))}
                   </div>
@@ -191,20 +187,26 @@ export default function MasterTableDesktop({
                 return (
                   <div
                     key={i}
-                    className="px-4 border-t border-neutral-800 flex flex-col justify-center gap-2"
+                    className="px-4 border-t border-neutral-800 flex flex-col justify-center gap-3"
                     style={{ height: ROW_H }}
                   >
                     {/* SUMMARY */}
-                    <div className="grid grid-cols-4 gap-2 text-[11px] text-neutral-300">
+                    <div className="flex items-center justify-between text-[11px] text-neutral-300">
                       {["MIN", "MAX", "AVG", "GMS"].map((label, idx) => (
-                        <div key={label}>
-                          <div className="text-neutral-500">{label}</div>
+                        <div
+                          key={label}
+                          className="text-center min-w-[48px]"
+                        >
+                          <div className="text-neutral-500 text-[10px]">
+                            {label}
+                          </div>
                           {gated ? (
                             <Skeleton />
                           ) : (
                             <div
                               className={cx(
-                                idx === 2 && "text-yellow-300 font-semibold"
+                                idx === 2 &&
+                                  "text-yellow-300 font-semibold"
                               )}
                             >
                               {idx === 3 ? 23 : fakeValue()}
@@ -220,7 +222,7 @@ export default function MasterTableDesktop({
                         const r = fakeRate();
                         return (
                           <div key={t} className="flex items-center gap-2">
-                            <span className="w-10 text-[10px] text-neutral-400">
+                            <span className="w-8 text-[10px] text-neutral-400">
                               {t}+
                             </span>
 
@@ -229,7 +231,7 @@ export default function MasterTableDesktop({
                                 <Skeleton />
                               ) : (
                                 <div
-                                  className="h-1.5 bg-gradient-to-r from-emerald-400 via-yellow-300 to-orange-400"
+                                  className="h-1 bg-gradient-to-r from-emerald-400 via-yellow-300 to-orange-400"
                                   style={{ width: `${r}%` }}
                                 />
                               )}
