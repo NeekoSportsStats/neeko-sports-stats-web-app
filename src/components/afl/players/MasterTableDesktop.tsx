@@ -20,14 +20,18 @@ const ROUND_COL_W = 48;
 const RIGHT_COL_W = 260;
 
 /* -------------------- LOCKED SPACING TOKENS -------------------- */
-const ROW_H = 84;
+
+const ROW_H = {
+  normal: 84,
+  compact: 64,
+};
 
 const SPACING = {
-  statsGapY: "space-y-[2px]",
+  statsGapY: "space-y-[1px]", // tightened
   statRowGapX: "gap-1",
-  hitRateGapY: "space-y-1",
+  hitRateGapY: "space-y-0.5",
   dividerColor: "bg-yellow-500/10",
-  col3Grid: "grid-cols-[108px_1px_1fr]",
+  col3Grid: "grid-cols-[96px_1px_1fr]", // tighter stats column
 };
 
 /* -------------------------------------------------------------------------- */
@@ -76,8 +80,10 @@ export default function MasterTableDesktop({
   const [team, setTeam] = useState("All");
   const [expanded, setExpanded] = useState(false);
   const [search, setSearch] = useState("");
+  const [compact, setCompact] = useState(false);
 
   /* ---------------- DERIVED ROW DATA ---------------- */
+
   const rows = useMemo(() => {
     return players
       .map((p) => {
@@ -108,13 +114,14 @@ export default function MasterTableDesktop({
     [players]
   );
 
+  const rowHeight = compact ? ROW_H.compact : ROW_H.normal;
+
   return (
     <div className="mt-10 rounded-3xl border border-neutral-800 bg-black/90 shadow-2xl overflow-hidden">
       {/* ================= HEADER ================= */}
       <div className="px-6 py-6 border-b border-neutral-800 space-y-4">
         <div className="flex items-start justify-between">
           <div>
-            {/* HEADER PILL — matches AIInsights style */}
             <div className="inline-flex items-center gap-2 rounded-full border border-yellow-500/60 bg-black/80 px-3 py-1 text-xs text-yellow-200/90">
               <span className="uppercase tracking-[0.18em]">Master Table</span>
             </div>
@@ -128,28 +135,34 @@ export default function MasterTableDesktop({
             </p>
           </div>
 
-          {/* STAT LENS */}
-          <div className="flex gap-2 rounded-full border border-neutral-700 bg-black/80 p-1">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
-              <button
-                key={s}
-                onClick={() => setSelectedStat(s)}
-                className={cx(
-                  "rounded-full px-4 py-1.5 text-xs transition",
-                  selectedStat === s
-                    ? "bg-yellow-400 text-black shadow-[0_0_16px_rgba(250,204,21,0.6)]"
-                    : "text-neutral-300 hover:bg-neutral-800"
-                )}
-              >
-                {s}
-              </button>
-            ))}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setCompact((v) => !v)}
+              className="rounded-xl border border-neutral-700 bg-black px-4 py-2 text-xs text-neutral-300 hover:border-neutral-500"
+            >
+              {compact ? "Comfort" : "Compact"}
+            </button>
+
+            <div className="flex gap-2 rounded-full border border-neutral-700 bg-black/80 p-1">
+              {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSelectedStat(s)}
+                  className={cx(
+                    "rounded-full px-4 py-1.5 text-xs transition",
+                    selectedStat === s
+                      ? "bg-yellow-400 text-black shadow-[0_0_16px_rgba(250,204,21,0.6)]"
+                      : "text-neutral-300 hover:bg-neutral-800"
+                  )}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* FILTER ROW */}
         <div className="flex items-center justify-between gap-4">
-          {/* TEAM FILTER */}
           <div
             className={cx(
               "relative flex items-center gap-2 rounded-xl border px-3 py-2 text-sm",
@@ -176,7 +189,6 @@ export default function MasterTableDesktop({
             )}
           </div>
 
-          {/* SEARCH — PREMIUM ONLY */}
           {isPremium && (
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
@@ -217,8 +229,11 @@ export default function MasterTableDesktop({
               <button
                 key={player.id}
                 onClick={() => onSelectPlayer(player)}
-                className="group w-full px-5 border-t border-neutral-800 flex items-center justify-between hover:bg-neutral-900/40 transition"
-                style={{ height: ROW_H }}
+                className="group w-full px-5 border-t border-neutral-800
+                           flex items-center justify-between
+                           hover:bg-neutral-900/40 transition
+                           hover:-translate-y-[1px]"
+                style={{ height: rowHeight }}
               >
                 <div>
                   <div className="flex items-center gap-2 text-sm font-semibold text-neutral-50">
@@ -250,8 +265,8 @@ export default function MasterTableDesktop({
             {visible.map(({ player, values }) => (
               <div
                 key={player.id}
-                className="flex border-t border-neutral-800"
-                style={{ height: ROW_H }}
+                className="group flex border-t border-neutral-800 hover:bg-neutral-900/30 transition"
+                style={{ height: rowHeight }}
               >
                 {values.map((v, i) => (
                   <div
@@ -271,7 +286,6 @@ export default function MasterTableDesktop({
             className="sticky right-0 z-20 bg-black/95 border-l border-neutral-800"
             style={{ width: RIGHT_COL_W }}
           >
-            {/* STICKY COLUMN HEADER */}
             <div className="sticky top-0 z-10 px-4 py-3 bg-black/95 border-b border-neutral-800 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
               Stats & hit rate
             </div>
@@ -279,11 +293,10 @@ export default function MasterTableDesktop({
             {visible.map(({ player, stats }) => (
               <div
                 key={player.id}
-                className="px-4 border-t border-neutral-800"
-                style={{ height: ROW_H }}
+                className="px-4 border-t border-neutral-800 group hover:bg-neutral-900/30 transition"
+                style={{ height: rowHeight }}
               >
                 <div className={cx("grid h-full items-center", SPACING.col3Grid)}>
-                  {/* STATS */}
                   <div
                     className={cx(
                       "flex flex-col justify-center text-[11px]",
@@ -297,7 +310,7 @@ export default function MasterTableDesktop({
                       ["GMS", stats.gms],
                     ].map(([l, v]) => (
                       <div
-                        key={l as string}
+                        key={l}
                         className={cx(
                           "flex items-center justify-between",
                           SPACING.statRowGapX
@@ -316,13 +329,11 @@ export default function MasterTableDesktop({
                     ))}
                   </div>
 
-                  {/* DIVIDER */}
-                  <div className={cx("h-full", SPACING.dividerColor)} />
+                  <div className={SPACING.dividerColor} />
 
-                  {/* HIT RATE */}
                   <div
                     className={cx(
-                      "flex flex-col justify-center pl-3",
+                      "flex flex-col justify-center pl-2",
                       SPACING.hitRateGapY
                     )}
                   >
@@ -330,7 +341,7 @@ export default function MasterTableDesktop({
                       const r = fakeRate();
                       return (
                         <div key={t} className="flex items-center gap-2">
-                          <span className="w-7 text-[10px] text-neutral-400">
+                          <span className="w-6 text-[10px] text-neutral-400">
                             {t}+
                           </span>
                           <div className="flex-1 h-1 rounded-full bg-neutral-800 overflow-hidden">
@@ -339,7 +350,7 @@ export default function MasterTableDesktop({
                               style={{ width: `${r}%` }}
                             />
                           </div>
-                          <span className="w-8 text-right text-[10px] text-neutral-300">
+                          <span className="w-7 text-right text-[10px] text-neutral-300">
                             {r}%
                           </span>
                         </div>
@@ -353,7 +364,6 @@ export default function MasterTableDesktop({
         </div>
       </div>
 
-      {/* CTA */}
       {!isPremium && (
         <div className="flex justify-center py-10 border-t border-neutral-800">
           <button
