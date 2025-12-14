@@ -1,336 +1,278 @@
 import React, { useMemo, useState } from "react";
-import {
-  Lock,
-  ChevronRight,
-  ArrowRight,
-  ChevronDown,
-  Search,
-} from "lucide-react";
+import { Search, ChevronRight, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import type { PlayerRow, StatLens } from "./MasterTable";
 
 /* -------------------------------------------------------------------------- */
-/* CONSTANTS                                                                  */
+/* 🔒 LOCKED SPACING TOKENS — DO NOT TOUCH                                    */
+/* -------------------------------------------------------------------------- */
+
+const ROW_H = 84;
+const ROW_H_COMPACT = 64;
+
+const STAT_LABEL = "text-[10px]";
+const STAT_VALUE = "text-[11px]";
+const STAT_ROW_GAP = "gap-[2px]";
+const STAT_STACK_GAP = "space-y-[1px]";
+const HITRATE_STACK_GAP = "space-y-1";
+
+const COL_HOVER_BG = "bg-yellow-500/5";
+
 /* -------------------------------------------------------------------------- */
 
 const ROUND_LABELS = ["OR", ...Array.from({ length: 23 }, (_, i) => `R${i + 1}`)];
 const FREE_ROW_LIMIT = 8;
 
-const LEFT_COL_W = 220;
-const ROUND_COL_W = 48;
-const RIGHT_COL_W = 260;
+const LEFT_W = 220;
+const ROUND_W = 48;
+const RIGHT_W = 280;
 
-/* -------------------- LOCKED SPACING TOKENS -------------------- */
-const ROW_H = 84;
-
-const SPACING = {
-  statsGapY: "space-y-[2px]",
-  statRowGapX: "gap-1",
-  hitRateGapY: "space-y-1",
-  dividerColor: "bg-yellow-500/10",
-  col3Grid: "grid-cols-[108px_1px_1fr]",
-};
-
-/* -------------------------------------------------------------------------- */
-/* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
 const cx = (...c: Array<string | false | undefined>) =>
   c.filter(Boolean).join(" ");
 
-function getRowValues(key: string): number[] {
-  let seed = 0;
-  for (let i = 0; i < key.length; i++) seed += key.charCodeAt(i);
-  return ROUND_LABELS.map((_, i) => 70 + ((seed + i * 13) % 40));
-}
-
-function calcStats(values: number[]) {
-  const total = values.reduce((a, b) => a + b, 0);
-  return {
-    total,
-    avg: Math.round(total / values.length),
-    min: Math.min(...values),
-    max: Math.max(...values),
-    gms: values.length,
-  };
-}
-
 const fakeRate = () => Math.floor(50 + Math.random() * 50);
 
 /* -------------------------------------------------------------------------- */
-/* COMPONENT                                                                  */
+/* SAFE SERIES ACCESS — NO SCHEMA ASSUMPTIONS                                 */
+/* -------------------------------------------------------------------------- */
+
+function getSeries(row: PlayerRow, lens: StatLens): number[] {
+  // Case 1: lens array directly on row
+  if (Array.isArray((row as any)[lens])) {
+    return (row as any)[lens];
+  }
+
+  // Case 2: rounds array
+  if (Array.isArray((row as any).rounds)) {
+    return (row as any).rounds
+      .map((r: any) => r?.[lens])
+      .filter((v: any): v is number => typeof v === "number");
+  }
+
+  return [];
+}
+
 /* -------------------------------------------------------------------------- */
 
 export default function MasterTableDesktop({
-  players,
-  selectedStat,
-  setSelectedStat,
+  rows,
+  lens,
   isPremium,
-  onSelectPlayer,
 }: {
-  players: PlayerRow[];
-  selectedStat: StatLens;
-  setSelectedStat: (s: StatLens) => void;
+  rows: PlayerRow[];
+  lens: StatLens;
   isPremium: boolean;
-  onSelectPlayer: (p: PlayerRow) => void;
 }) {
-  const [team, setTeam] = useState("All");
-  const [expanded, setExpanded] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [search, setSearch] = useState("");
+  const [compact, setCompact] = useState(false);
+  const [hoverCol, setHoverCol] = useState<number | null>(null);
 
-  /* ---------------- DERIVED ROW DATA ---------------- */
-  const rows = useMemo(() => {
-    return players
-      .map((p) => {
-        const values = getRowValues(String(p.id));
-        return { player: p, values, stats: calcStats(values) };
-      })
-      .sort((a, b) => b.stats.total - a.stats.total);
-  }, [players]);
+  /* ------------------------------------------------------------------------ */
+  /* SORT BY TOTAL SEASON OUTPUT                                              */
+  /* ------------------------------------------------------------------------ */
 
-  const visible = useMemo(() => {
-    let list = rows;
+  const sorted = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      const ta = getSeries(a, lens).reduce((s, v) => s + v, 0);
+      const tb = getSeries(b, lens).reduce((s, v) => s + v, 0);
+      return tb - ta;
+    });
+  }, [rows, lens]);
 
-    if (team !== "All") list = list.filter((r) => r.player.team === team);
+  const filtered = useMemo(() => {
+    if (!search) return sorted;
+    return sorted.filter((p) =>
+      p.name.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [sorted, search]);
 
-    if (isPremium && search) {
-      list = list.filter((r) =>
-        r.player.name.toLowerCase().includes(search.toLowerCase())
-      );
-    }
+  const visible = showAll ? filtered : filtered.slice(0, FREE_ROW_LIMIT);
 
-    if (!expanded && !isPremium) list = list.slice(0, FREE_ROW_LIMIT);
-
-    return list;
-  }, [rows, team, search, expanded, isPremium]);
-
-  const teams = useMemo(
-    () => ["All", ...Array.from(new Set(players.map((p) => p.team)))],
-    [players]
-  );
+  /* ------------------------------------------------------------------------ */
 
   return (
-    <div className="mt-10 rounded-3xl border border-neutral-800 bg-black/90 shadow-2xl overflow-hidden">
-      {/* ================= HEADER ================= */}
-      <div className="px-6 py-6 border-b border-neutral-800 space-y-4">
-        <div className="flex items-start justify-between">
-          <div>
-            {/* HEADER PILL — matches AIInsights style */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-yellow-500/60 bg-black/80 px-3 py-1 text-xs text-yellow-200/90">
-              <span className="uppercase tracking-[0.18em]">Master Table</span>
-            </div>
+    <section className="relative rounded-3xl border border-yellow-500/30 bg-black shadow-[0_0_60px_rgba(0,0,0,0.85)]">
+      {/* ------------------------------------------------------------------ */}
+      {/* HEADER                                                             */}
+      {/* ------------------------------------------------------------------ */}
 
-            <h2 className="mt-3 text-xl font-semibold text-neutral-50">
+      <div className="px-6 pt-6 pb-4 border-b border-neutral-800">
+        {/* Pill */}
+        <div className="inline-flex items-center rounded-full border border-yellow-500/50 bg-black/80 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-yellow-200">
+          Master Table
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-neutral-50">
               Full-season player trends
             </h2>
-
-            <p className="mt-1 text-xs text-neutral-400">
+            <p className="mt-1 text-sm text-neutral-400">
               Season-long totals, averages and hit-rate performance
             </p>
           </div>
 
-          {/* STAT LENS */}
-          <div className="flex gap-2 rounded-full border border-neutral-700 bg-black/80 p-1">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
-              <button
-                key={s}
-                onClick={() => setSelectedStat(s)}
-                className={cx(
-                  "rounded-full px-4 py-1.5 text-xs transition",
-                  selectedStat === s
-                    ? "bg-yellow-400 text-black shadow-[0_0_16px_rgba(250,204,21,0.6)]"
-                    : "text-neutral-300 hover:bg-neutral-800"
-                )}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* FILTER ROW */}
-        <div className="flex items-center justify-between gap-4">
-          {/* TEAM FILTER */}
-          <div
-            className={cx(
-              "relative flex items-center gap-2 rounded-xl border px-3 py-2 text-sm",
-              isPremium
-                ? "border-neutral-700 bg-black text-neutral-200"
-                : "border-neutral-800 bg-neutral-900 text-neutral-500"
+          <div className="flex items-center gap-3">
+            {isPremium && (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search player"
+                  className="pl-9 pr-3 py-2 rounded-xl bg-black border border-neutral-700 text-sm text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:border-yellow-400"
+                />
+              </div>
             )}
-          >
-            <span className="text-xs">Team</span>
-            <select
-              disabled={!isPremium}
-              value={team}
-              onChange={(e) => setTeam(e.target.value)}
-              className="bg-transparent text-sm outline-none appearance-none pr-6"
+
+            <Button
+              variant="outline"
+              onClick={() => setCompact((v) => !v)}
+              className="border-neutral-700 text-xs"
             >
-              {teams.map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
-            {isPremium ? (
-              <ChevronDown className="h-4 w-4 absolute right-2" />
-            ) : (
-              <Lock className="h-4 w-4 absolute right-2" />
-            )}
+              {compact ? "Comfort" : "Compact"}
+            </Button>
           </div>
-
-          {/* SEARCH — PREMIUM ONLY */}
-          {isPremium && (
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search player"
-                className="pl-9 pr-3 py-2 rounded-xl bg-black border border-neutral-700
-                           text-sm text-neutral-200 placeholder:text-neutral-500
-                           focus:outline-none focus:border-yellow-400"
-              />
-            </div>
-          )}
         </div>
       </div>
 
-      {/* ================= TABLE ================= */}
-      <div className="relative overflow-x-auto scrollbar-none">
+      {/* ------------------------------------------------------------------ */}
+      {/* TABLE HEADER (STICKY)                                               */}
+      {/* ------------------------------------------------------------------ */}
+
+      <div className="sticky top-0 z-10 bg-black">
         <div
-          className="flex text-[11px]"
+          className="grid border-b border-neutral-800 text-[10px] uppercase tracking-widest text-neutral-500"
           style={{
-            minWidth:
-              LEFT_COL_W +
-              ROUND_LABELS.length * ROUND_COL_W +
-              RIGHT_COL_W,
+            gridTemplateColumns: `${LEFT_W}px repeat(${ROUND_LABELS.length}, ${ROUND_W}px) ${RIGHT_W}px`,
           }}
         >
-          {/* PLAYER */}
-          <div
-            className="sticky left-0 z-30 bg-black/95 border-r border-neutral-800"
-            style={{ width: LEFT_COL_W }}
-          >
-            <div className="px-5 py-3 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-              Player
-            </div>
+          <div className="px-4 py-2">Player</div>
 
-            {visible.map(({ player }) => (
-              <button
-                key={player.id}
-                onClick={() => onSelectPlayer(player)}
-                className="group w-full px-5 border-t border-neutral-800 flex items-center justify-between hover:bg-neutral-900/40 transition"
-                style={{ height: ROW_H }}
-              >
+          {ROUND_LABELS.map((r, i) => (
+            <div
+              key={r}
+              onMouseEnter={() => setHoverCol(i)}
+              onMouseLeave={() => setHoverCol(null)}
+              className={cx(
+                "py-2 text-center",
+                hoverCol === i && COL_HOVER_BG
+              )}
+            >
+              {r}
+            </div>
+          ))}
+
+          <div className="px-4 py-2 border-l border-neutral-800 sticky right-0 bg-black">
+            Stats & Hit Rate
+          </div>
+        </div>
+      </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* ROWS                                                               */}
+      {/* ------------------------------------------------------------------ */}
+
+      <div>
+        {visible.map((player) => {
+          const series = getSeries(player, lens);
+
+          const stats = {
+            avg: series.length
+              ? Math.round(series.reduce((a, b) => a + b, 0) / series.length)
+              : 0,
+            min: series.length ? Math.min(...series) : 0,
+            max: series.length ? Math.max(...series) : 0,
+            gms: series.length,
+          };
+
+          return (
+            <div
+              key={player.id}
+              className={cn(
+                "grid border-b border-neutral-800 transition",
+                "hover:bg-neutral-900/40 hover:-translate-y-[1px]"
+              )}
+              style={{
+                height: compact ? ROW_H_COMPACT : ROW_H,
+                gridTemplateColumns: `${LEFT_W}px repeat(${ROUND_LABELS.length}, ${ROUND_W}px) ${RIGHT_W}px`,
+              }}
+            >
+              {/* PLAYER */}
+              <div className="px-4 flex items-center">
                 <div>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-neutral-50">
+                  <div className="flex items-center gap-1 text-sm font-medium text-neutral-100">
                     {player.name}
-                    <ChevronRight className="h-4 w-4 text-neutral-600 group-hover:text-neutral-300" />
+                    <ChevronRight className="h-4 w-4 text-neutral-500" />
                   </div>
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
-                    {player.team} · {player.role}
+                  <div className="mt-0.5 text-[11px] uppercase tracking-wider text-neutral-500">
+                    {player.team}
+                    {"pos" in player && (player as any).pos && (
+                      <> · {(player as any).pos}</>
+                    )}
                   </div>
                 </div>
-              </button>
-            ))}
-          </div>
+              </div>
 
-          {/* ROUNDS */}
-          <div>
-            <div className="flex border-b border-neutral-800">
-              {ROUND_LABELS.map((r) => (
+              {/* ROUNDS */}
+              {ROUND_LABELS.map((_, i) => (
                 <div
-                  key={r}
-                  className="py-3 text-center text-[10px] uppercase tracking-[0.18em] text-neutral-500"
-                  style={{ width: ROUND_COL_W }}
+                  key={i}
+                  onMouseEnter={() => setHoverCol(i)}
+                  onMouseLeave={() => setHoverCol(null)}
+                  className={cx(
+                    "flex items-center justify-center text-sm text-neutral-200",
+                    hoverCol === i && COL_HOVER_BG
+                  )}
                 >
-                  {r}
+                  {series[i] ?? "–"}
                 </div>
               ))}
-            </div>
 
-            {visible.map(({ player, values }) => (
-              <div
-                key={player.id}
-                className="flex border-t border-neutral-800"
-                style={{ height: ROW_H }}
-              >
-                {values.map((v, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-center text-sm text-neutral-100"
-                    style={{ width: ROUND_COL_W }}
-                  >
-                    {v}
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-
-          {/* STATS & HIT RATE */}
-          <div
-            className="sticky right-0 z-20 bg-black/95 border-l border-neutral-800"
-            style={{ width: RIGHT_COL_W }}
-          >
-            {/* STICKY COLUMN HEADER */}
-            <div className="sticky top-0 z-10 px-4 py-3 bg-black/95 border-b border-neutral-800 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-              Stats & hit rate
-            </div>
-
-            {visible.map(({ player, stats }) => (
-              <div
-                key={player.id}
-                className="px-4 border-t border-neutral-800"
-                style={{ height: ROW_H }}
-              >
-                <div className={cx("grid h-full items-center", SPACING.col3Grid)}>
+              {/* STATS + HIT RATE */}
+              <div className="border-l border-neutral-800 px-3 flex items-center sticky right-0 bg-black">
+                <div className="grid grid-cols-[110px_1px_1fr] w-full items-center">
                   {/* STATS */}
-                  <div
-                    className={cx(
-                      "flex flex-col justify-center text-[11px]",
-                      SPACING.statsGapY
-                    )}
-                  >
+                  <div className={cx("flex flex-col", STAT_STACK_GAP)}>
                     {[
                       ["AVG", stats.avg],
                       ["MIN", stats.min],
                       ["MAX", stats.max],
                       ["GMS", stats.gms],
-                    ].map(([l, v]) => (
+                    ].map(([label, value]) => (
                       <div
-                        key={l as string}
+                        key={label}
                         className={cx(
-                          "flex items-center justify-between",
-                          SPACING.statRowGapX
+                          "flex justify-between",
+                          STAT_ROW_GAP,
+                          STAT_LABEL,
+                          STAT_VALUE
                         )}
                       >
-                        <span className="text-neutral-500">{l}</span>
+                        <span className="text-neutral-500">{label}</span>
                         <span
-                          className={cx(
-                            l === "AVG" &&
-                              "text-yellow-300 font-semibold"
-                          )}
+                          className={label === "AVG" ? "text-yellow-300" : ""}
                         >
-                          {v}
+                          {value}
                         </span>
                       </div>
                     ))}
                   </div>
 
                   {/* DIVIDER */}
-                  <div className={cx("h-full", SPACING.dividerColor)} />
+                  <div className="h-full bg-yellow-500/10 mx-2" />
 
                   {/* HIT RATE */}
-                  <div
-                    className={cx(
-                      "flex flex-col justify-center pl-3",
-                      SPACING.hitRateGapY
-                    )}
-                  >
+                  <div className={cx("flex flex-col", HITRATE_STACK_GAP)}>
                     {[60, 70, 80, 90].map((t) => {
                       const r = fakeRate();
                       return (
                         <div key={t} className="flex items-center gap-2">
-                          <span className="w-7 text-[10px] text-neutral-400">
+                          <span className="w-6 text-[10px] text-neutral-400">
                             {t}+
                           </span>
                           <div className="flex-1 h-1 rounded-full bg-neutral-800 overflow-hidden">
@@ -348,36 +290,54 @@ export default function MasterTableDesktop({
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* CTA */}
-      {!isPremium && (
-        <div className="flex justify-center py-10 border-t border-neutral-800">
+      {/* ------------------------------------------------------------------ */}
+      {/* SHOW MORE                                                          */}
+      {/* ------------------------------------------------------------------ */}
+
+      {!showAll && filtered.length > FREE_ROW_LIMIT && (
+        <div className="py-6 flex justify-center">
           <button
-            onClick={() => (window.location.href = "/neeko-plus")}
-            className="rounded-3xl border border-yellow-500/30
-                       bg-gradient-to-r from-yellow-500/25 via-yellow-500/10 to-transparent
-                       px-6 py-4 shadow-2xl max-w-lg w-full
-                       flex items-center justify-between"
+            onClick={() => setShowAll(true)}
+            className="text-yellow-300 text-sm hover:underline"
           >
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-yellow-300">
-                Neeko+
-              </div>
-              <div className="text-sm font-semibold text-yellow-100">
-                Unlock full player table
-              </div>
-              <div className="text-xs text-neutral-300">
-                Search, team filters & full season insights
-              </div>
-            </div>
-            <ArrowRight className="h-5 w-5 text-yellow-300" />
+            Show more
           </button>
         </div>
       )}
-    </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* CTA (MATCHES AI INSIGHTS)                                          */}
+      {/* ------------------------------------------------------------------ */}
+
+      {!isPremium && (
+        <div className="px-6 pb-8">
+          <button
+            onClick={() => (window.location.href = "/neeko-plus")}
+            className="group w-full rounded-3xl border border-yellow-500/30 bg-gradient-to-r from-yellow-500/15 via-yellow-500/0 to-transparent px-6 py-4 flex items-center justify-between hover:brightness-110"
+          >
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-yellow-200/80">
+                Neeko+
+              </div>
+              <div className="mt-1 text-sm font-semibold text-yellow-100">
+                Unlock full player table
+              </div>
+              <p className="mt-1 text-xs text-neutral-300">
+                Search, team filters & full season insights
+              </p>
+            </div>
+
+            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-yellow-400/50 bg-black/60 shadow-[0_0_14px_rgba(250,204,21,0.6)] group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition">
+              <ArrowRight className="h-4 w-4 text-yellow-300" />
+            </div>
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
