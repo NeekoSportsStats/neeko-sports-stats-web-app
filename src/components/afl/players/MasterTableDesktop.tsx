@@ -1,5 +1,10 @@
 import React, { useMemo, useState } from "react";
-import { Lock, ChevronRight, ArrowRight, Search } from "lucide-react";
+import {
+  Lock,
+  ChevronRight,
+  ArrowRight,
+  ChevronDown,
+} from "lucide-react";
 import type { PlayerRow, StatLens } from "./MasterTable";
 
 /* -------------------------------------------------------------------------- */
@@ -21,12 +26,24 @@ const ROW_H = 84;
 const cx = (...c: Array<string | false | undefined>) =>
   c.filter(Boolean).join(" ");
 
-const fakeValue = () => Math.floor(70 + Math.random() * 40);
-const fakeRate = () => Math.floor(50 + Math.random() * 50);
+function getRowValues(key: string): number[] {
+  let seed = 0;
+  for (let i = 0; i < key.length; i++) seed += key.charCodeAt(i);
+  return ROUND_LABELS.map((_, i) => 70 + ((seed + i * 13) % 40));
+}
 
-const Skeleton = () => (
-  <div className="h-3 w-full rounded-full bg-neutral-700/40 animate-pulse" />
-);
+function calcStats(values: number[]) {
+  const total = values.reduce((a, b) => a + b, 0);
+  return {
+    total,
+    avg: Math.round(total / values.length),
+    min: Math.min(...values),
+    max: Math.max(...values),
+    gms: values.length,
+  };
+}
+
+const fakeRate = () => Math.floor(50 + Math.random() * 50);
 
 /* -------------------------------------------------------------------------- */
 /* DESKTOP MASTER TABLE                                                       */
@@ -45,29 +62,24 @@ export default function MasterTableDesktop({
   isPremium: boolean;
   onSelectPlayer: (p: PlayerRow) => void;
 }) {
-  const [teamFilter, setTeamFilter] = useState<string>("All");
-  const [search, setSearch] = useState("");
+  const [team, setTeam] = useState("All");
   const [expanded, setExpanded] = useState(false);
 
-  const filteredPlayers = useMemo(() => {
-    let list = players;
+  const rows = useMemo(() => {
+    return players
+      .map((p) => {
+        const values = getRowValues(String(p.id));
+        return { player: p, values, stats: calcStats(values) };
+      })
+      .sort((a, b) => b.stats.total - a.stats.total);
+  }, [players]);
 
-    if (teamFilter !== "All") {
-      list = list.filter((p) => p.team === teamFilter);
-    }
-
-    if (isPremium && search) {
-      list = list.filter((p) =>
-        p.name.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
-    if (!expanded && !isPremium) {
-      list = list.slice(0, FREE_ROW_LIMIT);
-    }
-
+  const visible = useMemo(() => {
+    let list = rows;
+    if (team !== "All") list = list.filter((r) => r.player.team === team);
+    if (!expanded && !isPremium) list = list.slice(0, FREE_ROW_LIMIT);
     return list;
-  }, [players, teamFilter, search, expanded, isPremium]);
+  }, [rows, team, expanded, isPremium]);
 
   const teams = useMemo(
     () => ["All", ...Array.from(new Set(players.map((p) => p.team)))],
@@ -77,7 +89,7 @@ export default function MasterTableDesktop({
   return (
     <div className="mt-10 rounded-3xl border border-neutral-800 bg-black/90 shadow-2xl overflow-hidden">
       {/* ================= HEADER ================= */}
-      <div className="px-6 py-5 border-b border-neutral-800 space-y-4">
+      <div className="px-6 py-5 border-b border-neutral-800 space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-[10px] uppercase tracking-[0.18em] text-yellow-300">
@@ -86,6 +98,9 @@ export default function MasterTableDesktop({
             <h2 className="mt-1 text-xl font-semibold text-neutral-50">
               Full-season player trends
             </h2>
+            <p className="mt-1 text-xs text-neutral-400">
+              Season-long totals, averages and hit-rate performance
+            </p>
           </div>
 
           <div className="flex gap-2 rounded-full border border-neutral-700 bg-black/80 p-1">
@@ -106,202 +121,185 @@ export default function MasterTableDesktop({
           </div>
         </div>
 
-        {/* FILTER BAR */}
-        <div className="flex items-center justify-between gap-4">
-          {/* Team Filter */}
-          <div className="flex gap-2 flex-wrap">
-            {teams.map((t) => (
-              <button
-                key={t}
-                onClick={() => setTeamFilter(t)}
-                className={cx(
-                  "rounded-full px-3 py-1 text-[11px] border transition",
-                  teamFilter === t
-                    ? "bg-yellow-400 text-black border-yellow-400"
-                    : "border-neutral-700 text-neutral-300 hover:bg-neutral-800"
-                )}
-              >
-                {t}
-              </button>
-            ))}
+        {/* TEAM FILTER */}
+        <div className="flex justify-end">
+          <div
+            className={cx(
+              "relative flex items-center gap-2 rounded-xl border px-3 py-2 text-sm",
+              isPremium
+                ? "border-neutral-700 bg-black text-neutral-200"
+                : "border-neutral-800 bg-neutral-900 text-neutral-500"
+            )}
+          >
+            <span className="text-xs">Team</span>
+            <select
+              disabled={!isPremium}
+              value={team}
+              onChange={(e) => setTeam(e.target.value)}
+              className="bg-transparent text-sm outline-none appearance-none pr-6"
+            >
+              {teams.map((t) => (
+                <option key={t}>{t}</option>
+              ))}
+            </select>
+            {isPremium ? (
+              <ChevronDown className="h-4 w-4 absolute right-2" />
+            ) : (
+              <Lock className="h-4 w-4 absolute right-2" />
+            )}
           </div>
-
-          {/* Search (Premium only) */}
-          {isPremium && (
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search player…"
-                className="pl-9 pr-3 py-2 text-sm rounded-xl bg-black border border-neutral-700 text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:border-yellow-400"
-              />
-            </div>
-          )}
         </div>
       </div>
 
       {/* ================= TABLE ================= */}
-      <div className="relative">
-        <div className="overflow-x-auto scrollbar-none">
+      <div className="relative overflow-x-auto scrollbar-none">
+        <div
+          className="flex text-[11px]"
+          style={{
+            minWidth:
+              LEFT_COL_W +
+              ROUND_LABELS.length * ROUND_COL_W +
+              RIGHT_COL_W,
+          }}
+        >
+          {/* PLAYER */}
           <div
-            className="flex text-[11px]"
-            style={{
-              minWidth:
-                LEFT_COL_W +
-                ROUND_LABELS.length * ROUND_COL_W +
-                RIGHT_COL_W,
-            }}
+            className="sticky left-0 z-30 bg-black/95 border-r border-neutral-800"
+            style={{ width: LEFT_COL_W }}
           >
-            {/* LEFT */}
-            <div
-              className="sticky left-0 z-30 bg-black/95 border-r border-neutral-800"
-              style={{ width: LEFT_COL_W }}
-            >
-              <div className="px-5 py-3 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-                Player
-              </div>
+            <div className="px-5 py-3 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
+              Player
+            </div>
 
-              {filteredPlayers.map((p, i) => (
-                <button
-                  key={p.id}
-                  onClick={() => onSelectPlayer(p)}
-                  className="group w-full px-5 border-t border-neutral-800 flex items-center justify-between transition hover:bg-neutral-900/40 hover:-translate-y-[1px]"
-                  style={{ height: ROW_H }}
-                >
-                  <div>
-                    <div className="text-sm font-semibold text-neutral-50">
-                      {p.name}
-                    </div>
-                    <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
-                      {p.team} · {p.role}
-                    </div>
+            {visible.map(({ player }) => (
+              <button
+                key={player.id}
+                onClick={() => onSelectPlayer(player)}
+                className="group w-full px-5 border-t border-neutral-800 flex items-center justify-between hover:bg-neutral-900/40 transition"
+                style={{ height: ROW_H }}
+              >
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-neutral-50">
+                    {player.name}
+                    <ChevronRight className="h-4 w-4 text-neutral-600 group-hover:text-neutral-300" />
                   </div>
-                  <ChevronRight className="h-4 w-4 text-neutral-500 group-hover:text-neutral-300" />
-                </button>
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
+                    {player.team} · {player.role}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* ROUNDS */}
+          <div>
+            <div className="flex border-b border-neutral-800">
+              {ROUND_LABELS.map((r) => (
+                <div
+                  key={r}
+                  className="py-3 text-center text-[10px] uppercase tracking-[0.18em] text-neutral-500"
+                  style={{ width: ROUND_COL_W }}
+                >
+                  {r}
+                </div>
               ))}
             </div>
 
-            {/* ROUNDS */}
-            <div>
-              <div className="flex border-b border-neutral-800">
-                {ROUND_LABELS.map((r) => (
+            {visible.map(({ player, values }) => (
+              <div
+                key={player.id}
+                className="flex border-t border-neutral-800"
+                style={{ height: ROW_H }}
+              >
+                {values.map((v, i) => (
                   <div
-                    key={r}
-                    className="py-3 text-center text-[10px] uppercase tracking-[0.18em] text-neutral-500"
+                    key={i}
+                    className="flex items-center justify-center text-sm text-neutral-100"
                     style={{ width: ROUND_COL_W }}
                   >
-                    {r}
+                    {v}
                   </div>
                 ))}
               </div>
+            ))}
+          </div>
 
-              {filteredPlayers.map((_, i) => (
-                <div
-                  key={i}
-                  className="flex border-t border-neutral-800"
-                  style={{ height: ROW_H }}
-                >
-                  {ROUND_LABELS.map((_, j) => (
-                    <div
-                      key={j}
-                      className="flex items-center justify-center text-sm text-neutral-100"
-                      style={{ width: ROUND_COL_W }}
-                    >
-                      {fakeValue()}
-                    </div>
-                  ))}
-                </div>
-              ))}
+          {/* STATS */}
+          <div
+            className="sticky right-0 z-20 bg-black/95 border-l border-neutral-800"
+            style={{ width: RIGHT_COL_W }}
+          >
+            <div className="px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
+              Stats & hit rate
             </div>
 
-            {/* RIGHT */}
-            <div
-              className="sticky right-0 z-20 bg-black/95 border-l border-neutral-800"
-              style={{ width: RIGHT_COL_W }}
-            >
-              <div className="px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-                Stats & hit rate
-              </div>
-
-              {filteredPlayers.map((_, i) => (
-                <div
-                  key={i}
-                  className="px-4 border-t border-neutral-800"
-                  style={{ height: ROW_H }}
-                >
-                  <div className="grid grid-cols-[120px_1fr] gap-4 h-full items-center">
-                    {/* STATS */}
-                    <div className="space-y-0.5 text-[11px] text-neutral-300 pr-3">
-                      {[
-                        ["AVG", fakeValue()],
-                        ["MIN", fakeValue()],
-                        ["MAX", fakeValue()],
-                        ["GMS", 23],
-                      ].map(([label, value]) => (
-                        <div
-                          key={label as string}
-                          className="flex justify-between"
+            {visible.map(({ player, stats }) => (
+              <div
+                key={player.id}
+                className="px-4 border-t border-neutral-800"
+                style={{ height: ROW_H }}
+              >
+                <div className="grid grid-cols-[120px_1fr] gap-4 h-full items-center">
+                  <div className="space-y-0.5 text-[11px]">
+                    {[
+                      ["AVG", stats.avg],
+                      ["MIN", stats.min],
+                      ["MAX", stats.max],
+                      ["GMS", stats.gms],
+                    ].map(([l, v]) => (
+                      <div key={l as string} className="flex justify-between">
+                        <span className="text-neutral-500">{l}</span>
+                        <span
+                          className={cx(
+                            l === "AVG" && "text-yellow-300 font-semibold"
+                          )}
                         >
-                          <span className="text-neutral-500">
-                            {label as string}
+                          {v}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="border-l border-yellow-500/20 h-full" />
+
+                  <div className="space-y-1">
+                    {[60, 70, 80, 90].map((t) => {
+                      const r = fakeRate();
+                      return (
+                        <div key={t} className="flex items-center gap-2">
+                          <span className="w-8 text-[10px] text-neutral-400">
+                            {t}+
                           </span>
-                          <span
-                            className={cx(
-                              label === "AVG" &&
-                                "text-yellow-300 font-semibold"
-                            )}
-                          >
-                            {value as number}
+                          <div className="flex-1 rounded-full bg-neutral-800 overflow-hidden">
+                            <div
+                              className="h-1 bg-gradient-to-r from-emerald-400 via-yellow-300 to-orange-400"
+                              style={{ width: `${r}%` }}
+                            />
+                          </div>
+                          <span className="w-8 text-right text-[10px] text-neutral-300">
+                            {r}%
                           </span>
                         </div>
-                      ))}
-                    </div>
-
-                    {/* GOLD HAIRLINE DIVIDER */}
-                    <div className="absolute right-[140px] top-3 bottom-3 w-px bg-gradient-to-b from-transparent via-yellow-500/20 to-transparent" />
-
-                    {/* HIT RATE */}
-                    <div className="space-y-1">
-                      {[60, 70, 80, 90].map((t) => {
-                        const r = fakeRate();
-                        return (
-                          <div key={t} className="flex items-center gap-2">
-                            <span className="w-8 text-[10px] text-neutral-400">
-                              {t}+
-                            </span>
-                            <div className="flex-1 rounded-full bg-neutral-800 overflow-hidden">
-                              <div
-                                className="h-1 bg-gradient-to-r from-emerald-400 via-yellow-300 to-orange-400"
-                                style={{ width: `${r}%` }}
-                              />
-                            </div>
-                            <span className="w-8 text-right text-[10px] text-neutral-300">
-                              {r}%
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                      );
+                    })}
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
-
-        {/* SHOW MORE */}
-        {!isPremium && (
-          <div className="flex justify-center py-6">
-            <button
-              onClick={() => setExpanded((v) => !v)}
-              className="text-sm text-yellow-300 hover:underline"
-            >
-              {expanded ? "Show less" : "Show more"}
-            </button>
-          </div>
-        )}
       </div>
+
+      {!isPremium && (
+        <div className="flex justify-center py-6">
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="text-sm text-yellow-300 hover:underline"
+          >
+            {expanded ? "Show less" : "Show more"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
