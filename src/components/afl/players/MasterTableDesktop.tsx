@@ -65,12 +65,12 @@ function calcStats(values: number[]) {
   };
 }
 
-/* ---------------- HIT RATE — REAL, STAT-AWARE ---------------- */
+/* ---------------- HIT RATE (STAT AWARE) ---------------- */
 
 function getHitThresholds(stat: StatLens): number[] {
   if (stat === "Fantasy") return [80, 90, 100, 110];
   if (stat === "Disposals") return [15, 20, 25, 30];
-  return [1, 2, 3, 4]; // Goals
+  return [1, 2, 3, 4];
 }
 
 function calcHitRate(values: number[], threshold: number) {
@@ -98,6 +98,9 @@ export default function MasterTableDesktop({
   const [team, setTeam] = useState("All");
   const [expanded, setExpanded] = useState(false);
   const [search, setSearch] = useState("");
+
+  // 🔹 COMPACT ADD (state only, no behavior yet)
+  const [compact, setCompact] = useState(false);
 
   /* ---------------- DERIVED ROW DATA ---------------- */
   const rows = useMemo(() => {
@@ -178,6 +181,21 @@ export default function MasterTableDesktop({
           </div>
         </div>
 
+        {/* 🔹 COMPACT BUTTON ROW (NEW, ISOLATED) */}
+        <div className="flex justify-end">
+          <button
+            onClick={() => setCompact((v) => !v)}
+            className={cx(
+              "rounded-full px-4 py-1.5 text-xs border transition",
+              compact
+                ? "bg-yellow-400 text-black border-yellow-400 shadow-[0_0_12px_rgba(250,204,21,0.6)]"
+                : "border-neutral-700 text-neutral-300 hover:bg-neutral-800"
+            )}
+          >
+            Compact
+          </button>
+        </div>
+
         {/* FILTER ROW */}
         <div className="flex items-center justify-between gap-4">
           {/* TEAM FILTER */}
@@ -231,6 +249,9 @@ export default function MasterTableDesktop({
           </div>
         </div>
       </div>
+
+      {/* ================= TABLE ================= */}
+      {/* EVERYTHING BELOW IS UNCHANGED */}
 
       {/* ================= TABLE ================= */}
       <div className="relative overflow-x-auto scrollbar-none">
