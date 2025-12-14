@@ -229,7 +229,7 @@ export default function MasterTableDesktop({
         </div>
 
         {/* SUBTITLE + COMPACT INLINE */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-1">
           <p className="text-xs text-neutral-400">
             Season-long totals, averages and hit-rate performance
           </p>
@@ -353,6 +353,7 @@ export default function MasterTableDesktop({
                         <span className="text-neutral-500">{l}</span>
                         <span
                           className={cx(
+                            "text-left",
                             l === "AVG" && "text-yellow-300 font-semibold"
                           )}
                         >
