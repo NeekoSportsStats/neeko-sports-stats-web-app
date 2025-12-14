@@ -65,34 +65,17 @@ function calcStats(values: number[]) {
   };
 }
 
-/* ---------------- HIT RATE (PATCHED — STAT AWARE) ---------------- */
+/* ---------------- HIT RATE — REAL, STAT-AWARE ---------------- */
 
-function getHitRate(stat: StatLens, threshold: number) {
-  let min = 50;
-  let max = 90;
+function getHitThresholds(stat: StatLens): number[] {
+  if (stat === "Fantasy") return [80, 90, 100, 110];
+  if (stat === "Disposals") return [15, 20, 25, 30];
+  return [1, 2, 3, 4]; // Goals
+}
 
-  if (stat === "Fantasy") {
-    min = 65;
-    max = 90;
-  }
-
-  if (stat === "Disposals") {
-    min = 55;
-    max = 85;
-  }
-
-  if (stat === "Goals") {
-    min = 30;
-    max = 75;
-  }
-
-  const variance = (threshold - 60) * 0.8;
-  const base = min + Math.random() * (max - min);
-
-  return Math.max(
-    0,
-    Math.min(100, Math.round(base - variance))
-  );
+function calcHitRate(values: number[], threshold: number) {
+  const hits = values.filter((v) => v >= threshold).length;
+  return Math.round((hits / values.length) * 100);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -154,6 +137,8 @@ export default function MasterTableDesktop({
     () => ["All", ...Array.from(new Set(players.map((p) => p.team)))],
     [players]
   );
+
+  const hitThresholds = getHitThresholds(selectedStat);
 
   return (
     <div className="mt-10 rounded-3xl border border-neutral-800 bg-black/90 shadow-2xl overflow-hidden">
@@ -329,7 +314,7 @@ export default function MasterTableDesktop({
               Stats & hit rate
             </div>
 
-            {visible.map(({ player, stats }) => (
+            {visible.map(({ player, stats, values }) => (
               <div
                 key={player.id}
                 className="px-4 border-t border-neutral-800"
@@ -363,13 +348,13 @@ export default function MasterTableDesktop({
 
                   <div className={SPACING.dividerColor} />
 
-                  {/* HIT RATE */}
+                  {/* HIT RATE — REAL */}
                   <div className={cx("flex flex-col justify-center pl-3", SPACING.hitRateGapY)}>
-                    {[60, 70, 80, 90].map((t) => {
-                      const r = getHitRate(selectedStat, t);
+                    {hitThresholds.map((t) => {
+                      const r = calcHitRate(values, t);
                       return (
                         <div key={t} className="flex items-center gap-2">
-                          <span className="w-7 text-[10px] text-neutral-400">
+                          <span className="w-8 text-[10px] text-neutral-400">
                             {t}+
                           </span>
                           <div className="flex-1 h-1 rounded-full bg-neutral-800 overflow-hidden">
