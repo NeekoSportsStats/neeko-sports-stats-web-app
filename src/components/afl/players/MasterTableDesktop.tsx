@@ -98,8 +98,6 @@ export default function MasterTableDesktop({
   const [team, setTeam] = useState("All");
   const [expanded, setExpanded] = useState(false);
   const [search, setSearch] = useState("");
-
-  // 🔹 COMPACT STATE (already added previously)
   const [compact, setCompact] = useState(false);
 
   /* ---------------- DERIVED ROW DATA ---------------- */
@@ -156,10 +154,6 @@ export default function MasterTableDesktop({
             <h2 className="mt-3 text-xl font-semibold text-neutral-50">
               Full-season player trends
             </h2>
-
-            <p className="mt-1 text-xs text-neutral-400">
-              Season-long totals, averages and hit-rate performance
-            </p>
           </div>
 
           {/* STAT LENS */}
@@ -181,24 +175,8 @@ export default function MasterTableDesktop({
           </div>
         </div>
 
-        {/* COMPACT BUTTON (already present) */}
-        <div className="mt-1 flex justify-end">
-          <button
-            onClick={() => setCompact((v) => !v)}
-            className={cx(
-              "rounded-full px-4 py-1.5 text-xs border transition",
-              compact
-                ? "bg-yellow-400 text-black border-yellow-400 shadow-[0_0_12px_rgba(250,204,21,0.6)]"
-                : "border-neutral-700 text-neutral-300 hover:bg-neutral-800"
-            )}
-          >
-            Compact
-          </button>
-        </div>
-
         {/* FILTER ROW */}
         <div className="flex items-center justify-between gap-1">
-
           {/* TEAM FILTER */}
           <div
             className={cx(
@@ -249,6 +227,25 @@ export default function MasterTableDesktop({
             )}
           </div>
         </div>
+
+        {/* SUBTITLE + COMPACT INLINE */}
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-neutral-400">
+            Season-long totals, averages and hit-rate performance
+          </p>
+
+          <button
+            onClick={() => setCompact((v) => !v)}
+            className={cx(
+              "rounded-full px-3 py-1 text-xs border transition",
+              compact
+                ? "bg-yellow-400 text-black border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)]"
+                : "border-neutral-700 text-neutral-300 hover:bg-neutral-800"
+            )}
+          >
+            Compact
+          </button>
+        </div>
       </div>
 
       {/* ================= TABLE ================= */}
@@ -262,7 +259,7 @@ export default function MasterTableDesktop({
               RIGHT_COL_W,
           }}
         >
-          {/* PLAYER COLUMN — UNCHANGED */}
+          {/* PLAYER */}
           <div
             className="sticky left-0 z-30 bg-black/95 border-r border-neutral-800"
             style={{ width: LEFT_COL_W }}
@@ -291,7 +288,7 @@ export default function MasterTableDesktop({
             ))}
           </div>
 
-          {/* 🔹 ROUNDS — HIDDEN WHEN COMPACT */}
+          {/* ROUNDS */}
           {!compact && (
             <div>
               <div className="flex border-b border-neutral-800">
@@ -326,7 +323,7 @@ export default function MasterTableDesktop({
             </div>
           )}
 
-          {/* STATS & HIT RATE — UNCHANGED */}
+          {/* STATS & HIT RATE */}
           <div
             className="sticky right-0 z-20 bg-black/95 border-l border-neutral-800"
             style={{ width: RIGHT_COL_W }}
@@ -342,7 +339,6 @@ export default function MasterTableDesktop({
                 style={{ height: ROW_H }}
               >
                 <div className={cx("grid h-full items-center", SPACING.col3Grid)}>
-                  {/* STATS */}
                   <div className={cx("flex flex-col justify-center", SPACING.statsGapY)}>
                     {[
                       ["AVG", stats.avg],
@@ -351,13 +347,12 @@ export default function MasterTableDesktop({
                       ["GMS", stats.gms],
                     ].map(([l, v]) => (
                       <div
-                        key={l as string}
+                        key={l}
                         className="grid grid-cols-[32px_auto] items-center gap-2 text-[11px]"
                       >
                         <span className="text-neutral-500">{l}</span>
                         <span
                           className={cx(
-                            "text-left",
                             l === "AVG" && "text-yellow-300 font-semibold"
                           )}
                         >
@@ -369,7 +364,6 @@ export default function MasterTableDesktop({
 
                   <div className={SPACING.dividerColor} />
 
-                  {/* HIT RATE */}
                   <div className={cx("flex flex-col justify-center pl-3", SPACING.hitRateGapY)}>
                     {hitThresholds.map((t) => {
                       const r = calcHitRate(values, t);
