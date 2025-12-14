@@ -65,7 +65,35 @@ function calcStats(values: number[]) {
   };
 }
 
-const fakeRate = () => Math.floor(50 + Math.random() * 50);
+/* ---------------- HIT RATE (PATCHED — STAT AWARE) ---------------- */
+
+function getHitRate(stat: StatLens, threshold: number) {
+  let min = 50;
+  let max = 90;
+
+  if (stat === "Fantasy") {
+    min = 65;
+    max = 90;
+  }
+
+  if (stat === "Disposals") {
+    min = 55;
+    max = 85;
+  }
+
+  if (stat === "Goals") {
+    min = 30;
+    max = 75;
+  }
+
+  const variance = (threshold - 60) * 0.8;
+  const base = min + Math.random() * (max - min);
+
+  return Math.max(
+    0,
+    Math.min(100, Math.round(base - variance))
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /* COMPONENT                                                                  */
@@ -87,9 +115,6 @@ export default function MasterTableDesktop({
   const [team, setTeam] = useState("All");
   const [expanded, setExpanded] = useState(false);
   const [search, setSearch] = useState("");
-
-  // COMPACT MODE (STEP 1 — STATE ONLY)
-  const [compact, setCompact] = useState(false);
 
   /* ---------------- DERIVED ROW DATA ---------------- */
   const rows = useMemo(() => {
@@ -149,7 +174,7 @@ export default function MasterTableDesktop({
             </p>
           </div>
 
-          {/* STAT LENS + COMPACT PILL */}
+          {/* STAT LENS */}
           <div className="flex gap-2 rounded-full border border-neutral-700 bg-black/80 p-1">
             {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
               <button
@@ -165,24 +190,10 @@ export default function MasterTableDesktop({
                 {s}
               </button>
             ))}
-
-            {/* COMPACT MODE PILL (STEP 1 ONLY) */}
-            <button
-              onClick={() => setCompact((v) => !v)}
-              className={cx(
-                "rounded-full px-4 py-1.5 text-xs transition",
-                compact
-                  ? "bg-neutral-200 text-black"
-                  : "text-neutral-400 hover:bg-neutral-800"
-              )}
-            >
-              Compact
-            </button>
           </div>
         </div>
 
         {/* FILTER ROW */}
-        {/* (unchanged below) */}
         <div className="flex items-center justify-between gap-4">
           {/* TEAM FILTER */}
           <div
@@ -325,7 +336,7 @@ export default function MasterTableDesktop({
                 style={{ height: ROW_H }}
               >
                 <div className={cx("grid h-full items-center", SPACING.col3Grid)}>
-                  {/* STATS (PATCHED ALIGNMENT ONLY) */}
+                  {/* STATS */}
                   <div className={cx("flex flex-col justify-center", SPACING.statsGapY)}>
                     {[
                       ["AVG", stats.avg],
@@ -355,7 +366,7 @@ export default function MasterTableDesktop({
                   {/* HIT RATE */}
                   <div className={cx("flex flex-col justify-center pl-3", SPACING.hitRateGapY)}>
                     {[60, 70, 80, 90].map((t) => {
-                      const r = fakeRate();
+                      const r = getHitRate(selectedStat, t);
                       return (
                         <div key={t} className="flex items-center gap-2">
                           <span className="w-7 text-[10px] text-neutral-400">
@@ -381,7 +392,7 @@ export default function MasterTableDesktop({
         </div>
       </div>
 
-      {/* CTA — MOVED ABOVE SHOW MORE */}
+      {/* CTA */}
       {!isPremium && (
         <div className="flex justify-center py-10 border-t border-neutral-800">
           <button
@@ -407,7 +418,7 @@ export default function MasterTableDesktop({
         </div>
       )}
 
-      {/* SHOW MORE — NOW BELOW CTA */}
+      {/* SHOW MORE */}
       {!expanded && !isPremium && (
         <div className="py-6 text-center">
           <button
