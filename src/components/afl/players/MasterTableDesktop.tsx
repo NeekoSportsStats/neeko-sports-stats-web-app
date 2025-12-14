@@ -65,7 +65,7 @@ function calcStats(values: number[]) {
   };
 }
 
-/* ---------------- HIT RATE (STAT AWARE) ---------------- */
+/* ---------------- HIT RATE ---------------- */
 
 function getHitThresholds(stat: StatLens): number[] {
   if (stat === "Fantasy") return [80, 90, 100, 110];
@@ -99,7 +99,7 @@ export default function MasterTableDesktop({
   const [expanded, setExpanded] = useState(false);
   const [search, setSearch] = useState("");
 
-  // 🔹 COMPACT ADD (state only, no behavior yet)
+  // 🔹 COMPACT STATE (already added previously)
   const [compact, setCompact] = useState(false);
 
   /* ---------------- DERIVED ROW DATA ---------------- */
@@ -181,7 +181,7 @@ export default function MasterTableDesktop({
           </div>
         </div>
 
-        {/* 🔹 COMPACT BUTTON ROW (NEW, ISOLATED) */}
+        {/* COMPACT BUTTON (already present) */}
         <div className="flex justify-end">
           <button
             onClick={() => setCompact((v) => !v)}
@@ -251,20 +251,17 @@ export default function MasterTableDesktop({
       </div>
 
       {/* ================= TABLE ================= */}
-      {/* EVERYTHING BELOW IS UNCHANGED */}
-
-      {/* ================= TABLE ================= */}
       <div className="relative overflow-x-auto scrollbar-none">
         <div
           className="flex text-[11px]"
           style={{
             minWidth:
               LEFT_COL_W +
-              ROUND_LABELS.length * ROUND_COL_W +
+              (compact ? 0 : ROUND_LABELS.length * ROUND_COL_W) +
               RIGHT_COL_W,
           }}
         >
-          {/* PLAYER */}
+          {/* PLAYER COLUMN — UNCHANGED */}
           <div
             className="sticky left-0 z-30 bg-black/95 border-r border-neutral-800"
             style={{ width: LEFT_COL_W }}
@@ -293,40 +290,42 @@ export default function MasterTableDesktop({
             ))}
           </div>
 
-          {/* ROUNDS */}
-          <div>
-            <div className="flex border-b border-neutral-800">
-              {ROUND_LABELS.map((r) => (
-                <div
-                  key={r}
-                  className="py-3 text-center text-[10px] uppercase tracking-[0.18em] text-neutral-500"
-                  style={{ width: ROUND_COL_W }}
-                >
-                  {r}
-                </div>
-              ))}
-            </div>
-
-            {visible.map(({ player, values }) => (
-              <div
-                key={player.id}
-                className="flex border-t border-neutral-800"
-                style={{ height: ROW_H }}
-              >
-                {values.map((v, i) => (
+          {/* 🔹 ROUNDS — HIDDEN WHEN COMPACT */}
+          {!compact && (
+            <div>
+              <div className="flex border-b border-neutral-800">
+                {ROUND_LABELS.map((r) => (
                   <div
-                    key={i}
-                    className="flex items-center justify-center text-sm text-neutral-100"
+                    key={r}
+                    className="py-3 text-center text-[10px] uppercase tracking-[0.18em] text-neutral-500"
                     style={{ width: ROUND_COL_W }}
                   >
-                    {v}
+                    {r}
                   </div>
                 ))}
               </div>
-            ))}
-          </div>
 
-          {/* STATS & HIT RATE */}
+              {visible.map(({ player, values }) => (
+                <div
+                  key={player.id}
+                  className="flex border-t border-neutral-800"
+                  style={{ height: ROW_H }}
+                >
+                  {values.map((v, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-center text-sm text-neutral-100"
+                      style={{ width: ROUND_COL_W }}
+                    >
+                      {v}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* STATS & HIT RATE — UNCHANGED */}
           <div
             className="sticky right-0 z-20 bg-black/95 border-l border-neutral-800"
             style={{ width: RIGHT_COL_W }}
@@ -369,7 +368,7 @@ export default function MasterTableDesktop({
 
                   <div className={SPACING.dividerColor} />
 
-                  {/* HIT RATE — REAL */}
+                  {/* HIT RATE */}
                   <div className={cx("flex flex-col justify-center pl-3", SPACING.hitRateGapY)}>
                     {hitThresholds.map((t) => {
                       const r = calcHitRate(values, t);
