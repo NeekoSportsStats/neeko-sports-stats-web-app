@@ -194,7 +194,7 @@ export default function MasterTableDesktop({
             )}
           </div>
 
-          {/* SEARCH (PATCHED — NOTHING ELSE CHANGED) */}
+          {/* SEARCH */}
           <div
             className={cx(
               "relative flex items-center rounded-xl border px-3 py-2",
@@ -308,7 +308,7 @@ export default function MasterTableDesktop({
                 style={{ height: ROW_H }}
               >
                 <div className={cx("grid h-full items-center", SPACING.col3Grid)}>
-                  {/* STATS */}
+                  {/* STATS (PATCHED ALIGNMENT ONLY) */}
                   <div className={cx("flex flex-col justify-center", SPACING.statsGapY)}>
                     {[
                       ["AVG", stats.avg],
@@ -318,11 +318,12 @@ export default function MasterTableDesktop({
                     ].map(([l, v]) => (
                       <div
                         key={l as string}
-                        className="flex items-center justify-between gap-1 text-[11px]"
+                        className="grid grid-cols-[32px_auto] items-center gap-2 text-[11px]"
                       >
                         <span className="text-neutral-500">{l}</span>
                         <span
                           className={cx(
+                            "text-left",
                             l === "AVG" && "text-yellow-300 font-semibold"
                           )}
                         >
