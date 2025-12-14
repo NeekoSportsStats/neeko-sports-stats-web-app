@@ -19,6 +19,9 @@ const LEFT_COL_W = 220;
 const ROUND_COL_W = 48;
 const RIGHT_COL_W = 260;
 
+/* ✅ Compact version of column 3 width */
+const RIGHT_COL_W_COMPACT = 210;
+
 const ROW_H = 84;
 
 /* -------------------- LOCKED SPACING TOKENS -------------------- */
@@ -28,6 +31,11 @@ const SPACING = {
   hitRateGapY: "space-y-1",
   dividerColor: "bg-yellow-500/10",
   col3Grid: "grid-cols-[108px_1px_1fr]",
+};
+
+/* ✅ Compact grid for column 3 (less cramped) */
+const SPACING_COMPACT = {
+  col3Grid: "grid-cols-[82px_1px_1fr]",
 };
 
 /* -------------------------------------------------------------------------- */
@@ -256,7 +264,7 @@ export default function MasterTableDesktop({
             minWidth:
               LEFT_COL_W +
               (compact ? 0 : ROUND_LABELS.length * ROUND_COL_W) +
-              RIGHT_COL_W,
+              (compact ? RIGHT_COL_W_COMPACT : RIGHT_COL_W),
           }}
         >
           {/* PLAYER */}
@@ -326,7 +334,7 @@ export default function MasterTableDesktop({
           {/* STATS & HIT RATE */}
           <div
             className="sticky right-0 z-20 bg-black/95 border-l border-neutral-800"
-            style={{ width: RIGHT_COL_W }}
+            style={{ width: compact ? RIGHT_COL_W_COMPACT : RIGHT_COL_W }}
           >
             <div className="sticky top-0 z-10 px-4 py-3 bg-black/95 border-b border-neutral-800 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
               Stats & hit rate
@@ -338,14 +346,26 @@ export default function MasterTableDesktop({
                 className="px-4 border-t border-neutral-800"
                 style={{ height: ROW_H }}
               >
-                <div className={cx("grid h-full items-center", SPACING.col3Grid)}>
+                <div
+                  className={cx(
+                    "grid h-full items-center",
+                    compact ? SPACING_COMPACT.col3Grid : SPACING.col3Grid
+                  )}
+                >
+                  {/* STATS */}
                   <div className={cx("flex flex-col justify-center", SPACING.statsGapY)}>
-                    {[
-                      ["AVG", stats.avg],
-                      ["MIN", stats.min],
-                      ["MAX", stats.max],
-                      ["GMS", stats.gms],
-                    ].map(([l, v]) => (
+                    {(compact
+                      ? ([
+                          ["AVG", stats.avg],
+                          ["GMS", stats.gms],
+                        ] as Array<[string, number]>)
+                      : ([
+                          ["AVG", stats.avg],
+                          ["MIN", stats.min],
+                          ["MAX", stats.max],
+                          ["GMS", stats.gms],
+                        ] as Array<[string, number]>)
+                    ).map(([l, v]) => (
                       <div
                         key={l}
                         className="grid grid-cols-[32px_auto] items-center gap-2 text-[11px]"
@@ -365,12 +385,18 @@ export default function MasterTableDesktop({
 
                   <div className={SPACING.dividerColor} />
 
+                  {/* HIT RATE */}
                   <div className={cx("flex flex-col justify-center pl-3", SPACING.hitRateGapY)}>
                     {hitThresholds.map((t) => {
                       const r = calcHitRate(values, t);
                       return (
                         <div key={t} className="flex items-center gap-2">
-                          <span className="w-8 text-[10px] text-neutral-400">
+                          <span
+                            className={cx(
+                              "text-[10px] text-neutral-400",
+                              compact ? "w-7" : "w-8"
+                            )}
+                          >
                             {t}+
                           </span>
                           <div className="flex-1 h-1 rounded-full bg-neutral-800 overflow-hidden">
@@ -379,7 +405,12 @@ export default function MasterTableDesktop({
                               style={{ width: `${r}%` }}
                             />
                           </div>
-                          <span className="w-8 text-right text-[10px] text-neutral-300">
+                          <span
+                            className={cx(
+                              "text-right text-[10px] text-neutral-300",
+                              compact ? "w-7" : "w-8"
+                            )}
+                          >
                             {r}%
                           </span>
                         </div>
