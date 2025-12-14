@@ -364,19 +364,7 @@ export default function MasterTableDesktop({
         </div>
       </div>
 
-      {/* SHOW MORE */}
-      {!expanded && !isPremium && (
-        <div className="py-6 text-center">
-          <button
-            onClick={() => setExpanded(true)}
-            className="text-sm text-yellow-300 hover:underline"
-          >
-            Show more
-          </button>
-        </div>
-      )}
-
-      {/* CTA */}
+      {/* CTA — MOVED ABOVE SHOW MORE */}
       {!isPremium && (
         <div className="flex justify-center py-10 border-t border-neutral-800">
           <button
@@ -398,6 +386,18 @@ export default function MasterTableDesktop({
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-yellow-300" />
+          </button>
+        </div>
+      )}
+
+      {/* SHOW MORE — NOW BELOW CTA */}
+      {!expanded && !isPremium && (
+        <div className="py-6 text-center">
+          <button
+            onClick={() => setExpanded(true)}
+            className="text-sm text-yellow-300 hover:underline"
+          >
+            Show more
           </button>
         </div>
       )}
