@@ -146,7 +146,7 @@ export default function MasterTableDesktop({
   return (
     <div className="mt-10 rounded-3xl border border-neutral-800 bg-black/90 shadow-2xl overflow-hidden">
       {/* ================= HEADER ================= */}
-      <div className="px-6 py-6 border-b border-neutral-800 space-y-4">
+      <div className="px-6 py-6 border-b border-neutral-800 space-y-3">
         <div className="flex items-start justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-yellow-500/60 bg-black/80 px-3 py-1 text-xs text-yellow-200/90">
@@ -182,7 +182,7 @@ export default function MasterTableDesktop({
         </div>
 
         {/* COMPACT BUTTON (already present) */}
-        <div className="flex justify-end">
+        <div className="mt-1 flex justify-end">
           <button
             onClick={() => setCompact((v) => !v)}
             className={cx(
