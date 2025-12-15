@@ -19,9 +19,6 @@ const LEFT_COL_W = 220;
 const ROUND_COL_W = 48;
 const RIGHT_COL_W = 260;
 
-/* ✅ Compact version of column 3 width */
-const RIGHT_COL_W_COMPACT = 210;
-
 const ROW_H = 84;
 
 /* -------------------- LOCKED SPACING TOKENS -------------------- */
@@ -31,11 +28,6 @@ const SPACING = {
   hitRateGapY: "space-y-1",
   dividerColor: "bg-yellow-500/10",
   col3Grid: "grid-cols-[108px_1px_1fr]",
-};
-
-/* ✅ Compact grid for column 3 (less cramped) */
-const SPACING_COMPACT = {
-  col3Grid: "grid-cols-[82px_1px_1fr]",
 };
 
 /* -------------------------------------------------------------------------- */
@@ -106,6 +98,8 @@ export default function MasterTableDesktop({
   const [team, setTeam] = useState("All");
   const [expanded, setExpanded] = useState(false);
   const [search, setSearch] = useState("");
+
+  // 🔹 COMPACT STATE (already added previously)
   const [compact, setCompact] = useState(false);
 
   /* ---------------- DERIVED ROW DATA ---------------- */
@@ -183,76 +177,80 @@ export default function MasterTableDesktop({
           </div>
         </div>
 
-        {/* FILTER ROW */}
-        <div className="flex items-center justify-between gap-1">
-          {/* TEAM FILTER */}
-          <div
-            className={cx(
-              "relative flex items-center gap-2 rounded-xl border px-3 py-2 text-sm",
-              isPremium
-                ? "border-neutral-700 bg-black text-neutral-200"
-                : "border-neutral-800 bg-neutral-900 text-neutral-500"
-            )}
-          >
-            <span className="text-xs">Team</span>
-            <select
-              disabled={!isPremium}
-              value={team}
-              onChange={(e) => setTeam(e.target.value)}
-              className="bg-transparent text-sm outline-none appearance-none pr-6"
+        {/* FILTER ROW (subtitle now sits above Team; Compact now sits with Search) */}
+        <div className="flex items-start justify-between gap-3">
+          {/* LEFT: SUBTITLE + TEAM */}
+          <div className="flex flex-col gap-1">
+            <p className="text-xs text-neutral-400">
+              Season-long totals, averages and hit-rate performance
+            </p>
+
+            {/* TEAM FILTER */}
+            <div
+              className={cx(
+                "relative flex items-center gap-2 rounded-xl border px-3 py-2 text-sm",
+                isPremium
+                  ? "border-neutral-700 bg-black text-neutral-200"
+                  : "border-neutral-800 bg-neutral-900 text-neutral-500"
+              )}
             >
-              {teams.map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
-            {isPremium ? (
-              <ChevronDown className="h-4 w-4 absolute right-2" />
-            ) : (
-              <Lock className="h-4 w-4 absolute right-2" />
-            )}
+              <span className="text-xs">Team</span>
+              <select
+                disabled={!isPremium}
+                value={team}
+                onChange={(e) => setTeam(e.target.value)}
+                className="bg-transparent text-sm outline-none appearance-none pr-6"
+              >
+                {teams.map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
+              </select>
+              {isPremium ? (
+                <ChevronDown className="h-4 w-4 absolute right-2" />
+              ) : (
+                <Lock className="h-4 w-4 absolute right-2" />
+              )}
+            </div>
           </div>
 
-          {/* SEARCH */}
-          <div
-            className={cx(
-              "relative flex items-center rounded-xl border px-3 py-2",
-              isPremium
-                ? "border-neutral-700 bg-black"
-                : "border-neutral-800 bg-neutral-900"
-            )}
-          >
-            <Search className="h-4 w-4 text-neutral-500 mr-2" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              disabled={!isPremium}
-              placeholder="Search player, team or role"
-              className="bg-transparent text-sm text-neutral-200 placeholder:text-neutral-500
-                         outline-none w-48 disabled:cursor-not-allowed"
-            />
-            {!isPremium && (
-              <Lock className="h-4 w-4 text-neutral-500 ml-2" />
-            )}
+          {/* RIGHT: SEARCH + COMPACT */}
+          <div className="flex items-center gap-2">
+            {/* SEARCH */}
+            <div
+              className={cx(
+                "relative flex items-center rounded-xl border px-3 py-2",
+                isPremium
+                  ? "border-neutral-700 bg-black"
+                  : "border-neutral-800 bg-neutral-900"
+              )}
+            >
+              <Search className="h-4 w-4 text-neutral-500 mr-2" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                disabled={!isPremium}
+                placeholder="Search player, team or role"
+                className="bg-transparent text-sm text-neutral-200 placeholder:text-neutral-500
+                           outline-none w-48 disabled:cursor-not-allowed"
+              />
+              {!isPremium && (
+                <Lock className="h-4 w-4 text-neutral-500 ml-2" />
+              )}
+            </div>
+
+            {/* COMPACT BUTTON */}
+            <button
+              onClick={() => setCompact((v) => !v)}
+              className={cx(
+                "rounded-full px-3 py-1 text-xs border transition",
+                compact
+                  ? "bg-yellow-400 text-black border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)]"
+                  : "border-neutral-700 text-neutral-300 hover:bg-neutral-800"
+              )}
+            >
+              Compact
+            </button>
           </div>
-        </div>
-
-        {/* SUBTITLE + COMPACT INLINE */}
-        <div className="flex items-center justify-between pt-1">
-          <p className="text-xs text-neutral-400">
-            Season-long totals, averages and hit-rate performance
-          </p>
-
-          <button
-            onClick={() => setCompact((v) => !v)}
-            className={cx(
-              "rounded-full px-3 py-1 text-xs border transition",
-              compact
-                ? "bg-yellow-400 text-black border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)]"
-                : "border-neutral-700 text-neutral-300 hover:bg-neutral-800"
-            )}
-          >
-            Compact
-          </button>
         </div>
       </div>
 
@@ -264,10 +262,10 @@ export default function MasterTableDesktop({
             minWidth:
               LEFT_COL_W +
               (compact ? 0 : ROUND_LABELS.length * ROUND_COL_W) +
-              (compact ? RIGHT_COL_W_COMPACT : RIGHT_COL_W),
+              RIGHT_COL_W,
           }}
         >
-          {/* PLAYER */}
+          {/* PLAYER COLUMN — UNCHANGED */}
           <div
             className="sticky left-0 z-30 bg-black/95 border-r border-neutral-800"
             style={{ width: LEFT_COL_W }}
@@ -296,7 +294,7 @@ export default function MasterTableDesktop({
             ))}
           </div>
 
-          {/* ROUNDS */}
+          {/* 🔹 ROUNDS — HIDDEN WHEN COMPACT */}
           {!compact && (
             <div>
               <div className="flex border-b border-neutral-800">
@@ -331,10 +329,10 @@ export default function MasterTableDesktop({
             </div>
           )}
 
-          {/* STATS & HIT RATE */}
+          {/* STATS & HIT RATE — UNCHANGED */}
           <div
             className="sticky right-0 z-20 bg-black/95 border-l border-neutral-800"
-            style={{ width: compact ? RIGHT_COL_W_COMPACT : RIGHT_COL_W }}
+            style={{ width: RIGHT_COL_W }}
           >
             <div className="sticky top-0 z-10 px-4 py-3 bg-black/95 border-b border-neutral-800 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
               Stats & hit rate
@@ -346,28 +344,17 @@ export default function MasterTableDesktop({
                 className="px-4 border-t border-neutral-800"
                 style={{ height: ROW_H }}
               >
-                <div
-                  className={cx(
-                    "grid h-full items-center",
-                    compact ? SPACING_COMPACT.col3Grid : SPACING.col3Grid
-                  )}
-                >
+                <div className={cx("grid h-full items-center", SPACING.col3Grid)}>
                   {/* STATS */}
                   <div className={cx("flex flex-col justify-center", SPACING.statsGapY)}>
-                    {(compact
-                      ? ([
-                          ["AVG", stats.avg],
-                          ["GMS", stats.gms],
-                        ] as Array<[string, number]>)
-                      : ([
-                          ["AVG", stats.avg],
-                          ["MIN", stats.min],
-                          ["MAX", stats.max],
-                          ["GMS", stats.gms],
-                        ] as Array<[string, number]>)
-                    ).map(([l, v]) => (
+                    {[
+                      ["AVG", stats.avg],
+                      ["MIN", stats.min],
+                      ["MAX", stats.max],
+                      ["GMS", stats.gms],
+                    ].map(([l, v]) => (
                       <div
-                        key={l}
+                        key={l as string}
                         className="grid grid-cols-[32px_auto] items-center gap-2 text-[11px]"
                       >
                         <span className="text-neutral-500">{l}</span>
@@ -391,12 +378,7 @@ export default function MasterTableDesktop({
                       const r = calcHitRate(values, t);
                       return (
                         <div key={t} className="flex items-center gap-2">
-                          <span
-                            className={cx(
-                              "text-[10px] text-neutral-400",
-                              compact ? "w-7" : "w-8"
-                            )}
-                          >
+                          <span className="w-8 text-[10px] text-neutral-400">
                             {t}+
                           </span>
                           <div className="flex-1 h-1 rounded-full bg-neutral-800 overflow-hidden">
@@ -405,12 +387,7 @@ export default function MasterTableDesktop({
                               style={{ width: `${r}%` }}
                             />
                           </div>
-                          <span
-                            className={cx(
-                              "text-right text-[10px] text-neutral-300",
-                              compact ? "w-7" : "w-8"
-                            )}
-                          >
+                          <span className="w-8 text-right text-[10px] text-neutral-300">
                             {r}%
                           </span>
                         </div>
