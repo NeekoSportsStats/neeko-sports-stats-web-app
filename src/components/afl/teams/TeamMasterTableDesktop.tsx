@@ -15,6 +15,7 @@ import type { StatLens } from "./TeamMasterTable";
 const ROUND_LABELS = ["OR", ...Array.from({ length: 23 }, (_, i) => `R${i + 1}`)];
 
 const FREE_ROW_LIMIT = 8;
+const LOCKED_PREVIEW_ROWS = 2;
 
 const LEFT_COL_W = 220;
 const ROUND_COL_W = 48;
@@ -78,6 +79,7 @@ export default function TeamMasterTableDesktop({
 }) {
   const [search, setSearch] = useState("");
   const [compact, setCompact] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   /* ---------------- DERIVED DATA ---------------- */
 
@@ -99,22 +101,24 @@ export default function TeamMasterTableDesktop({
     return rows.filter((r) => r.searchIndex.includes(q));
   }, [rows, search, isPremium]);
 
-  const visibleRows = isPremium
+  const visibleRows = isPremium && expanded
     ? filtered
     : filtered.slice(0, FREE_ROW_LIMIT);
 
-  const lockedCount = isPremium
-    ? 0
-    : Math.max(0, filtered.length - FREE_ROW_LIMIT);
+  const lockedRows =
+    !isPremium && filtered.length > FREE_ROW_LIMIT
+      ? filtered.slice(
+          FREE_ROW_LIMIT,
+          FREE_ROW_LIMIT + LOCKED_PREVIEW_ROWS
+        )
+      : [];
 
   const hitThresholds = getHitThresholds(selectedStat);
 
   /* -------------------------------------------------------------------------- */
-  /* RENDER                                                                     */
-  /* -------------------------------------------------------------------------- */
 
   return (
-    <div className="mt-10 rounded-3xl border border-neutral-800 bg-black/90 shadow-2xl overflow-hidden">
+    <div className="mt-10 rounded-3xl border border-neutral-800 bg-black/95 shadow-2xl overflow-hidden">
       {/* ================= HEADER ================= */}
       <div className="px-6 py-6 border-b border-neutral-800">
         <div className="flex justify-between items-start">
@@ -131,7 +135,6 @@ export default function TeamMasterTableDesktop({
           </div>
 
           <div className="flex flex-col items-end gap-2">
-            {/* STAT LENSES */}
             <div className="flex gap-2 rounded-full border border-neutral-700 bg-black/80 p-1">
               {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
                 <button
@@ -149,15 +152,14 @@ export default function TeamMasterTableDesktop({
               ))}
             </div>
 
-            {/* COMPACT + SEARCH */}
             <div className="flex gap-2">
               <button
                 onClick={() => setCompact((v) => !v)}
                 className={cx(
                   "px-3 py-1 text-xs rounded-full border transition",
                   compact
-                    ? "bg-yellow-400 text-black border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)]"
-                    : "border-neutral-700 text-neutral-300 hover:bg-neutral-800"
+                    ? "bg-yellow-400 text-black"
+                    : "border-neutral-700 text-neutral-300"
                 )}
               >
                 Compact
@@ -177,11 +179,9 @@ export default function TeamMasterTableDesktop({
                   onChange={(e) => setSearch(e.target.value)}
                   disabled={!isPremium}
                   placeholder="Search team"
-                  className="bg-transparent text-sm text-neutral-200 placeholder:text-neutral-500 outline-none w-40 disabled:cursor-not-allowed"
+                  className="bg-transparent text-sm text-neutral-200 outline-none w-40 disabled:cursor-not-allowed"
                 />
-                {!isPremium && (
-                  <Lock className="h-4 w-4 text-neutral-500" />
-                )}
+                {!isPremium && <Lock className="h-4 w-4 text-neutral-500" />}
               </div>
             </div>
           </div>
@@ -202,44 +202,47 @@ export default function TeamMasterTableDesktop({
         >
           {/* ================= TEAM COLUMN ================= */}
           <div
-            className="sticky left-0 z-20 border-r border-neutral-800 bg-black"
+            className="sticky left-0 z-20 border-r border-neutral-800 bg-black/95"
             style={{ width: LEFT_COL_W }}
           >
-            <div className="sticky top-0 px-5 py-3 text-[10px] uppercase tracking-[0.18em] text-neutral-500 border-b border-neutral-800 bg-black">
+            <div className="sticky top-0 px-5 py-3 text-[10px] uppercase tracking-[0.18em] text-neutral-500 border-b border-neutral-800 bg-black/95">
               Team
             </div>
 
-            {visibleRows.map(({ team }) => (
+            {visibleRows.map(({ team }, idx) => (
               <button
                 key={team.id}
                 onClick={() => onSelectTeam(team)}
-                className="group w-full px-5 border-t border-neutral-800 flex items-center justify-between hover:bg-neutral-900/40 transition"
+                className="group w-full px-5 border-t border-neutral-800 flex items-center justify-between hover:bg-neutral-900/40"
                 style={{ height: ROW_H }}
               >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-neutral-50 truncate">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-neutral-50">
                     {team.name}
-                    <ChevronRight className="h-4 w-4 text-neutral-600 group-hover:text-neutral-200 transition" />
+                    <ChevronRight className="h-4 w-4 text-neutral-600" />
                   </div>
-                  <div className="mt-[1px] text-[10px] uppercase tracking-[0.16em] text-neutral-500 truncate">
+                  <div className="mt-[1px] text-[10px] uppercase tracking-[0.16em] text-neutral-500">
                     {team.code}
                   </div>
                 </div>
               </button>
             ))}
 
-            {/* LOCKED SKELETON ROWS */}
+            {!isPremium && filtered.length > FREE_ROW_LIMIT && (
+              <div className="h-px bg-neutral-700" />
+            )}
+
             {!isPremium &&
-              Array.from({ length: lockedCount }).map((_, i) => (
+              lockedRows.map((_, i) => (
                 <div
                   key={i}
-                  className="relative px-5 border-t border-neutral-800 overflow-hidden"
+                  className="relative px-5 border-t border-neutral-800"
                   style={{ height: ROW_H }}
                 >
-                  {/* shimmer */}
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-[shimmer_2.2s_linear_infinite]" />
-                  {/* blur */}
-                  <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
+                  <div className="absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center">
+                    <Lock className="h-5 w-5 text-neutral-500" />
+                  </div>
                 </div>
               ))}
           </div>
@@ -282,12 +285,12 @@ export default function TeamMasterTableDesktop({
           {/* ================= STATS ================= */}
           <div
             className={cx(
-              "sticky right-0 z-10 border-l border-neutral-800 bg-black",
+              "sticky right-0 z-10 border-l border-neutral-800 bg-black/95",
               !isPremium && "opacity-80"
             )}
             style={{ width: RIGHT_COL_W }}
           >
-            <div className="sticky top-0 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-neutral-500 border-b border-neutral-800 bg-black">
+            <div className="sticky top-0 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-neutral-500 border-b border-neutral-800 bg-black/95">
               Stats & hit rate
             </div>
 
@@ -345,16 +348,18 @@ export default function TeamMasterTableDesktop({
           </div>
         </div>
 
-        {/* bottom divider */}
         <div className="h-px bg-neutral-800 w-full" />
       </div>
 
-      {/* ================= CTA (FREE ONLY) ================= */}
-      {!isPremium && (
-        <div className="px-6 py-10 border-t border-neutral-800">
-          <a
-            href="https://www.neekostats.com.au/neeko-plus"
-            className="rounded-3xl border border-yellow-500/30 bg-gradient-to-r from-yellow-500/25 via-yellow-500/10 to-transparent px-6 py-4 shadow-2xl max-w-lg w-full flex items-center justify-between"
+      {/* ================= CTA / SHOW MORE ================= */}
+      <div className="py-10 flex justify-center border-t border-neutral-800">
+        {!isPremium ? (
+          <button
+            onClick={() =>
+              (window.location.href =
+                "https://www.neekostats.com.au/neeko-plus")
+            }
+            className="max-w-lg w-full rounded-3xl border border-yellow-500/30 bg-gradient-to-r from-yellow-500/25 via-yellow-500/10 to-transparent px-6 py-4 shadow-2xl flex items-center justify-between"
           >
             <div>
               <div className="text-[10px] uppercase tracking-[0.18em] text-yellow-300">
@@ -365,9 +370,16 @@ export default function TeamMasterTableDesktop({
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-yellow-300" />
-          </a>
-        </div>
-      )}
+          </button>
+        ) : !expanded ? (
+          <button
+            onClick={() => setExpanded(true)}
+            className="text-sm text-neutral-300 hover:text-yellow-300"
+          >
+            Show more
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
