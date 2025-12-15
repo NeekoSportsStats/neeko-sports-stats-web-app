@@ -85,14 +85,19 @@ export default function MasterTableDesktop({
   selectedStat,
   setSelectedStat,
   isPremium,
+  query,
+  setQuery,
   onSelectPlayer,
 }: {
   players: PlayerRow[];
   selectedStat: StatLens;
   setSelectedStat: (s: StatLens) => void;
   isPremium: boolean;
+  query: string;
+  setQuery: (v: string) => void;
   onSelectPlayer: (p: PlayerRow) => void;
 }) {
+
   const [team, setTeam] = useState("All");
   const [search, setSearch] = useState("");
   const [compact, setCompact] = useState(false);

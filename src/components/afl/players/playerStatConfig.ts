@@ -1,4 +1,12 @@
-export const STAT_CONFIG = {
+// src/components/afl/players/playerStatConfig.ts
+
+export type StatConfig = {
+  label: "Fantasy" | "Disposals" | "Goals";
+  valueUnitShort: string;
+  thresholds: readonly number[];
+};
+
+export const STAT_CONFIG: Record<StatConfig["label"], StatConfig> = {
   Fantasy: {
     label: "Fantasy",
     valueUnitShort: "pts",
@@ -7,11 +15,11 @@ export const STAT_CONFIG = {
   Disposals: {
     label: "Disposals",
     valueUnitShort: "disp",
-    thresholds: [15, 20, 25, 30, 35],
+    thresholds: [15, 20, 25, 30],
   },
   Goals: {
     label: "Goals",
     valueUnitShort: "g",
-    thresholds: [1, 2, 3, 4, 5],
+    thresholds: [1, 2, 3, 4],
   },
-} as const;
+};

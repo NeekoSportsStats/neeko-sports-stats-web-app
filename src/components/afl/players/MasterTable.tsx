@@ -4,10 +4,9 @@ import { useAuth } from "@/lib/auth";
 import PlayerInsightsOverlay from "./PlayerInsightsOverlay";
 import MasterTableDesktop from "./MasterTableDesktop";
 import MasterTableMobile from "./MasterTableMobile";
-import { STAT_CONFIG } from "./playerStatConfig";
 
 /* -------------------------------------------------------------------------- */
-/* TYPES (re-exported)                                                         */
+/* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
 
 export type StatLens = "Fantasy" | "Disposals" | "Goals";
@@ -34,32 +33,21 @@ export const ROUND_LABELS = [
 ];
 
 /* -------------------------------------------------------------------------- */
-/* MOCK DATA (UNCHANGED)                                                      */
+/* MOCK DATA                                                                  */
 /* -------------------------------------------------------------------------- */
 
 function buildMockPlayers(): PlayerRow[] {
   const list: PlayerRow[] = [];
 
   for (let i = 1; i <= 60; i++) {
-    const baseFantasy = 70 + Math.round(Math.random() * 35);
-    const baseDisposals = 18 + Math.round(Math.random() * 10);
-    const baseGoals = Math.random() < 0.5 ? 1 : 0;
-
     const f: number[] = [];
     const d: number[] = [];
     const g: number[] = [];
 
     for (let r = 0; r < ROUND_LABELS.length; r++) {
-      f.push(Math.max(35, baseFantasy + Math.round((Math.random() - 0.5) * 30)));
-      d.push(Math.max(6, baseDisposals + Math.round((Math.random() - 0.5) * 10)));
-      g.push(
-        Math.max(
-          0,
-          baseGoals +
-            (Math.random() < 0.18 ? 2 : 0) +
-            (Math.random() < 0.06 ? 3 : 0)
-        )
-      );
+      f.push(60 + Math.round(Math.random() * 40));
+      d.push(10 + Math.round(Math.random() * 20));
+      g.push(Math.round(Math.random() * 3));
     }
 
     list.push({
@@ -80,14 +68,13 @@ function buildMockPlayers(): PlayerRow[] {
 const MOCK_PLAYERS = buildMockPlayers();
 
 /* -------------------------------------------------------------------------- */
-/* MAIN ORCHESTRATOR                                                          */
+/* MASTER TABLE ORCHESTRATOR                                                   */
 /* -------------------------------------------------------------------------- */
 
 export default function MasterTable() {
   const { isPremium } = useAuth();
 
   const [selectedStat, setSelectedStat] = useState<StatLens>("Fantasy");
-  const [compactMode, setCompactMode] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null);
   const [query, setQuery] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -95,28 +82,15 @@ export default function MasterTable() {
   useEffect(() => setMounted(true), []);
 
   const players = useMemo(() => MOCK_PLAYERS, []);
-  const statCfg = STAT_CONFIG[selectedStat];
-
-  const filteredPlayers = useMemo(() => {
-    if (!isPremium) return players;
-    const q = query.trim().toLowerCase();
-    if (!q) return players;
-    return players.filter((p) =>
-      `${p.name} ${p.team} ${p.role}`.toLowerCase().includes(q)
-    );
-  }, [players, isPremium, query]);
 
   return (
     <>
-      {/* DESKTOP */}
+      {/* ================= DESKTOP ================= */}
       <div className="hidden md:block">
         <MasterTableDesktop
-          players={filteredPlayers}
-          statCfg={statCfg}
+          players={players}
           selectedStat={selectedStat}
           setSelectedStat={setSelectedStat}
-          compactMode={compactMode}
-          setCompactMode={setCompactMode}
           isPremium={isPremium}
           query={query}
           setQuery={setQuery}
@@ -124,15 +98,12 @@ export default function MasterTable() {
         />
       </div>
 
-      {/* MOBILE */}
+      {/* ================= MOBILE ================= */}
       <div className="md:hidden">
         <MasterTableMobile
-          players={filteredPlayers}
-          statCfg={statCfg}
+          players={players}
           selectedStat={selectedStat}
           setSelectedStat={setSelectedStat}
-          compactMode={compactMode}
-          setCompactMode={setCompactMode}
           isPremium={isPremium}
           query={query}
           setQuery={setQuery}
@@ -140,7 +111,7 @@ export default function MasterTable() {
         />
       </div>
 
-      {/* INSIGHTS OVERLAY */}
+      {/* ================= INSIGHTS OVERLAY ================= */}
       {mounted &&
         selectedPlayer &&
         createPortal(
