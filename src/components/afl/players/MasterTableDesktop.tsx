@@ -99,7 +99,6 @@ export default function MasterTableDesktop({
   const [expanded, setExpanded] = useState(false);
   const [search, setSearch] = useState("");
 
-  // 🔹 COMPACT STATE (already added previously)
   const [compact, setCompact] = useState(false);
 
   /* ---------------- DERIVED ROW DATA ---------------- */
@@ -177,15 +176,14 @@ export default function MasterTableDesktop({
           </div>
         </div>
 
-        {/* FILTER ROW (subtitle now sits above Team; Compact now sits with Search) */}
+        {/* FILTER ROW */}
         <div className="flex items-start justify-between gap-3">
-          {/* LEFT: SUBTITLE + TEAM */}
+          {/* LEFT */}
           <div className="flex flex-col gap-1">
             <p className="text-xs text-neutral-400">
               Season-long totals, averages and hit-rate performance
             </p>
 
-            {/* TEAM FILTER */}
             <div
               className={cx(
                 "relative flex items-center gap-2 rounded-xl border px-3 py-2 text-sm",
@@ -213,9 +211,20 @@ export default function MasterTableDesktop({
             </div>
           </div>
 
-          {/* RIGHT: SEARCH + COMPACT */}
-          <div className="flex items-center gap-2">
-            {/* SEARCH */}
+          {/* RIGHT — COMPACT ABOVE SEARCH */}
+          <div className="flex flex-col items-end gap-2">
+            <button
+              onClick={() => setCompact((v) => !v)}
+              className={cx(
+                "rounded-full px-3 py-1 text-xs border transition",
+                compact
+                  ? "bg-yellow-400 text-black border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)]"
+                  : "border-neutral-700 text-neutral-300 hover:bg-neutral-800"
+              )}
+            >
+              Compact
+            </button>
+
             <div
               className={cx(
                 "relative flex items-center rounded-xl border px-3 py-2",
@@ -237,22 +246,12 @@ export default function MasterTableDesktop({
                 <Lock className="h-4 w-4 text-neutral-500 ml-2" />
               )}
             </div>
-
-            {/* COMPACT BUTTON */}
-            <button
-              onClick={() => setCompact((v) => !v)}
-              className={cx(
-                "rounded-full px-3 py-1 text-xs border transition",
-                compact
-                  ? "bg-yellow-400 text-black border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)]"
-                  : "border-neutral-700 text-neutral-300 hover:bg-neutral-800"
-              )}
-            >
-              Compact
-            </button>
           </div>
         </div>
       </div>
+
+      {/* ================= TABLE ================= */}
+      {/* (unchanged below this point) */}
 
       {/* ================= TABLE ================= */}
       <div className="relative overflow-x-auto scrollbar-none">
