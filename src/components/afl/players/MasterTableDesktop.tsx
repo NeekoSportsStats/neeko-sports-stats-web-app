@@ -45,11 +45,8 @@ function getRowValues(key: string, stat: StatLens): number[] {
   let seed = 0;
   for (let i = 0; i < key.length; i++) seed += key.charCodeAt(i);
 
-  const base =
-    stat === "Fantasy" ? 70 : stat === "Disposals" ? 18 : 1;
-
-  const range =
-    stat === "Fantasy" ? 40 : stat === "Disposals" ? 20 : 4;
+  const base = stat === "Fantasy" ? 70 : stat === "Disposals" ? 18 : 1;
+  const range = stat === "Fantasy" ? 40 : stat === "Disposals" ? 20 : 4;
 
   return ROUND_LABELS.map((_, i) => base + ((seed + i * 13) % range));
 }
@@ -98,7 +95,6 @@ export default function MasterTableDesktop({
   const [team, setTeam] = useState("All");
   const [expanded, setExpanded] = useState(false);
   const [search, setSearch] = useState("");
-
   const [compact, setCompact] = useState(false);
 
   /* ---------------- DERIVED ROW DATA ---------------- */
@@ -157,7 +153,6 @@ export default function MasterTableDesktop({
             </h2>
           </div>
 
-          {/* STAT LENS */}
           <div className="flex gap-2 rounded-full border border-neutral-700 bg-black/80 p-1">
             {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
               <button
@@ -176,9 +171,7 @@ export default function MasterTableDesktop({
           </div>
         </div>
 
-        {/* FILTER ROW */}
         <div className="flex items-start justify-between gap-3">
-          {/* LEFT */}
           <div className="flex flex-col gap-1">
             <p className="text-xs text-neutral-400">
               Season-long totals, averages and hit-rate performance
@@ -211,7 +204,6 @@ export default function MasterTableDesktop({
             </div>
           </div>
 
-          {/* RIGHT — COMPACT ABOVE SEARCH */}
           <div className="flex flex-col items-end gap-2">
             <button
               onClick={() => setCompact((v) => !v)}
@@ -239,8 +231,7 @@ export default function MasterTableDesktop({
                 onChange={(e) => setSearch(e.target.value)}
                 disabled={!isPremium}
                 placeholder="Search player, team or role"
-                className="bg-transparent text-sm text-neutral-200 placeholder:text-neutral-500
-                           outline-none w-48 disabled:cursor-not-allowed"
+                className="bg-transparent text-sm text-neutral-200 placeholder:text-neutral-500 outline-none w-48"
               />
               {!isPremium && (
                 <Lock className="h-4 w-4 text-neutral-500 ml-2" />
@@ -249,9 +240,6 @@ export default function MasterTableDesktop({
           </div>
         </div>
       </div>
-
-      {/* ================= TABLE ================= */}
-      {/* (unchanged below this point) */}
 
       {/* ================= TABLE ================= */}
       <div className="relative overflow-x-auto scrollbar-none">
@@ -264,7 +252,7 @@ export default function MasterTableDesktop({
               RIGHT_COL_W,
           }}
         >
-          {/* PLAYER COLUMN — UNCHANGED */}
+          {/* PLAYER COLUMN */}
           <div
             className="sticky left-0 z-30 bg-black/95 border-r border-neutral-800"
             style={{ width: LEFT_COL_W }}
@@ -277,13 +265,13 @@ export default function MasterTableDesktop({
               <button
                 key={player.id}
                 onClick={() => onSelectPlayer(player)}
-                className="group w-full px-5 border-t border-neutral-800 flex items-center justify-between hover:bg-neutral-900/40 transition"
+                className="group w-full px-5 border-t border-neutral-800 flex items-center justify-between hover:bg-neutral-900/40"
                 style={{ height: ROW_H }}
               >
                 <div>
                   <div className="flex items-center gap-2 text-sm font-semibold text-neutral-50">
                     {player.name}
-                    <ChevronRight className="h-4 w-4 text-neutral-600 group-hover:text-neutral-300" />
+                    <ChevronRight className="h-4 w-4 text-neutral-600" />
                   </div>
                   <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
                     {player.team} · {player.role}
@@ -293,7 +281,6 @@ export default function MasterTableDesktop({
             ))}
           </div>
 
-          {/* 🔹 ROUNDS — HIDDEN WHEN COMPACT */}
           {!compact && (
             <div>
               <div className="flex border-b border-neutral-800">
@@ -328,12 +315,12 @@ export default function MasterTableDesktop({
             </div>
           )}
 
-          {/* STATS & HIT RATE — UNCHANGED */}
+          {/* COLUMN 3 */}
           <div
             className="sticky right-0 z-20 bg-black/95 border-l border-neutral-800"
             style={{ width: RIGHT_COL_W }}
           >
-            <div className="sticky top-0 z-10 px-4 py-3 bg-black/95 border-b border-neutral-800 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
+            <div className="px-4 py-3 border-b border-neutral-800 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
               Stats & hit rate
             </div>
 
@@ -343,90 +330,87 @@ export default function MasterTableDesktop({
                 className="px-4 border-t border-neutral-800"
                 style={{ height: ROW_H }}
               >
-                <div className={cx("grid h-full items-center", SPACING.col3Grid)}>
-                  {/* STATS */}
-                  <div className={cx("flex flex-col justify-center", SPACING.statsGapY)}>
+                {!compact && (
+                  <div className={cx("grid h-full items-center", SPACING.col3Grid)}>
+                    <div className={cx("flex flex-col justify-center", SPACING.statsGapY)}>
+                      {[
+                        ["AVG", stats.avg],
+                        ["MIN", stats.min],
+                        ["MAX", stats.max],
+                        ["GMS", stats.gms],
+                      ].map(([l, v]) => (
+                        <div key={l as string} className="grid grid-cols-[32px_auto] gap-2">
+                          <span className="text-neutral-500">{l}</span>
+                          <span className={l === "AVG" ? "text-yellow-300 font-semibold" : ""}>
+                            {v}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className={SPACING.dividerColor} />
+
+                    <div className={cx("flex flex-col justify-center pl-3", SPACING.hitRateGapY)}>
+                      {hitThresholds.map((t) => {
+                        const r = calcHitRate(values, t);
+                        return (
+                          <div key={t} className="flex items-center gap-2">
+                            <span className="w-8 text-[10px] text-neutral-400">{t}+</span>
+                            <div className="flex-1 h-1 bg-neutral-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-emerald-400 via-yellow-300 to-orange-400"
+                                style={{ width: `${r}%` }}
+                              />
+                            </div>
+                            <span className="w-8 text-right text-[10px] text-neutral-300">
+                              {r}%
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {compact && (
+                  <div className="flex h-full items-center justify-between gap-3">
                     {[
                       ["AVG", stats.avg],
                       ["MIN", stats.min],
                       ["MAX", stats.max],
                       ["GMS", stats.gms],
                     ].map(([l, v]) => (
-                      <div
-                        key={l as string}
-                        className="grid grid-cols-[32px_auto] items-center gap-2 text-[11px]"
-                      >
+                      <div key={l as string} className="flex items-center gap-1">
                         <span className="text-neutral-500">{l}</span>
-                        <span
-                          className={cx(
-                            "text-left",
-                            l === "AVG" && "text-yellow-300 font-semibold"
-                          )}
-                        >
-                          {v}
-                        </span>
+                        <span className="text-neutral-100 font-medium">{v}</span>
                       </div>
                     ))}
-                  </div>
 
-                  <div className={SPACING.dividerColor} />
-
-                  {/* HIT RATE */}
-                  <div className={cx("flex flex-col justify-center pl-3", SPACING.hitRateGapY)}>
                     {hitThresholds.map((t) => {
                       const r = calcHitRate(values, t);
                       return (
-                        <div key={t} className="flex items-center gap-2">
-                          <span className="w-8 text-[10px] text-neutral-400">
-                            {t}+
-                          </span>
-                          <div className="flex-1 h-1 rounded-full bg-neutral-800 overflow-hidden">
+                        <div key={t} className="flex items-center gap-1 min-w-[54px]">
+                          <span className="text-[10px] text-neutral-400">{t}+</span>
+                          <div className="flex-1 h-1 bg-neutral-800 rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-gradient-to-r from-emerald-400 via-yellow-300 to-orange-400"
+                              className="h-full bg-yellow-400"
                               style={{ width: `${r}%` }}
                             />
                           </div>
-                          <span className="w-8 text-right text-[10px] text-neutral-300">
+                          <span className="text-[10px] text-neutral-300">
                             {r}%
                           </span>
                         </div>
                       );
                     })}
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* CTA */}
-      {!isPremium && (
-        <div className="flex justify-center py-10 border-t border-neutral-800">
-          <button
-            onClick={() => (window.location.href = "/neeko-plus")}
-            className="rounded-3xl border border-yellow-500/30
-                       bg-gradient-to-r from-yellow-500/25 via-yellow-500/10 to-transparent
-                       px-6 py-4 shadow-2xl max-w-lg w-full
-                       flex items-center justify-between"
-          >
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-yellow-300">
-                Neeko+
-              </div>
-              <div className="text-sm font-semibold text-yellow-100">
-                Unlock full player table
-              </div>
-              <div className="text-xs text-neutral-300">
-                Search, team filters & full season insights
-              </div>
-            </div>
-            <ArrowRight className="h-5 w-5 text-yellow-300" />
-          </button>
-        </div>
-      )}
-
-      {/* SHOW MORE */}
       {!expanded && !isPremium && (
         <div className="py-6 text-center">
           <button
