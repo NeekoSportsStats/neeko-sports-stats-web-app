@@ -1,5 +1,10 @@
 import React, { useMemo, useState } from "react";
-import { Lock, ChevronRight, ChevronDown, Search } from "lucide-react";
+import {
+  Lock,
+  ChevronRight,
+  ChevronDown,
+  Search,
+} from "lucide-react";
 import type { PlayerRow, StatLens } from "./MasterTable";
 
 /* -------------------------------------------------------------------------- */
@@ -13,14 +18,6 @@ const LEFT_COL_W = 220;
 const ROUND_COL_W = 48;
 const RIGHT_COL_W = 260;
 const ROW_H = 84;
-
-/* -------------------- LOCKED SPACING TOKENS -------------------- */
-const SPACING = {
-  statsGapY: "space-y-[2px]",
-  hitRateGapY: "space-y-1",
-  dividerColor: "bg-yellow-500/10",
-  col3Grid: "grid-cols-[108px_1px_1fr]",
-};
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
@@ -46,6 +43,7 @@ function getRowValues(key: string, stat: StatLens): number[] {
 function calcStats(values: number[]) {
   const total = values.reduce((a, b) => a + b, 0);
   return {
+    total,
     avg: Math.round(total / values.length),
     min: Math.min(...values),
     max: Math.max(...values),
@@ -97,18 +95,24 @@ export default function MasterTableDesktop({
           searchIndex: buildSearchIndex(p),
         };
       })
-      .sort((a, b) => b.stats.avg - a.stats.avg);
+      .sort((a, b) => b.stats.total - a.stats.total);
   }, [players, selectedStat]);
 
   const visible = useMemo(() => {
     let list = rows;
 
-    if (team !== "All") list = list.filter((r) => r.player.team === team);
+    if (team !== "All") {
+      list = list.filter((r) => r.player.team === team);
+    }
+
     if (isPremium && search.trim()) {
       const q = search.toLowerCase().trim();
       list = list.filter((r) => r.searchIndex.includes(q));
     }
-    if (!expanded && !isPremium) list = list.slice(0, FREE_ROW_LIMIT);
+
+    if (!expanded && !isPremium) {
+      list = list.slice(0, FREE_ROW_LIMIT);
+    }
 
     return list;
   }, [rows, team, search, expanded, isPremium]);
@@ -158,9 +162,17 @@ export default function MasterTableDesktop({
               Season-long totals, averages and hit-rate performance
             </p>
 
-            <div className="relative flex items-center gap-2 rounded-xl border px-3 py-2 text-sm border-neutral-700 bg-black text-neutral-200">
+            <div
+              className={cx(
+                "relative flex items-center gap-2 rounded-xl border px-3 py-2 text-sm",
+                isPremium
+                  ? "border-neutral-700 bg-black text-neutral-200"
+                  : "border-neutral-800 bg-neutral-900 text-neutral-500"
+              )}
+            >
               <span className="text-xs">Team</span>
               <select
+                disabled={!isPremium}
                 value={team}
                 onChange={(e) => setTeam(e.target.value)}
                 className="bg-transparent text-sm outline-none appearance-none pr-6"
@@ -169,7 +181,11 @@ export default function MasterTableDesktop({
                   <option key={t}>{t}</option>
                 ))}
               </select>
-              <ChevronDown className="h-4 w-4 absolute right-2" />
+              {isPremium ? (
+                <ChevronDown className="h-4 w-4 absolute right-2" />
+              ) : (
+                <Lock className="h-4 w-4 absolute right-2" />
+              )}
             </div>
           </div>
 
@@ -179,21 +195,32 @@ export default function MasterTableDesktop({
               className={cx(
                 "rounded-full px-3 py-1 text-xs border transition",
                 compact
-                  ? "bg-yellow-400 text-black border-yellow-400"
+                  ? "bg-yellow-400 text-black border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)]"
                   : "border-neutral-700 text-neutral-300 hover:bg-neutral-800"
               )}
             >
               Compact
             </button>
 
-            <div className="relative flex items-center rounded-xl border px-3 py-2 border-neutral-700 bg-black">
+            <div
+              className={cx(
+                "relative flex items-center rounded-xl border px-3 py-2",
+                isPremium
+                  ? "border-neutral-700 bg-black"
+                  : "border-neutral-800 bg-neutral-900"
+              )}
+            >
               <Search className="h-4 w-4 text-neutral-500 mr-2" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                disabled={!isPremium}
                 placeholder="Search player, team or role"
                 className="bg-transparent text-sm text-neutral-200 placeholder:text-neutral-500 outline-none w-48"
               />
+              {!isPremium && (
+                <Lock className="h-4 w-4 text-neutral-500 ml-2" />
+              )}
             </div>
           </div>
         </div>
@@ -201,7 +228,14 @@ export default function MasterTableDesktop({
 
       {/* ================= TABLE ================= */}
       <div className="relative overflow-x-auto scrollbar-none">
-        <div className="flex text-[11px]">
+        <div
+          className="flex text-[11px]"
+          style={{
+            minWidth:
+              LEFT_COL_W +
+              (compact ? RIGHT_COL_W : ROUND_LABELS.length * ROUND_COL_W + RIGHT_COL_W),
+          }}
+        >
           {/* PLAYER COLUMN */}
           <div
             className="sticky left-0 z-30 bg-black/95 border-r border-neutral-800"
@@ -215,22 +249,62 @@ export default function MasterTableDesktop({
               <button
                 key={player.id}
                 onClick={() => onSelectPlayer(player)}
-                className="w-full px-5 border-t border-neutral-800 text-left"
+                className="group w-full px-5 border-t border-neutral-800 flex items-center justify-between hover:bg-neutral-900/40"
                 style={{ height: ROW_H }}
               >
-                <div className="flex items-center gap-2 text-sm font-semibold text-neutral-50">
-                  {player.name}
-                  <ChevronRight className="h-4 w-4 text-neutral-600" />
-                </div>
-                <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
-                  {player.team} · {player.role}
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-neutral-50">
+                    {player.name}
+                    <ChevronRight className="h-4 w-4 text-neutral-600" />
+                  </div>
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
+                    {player.team} · {player.role}
+                  </div>
                 </div>
               </button>
             ))}
           </div>
 
-          {/* COMBINED STATS COLUMN */}
-          <div className="flex-1 bg-black/95">
+          {/* ROUND COLUMNS */}
+          {!compact && (
+            <div>
+              <div className="flex border-b border-neutral-800">
+                {ROUND_LABELS.map((r) => (
+                  <div
+                    key={r}
+                    className="py-3 text-center text-[10px] uppercase tracking-[0.18em] text-neutral-500"
+                    style={{ width: ROUND_COL_W }}
+                  >
+                    {r}
+                  </div>
+                ))}
+              </div>
+
+              {visible.map(({ values }, i) => (
+                <div
+                  key={i}
+                  className="flex border-t border-neutral-800"
+                  style={{ height: ROW_H }}
+                >
+                  {values.map((v, j) => (
+                    <div
+                      key={j}
+                      className="flex items-center justify-center text-sm text-neutral-100"
+                      style={{ width: ROUND_COL_W }}
+                    >
+                      {v}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* STATS COLUMN */}
+          <div
+            className="bg-black/95 border-l border-neutral-800"
+            style={{ width: RIGHT_COL_W }}
+          >
             <div className="px-4 py-3 border-b border-neutral-800 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
               Stats & hit rate
             </div>
@@ -238,36 +312,38 @@ export default function MasterTableDesktop({
             {visible.map(({ stats, values }, i) => (
               <div
                 key={i}
-                className="border-t border-neutral-800 px-4 flex items-center gap-6"
+                className="border-t border-neutral-800"
                 style={{ height: ROW_H }}
               >
-                <div className="flex gap-4 text-xs">
-                  <span>
-                    AVG <b className="text-yellow-300">{stats.avg}</b>
-                  </span>
-                  <span>MIN {stats.min}</span>
-                  <span>MAX {stats.max}</span>
-                  <span>GMS {stats.gms}</span>
-                </div>
+                <div className="px-4 h-full">
+                  <div className="grid h-full items-center grid-cols-[120px_1fr] gap-4">
+                    <div className="space-y-1">
+                      <div>AVG <span className="text-yellow-300">{stats.avg}</span></div>
+                      <div>MIN {stats.min}</div>
+                      <div>MAX {stats.max}</div>
+                      <div>GMS {stats.gms}</div>
+                    </div>
 
-                <div className="flex-1 grid grid-cols-4 gap-4">
-                  {hitThresholds.map((t) => {
-                    const r = calcHitRate(values, t);
-                    return (
-                      <div key={t} className="flex items-center gap-2">
-                        <span className="text-[10px] text-neutral-400">{t}+</span>
-                        <div className="flex-1 h-1 bg-neutral-800 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-emerald-400 via-yellow-300 to-orange-400"
-                            style={{ width: `${r}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] text-neutral-300">
-                          {r}%
-                        </span>
-                      </div>
-                    );
-                  })}
+                    <div className="space-y-1">
+                      {hitThresholds.map((t) => {
+                        const r = calcHitRate(values, t);
+                        return (
+                          <div key={t} className="flex items-center gap-2">
+                            <span className="w-8 text-[10px] text-neutral-400">{t}+</span>
+                            <div className="flex-1 h-1 bg-neutral-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-emerald-400 via-yellow-300 to-orange-400"
+                                style={{ width: `${r}%` }}
+                              />
+                            </div>
+                            <span className="w-8 text-right text-[10px] text-neutral-300">
+                              {r}%
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
