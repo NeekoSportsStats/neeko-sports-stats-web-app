@@ -58,7 +58,7 @@ function calcHitRate(values: number[], threshold: number) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* COMPONENT                                                                  */
+/* DESKTOP MASTER TABLE — TEAMS                                                */
 /* -------------------------------------------------------------------------- */
 
 export default function TeamMasterTableDesktop({
@@ -120,7 +120,6 @@ export default function TeamMasterTableDesktop({
 
   return (
     <>
-      {/* ================= TABLE WRAPPER ================= */}
       <div className="mt-10 rounded-3xl border border-neutral-800 bg-black shadow-2xl overflow-hidden">
         {/* ================= HEADER ================= */}
         <div className="px-6 py-6 border-b border-neutral-800">
@@ -222,7 +221,7 @@ export default function TeamMasterTableDesktop({
                   <div>
                     <div className="flex items-center gap-2 text-sm font-semibold text-neutral-50">
                       {team.name}
-                      <ChevronRight className="h-4 w-4 text-neutral-600" />
+                      <ChevronRight className="h-4 w-4 text-neutral-600 group-hover:text-neutral-300 transition" />
                     </div>
                     <div className="mt-[1px] text-[10px] uppercase tracking-[0.16em] text-neutral-500">
                       {team.code}
@@ -235,9 +234,9 @@ export default function TeamMasterTableDesktop({
                 lockedRows.map((_, i) => (
                   <div
                     key={i}
-                    onClick={() => setShowUpgrade(true)}
                     className="group relative px-5 border-t border-neutral-800 overflow-hidden cursor-pointer"
                     style={{ height: ROW_H }}
+                    onClick={() => setShowUpgrade(true)}
                   >
                     <div className="space-y-2 pt-4 opacity-40">
                       <div className="h-4 w-3/4 rounded bg-neutral-800" />
@@ -245,9 +244,9 @@ export default function TeamMasterTableDesktop({
                     </div>
 
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-yellow-400/20 to-transparent animate-[shimmer_2.2s_linear_infinite]" />
-                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/25 via-black/80 to-black/90 backdrop-blur-md" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/20 via-black/80 to-black/90 backdrop-blur-md" />
 
-                    <div className="absolute inset-0 flex items-center justify-center opacity-60 group-hover:opacity-100 transition">
+                    <div className="absolute inset-0 flex items-center justify-center opacity-70 group-hover:opacity-100 transition">
                       <div className="flex items-center gap-2 text-yellow-300">
                         <Lock className="h-4 w-4" />
                         <span className="text-xs tracking-wide">
@@ -359,37 +358,85 @@ export default function TeamMasterTableDesktop({
 
           <div className="h-px bg-neutral-800 w-full" />
         </div>
+
+        {/* ================= CTA / SHOW MORE ================= */}
+        <div className="py-10 flex justify-center border-t border-neutral-800">
+          {!isPremium ? (
+            <button
+              onClick={() => setShowUpgrade(true)}
+              className="group max-w-lg w-full rounded-3xl border border-yellow-500/30
+                         bg-gradient-to-r from-yellow-500/25 via-yellow-500/10 to-transparent
+                         px-6 py-4 shadow-2xl flex items-center justify-between
+                         transition hover:shadow-[0_0_32px_rgba(250,204,21,0.6)]"
+            >
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.18em] text-yellow-300">
+                  Neeko+
+                </div>
+                <div className="text-sm font-semibold text-yellow-100">
+                  Unlock full teams table
+                </div>
+              </div>
+              <ArrowRight className="h-5 w-5 text-yellow-300 transition group-hover:translate-x-0.5" />
+            </button>
+          ) : !expanded ? (
+            <button
+              onClick={() => setExpanded(true)}
+              className="text-sm text-neutral-300 hover:text-yellow-300"
+            >
+              Show more
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* ================= UPGRADE POPUP ================= */}
-      {!isPremium && showUpgrade && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md">
-          <div className="relative max-w-lg w-full rounded-3xl border border-yellow-500/30 bg-gradient-to-br from-black via-black to-yellow-950/30 p-8 shadow-2xl">
-            <button
-              onClick={() => setShowUpgrade(false)}
-              className="absolute right-4 top-4 text-neutral-400 hover:text-neutral-200"
-            >
-              <X className="h-5 w-5" />
-            </button>
+      {showUpgrade && (
+        <div className="fixed inset-0 z-[100]">
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowUpgrade(false)}
+          />
 
-            <div className="text-center">
-              <div className="inline-flex mb-3 rounded-full border border-yellow-500/40 px-3 py-1 text-xs text-yellow-300 uppercase tracking-[0.18em]">
-                Neeko+
+          <div className="fixed inset-0 z-[101] flex items-center justify-center px-4">
+            <div className="rounded-3xl border border-yellow-500/30 bg-black/95 shadow-2xl max-w-md w-full">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-yellow-300">
+                    Neeko+
+                  </div>
+                  <div className="text-lg font-semibold text-neutral-50">
+                    Unlock full teams table
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setShowUpgrade(false)}
+                  className="rounded-full p-2 text-neutral-400 hover:bg-neutral-800"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <h3 className="text-lg font-semibold text-neutral-50">
-                Unlock full teams insights
-              </h3>
-              <p className="mt-2 text-sm text-neutral-400">
-                Full season stats, search, filters and premium analysis.
-              </p>
 
-              <a
-                href="https://www.neekostats.com.au/neeko-plus"
-                className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-400 px-6 py-3 text-sm font-semibold text-black shadow-[0_0_20px_rgba(250,204,21,0.5)] hover:brightness-110 transition"
-              >
-                Upgrade to Neeko+
-                <ArrowRight className="h-4 w-4" />
-              </a>
+              <div className="px-5 py-5 space-y-4">
+                <p className="text-sm text-neutral-300">
+                  Access full-season team trends, advanced hit-rate analysis,
+                  and deeper matchup insights across every AFL club.
+                </p>
+
+                <button
+                  className="mt-4 w-full rounded-2xl
+                             bg-gradient-to-r from-yellow-400 to-yellow-500
+                             py-3 text-sm font-semibold text-black
+                             shadow-[0_0_24px_rgba(250,204,21,0.6)]"
+                  onClick={() =>
+                    (window.location.href =
+                      "https://www.neekostats.com.au/neeko-plus")
+                  }
+                >
+                  Upgrade to Neeko+
+                </button>
+              </div>
             </div>
           </div>
         </div>
