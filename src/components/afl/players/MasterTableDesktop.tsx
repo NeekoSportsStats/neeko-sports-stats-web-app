@@ -137,6 +137,9 @@ export default function MasterTableDesktop({
 
   const hitThresholds = getHitThresholds(selectedStat);
 
+  const COMPACT_STATS_W =
+    ROUND_LABELS.length * ROUND_COL_W + RIGHT_COL_W;
+
   return (
     <div className="mt-10 rounded-3xl border border-neutral-800 bg-black/90 shadow-2xl overflow-hidden">
       <div className="px-6 py-6 border-b border-neutral-800 space-y-3">
@@ -245,8 +248,9 @@ export default function MasterTableDesktop({
           style={{
             minWidth:
               LEFT_COL_W +
-              (compact ? 0 : ROUND_LABELS.length * ROUND_COL_W) +
-              RIGHT_COL_W,
+              (compact
+                ? COMPACT_STATS_W
+                : ROUND_LABELS.length * ROUND_COL_W + RIGHT_COL_W),
           }}
         >
           <div
@@ -313,97 +317,67 @@ export default function MasterTableDesktop({
 
           <div
             className="sticky right-0 z-20 bg-black/95 border-l border-neutral-800"
-            style={{ width: RIGHT_COL_W }}
+            style={{ width: compact ? COMPACT_STATS_W : RIGHT_COL_W }}
           >
             <div className="px-4 py-3 border-b border-neutral-800 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
               Stats & hit rate
             </div>
 
-            {visible.map(({ player, stats, values }) => (
+            {visible.map(({ stats, values }, i) => (
               <div
-                key={player.id}
+                key={i}
                 className="border-t border-neutral-800"
                 style={{ height: ROW_H }}
               >
-                {!compact && (
-                  <div className="px-4 h-full">
-                    <div className={cx("grid h-full items-center", SPACING.col3Grid)}>
-                      <div className={cx("flex flex-col justify-center", SPACING.statsGapY)}>
-                        {[
-                          ["AVG", stats.avg],
-                          ["MIN", stats.min],
-                          ["MAX", stats.max],
-                          ["GMS", stats.gms],
-                        ].map(([l, v]) => (
-                          <div key={l as string} className="grid grid-cols-[32px_auto] gap-2">
-                            <span className="text-neutral-500">{l}</span>
-                            <span className={l === "AVG" ? "text-yellow-300 font-semibold" : ""}>
-                              {v}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className={SPACING.dividerColor} />
-
-                      <div className={cx("flex flex-col justify-center pl-3", SPACING.hitRateGapY)}>
-                        {hitThresholds.map((t) => {
-                          const r = calcHitRate(values, t);
-                          return (
-                            <div key={t} className="flex items-center gap-2">
-                              <span className="w-8 text-[10px] text-neutral-400">{t}+</span>
-                              <div className="flex-1 h-1 bg-neutral-800 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-gradient-to-r from-emerald-400 via-yellow-300 to-orange-400"
-                                  style={{ width: `${r}%` }}
-                                />
-                              </div>
-                              <span className="w-8 text-right text-[10px] text-neutral-300">
-                                {r}%
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {compact && (
-                  <div className="-mx-4 px-4 h-full">
-                    <div className="grid h-full items-center gap-4 grid-cols-[repeat(8,minmax(0,1fr))]">
-                      {[
+                <div className="px-4 h-full">
+                  <div
+                    className={
+                      compact
+                        ? "grid h-full items-center gap-4 grid-cols-[repeat(8,minmax(0,1fr))]"
+                        : cx("grid h-full items-center", SPACING.col3Grid)
+                    }
+                  >
+                    {!compact &&
+                      [
                         ["AVG", stats.avg],
                         ["MIN", stats.min],
                         ["MAX", stats.max],
                         ["GMS", stats.gms],
                       ].map(([l, v]) => (
-                        <div key={l as string} className="flex justify-center gap-1">
+                        <div
+                          key={l as string}
+                          className="grid grid-cols-[32px_auto] gap-2"
+                        >
                           <span className="text-neutral-500">{l}</span>
-                          <span className="text-neutral-100 font-medium">{v}</span>
+                          <span
+                            className={l === "AVG" ? "text-yellow-300 font-semibold" : ""}
+                          >
+                            {v}
+                          </span>
                         </div>
                       ))}
 
-                      {hitThresholds.map((t) => {
-                        const r = calcHitRate(values, t);
-                        return (
-                          <div key={t} className="flex items-center gap-2">
-                            <span className="text-[10px] text-neutral-400">{t}+</span>
-                            <div className="flex-1 h-1 bg-neutral-800 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-gradient-to-r from-emerald-400 via-yellow-300 to-orange-400"
-                                style={{ width: `${r}%` }}
-                              />
-                            </div>
-                            <span className="text-[10px] text-neutral-300">
-                              {r}%
-                            </span>
+                    {hitThresholds.map((t) => {
+                      const r = calcHitRate(values, t);
+                      return (
+                        <div key={t} className="flex items-center gap-2">
+                          <span className="text-[10px] text-neutral-400">
+                            {t}+
+                          </span>
+                          <div className="flex-1 h-1 bg-neutral-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-emerald-400 via-yellow-300 to-orange-400"
+                              style={{ width: `${r}%` }}
+                            />
                           </div>
-                        );
-                      })}
-                    </div>
+                          <span className="text-[10px] text-neutral-300">
+                            {r}%
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
+                </div>
               </div>
             ))}
           </div>
