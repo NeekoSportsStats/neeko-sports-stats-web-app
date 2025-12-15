@@ -101,9 +101,8 @@ export default function TeamMasterTableDesktop({
     return rows.filter((r) => r.searchIndex.includes(q));
   }, [rows, search, isPremium]);
 
-  const visibleRows = isPremium && expanded
-    ? filtered
-    : filtered.slice(0, FREE_ROW_LIMIT);
+  const visibleRows =
+    isPremium && expanded ? filtered : filtered.slice(0, FREE_ROW_LIMIT);
 
   const lockedRows =
     !isPremium && filtered.length > FREE_ROW_LIMIT
@@ -118,7 +117,7 @@ export default function TeamMasterTableDesktop({
   /* -------------------------------------------------------------------------- */
 
   return (
-    <div className="mt-10 rounded-3xl border border-neutral-800 bg-black/95 shadow-2xl overflow-hidden">
+    <div className="mt-10 rounded-3xl border border-neutral-800 bg-black shadow-2xl overflow-hidden">
       {/* ================= HEADER ================= */}
       <div className="px-6 py-6 border-b border-neutral-800">
         <div className="flex justify-between items-start">
@@ -135,7 +134,7 @@ export default function TeamMasterTableDesktop({
           </div>
 
           <div className="flex flex-col items-end gap-2">
-            <div className="flex gap-2 rounded-full border border-neutral-700 bg-black/80 p-1">
+            <div className="flex gap-2 rounded-full border border-neutral-700 bg-black p-1">
               {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
                 <button
                   key={s}
@@ -194,7 +193,7 @@ export default function TeamMasterTableDesktop({
           className="flex text-[11px]"
           style={{
             minWidth: compact
-              ? LEFT_COL_W + RIGHT_COL_W
+              ? LEFT_COL_W + RIGHT_COL_W * 2
               : LEFT_COL_W +
                 ROUND_LABELS.length * ROUND_COL_W +
                 RIGHT_COL_W,
@@ -202,14 +201,14 @@ export default function TeamMasterTableDesktop({
         >
           {/* ================= TEAM COLUMN ================= */}
           <div
-            className="sticky left-0 z-20 border-r border-neutral-800 bg-black/95"
+            className="sticky left-0 z-20 border-r border-neutral-800 bg-black"
             style={{ width: LEFT_COL_W }}
           >
-            <div className="sticky top-0 px-5 py-3 text-[10px] uppercase tracking-[0.18em] text-neutral-500 border-b border-neutral-800 bg-black/95">
+            <div className="sticky top-0 px-5 py-3 text-[10px] uppercase tracking-[0.18em] text-neutral-500 border-b border-neutral-800 bg-black">
               Team
             </div>
 
-            {visibleRows.map(({ team }, idx) => (
+            {visibleRows.map(({ team }) => (
               <button
                 key={team.id}
                 onClick={() => onSelectTeam(team)}
@@ -228,18 +227,27 @@ export default function TeamMasterTableDesktop({
               </button>
             ))}
 
-            {!isPremium && filtered.length > FREE_ROW_LIMIT && (
-              <div className="h-px bg-neutral-700" />
+            {!isPremium && lockedRows.length > 0 && (
+              <div className="h-px bg-neutral-800" />
             )}
 
             {!isPremium &&
               lockedRows.map((_, i) => (
                 <div
                   key={i}
-                  className="relative px-5 border-t border-neutral-800"
+                  className="relative px-5 border-t border-neutral-800 overflow-hidden"
                   style={{ height: ROW_H }}
                 >
+                  {/* fake content */}
+                  <div className="space-y-2 pt-4">
+                    <div className="h-4 w-3/4 rounded bg-neutral-800" />
+                    <div className="h-3 w-1/3 rounded bg-neutral-900" />
+                  </div>
+
+                  {/* shimmer */}
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-[shimmer_2.2s_linear_infinite]" />
+
+                  {/* blur */}
                   <div className="absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center">
                     <Lock className="h-5 w-5 text-neutral-500" />
                   </div>
@@ -284,13 +292,10 @@ export default function TeamMasterTableDesktop({
 
           {/* ================= STATS ================= */}
           <div
-            className={cx(
-              "sticky right-0 z-10 border-l border-neutral-800 bg-black/95",
-              !isPremium && "opacity-80"
-            )}
-            style={{ width: RIGHT_COL_W }}
+            className="sticky right-0 z-10 border-l border-neutral-800 bg-black"
+            style={{ width: compact ? RIGHT_COL_W * 2 : RIGHT_COL_W }}
           >
-            <div className="sticky top-0 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-neutral-500 border-b border-neutral-800 bg-black/95">
+            <div className="sticky top-0 px-4 py-3 text-[10px] uppercase tracking-[0.18em] text-neutral-500 border-b border-neutral-800 bg-black">
               Stats & hit rate
             </div>
 
