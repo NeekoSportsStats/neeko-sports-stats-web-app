@@ -1,10 +1,5 @@
 import React, { useMemo, useState } from "react";
-import {
-  Lock,
-  ChevronRight,
-  ArrowRight,
-  Search,
-} from "lucide-react";
+import { Lock, ChevronRight, ArrowRight, Search } from "lucide-react";
 import type { TeamRow } from "./mockTeams";
 import type { StatLens } from "./TeamMasterTable";
 
@@ -238,16 +233,13 @@ export default function TeamMasterTableDesktop({
                   className="relative px-5 border-t border-neutral-800 overflow-hidden"
                   style={{ height: ROW_H }}
                 >
-                  {/* fake content */}
                   <div className="space-y-2 pt-4">
                     <div className="h-4 w-3/4 rounded bg-neutral-800" />
                     <div className="h-3 w-1/3 rounded bg-neutral-900" />
                   </div>
 
-                  {/* shimmer */}
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-[shimmer_2.2s_linear_infinite]" />
 
-                  {/* blur */}
                   <div className="absolute inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center">
                     <Lock className="h-5 w-5 text-neutral-500" />
                   </div>
