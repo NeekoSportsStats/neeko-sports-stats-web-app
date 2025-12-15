@@ -1,7 +1,10 @@
-
 import React from "react";
 import type { TeamRow } from "./mockTeams";
 import type { StatLens } from "./TeamMasterTable";
+
+/* -------------------------------------------------------------------------- */
+/* TEAM INSIGHTS CONTENT                                                       */
+/* -------------------------------------------------------------------------- */
 
 export default function TeamInsightsContent({
   team,
@@ -23,7 +26,8 @@ export default function TeamInsightsContent({
   const avg = total / values.length;
 
   return (
-    <div className="space-y-6 text-sm text-neutral-200">
+    <div className="flex flex-col gap-4 text-sm text-neutral-200">
+      {/* ================= SUMMARY ================= */}
       <div>
         <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
           Season average
@@ -33,24 +37,40 @@ export default function TeamInsightsContent({
         </div>
       </div>
 
+      {/* ================= TEAM METRICS ================= */}
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-xl border border-neutral-800 bg-black/80 p-3">
-          <div className="text-[10px] uppercase text-neutral-400">Attack</div>
-          <div className="text-lg font-semibold">{team.attackRating}</div>
+          <div className="text-[10px] uppercase text-neutral-400">
+            Attack
+          </div>
+          <div className="text-lg font-semibold">
+            {team.attackRating}
+          </div>
         </div>
+
         <div className="rounded-xl border border-neutral-800 bg-black/80 p-3">
-          <div className="text-[10px] uppercase text-neutral-400">Defence</div>
-          <div className="text-lg font-semibold">{team.defenceRating}</div>
+          <div className="text-[10px] uppercase text-neutral-400">
+            Defence
+          </div>
+          <div className="text-lg font-semibold">
+            {team.defenceRating}
+          </div>
         </div>
+
         <div className="rounded-xl border border-neutral-800 bg-black/80 p-3">
-          <div className="text-[10px] uppercase text-neutral-400">Consistency</div>
-          <div className="text-lg font-semibold">{team.consistencyIndex}</div>
+          <div className="text-[10px] uppercase text-neutral-400">
+            Consistency
+          </div>
+          <div className="text-lg font-semibold">
+            {team.consistencyIndex}
+          </div>
         </div>
       </div>
 
+      {/* ================= PREMIUM GATE ================= */}
       {!isPremium && (
         <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs text-neutral-300">
-          Upgrade to Neeko+ for full team insights & trends
+          Upgrade to Neeko+ for full team insights
         </div>
       )}
     </div>

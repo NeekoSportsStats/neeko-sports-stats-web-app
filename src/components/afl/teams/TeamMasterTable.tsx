@@ -1,16 +1,28 @@
+// src/components/afl/teams/TeamMasterTable.tsx
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/lib/auth";
-import { MOCK_TEAMS, TeamRow } from "./mockTeams";
+
+import TeamInsightsOverlay from "./TeamInsightsOverlay";
 import TeamMasterTableDesktop from "./TeamMasterTableDesktop";
 import TeamMasterTableMobile from "./TeamMasterTableMobile";
-import TeamInsightsOverlay from "./TeamInsightsOverlay";
+
+import { MOCK_TEAMS, TeamRow } from "./mockTeams";
+
+/* -------------------------------------------------------------------------- */
+/* TYPES                                                                      */
+/* -------------------------------------------------------------------------- */
 
 export type StatLens = "Fantasy" | "Disposals" | "Goals";
 
+/* -------------------------------------------------------------------------- */
+/* MASTER TABLE ORCHESTRATOR                                                   */
+/* -------------------------------------------------------------------------- */
+
 export default function TeamMasterTable() {
   const { isPremium } = useAuth();
+
   const [selectedStat, setSelectedStat] = useState<StatLens>("Fantasy");
   const [selectedTeam, setSelectedTeam] = useState<TeamRow | null>(null);
   const [query, setQuery] = useState("");
@@ -22,6 +34,7 @@ export default function TeamMasterTable() {
 
   return (
     <>
+      {/* ================= DESKTOP ================= */}
       <div className="hidden md:block">
         <TeamMasterTableDesktop
           teams={teams}
@@ -34,6 +47,7 @@ export default function TeamMasterTable() {
         />
       </div>
 
+      {/* ================= MOBILE ================= */}
       <div className="md:hidden">
         <TeamMasterTableMobile
           teams={teams}
@@ -46,7 +60,9 @@ export default function TeamMasterTable() {
         />
       </div>
 
-      {mounted && selectedTeam &&
+      {/* ================= INSIGHTS OVERLAY ================= */}
+      {mounted &&
+        selectedTeam &&
         createPortal(
           <TeamInsightsOverlay
             team={selectedTeam}
