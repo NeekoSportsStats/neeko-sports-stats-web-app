@@ -3,9 +3,7 @@ import {
   Lock,
   ChevronRight,
   ArrowRight,
-  ChevronDown,
   Search,
-  X,
 } from "lucide-react";
 import type { TeamRow } from "./mockTeams";
 import type { StatLens } from "./TeamMasterTable";
@@ -90,7 +88,6 @@ export default function TeamMasterTableDesktop({
   const [search, setSearch] = useState("");
   const [compact, setCompact] = useState(false);
   const [premiumVisible, setPremiumVisible] = useState(PREMIUM_PAGE_SIZE);
-  const [ctaOpen, setCtaOpen] = useState(false);
 
   /* ---------------- DERIVED DATA ---------------- */
 
@@ -126,7 +123,8 @@ export default function TeamMasterTableDesktop({
     ? Array.from({ length: GHOST_ROW_COUNT }, (_, i) => i)
     : [];
 
-  const nonCompactMinWidth =
+  const minWidthCompact = LEFT_COL_W + RIGHT_COL_W;
+  const minWidthFull =
     LEFT_COL_W + ROUND_LABELS.length * ROUND_COL_W + RIGHT_COL_W;
 
   const hitThresholds = getHitThresholds(selectedStat);
@@ -149,61 +147,63 @@ export default function TeamMasterTableDesktop({
             <h2 className="mt-3 text-xl font-semibold text-neutral-50">
               Full-season team trends
             </h2>
+            <p className="mt-1 text-xs text-neutral-400">
+              Season-long totals, averages and hit-rate performance
+            </p>
           </div>
 
-          <div className="flex gap-2 rounded-full border border-neutral-700 bg-black/80 p-1">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
+          {/* RIGHT CONTROLS — EXACT PLAYER GROUPING */}
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex gap-2 rounded-full border border-neutral-700 bg-black/80 p-1">
+              {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSelectedStat(s)}
+                  className={cx(
+                    "rounded-full px-4 py-1.5 text-xs transition",
+                    selectedStat === s
+                      ? "bg-yellow-400 text-black shadow-[0_0_16px_rgba(250,204,21,0.6)]"
+                      : "text-neutral-300 hover:bg-neutral-800"
+                  )}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
               <button
-                key={s}
-                onClick={() => setSelectedStat(s)}
+                onClick={() => setCompact((v) => !v)}
                 className={cx(
-                  "rounded-full px-4 py-1.5 text-xs transition",
-                  selectedStat === s
-                    ? "bg-yellow-400 text-black shadow-[0_0_16px_rgba(250,204,21,0.6)]"
-                    : "text-neutral-300 hover:bg-neutral-800"
+                  "rounded-full px-3 py-1 text-xs border transition",
+                  compact
+                    ? "bg-yellow-400 text-black border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)]"
+                    : "border-neutral-700 text-neutral-300 hover:bg-neutral-800"
                 )}
               >
-                {s}
+                Compact
               </button>
-            ))}
-          </div>
-        </div>
 
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-xs text-neutral-400">
-            Season-long totals, averages and hit-rate performance
-          </p>
-
-          <div className="flex flex-col items-end gap-2">
-            <button
-              onClick={() => setCompact((v) => !v)}
-              className={cx(
-                "rounded-full px-3 py-1 text-xs border transition",
-                compact
-                  ? "bg-yellow-400 text-black border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)]"
-                  : "border-neutral-700 text-neutral-300 hover:bg-neutral-800"
-              )}
-            >
-              Compact
-            </button>
-
-            <div
-              className={cx(
-                "relative flex items-center rounded-xl border px-3 py-2",
-                isPremium
-                  ? "border-neutral-700 bg-black"
-                  : "border-neutral-800 bg-neutral-900"
-              )}
-            >
-              <Search className="h-4 w-4 text-neutral-500 mr-2" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                disabled={!isPremium}
-                placeholder="Search team"
-                className="bg-transparent text-sm text-neutral-200 placeholder:text-neutral-500 outline-none w-40 disabled:cursor-not-allowed"
-              />
-              {!isPremium && <Lock className="h-4 w-4 text-neutral-500 ml-2" />}
+              <div
+                className={cx(
+                  "relative flex items-center rounded-xl border px-3 py-2",
+                  isPremium
+                    ? "border-neutral-700 bg-black"
+                    : "border-neutral-800 bg-neutral-900"
+                )}
+              >
+                <Search className="h-4 w-4 text-neutral-500 mr-2" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  disabled={!isPremium}
+                  placeholder="Search team"
+                  className="bg-transparent text-sm text-neutral-200 placeholder:text-neutral-500 outline-none w-40 disabled:cursor-not-allowed"
+                />
+                {!isPremium && (
+                  <Lock className="h-4 w-4 text-neutral-500 ml-2" />
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -213,7 +213,9 @@ export default function TeamMasterTableDesktop({
       <div className="relative max-h-[65vh] overflow-y-auto overflow-x-auto scrollbar-none">
         <div
           className="flex text-[11px]"
-          style={{ minWidth: compact ? undefined : nonCompactMinWidth }}
+          style={{
+            minWidth: compact ? minWidthCompact : minWidthFull,
+          }}
         >
           {/* ================= TEAM COLUMN ================= */}
           <div
@@ -236,7 +238,7 @@ export default function TeamMasterTableDesktop({
                     <span className="truncate">{team.name}</span>
                     <ChevronRight className="h-4 w-4 text-neutral-600 group-hover:text-neutral-200 transition" />
                   </div>
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500 truncate">
+                  <div className="mt-[1px] text-[10px] uppercase tracking-[0.16em] text-neutral-500 truncate">
                     {team.code}
                   </div>
                 </div>
@@ -363,11 +365,8 @@ export default function TeamMasterTableDesktop({
 
       {/* ================= CTA ================= */}
       {!isPremium && (
-        <div className="flex justify-center py-10 border-t border-neutral-800">
-          <button
-            onClick={() => setCtaOpen(true)}
-            className="rounded-3xl border border-yellow-500/30 bg-gradient-to-r from-yellow-500/25 via-yellow-500/10 to-transparent px-6 py-4 shadow-2xl max-w-lg w-full flex items-center justify-between"
-          >
+        <div className="px-6 py-10 border-t border-neutral-800">
+          <button className="rounded-3xl border border-yellow-500/30 bg-gradient-to-r from-yellow-500/25 via-yellow-500/10 to-transparent px-6 py-4 shadow-2xl max-w-lg w-full flex items-center justify-between">
             <div>
               <div className="text-[10px] uppercase tracking-[0.18em] text-yellow-300">
                 Neeko+
