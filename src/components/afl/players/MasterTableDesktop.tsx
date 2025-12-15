@@ -96,17 +96,22 @@ export default function MasterTableDesktop({
   const [expandedFree, setExpandedFree] = useState(false);
   const [premiumVisible, setPremiumVisible] = useState(PREMIUM_PAGE_SIZE);
 
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
+
   /* ---------------- DERIVED DATA ---------------- */
 
   const rows = useMemo(() => {
     return players
       .map((p) => {
         const values = getRowValues(String(p.id), selectedStat);
+        const stats = calcStats(values);
         return {
           player: p,
           values,
-          stats: calcStats(values),
+          stats,
           searchIndex: buildSearchIndex(p),
+          best: stats.max,
+          worst: stats.min,
         };
       })
       .sort((a, b) => b.stats.total - a.stats.total);
@@ -269,9 +274,11 @@ export default function MasterTableDesktop({
               Player
             </div>
 
-            {visible.map(({ player }) => (
+            {visible.map(({ player, best, worst }) => (
               <button
                 key={player.id}
+                onMouseEnter={() => setHoveredId(player.id)}
+                onMouseLeave={() => setHoveredId(null)}
                 onClick={() => onSelectPlayer(player)}
                 className="group w-full px-5 border-t border-neutral-800 flex items-center justify-between hover:bg-neutral-900/40"
                 style={{ height: ROW_H }}
@@ -284,6 +291,12 @@ export default function MasterTableDesktop({
                   <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
                     {player.team} · {player.role}
                   </div>
+
+                  {hoveredId === player.id && (
+                    <div className="mt-1 text-[10px] text-neutral-400">
+                      Best {best} · Worst {worst}
+                    </div>
+                  )}
                 </div>
               </button>
             ))}
@@ -479,7 +492,9 @@ export default function MasterTableDesktop({
         <div className="py-6 text-center">
           <button
             onClick={() =>
-              setPremiumVisible((v) => Math.min(v + PREMIUM_PAGE_SIZE, filtered.length))
+              setPremiumVisible((v) =>
+                Math.min(v + PREMIUM_PAGE_SIZE, filtered.length)
+              )
             }
             className="text-sm text-yellow-300 hover:underline"
           >
@@ -488,7 +503,7 @@ export default function MasterTableDesktop({
         </div>
       )}
 
-      {!isPremium && !expandedFree && filtered.length > FREE_ROW_LIMIT && (
+      {!isPremium && !expandedFree && filtered.length > FREE_ROW_LIMIT && false && (
         <div className="py-6 text-center">
           <button
             onClick={() => setExpandedFree(true)}
