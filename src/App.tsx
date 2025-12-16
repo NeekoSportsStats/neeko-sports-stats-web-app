@@ -30,7 +30,7 @@ import AFLHub from "@/pages/sports/AFLHub";
 import AFLPlayers from "@/pages/sports/afl/AFLPlayers";
 import AFLTeams from "@/pages/sports/afl/AFLTeams";
 import AFLCompleteAIAnalysis from "@/pages/sports/AFLCompleteAIAnalysis";
-import AFLMatchCentre from "@/pages/sports/AFLMatchCentre";
+import AFLMatchCentre from "@/pages/sports/afl/AFLMatchCentre";
 
 import EPLHub from "@/pages/sports/EPLHub";
 import EPLPlayers from "@/pages/sports/EPLPlayers";
