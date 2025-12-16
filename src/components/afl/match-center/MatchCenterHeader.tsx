@@ -4,10 +4,9 @@ import { Activity } from "lucide-react";
 export default function MatchCenterHeader() {
   return (
     <section className="relative mb-10">
-      {/* Atmospheric gold glow */}
+      {/* Ambient gold glow */}
       <div className="pointer-events-none absolute inset-0 rounded-3xl bg-[radial-gradient(60%_60%_at_15%_0%,rgba(255,200,60,0.14),transparent_70%)]" />
 
-      {/* Header surface */}
       <div className="relative rounded-3xl border border-white/10 bg-black/60 backdrop-blur-xl px-6 py-7 md:px-8 md:py-9">
         {/* Eyebrow */}
         <div className="mb-3 flex items-center gap-2 text-xs font-medium tracking-widest text-amber-300/80">
@@ -26,7 +25,7 @@ export default function MatchCenterHeader() {
           interpretation is available through AI match analysis.
         </p>
 
-        {/* Optional AI CTA */}
+        {/* CTA */}
         <div className="mt-5">
           <a
             href="/sports/afl/ai-analysis"

@@ -3,23 +3,13 @@ import MatchCard from "./MatchCard";
 import type { FixtureMatch } from "./types";
 
 /* -------------------------------------------------------------------------- */
-/*                                   TYPES                                    */
-/* -------------------------------------------------------------------------- */
-
-type Props = {
-  matches: FixtureMatch[];
-  onSelectMatch: (match: FixtureMatch) => void;
-};
-
-/* -------------------------------------------------------------------------- */
-/*                               HELPERS                                      */
+/* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
 function groupByDate(matches: FixtureMatch[]) {
   return matches.reduce<Record<string, FixtureMatch[]>>((acc, match) => {
-    const key = match.dateISO;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(match);
+    if (!acc[match.dateISO]) acc[match.dateISO] = [];
+    acc[match.dateISO].push(match);
     return acc;
   }, {});
 }
@@ -34,18 +24,18 @@ function formatDateLabel(dateISO: string) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                 MATCH LIST                                 */
+/* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
-/**
- * MatchList
- * ---------
- * Chronological fixture stream grouped by day.
- *
- * Responsibilities:
- * - Visual grouping only (no filtering logic)
- * - Delegates card rendering
- * - Keeps list scannable as fixtures scale
- */
+
+type Props = {
+  matches: FixtureMatch[];
+  onSelectMatch: (match: FixtureMatch) => void;
+};
+
+/* -------------------------------------------------------------------------- */
+/* MATCH LIST                                                                 */
+/* -------------------------------------------------------------------------- */
+
 export default function MatchList({ matches, onSelectMatch }: Props) {
   if (!matches.length) {
     return (
@@ -67,7 +57,7 @@ export default function MatchList({ matches, onSelectMatch }: Props) {
     <section className="space-y-10">
       {orderedDates.map((dateISO) => (
         <div key={dateISO} className="space-y-4">
-          {/* Date header */}
+          {/* Date divider */}
           <div className="flex items-center gap-3">
             <div className="text-sm font-semibold text-white">
               {formatDateLabel(dateISO)}
@@ -75,7 +65,7 @@ export default function MatchList({ matches, onSelectMatch }: Props) {
             <div className="flex-1 h-px bg-white/10" />
           </div>
 
-          {/* Matches for day */}
+          {/* Matches */}
           <div className="space-y-6">
             {grouped[dateISO].map((match) => (
               <MatchCard

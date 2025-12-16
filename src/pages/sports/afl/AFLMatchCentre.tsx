@@ -1,5 +1,3 @@
-// src/pages/sports/afl/AFLMatchCentre.tsx
-
 import React, { useState } from "react";
 
 import MatchCenterHeader from "@/components/afl/match-center/MatchCenterHeader";
