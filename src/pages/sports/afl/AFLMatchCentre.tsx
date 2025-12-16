@@ -1,3 +1,5 @@
+// src/pages/sports/afl/AFLMatchCentre.tsx
+
 import React, { useState } from "react";
 
 import MatchCenterHeader from "@/components/afl/match-center/MatchCenterHeader";
@@ -18,8 +20,10 @@ export default function AFLMatchCentre() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 md:px-6 py-8">
+      {/* Header */}
       <MatchCenterHeader />
 
+      {/* Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
         {/* LEFT */}
         <div className="space-y-6">
@@ -34,18 +38,16 @@ export default function AFLMatchCentre() {
         <div className="hidden lg:block">
           <LadderSnapshot
             rows={MOCK_LADDER_TOP16}
-            highlightTeams={[
-              "Richmond",
-              "Carlton",
-              "Brisbane",
-              "Sydney",
-              "Geelong",
-            ]}
+            highlightTeams={
+              activeMatch
+                ? [activeMatch.homeTeam, activeMatch.awayTeam]
+                : []
+            }
           />
         </div>
       </div>
 
-      {/* MATCH DETAIL OVERLAY */}
+      {/* Overlay */}
       {activeMatch && (
         <MatchDetailOverlay
           match={activeMatch}

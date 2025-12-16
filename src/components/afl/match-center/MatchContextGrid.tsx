@@ -1,23 +1,18 @@
-import React from "react";
-import type { FixtureMatch } from "./types";
-import LadderSnapshot from "./LadderSnapshot";
-import { MOCK_LADDER_TOP16 } from "./mockData";
-
-export default function MatchContextGrid({ match }: { match: FixtureMatch }) {
+export default function MatchContextGrid() {
   return (
-    <div className="grid grid-cols-1 gap-4">
-      <LadderSnapshot
-        rows={MOCK_LADDER_TOP16}
-        highlightTeams={[match.homeTeam, match.awayTeam]}
-      />
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-2">
+      <div className="text-xs uppercase tracking-wide text-white/50">
+        Context
+      </div>
 
-      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-        <h3 className="text-xs uppercase tracking-widest text-white/50 mb-2">
-          Context
-        </h3>
-        <div className="text-sm text-white/60">
-          Form, matchup notes and trends will live here.
-        </div>
+      <div className="text-sm text-white/70">
+        Recent form: —
+      </div>
+      <div className="text-sm text-white/70">
+        Head-to-head trend: —
+      </div>
+      <div className="text-sm text-white/70">
+        Scoring profile: —
       </div>
     </div>
   );
