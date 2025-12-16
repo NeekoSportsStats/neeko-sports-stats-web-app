@@ -19,28 +19,44 @@ type Props = {
  * ---------
  * Renders a vertical list of MatchCard components.
  *
- * Design notes:
- * - Grouping by date/round intentionally left to parent
- * - This component stays dumb & reusable
+ * Design intent:
+ * - Chronological, scannable fixture stream
+ * - No business logic or filtering
+ * - Visual rhythm that scales with longer lists
  */
 export default function MatchList({ matches, onSelectMatch }: Props) {
   if (!matches.length) {
     return (
-      <div className="text-sm text-white/50 py-12 text-center">
-        No matches available.
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] py-12 text-center">
+        <div className="text-sm font-medium text-white">
+          No fixtures available
+        </div>
+        <div className="mt-1 text-xs text-white/50">
+          Check back later for upcoming AFL matches.
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {matches.map((match) => (
-        <MatchCard
-          key={match.id}
-          match={match}
-          onClick={() => onSelectMatch(match)}
-        />
-      ))}
-    </div>
+    <section className="space-y-8">
+      {/* Optional section label (future-proofing) */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold tracking-wide text-white/80">
+          Fixtures
+        </h2>
+      </div>
+
+      {/* Match stream */}
+      <div className="space-y-6">
+        {matches.map((match) => (
+          <MatchCard
+            key={match.id}
+            match={match}
+            onClick={() => onSelectMatch(match)}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
