@@ -5,9 +5,10 @@ import { formatDateLong } from "./utils";
 
 type Props = {
   matches: FixtureMatch[];
+  onSelectMatch?: (match: FixtureMatch) => void;
 };
 
-export default function MatchList({ matches }: Props) {
+export default function MatchList({ matches, onSelectMatch }: Props) {
   if (!matches.length) {
     return (
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
@@ -37,7 +38,11 @@ export default function MatchList({ matches }: Props) {
                 <div className="h-px flex-1 bg-gradient-to-r from-amber-300/20 to-transparent" />
               </div>
             )}
-            <MatchCard match={match} />
+
+            <MatchCard
+              match={match}
+              onClick={() => onSelectMatch?.(match)}
+            />
           </React.Fragment>
         );
       })}
