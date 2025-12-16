@@ -1,4 +1,3 @@
-
 export type MatchStatus = "upcoming" | "live" | "final";
 
 export type FixtureMatch = {

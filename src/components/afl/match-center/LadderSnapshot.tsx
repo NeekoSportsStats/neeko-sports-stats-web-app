@@ -1,4 +1,3 @@
-
 import React from "react";
 import type { LadderRow } from "./types";
 

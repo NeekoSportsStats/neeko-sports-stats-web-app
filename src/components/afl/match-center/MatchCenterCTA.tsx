@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Button } from "@/components/ui/button";
 
@@ -10,10 +9,11 @@ export default function MatchCenterCTA() {
           <div className="text-sm font-semibold text-amber-100">
             Ready for deeper match insight?
           </div>
-          <div className="text-xs text-amber-100/70 mt-1">
+          <div className="mt-1 text-xs text-amber-100/70">
             Full interpretation lives on the AI Insights page.
           </div>
         </div>
+
         <a href="/sports/afl/ai-analysis">
           <Button size="sm">Open AI Insights →</Button>
         </a>

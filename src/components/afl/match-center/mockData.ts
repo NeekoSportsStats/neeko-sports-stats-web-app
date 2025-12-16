@@ -1,9 +1,12 @@
-
 import type { FixtureMatch, LadderRow } from "./types";
+
+/* -------------------------------------------------------------------------- */
+/* FIXTURE MOCK DATA                                                          */
+/* -------------------------------------------------------------------------- */
 
 export const MOCK_FIXTURES: FixtureMatch[] = [
   {
-    id: "m1",
+    id: "r1-m1",
     roundLabel: "R1",
     dateISO: "2026-03-19",
     timeLocal: "19:20",
@@ -13,7 +16,7 @@ export const MOCK_FIXTURES: FixtureMatch[] = [
     status: "upcoming",
   },
   {
-    id: "m2",
+    id: "r1-m2",
     roundLabel: "R1",
     dateISO: "2026-03-20",
     timeLocal: "19:40",
@@ -23,7 +26,7 @@ export const MOCK_FIXTURES: FixtureMatch[] = [
     status: "upcoming",
   },
   {
-    id: "m3",
+    id: "r1-m3",
     roundLabel: "R1",
     dateISO: "2026-03-20",
     timeLocal: "16:10",
@@ -33,7 +36,7 @@ export const MOCK_FIXTURES: FixtureMatch[] = [
     status: "upcoming",
   },
   {
-    id: "m4",
+    id: "r1-m4",
     roundLabel: "R1",
     dateISO: "2026-03-21",
     timeLocal: "13:45",
@@ -43,6 +46,10 @@ export const MOCK_FIXTURES: FixtureMatch[] = [
     status: "upcoming",
   },
 ];
+
+/* -------------------------------------------------------------------------- */
+/* LADDER MOCK DATA (TOP 16)                                                   */
+/* -------------------------------------------------------------------------- */
 
 export const MOCK_LADDER_TOP16: LadderRow[] = [
   { team: "Collingwood", pos: 1, played: 23, wins: 17, losses: 6, draws: 0, pct: 132.4 },
