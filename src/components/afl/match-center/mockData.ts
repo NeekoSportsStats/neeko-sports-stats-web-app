@@ -1,9 +1,5 @@
-import type { FixtureMatch, LadderRow } from "./types";
 
-/**
- * PLACEHOLDER DATA ONLY.
- * Replace with your fixture ingestion pipeline (Supabase / API) later.
- */
+import type { FixtureMatch, LadderRow } from "./types";
 
 export const MOCK_FIXTURES: FixtureMatch[] = [
   {
@@ -24,26 +20,6 @@ export const MOCK_FIXTURES: FixtureMatch[] = [
     venue: "Adelaide Oval",
     homeTeam: "Adelaide",
     awayTeam: "Port Adelaide",
-    status: "upcoming",
-  },
-  {
-    id: "m3",
-    roundLabel: "R1",
-    dateISO: "2026-03-21",
-    timeLocal: "13:45",
-    venue: "Gabba",
-    homeTeam: "Brisbane",
-    awayTeam: "Sydney",
-    status: "upcoming",
-  },
-  {
-    id: "m4",
-    roundLabel: "R1",
-    dateISO: "2026-03-22",
-    timeLocal: "16:40",
-    venue: "Optus Stadium",
-    homeTeam: "West Coast",
-    awayTeam: "Fremantle",
     status: "upcoming",
   },
 ];

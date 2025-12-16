@@ -1,24 +1,20 @@
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 
-type Props = {
-  href?: string;
-};
-
-export default function MatchCenterCTA({
-  href = "https://www.neekostats.com.au/sports/afl/ai-analysis",
-}: Props) {
+export default function MatchCenterCTA() {
   return (
-    <div className="rounded-2xl border border-amber-300/15 bg-amber-300/10 p-4 backdrop-blur-xl">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+    <div className="mt-6 rounded-xl border border-amber-300/20 bg-gradient-to-r from-amber-300/10 to-amber-300/5 p-4">
+      <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm font-semibold text-amber-100">Want the full breakdown?</div>
-          <div className="mt-1 text-xs text-amber-100/70">
-            Match Center is schedule + context. Full interpretation lives on the AI Insights page.
+          <div className="text-sm font-semibold text-amber-100">
+            Ready for deeper match insight?
+          </div>
+          <div className="text-xs text-amber-100/70 mt-1">
+            Full interpretation lives on the AI Insights page.
           </div>
         </div>
-
-        <a href={href} target="_blank" rel="noreferrer">
+        <a href="/sports/afl/ai-analysis">
           <Button size="sm">Open AI Insights →</Button>
         </a>
       </div>
