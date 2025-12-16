@@ -1,17 +1,37 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 
+/* -------------------------------------------------------------------------- */
+/*                                   TYPES                                    */
+/* -------------------------------------------------------------------------- */
+
 export type MatchCenterView = "today" | "thisRound" | "all";
 
 type Props = {
   view: MatchCenterView;
-  onChangeView: (v: MatchCenterView) => void;
+  onChangeView: (view: MatchCenterView) => void;
 
-  // Mobile ladder toggle
+  /** Mobile ladder toggle */
   ladderOpen?: boolean;
   onToggleLadder?: () => void;
 };
 
+/* -------------------------------------------------------------------------- */
+/*                               FILTERS BAR                                  */
+/* -------------------------------------------------------------------------- */
+/**
+ * MatchFiltersBar
+ * ---------------
+ * Controls the active fixture view.
+ *
+ * Views:
+ * - Today
+ * - This Round
+ * - All Fixtures
+ *
+ * Mobile:
+ * - Optional ladder toggle
+ */
 export default function MatchFiltersBar({
   view,
   onChangeView,
@@ -19,9 +39,17 @@ export default function MatchFiltersBar({
   onToggleLadder,
 }: Props) {
   return (
-    <div className="mb-5 md:mb-6">
-      <div className="sticky top-3 z-20 rounded-xl border border-white/10 bg-black/60 p-2 backdrop-blur-xl md:static md:bg-white/[0.03]">
+    <div className="mb-6">
+      <div
+        className="
+          sticky top-3 z-20
+          rounded-xl border border-white/10
+          bg-black/70 backdrop-blur-xl
+          p-2
+        "
+      >
         <div className="flex flex-wrap items-center gap-2">
+          {/* View buttons */}
           <div className="flex gap-2">
             <Button
               size="sm"
@@ -30,6 +58,7 @@ export default function MatchFiltersBar({
             >
               Today
             </Button>
+
             <Button
               size="sm"
               variant={view === "thisRound" ? "default" : "secondary"}
@@ -37,6 +66,7 @@ export default function MatchFiltersBar({
             >
               This Round
             </Button>
+
             <Button
               size="sm"
               variant={view === "all" ? "default" : "secondary"}
@@ -46,6 +76,7 @@ export default function MatchFiltersBar({
             </Button>
           </div>
 
+          {/* Spacer */}
           <div className="flex-1" />
 
           {/* Mobile ladder toggle */}
