@@ -5,6 +5,9 @@ import type { FixtureMatch, LadderRow } from "./types";
 /* -------------------------------------------------------------------------- */
 
 export const MOCK_FIXTURES: FixtureMatch[] = [
+  // -----------------------------------------------------------------------
+  // THURSDAY — SEASON OPENER
+  // -----------------------------------------------------------------------
   {
     id: "r1-m1",
     roundLabel: "R1",
@@ -15,6 +18,10 @@ export const MOCK_FIXTURES: FixtureMatch[] = [
     awayTeam: "Carlton",
     status: "upcoming",
   },
+
+  // -----------------------------------------------------------------------
+  // FRIDAY NIGHT
+  // -----------------------------------------------------------------------
   {
     id: "r1-m2",
     roundLabel: "R1",
@@ -23,12 +30,26 @@ export const MOCK_FIXTURES: FixtureMatch[] = [
     venue: "Adelaide Oval",
     homeTeam: "Adelaide",
     awayTeam: "Port Adelaide",
-    status: "upcoming",
+    status: "live",
   },
+
+  // -----------------------------------------------------------------------
+  // SATURDAY
+  // -----------------------------------------------------------------------
   {
     id: "r1-m3",
     roundLabel: "R1",
-    dateISO: "2026-03-20",
+    dateISO: "2026-03-21",
+    timeLocal: "13:45",
+    venue: "Gabba",
+    homeTeam: "Brisbane",
+    awayTeam: "Sydney",
+    status: "upcoming",
+  },
+  {
+    id: "r1-m4",
+    roundLabel: "R1",
+    dateISO: "2026-03-21",
     timeLocal: "16:10",
     venue: "GMHBA Stadium",
     homeTeam: "Geelong",
@@ -36,13 +57,47 @@ export const MOCK_FIXTURES: FixtureMatch[] = [
     status: "upcoming",
   },
   {
-    id: "r1-m4",
+    id: "r1-m5",
     roundLabel: "R1",
     dateISO: "2026-03-21",
-    timeLocal: "13:45",
-    venue: "Gabba",
-    homeTeam: "Brisbane",
-    awayTeam: "Sydney",
+    timeLocal: "19:25",
+    venue: "Marvel Stadium",
+    homeTeam: "Essendon",
+    awayTeam: "Collingwood",
+    status: "upcoming",
+  },
+
+  // -----------------------------------------------------------------------
+  // SUNDAY
+  // -----------------------------------------------------------------------
+  {
+    id: "r1-m6",
+    roundLabel: "R1",
+    dateISO: "2026-03-22",
+    timeLocal: "13:10",
+    venue: "Optus Stadium",
+    homeTeam: "Fremantle",
+    awayTeam: "West Coast",
+    status: "final",
+  },
+  {
+    id: "r1-m7",
+    roundLabel: "R1",
+    dateISO: "2026-03-22",
+    timeLocal: "15:20",
+    venue: "People First Stadium",
+    homeTeam: "Gold Coast",
+    awayTeam: "St Kilda",
+    status: "upcoming",
+  },
+  {
+    id: "r1-m8",
+    roundLabel: "R1",
+    dateISO: "2026-03-22",
+    timeLocal: "16:40",
+    venue: "ENGIE Stadium",
+    homeTeam: "GWS",
+    awayTeam: "Western Bulldogs",
     status: "upcoming",
   },
 ];
