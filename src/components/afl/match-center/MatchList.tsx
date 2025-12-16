@@ -5,36 +5,42 @@ import { formatDateLong } from "./utils";
 
 type Props = {
   matches: FixtureMatch[];
-  viewLabel?: string;
 };
 
 export default function MatchList({ matches }: Props) {
   if (!matches.length) {
     return (
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
-        <div className="text-white font-semibold">No matches found</div>
+        <div className="text-white font-semibold">No matches scheduled</div>
         <div className="mt-2 text-sm text-white/60">
-          Fixtures will appear here once available.
+          Fixtures will appear here once released.
         </div>
       </div>
     );
   }
 
+  let lastDate = "";
+
   return (
     <div className="space-y-6">
-      {/* Date header */}
-      <div className="flex items-center gap-3">
-        <span className="text-xs uppercase tracking-wide text-white/60">
-          {formatDateLong(matches[0].dateISO)}
-        </span>
-        <div className="h-px flex-1 bg-white/10" />
-      </div>
+      {matches.map((match) => {
+        const showDate = match.dateISO !== lastDate;
+        lastDate = match.dateISO;
 
-      <div className="space-y-3">
-        {matches.map((match) => (
-          <MatchCard key={match.id} match={match} />
-        ))}
-      </div>
+        return (
+          <React.Fragment key={match.id}>
+            {showDate && (
+              <div className="flex items-center gap-3 pt-2">
+                <span className="text-xs uppercase tracking-widest text-amber-300/70">
+                  {formatDateLong(match.dateISO)}
+                </span>
+                <div className="h-px flex-1 bg-gradient-to-r from-amber-300/20 to-transparent" />
+              </div>
+            )}
+            <MatchCard match={match} />
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }

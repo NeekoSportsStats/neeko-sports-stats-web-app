@@ -20,7 +20,7 @@ export default function AFLMatchCentre() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
         {/* LEFT — Matches */}
         <div className="space-y-6">
-          <MatchList matches={MOCK_FIXTURES} viewLabel="All Fixtures" />
+          <MatchList matches={MOCK_FIXTURES} />
           <MatchCenterCTA />
         </div>
 
