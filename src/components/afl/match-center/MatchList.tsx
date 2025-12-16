@@ -12,17 +12,39 @@ type Props = {
 };
 
 /* -------------------------------------------------------------------------- */
+/*                               HELPERS                                      */
+/* -------------------------------------------------------------------------- */
+
+function groupByDate(matches: FixtureMatch[]) {
+  return matches.reduce<Record<string, FixtureMatch[]>>((acc, match) => {
+    const key = match.dateISO;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(match);
+    return acc;
+  }, {});
+}
+
+function formatDateLabel(dateISO: string) {
+  const date = new Date(dateISO);
+  return date.toLocaleDateString("en-AU", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+}
+
+/* -------------------------------------------------------------------------- */
 /*                                 MATCH LIST                                 */
 /* -------------------------------------------------------------------------- */
 /**
  * MatchList
  * ---------
- * Renders a vertical list of MatchCard components.
+ * Chronological fixture stream grouped by day.
  *
- * Design intent:
- * - Chronological, scannable fixture stream
- * - No business logic or filtering
- * - Visual rhythm that scales with longer lists
+ * Responsibilities:
+ * - Visual grouping only (no filtering logic)
+ * - Delegates card rendering
+ * - Keeps list scannable as fixtures scale
  */
 export default function MatchList({ matches, onSelectMatch }: Props) {
   if (!matches.length) {
@@ -38,25 +60,33 @@ export default function MatchList({ matches, onSelectMatch }: Props) {
     );
   }
 
-  return (
-    <section className="space-y-8">
-      {/* Optional section label (future-proofing) */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold tracking-wide text-white/80">
-          Fixtures
-        </h2>
-      </div>
+  const grouped = groupByDate(matches);
+  const orderedDates = Object.keys(grouped).sort();
 
-      {/* Match stream */}
-      <div className="space-y-6">
-        {matches.map((match) => (
-          <MatchCard
-            key={match.id}
-            match={match}
-            onClick={() => onSelectMatch(match)}
-          />
-        ))}
-      </div>
+  return (
+    <section className="space-y-10">
+      {orderedDates.map((dateISO) => (
+        <div key={dateISO} className="space-y-4">
+          {/* Date header */}
+          <div className="flex items-center gap-3">
+            <div className="text-sm font-semibold text-white">
+              {formatDateLabel(dateISO)}
+            </div>
+            <div className="flex-1 h-px bg-white/10" />
+          </div>
+
+          {/* Matches for day */}
+          <div className="space-y-6">
+            {grouped[dateISO].map((match) => (
+              <MatchCard
+                key={match.id}
+                match={match}
+                onClick={() => onSelectMatch(match)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
     </section>
   );
 }
