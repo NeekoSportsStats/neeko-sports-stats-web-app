@@ -9,11 +9,11 @@ type Props = {
 
 export default function MatchCard({ match }: Props) {
   return (
-    <div className="group rounded-xl border border-white/10 bg-white/[0.025] p-3 transition-all hover:-translate-y-[1px] hover:border-amber-300/30">
+    <div className="group rounded-xl border border-white/10 bg-white/[0.025] p-3 transition-all hover:-translate-y-[1px] hover:border-amber-300/30 hover:bg-white/[0.03]">
       <div className="flex justify-between text-xs text-white/60">
         <span>{match.roundLabel} · {formatDateShort(match.dateISO)} · {match.timeLocal}</span>
-        <span className="rounded-full px-2 py-0.5 text-[10px] border border-white/10">
-          UPCOMING
+        <span className="rounded-full px-2 py-0.5 text-[10px] border border-white/10 text-white/70">
+          {match.status.toUpperCase()}
         </span>
       </div>
 
