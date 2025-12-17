@@ -1,22 +1,23 @@
 import React from "react";
-import { Button } from "@/components/ui/button";
+import { ArrowRight } from "lucide-react";
 
 export default function MatchCenterCTA() {
   return (
-    <div className="rounded-xl border border-amber-300/20 bg-gradient-to-r from-amber-300/10 to-transparent p-4">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+    <div className="rounded-xl border border-amber-400/25 bg-gradient-to-r from-amber-400/10 to-amber-400/5 p-4">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="text-sm font-semibold text-amber-100">
+          <div className="text-sm font-semibold text-white">
             Ready for deeper match insight?
           </div>
-          <div className="mt-1 text-xs text-amber-100/70">
+          <div className="text-xs text-white/60">
             Full interpretation lives on the AI Insights page.
           </div>
         </div>
 
-        <a href="/sports/afl/ai-analysis">
-          <Button size="sm">Open AI Insights →</Button>
-        </a>
+        <button className="flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-sm font-medium text-black hover:bg-amber-300 transition">
+          Open AI Insights
+          <ArrowRight size={16} />
+        </button>
       </div>
     </div>
   );

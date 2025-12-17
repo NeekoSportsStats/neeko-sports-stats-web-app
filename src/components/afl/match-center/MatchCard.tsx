@@ -5,7 +5,6 @@ import type { FixtureMatch } from "./types";
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
-// Convert points → goals.behinds (points)
 function goalsBehinds(points: number) {
   const goals = Math.floor(points / 6);
   const behinds = points - goals * 6;
@@ -39,14 +38,10 @@ export default function MatchCard({ match, onClick }: Props) {
     match.awayScore !== undefined &&
     match.awayScore > match.homeScore;
 
-  // Identify highest scoring quarter (subtle emphasis)
-  const maxHomeQ = isFinal && match.quarters
-    ? Math.max(...match.quarters.map((q) => q.home))
-    : null;
-
-  const maxAwayQ = isFinal && match.quarters
-    ? Math.max(...match.quarters.map((q) => q.away))
-    : null;
+  const margin =
+    isFinal && match.homeScore !== undefined && match.awayScore !== undefined
+      ? Math.abs(match.homeScore - match.awayScore)
+      : null;
 
   return (
     <button
@@ -59,46 +54,41 @@ export default function MatchCard({ match, onClick }: Props) {
           : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
       )}
     >
-      {/* FINAL accent bar */}
+      {/* FINAL accent */}
       {isFinal && (
         <div className="absolute left-0 top-0 h-full w-[3px] bg-amber-400 rounded-l-xl" />
       )}
 
-      {/* ------------------------------------------------------------------ */}
-      {/* META                                                               */}
-      {/* ------------------------------------------------------------------ */}
+      {/* META */}
       <div className="flex justify-between items-center text-xs mb-4">
         <div className="text-white/50">
           {match.roundLabel} · {match.dateISO} · {match.timeLocal}
         </div>
-        <div
-          className={cx(
-            "uppercase tracking-wide",
-            isFinal ? "text-[10px] text-amber-300/70" : "text-white/40"
-          )}
-        >
+        <div className="px-2 py-[2px] rounded-full border border-amber-400/20 bg-amber-400/10 text-[10px] uppercase tracking-wide text-amber-300/80">
           {match.status}
         </div>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* TEAMS + SCORE                                                      */}
-      {/* ------------------------------------------------------------------ */}
+      {/* TEAMS + SCORE */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-        <div
-          className={cx(
-            "truncate",
-            homeWon ? "font-semibold text-white" : "text-white"
-          )}
-        >
+        <div className={cx(homeWon ? "font-semibold text-white" : "text-white")}>
           {match.homeTeam}
         </div>
 
         <div className="text-center">
           {isFinal ? (
-            <div className="text-[22px] font-bold tracking-tight">
-              {match.homeScore} – {match.awayScore}
-            </div>
+            <>
+              <div className="text-[22px] font-bold tracking-tight">
+                {match.homeScore} – {match.awayScore}
+              </div>
+              {margin !== null && (
+                <div className="mt-0.5 text-[11px] text-white/45">
+                  {homeWon
+                    ? `${match.homeTeam} by ${margin}`
+                    : `${match.awayTeam} by ${margin}`}
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-xs text-white/40">vs</div>
           )}
@@ -106,7 +96,7 @@ export default function MatchCard({ match, onClick }: Props) {
 
         <div
           className={cx(
-            "text-right truncate",
+            "text-right",
             awayWon ? "font-semibold text-white" : "text-white"
           )}
         >
@@ -114,36 +104,31 @@ export default function MatchCard({ match, onClick }: Props) {
         </div>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* VENUE                                                              */}
-      {/* ------------------------------------------------------------------ */}
+      {/* VENUE */}
       <div className="mt-2 text-xs text-white/40">
         {match.venue}
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* FINAL: QUARTER BREAKDOWN (OPTION A — ALIGNED)                      */}
-      {/* ------------------------------------------------------------------ */}
+      {/* FINAL: QUARTER BREAKDOWN */}
       {isFinal && match.quarters && (
-        <div className="mt-4 space-y-1 text-xs text-white/65">
+        <div className="mt-4 rounded-lg bg-black/20 p-3 text-xs">
           {match.quarters.map((q) => {
-            const homePeak = q.home === maxHomeQ;
-            const awayPeak = q.away === maxAwayQ;
+            const homeBetter = q.home > q.away;
+            const awayBetter = q.away > q.home;
 
             return (
               <div
                 key={q.label}
-                className="grid grid-cols-[28px_1fr_1fr] items-center tabular-nums"
+                className="grid grid-cols-[32px_1fr_1fr] items-center tabular-nums py-0.5"
               >
-                {/* Quarter label */}
-                <div className="text-white/40">
-                  {q.label}
-                </div>
+                {/* Quarter */}
+                <div className="text-white/40">{q.label}</div>
 
                 {/* Home */}
                 <div
                   className={cx(
-                    homePeak && "text-white font-medium"
+                    homeBetter && "text-emerald-300 font-medium",
+                    awayBetter && "text-white/55"
                   )}
                 >
                   {goalsBehinds(q.home)}
@@ -153,7 +138,8 @@ export default function MatchCard({ match, onClick }: Props) {
                 <div
                   className={cx(
                     "text-right",
-                    awayPeak && "text-white font-medium"
+                    awayBetter && "text-emerald-300 font-medium",
+                    homeBetter && "text-white/55"
                   )}
                 >
                   {goalsBehinds(q.away)}
@@ -162,7 +148,6 @@ export default function MatchCard({ match, onClick }: Props) {
             );
           })}
 
-          {/* Crowd */}
           {match.crowd && (
             <div className="pt-2 text-[11px] text-white/45">
               Crowd: {match.crowd.toLocaleString()}
