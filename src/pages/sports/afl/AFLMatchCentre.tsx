@@ -61,7 +61,7 @@ export default function AFLMatchCentre() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
         {/* LEFT */}
         <div className="space-y-6">
-          <MatchList matches={matches} onSelectMatch={setActiveMatch} groupByDay />
+          <MatchList matches={matches} onSelectMatch={setActiveMatch} />
           <MatchCenterCTA />
         </div>
 
