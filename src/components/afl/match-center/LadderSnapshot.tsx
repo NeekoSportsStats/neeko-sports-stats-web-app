@@ -1,9 +1,5 @@
 import React from "react";
 
-/* -------------------------------------------------------------------------- */
-/* TYPES                                                                      */
-/* -------------------------------------------------------------------------- */
-
 export type LadderRow = {
   pos: number;
   team: string;
@@ -19,25 +15,27 @@ type Props = {
   highlightTeams?: string[];
 };
 
-/* -------------------------------------------------------------------------- */
-/* HELPERS                                                                    */
-/* -------------------------------------------------------------------------- */
-
 const cx = (...c: Array<string | false | undefined>) =>
   c.filter(Boolean).join(" ");
-
-/* -------------------------------------------------------------------------- */
-/* COMPONENT                                                                  */
-/* -------------------------------------------------------------------------- */
 
 function LadderSnapshot({ rows, highlightTeams = [] }: Props) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between">
         <div className="text-sm font-semibold text-white">
           Ladder Snapshot
         </div>
         <div className="text-xs text-white/45">Top 16</div>
+      </div>
+
+      {/* Column labels */}
+      <div className="grid grid-cols-[28px_1fr_28px_28px_28px_48px] gap-2 px-2 text-[10px] text-white/40 mb-1">
+        <div>#</div>
+        <div>Team</div>
+        <div className="text-center">W</div>
+        <div className="text-center">L</div>
+        <div className="text-center">D</div>
+        <div className="text-right">%</div>
       </div>
 
       <div className="space-y-1.5">
@@ -73,10 +71,6 @@ function LadderSnapshot({ rows, highlightTeams = [] }: Props) {
     </div>
   );
 }
-
-/* -------------------------------------------------------------------------- */
-/* EXPORTS (BOTH default + named — intentional)                               */
-/* -------------------------------------------------------------------------- */
 
 export default LadderSnapshot;
 export { LadderSnapshot };
