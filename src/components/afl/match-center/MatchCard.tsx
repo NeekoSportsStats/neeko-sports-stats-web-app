@@ -1,102 +1,116 @@
 import React from "react";
 import type { FixtureMatch } from "./types";
-import { MOCK_MATCH_RESULTS } from "./mockData";
+import { cx, formatCrowd, formatDateShort } from "./utils";
+
+/* -------------------------------------------------------------------------- */
+/*                                  TYPES                                     */
+/* -------------------------------------------------------------------------- */
 
 type Props = {
   match: FixtureMatch;
   onClick: () => void;
 };
 
+/* -------------------------------------------------------------------------- */
+/*                               MATCH CARD                                   */
+/* -------------------------------------------------------------------------- */
+
 export default function MatchCard({ match, onClick }: Props) {
-  const result = MOCK_MATCH_RESULTS[match.id];
-  const isFinal = match.status === "final" && !!result;
+  const isFinal = match.status === "final";
+  const isLive = match.status === "live";
 
   return (
     <button
       onClick={onClick}
-      className="
-        w-full text-left
-        rounded-xl border border-white/10
-        bg-white/[0.03]
-        hover:bg-white/[0.06]
-        transition-colors
-        p-5
-        focus:outline-none focus:ring-2 focus:ring-amber-400/40
-      "
+      className={cx(
+        "w-full text-left rounded-xl border border-white/10 bg-white/[0.03]",
+        "hover:bg-white/[0.06] transition-colors p-5",
+        "focus:outline-none focus:ring-2 focus:ring-amber-400/40"
+      )}
     >
-      {/* Meta */}
+      {/* Top meta row */}
       <div className="flex items-center justify-between text-xs text-white/50 mb-3">
-        <div>
-          {match.roundLabel} · {match.dateISO} · {match.timeLocal}
+        <div className="truncate">
+          {match.roundLabel} · {formatDateShort(match.dateISO)} · {match.timeLocal}
         </div>
-        <div className="uppercase tracking-wide">
+
+        <div
+          className={cx(
+            "uppercase tracking-wide",
+            isFinal ? "text-white/60" : isLive ? "text-amber-300" : "text-white/50"
+          )}
+        >
           {match.status}
         </div>
       </div>
 
-      {/* Teams */}
+      {/* Teams row */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-        <div>
-          <div className="text-white font-semibold">
-            {match.homeTeam}
-          </div>
+        {/* Home */}
+        <div className="min-w-0">
+          <div className="text-white font-semibold truncate">{match.homeTeam}</div>
           <div className="text-xs text-white/50">Home</div>
         </div>
 
-        <div className="text-xs text-white/40">
-          {isFinal ? (
-            <span className="text-white font-semibold">
-              {result.homeScore} – {result.awayScore}
-            </span>
+        {/* Middle */}
+        <div className="text-center">
+          {isFinal && typeof match.homeScore === "number" && typeof match.awayScore === "number" ? (
+            <div className="text-sm font-semibold text-white">
+              {match.homeScore} <span className="text-white/40">–</span> {match.awayScore}
+            </div>
           ) : (
-            "vs"
+            <div className="text-xs text-white/40">vs</div>
           )}
+          {isLive && match.liveQuarterLabel ? (
+            <div className="mt-1 text-[11px] text-amber-300/90">{match.liveQuarterLabel}</div>
+          ) : null}
         </div>
 
-        <div className="text-right">
-          <div className="text-white font-semibold">
-            {match.awayTeam}
-          </div>
+        {/* Away */}
+        <div className="text-right min-w-0">
+          <div className="text-white font-semibold truncate">{match.awayTeam}</div>
           <div className="text-xs text-white/50">Away</div>
         </div>
       </div>
 
       {/* Venue */}
-      <div className="mt-3 text-xs text-white/40">
-        Venue: {match.venue}
-      </div>
+      <div className="mt-3 text-xs text-white/40">Venue: {match.venue}</div>
 
-      {/* Final details */}
-      {isFinal && (
-        <div className="mt-4 space-y-2 text-xs text-white/70">
-          {result.quarters.map((q) => (
-            <div key={q.label} className="flex justify-between">
-              <span>{q.label}</span>
-              <span>
-                {q.home} v {q.away}
-              </span>
+      {/* Final details (Previous Rounds look) */}
+      {isFinal ? (
+        <div className="mt-4 space-y-3">
+          {/* Quarters */}
+          {match.quarters?.length ? (
+            <div className="grid grid-cols-[40px_1fr] gap-x-4 gap-y-2 text-xs">
+              {match.quarters.map((q) => (
+                <React.Fragment key={q.label}>
+                  <div className="text-white/50">{q.label}</div>
+                  <div className="text-white/60 text-right">
+                    {q.home} <span className="text-white/30">v</span> {q.away}
+                  </div>
+                </React.Fragment>
+              ))}
             </div>
-          ))}
+          ) : null}
 
-          {result.crowd && (
-            <div className="pt-2 text-white/50">
-              Crowd: {result.crowd.toLocaleString()}
-            </div>
-          )}
+          {/* Crowd */}
+          <div className="text-xs text-white/50">
+            Crowd: <span className="text-white/60">{formatCrowd(match.crowd)}</span>
+          </div>
 
-          {result.topPlayersHome && (
-            <div className="pt-1 text-white/50">
-              {match.homeTeam}: {result.topPlayersHome.join(", ")}
+          {/* Top players */}
+          {match.topPlayers?.length ? (
+            <div className="space-y-1 text-xs text-white/45">
+              {match.topPlayers.map((tp) => (
+                <div key={tp.teamLabel} className="truncate">
+                  <span className="text-white/50">{tp.teamLabel}:</span>{" "}
+                  <span className="text-white/60">{tp.names.join(", ")}</span>
+                </div>
+              ))}
             </div>
-          )}
-
-          {result.topPlayersAway && (
-            <div className="text-white/50">
-              {match.awayTeam}: {result.topPlayersAway.join(", ")}
-            </div>
-          )}
+          ) : null}
         </div>
-      )}
+      ) : null}
     </button>
   );
 }
