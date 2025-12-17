@@ -11,29 +11,6 @@ export type FixtureMatch = {
   status: MatchStatus;
 };
 
-/* -------------------------------------------------------------------------- */
-/* RESULT DATA (PAST MATCHES)                                                  */
-/* -------------------------------------------------------------------------- */
-
-export type MatchQuarterScore = {
-  quarter: "Q1" | "Q2" | "Q3" | "Q4";
-  home: string; // e.g. "2.1 (13)"
-  away: string; // e.g. "1.4 (10)"
-};
-
-export type MatchResultData = {
-  homeScore: number;
-  awayScore: number;
-  quarters: MatchQuarterScore[];
-  crowd?: number;
-  topPlayersHome?: string[];
-  topPlayersAway?: string[];
-};
-
-/* -------------------------------------------------------------------------- */
-/* LADDER                                                                     */
-/* -------------------------------------------------------------------------- */
-
 export type LadderRow = {
   team: string;
   pos: number;
@@ -42,4 +19,16 @@ export type LadderRow = {
   losses: number;
   draws: number;
   pct: number;
+};
+
+/* -------------------------------------------------------------------------- */
+/* MATCH PLAYERS                                                              */
+/* -------------------------------------------------------------------------- */
+
+export type MatchPlayer = {
+  id: string;
+  name: string;
+  team: string;
+  position?: string;
+  isConfirmed?: boolean;
 };

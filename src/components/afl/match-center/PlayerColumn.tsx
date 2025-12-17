@@ -1,52 +1,61 @@
 import React from "react";
 import type { MatchPlayer } from "./types";
 
+/* -------------------------------------------------------------------------- */
+/*                                   TYPES                                    */
+/* -------------------------------------------------------------------------- */
+
 type Props = {
-  title: string;
+  team: string;
   players: MatchPlayer[];
+  isConfirmed: boolean;
 };
 
-export default function PlayerColumn({ title, players }: Props) {
+/* -------------------------------------------------------------------------- */
+/*                               PLAYER COLUMN                                */
+/* -------------------------------------------------------------------------- */
+
+export default function PlayerColumn({
+  team,
+  players,
+  isConfirmed,
+}: Props) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-      <div className="mb-2 text-xs font-semibold text-white/80">
-        {title}
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+      {/* Header */}
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-sm font-semibold text-white">
+          {team}
+        </div>
+
+        <div
+          className={`text-[10px] uppercase tracking-wide ${
+            isConfirmed
+              ? "text-emerald-400"
+              : "text-amber-400"
+          }`}
+        >
+          {isConfirmed ? "Confirmed" : "Projected"}
+        </div>
       </div>
 
-      <div className="max-h-56 overflow-y-auto divide-y divide-white/5">
+      {/* Players */}
+      <ul className="space-y-2">
         {players.map((player) => (
-          <div
+          <li
             key={player.id}
-            className="flex items-center justify-between py-2 text-sm"
+            className="flex items-center justify-between text-sm text-white/80"
           >
-            <div className="text-white">
-              {player.name}
-            </div>
+            <span>{player.name}</span>
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-white/50">
+            {player.position && (
+              <span className="text-xs text-white/40">
                 {player.position}
               </span>
-              <AvailabilityDot status={player.availability} />
-            </div>
-          </div>
+            )}
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
-  );
-}
-
-function AvailabilityDot({ status }: { status: MatchPlayer["availability"] }) {
-  const color =
-    status === "confirmed"
-      ? "bg-green-400"
-      : status === "out"
-      ? "bg-red-400"
-      : status === "emergency"
-      ? "bg-amber-400"
-      : "bg-white/40";
-
-  return (
-    <span className={`h-2 w-2 rounded-full ${color}`} />
   );
 }

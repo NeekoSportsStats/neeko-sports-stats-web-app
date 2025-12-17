@@ -1,124 +1,82 @@
 import React from "react";
-import type { MatchPlayer } from "./types";
+import MatchCard from "./MatchCard";
+import type { FixtureMatch } from "./types";
 
 /* -------------------------------------------------------------------------- */
-/*                                   TYPES                                    */
+/* HELPERS                                                                    */
+/* -------------------------------------------------------------------------- */
+
+function groupByDate(matches: FixtureMatch[]) {
+  return matches.reduce<Record<string, FixtureMatch[]>>((acc, match) => {
+    if (!acc[match.dateISO]) acc[match.dateISO] = [];
+    acc[match.dateISO].push(match);
+    return acc;
+  }, {});
+}
+
+function formatDateLabel(dateISO: string) {
+  const date = new Date(dateISO);
+  return date.toLocaleDateString("en-AU", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
 
 type Props = {
-  homeTeam: string;
-  awayTeam: string;
-  players: MatchPlayer[];
-  isConfirmed?: boolean;
+  matches: FixtureMatch[];
+  onSelectMatch: (match: FixtureMatch) => void;
 };
 
 /* -------------------------------------------------------------------------- */
-/*                                PLAYER LIST                                 */
+/* MATCH LIST                                                                 */
 /* -------------------------------------------------------------------------- */
-/**
- * PlayerList
- * ----------
- * Displays projected or confirmed players for a match.
- *
- * Design intent:
- * - Full squad pre-announcement
- * - Same layout transitions cleanly to confirmed teams
- * - Contextual only (no stats, no AI)
- */
-export default function PlayerList({
-  homeTeam,
-  awayTeam,
-  players,
-  isConfirmed = false,
-}: Props) {
-  const homePlayers = players.filter((p) => p.team === "home");
-  const awayPlayers = players.filter((p) => p.team === "away");
 
-  return (
-    <section className="space-y-4">
-      {/* Header */}
-      <div>
-        <div className="text-sm font-semibold text-white">
-          Players — {isConfirmed ? "Confirmed Lineup" : "Projected Squad"}
+export default function MatchList({ matches, onSelectMatch }: Props) {
+  if (!matches.length) {
+    return (
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] py-12 text-center">
+        <div className="text-sm font-medium text-white">
+          No fixtures available
         </div>
-        <div className="text-xs text-white/50">
-          {isConfirmed
-            ? "Official team selections"
-            : "Based on available players prior to team announcement"}
+        <div className="mt-1 text-xs text-white/50">
+          Check back later for upcoming AFL matches.
         </div>
       </div>
+    );
+  }
 
-      {/* Columns */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <PlayerColumn title={homeTeam} players={homePlayers} />
-        <PlayerColumn title={awayTeam} players={awayPlayers} />
-      </div>
-    </section>
-  );
-}
+  const grouped = groupByDate(matches);
+  const orderedDates = Object.keys(grouped).sort();
 
-/* -------------------------------------------------------------------------- */
-/*                              PLAYER COLUMN                                 */
-/* -------------------------------------------------------------------------- */
-
-function PlayerColumn({
-  title,
-  players,
-}: {
-  title: string;
-  players: MatchPlayer[];
-}) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-      <div className="mb-2 text-xs font-semibold text-white/80">
-        {title}
-      </div>
-
-      <div className="max-h-56 overflow-y-auto divide-y divide-white/5">
-        {players.map((player) => (
-          <div
-            key={player.id}
-            className="flex items-center justify-between py-2 text-sm"
-          >
-            <div className="text-white truncate">
-              {player.name}
+    <section className="space-y-10">
+      {orderedDates.map((dateISO) => (
+        <div key={dateISO} className="space-y-4">
+          {/* Date divider */}
+          <div className="flex items-center gap-3">
+            <div className="text-sm font-semibold text-white">
+              {formatDateLabel(dateISO)}
             </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-xs text-white/50">
-                {player.position}
-              </span>
-              <AvailabilityDot status={player.availability} />
-            </div>
+            <div className="flex-1 h-px bg-white/10" />
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
-/* -------------------------------------------------------------------------- */
-/*                            AVAILABILITY DOT                                */
-/* -------------------------------------------------------------------------- */
-
-function AvailabilityDot({
-  status,
-}: {
-  status: MatchPlayer["availability"];
-}) {
-  const color =
-    status === "confirmed"
-      ? "bg-green-400"
-      : status === "out"
-      ? "bg-red-400"
-      : status === "emergency"
-      ? "bg-amber-400"
-      : "bg-white/40";
-
-  return (
-    <span
-      className={`inline-block h-2 w-2 rounded-full ${color}`}
-      title={status}
-    />
+          {/* Matches */}
+          <div className="space-y-6">
+            {grouped[dateISO].map((match) => (
+              <MatchCard
+                key={match.id}
+                match={match}
+                onClick={() => onSelectMatch(match)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </section>
   );
 }

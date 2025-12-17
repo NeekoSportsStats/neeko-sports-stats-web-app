@@ -1,126 +1,67 @@
 import type { FixtureMatch, LadderRow } from "./types";
 
 /* -------------------------------------------------------------------------- */
-/* FIXTURE MOCK DATA                                                          */
+/* FIXTURES                                                                    */
 /* -------------------------------------------------------------------------- */
 
 export const MOCK_FIXTURES: FixtureMatch[] = [
-  // -----------------------------------------------------------------------
-  // THURSDAY — SEASON OPENER
-  // -----------------------------------------------------------------------
   {
-    id: "r1-m1",
-    roundLabel: "R1",
-    dateISO: "2026-03-19",
-    timeLocal: "19:20",
+    id: "match-001",
+    roundLabel: "Round 1",
+    dateISO: "2025-03-21",
+    timeLocal: "7:50 PM",
     venue: "MCG",
     homeTeam: "Richmond",
     awayTeam: "Carlton",
-    status: "upcoming",
+    status: "final",
   },
-
-  // -----------------------------------------------------------------------
-  // FRIDAY NIGHT
-  // -----------------------------------------------------------------------
   {
-    id: "r1-m2",
-    roundLabel: "R1",
-    dateISO: "2026-03-20",
-    timeLocal: "19:40",
-    venue: "Adelaide Oval",
-    homeTeam: "Adelaide",
-    awayTeam: "Port Adelaide",
-    status: "live",
-  },
-
-  // -----------------------------------------------------------------------
-  // SATURDAY
-  // -----------------------------------------------------------------------
-  {
-    id: "r1-m3",
-    roundLabel: "R1",
-    dateISO: "2026-03-21",
-    timeLocal: "13:45",
+    id: "match-002",
+    roundLabel: "Round 1",
+    dateISO: "2025-03-22",
+    timeLocal: "4:35 PM",
     venue: "Gabba",
     homeTeam: "Brisbane",
     awayTeam: "Sydney",
     status: "upcoming",
   },
-  {
-    id: "r1-m4",
-    roundLabel: "R1",
-    dateISO: "2026-03-21",
-    timeLocal: "16:10",
-    venue: "GMHBA Stadium",
-    homeTeam: "Geelong",
-    awayTeam: "Hawthorn",
-    status: "upcoming",
-  },
-  {
-    id: "r1-m5",
-    roundLabel: "R1",
-    dateISO: "2026-03-21",
-    timeLocal: "19:25",
-    venue: "Marvel Stadium",
-    homeTeam: "Essendon",
-    awayTeam: "Collingwood",
-    status: "upcoming",
-  },
-
-  // -----------------------------------------------------------------------
-  // SUNDAY
-  // -----------------------------------------------------------------------
-  {
-    id: "r1-m6",
-    roundLabel: "R1",
-    dateISO: "2026-03-22",
-    timeLocal: "13:10",
-    venue: "Optus Stadium",
-    homeTeam: "Fremantle",
-    awayTeam: "West Coast",
-    status: "final",
-  },
-  {
-    id: "r1-m7",
-    roundLabel: "R1",
-    dateISO: "2026-03-22",
-    timeLocal: "15:20",
-    venue: "People First Stadium",
-    homeTeam: "Gold Coast",
-    awayTeam: "St Kilda",
-    status: "upcoming",
-  },
-  {
-    id: "r1-m8",
-    roundLabel: "R1",
-    dateISO: "2026-03-22",
-    timeLocal: "16:40",
-    venue: "ENGIE Stadium",
-    homeTeam: "GWS",
-    awayTeam: "Western Bulldogs",
-    status: "upcoming",
-  },
 ];
 
 /* -------------------------------------------------------------------------- */
-/* LADDER MOCK DATA (TOP 16)                                                   */
+/* LADDER                                                                      */
 /* -------------------------------------------------------------------------- */
 
 export const MOCK_LADDER_TOP16: LadderRow[] = [
-  { team: "Collingwood", pos: 1, played: 23, wins: 17, losses: 6, draws: 0, pct: 132.4 },
-  { team: "Brisbane", pos: 2, played: 23, wins: 16, losses: 7, draws: 0, pct: 125.7 },
-  { team: "Carlton", pos: 3, played: 23, wins: 15, losses: 8, draws: 0, pct: 118.9 },
-  { team: "Melbourne", pos: 4, played: 23, wins: 14, losses: 9, draws: 0, pct: 112.3 },
-  { team: "Port Adelaide", pos: 5, played: 23, wins: 14, losses: 9, draws: 0, pct: 108.6 },
-  { team: "Sydney", pos: 6, played: 23, wins: 13, losses: 10, draws: 0, pct: 104.1 },
-  { team: "GWS", pos: 7, played: 23, wins: 13, losses: 10, draws: 0, pct: 102.8 },
-  { team: "Western Bulldogs", pos: 8, played: 23, wins: 12, losses: 11, draws: 0, pct: 100.4 },
-  { team: "Geelong", pos: 9, played: 23, wins: 12, losses: 11, draws: 0, pct: 99.7 },
-  { team: "Fremantle", pos: 10, played: 23, wins: 11, losses: 12, draws: 0, pct: 98.1 },
-  { team: "Essendon", pos: 11, played: 23, wins: 11, losses: 12, draws: 0, pct: 96.3 },
-  { team: "St Kilda", pos: 12, played: 23, wins: 10, losses: 13, draws: 0, pct: 94.2 },
-  { team: "Adelaide", pos: 13, played: 23, wins: 10, losses: 13, draws: 0, pct: 92.0 },
-  { team: "Gold Coast", pos: 14, played: 23, wins: 9, losses: 14, draws: 0, pct: 90.1 },
-  { team: "Hawthorn", pos: 15, played: 23, wins: 8, losses: 15, draws: 0, pct: 87.6 },
-  { team: "Richmond", pos: 16, played: 23, wins: 7, losses: 16, draws: 0, pct: 83.9 },
+  { team: "Richmond", pos: 1, played: 1, wins: 1, losses: 0, draws: 0, pct: 142 },
+  { team: "Carlton", pos: 2, played: 1, wins: 0, losses: 1, draws: 0, pct: 70 },
 ];
+
+/* -------------------------------------------------------------------------- */
+/* MATCH RESULTS (PAST GAMES)                                                  */
+/* -------------------------------------------------------------------------- */
+
+export const MOCK_MATCH_RESULTS: Record<
+  string,
+  {
+    homeScore: number;
+    awayScore: number;
+    quarters: { label: string; home: string; away: string }[];
+    crowd?: number;
+    topPlayersHome?: string[];
+    topPlayersAway?: string[];
+  }
+> = {
+  "match-001": {
+    homeScore: 100,
+    awayScore: 75,
+    quarters: [
+      { label: "Q1", home: "2.1 (13)", away: "1.4 (10)" },
+      { label: "Q2", home: "9.4 (58)", away: "2.10 (22)" },
+      { label: "Q3", home: "12.7 (79)", away: "7.13 (55)" },
+      { label: "Q4", home: "15.10 (100)", away: "10.15 (75)" },
+    ],
+    crowd: 62418,
+    topPlayersHome: ["D. Martin", "S. Bolton", "J. Hopper"],
+    topPlayersAway: ["P. Cripps", "C. Curnow", "S. Walsh"],
+  },
+};

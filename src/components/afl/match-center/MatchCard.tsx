@@ -1,5 +1,6 @@
 import React from "react";
 import type { FixtureMatch } from "./types";
+import { MOCK_MATCH_RESULTS } from "./mockData";
 
 type Props = {
   match: FixtureMatch;
@@ -7,6 +8,9 @@ type Props = {
 };
 
 export default function MatchCard({ match, onClick }: Props) {
+  const result = MOCK_MATCH_RESULTS[match.id];
+  const isFinal = match.status === "final" && !!result;
+
   return (
     <button
       onClick={onClick}
@@ -39,7 +43,15 @@ export default function MatchCard({ match, onClick }: Props) {
           <div className="text-xs text-white/50">Home</div>
         </div>
 
-        <div className="text-xs text-white/40">vs</div>
+        <div className="text-xs text-white/40">
+          {isFinal ? (
+            <span className="text-white font-semibold">
+              {result.homeScore} – {result.awayScore}
+            </span>
+          ) : (
+            "vs"
+          )}
+        </div>
 
         <div className="text-right">
           <div className="text-white font-semibold">
@@ -53,6 +65,38 @@ export default function MatchCard({ match, onClick }: Props) {
       <div className="mt-3 text-xs text-white/40">
         Venue: {match.venue}
       </div>
+
+      {/* Final details */}
+      {isFinal && (
+        <div className="mt-4 space-y-2 text-xs text-white/70">
+          {result.quarters.map((q) => (
+            <div key={q.label} className="flex justify-between">
+              <span>{q.label}</span>
+              <span>
+                {q.home} v {q.away}
+              </span>
+            </div>
+          ))}
+
+          {result.crowd && (
+            <div className="pt-2 text-white/50">
+              Crowd: {result.crowd.toLocaleString()}
+            </div>
+          )}
+
+          {result.topPlayersHome && (
+            <div className="pt-1 text-white/50">
+              {match.homeTeam}: {result.topPlayersHome.join(", ")}
+            </div>
+          )}
+
+          {result.topPlayersAway && (
+            <div className="text-white/50">
+              {match.awayTeam}: {result.topPlayersAway.join(", ")}
+            </div>
+          )}
+        </div>
+      )}
     </button>
   );
 }
