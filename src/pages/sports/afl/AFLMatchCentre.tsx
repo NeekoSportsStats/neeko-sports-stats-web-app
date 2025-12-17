@@ -1,33 +1,34 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 
 import MatchCenterHeader from "@/components/afl/match-center/MatchCenterHeader";
 import MatchList from "@/components/afl/match-center/MatchList";
 import LadderSnapshot from "@/components/afl/match-center/LadderSnapshot";
 import MatchCenterCTA from "@/components/afl/match-center/MatchCenterCTA";
 import MatchDetailOverlay from "@/components/afl/match-center/MatchDetailOverlay";
-import RoundSummaryStats from "@/components/afl/match-center/RoundSummaryStats";
 
-import {
-  MOCK_FIXTURES,
-  MOCK_LADDER_TOP16,
-} from "@/components/afl/match-center/mockData";
-
+import { MOCK_FIXTURES, MOCK_LADDER_TOP16 } from "@/components/afl/match-center/mockData";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 
 export default function AFLMatchCentre() {
-  const [activeMatch, setActiveMatch] =
-    useState<FixtureMatch | null>(null);
+  const [activeMatch, setActiveMatch] = useState<FixtureMatch | null>(null);
+
+  // Default = 2026 Opening Round
+  const filtered = useMemo(
+    () =>
+      MOCK_FIXTURES.filter(
+        (m) => m.season === 2026 && m.roundNumber === 0
+      ),
+    []
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-4 md:px-6 py-8">
       <MatchCenterHeader />
 
-      <RoundSummaryStats matches={MOCK_FIXTURES} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 mt-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
         <div className="space-y-6">
           <MatchList
-            matches={MOCK_FIXTURES}
+            matches={filtered}
             onSelectMatch={setActiveMatch}
           />
           <MatchCenterCTA />

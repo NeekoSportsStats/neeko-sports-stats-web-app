@@ -1,120 +1,75 @@
 import type { FixtureMatch, LadderRow } from "./types";
 
 /* -------------------------------------------------------------------------- */
-/*                                 ROUNDS                                     */
+/*                                FIXTURES                                    */
 /* -------------------------------------------------------------------------- */
 
-export type RoundOption = {
-  id: string; // e.g. "R1"
-  label: string; // e.g. "Round 1"
-  startISO: string; // inclusive
-  endISO: string; // inclusive
-};
-
-export const MOCK_ROUNDS: RoundOption[] = [
-  { id: "R1", label: "Round 1", startISO: "2026-03-19", endISO: "2026-03-22" },
-  { id: "R0", label: "Opening Round", startISO: "2026-03-12", endISO: "2026-03-16" },
-  { id: "R23", label: "Round 23", startISO: "2025-08-21", endISO: "2025-08-24" },
-];
-
-/* -------------------------------------------------------------------------- */
-/*                               FIXTURES                                     */
-/* -------------------------------------------------------------------------- */
-
-/** Default list (used if you don’t filter by round) */
 export const MOCK_FIXTURES: FixtureMatch[] = [
-  // CURRENT ROUND (mostly upcoming)
+  // 2026 — Opening Round (UPCOMING)
   {
-    id: "m_r1_1",
-    roundLabel: "R1",
-    dateISO: "2026-03-19",
-    timeLocal: "7:50 PM",
+    id: "2026-or-1",
+    season: 2026,
+    roundNumber: 0,
+    roundLabel: "OR",
+    dateISO: "2026-03-06",
+    timeLocal: "19:20",
     venue: "MCG",
     homeTeam: "Richmond",
     awayTeam: "Carlton",
     status: "upcoming",
   },
   {
-    id: "m_r1_2",
-    roundLabel: "R1",
-    dateISO: "2026-03-20",
-    timeLocal: "7:40 PM",
+    id: "2026-or-2",
+    season: 2026,
+    roundNumber: 0,
+    roundLabel: "OR",
+    dateISO: "2026-03-07",
+    timeLocal: "16:35",
     venue: "Adelaide Oval",
     homeTeam: "Adelaide",
     awayTeam: "Port Adelaide",
     status: "upcoming",
   },
-  {
-    id: "m_r1_3",
-    roundLabel: "R1",
-    dateISO: "2026-03-20",
-    timeLocal: "4:10 PM",
-    venue: "GMHBA Stadium",
-    homeTeam: "Geelong",
-    awayTeam: "Hawthorn",
-    status: "upcoming",
-  },
-  {
-    id: "m_r1_4",
-    roundLabel: "R1",
-    dateISO: "2026-03-21",
-    timeLocal: "1:45 PM",
-    venue: "Gabba",
-    homeTeam: "Brisbane",
-    awayTeam: "Sydney",
-    status: "upcoming",
-  },
 
-  // PREVIOUS ROUND EXAMPLE (final w/ richer card)
+  // 2025 — Round 23 (FINAL)
   {
-    id: "m_r23_1",
+    id: "2025-r23-1",
+    season: 2025,
+    roundNumber: 23,
     roundLabel: "R23",
     dateISO: "2025-08-23",
-    timeLocal: "7:50 PM",
-    venue: "MCG",
-    homeTeam: "Richmond",
-    awayTeam: "Carlton",
+    timeLocal: "19:10",
+    venue: "Optus Stadium",
+    homeTeam: "Fremantle",
+    awayTeam: "Geelong",
     status: "final",
-    homeScore: 100,
-    awayScore: 75,
+    homeScore: 86,
+    awayScore: 79,
     quarters: [
-      { label: "Q1", home: "2.1 (13)", away: "1.4 (10)" },
-      { label: "Q2", home: "9.4 (58)", away: "2.10 (22)" },
-      { label: "Q3", home: "12.7 (79)", away: "7.13 (55)" },
-      { label: "Q4", home: "15.10 (100)", away: "10.15 (75)" },
+      { label: "Q1", home: 15, away: 19 },
+      { label: "Q2", home: 41, away: 34 },
+      { label: "Q3", home: 62, away: 54 },
+      { label: "Q4", home: 86, away: 79 },
     ],
-    crowd: 62418,
-    topPlayers: [
-      { teamLabel: "Richmond", names: ["D. Martin", "S. Bolton", "J. Hopper"] },
-      { teamLabel: "Carlton", names: ["P. Cripps", "C. Curnow", "S. Walsh"] },
-    ],
+    crowd: 49210,
+    topPlayers: {
+      home: ["Brayshaw", "Serong", "Jackson"],
+      away: ["Cameron", "Stewart", "Guthrie"],
+    },
   },
 ];
 
-/** Round-filtered access (what the selector uses) */
-export const MOCK_FIXTURES_BY_ROUND: Record<string, FixtureMatch[]> = {
-  R1: MOCK_FIXTURES.filter((m) => m.roundLabel === "R1"),
-  R0: [
-    {
-      id: "m_r0_1",
-      roundLabel: "OR",
-      dateISO: "2026-03-14",
-      timeLocal: "7:30 PM",
-      venue: "Optus Stadium",
-      homeTeam: "Fremantle",
-      awayTeam: "Brisbane",
-      status: "upcoming",
-    },
-  ],
-  R23: MOCK_FIXTURES.filter((m) => m.roundLabel === "R23"),
-};
-
 /* -------------------------------------------------------------------------- */
-/*                                  LADDER                                    */
+/*                                 LADDER                                     */
 /* -------------------------------------------------------------------------- */
 
 export const MOCK_LADDER_TOP16: LadderRow[] = [
-  { pos: 1, team: "Richmond", played: 1, wins: 1, losses: 0, draws: 0, pct: 120.5 },
-  { pos: 2, team: "Carlton", played: 1, wins: 0, losses: 1, draws: 0, pct: 89.2 },
-  // keep your real ladder mock below (trimmed here for brevity)
+  { pos: 1, team: "Sydney", played: 23, wins: 17, losses: 6, draws: 0, pct: 118.2 },
+  { pos: 2, team: "Geelong", played: 23, wins: 16, losses: 7, draws: 0, pct: 115.4 },
+  { pos: 3, team: "Brisbane", played: 23, wins: 15, losses: 8, draws: 0, pct: 112.9 },
+  { pos: 4, team: "Carlton", played: 23, wins: 14, losses: 9, draws: 0, pct: 109.6 },
+  { pos: 5, team: "Fremantle", played: 23, wins: 14, losses: 9, draws: 0, pct: 107.3 },
+  { pos: 6, team: "Collingwood", played: 23, wins: 13, losses: 10, draws: 0, pct: 103.8 },
+  { pos: 7, team: "Port Adelaide", played: 23, wins: 13, losses: 10, draws: 0, pct: 101.4 },
+  { pos: 8, team: "Melbourne", played: 23, wins: 12, losses: 11, draws: 0, pct: 99.1 },
 ];
