@@ -13,22 +13,23 @@ type Props = {
 /* -------------------------------------------------------------------------- */
 /*                               MATCH CARD                                   */
 /* -------------------------------------------------------------------------- */
-/**
- * MatchCard
- * ----------
- * Primary fixture display unit for Match Center.
- *
- * FINAL cards:
- * - Prominent scoreline
- * - Gold accent
- * - Quarter breakdown + crowd
- * - Top players (generic, phase-1 safe)
- *
- * UPCOMING cards:
- * - Fixture-focused
- */
 export default function MatchCard({ match, onClick }: Props) {
   const isFinal = match.status === "final";
+
+  const homeWon =
+    isFinal && typeof match.homeScore === "number" && typeof match.awayScore === "number"
+      ? match.homeScore > match.awayScore
+      : false;
+
+  const awayWon =
+    isFinal && typeof match.homeScore === "number" && typeof match.awayScore === "number"
+      ? match.awayScore > match.homeScore
+      : false;
+
+  const margin =
+    isFinal && typeof match.homeScore === "number" && typeof match.awayScore === "number"
+      ? Math.abs(match.homeScore - match.awayScore)
+      : null;
 
   return (
     <button
@@ -68,30 +69,43 @@ export default function MatchCard({ match, onClick }: Props) {
       {/* Teams + score */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
         {/* Home */}
-        <div>
-          <div className="text-white font-semibold">
-            {match.homeTeam}
-          </div>
-          <div className="text-xs text-white/50">Home</div>
+        <div
+          className={`
+            ${homeWon ? "text-white drop-shadow-[0_0_6px_rgba(251,191,36,0.35)]" : "text-white/40"}
+          `}
+        >
+          <div className="font-semibold">{match.homeTeam}</div>
+          <div className="text-xs opacity-70">Home</div>
         </div>
 
-        {/* Score or VS */}
+        {/* Score / margin */}
         <div className="text-center">
           {isFinal ? (
-            <div className="text-2xl font-bold text-white">
-              {match.homeScore} – {match.awayScore}
-            </div>
+            <>
+              <div className="text-2xl font-bold text-white">
+                {match.homeScore} – {match.awayScore}
+              </div>
+
+              {margin !== null && (
+                <div className="mt-1 inline-block rounded-full bg-amber-400/10 px-2 py-0.5 text-[10px] font-medium text-amber-300">
+                  +{margin}
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-xs text-white/40">vs</div>
           )}
         </div>
 
         {/* Away */}
-        <div className="text-right">
-          <div className="text-white font-semibold">
-            {match.awayTeam}
-          </div>
-          <div className="text-xs text-white/50">Away</div>
+        <div
+          className={`
+            text-right
+            ${awayWon ? "text-white drop-shadow-[0_0_6px_rgba(251,191,36,0.35)]" : "text-white/40"}
+          `}
+        >
+          <div className="font-semibold">{match.awayTeam}</div>
+          <div className="text-xs opacity-70">Away</div>
         </div>
       </div>
 
@@ -124,14 +138,13 @@ export default function MatchCard({ match, onClick }: Props) {
             <div>Crowd: {match.crowd.toLocaleString()}</div>
           )}
 
-          {/* Top players (phase 1 — generic list) */}
-          {Array.isArray(match.topPlayers) &&
-            match.topPlayers.length > 0 && (
-              <div>
-                <div className="text-white/40 mb-1">Top players</div>
-                <div>{match.topPlayers.join(", ")}</div>
-              </div>
-            )}
+          {/* Top players (phase 1 generic) */}
+          {Array.isArray(match.topPlayers) && match.topPlayers.length > 0 && (
+            <div>
+              <div className="text-white/40 mb-1">Top players</div>
+              <div>{match.topPlayers.join(", ")}</div>
+            </div>
+          )}
         </div>
       )}
     </button>
