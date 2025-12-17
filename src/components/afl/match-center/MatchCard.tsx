@@ -17,17 +17,21 @@ export default function MatchCard({ match, onClick }: Props) {
   const isFinal = match.status === "final";
 
   const homeWon =
-    isFinal && typeof match.homeScore === "number" && typeof match.awayScore === "number"
-      ? match.homeScore > match.awayScore
-      : false;
+    isFinal &&
+    typeof match.homeScore === "number" &&
+    typeof match.awayScore === "number" &&
+    match.homeScore > match.awayScore;
 
   const awayWon =
-    isFinal && typeof match.homeScore === "number" && typeof match.awayScore === "number"
-      ? match.awayScore > match.homeScore
-      : false;
+    isFinal &&
+    typeof match.homeScore === "number" &&
+    typeof match.awayScore === "number" &&
+    match.awayScore > match.homeScore;
 
   const margin =
-    isFinal && typeof match.homeScore === "number" && typeof match.awayScore === "number"
+    isFinal &&
+    typeof match.homeScore === "number" &&
+    typeof match.awayScore === "number"
       ? Math.abs(match.homeScore - match.awayScore)
       : null;
 
@@ -71,7 +75,11 @@ export default function MatchCard({ match, onClick }: Props) {
         {/* Home */}
         <div
           className={`
-            ${homeWon ? "text-white drop-shadow-[0_0_6px_rgba(251,191,36,0.35)]" : "text-white/40"}
+            ${
+              homeWon
+                ? "text-white drop-shadow-[0_0_6px_rgba(251,191,36,0.35)]"
+                : "text-white/40"
+            }
           `}
         >
           <div className="font-semibold">{match.homeTeam}</div>
@@ -101,7 +109,11 @@ export default function MatchCard({ match, onClick }: Props) {
         <div
           className={`
             text-right
-            ${awayWon ? "text-white drop-shadow-[0_0_6px_rgba(251,191,36,0.35)]" : "text-white/40"}
+            ${
+              awayWon
+                ? "text-white drop-shadow-[0_0_6px_rgba(251,191,36,0.35)]"
+                : "text-white/40"
+            }
           `}
         >
           <div className="font-semibold">{match.awayTeam}</div>
@@ -117,19 +129,46 @@ export default function MatchCard({ match, onClick }: Props) {
       {/* FINAL-only details */}
       {isFinal && (
         <div className="mt-4 space-y-3 text-xs text-white/60">
-          {/* Quarters */}
+          {/* Quarters with win/loss colouring */}
           {match.quarters && (
             <div className="space-y-1">
-              {match.quarters.map((q) => (
-                <div
-                  key={q.label}
-                  className="grid grid-cols-[32px_1fr_1fr] gap-2"
-                >
-                  <div className="text-white/40">{q.label}</div>
-                  <div>{q.home}</div>
-                  <div className="text-right">{q.away}</div>
-                </div>
-              ))}
+              {match.quarters.map((q) => {
+                const homeQWon = q.home > q.away;
+                const awayQWon = q.away > q.home;
+
+                return (
+                  <div
+                    key={q.label}
+                    className="grid grid-cols-[32px_1fr_1fr] gap-2"
+                  >
+                    <div className="text-white/40">{q.label}</div>
+
+                    <div
+                      className={
+                        homeQWon
+                          ? "text-emerald-300"
+                          : awayQWon
+                          ? "text-red-300"
+                          : "text-white/60"
+                      }
+                    >
+                      {q.home}
+                    </div>
+
+                    <div
+                      className={`text-right ${
+                        awayQWon
+                          ? "text-emerald-300"
+                          : homeQWon
+                          ? "text-red-300"
+                          : "text-white/60"
+                      }`}
+                    >
+                      {q.away}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
