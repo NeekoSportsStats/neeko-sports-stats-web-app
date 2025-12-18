@@ -9,7 +9,10 @@ import MatchCenterCTA from "@/components/afl/match-center/MatchCenterCTA";
 import MatchDetailOverlay from "@/components/afl/match-center/MatchDetailOverlay";
 import SeasonRoundSelector from "@/components/afl/match-center/SeasonRoundSelector";
 
-import { MOCK_FIXTURES, MOCK_LADDER_TOP16 } from "@/components/afl/match-center/mockData";
+import {
+  MOCK_FIXTURES,
+  MOCK_LADDER_TOP16,
+} from "@/components/afl/match-center/mockData";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 
 type Season = 2025 | 2026;
@@ -20,11 +23,7 @@ type Season = 2025 | 2026;
 
 function normaliseLadder(rows: any[]): LadderRow[] {
   // Already correct shape
-  if (
-    rows.length &&
-    "pos" in rows[0] &&
-    "played" in rows[0]
-  ) {
+  if (rows.length && "pos" in rows[0] && "played" in rows[0]) {
     return rows as LadderRow[];
   }
 
@@ -49,16 +48,57 @@ function normaliseLadder(rows: any[]): LadderRow[] {
   });
 }
 
+/* -------------------------------------------------------------------------- */
+/* ROUND DEFAULT LOGIC                                                         */
+/* -------------------------------------------------------------------------- */
+
+function getDefaultRoundForSeason(
+  season: Season,
+  fixtures: FixtureMatch[]
+): number {
+  const seasonMatches = fixtures.filter((m) => m.season === season);
+
+  if (seasonMatches.length === 0) return 0;
+
+  const completedRounds = seasonMatches
+    .filter((m) => m.status === "final")
+    .map((m) => m.roundNumber);
+
+  // If there are completed games → latest completed round
+  if (completedRounds.length > 0) {
+    return Math.max(...completedRounds);
+  }
+
+  // Otherwise → earliest upcoming round
+  return Math.min(...seasonMatches.map((m) => m.roundNumber));
+}
+
+/* -------------------------------------------------------------------------- */
+/* COMPONENT                                                                  */
+/* -------------------------------------------------------------------------- */
+
 export default function AFLMatchCentre() {
   const [activeMatch, setActiveMatch] = useState<FixtureMatch | null>(null);
 
-  // Default: 2026 Opening Round
-  const [season, setSeason] = useState<Season>(2026);
-  const [roundNumber, setRoundNumber] = useState<number>(0);
+  /* ------------------------ SEASON / ROUND STATE ------------------------ */
 
+  const [season, setSeason] = useState<Season>(2026);
+  const [roundNumber, setRoundNumber] = useState<number>(() =>
+    getDefaultRoundForSeason(2026, MOCK_FIXTURES)
+  );
+
+  /* When season changes, auto-pick sensible default round */
+  useEffect(() => {
+    const nextRound = getDefaultRoundForSeason(season, MOCK_FIXTURES);
+    setRoundNumber(nextRound);
+  }, [season]);
+
+  /* Close overlay on round/season change */
   useEffect(() => {
     setActiveMatch(null);
   }, [season, roundNumber]);
+
+  /* ----------------------------- FILTERING ------------------------------ */
 
   const filtered = useMemo(() => {
     return MOCK_FIXTURES
@@ -73,10 +113,14 @@ export default function AFLMatchCentre() {
       });
   }, [season, roundNumber]);
 
+  /* ------------------------------- LADDER ------------------------------- */
+
   const ladderRows = useMemo(
     () => normaliseLadder(MOCK_LADDER_TOP16 as any[]),
     []
   );
+
+  /* ---------------------------------------------------------------------- */
 
   return (
     <div className="mx-auto max-w-6xl px-4 md:px-6 py-8">
