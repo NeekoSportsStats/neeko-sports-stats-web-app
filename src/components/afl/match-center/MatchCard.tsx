@@ -39,7 +39,8 @@ export default function MatchCard({ match, onClick }: Props) {
       ? Math.abs(match.homeScore - match.awayScore)
       : null;
 
-  // Best quarter per team
+  /* --------------------------- BEST QUARTERS --------------------------- */
+
   const bestHomeQ =
     match.quarters &&
     match.quarters.reduce((a, b) => (b.home > a.home ? b : a));
@@ -115,27 +116,38 @@ export default function MatchCard({ match, onClick }: Props) {
               >
                 <div className="text-white/40">{q.label}</div>
 
+                {/* HOME */}
                 <div
                   className={cx(
+                    "flex items-center gap-1",
                     homeBetter && "text-emerald-300 font-medium",
-                    awayBetter && "text-rose-400/70",
-                    q.label === bestHomeQ?.label &&
-                      "after:content-['Best'] after:ml-2 after:text-[9px] after:px-1.5 after:py-0.5 after:rounded after:bg-emerald-400/15 after:text-emerald-300"
+                    awayBetter && "text-rose-400/70"
                   )}
                 >
-                  {goalsBehinds(q.home)}
+                  <span>{goalsBehinds(q.home)}</span>
+
+                  {q.label === bestHomeQ?.label && (
+                    <span className="ml-1 text-[9px] px-1.5 py-0.5 rounded bg-emerald-400/15 text-emerald-300">
+                      Best
+                    </span>
+                  )}
                 </div>
 
+                {/* AWAY (Best badge on LEFT) */}
                 <div
                   className={cx(
-                    "text-right",
+                    "flex items-center justify-end gap-1 text-right",
                     awayBetter && "text-emerald-300 font-medium",
-                    homeBetter && "text-rose-400/70",
-                    q.label === bestAwayQ?.label &&
-                      "after:content-['Best'] after:ml-2 after:text-[9px] after:px-1.5 after:py-0.5 after:rounded after:bg-emerald-400/15 after:text-emerald-300"
+                    homeBetter && "text-rose-400/70"
                   )}
                 >
-                  {goalsBehinds(q.away)}
+                  {q.label === bestAwayQ?.label && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-400/15 text-emerald-300">
+                      Best
+                    </span>
+                  )}
+
+                  <span>{goalsBehinds(q.away)}</span>
                 </div>
               </div>
             );
@@ -175,7 +187,8 @@ export default function MatchCard({ match, onClick }: Props) {
                       d.delta < 0 && "text-rose-400/70"
                     )}
                   >
-                    {d.team} {d.delta > 0 ? `↑${d.delta}` : `↓${Math.abs(d.delta)}`}
+                    {d.team}{" "}
+                    {d.delta > 0 ? `↑${d.delta}` : `↓${Math.abs(d.delta)}`}
                   </span>
                 ))}
               </div>
