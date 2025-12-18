@@ -14,6 +14,15 @@ function statDelta(a: number, b: number) {
   return a > b ? `↑${a - b}` : `↓${b - a}`;
 }
 
+function pct(a: number, b: number) {
+  const max = Math.max(a, b);
+  if (max === 0) return { home: 50, away: 50 };
+  return {
+    home: Math.round((a / max) * 50),
+    away: Math.round((b / max) * 50),
+  };
+}
+
 /* -------------------------------------------------------------------------- */
 /* PROPS                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -37,9 +46,6 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
       ? match.homeScore - match.awayScore
       : 0;
 
-  const homeWon = margin > 0;
-  const awayWon = margin < 0;
-
   const homeStats = match.teamStats?.[0];
   const awayStats = match.teamStats?.[1];
 
@@ -52,11 +58,11 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
       />
 
       {/* Panel */}
-      <aside className="relative h-full w-full max-w-[420px] bg-[#0b0b0b] border-l border-white/10 p-5 overflow-y-auto">
+      <aside className="relative h-full w-full max-w-[420px] bg-[#0b0b0b] border-l border-white/10 p-4 sm:p-5 overflow-y-auto">
         {/* Header */}
-        <div className="flex justify-between items-start mb-6">
+        <div className="flex justify-between items-start mb-5">
           <div>
-            <div className="text-xs text-white/40">
+            <div className="text-[11px] sm:text-xs text-white/40">
               {match.roundLabel} ·{" "}
               {new Date(match.dateISO).toLocaleDateString("en-AU", {
                 weekday: "long",
@@ -66,7 +72,7 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
               })}{" "}
               · {match.timeLocal}
             </div>
-            <div className="mt-1 text-lg font-semibold">
+            <div className="mt-1 text-base sm:text-lg font-semibold">
               {match.homeTeam}{" "}
               <span className="text-white/40 mx-1">vs</span>{" "}
               {match.awayTeam}
@@ -83,18 +89,18 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
 
         {/* =========================== FINAL MATCH =========================== */}
         {isFinal && (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {/* RESULT */}
             <section>
               <div className="text-sm font-semibold mb-1">Final Result</div>
-              <div className="text-white/80">
-                {homeWon
+              <div className="text-white/80 text-sm">
+                {margin > 0
                   ? `${match.homeTeam} def ${match.awayTeam} by ${margin}`
                   : `${match.awayTeam} def ${match.homeTeam} by ${Math.abs(
                       margin
                     )}`}
               </div>
-              <div className="mt-1 text-white/50 text-sm">
+              <div className="mt-0.5 text-white/50 text-xs">
                 Final score: {match.homeScore} – {match.awayScore}
               </div>
             </section>
@@ -106,7 +112,7 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
                   Team Performance
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {homeStats.stats.map((stat, i) => {
                     const homeVal = Number(stat.value);
                     const awayVal = Number(
@@ -116,13 +122,17 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
                     const homeBetter = homeVal > awayVal;
                     const awayBetter = awayVal > homeVal;
 
+                    const bar = pct(homeVal, awayVal);
+
                     return (
                       <div key={stat.label}>
-                        <div className="text-xs text-white/40 mb-1">
+                        {/* Label */}
+                        <div className="text-[11px] text-white/40 mb-1">
                           {stat.label}
                         </div>
 
-                        <div className="grid grid-cols-[1fr_auto_1fr] items-center text-sm">
+                        {/* Values */}
+                        <div className="grid grid-cols-[1fr_auto_1fr] items-center text-sm sm:text-[15px]">
                           <div
                             className={cx(
                               homeBetter && "text-emerald-300 font-medium",
@@ -132,7 +142,7 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
                             {homeVal}
                           </div>
 
-                          <div className="px-2 text-xs text-white/40">
+                          <div className="px-2 text-[11px] text-white/40">
                             {statDelta(homeVal, awayVal)}
                           </div>
 
@@ -145,6 +155,24 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
                           >
                             {awayVal}
                           </div>
+                        </div>
+
+                        {/* Mini bar */}
+                        <div className="relative mt-1 h-1.5 rounded bg-white/10 overflow-hidden">
+                          <div
+                            className={cx(
+                              "absolute left-1/2 top-0 h-full rounded-l",
+                              homeBetter ? "bg-emerald-400" : "bg-white/30"
+                            )}
+                            style={{ width: `${bar.home}%` }}
+                          />
+                          <div
+                            className={cx(
+                              "absolute right-1/2 top-0 h-full rounded-r",
+                              awayBetter ? "bg-emerald-400" : "bg-white/30"
+                            )}
+                            style={{ width: `${bar.away}%` }}
+                          />
                         </div>
                       </div>
                     );
@@ -160,13 +188,13 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
                   Top Performers (Fantasy)
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {match.topPlayers.map((team) => (
                     <div key={team.team}>
-                      <div className="text-xs text-white/50 mb-1">
+                      <div className="text-[11px] text-white/50 mb-0.5">
                         {team.team}
                       </div>
-                      <div className="text-sm text-white/80 leading-relaxed">
+                      <div className="text-sm text-white/80 leading-snug">
                         {team.players
                           .slice(0, 3)
                           .map((p) => `${p.name} ${p.fantasy}`)
@@ -181,7 +209,7 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
             {/* CONTEXT */}
             <section>
               <div className="text-sm font-semibold mb-2">Context</div>
-              <div className="text-sm text-white/60 space-y-1">
+              <div className="text-xs sm:text-sm text-white/60 space-y-0.5">
                 <div>Venue: {match.venue}</div>
                 {match.crowd && (
                   <div>Crowd: {match.crowd.toLocaleString()}</div>
@@ -193,7 +221,7 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
         )}
 
         {/* CTA */}
-        <div className="mt-8">
+        <div className="mt-6">
           <a
             href="https://www.neekostats.com.au/sports/afl/ai-analysis"
             className="block w-full rounded-lg bg-amber-400 text-black text-sm font-semibold py-3 text-center hover:bg-amber-300 transition-colors"
