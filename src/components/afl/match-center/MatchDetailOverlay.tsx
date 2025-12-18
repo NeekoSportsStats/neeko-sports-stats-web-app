@@ -13,11 +13,6 @@ function quarterDelta(q: { home: number; away: number }) {
   return q.home - q.away;
 }
 
-function isBetter(a: number | string, b: number | string) {
-  if (typeof a === "number" && typeof b === "number") return a > b;
-  return false;
-}
-
 /* -------------------------------------------------------------------------- */
 /* PROPS                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -104,89 +99,69 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
 
         {/* =========================== FINAL MATCH =========================== */}
         {isFinal && (
-          <div className="space-y-8">
-            {/* ------------------------------------------------------------------ */}
-            {/* TEAM PERFORMANCE (NEW – PRIMARY CONTENT)                           */}
-            {/* ------------------------------------------------------------------ */}
-            {match.teamStats && (
+          <div className="space-y-6">
+            {/* RESULT SUMMARY */}
+            <section>
+              <div className="text-sm font-semibold mb-1">Result Summary</div>
+              <div className="text-white/80">
+                {margin > 0
+                  ? `${match.homeTeam} def ${match.awayTeam} by ${margin}`
+                  : `${match.awayTeam} def ${match.homeTeam} by ${Math.abs(
+                      margin
+                    )}`}
+              </div>
+              <div className="mt-1 text-white/50 text-sm">
+                Final score: {match.homeScore} – {match.awayScore}
+              </div>
+            </section>
+
+            {/* GAME FLOW */}
+            {quarterResults.length > 0 && (
               <section>
-                <div className="text-sm font-semibold mb-3">
-                  Team Performance
-                </div>
-
-                <div className="space-y-2 text-sm">
-                  {match.teamStats[0].stats.map((stat, i) => {
-                    const homeVal = match.teamStats?.[0].stats[i].value;
-                    const awayVal = match.teamStats?.[1].stats[i].value;
-
-                    const homeBetter = isBetter(homeVal, awayVal);
-                    const awayBetter = isBetter(awayVal, homeVal);
-
-                    return (
-                      <div
-                        key={stat.label}
-                        className="grid grid-cols-[1fr_auto_1fr] items-center gap-3"
-                      >
-                        <div
-                          className={cx(
-                            homeBetter &&
-                              "text-emerald-300 font-medium",
-                            awayBetter && "text-rose-400/70"
-                          )}
-                        >
-                          {homeVal}
-                        </div>
-
-                        <div className="text-xs text-white/50 text-center">
-                          {stat.label}
-                        </div>
-
-                        <div
-                          className={cx(
-                            "text-right",
-                            awayBetter &&
-                              "text-emerald-300 font-medium",
-                            homeBetter && "text-rose-400/70"
-                          )}
-                        >
-                          {awayVal}
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="text-sm font-semibold mb-2">Game Flow</div>
+                <div className="text-sm text-white/70">
+                  {match.homeTeam} won{" "}
+                  {
+                    quarterResults.filter(
+                      (q) => q.winner === match.homeTeam
+                    ).length
+                  }{" "}
+                  quarters · {match.awayTeam} won{" "}
+                  {
+                    quarterResults.filter(
+                      (q) => q.winner === match.awayTeam
+                    ).length
+                  }
                 </div>
               </section>
             )}
 
-            {/* ------------------------------------------------------------------ */}
-            {/* KEY PLAYERS (TOP 3 TOTAL)                                          */}
-            {/* ------------------------------------------------------------------ */}
-            {match.keyPlayers && (
+            {/* KEY SWING */}
+            {decisiveQuarter && decisiveQuarter.delta >= 6 && (
               <section>
-                <div className="text-sm font-semibold mb-3">
-                  Key Players
+                <div className="text-sm font-semibold mb-1">Key Swing</div>
+                <div className="text-sm text-white/70">
+                  {decisiveQuarter.winner} +{decisiveQuarter.delta} in{" "}
+                  {decisiveQuarter.label}
                 </div>
+              </section>
+            )}
 
+            {/* TEAM STATS (OPTIONAL) */}
+            {match.teamStats && (
+              <section>
+                <div className="text-sm font-semibold mb-2">Team Stats</div>
                 <div className="space-y-3">
-                  {match.keyPlayers.slice(0, 3).map((p) => (
-                    <div
-                      key={p.name}
-                      className="rounded-lg bg-white/[0.04] p-3"
-                    >
-                      <div className="flex justify-between items-center mb-1">
-                        <div className="font-medium">
-                          {p.name}{" "}
-                          <span className="text-white/40">
-                            ({p.team})
-                          </span>
-                        </div>
-                        <div className="text-emerald-300 font-medium">
-                          {p.fantasy}
-                        </div>
-                      </div>
-
-                      <div className="text-xs text-white/60">
-                        {p.note}
+                  {match.teamStats.map((team) => (
+                    <div key={team.team}>
+                      <div className="text-white/60 mb-1">{team.team}</div>
+                      <div className="grid grid-cols-2 gap-y-1 text-sm">
+                        {team.stats.map((s) => (
+                          <div key={s.label} className="text-white/70">
+                            {s.label}:{" "}
+                            <span className="text-white">{s.value}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ))}
@@ -194,19 +169,37 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
               </section>
             )}
 
-            {/* ------------------------------------------------------------------ */}
-            {/* EXISTING SECTIONS (INTENTIONALLY NOT RENDERED)                     */}
-            {/* ------------------------------------------------------------------ */}
-            {false && (
-              <>
-                {/* RESULT SUMMARY */}
-                {/* GAME FLOW */}
-                {/* KEY SWING */}
-                {/* TOP FANTASY PER TEAM */}
-                {/* CONTEXT */}
-                {/* LADDER IMPACT */}
-              </>
+            {/* KEY PLAYERS (OPTIONAL) */}
+            {match.keyPlayers && (
+              <section>
+                <div className="text-sm font-semibold mb-2">Key Players</div>
+                <div className="space-y-2 text-sm">
+                  {match.keyPlayers.map((p) => (
+                    <div key={p.name} className="flex justify-between">
+                      <span className="text-white/80">
+                        {p.name}{" "}
+                        <span className="text-white/40">({p.team})</span>
+                      </span>
+                      <span className="text-amber-300">
+                        {p.fantasy} pts
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
+
+            {/* CONTEXT */}
+            <section>
+              <div className="text-sm font-semibold mb-2">Context</div>
+              <div className="text-sm text-white/60 space-y-1">
+                <div>Venue: {match.venue}</div>
+                {match.crowd && (
+                  <div>Crowd: {match.crowd.toLocaleString()}</div>
+                )}
+                <div>Round: {match.roundLabel}</div>
+              </div>
+            </section>
           </div>
         )}
 
@@ -214,12 +207,9 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
         {!isFinal && (
           <div className="space-y-6">
             <section>
-              <div className="text-sm font-semibold mb-1">
-                Match Preview
-              </div>
+              <div className="text-sm font-semibold mb-1">Match Preview</div>
               <div className="text-sm text-white/60">
-                Full predictive analysis available via AI Match
-                Insights.
+                Full predictive analysis available via AI Match Insights.
               </div>
             </section>
           </div>
