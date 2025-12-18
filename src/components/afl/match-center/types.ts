@@ -1,33 +1,57 @@
-/* -------------------------------------------------------------------------- */
-/* MATCH STATUS                                                               */
-/* -------------------------------------------------------------------------- */
-
 export type MatchStatus = "upcoming" | "final";
 
 /* -------------------------------------------------------------------------- */
-/* PLAYER / INSIGHT TYPES                                                     */
+/*  Core match types used across Match Centre                                 */
 /* -------------------------------------------------------------------------- */
 
-export type KeyPlayer = {
+export type QuarterLine = {
+  label: "Q1" | "Q2" | "Q3" | "Q4";
+  home: number; // points for the quarter
+  away: number; // points for the quarter
+};
+
+export type PlayerStatLine = {
   name: string;
-  team: string;
   fantasy: number;
-  note: string;
+  disposals?: number;
+  goals?: number;
 };
 
-export type TeamStatRow = {
-  label: string;
-  value: number | string;
-};
-
-export type TeamStats = {
+export type TopPlayersByTeam = {
   team: string;
-  stats: TeamStatRow[];
+  players: PlayerStatLine[]; // best → worst
 };
 
-/* -------------------------------------------------------------------------- */
-/* FIXTURE MATCH                                                              */
-/* -------------------------------------------------------------------------- */
+export type StatCompareRow = {
+  label: string;
+  home: number;
+  away: number;
+  /** Optional league average for “ghost line” */
+  leagueAvg?: number;
+  /** Most AFL volume stats: higher is better. Turnovers: lower is better. */
+  higherIsBetter?: boolean;
+};
+
+export type PreviewPack = {
+  /** 0–100 (home + away should sum to 100) */
+  winProbHome: number;
+  winProbAway: number;
+
+  /** Ladder positions heading into the match */
+  ladderPosHome?: number;
+  ladderPosAway?: number;
+
+  /** Last 5 form, most recent on the right */
+  last5Home?: ("W" | "L")[];
+  last5Away?: ("W" | "L")[];
+
+  /** 1–2 short AI sentences */
+  aiWhy?: string[];
+
+  /** Squad/team list (when announced) */
+  squadHome?: string[];
+  squadAway?: string[];
+};
 
 export type FixtureMatch = {
   id: string;
@@ -37,11 +61,11 @@ export type FixtureMatch = {
 
   /** Round context */
   roundNumber: number; // 0 = Opening Round
-  roundLabel: string;  // OR, R1…R23
+  roundLabel: string; // OR, R1…R23
 
   /** Match info */
-  dateISO: string;
-  timeLocal: string;
+  dateISO: string; // YYYY-MM-DD
+  timeLocal: string; // HH:mm
   venue: string;
 
   homeTeam: string;
@@ -49,49 +73,24 @@ export type FixtureMatch = {
 
   status: MatchStatus;
 
-  /* ---------------------------- FINAL ONLY ---------------------------- */
-
+  /** FINAL-only fields */
   homeScore?: number;
   awayScore?: number;
-
-  quarters?: {
-    label: "Q1" | "Q2" | "Q3" | "Q4";
-    home: number;
-    away: number;
-  }[];
-
+  quarters?: QuarterLine[];
   crowd?: number;
 
-  /* -------------------------- EXISTING DATA --------------------------- */
+  /** Card-only: top performers (Fantasy) */
+  topPlayers?: TopPlayersByTeam[];
 
-  topPlayers?: {
-    team: string;
-    players: { name: string; fantasy: number }[];
-  }[];
+  /** Completed games: team stats compare rows */
+  teamStats?: StatCompareRow[];
 
-  ladderDelta?: {
-    team: string;
-    delta: number;
-  }[];
+  /** Optional: ladder movement after match */
+  ladderDelta?: { team: string; delta: number }[];
 
-  /* -------------------------- NEW (OVERLAY) --------------------------- */
-
-  /**
-   * Per-team stats from THIS game only
-   * Used in MatchDetailOverlay (FINAL games)
-   */
-  teamStats?: TeamStats[];
-
-  /**
-   * Top 3 key players (total) with context
-   * Ranked by fantasy
-   */
-  keyPlayers?: KeyPlayer[];
+  /** Upcoming games: preview pack */
+  preview?: PreviewPack;
 };
-
-/* -------------------------------------------------------------------------- */
-/* LADDER ROW                                                                 */
-/* -------------------------------------------------------------------------- */
 
 export type LadderRow = {
   team: string;

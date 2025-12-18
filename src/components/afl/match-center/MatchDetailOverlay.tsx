@@ -1,41 +1,40 @@
-import React from "react";
-import type { FixtureMatch } from "./types";
+import React, { useMemo } from "react";
+import type { FixtureMatch, StatCompareRow } from "./types";
 import { X } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const cx = (...c: Array<string | false | undefined>) =>
-  c.filter(Boolean).join(" ");
+const cx = (...c: Array<string | false | undefined>) => c.filter(Boolean).join(" ");
 
-function statDelta(a: number, b: number) {
-  if (a === b) return "—";
-  return a > b ? `↑${a - b}` : `↓${b - a}`;
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
 }
 
-function pct(a: number, b: number) {
-  const max = Math.max(a, b);
-  if (max === 0) return { home: 50, away: 50 };
-  return {
-    home: Math.round((a / max) * 50),
-    away: Math.round((b / max) * 50),
-  };
+function pct(n: number) {
+  if (!Number.isFinite(n)) return "—";
+  return `${Math.round(n)}%`;
 }
 
-/* -------------------------------------------------------------------------- */
-/* LEAGUE AVERAGE (GHOST LINES)                                                */
-/* -------------------------------------------------------------------------- */
-/* Rough AFL-realistic benchmarks — mock safe, visually consistent */
-
-const LEAGUE_AVG: Record<string, number> = {
-  Disposals: 390,
-  Clearances: 40,
-  Turnovers: 65,
-  Tackles: 60,
-  "Inside 50s": 55,
-  "Contested Possessions": 145,
-};
+function formPills(form?: ("W" | "L")[]) {
+  if (!form || form.length === 0) return <span className="text-white/40">—</span>;
+  return (
+    <div className="flex gap-1">
+      {form.map((r, i) => (
+        <span
+          key={i}
+          className={cx(
+            "inline-flex h-5 w-5 items-center justify-center rounded text-[10px] font-semibold",
+            r === "W" ? "bg-emerald-400/15 text-emerald-300" : "bg-rose-400/15 text-rose-300"
+          )}
+        >
+          {r}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /* PROPS                                                                      */
@@ -52,44 +51,48 @@ type Props = {
 
 export default function MatchDetailOverlay({ match, onClose }: Props) {
   const isFinal = match.status === "final";
+  const preview = match.preview;
 
   const margin =
-    isFinal &&
-    match.homeScore !== undefined &&
-    match.awayScore !== undefined
+    isFinal && match.homeScore !== undefined && match.awayScore !== undefined
       ? match.homeScore - match.awayScore
       : 0;
 
-  const homeStats = match.teamStats?.[0];
-  const awayStats = match.teamStats?.[1];
+  const titleDate = useMemo(() => {
+    try {
+      return new Date(match.dateISO).toLocaleDateString("en-AU", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+    } catch {
+      return match.dateISO;
+    }
+  }, [match.dateISO]);
+
+  const teamStats: StatCompareRow[] = match.teamStats ?? [];
+
+  // build max per row for bar normalization
+  const maxPerRow = useMemo(() => {
+    return teamStats.map((r) => Math.max(r.home, r.away, r.leagueAvg ?? 0, 1));
+  }, [teamStats]);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
-      <aside className="relative h-full w-full max-w-[420px] bg-[#0b0b0b] border-l border-white/10 p-4 sm:p-5 overflow-y-auto">
+      <aside className="relative h-full w-full max-w-[440px] bg-[#0b0b0b] border-l border-white/10 p-5 overflow-y-auto">
         {/* Header */}
-        <div className="flex justify-between items-start mb-5">
+        <div className="flex justify-between items-start mb-6">
           <div>
-            <div className="text-[11px] sm:text-xs text-white/40">
-              {match.roundLabel} ·{" "}
-              {new Date(match.dateISO).toLocaleDateString("en-AU", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}{" "}
-              · {match.timeLocal}
+            <div className="text-xs text-white/40">
+              {match.roundLabel} · {titleDate} · {match.timeLocal}
             </div>
-            <div className="mt-1 text-base sm:text-lg font-semibold">
-              {match.homeTeam}{" "}
-              <span className="text-white/40 mx-1">vs</span>{" "}
-              {match.awayTeam}
+            <div className="mt-1 text-lg font-semibold">
+              {match.homeTeam} <span className="text-white/40 mx-1">vs</span> {match.awayTeam}
             </div>
           </div>
 
@@ -103,139 +106,247 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
 
         {/* =========================== FINAL MATCH =========================== */}
         {isFinal && (
-          <div className="space-y-5">
-            {/* RESULT */}
+          <div className="space-y-6">
+            {/* FINAL RESULT */}
             <section>
               <div className="text-sm font-semibold mb-1">Final Result</div>
-              <div className="text-white/80 text-sm">
+              <div className="text-white/80">
                 {margin > 0
                   ? `${match.homeTeam} def ${match.awayTeam} by ${margin}`
-                  : `${match.awayTeam} def ${match.homeTeam} by ${Math.abs(
-                      margin
-                    )}`}
+                  : `${match.awayTeam} def ${match.homeTeam} by ${Math.abs(margin)}`}
               </div>
-              <div className="mt-0.5 text-white/50 text-xs">
+              <div className="mt-1 text-white/50 text-sm">
                 Final score: {match.homeScore} – {match.awayScore}
               </div>
             </section>
 
-            {/* TEAM PERFORMANCE */}
-            {homeStats && awayStats && (
-              <section>
-                <div className="text-sm font-semibold mb-3">
-                  Team Performance
-                </div>
+            {/* TEAM PERFORMANCE (COMPARE) */}
+            <section>
+              <div className="text-sm font-semibold mb-3">Team Performance</div>
 
+              {teamStats.length === 0 ? (
+                <div className="text-sm text-white/55">No team stats available for this match.</div>
+              ) : (
                 <div className="space-y-3">
-                  {homeStats.stats.map((stat, i) => {
-                    const label =
-                      stat.label === "Time in Forward Half"
-                        ? "Tackles"
-                        : stat.label;
+                  {teamStats.map((row, idx) => {
+                    const maxV = maxPerRow[idx] ?? 1;
 
-                    const homeVal = Number(stat.value);
-                    const awayVal = Number(
-                      awayStats.stats[i]?.value ?? 0
-                    );
+                    const higherIsBetter = row.higherIsBetter !== false; // default true
+                    const diff = row.home - row.away;
 
-                    const homeBetter = homeVal > awayVal;
-                    const awayBetter = awayVal > homeVal;
+                    // who "wins" this stat?
+                    const homeWins = higherIsBetter ? diff > 0 : diff < 0;
+                    const awayWins = higherIsBetter ? diff < 0 : diff > 0;
 
-                    const bar = pct(homeVal, awayVal);
-                    const avg = LEAGUE_AVG[label];
+                    const absDelta = Math.abs(diff);
+                    const arrow = diff === 0 ? "—" : diff > 0 ? `↑${absDelta}` : `↓${absDelta}`;
+
+                    const homePct = (row.home / maxV) * 100;
+                    const awayPct = (row.away / maxV) * 100;
+
                     const avgPct =
-                      avg && Math.max(homeVal, awayVal) > 0
-                        ? Math.min(
-                            100,
-                            (avg / Math.max(homeVal, awayVal)) * 100
-                          )
-                        : null;
+                      row.leagueAvg !== undefined ? clamp((row.leagueAvg / maxV) * 100, 0, 100) : null;
 
                     return (
-                      <div key={label}>
-                        {/* Label */}
-                        <div className="text-[11px] text-white/40 mb-1">
-                          {label}
+                      <div key={row.label} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                        {/* label row */}
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <div className="text-[11px] text-white/50">{row.label}</div>
+                          <div className="text-[11px] text-white/40 tabular-nums">{arrow}</div>
                         </div>
 
-                        {/* Values */}
-                        <div className="grid grid-cols-[1fr_auto_1fr] items-center text-sm sm:text-[15px]">
+                        {/* numbers row */}
+                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                          {/* HOME number */}
                           <div
                             className={cx(
-                              "text-left",
-                              homeBetter
-                                ? "text-emerald-300 font-medium"
-                                : "text-amber-200/80"
+                              "text-sm tabular-nums",
+                              homeWins ? "text-emerald-300 font-semibold" : "text-white/75"
                             )}
                           >
-                            {homeVal}
+                            {row.home}
                           </div>
 
-                          <div className="px-2 text-[11px] text-white/40">
-                            {statDelta(homeVal, awayVal)}
-                          </div>
+                          <div className="text-[10px] text-white/35 uppercase tracking-wide">vs</div>
 
+                          {/* AWAY number */}
                           <div
                             className={cx(
-                              "text-right",
-                              awayBetter
-                                ? "text-emerald-300 font-medium"
-                                : "text-slate-200/80"
+                              "text-sm tabular-nums text-right",
+                              awayWins ? "text-emerald-300 font-semibold" : "text-white/75"
                             )}
                           >
-                            {awayVal}
+                            {row.away}
                           </div>
                         </div>
 
-                        {/* Mini bar */}
-                        <div className="relative mt-1 h-1.5 rounded bg-white/10 overflow-hidden">
-                          {/* Home */}
-                          <div
-                            className={cx(
-                              "absolute left-1/2 top-0 h-full rounded-l",
-                              homeBetter
-                                ? "bg-emerald-400"
-                                : "bg-amber-400/50"
+                        {/* bars row */}
+                        <div className="mt-2">
+                          <div className="relative h-2 rounded bg-white/10 overflow-hidden">
+                            {/* league average ghost marker */}
+                            {avgPct !== null && (
+                              <div
+                                className="absolute top-0 h-full w-[2px] bg-white/35"
+                                style={{ left: `${avgPct}%` }}
+                              />
                             )}
-                            style={{ width: `${bar.home}%` }}
-                          />
 
-                          {/* Away */}
-                          <div
-                            className={cx(
-                              "absolute right-1/2 top-0 h-full rounded-r",
-                              awayBetter
-                                ? "bg-emerald-400"
-                                : "bg-slate-400/50"
-                            )}
-                            style={{ width: `${bar.away}%` }}
-                          />
-
-                          {/* League average ghost */}
-                          {avgPct && (
+                            {/* home bar (left tint) */}
                             <div
-                              className="absolute top-0 h-full w-[1px] bg-white/25"
-                              style={{
-                                left: `calc(50% - ${avgPct / 2}%)`,
-                              }}
+                              className={cx(
+                                "absolute top-0 left-0 h-full",
+                                homeWins ? "bg-emerald-400/90" : "bg-emerald-400/55"
+                              )}
+                              style={{ width: `${clamp(homePct, 0, 100)}%` }}
                             />
-                          )}
+
+                            {/* away bar (right tint) */}
+                            <div
+                              className={cx(
+                                "absolute top-0 right-0 h-full",
+                                awayWins ? "bg-cyan-400/90" : "bg-cyan-400/55"
+                              )}
+                              style={{ width: `${clamp(awayPct, 0, 100)}%` }}
+                            />
+                          </div>
+
+                          {/* compact hint line (mobile) */}
+                          <div className="mt-1 flex justify-between text-[10px] text-white/35">
+                            <span>{match.homeTeam}</span>
+                            <span className="hidden sm:inline">
+                              League avg: {row.leagueAvg !== undefined ? row.leagueAvg : "—"}
+                            </span>
+                            <span>{match.awayTeam}</span>
+                          </div>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              </section>
-            )}
+              )}
+            </section>
 
             {/* CONTEXT */}
             <section>
               <div className="text-sm font-semibold mb-2">Context</div>
-              <div className="text-xs sm:text-sm text-white/60 space-y-0.5">
+              <div className="text-sm text-white/60 space-y-1">
                 <div>Venue: {match.venue}</div>
-                {match.crowd && (
-                  <div>Crowd: {match.crowd.toLocaleString()}</div>
+                {match.crowd && <div>Crowd: {match.crowd.toLocaleString()}</div>}
+                <div>Round: {match.roundLabel}</div>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* =========================== UPCOMING MATCH ========================= */}
+        {!isFinal && (
+          <div className="space-y-6">
+            {/* PREVIEW */}
+            <section>
+              <div className="text-sm font-semibold mb-1">Match Preview</div>
+              <div className="text-sm text-white/55">
+                This is a pre-game preview — results and team stats will appear after the match.
+              </div>
+            </section>
+
+            {/* Win probability */}
+            <section>
+              <div className="text-sm font-semibold mb-2">Win Probability</div>
+
+              <div className="flex justify-between text-sm text-white/70 mb-2">
+                <span>
+                  {match.homeTeam}{" "}
+                  <span className="text-white/90 font-semibold">
+                    {preview ? pct(preview.winProbHome) : "—"}
+                  </span>
+                </span>
+                <span className="text-right">
+                  {match.awayTeam}{" "}
+                  <span className="text-white/90 font-semibold">
+                    {preview ? pct(preview.winProbAway) : "—"}
+                  </span>
+                </span>
+              </div>
+
+              <div className="h-2 rounded bg-white/10 overflow-hidden">
+                <div
+                  className="h-full bg-amber-400"
+                  style={{ width: `${preview ? clamp(preview.winProbHome, 0, 100) : 50}%` }}
+                />
+              </div>
+
+              {/* AI why */}
+              <div className="mt-3 text-sm text-white/65 space-y-1">
+                {preview?.aiWhy?.length ? (
+                  preview.aiWhy.slice(0, 2).map((s, i) => <div key={i}>{s}</div>)
+                ) : (
+                  <div className="text-white/45">AI preview notes will appear closer to match day.</div>
                 )}
+              </div>
+            </section>
+
+            {/* Ladder positions + last 5 */}
+            <section className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm font-semibold">Form & Ladder</div>
+                <div className="text-[11px] text-white/40">last 5</div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-sm text-white/80 font-medium">{match.homeTeam}</div>
+                  <div className="mt-1 text-[11px] text-white/45">
+                    Ladder: {preview?.ladderPosHome ? `#${preview.ladderPosHome}` : "—"}
+                  </div>
+                  <div className="mt-2">{formPills(preview?.last5Home)}</div>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-sm text-white/80 font-medium">{match.awayTeam}</div>
+                  <div className="mt-1 text-[11px] text-white/45">
+                    Ladder: {preview?.ladderPosAway ? `#${preview.ladderPosAway}` : "—"}
+                  </div>
+                  <div className="mt-2 flex justify-end">{formPills(preview?.last5Away)}</div>
+                </div>
+              </div>
+            </section>
+
+            {/* Squad / team list */}
+            <section>
+              <div className="text-sm font-semibold mb-2">Team Lists</div>
+
+              {preview?.squadHome && preview?.squadAway ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                    <div className="text-sm text-white/80 font-medium mb-2">{match.homeTeam}</div>
+                    <ul className="text-[11px] text-white/60 space-y-1">
+                      {preview.squadHome.slice(0, 26).map((p) => (
+                        <li key={p}>{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                    <div className="text-sm text-white/80 font-medium mb-2 text-right">{match.awayTeam}</div>
+                    <ul className="text-[11px] text-white/60 space-y-1 text-right">
+                      {preview.squadAway.slice(0, 26).map((p) => (
+                        <li key={p}>{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm text-white/55">
+                  Squads haven’t been announced yet.
+                </div>
+              )}
+            </section>
+
+            {/* CONTEXT */}
+            <section>
+              <div className="text-sm font-semibold mb-2">Context</div>
+              <div className="text-sm text-white/60 space-y-1">
+                <div>Venue: {match.venue}</div>
                 <div>Round: {match.roundLabel}</div>
               </div>
             </section>
@@ -243,7 +354,7 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
         )}
 
         {/* CTA */}
-        <div className="mt-6">
+        <div className="mt-8">
           <a
             href="https://www.neekostats.com.au/sports/afl/ai-analysis"
             className="block w-full rounded-lg bg-amber-400 text-black text-sm font-semibold py-3 text-center hover:bg-amber-300 transition-colors"
