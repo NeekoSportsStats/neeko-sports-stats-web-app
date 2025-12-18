@@ -19,10 +19,6 @@ type Props = {
   onClick: () => void;
 };
 
-/* -------------------------------------------------------------------------- */
-/* MATCH CARD                                                                 */
-/* -------------------------------------------------------------------------- */
-
 export default function MatchCard({ match, onClick }: Props) {
   const isFinal = match.status === "final";
 
@@ -42,6 +38,15 @@ export default function MatchCard({ match, onClick }: Props) {
     isFinal && match.homeScore !== undefined && match.awayScore !== undefined
       ? Math.abs(match.homeScore - match.awayScore)
       : null;
+
+  // Best quarter per team
+  const bestHomeQ =
+    match.quarters &&
+    match.quarters.reduce((a, b) => (b.home > a.home ? b : a));
+
+  const bestAwayQ =
+    match.quarters &&
+    match.quarters.reduce((a, b) => (b.away > a.away ? b : a));
 
   return (
     <button
@@ -65,51 +70,38 @@ export default function MatchCard({ match, onClick }: Props) {
           {match.roundLabel} · {match.dateISO} · {match.timeLocal}
         </div>
         <div className="px-2 py-[2px] rounded-full border border-amber-400/20 bg-amber-400/10 text-[10px] uppercase tracking-wide text-amber-300/80">
-          {match.status}
+          FINAL
         </div>
       </div>
 
       {/* TEAMS + SCORE */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-        <div className={cx(homeWon ? "font-semibold text-white" : "text-white")}>
+        <div className={cx(homeWon && "font-semibold text-white")}>
           {match.homeTeam}
         </div>
 
         <div className="text-center">
-          {isFinal ? (
-            <>
-              <div className="text-[22px] font-bold tracking-tight">
-                {match.homeScore} – {match.awayScore}
-              </div>
-              {margin !== null && (
-                <div className="mt-0.5 text-[11px] text-white/45">
-                  {homeWon
-                    ? `${match.homeTeam} by ${margin}`
-                    : `${match.awayTeam} by ${margin}`}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-xs text-white/40">vs</div>
+          <div className="text-[22px] font-bold tracking-tight">
+            {match.homeScore} – {match.awayScore}
+          </div>
+          {margin !== null && (
+            <div className="mt-0.5 text-[11px] text-white/45">
+              {homeWon
+                ? `${match.homeTeam} by ${margin}`
+                : `${match.awayTeam} by ${margin}`}
+            </div>
           )}
         </div>
 
-        <div
-          className={cx(
-            "text-right",
-            awayWon ? "font-semibold text-white" : "text-white"
-          )}
-        >
+        <div className={cx("text-right", awayWon && "font-semibold text-white")}>
           {match.awayTeam}
         </div>
       </div>
 
       {/* VENUE */}
-      <div className="mt-2 text-xs text-white/40">
-        {match.venue}
-      </div>
+      <div className="mt-2 text-xs text-white/40">{match.venue}</div>
 
-      {/* FINAL: QUARTER BREAKDOWN */}
+      {/* QUARTER BREAKDOWN */}
       {isFinal && match.quarters && (
         <div className="mt-4 rounded-lg bg-black/20 p-3 text-xs">
           {match.quarters.map((q) => {
@@ -121,25 +113,26 @@ export default function MatchCard({ match, onClick }: Props) {
                 key={q.label}
                 className="grid grid-cols-[32px_1fr_1fr] items-center tabular-nums py-0.5"
               >
-                {/* Quarter */}
                 <div className="text-white/40">{q.label}</div>
 
-                {/* Home */}
                 <div
                   className={cx(
                     homeBetter && "text-emerald-300 font-medium",
-                    awayBetter && "text-white/55"
+                    awayBetter && "text-rose-400/70",
+                    q.label === bestHomeQ?.label &&
+                      "after:content-['Best'] after:ml-2 after:text-[9px] after:px-1.5 after:py-0.5 after:rounded after:bg-emerald-400/15 after:text-emerald-300"
                   )}
                 >
                   {goalsBehinds(q.home)}
                 </div>
 
-                {/* Away */}
                 <div
                   className={cx(
                     "text-right",
                     awayBetter && "text-emerald-300 font-medium",
-                    homeBetter && "text-white/55"
+                    homeBetter && "text-rose-400/70",
+                    q.label === bestAwayQ?.label &&
+                      "after:content-['Best'] after:ml-2 after:text-[9px] after:px-1.5 after:py-0.5 after:rounded after:bg-emerald-400/15 after:text-emerald-300"
                   )}
                 >
                   {goalsBehinds(q.away)}
@@ -148,11 +141,46 @@ export default function MatchCard({ match, onClick }: Props) {
             );
           })}
 
-          {match.crowd && (
-            <div className="pt-2 text-[11px] text-white/45">
-              Crowd: {match.crowd.toLocaleString()}
+          {/* TOP PLAYERS */}
+          {match.topPlayers && (
+            <div className="mt-3 space-y-1 text-[11px] text-white/70">
+              <div className="text-white/45 uppercase tracking-wide">
+                Top Fantasy
+              </div>
+              {match.topPlayers.map((t) => (
+                <div key={t.team}>
+                  <span className="text-white/50 mr-1">
+                    {t.team.slice(0, 3).toUpperCase()}:
+                  </span>
+                  {t.players
+                    .map((p) => `${p.name} ${p.fantasy}`)
+                    .join(" · ")}
+                </div>
+              ))}
             </div>
           )}
+
+          {/* CROWD + LADDER DELTA */}
+          <div className="mt-3 flex justify-between text-[11px] text-white/45">
+            {match.crowd && (
+              <div>Crowd: {match.crowd.toLocaleString()}</div>
+            )}
+            {match.ladderDelta && (
+              <div className="flex gap-2">
+                {match.ladderDelta.map((d) => (
+                  <span
+                    key={d.team}
+                    className={cx(
+                      d.delta > 0 && "text-emerald-300",
+                      d.delta < 0 && "text-rose-400/70"
+                    )}
+                  >
+                    {d.team} {d.delta > 0 ? `↑${d.delta}` : `↓${Math.abs(d.delta)}`}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </button>

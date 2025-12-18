@@ -1,47 +1,44 @@
-import React from "react";
+import React, { useMemo } from "react";
 import MatchCard from "./MatchCard";
 import type { FixtureMatch } from "./types";
 
 type Props = {
   matches: FixtureMatch[];
-  onSelectMatch: (match: FixtureMatch) => void;
+  onSelectMatch: (m: FixtureMatch) => void;
 };
 
-export default function MatchList({ matches, onSelectMatch }: Props) {
-  if (!matches.length) {
-    return (
-      <div className="py-12 text-center text-sm text-white/50">
-        No matches available.
-      </div>
-    );
-  }
+function dayLabel(dateISO: string) {
+  return new Date(dateISO).toLocaleDateString("en-AU", {
+    weekday: "long",
+  });
+}
 
-  const grouped = matches.reduce<Record<string, FixtureMatch[]>>(
-    (acc, m) => {
-      acc[m.dateISO] ??= [];
-      acc[m.dateISO].push(m);
-      return acc;
-    },
-    {}
-  );
+export default function MatchList({ matches, onSelectMatch }: Props) {
+  const grouped = useMemo(() => {
+    const map: Record<string, FixtureMatch[]> = {};
+    matches.forEach((m) => {
+      const day = dayLabel(m.dateISO);
+      if (!map[day]) map[day] = [];
+      map[day].push(m);
+    });
+    return map;
+  }, [matches]);
 
   return (
-    <div className="space-y-10">
-      {Object.entries(grouped).map(([date, dayMatches]) => (
-        <div key={date} className="space-y-4">
-          <div className="sticky top-24 z-10 text-xs uppercase text-white/40">
-            {date}
+    <div className="space-y-6">
+      {Object.entries(grouped).map(([day, dayMatches]) => (
+        <div key={day} className="space-y-3">
+          <div className="text-sm font-semibold text-white/70">
+            {day}
           </div>
 
-          <div className="space-y-4">
-            {dayMatches.map((m) => (
-              <MatchCard
-                key={m.id}
-                match={m}
-                onClick={() => onSelectMatch(m)}
-              />
-            ))}
-          </div>
+          {dayMatches.map((match) => (
+            <MatchCard
+              key={match.id}
+              match={match}
+              onClick={() => onSelectMatch(match)}
+            />
+          ))}
         </div>
       ))}
     </div>
