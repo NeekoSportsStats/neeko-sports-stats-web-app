@@ -5,26 +5,24 @@
 export type MatchStatus = "upcoming" | "final";
 
 /* -------------------------------------------------------------------------- */
-/* FANTASY / PLAYER TYPES                                                     */
+/* PLAYER / INSIGHT TYPES                                                     */
 /* -------------------------------------------------------------------------- */
 
-export type FantasyPlayer = {
+export type KeyPlayer = {
   name: string;
+  team: string;
   fantasy: number;
+  note: string;
 };
 
-export type TeamTopFantasy = {
-  team: string;
-  players: FantasyPlayer[]; // top 3 only
+export type TeamStatRow = {
+  label: string;
+  value: number | string;
 };
 
-/* -------------------------------------------------------------------------- */
-/* LADDER DELTA                                                               */
-/* -------------------------------------------------------------------------- */
-
-export type LadderDelta = {
+export type TeamStats = {
   team: string;
-  delta: number; // +2, -1, 0
+  stats: TeamStatRow[];
 };
 
 /* -------------------------------------------------------------------------- */
@@ -34,13 +32,14 @@ export type LadderDelta = {
 export type FixtureMatch = {
   id: string;
 
-  /* ------------------------- SEASON / ROUND ------------------------- */
+  /** Season context */
   season: 2025 | 2026;
 
+  /** Round context */
   roundNumber: number; // 0 = Opening Round
   roundLabel: string;  // OR, R1…R23
 
-  /* ---------------------------- MATCH INFO --------------------------- */
+  /** Match info */
   dateISO: string;
   timeLocal: string;
   venue: string;
@@ -50,49 +49,56 @@ export type FixtureMatch = {
 
   status: MatchStatus;
 
-  /* --------------------------- FINAL-ONLY ---------------------------- */
+  /* ---------------------------- FINAL ONLY ---------------------------- */
+
   homeScore?: number;
   awayScore?: number;
 
   quarters?: {
     label: "Q1" | "Q2" | "Q3" | "Q4";
-    home: number; // points
-    away: number; // points
+    home: number;
+    away: number;
   }[];
 
   crowd?: number;
 
-  /* ---------------------- POST-MATCH INSIGHTS ------------------------ */
+  /* -------------------------- EXISTING DATA --------------------------- */
+
+  topPlayers?: {
+    team: string;
+    players: { name: string; fantasy: number }[];
+  }[];
+
+  ladderDelta?: {
+    team: string;
+    delta: number;
+  }[];
+
+  /* -------------------------- NEW (OVERLAY) --------------------------- */
 
   /**
-   * Top fantasy players per team (post-match only)
-   * Always max 3 players per team
+   * Per-team stats from THIS game only
+   * Used in MatchDetailOverlay (FINAL games)
    */
-  topPlayers?: TeamTopFantasy[];
+  teamStats?: TeamStats[];
 
   /**
-   * Ladder movement caused by this match
-   * Example: [{ team: "Collingwood", delta: +1 }]
+   * Top 3 key players (total) with context
+   * Ranked by fantasy
    */
-  ladderDelta?: LadderDelta[];
+  keyPlayers?: KeyPlayer[];
 };
 
 /* -------------------------------------------------------------------------- */
-/* LADDER ROW (SNAPSHOT)                                                      */
+/* LADDER ROW                                                                 */
 /* -------------------------------------------------------------------------- */
 
 export type LadderRow = {
   team: string;
   pos: number;
-
   played: number;
   wins: number;
   losses: number;
   draws: number;
-
-  /**
-   * Percentage (AFL ladder %)
-   * Stored as raw number (e.g. 123.4)
-   */
   pct: number;
 };
