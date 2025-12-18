@@ -1,289 +1,241 @@
-import React, { useMemo } from "react";
-import { X } from "lucide-react";
+import React from "react";
 import type { FixtureMatch } from "./types";
+import { X } from "lucide-react";
 
-import MatchDetailHeader from "./MatchDetailHeader";
-import VenueIntelChips from "./VenueIntelChips";
-import WinProbabilityBar from "./WinProbabilityBar";
-import MatchDetailCTA from "./MatchDetailCTA";
-import HeadToHeadPanel from "./HeadToHeadPanel";
-import UpcomingAIPreview from "./UpcomingAIPreview";
+/* -------------------------------------------------------------------------- */
+/* HELPERS                                                                    */
+/* -------------------------------------------------------------------------- */
+
+const cx = (...c: Array<string | false | undefined>) =>
+  c.filter(Boolean).join(" ");
+
+function quarterDelta(q: { home: number; away: number }) {
+  return q.home - q.away;
+}
+
+/* -------------------------------------------------------------------------- */
+/* PROPS                                                                      */
+/* -------------------------------------------------------------------------- */
 
 type Props = {
   match: FixtureMatch;
   onClose: () => void;
 };
 
-const cx = (...c: Array<string | false | undefined>) => c.filter(Boolean).join(" ");
-
-/** Deterministic “hash” → stable mock outputs per matchup */
-function hashSeed(str: string) {
-  let h = 2166136261;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return Math.abs(h);
-}
-
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
-/** 45–55 with slight matchup variance, stable */
-function computeWinProbability(homeTeam: string, awayTeam: string) {
-  const seed = hashSeed(`${homeTeam}__${awayTeam}`);
-  const wobble = (seed % 17) - 8; // -8..+8
-  const base = 50 + wobble * 0.6; // ~45..55
-  return clamp(Math.round(base), 38, 62);
-}
-
-const PLAYERS_POOL = [
-  "Anderson",
-  "Daicos",
-  "Walsh",
-  "Neale",
-  "Petracca",
-  "Butters",
-  "Cripps",
-  "Merrett",
-  "Serong",
-  "Bontempelli",
-  "Greene",
-  "Dawson",
-  "Gulden",
-  "Cameron",
-  "Stewart",
-  "Moore",
-  "Weitering",
-  "May",
-  "Bolton",
-  "De Goey",
-  "Brayshaw",
-  "Guthrie",
-];
-
-function buildProjectedLineup(team: string, count = 22) {
-  const seed = hashSeed(team);
-  const out: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const idx = (seed + i * 7) % PLAYERS_POOL.length;
-    out.push(`${PLAYERS_POOL[idx]} (${team.slice(0, 1)})`);
-  }
-  return out;
-}
-
-type LastFiveItem = { label: string; result: "W" | "L"; margin: number };
-
-function buildLastFive(team: string): LastFiveItem[] {
-  const seed = hashSeed(team);
-  return Array.from({ length: 5 }).map((_, i) => {
-    const n = (seed + i * 13) % 100;
-    const win = n >= 48;
-    const margin = 6 + ((seed + i * 11) % 39); // 6..44
-    const oppIdx = (seed + i * 5) % 18;
-    const opp = [
-      "Sydney",
-      "Geelong",
-      "Brisbane",
-      "Carlton",
-      "Fremantle",
-      "Collingwood",
-      "Port Adelaide",
-      "Melbourne",
-      "Essendon",
-      "Adelaide",
-      "Richmond",
-      "Hawthorn",
-      "GWS",
-      "St Kilda",
-      "Gold Coast",
-      "North Melbourne",
-      "West Coast",
-      "Bulldogs",
-    ][oppIdx];
-
-    return {
-      label: `vs ${opp}`,
-      result: win ? "W" : "L",
-      margin: margin,
-    };
-  });
-}
-
-function buildInsights(homeTeam: string, awayTeam: string) {
-  const seed = hashSeed(`${homeTeam}-${awayTeam}`);
-  const options = [
-    "Midfield pressure profile suggests cleaner entries for the home side.",
-    "Scoring efficiency gap looks narrow — expect a tight finish.",
-    "Contested game profile favours the side with higher stoppage wins.",
-    "Transition defence will be key — watch intercept chains off half-back.",
-    "Venue bias + travel load slightly shifts expected margin.",
-    "If early clearance dominance holds, win probability rises quickly.",
-  ];
-  const a = options[seed % options.length];
-  const b = options[(seed + 2) % options.length];
-  const c = options[(seed + 4) % options.length];
-  return [a, b, c].slice(0, 3);
-}
+/* -------------------------------------------------------------------------- */
+/* COMPONENT                                                                  */
+/* -------------------------------------------------------------------------- */
 
 export default function MatchDetailOverlay({ match, onClose }: Props) {
-  const homePct = useMemo(
-    () => computeWinProbability(match.homeTeam, match.awayTeam),
-    [match.homeTeam, match.awayTeam]
-  );
+  const isFinal = match.status === "final";
 
-  const upcomingLineups = useMemo(() => {
-    return {
-      home: buildProjectedLineup(match.homeTeam),
-      away: buildProjectedLineup(match.awayTeam),
-    };
-  }, [match.homeTeam, match.awayTeam]);
+  const margin =
+    isFinal &&
+    match.homeScore !== undefined &&
+    match.awayScore !== undefined
+      ? match.homeScore - match.awayScore
+      : 0;
 
-  const last5 = useMemo(() => {
-    return {
-      home: buildLastFive(match.homeTeam),
-      away: buildLastFive(match.awayTeam),
-    };
-  }, [match.homeTeam, match.awayTeam]);
+  /* --------------------------- POST GAME LOGIC --------------------------- */
 
-  const insights = useMemo(() => buildInsights(match.homeTeam, match.awayTeam), [
-    match.homeTeam,
-    match.awayTeam,
-  ]);
+  const quarterWinners =
+    isFinal && match.quarters
+      ? match.quarters.map((q) => ({
+          label: q.label,
+          winner:
+            q.home > q.away
+              ? match.homeTeam
+              : q.away > q.home
+              ? match.awayTeam
+              : "Draw",
+          delta: Math.abs(quarterDelta(q)),
+        }))
+      : [];
+
+  const decisiveQuarter =
+    quarterWinners.length > 0
+      ? quarterWinners.reduce((a, b) => (b.delta > a.delta ? b : a))
+      : null;
+
+  /* ---------------------------------------------------------------------- */
 
   return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex justify-end">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
 
-      <div className="absolute inset-y-0 right-0 w-full max-w-md bg-black border-l border-white/10 overflow-y-auto">
-        <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-white/10 bg-black/80 backdrop-blur">
-          <div className="text-sm font-semibold">Match Details</div>
-          <button onClick={onClose} className="text-white/80 hover:text-white">
-            <X size={18} />
+      {/* Panel */}
+      <aside className="relative h-full w-full max-w-[420px] bg-[#0b0b0b] border-l border-white/10 p-5 overflow-y-auto">
+        {/* Header */}
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <div className="text-xs text-white/40">
+              {match.roundLabel} ·{" "}
+              {new Date(match.dateISO).toLocaleDateString("en-AU", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}{" "}
+              · {match.timeLocal}
+            </div>
+            <div className="mt-1 text-lg font-semibold">
+              {match.homeTeam}{" "}
+              <span className="text-white/40 mx-1">vs</span>{" "}
+              {match.awayTeam}
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="rounded-md p-1.5 text-white/50 hover:text-white hover:bg-white/10"
+          >
+            <X size={16} />
           </button>
         </div>
 
-        <div className="p-4 space-y-6">
-          <MatchDetailHeader match={match} />
+        {/* =========================== FINAL MATCH =========================== */}
+        {isFinal && (
+          <div className="space-y-6">
+            {/* RESULT SUMMARY */}
+            <section>
+              <div className="text-sm font-semibold mb-1">
+                Result Summary
+              </div>
+              <div className="text-white/80">
+                {margin > 0
+                  ? `${match.homeTeam} def ${match.awayTeam} by ${margin}`
+                  : `${match.awayTeam} def ${match.homeTeam} by ${Math.abs(
+                      margin
+                    )}`}
+              </div>
+              <div className="mt-1 text-white/50 text-sm">
+                Final score: {match.homeScore} – {match.awayScore}
+              </div>
+            </section>
 
-          {/* ✅ Win Probability: now for UPCOMING too */}
-          <WinProbabilityBar homePct={homePct} />
-
-          {/* FINAL (2025 historical) */}
-          {match.status === "final" && (
-            <HeadToHeadPanel homeTeam={match.homeTeam} awayTeam={match.awayTeam} />
-          )}
-
-          {/* UPCOMING (2026 default + future rounds) */}
-          {match.status === "upcoming" && (
-            <>
-              {/* Keep your existing short AI preview */}
-              <UpcomingAIPreview />
-
-              {/* Added: Lineups */}
-              <Panel title="Lineups (Projected)" subtitle="Full squad shown until official teams drop.">
-                <div className="grid grid-cols-2 gap-3">
-                  <LineupCol team={match.homeTeam} players={upcomingLineups.home.slice(0, 11)} />
-                  <LineupCol team={match.awayTeam} players={upcomingLineups.away.slice(0, 11)} />
-                  <LineupCol team={`${match.homeTeam} (Bench)`} players={upcomingLineups.home.slice(11, 22)} />
-                  <LineupCol team={`${match.awayTeam} (Bench)`} players={upcomingLineups.away.slice(11, 22)} />
+            {/* GAME FLOW */}
+            {quarterWinners.length > 0 && (
+              <section>
+                <div className="text-sm font-semibold mb-2">Game Flow</div>
+                <div className="text-sm text-white/70 space-y-1">
+                  {match.homeTeam} won{" "}
+                  {
+                    quarterWinners.filter(
+                      (q) => q.winner === match.homeTeam
+                    ).length
+                  }{" "}
+                  quarters · {match.awayTeam} won{" "}
+                  {
+                    quarterWinners.filter(
+                      (q) => q.winner === match.awayTeam
+                    ).length
+                  }
                 </div>
-              </Panel>
 
-              {/* Added: Last 5 */}
-              <Panel title="Last 5" subtitle="Recent form snapshot for both teams.">
-                <div className="grid grid-cols-2 gap-3">
-                  <Last5Col team={match.homeTeam} items={last5.home} />
-                  <Last5Col team={match.awayTeam} items={last5.away} />
-                </div>
-              </Panel>
-
-              {/* Added: 2–3 insights */}
-              <Panel title="Key Insights" subtitle="Short preview notes (mocked for now).">
-                <ul className="space-y-2 text-xs text-white/70">
-                  {insights.map((t) => (
-                    <li key={t} className="flex gap-2">
-                      <span className="mt-[6px] h-1 w-1 rounded-full bg-amber-400/80 shrink-0" />
-                      <span>{t}</span>
-                    </li>
-                  ))}
-                </ul>
-              </Panel>
-            </>
-          )}
-
-          <VenueIntelChips match={match} />
-          <MatchDetailCTA />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* --------------------------------- UI Bits -------------------------------- */
-
-function Panel({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div>
-          <div className="text-sm font-semibold text-white">{title}</div>
-          {subtitle && <div className="text-[11px] text-white/45 mt-0.5">{subtitle}</div>}
-        </div>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function LineupCol({ team, players }: { team: string; players: string[] }) {
-  return (
-    <div className="rounded-lg border border-white/10 bg-black/20 p-3">
-      <div className="text-[11px] font-semibold text-white/75 mb-2 truncate">{team}</div>
-      <div className="space-y-1">
-        {players.map((p, idx) => (
-          <div key={`${team}-${idx}`} className="text-[11px] text-white/60 truncate">
-            {p}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Last5Col({ team, items }: { team: string; items: { label: string; result: "W" | "L"; margin: number }[] }) {
-  return (
-    <div className="rounded-lg border border-white/10 bg-black/20 p-3">
-      <div className="text-[11px] font-semibold text-white/75 mb-2 truncate">{team}</div>
-      <div className="space-y-1.5">
-        {items.map((it, idx) => (
-          <div key={`${team}-l5-${idx}`} className="flex items-center justify-between gap-2 text-[11px]">
-            <div className="text-white/55 truncate">{it.label}</div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span
-                className={cx(
-                  "inline-flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold border",
-                  it.result === "W"
-                    ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                    : "border-rose-400/30 bg-rose-400/10 text-rose-200"
+                {decisiveQuarter && decisiveQuarter.delta >= 6 && (
+                  <div className="mt-2 text-xs text-white/50">
+                    Decisive period: {decisiveQuarter.label} (
+                    {decisiveQuarter.winner} +{decisiveQuarter.delta})
+                  </div>
                 )}
-              >
-                {it.result}
-              </span>
-              <span className="text-white/60">{it.margin}</span>
-            </div>
+              </section>
+            )}
+
+            {/* TOP FANTASY */}
+            {match.topPlayers && (
+              <section>
+                <div className="text-sm font-semibold mb-2">
+                  Top Fantasy Performers
+                </div>
+                <div className="space-y-3 text-sm">
+                  {match.topPlayers.map((team) => (
+                    <div key={team.team}>
+                      <div className="text-white/60 mb-1">
+                        {team.team}
+                      </div>
+                      <div className="text-white/80">
+                        {team.players
+                          .map((p) => `${p.name} ${p.fantasy}`)
+                          .join(" · ")}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* CONTEXT */}
+            <section>
+              <div className="text-sm font-semibold mb-2">Context</div>
+              <div className="text-sm text-white/60 space-y-1">
+                <div>Venue: {match.venue}</div>
+                {match.crowd && (
+                  <div>Crowd: {match.crowd.toLocaleString()}</div>
+                )}
+                <div>Round: {match.roundLabel}</div>
+              </div>
+            </section>
+
+            {/* LADDER IMPACT */}
+            {match.ladderDelta && (
+              <section>
+                <div className="text-sm font-semibold mb-2">
+                  Ladder Impact
+                </div>
+                <div className="text-sm space-y-1">
+                  {match.ladderDelta.map((d) => (
+                    <div
+                      key={d.team}
+                      className={cx(
+                        d.delta > 0 && "text-emerald-300",
+                        d.delta < 0 && "text-rose-400/70",
+                        d.delta === 0 && "text-white/50"
+                      )}
+                    >
+                      {d.team}{" "}
+                      {d.delta > 0
+                        ? `↑${d.delta}`
+                        : d.delta < 0
+                        ? `↓${Math.abs(d.delta)}`
+                        : "—"}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
-        ))}
-      </div>
+        )}
+
+        {/* =========================== UPCOMING MATCH ========================= */}
+        {!isFinal && (
+          <div className="space-y-6">
+            {/* This is intentionally future-facing */}
+            <section>
+              <div className="text-sm font-semibold mb-1">
+                Match Preview
+              </div>
+              <div className="text-sm text-white/60">
+                Full predictive analysis available via AI Match
+                Insights.
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* CTA */}
+        <div className="mt-8">
+          <a
+            href="https://www.neekostats.com.au/sports/afl/ai-analysis"
+            className="block w-full rounded-lg bg-amber-400 text-black text-sm font-semibold py-3 text-center hover:bg-amber-300 transition-colors"
+          >
+            Open AI Match Analysis →
+          </a>
+        </div>
+      </aside>
     </div>
   );
 }
