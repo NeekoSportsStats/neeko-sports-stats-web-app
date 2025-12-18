@@ -24,6 +24,20 @@ function pct(a: number, b: number) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* LEAGUE AVERAGE (GHOST LINES)                                                */
+/* -------------------------------------------------------------------------- */
+/* Rough AFL-realistic benchmarks — mock safe, visually consistent */
+
+const LEAGUE_AVG: Record<string, number> = {
+  Disposals: 390,
+  Clearances: 40,
+  Turnovers: 65,
+  Tackles: 60,
+  "Inside 50s": 55,
+  "Contested Possessions": 145,
+};
+
+/* -------------------------------------------------------------------------- */
 /* PROPS                                                                      */
 /* -------------------------------------------------------------------------- */
 
@@ -114,6 +128,11 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
 
                 <div className="space-y-3">
                   {homeStats.stats.map((stat, i) => {
+                    const label =
+                      stat.label === "Time in Forward Half"
+                        ? "Tackles"
+                        : stat.label;
+
                     const homeVal = Number(stat.value);
                     const awayVal = Number(
                       awayStats.stats[i]?.value ?? 0
@@ -123,20 +142,30 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
                     const awayBetter = awayVal > homeVal;
 
                     const bar = pct(homeVal, awayVal);
+                    const avg = LEAGUE_AVG[label];
+                    const avgPct =
+                      avg && Math.max(homeVal, awayVal) > 0
+                        ? Math.min(
+                            100,
+                            (avg / Math.max(homeVal, awayVal)) * 100
+                          )
+                        : null;
 
                     return (
-                      <div key={stat.label}>
+                      <div key={label}>
                         {/* Label */}
                         <div className="text-[11px] text-white/40 mb-1">
-                          {stat.label}
+                          {label}
                         </div>
 
                         {/* Values */}
                         <div className="grid grid-cols-[1fr_auto_1fr] items-center text-sm sm:text-[15px]">
                           <div
                             className={cx(
-                              homeBetter && "text-emerald-300 font-medium",
-                              !homeBetter && "text-white/70"
+                              "text-left",
+                              homeBetter
+                                ? "text-emerald-300 font-medium"
+                                : "text-amber-200/80"
                             )}
                           >
                             {homeVal}
@@ -149,8 +178,9 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
                           <div
                             className={cx(
                               "text-right",
-                              awayBetter && "text-emerald-300 font-medium",
-                              !awayBetter && "text-white/70"
+                              awayBetter
+                                ? "text-emerald-300 font-medium"
+                                : "text-slate-200/80"
                             )}
                           >
                             {awayVal}
@@ -159,49 +189,41 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
 
                         {/* Mini bar */}
                         <div className="relative mt-1 h-1.5 rounded bg-white/10 overflow-hidden">
+                          {/* Home */}
                           <div
                             className={cx(
                               "absolute left-1/2 top-0 h-full rounded-l",
-                              homeBetter ? "bg-emerald-400" : "bg-white/30"
+                              homeBetter
+                                ? "bg-emerald-400"
+                                : "bg-amber-400/50"
                             )}
                             style={{ width: `${bar.home}%` }}
                           />
+
+                          {/* Away */}
                           <div
                             className={cx(
                               "absolute right-1/2 top-0 h-full rounded-r",
-                              awayBetter ? "bg-emerald-400" : "bg-white/30"
+                              awayBetter
+                                ? "bg-emerald-400"
+                                : "bg-slate-400/50"
                             )}
                             style={{ width: `${bar.away}%` }}
                           />
+
+                          {/* League average ghost */}
+                          {avgPct && (
+                            <div
+                              className="absolute top-0 h-full w-[1px] bg-white/25"
+                              style={{
+                                left: `calc(50% - ${avgPct / 2}%)`,
+                              }}
+                            />
+                          )}
                         </div>
                       </div>
                     );
                   })}
-                </div>
-              </section>
-            )}
-
-            {/* TOP PERFORMERS */}
-            {match.topPlayers && (
-              <section>
-                <div className="text-sm font-semibold mb-2">
-                  Top Performers (Fantasy)
-                </div>
-
-                <div className="space-y-2">
-                  {match.topPlayers.map((team) => (
-                    <div key={team.team}>
-                      <div className="text-[11px] text-white/50 mb-0.5">
-                        {team.team}
-                      </div>
-                      <div className="text-sm text-white/80 leading-snug">
-                        {team.players
-                          .slice(0, 3)
-                          .map((p) => `${p.name} ${p.fantasy}`)
-                          .join(" · ")}
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </section>
             )}
