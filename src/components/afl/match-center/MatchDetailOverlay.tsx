@@ -9,8 +9,9 @@ import { X } from "lucide-react";
 const cx = (...c: Array<string | false | undefined>) =>
   c.filter(Boolean).join(" ");
 
-function quarterDelta(q: { home: number; away: number }) {
-  return q.home - q.away;
+function statDelta(a: number, b: number) {
+  if (a === b) return "—";
+  return a > b ? `↑${a - b}` : `↓${b - a}`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -36,28 +37,11 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
       ? match.homeScore - match.awayScore
       : 0;
 
-  /* --------------------------- POST GAME LOGIC --------------------------- */
+  const homeWon = margin > 0;
+  const awayWon = margin < 0;
 
-  const quarterResults =
-    isFinal && match.quarters
-      ? match.quarters.map((q) => ({
-          label: q.label,
-          winner:
-            q.home > q.away
-              ? match.homeTeam
-              : q.away > q.home
-              ? match.awayTeam
-              : "Draw",
-          delta: Math.abs(quarterDelta(q)),
-        }))
-      : [];
-
-  const decisiveQuarter =
-    quarterResults.length > 0
-      ? quarterResults.reduce((a, b) => (b.delta > a.delta ? b : a))
-      : null;
-
-  /* ---------------------------------------------------------------------- */
+  const homeStats = match.teamStats?.[0];
+  const awayStats = match.teamStats?.[1];
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -100,13 +84,11 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
         {/* =========================== FINAL MATCH =========================== */}
         {isFinal && (
           <div className="space-y-6">
-            {/* RESULT SUMMARY (kept but minimal) */}
+            {/* RESULT */}
             <section>
-              <div className="text-sm font-semibold mb-1">
-                Final Result
-              </div>
+              <div className="text-sm font-semibold mb-1">Final Result</div>
               <div className="text-white/80">
-                {margin > 0
+                {homeWon
                   ? `${match.homeTeam} def ${match.awayTeam} by ${margin}`
                   : `${match.awayTeam} def ${match.homeTeam} by ${Math.abs(
                       margin
@@ -117,44 +99,81 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
               </div>
             </section>
 
-            {/* TEAM STATS — CORE VALUE */}
-            {match.teamStats ? (
+            {/* TEAM PERFORMANCE */}
+            {homeStats && awayStats && (
               <section>
                 <div className="text-sm font-semibold mb-3">
                   Team Performance
                 </div>
 
                 <div className="space-y-4">
-                  {match.teamStats.map((team) => (
-                    <div
-                      key={team.team}
-                      className="rounded-lg border border-white/10 bg-white/[0.03] p-3"
-                    >
-                      <div className="mb-2 text-white/80 font-medium">
+                  {homeStats.stats.map((stat, i) => {
+                    const homeVal = Number(stat.value);
+                    const awayVal = Number(
+                      awayStats.stats[i]?.value ?? 0
+                    );
+
+                    const homeBetter = homeVal > awayVal;
+                    const awayBetter = awayVal > homeVal;
+
+                    return (
+                      <div key={stat.label}>
+                        <div className="text-xs text-white/40 mb-1">
+                          {stat.label}
+                        </div>
+
+                        <div className="grid grid-cols-[1fr_auto_1fr] items-center text-sm">
+                          <div
+                            className={cx(
+                              homeBetter && "text-emerald-300 font-medium",
+                              !homeBetter && "text-white/70"
+                            )}
+                          >
+                            {homeVal}
+                          </div>
+
+                          <div className="px-2 text-xs text-white/40">
+                            {statDelta(homeVal, awayVal)}
+                          </div>
+
+                          <div
+                            className={cx(
+                              "text-right",
+                              awayBetter && "text-emerald-300 font-medium",
+                              !awayBetter && "text-white/70"
+                            )}
+                          >
+                            {awayVal}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* TOP PERFORMERS */}
+            {match.topPlayers && (
+              <section>
+                <div className="text-sm font-semibold mb-2">
+                  Top Performers (Fantasy)
+                </div>
+
+                <div className="space-y-3">
+                  {match.topPlayers.map((team) => (
+                    <div key={team.team}>
+                      <div className="text-xs text-white/50 mb-1">
                         {team.team}
                       </div>
-
-                      <div className="grid grid-cols-2 gap-y-1 text-sm">
-                        {team.stats.map((s) => (
-                          <div
-                            key={s.label}
-                            className="flex justify-between text-white/70"
-                          >
-                            <span>{s.label}</span>
-                            <span className="text-white">
-                              {s.value}
-                            </span>
-                          </div>
-                        ))}
+                      <div className="text-sm text-white/80 leading-relaxed">
+                        {team.players
+                          .slice(0, 3)
+                          .map((p) => `${p.name} ${p.fantasy}`)
+                          .join(" · ")}
                       </div>
                     </div>
                   ))}
-                </div>
-              </section>
-            ) : (
-              <section>
-                <div className="text-sm text-white/50">
-                  Team statistics not available for this match.
                 </div>
               </section>
             )}
@@ -168,20 +187,6 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
                   <div>Crowd: {match.crowd.toLocaleString()}</div>
                 )}
                 <div>Round: {match.roundLabel}</div>
-              </div>
-            </section>
-          </div>
-        )}
-
-        {/* =========================== UPCOMING MATCH ========================= */}
-        {!isFinal && (
-          <div className="space-y-6">
-            <section>
-              <div className="text-sm font-semibold mb-1">
-                Match Preview
-              </div>
-              <div className="text-sm text-white/60">
-                Full predictive analysis available via AI Match Insights.
               </div>
             </section>
           </div>
