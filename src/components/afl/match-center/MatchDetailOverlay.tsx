@@ -38,7 +38,7 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
 
   /* --------------------------- POST GAME LOGIC --------------------------- */
 
-  const quarterWinners =
+  const quarterResults =
     isFinal && match.quarters
       ? match.quarters.map((q) => ({
           label: q.label,
@@ -53,8 +53,8 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
       : [];
 
   const decisiveQuarter =
-    quarterWinners.length > 0
-      ? quarterWinners.reduce((a, b) => (b.delta > a.delta ? b : a))
+    quarterResults.length > 0
+      ? quarterResults.reduce((a, b) => (b.delta > a.delta ? b : a))
       : null;
 
   /* ---------------------------------------------------------------------- */
@@ -118,46 +118,51 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
             </section>
 
             {/* GAME FLOW */}
-            {quarterWinners.length > 0 && (
+            {quarterResults.length > 0 && (
               <section>
                 <div className="text-sm font-semibold mb-2">Game Flow</div>
-                <div className="text-sm text-white/70 space-y-1">
+                <div className="text-sm text-white/70">
                   {match.homeTeam} won{" "}
                   {
-                    quarterWinners.filter(
+                    quarterResults.filter(
                       (q) => q.winner === match.homeTeam
                     ).length
                   }{" "}
                   quarters · {match.awayTeam} won{" "}
                   {
-                    quarterWinners.filter(
+                    quarterResults.filter(
                       (q) => q.winner === match.awayTeam
                     ).length
                   }
                 </div>
-
-                {decisiveQuarter && decisiveQuarter.delta >= 6 && (
-                  <div className="mt-2 text-xs text-white/50">
-                    Decisive period: {decisiveQuarter.label} (
-                    {decisiveQuarter.winner} +{decisiveQuarter.delta})
-                  </div>
-                )}
               </section>
             )}
 
-            {/* TOP FANTASY */}
+            {/* KEY SWING */}
+            {decisiveQuarter && decisiveQuarter.delta >= 6 && (
+              <section>
+                <div className="text-sm font-semibold mb-1">Key Swing</div>
+                <div className="text-sm text-white/70">
+                  {decisiveQuarter.winner} +{decisiveQuarter.delta} in{" "}
+                  {decisiveQuarter.label}
+                </div>
+              </section>
+            )}
+
+            {/* TOP FANTASY PERFORMERS */}
             {match.topPlayers && (
               <section>
                 <div className="text-sm font-semibold mb-2">
                   Top Fantasy Performers
                 </div>
+
                 <div className="space-y-3 text-sm">
                   {match.topPlayers.map((team) => (
                     <div key={team.team}>
                       <div className="text-white/60 mb-1">
                         {team.team}
                       </div>
-                      <div className="text-white/80">
+                      <div className="text-white/80 leading-relaxed">
                         {team.players
                           .map((p) => `${p.name} ${p.fantasy}`)
                           .join(" · ")}
@@ -213,7 +218,6 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
         {/* =========================== UPCOMING MATCH ========================= */}
         {!isFinal && (
           <div className="space-y-6">
-            {/* This is intentionally future-facing */}
             <section>
               <div className="text-sm font-semibold mb-1">
                 Match Preview
