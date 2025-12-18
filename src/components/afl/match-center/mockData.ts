@@ -52,6 +52,31 @@ const FIXTURES_2025: FixtureMatch[] = [
         crowd: 78124,
       };
     })(),
+
+    teamStats: [
+      {
+        team: "Richmond",
+        stats: [
+          { label: "Disposals", value: 386 },
+          { label: "Inside 50s", value: 57 },
+          { label: "Clearances", value: 38 },
+          { label: "Contested Possessions", value: 141 },
+          { label: "Turnovers", value: 64 },
+          { label: "Time in Forward Half", value: "53%" },
+        ],
+      },
+      {
+        team: "Carlton",
+        stats: [
+          { label: "Disposals", value: 372 },
+          { label: "Inside 50s", value: 54 },
+          { label: "Clearances", value: 36 },
+          { label: "Contested Possessions", value: 134 },
+          { label: "Turnovers", value: 69 },
+          { label: "Time in Forward Half", value: "47%" },
+        ],
+      },
+    ],
   },
 
   /* ------------------------------- R22 -------------------------------- */
@@ -86,6 +111,31 @@ const FIXTURES_2025: FixtureMatch[] = [
         crowd: 86402,
       };
     })(),
+
+    teamStats: [
+      {
+        team: "Collingwood",
+        stats: [
+          { label: "Disposals", value: 401 },
+          { label: "Inside 50s", value: 60 },
+          { label: "Clearances", value: 41 },
+          { label: "Contested Possessions", value: 148 },
+          { label: "Turnovers", value: 61 },
+          { label: "Time in Forward Half", value: "55%" },
+        ],
+      },
+      {
+        team: "Brisbane",
+        stats: [
+          { label: "Disposals", value: 389 },
+          { label: "Inside 50s", value: 56 },
+          { label: "Clearances", value: 39 },
+          { label: "Contested Possessions", value: 144 },
+          { label: "Turnovers", value: 68 },
+          { label: "Time in Forward Half", value: "45%" },
+        ],
+      },
+    ],
   },
 
   /* ------------------------------- R23 -------------------------------- */
@@ -120,6 +170,31 @@ const FIXTURES_2025: FixtureMatch[] = [
         crowd: 52318,
       };
     })(),
+
+    teamStats: [
+      {
+        team: "Port Adelaide",
+        stats: [
+          { label: "Disposals", value: 395 },
+          { label: "Inside 50s", value: 59 },
+          { label: "Clearances", value: 40 },
+          { label: "Contested Possessions", value: 146 },
+          { label: "Turnovers", value: 58 },
+          { label: "Time in Forward Half", value: "56%" },
+        ],
+      },
+      {
+        team: "Adelaide",
+        stats: [
+          { label: "Disposals", value: 368 },
+          { label: "Inside 50s", value: 52 },
+          { label: "Clearances", value: 35 },
+          { label: "Contested Possessions", value: 132 },
+          { label: "Turnovers", value: 71 },
+          { label: "Time in Forward Half", value: "44%" },
+        ],
+      },
+    ],
   },
 ];
 
@@ -128,7 +203,6 @@ const FIXTURES_2025: FixtureMatch[] = [
 /* -------------------------------------------------------------------------- */
 
 const FIXTURES_2026: FixtureMatch[] = [
-  /* --------------------------- OPENING ROUND --------------------------- */
   {
     id: "2026-or-rich-carl",
     season: 2026,
@@ -153,8 +227,6 @@ const FIXTURES_2026: FixtureMatch[] = [
     homeTeam: "Adelaide",
     awayTeam: "Port Adelaide",
   },
-
-  /* -------------------------------- R1 -------------------------------- */
   {
     id: "2026-r1-coll-syd",
     season: 2026,
@@ -179,8 +251,6 @@ const FIXTURES_2026: FixtureMatch[] = [
     homeTeam: "Geelong",
     awayTeam: "Melbourne",
   },
-
-  /* -------------------------------- R2 -------------------------------- */
   {
     id: "2026-r2-bris-frem",
     season: 2026,
