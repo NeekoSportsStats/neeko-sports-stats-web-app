@@ -1,109 +1,102 @@
 // src/components/afl/match-center/types.ts
+// Centralised types for the AFL Match Centre mock + UI.
+// Keep these broad so both FINAL and UPCOMING matches can be enriched.
+
+export type Season = 2025 | 2026;
 
 export type MatchStatus = "upcoming" | "final";
 
-export type FixtureQuarter = {
-  label: "Q1" | "Q2" | "Q3" | "Q4";
-  home: number;
-  away: number;
+export type QuarterLabel = "Q1" | "Q2" | "Q3" | "Q4";
+
+export type QuarterScore = {
+  label: QuarterLabel;
+  home: number; // points in quarter
+  away: number; // points in quarter
 };
 
-export type TeamStatLine = {
+export type MatchPreview = {
+  homeWinProb: number; // 0-100
+  awayWinProb: number; // 0-100
+  reasons: [string, string];
+  ladderPos: { home: number; away: number };
+  last5: {
+    home: ("W" | "L")[];
+    away: ("W" | "L")[];
+  };
+};
+
+export type TeamListChange = {
+  team: string;
+  in: string;
+  out: string;
+  note?: string;
+};
+
+export type TeamLists = {
+  announced: boolean;
+  caption: string;
+  home: string[];
+  away: string[];
+  homeBench?: string[];
+  awayBench?: string[];
+  lateChanges?: TeamListChange[];
+};
+
+export type MatchStat = {
   label: string;
   value: number;
-  /** Optional league average for a ghost marker line */
   leagueAvg?: number;
-  /** If false, lower is better (e.g. Turnovers). Default true */
   higherIsBetter?: boolean;
 };
 
 export type MatchTeamStats = {
   team: string;
-  stats: TeamStatLine[];
+  stats: MatchStat[];
 };
 
-export type FantasyPlayer = {
+export type TopFantasyPlayer = {
   name: string;
   fantasy: number;
 };
 
 export type TopFantasyTeam = {
   team: string;
-  players: FantasyPlayer[];
+  players: TopFantasyPlayer[];
 };
 
-export type TeamLists = {
-  /** If false, we show the full club list as “Not yet announced (projected)” */
-  announced: boolean;
-  caption?: string;
-
-  /** Usually 22 when announced; can be full list when not announced */
-  home: string[];
-  away: string[];
-
-  /** Optional bench labels (subset of home/away) */
-  homeBench?: string[];
-  awayBench?: string[];
-
-  /** Optional change notes (purely mock for now) */
-  lateChanges?: { team: string; in: string; out?: string; note?: string }[];
-  insOuts?: { team: string; ins: string[]; outs: string[] }[];
-};
-
-export type MatchPreview = {
-  homeWinProb: number; // 0-100
-  awayWinProb: number; // 0-100
-  reasons: [string, string]; // exactly 2 lines
-  ladderPos?: { home: number; away: number };
-  last5?: { home: ("W" | "L")[]; away: ("W" | "L")[] };
+// Some UI modules (e.g. RoundControlBar) reference topPlayers.
+// Keep it optional so older/newer UIs compile.
+export type TopPlayers = {
+  home: { name: string; value: number; label?: string }[];
+  away: { name: string; value: number; label?: string }[];
 };
 
 export type FixtureMatch = {
   id: string;
 
-  /** Season context */
-  season: 2025 | 2026;
+  season: Season;
+  roundNumber: number; // OR = 0, R1..R23 = 1..23
+  roundLabel: string; // "OR" | "R1" | ...
 
-  /** Round context */
-  roundNumber: number; // 0 = Opening Round
-  roundLabel: string; // OR, R1…R23
+  status: MatchStatus;
 
-  /** Match info */
-  dateISO: string;
-  timeLocal: string;
+  dateISO: string; // YYYY-MM-DD
+  timeLocal: string; // HH:mm
   venue: string;
 
   homeTeam: string;
   awayTeam: string;
 
-  status: MatchStatus;
-
-  /** FINAL-only fields */
+  // FINAL extras
+  quarters?: QuarterScore[];
   homeScore?: number;
   awayScore?: number;
-
-  quarters?: FixtureQuarter[];
-
   crowd?: number;
 
-  /** Optional: existing (kept) */
-  topPlayers?: {
-    home: string[];
-    away: string[];
-  };
-
-  /** Post-match ladder movement (optional) */
-  ladderDelta?: { team: string; delta: number }[];
-
-  /** FINAL: team stats shown in overlay */
-  teamStats?: MatchTeamStats[];
-
-  /** FINAL: top 3 fantasy performers per team (card + overlay optional) */
-  topFantasy?: TopFantasyTeam[];
-
-  /** UPCOMING: squads & lists (overlay only) */
-  teamLists?: TeamLists;
-
-  /** UPCOMING: win probability + reasons + ladder + last5 */
+  // Enrichment (both upcoming/final)
   preview?: MatchPreview;
+  teamLists?: TeamLists;
+  teamStats?: MatchTeamStats[];
+  topFantasy?: TopFantasyTeam[];
+  topPlayers?: TopPlayers;
 };

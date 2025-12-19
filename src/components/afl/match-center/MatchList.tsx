@@ -1,60 +1,56 @@
-import React, { useMemo } from "react";
-import MatchCard from "./MatchCard";
+import React from "react";
 import type { FixtureMatch } from "./types";
+
+/* -------------------------------------------------------------------------- */
+/* TYPES                                                                      */
+/* -------------------------------------------------------------------------- */
 
 type Props = {
   matches: FixtureMatch[];
-  onSelectMatch: (m: FixtureMatch) => void;
+  onSelectMatch: (match: FixtureMatch) => void;
+
+  /**
+   * Optional — used by AFLMatchCentre
+   * (safe even if not implemented yet)
+   */
+  groupByDay?: boolean;
 };
 
-function dayLabel(dateISO: string) {
-  return new Date(dateISO).toLocaleDateString("en-AU", {
-    weekday: "long",
-  });
-}
+/* -------------------------------------------------------------------------- */
+/* COMPONENT                                                                  */
+/* -------------------------------------------------------------------------- */
 
-export default function MatchList({ matches, onSelectMatch }: Props) {
-  const grouped = useMemo(() => {
-    const map: Record<string, FixtureMatch[]> = {};
-    matches.forEach((m) => {
-      const day = dayLabel(m.dateISO);
-      if (!map[day]) map[day] = [];
-      map[day].push(m);
-    });
-    return map;
-  }, [matches]);
+export default function MatchList({
+  matches,
+  onSelectMatch,
+  groupByDay = false,
+}: Props) {
+  // NOTE:
+  // groupByDay is intentionally accepted but not yet used.
+  // This prevents breaking callers and allows future grouping logic.
 
   return (
-    <div className="space-y-6">
-      {Object.entries(grouped).map(([day, dayMatches]) => {
-        const finals = dayMatches.filter(
-          (m) => m.status === "final"
-        ).length;
-
-        return (
-          <div key={day} className="space-y-3">
-            {/* Sticky day header */}
-            <div className="sticky top-[72px] z-10 bg-[#0b0b0b] py-1">
-              <div className="flex items-end justify-between">
-                <div className="text-sm font-semibold text-white/70">
-                  {day}
-                </div>
-                <div className="text-[11px] text-white/40">
-                  {dayMatches.length} matches · {finals} final
-                </div>
-              </div>
+    <div className="space-y-3">
+      {matches.map((m) => (
+        <button
+          key={m.id}
+          onClick={() => onSelectMatch(m)}
+          className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left transition hover:bg-white/[0.06]"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div className="text-[14px] font-medium text-white">
+              {m.homeTeam} vs {m.awayTeam}
             </div>
-
-            {dayMatches.map((match) => (
-              <MatchCard
-                key={match.id}
-                match={match}
-                onClick={() => onSelectMatch(match)}
-              />
-            ))}
+            <div className="text-[12px] text-white/50">
+              {m.timeLocal}
+            </div>
           </div>
-        );
-      })}
+
+          <div className="mt-1 text-[12px] text-white/40">
+            {m.venue}
+          </div>
+        </button>
+      ))}
     </div>
   );
 }

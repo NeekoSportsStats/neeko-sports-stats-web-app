@@ -1,494 +1,567 @@
 // src/components/afl/match-center/MatchDetailOverlay.tsx
 import React, { useMemo, useState } from "react";
-import type { FixtureMatch, TeamStatLine } from "./types";
+import { createPortal } from "react-dom";
 import { X, ChevronDown } from "lucide-react";
-
-/* -------------------------------------------------------------------------- */
-/* HELPERS                                                                    */
-/* -------------------------------------------------------------------------- */
-
-const cx = (...c: Array<string | false | undefined>) => c.filter(Boolean).join(" ");
-
-function quarterDelta(q: { home: number; away: number }) {
-  return q.home - q.away;
-}
-
-function statKey(label: string) {
-  return label.trim().toLowerCase().replace(/\s+/g, "-");
-}
-
-/** For stats where lower is better (e.g. Turnovers) */
-function isHigherBetter(s: TeamStatLine) {
-  return s.higherIsBetter !== false;
-}
-
-function fmtDelta(d: number) {
-  const sign = d > 0 ? "↑" : d < 0 ? "↓" : "—";
-  return d === 0 ? "—" : `${sign}${Math.abs(d)}`;
-}
-
-function safeNum(n: any) {
-  const v = Number(n);
-  return Number.isFinite(v) ? v : 0;
-}
-
-/* -------------------------------------------------------------------------- */
-/* PROPS                                                                      */
-/* -------------------------------------------------------------------------- */
+import type { FixtureMatch } from "./types";
 
 type Props = {
-  match: FixtureMatch;
+  match: FixtureMatch | null;
   onClose: () => void;
+  ctaHref?: string;
 };
 
-/* -------------------------------------------------------------------------- */
-/* COMPONENT                                                                  */
-/* -------------------------------------------------------------------------- */
+const cx = (...c: Array<string | false | undefined | null>) =>
+  c.filter(Boolean).join(" ");
 
-export default function MatchDetailOverlay({ match, onClose }: Props) {
-  const isFinal = match.status === "final";
+function prettyDateTime(dateISO: string, timeLocal: string) {
+  const d = new Date(`${dateISO}T${timeLocal}:00`);
+  return d.toLocaleString(undefined, {
+    weekday: "short",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
-  const margin =
-    isFinal && match.homeScore !== undefined && match.awayScore !== undefined
-      ? match.homeScore - match.awayScore
-      : 0;
+function resultLine(match: FixtureMatch) {
+  const hs = match.homeScore ?? 0;
+  const as = match.awayScore ?? 0;
+  if (hs === as) return "Draw";
+  const winner = hs > as ? match.homeTeam : match.awayTeam;
+  const margin = Math.abs(hs - as);
+  return `${winner} def ${hs > as ? match.awayTeam : match.homeTeam} by ${margin}`;
+}
 
-  /* --------------------------- POST GAME LOGIC --------------------------- */
+function computeGameFlow(match: FixtureMatch) {
+  const qs = match.quarters ?? [];
+  const won = { home: 0, away: 0, draw: 0 };
+  const margins: number[] = [];
+  let cumHome = 0;
+  let cumAway = 0;
 
-  const quarterResults =
-    isFinal && match.quarters
-      ? match.quarters.map((q) => ({
-          label: q.label,
-          winner:
-            q.home > q.away ? match.homeTeam : q.away > q.home ? match.awayTeam : "Draw",
-          delta: Math.abs(quarterDelta(q)),
-        }))
-      : [];
+  qs.forEach((q) => {
+    if (q.home > q.away) won.home += 1;
+    else if (q.away > q.home) won.away += 1;
+    else won.draw += 1;
 
-  const decisiveQuarter =
-    quarterResults.length > 0 ? quarterResults.reduce((a, b) => (b.delta > a.delta ? b : a)) : null;
+    cumHome += q.home;
+    cumAway += q.away;
+    margins.push(cumHome - cumAway);
+  });
 
-  /* ---------------------------------------------------------------------- */
+  // key swing = biggest absolute change in cumulative margin from prev quarter
+  let keyIdx = 0;
+  let best = -1;
+  for (let i = 0; i < margins.length; i++) {
+    const prev = i === 0 ? 0 : margins[i - 1];
+    const delta = Math.abs(margins[i] - prev);
+    if (delta > best) {
+      best = delta;
+      keyIdx = i;
+    }
+  }
 
-  // FINAL: team performance table model
-  const perfRows = useMemo(() => {
-    if (!isFinal || !match.teamStats?.length) return [];
+  const swing = keyIdx >= 0 && qs[keyIdx] ? qs[keyIdx].label : "Q1";
+  const swingDelta =
+    keyIdx >= 0 ? Math.abs(margins[keyIdx] - (keyIdx === 0 ? 0 : margins[keyIdx - 1])) : 0;
 
-    const home = match.teamStats.find((t) => t.team === match.homeTeam);
-    const away = match.teamStats.find((t) => t.team === match.awayTeam);
-    if (!home || !away) return [];
+  const leadAfterQ = margins.map((m) => {
+    if (m === 0) return "level";
+    return m > 0 ? `${match.homeTeam} +${m}` : `${match.awayTeam} +${Math.abs(m)}`;
+  });
 
-    const homeMap = new Map(home.stats.map((s) => [statKey(s.label), s]));
-    const awayMap = new Map(away.stats.map((s) => [statKey(s.label), s]));
+  return { won, swing, swingDelta, leadAfterQ };
+}
 
-    const labels = Array.from(
-      new Set([...home.stats.map((s) => s.label), ...away.stats.map((s) => s.label)])
-    );
+function StatRow({
+  label,
+  home,
+  away,
+  leagueAvg,
+  higherIsBetter,
+  homeTeam,
+  awayTeam,
+}: {
+  label: string;
+  home: number;
+  away: number;
+  leagueAvg: number;
+  higherIsBetter: boolean;
+  homeTeam: string;
+  awayTeam: string;
+}) {
+  const max = Math.max(home, away, leagueAvg, 1);
+  const min = Math.min(home, away, leagueAvg, 0);
 
-    return labels.map((label) => {
-      const hk = statKey(label);
-      const hs = homeMap.get(hk);
-      const as = awayMap.get(hk);
-      const hVal = safeNum(hs?.value);
-      const aVal = safeNum(as?.value);
+  const toPct = (v: number) => ((v - min) / Math.max(1, max - min)) * 100;
 
-      const leagueAvg = hs?.leagueAvg ?? as?.leagueAvg;
-      const higherBetter = isHigherBetter(hs ?? as ?? { label, value: 0 });
+  const homePct = toPct(home);
+  const awayPct = toPct(away);
+  const avgPct = toPct(leagueAvg);
 
-      // determine “winner” (accounting for lower-better)
-      let homeBetter = false;
-      let awayBetter = false;
-      if (higherBetter) {
-        homeBetter = hVal > aVal;
-        awayBetter = aVal > hVal;
-      } else {
-        homeBetter = hVal < aVal;
-        awayBetter = aVal < hVal;
-      }
+  const diff = home - away;
+  const betterHome = higherIsBetter ? diff > 0 : diff < 0;
+  const equal = diff === 0;
 
-      const delta = higherBetter ? hVal - aVal : aVal - hVal; // positive = home “wins” the stat
-
-      return {
-        label,
-        home: hVal,
-        away: aVal,
-        leagueAvg,
-        homeBetter,
-        awayBetter,
-        higherBetter,
-        delta,
-      };
-    });
-  }, [isFinal, match.teamStats, match.homeTeam, match.awayTeam]);
-
-  // Collapsible team lists for UPCOMING (overlay only)
-  const [showLists, setShowLists] = useState(true);
+  const deltaText = equal ? "0" : `${Math.abs(diff)}`;
+  const deltaArrow = equal ? "–" : betterHome ? "↑" : "↓";
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[10px] uppercase tracking-wide text-white/45">{label}</div>
+        <div
+          className={cx(
+            "text-[12px] font-semibold tabular-nums",
+            equal ? "text-white/55" : betterHome ? "text-emerald-200" : "text-amber-200"
+          )}
+        >
+          {deltaArrow}
+          {deltaText}
+        </div>
+      </div>
 
-      {/* Panel */}
-      <aside className="relative h-full w-full max-w-[460px] bg-[#0b0b0b] border-l border-white/10 p-5 overflow-y-auto">
-        {/* Header */}
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <div className="text-xs text-white/40">
-              {match.roundLabel} ·{" "}
-              {new Date(match.dateISO).toLocaleDateString("en-AU", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}{" "}
-              · {match.timeLocal}
+      <div className="mt-2 flex items-center justify-between gap-3 text-[14px]">
+        <div className={cx("tabular-nums", betterHome ? "text-emerald-200" : "text-white/80")}>
+          {home}
+          <div className="text-[10px] text-white/35">{homeTeam}</div>
+        </div>
+        <div className={cx("tabular-nums text-right", !betterHome && !equal ? "text-emerald-200" : "text-white/80")}>
+          {away}
+          <div className="text-[10px] text-white/35">{awayTeam}</div>
+        </div>
+      </div>
+
+      <div className="mt-3 relative h-2.5 rounded-full bg-white/10">
+        {/* league avg ghost line */}
+        <div
+          className="absolute top-[-2px] h-[14px] w-[2px] bg-white/25"
+          style={{ left: `${avgPct}%` }}
+        />
+        {/* fill between home and away markers */}
+        <div
+          className={cx(
+            "absolute top-0 h-2.5 rounded-full",
+            equal ? "bg-white/15" : betterHome ? "bg-emerald-400/70" : "bg-amber-300/70"
+          )}
+          style={{
+            left: `${Math.min(homePct, awayPct)}%`,
+            width: `${Math.max(4, Math.abs(homePct - awayPct))}%`,
+          }}
+        />
+        {/* markers */}
+        <div
+          className={cx("absolute top-[-2px] h-[14px] w-[14px] rounded-full ring-2 ring-black/50", "bg-emerald-300")}
+          style={{ left: `calc(${homePct}% - 7px)` }}
+          title={`${homeTeam}: ${home}`}
+        />
+        <div
+          className={cx("absolute top-[-2px] h-[14px] w-[14px] rounded-full ring-2 ring-black/50", "bg-amber-200")}
+          style={{ left: `calc(${awayPct}% - 7px)` }}
+          title={`${awayTeam}: ${away}`}
+        />
+      </div>
+
+      <div className="mt-2 text-[10px] text-white/35">
+        League avg {leagueAvg} • {higherIsBetter ? "Higher is better" : "Lower is better"}
+      </div>
+    </div>
+  );
+}
+
+function TeamListsBlock({ match }: { match: FixtureMatch }) {
+  const [open, setOpen] = useState(true);
+  const lists = match.teamLists;
+  if (!lists) return null;
+
+  const home = lists.home ?? [];
+  const away = lists.away ?? [];
+
+  const maxRows = Math.max(home.length, away.length);
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.02]">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+      >
+        <div>
+          <div className="text-[13px] font-semibold text-white">Team Lists</div>
+          <div className="mt-0.5 text-[12px] text-white/45">
+            {lists.announced ? "Final teams" : "Not yet announced"}
+          </div>
+        </div>
+        <ChevronDown
+          className={cx(
+            "h-5 w-5 text-white/50 transition-transform",
+            open ? "rotate-180" : "rotate-0"
+          )}
+        />
+      </button>
+
+      {open ? (
+        <div className="px-5 pb-5">
+          <div className="text-[12px] text-white/45">{lists.caption}</div>
+
+          <div className="mt-3 overflow-hidden rounded-xl border border-white/10">
+            <div className="grid grid-cols-2 bg-white/[0.04] px-4 py-2 text-[12px] text-white/60">
+              <div className="font-semibold">{match.homeTeam}</div>
+              <div className="text-right font-semibold">{match.awayTeam}</div>
             </div>
-            <div className="mt-1 text-lg font-semibold">
-              {match.homeTeam} <span className="text-white/40 mx-1">vs</span> {match.awayTeam}
+
+            <div className="max-h-[340px] overflow-auto">
+              <div className="grid grid-cols-2 gap-0 divide-x divide-white/10">
+                <div className="divide-y divide-white/10">
+                  {Array.from({ length: maxRows }).map((_, i) => (
+                    <div key={`h-${i}`} className="px-4 py-2 text-[13px] text-white/75">
+                      {home[i] ?? ""}
+                    </div>
+                  ))}
+                </div>
+                <div className="divide-y divide-white/10">
+                  {Array.from({ length: maxRows }).map((_, i) => (
+                    <div
+                      key={`a-${i}`}
+                      className="px-4 py-2 text-right text-[13px] text-white/75"
+                    >
+                      {away[i] ?? ""}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {lists.announced && (lists.homeBench?.length || lists.awayBench?.length) ? (
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
+                <div className="text-[10px] uppercase tracking-wide text-white/45">
+                  {match.homeTeam} bench
+                </div>
+                <div className="mt-2 space-y-1 text-[13px] text-white/75">
+                  {(lists.homeBench ?? []).map((n) => (
+                    <div key={n}>{n}</div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
+                <div className="text-[10px] uppercase tracking-wide text-white/45 text-right">
+                  {match.awayTeam} bench
+                </div>
+                <div className="mt-2 space-y-1 text-[13px] text-white/75 text-right">
+                  {(lists.awayBench ?? []).map((n) => (
+                    <div key={n}>{n}</div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {lists.lateChanges?.length ? (
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
+              <div className="text-[10px] uppercase tracking-wide text-white/45">
+                Late changes
+              </div>
+              <div className="mt-2 space-y-1 text-[13px] text-white/75">
+                {lists.lateChanges.map((c, idx) => (
+                  <div key={`${c.team}-${idx}`}>
+                    <span className="text-white/60">{c.team}:</span> IN {c.in} • OUT {c.out}
+                    {c.note ? <span className="text-white/45"> — {c.note}</span> : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export default function MatchDetailOverlay({
+  match,
+  onClose,
+  ctaHref = "https://www.neekostats.com.au/sports/afl/ai-analysis",
+}: Props) {
+  const [mounted, setMounted] = useState(false);
+  React.useEffect(() => setMounted(true), []);
+
+  const isFinal = match?.status === "final";
+
+  const flow = useMemo(() => (match && isFinal ? computeGameFlow(match) : null), [match, isFinal]);
+
+  const stats = useMemo(() => {
+    if (!match?.teamStats || match.teamStats.length < 2) return null;
+    const home = match.teamStats[0];
+    const away = match.teamStats[1];
+    return { home, away };
+  }, [match]);
+
+  if (!match) return null;
+  if (!mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[80]">
+      {/* backdrop */}
+      <button
+        onClick={onClose}
+        className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+        aria-label="Close overlay"
+      />
+
+      {/* panel */}
+      <div className="absolute right-0 top-0 h-full w-full max-w-[520px] border-l border-white/10 bg-black/55 backdrop-blur-xl">
+        <div className="flex items-start justify-between gap-4 px-6 pb-4 pt-5">
+          <div>
+            <div className="text-[12px] text-white/45">
+              {match.roundLabel} · {prettyDateTime(match.dateISO, match.timeLocal)}
+            </div>
+            <div className="mt-2 text-[20px] font-semibold text-white">
+              {match.homeTeam} <span className="text-white/40">vs</span> {match.awayTeam}
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="rounded-md p-1.5 text-white/50 hover:text-white hover:bg-white/10"
+            className="rounded-xl border border-white/10 bg-white/[0.03] p-2 text-white/70 hover:bg-white/[0.06]"
+            aria-label="Close"
           >
-            <X size={16} />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* =========================== FINAL MATCH =========================== */}
-        {isFinal && (
-          <div className="space-y-6">
-            {/* RESULT SUMMARY */}
-            <section>
-              <div className="text-sm font-semibold mb-1">Final Result</div>
-              <div className="text-white/80">
-                {margin > 0
-                  ? `${match.homeTeam} def ${match.awayTeam} by ${margin}`
-                  : `${match.awayTeam} def ${match.homeTeam} by ${Math.abs(margin)}`}
-              </div>
-              <div className="mt-1 text-white/50 text-sm">
-                Final score: {match.homeScore} – {match.awayScore}
-              </div>
-            </section>
-
-            {/* GAME FLOW */}
-            {quarterResults.length > 0 && (
-              <section>
-                <div className="text-sm font-semibold mb-2">Game Flow</div>
-                <div className="text-sm text-white/70">
-                  {match.homeTeam} won {quarterResults.filter((q) => q.winner === match.homeTeam).length} quarters ·{" "}
-                  {match.awayTeam} won {quarterResults.filter((q) => q.winner === match.awayTeam).length}
+        <div className="h-[calc(100%-76px)] overflow-auto px-6 pb-10">
+          {/* UPCOMING */}
+          {!isFinal && match.preview ? (
+            <>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4">
+                <div className="text-[13px] font-semibold text-white">Match Preview</div>
+                <div className="mt-1 text-[13px] text-white/55">
+                  This is a pre-game preview — results and team stats will appear after the match.
                 </div>
-              </section>
-            )}
-
-            {/* KEY SWING */}
-            {decisiveQuarter && decisiveQuarter.delta >= 6 && (
-              <section>
-                <div className="text-sm font-semibold mb-1">Key Swing</div>
-                <div className="text-sm text-white/70">
-                  {decisiveQuarter.winner} +{decisiveQuarter.delta} in {decisiveQuarter.label}
-                </div>
-              </section>
-            )}
-
-            {/* TEAM PERFORMANCE (bars + ghost line + deltas + winner highlight) */}
-            {perfRows.length > 0 && (
-              <section>
-                <div className="text-sm font-semibold mb-3">Team Performance</div>
-
-                <div className="space-y-3">
-                  {perfRows.map((r) => {
-                    const max = Math.max(r.home, r.away, r.leagueAvg ?? 0, 1);
-                    const homePct = (r.home / max) * 100;
-                    const awayPct = (r.away / max) * 100;
-                    const avgPct = r.leagueAvg !== undefined ? (r.leagueAvg / max) * 100 : null;
-
-                    // display delta as “home vs away” but reflect lower-better too
-                    const rawDelta = r.home - r.away;
-                    const deltaDisplay = r.higherBetter ? rawDelta : -rawDelta;
-
-                    return (
-                      <div key={r.label} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                        <div className="flex items-center justify-between text-[11px] text-white/55 mb-2">
-                          <div className="uppercase tracking-wide">{r.label}</div>
-                          <div className="tabular-nums">{fmtDelta(deltaDisplay)}</div>
-                        </div>
-
-                        <div className="grid grid-cols-[56px_1fr_56px] items-center gap-3">
-                          <div className={cx("text-sm tabular-nums", r.homeBetter && "text-emerald-200 font-semibold")}>
-                            {r.home}
-                          </div>
-
-                          <div className="relative h-2 rounded-full bg-white/10 overflow-hidden">
-                            {/* league avg ghost line */}
-                            {avgPct !== null && (
-                              <div
-                                className="absolute top-0 h-full w-[2px] bg-white/25"
-                                style={{ left: `${avgPct}%` }}
-                              />
-                            )}
-
-                            {/* home fill */}
-                            <div
-                              className={cx(
-                                "absolute left-0 top-0 h-full",
-                                r.homeBetter ? "bg-emerald-400/80" : "bg-emerald-400/35"
-                              )}
-                              style={{ width: `${homePct}%` }}
-                            />
-                            {/* away fill (overlay from right to show split) */}
-                            <div
-                              className={cx(
-                                "absolute right-0 top-0 h-full",
-                                r.awayBetter ? "bg-amber-400/70" : "bg-amber-400/30"
-                              )}
-                              style={{ width: `${awayPct}%` }}
-                            />
-                          </div>
-
-                          <div
-                            className={cx(
-                              "text-sm tabular-nums text-right",
-                              r.awayBetter && "text-amber-200 font-semibold"
-                            )}
-                          >
-                            {r.away}
-                          </div>
-                        </div>
-
-                        <div className="mt-2 flex items-center justify-between text-[11px] text-white/40">
-                          <div>{match.homeTeam}</div>
-                          <div>{match.awayTeam}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
-            {/* TOP FANTASY (small) */}
-            {match.topFantasy?.length ? (
-              <section>
-                <div className="text-sm font-semibold mb-2">Top Fantasy</div>
-                <div className="space-y-3 text-sm">
-                  {match.topFantasy.map((team) => (
-                    <div key={team.team}>
-                      <div className="text-white/60 mb-1">{team.team}</div>
-                      <div className="text-white/80 leading-relaxed">
-                        {team.players.map((p) => `${p.name} ${p.fantasy}`).join(" · ")}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
-            {/* CONTEXT */}
-            <section>
-              <div className="text-sm font-semibold mb-2">Context</div>
-              <div className="text-sm text-white/60 space-y-1">
-                <div>Venue: {match.venue}</div>
-                {match.crowd && <div>Crowd: {match.crowd.toLocaleString()}</div>}
-                <div>Round: {match.roundLabel}</div>
               </div>
-            </section>
-          </div>
-        )}
 
-        {/* =========================== UPCOMING MATCH ========================= */}
-        {!isFinal && (
-          <div className="space-y-6">
-            <section>
-              <div className="text-sm font-semibold mb-1">Match Preview</div>
-              <div className="text-sm text-white/60">
-                This is a pre-game preview — results and team stats will appear after the match.
-              </div>
-            </section>
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4">
+                <div className="text-[13px] font-semibold text-white">Win Probability</div>
 
-            {/* WIN PROB + REASONS */}
-            {match.preview && (
-              <section>
-                <div className="text-sm font-semibold mb-2">Win Probability</div>
-
-                <div className="flex justify-between text-sm text-white/70 mb-2">
+                <div className="mt-3 flex items-center justify-between text-[13px] text-white/65">
                   <div>
                     {match.homeTeam}{" "}
-                    <span className="text-white tabular-nums">{match.preview.homeWinProb}%</span>
+                    <span className="font-semibold text-white">
+                      {match.preview.homeWinProb}%
+                    </span>
                   </div>
-                  <div className="text-right">
+                  <div>
                     {match.awayTeam}{" "}
-                    <span className="text-white tabular-nums">{match.preview.awayWinProb}%</span>
+                    <span className="font-semibold text-white">
+                      {match.preview.awayWinProb}%
+                    </span>
                   </div>
                 </div>
 
-                <div className="relative h-2 rounded-full bg-white/10 overflow-hidden">
+                <div className="mt-2 h-3 overflow-hidden rounded-full bg-white/10">
                   <div
-                    className="absolute left-0 top-0 h-full bg-amber-400"
+                    className="h-3 bg-amber-400/80"
                     style={{ width: `${match.preview.homeWinProb}%` }}
                   />
                 </div>
 
-                <div className="mt-3 space-y-1 text-sm text-white/65">
+                <div className="mt-3 space-y-2 text-[13px] text-white/55">
                   <div>{match.preview.reasons[0]}</div>
                   <div>{match.preview.reasons[1]}</div>
                 </div>
-              </section>
-            )}
+              </div>
 
-            {/* FORM & LADDER */}
-            {match.preview?.last5 && match.preview.ladderPos && (
-              <section className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-sm font-semibold">Form & Ladder</div>
-                  <div className="text-xs text-white/40">last 5</div>
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-[13px] font-semibold text-white">Form & Ladder</div>
+                  <div className="text-[12px] text-white/45">last 5</div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-sm text-white/80">{match.homeTeam}</div>
-                    <div className="text-xs text-white/40">Ladder: #{match.preview.ladderPos.home}</div>
-                    <div className="mt-2 flex gap-1">{match.preview.last5.home.map((v, i) => (
-                      <span
-                        key={i}
-                        className={cx(
-                          "inline-flex items-center justify-center h-5 w-5 rounded-md text-[10px] font-semibold",
-                          v === "W" ? "bg-emerald-500/15 text-emerald-200" : "bg-rose-500/15 text-rose-200"
-                        )}
-                      >
-                        {v}
-                      </span>
-                    ))}</div>
+                <div className="mt-3 grid grid-cols-2 gap-4">
+                  <div className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
+                    <div className="text-[13px] font-semibold text-white">{match.homeTeam}</div>
+                    <div className="mt-1 text-[12px] text-white/45">
+                      Ladder: #{match.preview.ladderPos.home}
+                    </div>
+                    <div className="mt-2 flex gap-1.5">
+                      {match.preview.last5.home.map((x, i) => (
+                        <div
+                          key={`h-${i}`}
+                          className={cx(
+                            "h-6 w-6 rounded-full grid place-items-center text-[11px] font-semibold",
+                            x === "W"
+                              ? "bg-emerald-500/20 text-emerald-200"
+                              : "bg-rose-500/20 text-rose-200"
+                          )}
+                        >
+                          {x}
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="text-right">
-                    <div className="text-sm text-white/80">{match.awayTeam}</div>
-                    <div className="text-xs text-white/40">Ladder: #{match.preview.ladderPos.away}</div>
-                    <div className="mt-2 flex gap-1 justify-end">{match.preview.last5.away.map((v, i) => (
-                      <span
-                        key={i}
-                        className={cx(
-                          "inline-flex items-center justify-center h-5 w-5 rounded-md text-[10px] font-semibold",
-                          v === "W" ? "bg-emerald-500/15 text-emerald-200" : "bg-rose-500/15 text-rose-200"
-                        )}
-                      >
-                        {v}
-                      </span>
-                    ))}</div>
+                  <div className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3 text-right">
+                    <div className="text-[13px] font-semibold text-white">{match.awayTeam}</div>
+                    <div className="mt-1 text-[12px] text-white/45">
+                      Ladder: #{match.preview.ladderPos.away}
+                    </div>
+                    <div className="mt-2 flex justify-end gap-1.5">
+                      {match.preview.last5.away.map((x, i) => (
+                        <div
+                          key={`a-${i}`}
+                          className={cx(
+                            "h-6 w-6 rounded-full grid place-items-center text-[11px] font-semibold",
+                            x === "W"
+                              ? "bg-emerald-500/20 text-emerald-200"
+                              : "bg-rose-500/20 text-rose-200"
+                          )}
+                        >
+                          {x}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </section>
-            )}
+              </div>
 
-            {/* TEAM LISTS (overlay only) */}
-            {match.teamLists && (
-              <section>
-                <button
-                  type="button"
-                  onClick={() => setShowLists((s) => !s)}
-                  className="w-full flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
+              <div className="mt-4">
+                <TeamListsBlock match={match} />
+              </div>
+
+              <div className="mt-5">
+                <a
+                  href={ctaHref}
+                  className={cx(
+                    "block w-full rounded-2xl bg-amber-400 px-5 py-4 text-center",
+                    "text-[14px] font-semibold text-black shadow-[0_18px_50px_rgba(0,0,0,0.35)]",
+                    "hover:bg-amber-300 transition-colors"
+                  )}
                 >
-                  <div>
-                    <div className="text-sm font-semibold">Team Lists</div>
-                    <div className="text-xs text-white/45">
-                      {match.teamLists.announced ? "Announced" : "Not yet announced"}
-                    </div>
+                  Open AI Match Analysis →
+                </a>
+              </div>
+
+              <div className="mt-4 text-[12px] text-white/45">
+                Context
+                <div className="mt-1">Venue: {match.venue}</div>
+                <div className="mt-0.5">
+                  Round: {match.roundLabel === "OR" ? "Opening Round" : match.roundLabel}
+                </div>
+              </div>
+            </>
+          ) : null}
+
+          {/* FINAL */}
+          {isFinal ? (
+            <>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4">
+                <div className="text-[13px] font-semibold text-white">Final Result</div>
+                <div className="mt-2 text-[13px] text-white/65">{resultLine(match)}</div>
+                <div className="mt-1 text-[13px] text-white/45">
+                  Final score: {match.homeScore ?? 0} – {match.awayScore ?? 0}
+                </div>
+              </div>
+
+              {flow ? (
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4">
+                  <div className="text-[13px] font-semibold text-white">Game Flow</div>
+                  <div className="mt-2 text-[13px] text-white/55">
+                    {match.homeTeam} won {flow.won.home} quarters · {match.awayTeam} won{" "}
+                    {flow.won.away}{" "}
+                    {flow.won.draw ? `· ${flow.won.draw} drawn` : ""}
                   </div>
-                  <ChevronDown className={cx("h-4 w-4 text-white/50 transition-transform", showLists && "rotate-180")} />
-                </button>
 
-                {showLists && (
-                  <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-4">
-                    {!match.teamLists.announced && (
-                      <div className="mb-3 text-xs text-white/50">
-                        {match.teamLists.caption ?? "Not yet announced — projected club list"}
-                      </div>
-                    )}
+                  <div className="mt-2 text-[13px] text-white/45">
+                    Key swing: {flow.swing} ({flow.swingDelta} pts)
+                  </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <div className="text-sm font-semibold mb-2">{match.homeTeam}</div>
-                        <ul className="text-sm text-white/70 space-y-1">
-                          {match.teamLists.home.map((p) => (
-                            <li key={p} className="flex items-center justify-between">
-                              <span>{p}</span>
-                              {match.teamLists.homeBench?.includes(p) ? (
-                                <span className="ml-2 text-[10px] rounded bg-white/10 px-1.5 py-0.5 text-white/60">
-                                  B
-                                </span>
-                              ) : null}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      <div>
-                        <div className="text-sm font-semibold mb-2">{match.awayTeam}</div>
-                        <ul className="text-sm text-white/70 space-y-1">
-                          {match.teamLists.away.map((p) => (
-                            <li key={p} className="flex items-center justify-between">
-                              <span>{p}</span>
-                              {match.teamLists.awayBench?.includes(p) ? (
-                                <span className="ml-2 text-[10px] rounded bg-white/10 px-1.5 py-0.5 text-white/60">
-                                  B
-                                </span>
-                              ) : null}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                  {flow.leadAfterQ.length ? (
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-[12px] text-white/50">
+                      {flow.leadAfterQ.map((txt, i) => (
+                        <div key={`lead-${i}`} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+                          After Q{i + 1}: <span className="text-white/70">{txt}</span>
+                        </div>
+                      ))}
                     </div>
+                  ) : null}
+                </div>
+              ) : null}
 
-                    {match.teamLists.lateChanges?.length ? (
-                      <div className="mt-4 border-t border-white/10 pt-3">
-                        <div className="text-xs text-white/45 uppercase tracking-wide mb-2">Late Changes</div>
-                        <div className="space-y-2 text-sm text-white/70">
-                          {match.teamLists.lateChanges.map((c, idx) => (
-                            <div key={idx} className="rounded-lg bg-white/[0.04] px-3 py-2">
-                              <span className="text-white/80">{c.team}:</span>{" "}
-                              <span className="text-emerald-200">{c.in}</span>
-                              {c.out ? (
-                                <>
-                                  {" "}
-                                  <span className="text-white/40">for</span>{" "}
-                                  <span className="text-rose-200">{c.out}</span>
-                                </>
-                              ) : null}
-                              {c.note ? <span className="text-white/40"> · {c.note}</span> : null}
-                            </div>
-                          ))}
+              {stats ? (
+                <div className="mt-4">
+                  <div className="mb-2 text-[13px] font-semibold text-white">
+                    Team Performance
+                  </div>
+
+                  <div className="space-y-3">
+                    {stats.home.stats.map((s, idx) => {
+                      const awayLine = stats.away.stats[idx];
+                      return (
+                        <StatRow
+                          key={`${s.label}-${idx}`}
+                          label={s.label}
+                          home={s.value}
+                          away={awayLine?.value ?? 0}
+                          leagueAvg={s.leagueAvg}
+                          higherIsBetter={s.higherIsBetter}
+                          homeTeam={stats.home.team}
+                          awayTeam={stats.away.team}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {match.topFantasy ? (
+                <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4">
+                  <div className="text-[13px] font-semibold text-white">Top Fantasy</div>
+                  <div className="mt-3 space-y-3 text-[13px] text-white/70">
+                    {match.topFantasy.map((t) => (
+                      <div key={t.team}>
+                        <div className="text-[12px] uppercase tracking-wide text-white/45">
+                          {t.team}
+                        </div>
+                        <div className="mt-1">
+                          {t.players
+                            .map((p) => `${p.name} ${p.fantasy}`)
+                            .join(" · ")}
                         </div>
                       </div>
-                    ) : null}
+                    ))}
                   </div>
-                )}
-              </section>
-            )}
+                </div>
+              ) : null}
 
-            {/* CONTEXT */}
-            <section>
-              <div className="text-sm font-semibold mb-2">Context</div>
-              <div className="text-sm text-white/60 space-y-1">
-                <div>Venue: {match.venue}</div>
-                <div>Round: {match.roundLabel}</div>
+              <div className="mt-5">
+                <a
+                  href={ctaHref}
+                  className={cx(
+                    "block w-full rounded-2xl bg-amber-400 px-5 py-4 text-center",
+                    "text-[14px] font-semibold text-black shadow-[0_18px_50px_rgba(0,0,0,0.35)]",
+                    "hover:bg-amber-300 transition-colors"
+                  )}
+                >
+                  Open AI Match Analysis →
+                </a>
               </div>
-            </section>
-          </div>
-        )}
 
-        {/* CTA */}
-        <div className="mt-8">
-          <a
-            href="https://www.neekostats.com.au/sports/afl/ai-analysis"
-            className="block w-full rounded-lg bg-amber-400 text-black text-sm font-semibold py-3 text-center hover:bg-amber-300 transition-colors"
-          >
-            Open AI Match Analysis →
-          </a>
+              <div className="mt-4 text-[12px] text-white/45">
+                Context
+                <div className="mt-1">Venue: {match.venue}</div>
+                {match.crowd ? (
+                  <div className="mt-0.5">Crowd: {match.crowd.toLocaleString()}</div>
+                ) : null}
+                <div className="mt-0.5">Round: {match.roundLabel}</div>
+              </div>
+            </>
+          ) : null}
         </div>
-      </aside>
-    </div>
+      </div>
+    </div>,
+    document.body
   );
 }
