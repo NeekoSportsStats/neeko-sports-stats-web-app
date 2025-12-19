@@ -26,21 +26,35 @@ export default function MatchList({ matches, onSelectMatch }: Props) {
 
   return (
     <div className="space-y-6">
-      {Object.entries(grouped).map(([day, dayMatches]) => (
-        <div key={day} className="space-y-3">
-          <div className="text-sm font-semibold text-white/70">
-            {day}
-          </div>
+      {Object.entries(grouped).map(([day, dayMatches]) => {
+        const finals = dayMatches.filter(
+          (m) => m.status === "final"
+        ).length;
 
-          {dayMatches.map((match) => (
-            <MatchCard
-              key={match.id}
-              match={match}
-              onClick={() => onSelectMatch(match)}
-            />
-          ))}
-        </div>
-      ))}
+        return (
+          <div key={day} className="space-y-3">
+            {/* Sticky day header */}
+            <div className="sticky top-[72px] z-10 bg-[#0b0b0b] py-1">
+              <div className="flex items-end justify-between">
+                <div className="text-sm font-semibold text-white/70">
+                  {day}
+                </div>
+                <div className="text-[11px] text-white/40">
+                  {dayMatches.length} matches · {finals} final
+                </div>
+              </div>
+            </div>
+
+            {dayMatches.map((match) => (
+              <MatchCard
+                key={match.id}
+                match={match}
+                onClick={() => onSelectMatch(match)}
+              />
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
