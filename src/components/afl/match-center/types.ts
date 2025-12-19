@@ -1,79 +1,62 @@
+// src/components/afl/match-center/types.ts
+
 export type MatchStatus = "upcoming" | "final";
 
-/* -------------------------------------------------------------------------- */
-/* TEAM STATS TYPES                                                           */
-/* -------------------------------------------------------------------------- */
+export type FixtureQuarter = {
+  label: "Q1" | "Q2" | "Q3" | "Q4";
+  home: number;
+  away: number;
+};
 
-export type MatchStat = {
+export type TeamStatLine = {
   label: string;
   value: number;
-  leagueAvg?: number; // used for ghost line
-  higherIsBetter?: boolean; // used for winner tinting when comparing two teams
+  /** Optional league average for a ghost marker line */
+  leagueAvg?: number;
+  /** If false, lower is better (e.g. Turnovers). Default true */
+  higherIsBetter?: boolean;
 };
 
 export type MatchTeamStats = {
   team: string;
-  stats: MatchStat[];
+  stats: TeamStatLine[];
 };
 
-/* -------------------------------------------------------------------------- */
-/* TOP FANTASY TYPES                                                          */
-/* -------------------------------------------------------------------------- */
-
-export type TopFantasyPlayer = {
+export type FantasyPlayer = {
   name: string;
   fantasy: number;
 };
 
 export type TopFantasyTeam = {
   team: string;
-  players: TopFantasyPlayer[];
-};
-
-/* -------------------------------------------------------------------------- */
-/* TEAM LISTS / SQUADS TYPES                                                   */
-/* -------------------------------------------------------------------------- */
-
-export type LateChange = {
-  team: string;
-  in: string;
-  out: string;
-  note?: string;
+  players: FantasyPlayer[];
 };
 
 export type TeamLists = {
+  /** If false, we show the full club list as “Not yet announced (projected)” */
   announced: boolean;
-  caption: string;
+  caption?: string;
 
-  // if not announced, these are full club lists
+  /** Usually 22 when announced; can be full list when not announced */
   home: string[];
   away: string[];
 
-  // if announced, these are selected squads
+  /** Optional bench labels (subset of home/away) */
   homeBench?: string[];
   awayBench?: string[];
 
-  lateChanges?: LateChange[];
+  /** Optional change notes (purely mock for now) */
+  lateChanges?: { team: string; in: string; out?: string; note?: string }[];
+  insOuts?: { team: string; ins: string[]; outs: string[] }[];
 };
-
-/* -------------------------------------------------------------------------- */
-/* MATCH PREVIEW TYPES                                                         */
-/* -------------------------------------------------------------------------- */
 
 export type MatchPreview = {
-  homeWinProb: number;
-  awayWinProb: number;
-  reasons: [string, string];
-  ladderPos: { home: number; away: number };
-  last5: {
-    home: ("W" | "L")[];
-    away: ("W" | "L")[];
-  };
+  homeWinProb: number; // 0-100
+  awayWinProb: number; // 0-100
+  reasons: [string, string]; // exactly 2 lines
+  ladderPos?: { home: number; away: number };
+  last5?: { home: ("W" | "L")[]; away: ("W" | "L")[] };
 };
-
-/* -------------------------------------------------------------------------- */
-/* FIXTURE MATCH                                                               */
-/* -------------------------------------------------------------------------- */
 
 export type FixtureMatch = {
   id: string;
@@ -99,39 +82,28 @@ export type FixtureMatch = {
   homeScore?: number;
   awayScore?: number;
 
-  quarters?: {
-    label: string;
-    home: number;
-    away: number;
-  }[];
+  quarters?: FixtureQuarter[];
 
   crowd?: number;
 
-  /** Past-game enrichments */
-  teamStats?: MatchTeamStats[];
-  topFantasy?: TopFantasyTeam[];
-
-  /** Future-game enrichments */
-  preview?: MatchPreview;
-  teamLists?: TeamLists;
-
-  /** Optional legacy hook (safe to keep) */
+  /** Optional: existing (kept) */
   topPlayers?: {
     home: string[];
     away: string[];
   };
-};
 
-/* -------------------------------------------------------------------------- */
-/* LADDER ROW                                                                  */
-/* -------------------------------------------------------------------------- */
+  /** Post-match ladder movement (optional) */
+  ladderDelta?: { team: string; delta: number }[];
 
-export type LadderRow = {
-  pos: number;
-  team: string;
-  played: number;
-  wins: number;
-  losses: number;
-  draws: number;
-  percentage: number;
+  /** FINAL: team stats shown in overlay */
+  teamStats?: MatchTeamStats[];
+
+  /** FINAL: top 3 fantasy performers per team (card + overlay optional) */
+  topFantasy?: TopFantasyTeam[];
+
+  /** UPCOMING: squads & lists (overlay only) */
+  teamLists?: TeamLists;
+
+  /** UPCOMING: win probability + reasons + ladder + last5 */
+  preview?: MatchPreview;
 };
