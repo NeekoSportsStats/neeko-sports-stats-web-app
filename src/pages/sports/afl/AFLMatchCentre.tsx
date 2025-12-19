@@ -36,8 +36,6 @@ function kickoffMs(m: FixtureMatch) {
 function defaultRoundForSeason(season: Season): string {
   const inSeason = MOCK_FIXTURES.filter((m) => m.season === season);
 
-  // prefer earliest upcoming (so offseason defaults to next season OR),
-  // but if there are no upcoming games, fall back to last final.
   const now = Date.now();
   const upcoming = inSeason
     .filter((m) => kickoffMs(m) >= now && m.status !== "final")
@@ -61,10 +59,13 @@ export default function AFLMatchCentre() {
   const [roundLabel, setRoundLabel] = useState<string>("OR");
   const [selectedMatch, setSelectedMatch] = useState<FixtureMatch | null>(null);
 
-  // initialise default season/round
+  /* ------------------------------------------------------------------------ */
+  /* INITIAL DEFAULT                                                          */
+  /* ------------------------------------------------------------------------ */
+
   useEffect(() => {
-    // pick the season containing the next upcoming match, else last final season
     const now = Date.now();
+
     const nextUpcoming = MOCK_FIXTURES
       .filter((m) => kickoffMs(m) >= now && m.status !== "final")
       .sort((a, b) => kickoffMs(a) - kickoffMs(b))[0];
@@ -75,7 +76,6 @@ export default function AFLMatchCentre() {
       return;
     }
 
-    // fallback: most recent final
     const lastFinal = MOCK_FIXTURES
       .filter((m) => m.status === "final")
       .sort((a, b) => kickoffMs(b) - kickoffMs(a))[0];
@@ -86,17 +86,26 @@ export default function AFLMatchCentre() {
     }
   }, []);
 
-  // when season toggles, choose best round for that season
+  /* ------------------------------------------------------------------------ */
+  /* SEASON CHANGE HANDLING                                                   */
+  /* ------------------------------------------------------------------------ */
+
   useEffect(() => {
     setRoundLabel((prev) => {
-      // if same label exists, keep it; otherwise pick default
       if (ROUND_LABELS.includes(prev)) return prev;
       return defaultRoundForSeason(season);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [season]);
 
-  const roundNumber = useMemo(() => roundNumberFromLabel(roundLabel), [roundLabel]);
+  const roundNumber = useMemo(
+    () => roundNumberFromLabel(roundLabel),
+    [roundLabel]
+  );
+
+  /* ------------------------------------------------------------------------ */
+  /* MATCH FILTERING                                                          */
+  /* ------------------------------------------------------------------------ */
 
   const matchesForRound = useMemo(() => {
     return MOCK_FIXTURES
@@ -104,16 +113,53 @@ export default function AFLMatchCentre() {
       .sort((a, b) => kickoffMs(a) - kickoffMs(b));
   }, [season, roundNumber]);
 
-  const ladderRows = useMemo(() => {
-    return getMockLadderRows(season, roundNumber);
-  }, [season, roundNumber]);
+  /**
+   * 🔒 SAFETY NET:
+   * If a round has no matches (e.g. 2025 R18),
+   * fall back to the nearest available round instead of rendering nothing.
+   */
+  const safeMatchesForRound = useMemo(() => {
+    if (matchesForRound.length > 0) return matchesForRound;
 
-  const ladderAsOf = useMemo(() => getLadderAsOfLabel(season, roundNumber), [season, roundNumber]);
+    const sameSeason = MOCK_FIXTURES.filter((m) => m.season === season);
+    if (!sameSeason.length) return [];
+
+    const availableRounds = Array.from(
+      new Set(sameSeason.map((m) => m.roundNumber))
+    ).sort((a, b) => a - b);
+
+    const nearest = availableRounds.reduce((prev, curr) =>
+      Math.abs(curr - roundNumber) < Math.abs(prev - roundNumber) ? curr : prev
+    );
+
+    return sameSeason
+      .filter((m) => m.roundNumber === nearest)
+      .sort((a, b) => kickoffMs(a) - kickoffMs(b));
+  }, [matchesForRound, season, roundNumber]);
+
+  /* ------------------------------------------------------------------------ */
+  /* LADDER                                                                   */
+  /* ------------------------------------------------------------------------ */
+
+  const ladderRows = useMemo(
+    () => getMockLadderRows(season, roundNumber),
+    [season, roundNumber]
+  );
+
+  const ladderAsOf = useMemo(
+    () => getLadderAsOfLabel(season, roundNumber),
+    [season, roundNumber]
+  );
 
   const tipText = useMemo(() => {
-    if (season === 2026 && roundLabel === "OR") return "Tip: 2026 OR is the default preview state.";
+    if (season === 2026 && roundLabel === "OR")
+      return "Tip: 2026 OR is the default preview state.";
     return "Choose a year, then select a round.";
   }, [season, roundLabel]);
+
+  /* ------------------------------------------------------------------------ */
+  /* RENDER                                                                   */
+  /* ------------------------------------------------------------------------ */
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-14 pt-10">
@@ -130,34 +176,23 @@ export default function AFLMatchCentre() {
 
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-1">
               <div className="flex gap-1">
-                <button
-                  onClick={() => {
-                    setSeason(2025);
-                    setRoundLabel(defaultRoundForSeason(2025));
-                  }}
-                  className={cx(
-                    "rounded-xl px-4 py-2 text-[13px] font-semibold transition-colors",
-                    season === 2025
-                      ? "bg-amber-400 text-black"
-                      : "text-white/65 hover:bg-white/5"
-                  )}
-                >
-                  2025
-                </button>
-                <button
-                  onClick={() => {
-                    setSeason(2026);
-                    setRoundLabel(defaultRoundForSeason(2026));
-                  }}
-                  className={cx(
-                    "rounded-xl px-4 py-2 text-[13px] font-semibold transition-colors",
-                    season === 2026
-                      ? "bg-amber-400 text-black"
-                      : "text-white/65 hover:bg-white/5"
-                  )}
-                >
-                  2026
-                </button>
+                {[2025, 2026].map((yr) => (
+                  <button
+                    key={yr}
+                    onClick={() => {
+                      setSeason(yr as Season);
+                      setRoundLabel(defaultRoundForSeason(yr as Season));
+                    }}
+                    className={cx(
+                      "rounded-xl px-4 py-2 text-[13px] font-semibold transition-colors",
+                      season === yr
+                        ? "bg-amber-400 text-black"
+                        : "text-white/65 hover:bg-white/5"
+                    )}
+                  >
+                    {yr}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -168,7 +203,9 @@ export default function AFLMatchCentre() {
                 <div className="text-[14px] font-semibold text-white">Round</div>
                 <div className="mt-1 text-[12px] text-white/45">{tipText}</div>
               </div>
-              <div className="text-[12px] text-white/40">{roundDisplay(roundLabel)}</div>
+              <div className="text-[12px] text-white/40">
+                {roundDisplay(roundLabel)}
+              </div>
             </div>
 
             <div className="mt-3 overflow-x-auto pb-1">
@@ -198,7 +235,11 @@ export default function AFLMatchCentre() {
 
       {/* Main grid */}
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_360px]">
-        <MatchList matches={matchesForRound} onSelectMatch={setSelectedMatch} groupByDay />
+        <MatchList
+          matches={safeMatchesForRound}
+          onSelectMatch={setSelectedMatch}
+          groupByDay
+        />
 
         <div className="lg:sticky lg:top-24">
           <LadderSnapshot rows={ladderRows} asOf={ladderAsOf} />
@@ -206,7 +247,10 @@ export default function AFLMatchCentre() {
       </div>
 
       {/* Overlay */}
-      <MatchDetailOverlay match={selectedMatch} onClose={() => setSelectedMatch(null)} />
+      <MatchDetailOverlay
+        match={selectedMatch}
+        onClose={() => setSelectedMatch(null)}
+      />
     </div>
   );
 }
