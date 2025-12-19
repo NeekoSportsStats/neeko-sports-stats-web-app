@@ -1,256 +1,57 @@
-// src/pages/sports/afl/AFLMatchCentre.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
+
+import MatchCenterHeader from "@/components/afl/match-center/MatchCenterHeader";
 import MatchList from "@/components/afl/match-center/MatchList";
-import MatchDetailOverlay from "@/components/afl/match-center/MatchDetailOverlay";
 import LadderSnapshot from "@/components/afl/match-center/LadderSnapshot";
-import type { FixtureMatch, Season } from "@/components/afl/match-center/types";
-import {
-  MOCK_FIXTURES,
-  getMockLadderRows,
-  getLadderAsOfLabel,
-} from "@/components/afl/match-center/mockData";
+import MatchCenterCTA from "@/components/afl/match-center/MatchCenterCTA";
+import MatchDetailOverlay from "@/components/afl/match-center/MatchDetailOverlay";
 
-const cx = (...c: Array<string | false | undefined | null>) =>
-  c.filter(Boolean).join(" ");
-
-/* -------------------------------------------------------------------------- */
-/* ROUND LABELS                                                               */
-/* -------------------------------------------------------------------------- */
-
-const ROUND_LABELS = ["OR", ...Array.from({ length: 23 }, (_, i) => `R${i + 1}`)];
-
-function roundNumberFromLabel(label: string) {
-  if (label === "OR") return 0;
-  const n = Number(label.replace("R", ""));
-  return Number.isFinite(n) ? n : 0;
-}
-
-function roundDisplay(label: string) {
-  return label === "OR" ? "Opening Round" : `Round ${roundNumberFromLabel(label)}`;
-}
-
-function kickoffMs(m: FixtureMatch) {
-  return new Date(`${m.dateISO}T${m.timeLocal}:00`).getTime();
-}
-
-function defaultRoundForSeason(season: Season): string {
-  const inSeason = MOCK_FIXTURES.filter((m) => m.season === season);
-
-  const now = Date.now();
-  const upcoming = inSeason
-    .filter((m) => kickoffMs(m) >= now && m.status !== "final")
-    .sort((a, b) => kickoffMs(a) - kickoffMs(b))[0];
-
-  if (upcoming) return upcoming.roundLabel;
-
-  const lastFinal = inSeason
-    .filter((m) => m.status === "final")
-    .sort((a, b) => b.roundNumber - a.roundNumber)[0];
-
-  return lastFinal?.roundLabel ?? "OR";
-}
-
-/* -------------------------------------------------------------------------- */
-/* PAGE                                                                       */
-/* -------------------------------------------------------------------------- */
+import { MOCK_FIXTURES, getMockLadder, MOCK_LADDER_TOP16 } from "@/components/afl/match-center/mockData";
+import type { FixtureMatch } from "@/components/afl/match-center/types";
 
 export default function AFLMatchCentre() {
-  const [season, setSeason] = useState<Season>(2026);
-  const [roundLabel, setRoundLabel] = useState<string>("OR");
-  const [selectedMatch, setSelectedMatch] = useState<FixtureMatch | null>(null);
+  const [activeMatch, setActiveMatch] = useState<FixtureMatch | null>(null);
 
-  /* ------------------------------------------------------------------------ */
-  /* INITIAL DEFAULT                                                          */
-  /* ------------------------------------------------------------------------ */
-
-  useEffect(() => {
-    const now = Date.now();
-
-    const nextUpcoming = MOCK_FIXTURES
-      .filter((m) => kickoffMs(m) >= now && m.status !== "final")
-      .sort((a, b) => kickoffMs(a) - kickoffMs(b))[0];
-
-    if (nextUpcoming) {
-      setSeason(nextUpcoming.season);
-      setRoundLabel(nextUpcoming.roundLabel);
-      return;
-    }
-
-    const lastFinal = MOCK_FIXTURES
-      .filter((m) => m.status === "final")
-      .sort((a, b) => kickoffMs(b) - kickoffMs(a))[0];
-
-    if (lastFinal) {
-      setSeason(lastFinal.season);
-      setRoundLabel(lastFinal.roundLabel);
-    }
-  }, []);
-
-  /* ------------------------------------------------------------------------ */
-  /* SEASON CHANGE HANDLING                                                   */
-  /* ------------------------------------------------------------------------ */
-
-  useEffect(() => {
-    setRoundLabel((prev) => {
-      if (ROUND_LABELS.includes(prev)) return prev;
-      return defaultRoundForSeason(season);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [season]);
-
-  const roundNumber = useMemo(
-    () => roundNumberFromLabel(roundLabel),
-    [roundLabel]
+  // Default = 2026 Opening Round
+  const filtered = useMemo(
+    () =>
+      MOCK_FIXTURES.filter(
+        (m) => m.season === 2026 && m.roundNumber === 0
+      ),
+    []
   );
-
-  /* ------------------------------------------------------------------------ */
-  /* MATCH FILTERING                                                          */
-  /* ------------------------------------------------------------------------ */
-
-  const matchesForRound = useMemo(() => {
-    return MOCK_FIXTURES
-      .filter((m) => m.season === season && m.roundNumber === roundNumber)
-      .sort((a, b) => kickoffMs(a) - kickoffMs(b));
-  }, [season, roundNumber]);
-
-  /**
-   * 🔒 SAFETY NET:
-   * If a round has no matches (e.g. 2025 R18),
-   * fall back to the nearest available round instead of rendering nothing.
-   */
-  const safeMatchesForRound = useMemo(() => {
-    if (matchesForRound.length > 0) return matchesForRound;
-
-    const sameSeason = MOCK_FIXTURES.filter((m) => m.season === season);
-    if (!sameSeason.length) return [];
-
-    const availableRounds = Array.from(
-      new Set(sameSeason.map((m) => m.roundNumber))
-    ).sort((a, b) => a - b);
-
-    const nearest = availableRounds.reduce((prev, curr) =>
-      Math.abs(curr - roundNumber) < Math.abs(prev - roundNumber) ? curr : prev
-    );
-
-    return sameSeason
-      .filter((m) => m.roundNumber === nearest)
-      .sort((a, b) => kickoffMs(a) - kickoffMs(b));
-  }, [matchesForRound, season, roundNumber]);
-
-  /* ------------------------------------------------------------------------ */
-  /* LADDER                                                                   */
-  /* ------------------------------------------------------------------------ */
-
-  const ladderRows = useMemo(
-    () => getMockLadderRows(season, roundNumber),
-    [season, roundNumber]
-  );
-
-  const ladderAsOf = useMemo(
-    () => getLadderAsOfLabel(season, roundNumber),
-    [season, roundNumber]
-  );
-
-  const tipText = useMemo(() => {
-    if (season === 2026 && roundLabel === "OR")
-      return "Tip: 2026 OR is the default preview state.";
-    return "Choose a year, then select a round.";
-  }, [season, roundLabel]);
-
-  /* ------------------------------------------------------------------------ */
-  /* RENDER                                                                   */
-  /* ------------------------------------------------------------------------ */
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 pb-14 pt-10">
-      {/* Selector card */}
-      <div className="rounded-3xl border border-white/10 bg-white/[0.03] shadow-[0_40px_120px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-        <div className="px-6 pb-6 pt-6">
-          <div className="flex items-start justify-between gap-5">
-            <div>
-              <div className="text-[16px] font-semibold text-white">Season</div>
-              <div className="mt-1 text-[13px] text-white/45">
-                Choose a year, then select a round.
-              </div>
-            </div>
+    <div className="mx-auto max-w-6xl px-4 md:px-6 py-8">
+      <MatchCenterHeader />
 
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-1">
-              <div className="flex gap-1">
-                {[2025, 2026].map((yr) => (
-                  <button
-                    key={yr}
-                    onClick={() => {
-                      setSeason(yr as Season);
-                      setRoundLabel(defaultRoundForSeason(yr as Season));
-                    }}
-                    className={cx(
-                      "rounded-xl px-4 py-2 text-[13px] font-semibold transition-colors",
-                      season === yr
-                        ? "bg-amber-400 text-black"
-                        : "text-white/65 hover:bg-white/5"
-                    )}
-                  >
-                    {yr}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+        <div className="space-y-6">
+          <MatchList
+            matches={filtered}
+            onSelectMatch={setActiveMatch}
+          />
+          <MatchCenterCTA />
+        </div>
 
-          <div className="mt-6">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <div className="text-[14px] font-semibold text-white">Round</div>
-                <div className="mt-1 text-[12px] text-white/45">{tipText}</div>
-              </div>
-              <div className="text-[12px] text-white/40">
-                {roundDisplay(roundLabel)}
-              </div>
-            </div>
-
-            <div className="mt-3 overflow-x-auto pb-1">
-              <div className="flex min-w-max gap-2">
-                {ROUND_LABELS.map((lab) => {
-                  const active = lab === roundLabel;
-                  return (
-                    <button
-                      key={lab}
-                      onClick={() => setRoundLabel(lab)}
-                      className={cx(
-                        "rounded-full border px-3.5 py-1.5 text-[12px] transition-colors",
-                        active
-                          ? "border-amber-400/60 bg-amber-400/20 text-amber-200"
-                          : "border-white/10 bg-white/[0.02] text-white/60 hover:bg-white/[0.05]"
-                      )}
-                    >
-                      {lab}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+        <div className="hidden lg:block">
+          <LadderSnapshot
+            rows={MOCK_LADDER_TOP16}
+            highlightTeams={
+              activeMatch
+                ? [activeMatch.homeTeam, activeMatch.awayTeam]
+                : []
+            }
+          />
         </div>
       </div>
 
-      {/* Main grid */}
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_360px]">
-        <MatchList
-          matches={safeMatchesForRound}
-          onSelectMatch={setSelectedMatch}
-          groupByDay
+      {activeMatch && (
+        <MatchDetailOverlay
+          match={activeMatch}
+          onClose={() => setActiveMatch(null)}
         />
-
-        <div className="lg:sticky lg:top-24">
-          <LadderSnapshot rows={ladderRows} asOf={ladderAsOf} />
-        </div>
-      </div>
-
-      {/* Overlay */}
-      <MatchDetailOverlay
-        match={selectedMatch}
-        onClose={() => setSelectedMatch(null)}
-      />
+      )}
     </div>
   );
 }
