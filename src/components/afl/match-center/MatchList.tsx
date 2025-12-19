@@ -1,5 +1,6 @@
 import React from "react";
 import type { FixtureMatch } from "./types";
+import MatchCard from "./MatchCard";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
@@ -11,7 +12,6 @@ type Props = {
 
   /**
    * Optional — used by AFLMatchCentre
-   * (safe even if not implemented yet)
    */
   groupByDay?: boolean;
 };
@@ -25,31 +25,22 @@ export default function MatchList({
   onSelectMatch,
   groupByDay = false,
 }: Props) {
-  // NOTE:
-  // groupByDay is intentionally accepted but not yet used.
-  // This prevents breaking callers and allows future grouping logic.
+  if (!matches.length) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-white/50">
+        No matches scheduled for this round.
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-3">
-      {matches.map((m) => (
-        <button
-          key={m.id}
-          onClick={() => onSelectMatch(m)}
-          className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left transition hover:bg-white/[0.06]"
-        >
-          <div className="flex items-center justify-between gap-4">
-            <div className="text-[14px] font-medium text-white">
-              {m.homeTeam} vs {m.awayTeam}
-            </div>
-            <div className="text-[12px] text-white/50">
-              {m.timeLocal}
-            </div>
-          </div>
-
-          <div className="mt-1 text-[12px] text-white/40">
-            {m.venue}
-          </div>
-        </button>
+    <div className="space-y-4">
+      {matches.map((match) => (
+        <MatchCard
+          key={match.id}
+          match={match}
+          onClick={() => onSelectMatch(match)}
+        />
       ))}
     </div>
   );
