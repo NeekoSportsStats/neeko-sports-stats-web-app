@@ -5,7 +5,6 @@ import type {
   TeamLists,
   TopFantasyTeam,
   MatchPreview,
-  Season,
 } from "./types";
 
 /* -------------------------------------------------------------------------- */
@@ -52,10 +51,6 @@ function hashStringToSeed(s: string) {
     h = Math.imul(h, 16777619);
   }
   return h >>> 0;
-}
-
-function clamp(n: number, a: number, b: number) {
-  return Math.max(a, Math.min(b, n));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -158,45 +153,43 @@ function mockLast5(r: () => number): ("W" | "L")[] {
   return arr;
 }
 
-function buildPreview(
-  homeTeam: string,
-  awayTeam: string,
-  roundLabel: string
-): MatchPreview {
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
+}
+
+function buildPreview(homeTeam: string, awayTeam: string, roundLabel: string): MatchPreview {
   const r = mulberry32(hashStringToSeed(`${homeTeam}-${awayTeam}-${roundLabel}`));
 
+  // mock ladder pos: stable-ish per team
   const homePos = 1 + Math.floor(mulberry32(hashStringToSeed(homeTeam))() * 18);
   const awayPos = 1 + Math.floor(mulberry32(hashStringToSeed(awayTeam))() * 18);
 
-  const ladderEdge = clamp((awayPos - homePos) * 2.2, -12, 12);
+  // ladder edge → probability
+  const ladderEdge = clamp((awayPos - homePos) * 2.2, -12, 12); // + favors home
+
+  // small home advantage + noise
   const noise = (r() - 0.5) * 8;
   const homeProb = clamp(50 + ladderEdge + 2 + noise, 35, 65);
   const awayProb = 100 - homeProb;
 
+  const reasons: [string, string] = [
+    `${awayTeam} have the edge on ladder position and recent efficiency indicators.`,
+    `Expect the contest to be decided by clearance/inside-50 conversion rather than a blowout.`,
+  ];
+
   return {
     homeWinProb: Math.round(homeProb),
     awayWinProb: Math.round(awayProb),
-    reasons: [
-      `${awayTeam} have the edge on ladder position and recent efficiency indicators.`,
-      `Expect the contest to be decided by clearance/inside-50 conversion rather than a blowout.`,
-    ],
+    reasons,
     ladderPos: { home: homePos, away: awayPos },
     last5: {
-      home: mockLast5(
-        mulberry32(hashStringToSeed(`${homeTeam}-L5-${roundLabel}`))
-      ),
-      away: mockLast5(
-        mulberry32(hashStringToSeed(`${awayTeam}-L5-${roundLabel}`))
-      ),
+      home: mockLast5(mulberry32(hashStringToSeed(`${homeTeam}-L5-${roundLabel}`))),
+      away: mockLast5(mulberry32(hashStringToSeed(`${awayTeam}-L5-${roundLabel}`))),
     },
   };
 }
 
-function buildTeamLists(
-  home: string,
-  away: string,
-  announced: boolean
-): TeamLists {
+function buildTeamLists(home: string, away: string, announced: boolean): TeamLists {
   const homeAll = TEAM_ROSTERS[home] ?? [];
   const awayAll = TEAM_ROSTERS[away] ?? [];
 
@@ -209,6 +202,7 @@ function buildTeamLists(
     };
   }
 
+  // announced: pick 22 + bench subset
   const r = mulberry32(hashStringToSeed(`${home}-${away}-squad`));
   const pick = (arr: string[], n: number) => {
     const copy = arr.slice();
@@ -241,7 +235,7 @@ function buildTeamLists(
 }
 
 /* -------------------------------------------------------------------------- */
-/* MOCK TEAM STATS + TOP FANTASY                                               */
+/* MOCK TEAM STATS + TOP FANTASY                                                */
 /* -------------------------------------------------------------------------- */
 
 function buildTeamStats(
@@ -250,20 +244,19 @@ function buildTeamStats(
   homePts: number,
   awayPts: number
 ): MatchTeamStats[] {
-  const r = mulberry32(
-    hashStringToSeed(`${homeTeam}-${awayTeam}-${homePts}-${awayPts}`)
-  );
+  const r = mulberry32(hashStringToSeed(`${homeTeam}-${awayTeam}-${homePts}-${awayPts}`));
   const totalPts = homePts + awayPts;
 
   const make = (team: string, isHome: boolean) => {
     const pts = isHome ? homePts : awayPts;
     const share = pts / Math.max(1, totalPts);
 
+    // realistic-ish ranges
     const disposals = Math.round(340 + share * 90 + (r() - 0.5) * 18);
     const inside50 = Math.round(42 + share * 28 + (r() - 0.5) * 6);
     const clearances = Math.round(32 + share * 18 + (r() - 0.5) * 4);
     const contested = Math.round(120 + share * 55 + (r() - 0.5) * 10);
-    const turnovers = Math.round(58 + (1 - share) * 16 + (r() - 0.5) * 8);
+    const turnovers = Math.round(58 + (1 - share) * 16 + (r() - 0.5) * 8); // lower better
     const tackles = Math.round(52 + (1 - share) * 18 + (r() - 0.5) * 6);
 
     return {
@@ -276,16 +269,13 @@ function buildTeamStats(
         { label: "Turnovers", value: turnovers, leagueAvg: 63, higherIsBetter: false },
         { label: "Tackles", value: tackles, leagueAvg: 60, higherIsBetter: true },
       ],
-    };
+    } satisfies MatchTeamStats;
   };
 
   return [make(homeTeam, true), make(awayTeam, false)];
 }
 
-function buildTopFantasy(
-  homeTeam: string,
-  awayTeam: string
-): TopFantasyTeam[] {
+function buildTopFantasy(homeTeam: string, awayTeam: string): TopFantasyTeam[] {
   const rh = mulberry32(hashStringToSeed(`${homeTeam}-fantasy`));
   const ra = mulberry32(hashStringToSeed(`${awayTeam}-fantasy`));
 
@@ -295,7 +285,7 @@ function buildTopFantasy(
     for (let i = 0; i < 3; i++) {
       const idx = Math.floor(r() * roster.length);
       const name = roster.splice(idx, 1)[0] ?? `${team} Player ${i + 1}`;
-      const fantasy = Math.round(78 + r() * 42);
+      const fantasy = Math.round(78 + r() * 42); // 78–120
       out.push({ name, fantasy });
     }
     out.sort((a, b) => b.fantasy - a.fantasy);
@@ -309,74 +299,10 @@ function buildTopFantasy(
 }
 
 /* -------------------------------------------------------------------------- */
-/* ROUND-AWARE LADDER (MOCK)                                                   */
-/* -------------------------------------------------------------------------- */
-
-type LegacyLadderRow = { rank: number; team: string; record: string };
-
-const LADDER_BASE: string[] = [
-  "Sydney",
-  "Geelong",
-  "Brisbane",
-  "Carlton",
-  "Fremantle",
-  "Collingwood",
-  "Port Adelaide",
-  "Melbourne",
-  "GWS",
-  "Adelaide",
-  "Richmond",
-  "Western Bulldogs",
-  "Essendon",
-  "St Kilda",
-  "Gold Coast",
-  "Hawthorn",
-  "North Melbourne",
-  "West Coast",
-];
-
-function buildLegacyRecord(w: number, l: number) {
-  return `${w}-${l}`;
-}
-
-export function getMockLadder(
-  season: Season,
-  roundNumber: number
-): LegacyLadderRow[] {
-  const r = mulberry32(hashStringToSeed(`ladder-${season}-r${roundNumber}`));
-  const order = LADDER_BASE.slice();
-
-  const swaps = clamp(Math.floor(roundNumber * 0.6), 0, 10);
-  for (let i = 0; i < swaps; i++) {
-    const a = Math.floor(r() * Math.min(12, order.length));
-    const b = clamp(a + (r() > 0.5 ? 1 : -1), 0, Math.min(12, order.length) - 1);
-    const tmp = order[a];
-    order[a] = order[b];
-    order[b] = tmp;
-  }
-
-  const rows: LegacyLadderRow[] = [];
-  for (let i = 0; i < 16; i++) {
-    const team = order[i];
-    const round = clamp(roundNumber, 0, 23);
-    const baseWins = clamp(18 - i, 0, 18);
-    const roundWins = clamp(Math.floor((round / 23) * 18), 0, 18);
-    const wins = clamp(
-      Math.floor(baseWins * 0.45 + roundWins * 0.55 + (r() - 0.5) * 2),
-      0,
-      round
-    );
-    const losses = clamp(round - wins, 0, round);
-    rows.push({ rank: i + 1, team, record: buildLegacyRecord(wins, losses) });
-  }
-  return rows;
-}
-
-/* -------------------------------------------------------------------------- */
 /* 2025 FINALS (EXISTING)                                                       */
 /* -------------------------------------------------------------------------- */
 
-const FIXTURES_2025_BASE = [
+const FIXTURES_2025_BASE: FixtureMatch[] = [
   {
     id: "2025-r21-rich-carl",
     season: 2025,
@@ -446,26 +372,43 @@ const FIXTURES_2025_BASE = [
       return { homeScore: t.home, awayScore: t.away, crowd: 52318 };
     })(),
   },
-] satisfies FixtureMatch[];
+];
+
+const FIXTURES_2025: FixtureMatch[] = FIXTURES_2025_BASE.map((m) => {
+  // enrich finals with stats + top fantasy + announced lists
+  const homePts = m.homeScore ?? 0;
+  const awayPts = m.awayScore ?? 0;
+
+  return {
+    ...m,
+    teamStats: buildTeamStats(m.homeTeam, m.awayTeam, homePts, awayPts),
+    topFantasy: buildTopFantasy(m.homeTeam, m.awayTeam),
+    teamLists: buildTeamLists(m.homeTeam, m.awayTeam, true),
+  };
+});
 
 /* -------------------------------------------------------------------------- */
 /* 2026 GENERATOR (ALL ROUNDS)                                                  */
 /* -------------------------------------------------------------------------- */
 
 function circlePairings(teams: string[]) {
+  // standard “circle method” for even team count
   const list = teams.slice();
   const fixed = list[0];
   let rot = list.slice(1);
 
   return (roundIndex: number) => {
     if (roundIndex > 0) {
+      // rotate
       rot = [rot[rot.length - 1], ...rot.slice(0, -1)];
     }
     const left = [fixed, ...rot.slice(0, rot.length / 2)];
     const right = rot.slice(rot.length / 2).slice().reverse();
 
     const pairs: Array<[string, string]> = [];
-    for (let i = 0; i < left.length; i++) pairs.push([left[i], right[i]]);
+    for (let i = 0; i < left.length; i++) {
+      pairs.push([left[i], right[i]]);
+    }
     return pairs;
   };
 }
@@ -482,6 +425,7 @@ const TIME_SLOTS = [
   { dayOffset: 3, time: "19:10", label: "Sunday" },
 ];
 
+// light venue mapping (you can replace with real)
 const TEAM_VENUE: Record<string, string> = {
   Adelaide: "Adelaide Oval",
   Brisbane: "Gabba",
@@ -510,6 +454,7 @@ function buildRoundLabel(roundNumber: number) {
 function build2026(): FixtureMatch[] {
   const out: FixtureMatch[] = [];
 
+  // Opening Round (keep your existing)
   out.push(
     {
       id: "2026-or-rich-carl",
@@ -522,8 +467,6 @@ function build2026(): FixtureMatch[] {
       venue: TEAM_VENUE["Richmond"] ?? "MCG",
       homeTeam: "Richmond",
       awayTeam: "Carlton",
-      preview: buildPreview("Richmond", "Carlton", "OR"),
-      teamLists: buildTeamLists("Richmond", "Carlton", false),
     },
     {
       id: "2026-or-adel-port",
@@ -536,16 +479,17 @@ function build2026(): FixtureMatch[] {
       venue: TEAM_VENUE["Adelaide"] ?? "Adelaide Oval",
       homeTeam: "Adelaide",
       awayTeam: "Port Adelaide",
-      preview: buildPreview("Adelaide", "Port Adelaide", "OR"),
-      teamLists: buildTeamLists("Adelaide", "Port Adelaide", false),
     }
   );
 
+  // R1 starts next week
   const baseR1 = "2026-03-13";
 
   const pairsForRound = circlePairings(AFL_TEAMS.slice() as unknown as string[]);
   for (let round = 1; round <= 23; round++) {
-    const pairs = pairsForRound(round - 1);
+    const pairs = pairsForRound(round - 1); // deterministic rotation
+
+    // spread across week
     const roundStart = addDays(baseR1, (round - 1) * 7);
 
     pairs.forEach(([home, away], i) => {
@@ -554,7 +498,7 @@ function build2026(): FixtureMatch[] {
 
       const roundLabel = buildRoundLabel(round);
 
-      out.push({
+      const match: FixtureMatch = {
         id: `2026-${roundLabel}-${home.slice(0, 3).toLowerCase()}-${away
           .slice(0, 3)
           .toLowerCase()}-${i}`,
@@ -569,55 +513,44 @@ function build2026(): FixtureMatch[] {
         awayTeam: away,
         preview: buildPreview(home, away, roundLabel),
         teamLists: buildTeamLists(home, away, false),
-      });
+      };
+
+      out.push(match);
     });
   }
 
-  return out;
+  // enrich OR preview+lists too
+  return out.map((m) => {
+    if (m.status === "upcoming") {
+      return {
+        ...m,
+        preview: m.preview ?? buildPreview(m.homeTeam, m.awayTeam, m.roundLabel),
+        teamLists: m.teamLists ?? buildTeamLists(m.homeTeam, m.awayTeam, false),
+      };
+    }
+    return m;
+  });
 }
 
-const FIXTURES_2026: FixtureMatch[] = build2026();
+const FIXTURES_2026 = build2026();
 
 /* -------------------------------------------------------------------------- */
-/* EXPORTS                                                                     */
+/* EXPORTS                                                                    */
 /* -------------------------------------------------------------------------- */
 
-export const MOCK_FIXTURES: FixtureMatch[] = [
-  ...FIXTURES_2025_BASE,
-  ...FIXTURES_2026,
-];
+export const MOCK_FIXTURES: FixtureMatch[] = [...FIXTURES_2025, ...FIXTURES_2026];
 
-import type { LadderRow } from "./LadderSnapshot";
-
-export const MOCK_LADDER_TOP16: LadderRow[] = [
-  {
-    pos: 1,
-    team: "Collingwood",
-    played: 23,
-    wins: 18,
-    losses: 5,
-    draws: 0,
-    percentage: 132.4,
-    delta: +1,
-  },
-  {
-    pos: 2,
-    team: "Brisbane Lions",
-    played: 23,
-    wins: 17,
-    losses: 6,
-    draws: 0,
-    percentage: 128.9,
-    delta: -1,
-  },
-  {
-    pos: 3,
-    team: "Carlton",
-    played: 23,
-    wins: 16,
-    losses: 7,
-    draws: 0,
-    percentage: 121.3,
-  },
-  // …continue to 16
+/**
+ * Keep legacy ladder shape — AFLMatchCentre normalises it.
+ * You can replace this later with a true LadderRow[].
+ */
+export const MOCK_LADDER_TOP16 = [
+  { rank: 1, team: "Sydney", record: "17-6" },
+  { rank: 2, team: "Geelong", record: "16-7" },
+  { rank: 3, team: "Brisbane", record: "15-8" },
+  { rank: 4, team: "Carlton", record: "14-9" },
+  { rank: 5, team: "Fremantle", record: "14-9" },
+  { rank: 6, team: "Collingwood", record: "13-10" },
+  { rank: 7, team: "Port Adelaide", record: "13-10" },
+  { rank: 8, team: "Melbourne", record: "12-11" },
 ];

@@ -19,7 +19,7 @@ type Props = {
 const cx = (...c: Array<string | false | undefined>) =>
   c.filter(Boolean).join(" ");
 
-function LadderSnapshot({ rows, highlightTeams = [], asOfLabel }: Props) {
+function LadderSnapshot({ rows, highlightTeams = [] }: Props) {
   const homeTeam = highlightTeams[0];
   const awayTeam = highlightTeams[1];
 
@@ -27,11 +27,8 @@ function LadderSnapshot({ rows, highlightTeams = [], asOfLabel }: Props) {
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
       {/* Header */}
       <div className="mb-2 flex items-center justify-between">
-        <div>
-          <div className="text-sm font-semibold text-white">Ladder Snapshot</div>
-          {asOfLabel ? (
-            <div className="mt-0.5 text-[11px] text-white/40">{asOfLabel}</div>
-          ) : null}
+        <div className="text-sm font-semibold text-white">
+          Ladder Snapshot
         </div>
         <div className="text-xs text-white/45">Top 16</div>
       </div>
