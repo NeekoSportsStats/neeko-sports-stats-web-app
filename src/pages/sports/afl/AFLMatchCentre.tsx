@@ -14,26 +14,22 @@ import type { FixtureMatch } from "@/components/afl/match-center/types";
 type Season = 2025 | 2026;
 
 /* -------------------------------------------------------------------------- */
-/* NORMALISE LADDER (defensive, future-proof)                                  */
+/* NORMALISE LADDER                                                            */
 /* -------------------------------------------------------------------------- */
 
 function normaliseLadder(rows: any[]): LadderRow[] {
-  // Already correct shape
   if (rows.length && "pos" in rows[0] && "played" in rows[0]) {
     return rows as LadderRow[];
   }
 
-  // Legacy shape: { rank, team, record }
   return rows.map((r, idx) => {
     const [wins = 0, losses = 0] =
       typeof r.record === "string" ? r.record.split("-").map(Number) : [];
 
-    const played = wins + losses;
-
     return {
       pos: r.rank ?? idx + 1,
       team: r.team,
-      played,
+      played: wins + losses,
       wins,
       losses,
       draws: 0,
@@ -43,17 +39,16 @@ function normaliseLadder(rows: any[]): LadderRow[] {
 }
 
 function toDateTimeISO(m: FixtureMatch) {
-  // local-ish (good enough for ordering)
   return `${m.dateISO}T${m.timeLocal}:00`;
 }
 
-/**
- * Default selection:
- * - Find the first upcoming match on/after today; else latest final.
- * - Use its season + round.
- */
+/* -------------------------------------------------------------------------- */
+/* DEFAULT SEASON + ROUND                                                      */
+/* -------------------------------------------------------------------------- */
+
 function getDefaultSeasonRound(fixtures: FixtureMatch[]) {
   const now = new Date();
+
   const sorted = fixtures
     .slice()
     .sort((a, b) => toDateTimeISO(a).localeCompare(toDateTimeISO(b)));
@@ -71,17 +66,22 @@ function getDefaultSeasonRound(fixtures: FixtureMatch[]) {
     return { season: lastFinal.season, roundNumber: lastFinal.roundNumber };
   }
 
-  // fallback
   return { season: 2026 as Season, roundNumber: 0 };
 }
+
+/* -------------------------------------------------------------------------- */
+/* PAGE                                                                        */
+/* -------------------------------------------------------------------------- */
 
 export default function AFLMatchCentre() {
   const [activeMatch, setActiveMatch] = useState<FixtureMatch | null>(null);
 
-  // Default to “current” round
   const initial = useMemo(() => getDefaultSeasonRound(MOCK_FIXTURES), []);
   const [season, setSeason] = useState<Season>(initial.season);
   const [roundNumber, setRoundNumber] = useState<number>(initial.roundNumber);
+
+  const isDefaultRound =
+    season === initial.season && roundNumber === initial.roundNumber;
 
   useEffect(() => {
     setActiveMatch(null);
@@ -94,7 +94,10 @@ export default function AFLMatchCentre() {
       .sort((a, b) => toDateTimeISO(a).localeCompare(toDateTimeISO(b)));
   }, [season, roundNumber]);
 
-  const ladderRows = useMemo(() => normaliseLadder(MOCK_LADDER_TOP16 as any[]), []);
+  const ladderRows = useMemo(
+    () => normaliseLadder(MOCK_LADDER_TOP16 as any[]),
+    []
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-4 md:px-6 py-8">
@@ -106,6 +109,7 @@ export default function AFLMatchCentre() {
           roundNumber={roundNumber}
           onChangeSeason={setSeason}
           onChangeRound={setRoundNumber}
+          isDefaultRound={isDefaultRound}
         />
       </div>
 
@@ -118,12 +122,19 @@ export default function AFLMatchCentre() {
         <div className="hidden lg:block">
           <LadderSnapshot
             rows={ladderRows}
-            highlightTeams={activeMatch ? [activeMatch.homeTeam, activeMatch.awayTeam] : []}
+            highlightTeams={
+              activeMatch ? [activeMatch.homeTeam, activeMatch.awayTeam] : []
+            }
           />
         </div>
       </div>
 
-      {activeMatch && <MatchDetailOverlay match={activeMatch} onClose={() => setActiveMatch(null)} />}
+      {activeMatch && (
+        <MatchDetailOverlay
+          match={activeMatch}
+          onClose={() => setActiveMatch(null)}
+        />
+      )}
     </div>
   );
 }
