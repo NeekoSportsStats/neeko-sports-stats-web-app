@@ -8,3 +8,4 @@ export { default as MatchupTable } from "./MatchupTable";
 export { default as QuarterFlowGrid } from "./QuarterFlowGrid";
 export { default as ConsistencyList } from "./ConsistencyList";
 export { default as DriversList } from "./DriversList";
+export { default as RoundOverview } from "./RoundOverview";

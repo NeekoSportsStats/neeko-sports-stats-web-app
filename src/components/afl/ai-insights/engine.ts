@@ -10,9 +10,27 @@ function lastN<T>(arr: T[], n: number) {
   return arr.slice(Math.max(0, arr.length - n));
 }
 
+function lower(s: string) {
+  return (s ?? "").toString().trim().toLowerCase();
+}
+
+function findTeamByName(teams: AFLTeam[], name: string) {
+  const n = lower(name);
+  if (!n) return null;
+  return (
+    teams.find((t: any) => lower(t.name) === n) ??
+    teams.find((t: any) => lower(t.name).includes(n) || n.includes(lower(t.name))) ??
+    null
+  );
+}
+
+function seriesForTeam(t: AFLTeam | null, stat: StatLens): number[] {
+  if (!t) return [];
+  return stat === "fantasy" ? ((t as any).fantasy ?? []) : stat === "disposals" ? ((t as any).disposals ?? []) : ((t as any).goals ?? []);
+}
+
 function findStat(lines: TeamStatLine[] | undefined, key: StatLens) {
   if (!lines?.length) return null;
-  const lower = (s: string) => s.trim().toLowerCase();
   const candidates = [
     key,
     key === "fantasy" ? "fantasy points" : key,
@@ -25,6 +43,31 @@ function findStat(lines: TeamStatLine[] | undefined, key: StatLens) {
 
   const f2 = lines.find((l) => candidates.some((c) => lower(l.label).includes(c)));
   return f2 ? f2.value : null;
+}
+
+/* Helpers */
+export function filterPastFixtures(fixtures: FixtureMatch[]) {
+  // Use "final" as your canonical complete state. If your data uses "completed" too, it's still handled.
+  return fixtures.filter((m: any) => {
+    const s = lower(m.status);
+    return s === "final" || s === "completed" || s === "ft";
+  });
+}
+
+export function filterUpcomingFixtures(fixtures: FixtureMatch[]) {
+  return fixtures.filter((m: any) => {
+    const s = lower(m.status);
+    return s === "upcoming" || s === "scheduled" || s === "pre" || s === "preview";
+  });
+}
+
+export function roundOrder(label: string) {
+  const l = lower(label);
+  if (l === "or" || l.includes("opening")) return 0;
+  const m = l.match(/r\s*(\d{1,2})/);
+  if (m) return Number(m[1]);
+  const n = Number(l.replace(/\D/g, ""));
+  return Number.isFinite(n) ? n : 999;
 }
 
 /* 1) Player Score Predictability (fixtures topFantasy: fantasy-only today) */
@@ -148,77 +191,113 @@ export function buildTeamPredictabilityFromTeams(teams: AFLTeam[], stat: StatLen
   return rows;
 }
 
-/* 3) H2H Player */
-export function buildH2HPlayerMatchups(match: FixtureMatch | undefined, stat: StatLens): MatchupRow[] {
+/* 3) H2H Player (upcoming-aware) */
+export function buildH2HPlayerMatchups(match: FixtureMatch | undefined, stat: StatLens, teams: AFLTeam[]): MatchupRow[] {
   if (!match) return [];
 
+  // If it's a finished match with topFantasy, keep the original behavior for fantasy.
   const top = (match as any).topFantasy as any[] | undefined;
-  if (!top?.length || stat !== "fantasy") {
-    return [
+  const status = lower((match as any).status);
+
+  if ((status === "final" || status === "completed" || status === "ft") && top?.length && stat === "fantasy") {
+    const a = top[0];
+    const b = top[1];
+    const sumA = (a?.players ?? []).reduce((s: number, p: any) => s + (p.fantasy ?? 0), 0);
+    const sumB = (b?.players ?? []).reduce((s: number, p: any) => s + (p.fantasy ?? 0), 0);
+
+    const delta = safeDiv(sumA - sumB, Math.max(1, Math.abs(sumB)));
+    const label = advantageLabel(delta);
+    const reliability01 = 0.62;
+
+    const rows: MatchupRow[] = [
       {
-        key: "h2h_players_placeholder",
-        title: "Player matchup AI",
-        label: "Neutral",
-        reliability01: 0.45,
-        deltaPct: 0,
-        ai: stat !== "fantasy"
-          ? `Awaiting per-player ${stat} ingestion to compute matchup deltas.`
-          : "Top fantasy performers not available for this match.",
+        key: "top3_fantasy_swing",
+        title: "Top-3 fantasy ceiling (by team)",
+        label,
+        reliability01,
+        deltaPct: delta,
+        ai: `${label} indicated: top-3 fantasy totals ${Math.round(sumA)} vs ${Math.round(sumB)}. This explains ceiling swings and tag risk.`,
       },
     ];
+
+    const flat = top.flatMap((tb: any) =>
+      (tb.players ?? []).map((p: any) => ({ team: tb.team, name: p.name, fantasy: p.fantasy ?? 0 }))
+    );
+    flat.sort((x: any, y: any) => (y.fantasy - x.fantasy));
+    const star = flat[0];
+    if (star) {
+      rows.push({
+        key: "star_lever",
+        title: `Star lever: ${star.name}`,
+        label: "Advantage",
+        reliability01: 0.58,
+        deltaPct: 0.10,
+        ai: `${star.name} profiles as a key lever. If role/tag shifts, volatility rises and the matchup compresses toward Neutral.`,
+      });
+    }
+
+    return rows;
   }
 
-  const a = top[0];
-  const b = top[1];
-  const sumA = (a?.players ?? []).reduce((s: number, p: any) => s + (p.fantasy ?? 0), 0);
-  const sumB = (b?.players ?? []).reduce((s: number, p: any) => s + (p.fantasy ?? 0), 0);
+  // Upcoming match: infer "matchup risk" from team volatility and venue/travel. Deterministic and driven by past games only.
+  const home = (match as any).homeTeam as string;
+  const away = (match as any).awayTeam as string;
+  const venue = (match as any).venue ?? "";
+  const homeT = findTeamByName(teams, home);
+  const awayT = findTeamByName(teams, away);
 
-  const delta = safeDiv(sumA - sumB, Math.max(1, Math.abs(sumB)));
+  const hSeries = lastN(seriesForTeam(homeT, stat), WINDOW);
+  const aSeries = lastN(seriesForTeam(awayT, stat), WINDOW);
+
+  const hVol = cv(hSeries);
+  const aVol = cv(aSeries);
+
+  const combinedVol = clamp((hVol + aVol) / 2, 0, 1);
+  const volatilityLabel = combinedVol >= 0.22 ? "Variable" : "Stable";
+
+  const venueTravel = /gmhba|adelaide|perth|optus|gabba/i.test(lower(venue)) ? 0.10 : 0.04;
+  const delta = safeDiv(mean(hSeries) - mean(aSeries), Math.max(1, Math.abs(mean(aSeries))));
+
   const label = advantageLabel(delta);
-  const reliability01 = 0.62;
 
-  const rows: MatchupRow[] = [
+  return [
     {
-      key: "top3_fantasy_swing",
-      title: "Top-3 fantasy ceiling (by team)",
+      key: "role_risk",
+      title: "Role/Tag risk proxy (from volatility)",
+      label: combinedVol > 0.22 ? "Advantage" : "Neutral",
+      reliability01: 0.52,
+      deltaPct: combinedVol > 0.22 ? 0.08 : 0.0,
+      ai: `Upcoming matchup projected as ${volatilityLabel}. Higher volatility often comes from role swings, tagging, and contest profile changes.`,
+    },
+    {
+      key: "midfield_battle",
+      title: "Midfield battle expectation (system proxy)",
       label,
-      reliability01,
+      reliability01: 0.56,
       deltaPct: delta,
-      ai: `${label} indicated: top-3 fantasy totals ${Math.round(sumA)} vs ${Math.round(sumB)}. This feeds your predictability outcomes and explains ceiling risk.`,
+      ai: `Based on last ${WINDOW} games for team output under the ${stat} lens. This is a pre-game proxy until you store unit splits (MID vs MID, DEF vs FWD).`,
+    },
+    {
+      key: "venue_travel",
+      title: "Venue & travel impact on matchups",
+      label: venueTravel > 0.08 ? "Advantage" : "Neutral",
+      reliability01: 0.6,
+      deltaPct: venueTravel,
+      ai: `Venue profile suggests a ${venueTravel > 0.08 ? "meaningful" : "minor"} travel/comfort adjustment. This amplifies matchup variance if one side is already volatile.`,
     },
   ];
-
-  const flat = top.flatMap((tb: any) =>
-    (tb.players ?? []).map((p: any) => ({
-      team: tb.team,
-      name: p.name,
-      fantasy: p.fantasy ?? 0,
-    }))
-  );
-  flat.sort((x: any, y: any) => (y.fantasy - x.fantasy));
-  const star = flat[0];
-  if (star) {
-    rows.push({
-      key: "star_lever",
-      title: `Star lever: ${star.name}`,
-      label: "Advantage",
-      reliability01: 0.58,
-      deltaPct: 0.10,
-      ai: `${star.name} is projected to be a key lever. If tagged/role-changed, volatility increases and head-to-head swings toward Neutral.`,
-    });
-  }
-
-  return rows;
 }
 
-/* 4) H2H Team */
-export function buildH2HTeamMatchups(match: FixtureMatch | undefined, stat: StatLens): MatchupRow[] {
+/* 4) H2H Team (upcoming-aware) */
+export function buildH2HTeamMatchups(match: FixtureMatch | undefined, stat: StatLens, teams: AFLTeam[]): MatchupRow[] {
   if (!match) return [];
   const teamStats = (match as any).teamStats as any[] | undefined;
 
   const home = (match as any).homeTeam as string;
   const away = (match as any).awayTeam as string;
+  const venue = (match as any).venue ?? "";
 
+  // If we have stat lines (likely for completed matches), use them.
   if (teamStats?.length) {
     const hBlock = teamStats.find((x: any) => x.team === home || x.teamName === home) ?? teamStats[0];
     const aBlock = teamStats.find((x: any) => x.team === away || x.teamName === away) ?? teamStats[1];
@@ -236,46 +315,66 @@ export function buildH2HTeamMatchups(match: FixtureMatch | undefined, stat: Stat
         label,
         reliability01: 0.66,
         deltaPct: delta,
-        ai: `${label} indicated from match stat lines: ${Math.round(hVal)} vs ${Math.round(aVal)}. This is the core signal that drives your team predictability output.`,
+        ai: `${label} indicated from match stat lines: ${Math.round(hVal)} vs ${Math.round(aVal)}. This is a high-signal explainer.`,
       },
       {
-        key: "unit_proxy",
-        title: "Unit mismatch proxy",
-        label: "Neutral",
-        reliability01: 0.52,
-        deltaPct: delta * 0.6,
-        ai: `Once you store unit splits (DEF/MID/FWD), this becomes your strongest explainer. For now, we proxy using stat-line composition and variance.`,
+        key: "venue_travel",
+        title: "Venue & travel impact",
+        label: /gmhba|adelaide|perth|optus|gabba/i.test(lower(venue)) ? "Advantage" : "Neutral",
+        reliability01: 0.62,
+        deltaPct: /gmhba|adelaide|perth|optus|gabba/i.test(lower(venue)) ? 0.10 : 0.04,
+        ai: "Venue familiarity can shift scoring efficiency and repeat entries. This is modeled as a small but stable adjustment.",
       },
     ];
   }
+
+  // Upcoming matches: compare recent team baselines + preview probability if present.
+  const hT = findTeamByName(teams, home);
+  const aT = findTeamByName(teams, away);
+
+  const hSeries = lastN(seriesForTeam(hT, stat), WINDOW);
+  const aSeries = lastN(seriesForTeam(aT, stat), WINDOW);
+
+  const hMean = mean(hSeries);
+  const aMean = mean(aSeries);
+  const delta = safeDiv(hMean - aMean, Math.max(1, Math.abs(aMean)));
+  const label = advantageLabel(delta);
 
   const prev = (match as any).preview as any | undefined;
-  const hw = prev?.homeWinProb ?? null;
-  const aw = prev?.awayWinProb ?? null;
+  const hw = typeof prev?.homeWinProb === "number" ? prev.homeWinProb : null;
+  const aw = typeof prev?.awayWinProb === "number" ? prev.awayWinProb : null;
 
-  if (typeof hw === "number" && typeof aw === "number") {
-    const delta = hw - aw;
-    const label = advantageLabel(delta);
-    return [
-      {
-        key: "win_prob_edge",
-        title: `Win probability edge (model): ${home} vs ${away}`,
-        label,
-        reliability01: 0.55,
-        deltaPct: delta,
-        ai: `${label} based on model win probability: ${Math.round(hw * 100)}% vs ${Math.round(aw * 100)}%.`,
-      },
-    ];
-  }
+  const winDelta = hw !== null && aw !== null ? hw - aw : 0;
+  const winLabel = advantageLabel(winDelta);
+
+  const travel = /gmhba|adelaide|perth|optus|gabba/i.test(lower(venue)) ? 0.10 : 0.04;
 
   return [
     {
-      key: "h2h_team_placeholder",
-      title: "Team matchup AI",
-      label: "Neutral",
-      reliability01: 0.45,
-      deltaPct: 0,
-      ai: "No team stat lines / preview found for this fixture yet.",
+      key: "system_edge",
+      title: `System edge (${stat} baseline)`,
+      label,
+      reliability01: 0.58,
+      deltaPct: delta,
+      ai: `Based on last ${WINDOW} games: ${home} avg ${Math.round(hMean)} vs ${away} avg ${Math.round(aMean)}. Pre-game signal only (no live data).`,
+    },
+    {
+      key: "model_win_prob",
+      title: "Model win probability edge",
+      label: (hw !== null && aw !== null) ? (winLabel as any) : "Neutral",
+      reliability01: (hw !== null && aw !== null) ? 0.55 : 0.42,
+      deltaPct: (hw !== null && aw !== null) ? winDelta : 0,
+      ai: (hw !== null && aw !== null)
+        ? `${winLabel} based on model win probability: ${Math.round(hw * 100)}% vs ${Math.round(aw * 100)}%.`
+        : "Preview win probability not available for this fixture yet.",
+    },
+    {
+      key: "venue_travel",
+      title: "Venue & travel impact",
+      label: travel > 0.08 ? "Advantage" : "Neutral",
+      reliability01: 0.62,
+      deltaPct: travel,
+      ai: `Venue profile suggests a ${travel > 0.08 ? "meaningful" : "minor"} travel/comfort adjustment. Stable pre-game modifier.`,
     },
   ];
 }
@@ -318,7 +417,6 @@ export function buildQuarterFlow(match: FixtureMatch | undefined): QuarterFlowRo
 /* 6) Consistency vs Explosiveness */
 export function buildConsistencyExplosivenessTeams(teams: AFLTeam[], stat: StatLens): ConsistencyRow[] {
   const rows: ConsistencyRow[] = [];
-
   const clamp01 = (x: number) => clamp(x, 0, 1);
 
   for (const t of teams) {
@@ -374,7 +472,7 @@ export function buildOutcomeDrivers(params: { match: FixtureMatch | undefined; f
   const q1Swing = q1 ? Math.abs((q1.home ?? 0) - (q1.away ?? 0)) : 0;
 
   const venue = (match as any)?.venue ?? "";
-  const travelPenalty = /gmhba|adelaide|perth|optus|gabba/i.test(venue) ? 0.65 : 0.45;
+  const travelPenalty = /gmhba|adelaide|perth|optus|gabba/i.test(lower(venue)) ? 0.65 : 0.45;
 
   const winSpread =
     typeof preview?.homeWinProb === "number" && typeof preview?.awayWinProb === "number"
