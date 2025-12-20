@@ -2,10 +2,11 @@ import * as React from "react";
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "default" | "secondary" | "ghost";
-  size?: "sm" | "default" | "lg";
+  size?: "sm" | "default" | "lg" | "icon";
 };
 
-const cx = (...c: Array<string | false | undefined>) => c.filter(Boolean).join(" ");
+const cx = (...c: Array<string | false | undefined>) =>
+  c.filter(Boolean).join(" ");
 
 export function Button({
   className,
@@ -21,7 +22,9 @@ export function Button({
       : "bg-amber-400 hover:bg-amber-300 text-black";
 
   const sizeCls =
-    size === "sm"
+    size === "icon"
+      ? "h-9 w-9 p-0"
+      : size === "sm"
       ? "h-9 px-3 text-sm"
       : size === "lg"
       ? "h-11 px-6 text-base"
