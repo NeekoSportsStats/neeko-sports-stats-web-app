@@ -12,7 +12,7 @@ function meter(v01: number) {
   );
 }
 
-export default function ConsistencyList(props: { rows: ConsistencyRow[]; mode: PremiumMode; maxRows?: number }) {
+export default function ConsistencyList(props: { rows: ConsistencyRow[]; mode: PremiumMode; maxRows?: number; hideSearch?: boolean; titleLeft?: string }) {
   const locked = props.mode !== "premium";
   const [q, setQ] = useState("");
 
@@ -25,13 +25,15 @@ export default function ConsistencyList(props: { rows: ConsistencyRow[]; mode: P
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm text-white/70">Searchable list</div>
+        <div className="text-sm text-white/70">{props.titleLeft ?? "Searchable list"}</div>
+        {props.hideSearch ? null : (
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search…"
           className="w-48 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white placeholder:text-white/35 outline-none focus:border-amber-400/35"
         />
+      )}
       </div>
 
       <div className="grid gap-2">

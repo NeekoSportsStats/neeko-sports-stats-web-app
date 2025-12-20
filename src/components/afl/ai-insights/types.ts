@@ -1,25 +1,132 @@
-import type { StatLens } from "./utils";
-import type { FixtureMatch } from "@/components/afl/match-center/types";
-import type { AFLTeam } from "@/components/afl/teams/mockTeams";
+// src/components/afl/match-center/types.ts
+
+export type MatchStatus = "upcoming" | "final";
+
+export type FixtureQuarter = {
+  label: "Q1" | "Q2" | "Q3" | "Q4";
+  home: number;
+  away: number;
+};
+
+export type TeamStatLine = {
+  label: string;
+  value: number;
+  /** Optional league average for a ghost marker line */
+  leagueAvg?: number;
+  /** If false, lower is better (e.g. Turnovers). Default true */
+  higherIsBetter?: boolean;
+};
+
+export type MatchTeamStats = {
+  team: string;
+  stats: TeamStatLine[];
+};
+
+export type FantasyPlayer = {
+  name: string;
+  fantasy: number;
+};
+
+export type TopFantasyTeam = {
+  team: string;
+  players: FantasyPlayer[];
+};
+
+export type TeamLists = {
+  /** If false, we show the full club list as “Not yet announced (projected)” */
+  announced: boolean;
+  caption?: string;
+
+  /** Usually 22 when announced; can be full list when not announced */
+  home: string[];
+  away: string[];
+
+  /** Optional bench labels (subset of home/away) */
+  homeBench?: string[];
+  awayBench?: string[];
+
+  /** Optional change notes (purely mock for now) */
+  lateChanges?: { team: string; in: string; out?: string; note?: string }[];
+  insOuts?: { team: string; ins: string[]; outs: string[] }[];
+};
+
+export type MatchPreview = {
+  homeWinProb: number; // 0-100
+  awayWinProb: number; // 0-100
+  reasons: [string, string]; // exactly 2 lines
+  ladderPos?: { home: number; away: number };
+  last5?: { home: ("W" | "L")[]; away: ("W" | "L")[] };
+};
+
+export type FixtureMatch = {
+  id: string;
+
+  /** Season context */
+  season: 2025 | 2026;
+
+  /** Round context */
+  roundNumber: number; // 0 = Opening Round
+  roundLabel: string; // OR, R1…R23
+
+  /** Match info */
+  dateISO: string;
+  timeLocal: string;
+  venue: string;
+
+  homeTeam: string;
+  awayTeam: string;
+
+  status: MatchStatus;
+
+  /** FINAL-only fields */
+  homeScore?: number;
+  awayScore?: number;
+
+  quarters?: FixtureQuarter[];
+
+  crowd?: number;
+
+  /** Optional: existing (kept) */
+  topPlayers?: {
+    home: string[];
+    away: string[];
+  };
+
+  /** Post-match ladder movement (optional) */
+  ladderDelta?: { team: string; delta: number }[];
+
+  /** FINAL: team stats shown in overlay */
+  teamStats?: MatchTeamStats[];
+
+  /** FINAL: top 3 fantasy performers per team (card + overlay optional) */
+  topFantasy?: TopFantasyTeam[];
+
+  /** UPCOMING: squads & lists (overlay only) */
+  teamLists?: TeamLists;
+
+  /** UPCOMING: win probability + reasons + ladder + last5 */
+  preview?: MatchPreview;
+};
+/* -------------------------------------------------------------------------- */
+/* AFL AI INSIGHTS TYPES (added - does not remove existing match-center types) */
+/* -------------------------------------------------------------------------- */
 
 export type PremiumMode = "free" | "premium";
 
 export type PredictRow = {
   id: string;
   name: string;
-  rangeLow: number;
-  rangeHigh: number;
   confidence01: number;
   volatility01: number;
+  rangeLow: number;
+  rangeHigh: number;
   ai: string;
 };
 
 export type MatchupRow = {
-  key: string;
-  title: string;
-  label: "Advantage" | "Neutral" | "Disadvantage";
-  reliability01: number;
-  deltaPct: number; // +0.12 => +12%
+  id: string;
+  label: string;
+  edge01: number; // 0..1
   ai: string;
 };
 
@@ -39,22 +146,45 @@ export type ConsistencyRow = {
 };
 
 export type DriverRow = {
-  key: string;
+  id: string;
   title: string;
   influence01: number;
   stability01: number;
   ai: string;
 };
 
-export type DataSources = {
-  fixtures: FixtureMatch[];
-  teams: AFLTeam[];
+export type OutcomeDriver = {
+  key: string;
+  title: string;
+  influence01: number;
+  stability01: number;
+  aiSummary: string;
 };
 
-export type AFLAIInsightsProps = {
-  fixtures?: FixtureMatch[]; // if omitted, will use MOCK_FIXTURES
-  teams?: AFLTeam[];         // if omitted, will use MOCK_TEAMS
-  mode?: PremiumMode;        // if omitted, free
+export type PlayerMatchupRow = {
+  id: string;
+  label: string;
+  edge01: number;
+  confidence01: number;
+  volatility01: number;
+  ai: string;
 };
 
-export type Stat = StatLens;
+export type TeamMatchupRow = {
+  id: string;
+  label: string;
+  edge01: number;
+  confidence01: number;
+  volatility01: number;
+  ai: string;
+};
+
+export type QuarterFlow = QuarterFlowRow;
+
+export type ConsistencyExplosivenessRow = {
+  id: string;
+  name: string;
+  consistency01: number;
+  explosiveness01: number;
+  ai: string;
+};

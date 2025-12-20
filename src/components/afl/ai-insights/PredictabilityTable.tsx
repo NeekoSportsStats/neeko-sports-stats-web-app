@@ -8,8 +8,10 @@ export default function PredictabilityTable(props: {
   mode: PremiumMode;
   maxRows?: number;
   hint?: string;
+  insight?: string;
+  contextLabel?: string;
 }) {
-  const { rows, mode, maxRows = 12, hint } = props;
+  const { rows, mode, maxRows = 12, hint, insight, contextLabel } = props;
   const locked = mode !== "premium";
   const [q, setQ] = useState("");
 
@@ -21,8 +23,26 @@ export default function PredictabilityTable(props: {
 
   return (
     <div className="grid gap-3">
+    {insight ? (
+      <div className="rounded-2xl border border-amber-400/15 bg-amber-500/10 p-3 sm:p-4">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-400/20 bg-black/20">
+            <span className="text-amber-200">🧠</span>
+          </div>
+          <div className="min-w-0">
+            {contextLabel ? (
+              <div className="text-[11px] uppercase tracking-wide text-amber-200/80">
+                {contextLabel}
+              </div>
+            ) : null}
+            <div className="mt-0.5 text-sm text-amber-50/90">{insight}</div>
+          </div>
+        </div>
+      </div>
+    ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm text-white/70">{hint ?? "Searchable list"}</div>
+        <div className="text-sm text-white/70">{hint ?? "Search"}</div>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}

@@ -82,6 +82,23 @@ export default function AFLAIInsights() {
     [teams, stat]
   );
 
+  const consistencyRows = useMemo(
+    () => buildConsistencyExplosivenessTeams(teams, stat),
+    [teams, stat]
+  );
+
+  const playerInsight = useMemo(() => {
+    const top = playerPredict.slice(0, Math.min(12, playerPredict.length));
+    const avgConf = top.length ? mean(top.map((r) => r.confidence01)) : 0.55;
+    const avgVol = top.length ? mean(top.map((r) => r.volatility01)) : 0.55;
+
+    const confLabel = avgConf >= 0.72 ? "higher" : avgConf >= 0.52 ? "mixed" : "lower";
+    const volLabel = avgVol >= 0.72 ? "elevated" : avgVol >= 0.52 ? "moderate" : "low";
+
+    const lens = stat === "fantasy" ? "fantasy scoring" : stat === "disposals" ? "disposals" : "goals";
+    return `This round’s ${lens} profile shows ${confLabel} confidence with ${volLabel} volatility across the top options. Use confidence for “safe” picks, volatility for ceiling plays.`;
+  }, [playerPredict, stat]);
+
   const roundOverview = useMemo(() => {
     const teamNames = new Set<string>();
     roundMatches.forEach((m: any) => {
@@ -149,7 +166,7 @@ export default function AFLAIInsights() {
             subtitle="Expected ranges, confidence and volatility across the round."
             locked={mode !== "premium"}
           >
-            <PredictabilityTable rows={playerPredict} mode={mode} />
+            <PredictabilityTable rows={playerPredict} mode={mode} hint="Search players" contextLabel="AI round snapshot" insight={playerInsight} />
           </SectionShell>
 
           {/* 2 */}
@@ -158,7 +175,7 @@ export default function AFLAIInsights() {
             subtitle="System reliability for teams playing this round."
             locked={mode !== "premium"}
           >
-            <PredictabilityTable rows={teamPredict} mode={mode} />
+            <PredictabilityTable rows={teamPredict} mode={mode} hint="Search teams" contextLabel="AI round snapshot" insight={`Team predictability is computed from recent weekly outputs. Higher confidence suggests repeatable roles; higher volatility signals matchup/role sensitivity.`} />
           </SectionShell>
 
           {/* 3–7 PER MATCH */}
@@ -202,6 +219,27 @@ export default function AFLAIInsights() {
                   locked={mode !== "premium"}
                 >
                   <QuarterFlowGrid rows={flow} mode={mode} />
+                </SectionShell>
+
+
+                <SectionShell
+                  title="6. Consistency vs Explosiveness"
+                  locked={mode !== "premium"}
+                >
+                  {(() => {
+                    const home = consistencyRows.find((r) => lower(r.name) === lower(match.homeTeam));
+                    const away = consistencyRows.find((r) => lower(r.name) === lower(match.awayTeam));
+                    const rows = [home, away].filter(Boolean) as any[];
+                    return (
+                      <ConsistencyList
+                        rows={rows}
+                        mode={mode}
+                        maxRows={2}
+                        hideSearch
+                        titleLeft="How stable each side is week-to-week (and how spike-driven they are)."
+                      />
+                    );
+                  })()}
                 </SectionShell>
 
                 <SectionShell

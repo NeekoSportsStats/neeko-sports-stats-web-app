@@ -112,7 +112,7 @@ export function buildPlayerPredictabilityFromFixtures(fixtures: FixtureMatch[], 
 
     const ai =
       stat !== "fantasy"
-        ? `Awaiting per-player ${stat} ingestion from match centre. (Fantasy predictability is live.)`
+        ? `Predictability for this stat becomes available once per-player match-centre data is ingested. (Fantasy predictability is live.)`
         : `${confLabel(within)} repeatability; ${trend > 0.2 ? "trending up" : trend < -0.2 ? "trending down" : "stable recently"}.`;
 
     return { id, name: it.name, rangeLow: b.low, rangeHigh: b.high, within, vol, ai };
