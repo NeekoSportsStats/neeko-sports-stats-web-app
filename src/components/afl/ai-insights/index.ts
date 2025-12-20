@@ -1,11 +1,10 @@
 export * from "./types";
 export * from "./utils";
 export * from "./engine";
-export * from "./SectionShell";
-export * from "./ControlsBar";
-export * from "./PredictabilityTable";
-export * from "./H2HPlayerMatchups";
-export * from "./H2HTeamMatchups";
-export * from "./GameFlowTiming";
-export * from "./ConsistencyExplosiveness";
-export * from "./OutcomeDriverSensitivity";
+export { default as SectionShell } from "./SectionShell";
+export { default as ControlsBar } from "./ControlsBar";
+export { default as PredictabilityTable } from "./PredictabilityTable";
+export { default as MatchupTable } from "./MatchupTable";
+export { default as QuarterFlowGrid } from "./QuarterFlowGrid";
+export { default as ConsistencyList } from "./ConsistencyList";
+export { default as DriversList } from "./DriversList";

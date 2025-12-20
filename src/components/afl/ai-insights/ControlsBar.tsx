@@ -1,25 +1,25 @@
 import React from "react";
-import { STAT_LABEL, StatType, cx } from "./utils";
+import { StatLens, STAT_LABEL, cx } from "./utils";
 
-export function ControlsBar(props: {
-  stat: StatType;
-  onChangeStat: (s: StatType) => void;
-  extraRight?: React.ReactNode;
+export default function ControlsBar(props: {
+  stat: StatLens;
+  onChange: (s: StatLens) => void;
+  right?: React.ReactNode;
 }) {
-  const { stat, onChangeStat, extraRight } = props;
+  const { stat, onChange, right } = props;
 
-  const btn = (s: StatType) => {
+  const btn = (s: StatLens) => {
     const active = s === stat;
     return (
       <button
         key={s}
         type="button"
-        onClick={() => onChangeStat(s)}
+        onClick={() => onChange(s)}
         className={cx(
           "rounded-full px-3 py-1 text-sm transition",
           active
-            ? "border border-amber-400/40 bg-amber-500/15 text-amber-100 shadow-[0_0_0_1px_rgba(251,191,36,0.12)]"
-            : "border border-white/10 bg-white/5 text-white/70 hover:bg-white/8 hover:text-white"
+            ? "border border-amber-400/40 bg-amber-500/15 text-amber-100"
+            : "border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
         )}
       >
         {STAT_LABEL[s]}
@@ -34,7 +34,7 @@ export function ControlsBar(props: {
         {btn("disposals")}
         {btn("goals")}
       </div>
-      {extraRight ? <div className="flex items-center gap-2">{extraRight}</div> : null}
+      {right ? <div className="flex items-center gap-2">{right}</div> : null}
     </div>
   );
 }
