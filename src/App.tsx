@@ -29,7 +29,7 @@ import UserConductPolicy from "@/pages/policies/UserConductPolicy";
 import AFLHub from "@/pages/sports/AFLHub";
 import AFLPlayers from "@/pages/sports/afl/AFLPlayers";
 import AFLTeams from "@/pages/sports/afl/AFLTeams";
-import AFLCompleteAIAnalysis from "@/pages/sports/AFLCompleteAIAnalysis";
+import AFLAIAnalysis from "@/pages/sports/afl/AFLAIInsights";
 import AFLMatchCentre from "@/pages/sports/afl/AFLMatchCentre";
 
 import EPLHub from "@/pages/sports/EPLHub";
@@ -47,6 +47,7 @@ import NBAMatchCentre from "@/pages/sports/NBAMatchCentre";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import StartCheckout from "@/pages/StartCheckout";
+import AFLAIInsights from "@/pages/sports/afl/AFLAIInsights";
 
 function App() {
   return (
@@ -149,7 +150,7 @@ function App() {
       <Route path="/sports/afl" element={<Layout><AFLHub /></Layout>} />
       <Route path="/sports/afl/players" element={<Layout><AFLPlayers /></Layout>} />
       <Route path="/sports/afl/teams" element={<Layout><AFLTeams /></Layout>} />
-      <Route path="/sports/afl/ai-analysis" element={<Layout><AFLCompleteAIAnalysis /></Layout>} />
+      <Route path="/sports/afl/ai-analysis" element={<Layout><AFLAIInsights /></Layout>} />
       <Route path="/sports/afl/match-centre" element={<Layout><AFLMatchCentre /></Layout>} />
 
       <Route path="/sports/epl" element={<Layout><EPLHub /></Layout>} />

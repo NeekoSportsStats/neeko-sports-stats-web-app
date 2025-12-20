@@ -1,46 +1,57 @@
+// src/components/ui/button.tsx
 import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
 
-type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "default" | "secondary" | "ghost";
-  size?: "sm" | "default" | "lg" | "icon";
+type ButtonVariant = "default" | "secondary" | "ghost" | "outline";
+type ButtonSize = "default" | "sm" | "lg" | "icon";
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  asChild?: boolean;
+}
+
+const base =
+  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium " +
+  "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 " +
+  "disabled:pointer-events-none disabled:opacity-50";
+
+const variants: Record<ButtonVariant, string> = {
+  default:
+    "bg-amber-500/90 text-black hover:bg-amber-500 shadow-[0_10px_20px_rgba(0,0,0,0.25)]",
+  secondary:
+    "bg-white/10 text-white hover:bg-white/15 border border-white/10",
+  ghost:
+    "bg-transparent text-white/85 hover:bg-white/10",
+  outline:
+    "bg-transparent text-white border border-white/20 hover:bg-white/10",
 };
 
-const cx = (...c: Array<string | false | undefined>) =>
-  c.filter(Boolean).join(" ");
+const sizes: Record<ButtonSize, string> = {
+  default: "h-10 px-4 py-2",
+  sm: "h-9 px-3",
+  lg: "h-11 px-6",
+  icon: "h-10 w-10",
+};
 
-export function Button({
-  className,
-  variant = "default",
-  size = "default",
-  ...props
-}: ButtonProps) {
-  const variantCls =
-    variant === "secondary"
-      ? "bg-white/5 hover:bg-white/10 text-white border border-white/10"
-      : variant === "ghost"
-      ? "bg-transparent hover:bg-white/10 text-white border border-white/10"
-      : "bg-amber-400 hover:bg-amber-300 text-black";
-
-  const sizeCls =
-    size === "icon"
-      ? "h-9 w-9 p-0"
-      : size === "sm"
-      ? "h-9 px-3 text-sm"
-      : size === "lg"
-      ? "h-11 px-6 text-base"
-      : "h-10 px-4 text-sm";
-
-  return (
-    <button
-      className={cx(
-        "inline-flex items-center justify-center rounded-xl font-medium transition-all",
-        "focus:outline-none focus:ring-2 focus:ring-amber-300/40",
-        "disabled:opacity-50 disabled:cursor-not-allowed",
-        variantCls,
-        sizeCls,
-        className
-      )}
-      {...props}
-    />
-  );
+function cn(...c: Array<string | false | null | undefined>) {
+  return c.filter(Boolean).join(" ");
 }
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant = "default", size = "default", asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button";
+    return (
+      <Comp
+        ref={ref}
+        className={cn(base, variants[variant], sizes[size], className)}
+        {...props}
+      />
+    );
+  }
+);
+
+Button.displayName = "Button";
+
+export { Button };
