@@ -22,7 +22,6 @@ import {
   Share2,
   ChevronDown,
   User,
-  Shield,
   Mail,
   HelpCircle,
   FileText,
@@ -33,8 +32,13 @@ import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Separator } from "@/components/ui/separator";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
   const { open: sidebarOpen, isMobile, setOpenMobile, setOpen } = useSidebar();
@@ -42,7 +46,9 @@ export function AppSidebar() {
   const location = useLocation();
   const currentPath = location.pathname;
 
-  const [sportsOpen, setSportsOpen] = useState(currentPath.startsWith("/sports"));
+  const [sportsOpen, setSportsOpen] = useState(
+    currentPath.startsWith("/sports")
+  );
   const [isAdmin, setIsAdmin] = useState(false);
 
   const handleLinkClick = () => {
@@ -65,12 +71,14 @@ export function AppSidebar() {
       <SidebarHeader className="flex flex-row items-center justify-between">
         <span className="text-lg font-semibold">Menu</span>
 
-        <button
+        {/* PATCHED ICON BUTTON */}
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => (isMobile ? setOpenMobile(false) : setOpen(false))}
-          className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-muted"
         >
           <X className="h-4 w-4" />
-        </button>
+        </Button>
       </SidebarHeader>
 
       <SidebarContent>
@@ -101,7 +109,9 @@ export function AppSidebar() {
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton
                       className={`py-1.5 hover:bg-muted/50 ${
-                        isActive("/sports") ? "bg-muted text-primary font-medium" : ""
+                        isActive("/sports")
+                          ? "bg-muted text-primary font-medium"
+                          : ""
                       }`}
                     >
                       <Trophy className="h-4 w-4" />
@@ -133,10 +143,22 @@ export function AppSidebar() {
 
                       {/* AFL SUB */}
                       {[
-                        { title: "Player Stats", url: "/sports/afl/players" },
-                        { title: "Team Stats", url: "/sports/afl/teams" },
-                        { title: "AI Analysis", url: "/sports/afl/ai-analysis" },
-                        { title: "Match Center", url: "/sports/afl/match-centre" },
+                        {
+                          title: "Player Stats",
+                          url: "/sports/afl/players",
+                        },
+                        {
+                          title: "Team Stats",
+                          url: "/sports/afl/teams",
+                        },
+                        {
+                          title: "AI Analysis",
+                          url: "/sports/afl/ai-analysis",
+                        },
+                        {
+                          title: "Match Center",
+                          url: "/sports/afl/match-centre",
+                        },
                       ].map((item) => (
                         <SidebarMenuSubItem key={item.title}>
                           <SidebarMenuSubButton asChild className="py-0.5">
@@ -168,10 +190,22 @@ export function AppSidebar() {
 
                       {/* EPL SUB */}
                       {[
-                        { title: "Player Stats", url: "/sports/epl/players" },
-                        { title: "Team Stats", url: "/sports/epl/teams" },
-                        { title: "AI Analysis", url: "/sports/epl/ai-analysis" },
-                        { title: "Match Center", url: "/sports/epl/match-centre" },
+                        {
+                          title: "Player Stats",
+                          url: "/sports/epl/players",
+                        },
+                        {
+                          title: "Team Stats",
+                          url: "/sports/epl/teams",
+                        },
+                        {
+                          title: "AI Analysis",
+                          url: "/sports/epl/ai-analysis",
+                        },
+                        {
+                          title: "Match Center",
+                          url: "/sports/epl/match-centre",
+                        },
                       ].map((item) => (
                         <SidebarMenuSubItem key={item.title}>
                           <SidebarMenuSubButton asChild className="py-0.5">
@@ -203,10 +237,22 @@ export function AppSidebar() {
 
                       {/* NBA SUB */}
                       {[
-                        { title: "Player Stats", url: "/sports/nba/players" },
-                        { title: "Team Stats", url: "/sports/nba/teams" },
-                        { title: "AI Analysis", url: "/sports/nba/ai-analysis" },
-                        { title: "Match Center", url: "/sports/nba/match-centre" },
+                        {
+                          title: "Player Stats",
+                          url: "/sports/nba/players",
+                        },
+                        {
+                          title: "Team Stats",
+                          url: "/sports/nba/teams",
+                        },
+                        {
+                          title: "AI Analysis",
+                          url: "/sports/nba/ai-analysis",
+                        },
+                        {
+                          title: "Match Center",
+                          url: "/sports/nba/match-centre",
+                        },
                       ].map((item) => (
                         <SidebarMenuSubItem key={item.title}>
                           <SidebarMenuSubButton asChild className="py-0.5">
@@ -243,7 +289,7 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               )}
 
-              {/* Always show Account */}
+              {/* ACCOUNT */}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild className="py-1.5">
                   <NavLink
