@@ -1,7 +1,7 @@
 // src/pages/sports/afl/AFLAIInsights.tsx
 
 import React, { useMemo, useState } from "react";
-import { Crown } from "lucide-react";
+import { Crown, ChevronDown } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import { MOCK_FIXTURES } from "@/components/afl/match-center/mockData";
@@ -68,6 +68,13 @@ export default function AFLAIInsights() {
     [fixtures, roundLabel]
   );
 
+  /* ---------------- MATCH FILTER (ADDED, NON-BREAKING) ------------------- */
+  const [matchId, setMatchId] = useState<string>(roundMatches[0]?.id ?? "");
+  const selectedMatch = useMemo(
+    () => roundMatches.find((m: any) => m.id === matchId),
+    [roundMatches, matchId]
+  );
+
   /* ---------------------------------------------------------------------- */
   /* ROUND-WIDE INSIGHTS                                                     */
   /* ---------------------------------------------------------------------- */
@@ -92,10 +99,18 @@ export default function AFLAIInsights() {
     const avgConf = top.length ? mean(top.map((r) => r.confidence01)) : 0.55;
     const avgVol = top.length ? mean(top.map((r) => r.volatility01)) : 0.55;
 
-    const confLabel = avgConf >= 0.72 ? "higher" : avgConf >= 0.52 ? "mixed" : "lower";
-    const volLabel = avgVol >= 0.72 ? "elevated" : avgVol >= 0.52 ? "moderate" : "low";
+    const confLabel =
+      avgConf >= 0.72 ? "higher" : avgConf >= 0.52 ? "mixed" : "lower";
+    const volLabel =
+      avgVol >= 0.72 ? "elevated" : avgVol >= 0.52 ? "moderate" : "low";
 
-    const lens = stat === "fantasy" ? "fantasy scoring" : stat === "disposals" ? "disposals" : "goals";
+    const lens =
+      stat === "fantasy"
+        ? "fantasy scoring"
+        : stat === "disposals"
+        ? "disposals"
+        : "goals";
+
     return `This round’s ${lens} profile shows ${confLabel} confidence with ${volLabel} volatility across the top options. Use confidence for “safe” picks, volatility for ceiling plays.`;
   }, [playerPredict, stat]);
 
@@ -131,9 +146,9 @@ export default function AFLAIInsights() {
               AFL AI Insights
             </h1>
             <p className="mt-1 text-sm text-white/65">
-              Pre-game analysis for the <span className="text-white/85 font-medium">
-                current round
-              </span>, driven from past matches only.
+              Pre-game analysis for the{" "}
+              <span className="text-white/85 font-medium">current round</span>,
+              driven from past matches only.
             </p>
           </div>
 
@@ -155,6 +170,34 @@ export default function AFLAIInsights() {
           updatedText="Updated daily · Based on last 6–8 matches"
         />
 
+        {/* MATCH FILTER BAR (ADDED) */}
+        <div className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm text-white/70">
+              Match context:{" "}
+              <span className="text-white font-medium">
+                {selectedMatch?.homeTeam} vs {selectedMatch?.awayTeam}
+              </span>{" "}
+              · <span className="text-white/60">{selectedMatch?.venue}</span>
+            </div>
+
+            <div className="relative">
+              <select
+                value={matchId}
+                onChange={(e) => setMatchId(e.target.value)}
+                className="appearance-none rounded-full border border-white/10 bg-white/5 py-1.5 pl-3 pr-9 text-sm text-white/85 hover:bg-white/10"
+              >
+                {roundMatches.map((m: any) => (
+                  <option key={m.id} value={m.id}>
+                    {m.homeTeam} vs {m.awayTeam}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/55" />
+            </div>
+          </div>
+        </div>
+
         <div className="mt-5">
           <ControlsBar stat={stat} onChange={setStat} />
         </div>
@@ -163,10 +206,16 @@ export default function AFLAIInsights() {
           {/* 1 */}
           <SectionShell
             title="1. Player Score Predictability"
-            subtitle="Expected ranges, confidence and volatility across the round."
+            subtitle="Expected ranges, confidence and volatility for this matchup."
             locked={mode !== "premium"}
           >
-            <PredictabilityTable rows={playerPredict} mode={mode} hint="Search players" contextLabel="AI round snapshot" insight={playerInsight} />
+            <PredictabilityTable
+              rows={playerPredict}
+              mode={mode}
+              hint="Search players"
+              contextLabel="AI round snapshot"
+              insight={playerInsight}
+            />
           </SectionShell>
 
           {/* 2 */}
@@ -175,10 +224,16 @@ export default function AFLAIInsights() {
             subtitle="System reliability for teams playing this round."
             locked={mode !== "premium"}
           >
-            <PredictabilityTable rows={teamPredict} mode={mode} hint="Search teams" contextLabel="AI round snapshot" insight={`Team predictability is computed from recent weekly outputs. Higher confidence suggests repeatable roles; higher volatility signals matchup/role sensitivity.`} />
+            <PredictabilityTable
+              rows={teamPredict}
+              mode={mode}
+              hint="Search teams"
+              contextLabel="AI round snapshot"
+              insight="Team predictability is computed from recent weekly outputs. Higher confidence suggests repeatable roles; higher volatility signals matchup sensitivity."
+            />
           </SectionShell>
 
-          {/* 3–7 PER MATCH */}
+          {/* 3–7 PER MATCH (UNCHANGED) */}
           {roundMatches.map((match: any) => {
             const h2hPlayers = buildH2HPlayerMatchups(match, stat, teams);
             const h2hTeams = buildH2HTeamMatchups(match, stat, teams);
@@ -221,14 +276,17 @@ export default function AFLAIInsights() {
                   <QuarterFlowGrid rows={flow} mode={mode} />
                 </SectionShell>
 
-
                 <SectionShell
                   title="6. Consistency vs Explosiveness"
                   locked={mode !== "premium"}
                 >
                   {(() => {
-                    const home = consistencyRows.find((r) => lower(r.name) === lower(match.homeTeam));
-                    const away = consistencyRows.find((r) => lower(r.name) === lower(match.awayTeam));
+                    const home = consistencyRows.find(
+                      (r) => lower(r.name) === lower(match.homeTeam)
+                    );
+                    const away = consistencyRows.find(
+                      (r) => lower(r.name) === lower(match.awayTeam)
+                    );
                     const rows = [home, away].filter(Boolean) as any[];
                     return (
                       <ConsistencyList
