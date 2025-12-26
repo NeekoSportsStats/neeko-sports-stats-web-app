@@ -8,16 +8,12 @@ import { MOCK_FIXTURES } from "@/components/afl/match-center/mockData";
 import { MOCK_TEAMS } from "@/components/afl/teams/mockTeams";
 
 import type { PremiumMode } from "@/components/afl/ai-insights/types";
-<<<<<<< HEAD
-import { STAT_LABEL, StatLens, mean } from "@/components/afl/ai-insights/utils";
-=======
 import {
   STAT_LABEL,
   StatLens,
   mean,
   cv,
 } from "@/components/afl/ai-insights/utils";
->>>>>>> c3ab9f5a9b4cd8526bd59a67e392f28cffebafe7
 
 import SectionShell from "@/components/afl/ai-insights/SectionShell";
 import ControlsBar from "@/components/afl/ai-insights/ControlsBar";
@@ -78,7 +74,9 @@ export default function AFLAIInsights() {
   );
 
   /* ---------------- MATCH FILTER ---------------- */
+
   const [matchId, setMatchId] = useState<string>(roundMatches[0]?.id ?? "");
+
   const selectedMatch = useMemo(
     () => roundMatches.find((m: any) => m.id === matchId),
     [roundMatches, matchId]
@@ -88,7 +86,7 @@ export default function AFLAIInsights() {
     if (!selectedMatch) return undefined;
     const home = selectedMatch.homeTeam ?? "Home";
     const away = selectedMatch.awayTeam ?? "Away";
-    const venue = selectedMatch.venue ? ` at ${selectedMatch.venue}` : "";
+    const venue = selectedMatch.venue ? ` · ${selectedMatch.venue}` : "";
     return `${home} vs ${away}${venue}`;
   }, [selectedMatch]);
 
@@ -113,37 +111,29 @@ export default function AFLAIInsights() {
 
   const playerInsight = useMemo(() => {
     const top = playerPredict.slice(0, Math.min(12, playerPredict.length));
+
     const avgConf = top.length ? mean(top.map((r) => r.confidence01)) : 0.55;
     const avgVol = top.length ? mean(top.map((r) => r.volatility01)) : 0.55;
 
-    // Use cv() so the import is meaningful and also adds an extra layer of signal
-    const highs = top.map((r) => Number(r.rangeHigh ?? 0)).filter((n) => n > 0);
+    const highs = top
+      .map((r) => Number(r.rangeHigh ?? 0))
+      .filter((n) => n > 0);
+
     const spread = highs.length >= 3 ? cv(highs) : 0;
 
     const confWord =
       avgConf >= 0.72 ? "higher" : avgConf >= 0.52 ? "mixed" : "lower";
     const volWord =
       avgVol >= 0.72 ? "elevated" : avgVol >= 0.52 ? "moderate" : "low";
-
-<<<<<<< HEAD
-    return `This round’s ${STAT_LABEL[stat]} profile shows ${confLabel} confidence with ${volLabel} volatility across the top options. Use confidence for “safe” picks and volatility for ceiling plays.`;
-=======
     const spreadWord =
       spread >= 0.28 ? "wide" : spread >= 0.16 ? "balanced" : "tight";
 
-    const lens =
-      stat === "fantasy"
-        ? "fantasy scoring"
-        : stat === "disposals"
-        ? "disposals"
-        : "goals";
-
-    return `This matchup’s ${lens} profile shows ${confWord} confidence with ${volWord} volatility. The top-end distribution is ${spreadWord}, so use confidence for “safe” picks and volatility for ceiling plays.`;
->>>>>>> c3ab9f5a9b4cd8526bd59a67e392f28cffebafe7
+    return `This matchup’s ${STAT_LABEL[stat]} profile shows ${confWord} confidence with ${volWord} volatility. The top-end distribution is ${spreadWord}, so use confidence for “safe” picks and volatility for ceiling plays.`;
   }, [playerPredict, stat]);
 
   const teamInsight = useMemo(() => {
     const top = teamPredict.slice(0, Math.min(10, teamPredict.length));
+
     const avgConf = top.length ? mean(top.map((r) => r.confidence01)) : 0.55;
     const avgVol = top.length ? mean(top.map((r) => r.volatility01)) : 0.55;
 
@@ -216,10 +206,7 @@ export default function AFLAIInsights() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm text-white/70">
               Match context:{" "}
-              <span className="text-white font-medium">
-                {selectedMatch?.homeTeam} vs {selectedMatch?.awayTeam}
-              </span>{" "}
-              · <span className="text-white/60">{selectedMatch?.venue}</span>
+              <span className="text-white font-medium">{matchContext}</span>
             </div>
 
             <div className="relative">
@@ -244,7 +231,6 @@ export default function AFLAIInsights() {
         </div>
 
         <div className="mt-6 grid gap-6">
-          {/* 1 */}
           <SectionShell
             title="1. Player Score Predictability"
             subtitle="Expected ranges, confidence and volatility for this matchup."
@@ -254,22 +240,11 @@ export default function AFLAIInsights() {
               rows={playerPredict}
               mode={mode}
               statLabel={STAT_LABEL[stat]}
-<<<<<<< HEAD
-              hint="Search players"
-              contextLabel="AI round snapshot"
-              matchContext={
-                selectedMatch
-                  ? `${selectedMatch.homeTeam} vs ${selectedMatch.awayTeam}`
-                  : undefined
-              }
-=======
               matchContext={matchContext}
->>>>>>> c3ab9f5a9b4cd8526bd59a67e392f28cffebafe7
               insight={playerInsight}
             />
           </SectionShell>
 
-          {/* 2 */}
           <SectionShell
             title="2. Team Score Predictability"
             subtitle="System reliability for teams playing this round."
@@ -279,18 +254,11 @@ export default function AFLAIInsights() {
               rows={teamPredict}
               mode={mode}
               statLabel={STAT_LABEL[stat]}
-<<<<<<< HEAD
-              hint="Search teams"
-              contextLabel="AI round snapshot"
-              insight="Team predictability is computed from recent weekly outputs. Higher confidence suggests repeatable roles; higher volatility signals matchup sensitivity."
-=======
               matchContext={matchContext}
               insight={teamInsight}
->>>>>>> c3ab9f5a9b4cd8526bd59a67e392f28cffebafe7
             />
           </SectionShell>
 
-          {/* 3–7 PER MATCH */}
           {roundMatches.map((match: any) => {
             const h2hPlayers = buildH2HPlayerMatchups(match, stat, teams);
             const h2hTeams = buildH2HTeamMatchups(match, stat, teams);
