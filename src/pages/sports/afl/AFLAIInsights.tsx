@@ -8,7 +8,16 @@ import { MOCK_FIXTURES } from "@/components/afl/match-center/mockData";
 import { MOCK_TEAMS } from "@/components/afl/teams/mockTeams";
 
 import type { PremiumMode } from "@/components/afl/ai-insights/types";
+<<<<<<< HEAD
 import { STAT_LABEL, StatLens, mean } from "@/components/afl/ai-insights/utils";
+=======
+import {
+  STAT_LABEL,
+  StatLens,
+  mean,
+  cv,
+} from "@/components/afl/ai-insights/utils";
+>>>>>>> c3ab9f5a9b4cd8526bd59a67e392f28cffebafe7
 
 import SectionShell from "@/components/afl/ai-insights/SectionShell";
 import ControlsBar from "@/components/afl/ai-insights/ControlsBar";
@@ -75,6 +84,14 @@ export default function AFLAIInsights() {
     [roundMatches, matchId]
   );
 
+  const matchContext = useMemo(() => {
+    if (!selectedMatch) return undefined;
+    const home = selectedMatch.homeTeam ?? "Home";
+    const away = selectedMatch.awayTeam ?? "Away";
+    const venue = selectedMatch.venue ? ` at ${selectedMatch.venue}` : "";
+    return `${home} vs ${away}${venue}`;
+  }, [selectedMatch]);
+
   /* ---------------------------------------------------------------------- */
   /* ROUND-WIDE INSIGHTS                                                     */
   /* ---------------------------------------------------------------------- */
@@ -99,13 +116,44 @@ export default function AFLAIInsights() {
     const avgConf = top.length ? mean(top.map((r) => r.confidence01)) : 0.55;
     const avgVol = top.length ? mean(top.map((r) => r.volatility01)) : 0.55;
 
-    const confLabel =
+    // Use cv() so the import is meaningful and also adds an extra layer of signal
+    const highs = top.map((r) => Number(r.rangeHigh ?? 0)).filter((n) => n > 0);
+    const spread = highs.length >= 3 ? cv(highs) : 0;
+
+    const confWord =
       avgConf >= 0.72 ? "higher" : avgConf >= 0.52 ? "mixed" : "lower";
-    const volLabel =
+    const volWord =
       avgVol >= 0.72 ? "elevated" : avgVol >= 0.52 ? "moderate" : "low";
 
+<<<<<<< HEAD
     return `This round’s ${STAT_LABEL[stat]} profile shows ${confLabel} confidence with ${volLabel} volatility across the top options. Use confidence for “safe” picks and volatility for ceiling plays.`;
+=======
+    const spreadWord =
+      spread >= 0.28 ? "wide" : spread >= 0.16 ? "balanced" : "tight";
+
+    const lens =
+      stat === "fantasy"
+        ? "fantasy scoring"
+        : stat === "disposals"
+        ? "disposals"
+        : "goals";
+
+    return `This matchup’s ${lens} profile shows ${confWord} confidence with ${volWord} volatility. The top-end distribution is ${spreadWord}, so use confidence for “safe” picks and volatility for ceiling plays.`;
+>>>>>>> c3ab9f5a9b4cd8526bd59a67e392f28cffebafe7
   }, [playerPredict, stat]);
+
+  const teamInsight = useMemo(() => {
+    const top = teamPredict.slice(0, Math.min(10, teamPredict.length));
+    const avgConf = top.length ? mean(top.map((r) => r.confidence01)) : 0.55;
+    const avgVol = top.length ? mean(top.map((r) => r.volatility01)) : 0.55;
+
+    const confWord =
+      avgConf >= 0.72 ? "repeatable" : avgConf >= 0.52 ? "mixed" : "fragile";
+    const volWord =
+      avgVol >= 0.72 ? "high" : avgVol >= 0.52 ? "moderate" : "low";
+
+    return `Team predictability is computed from weekly outputs. This round’s team profile looks ${confWord} overall, with ${volWord} volatility—matchups and venue can amplify swings.`;
+  }, [teamPredict]);
 
   const roundOverview = useMemo(() => {
     const teamNames = new Set<string>();
@@ -206,6 +254,7 @@ export default function AFLAIInsights() {
               rows={playerPredict}
               mode={mode}
               statLabel={STAT_LABEL[stat]}
+<<<<<<< HEAD
               hint="Search players"
               contextLabel="AI round snapshot"
               matchContext={
@@ -213,6 +262,9 @@ export default function AFLAIInsights() {
                   ? `${selectedMatch.homeTeam} vs ${selectedMatch.awayTeam}`
                   : undefined
               }
+=======
+              matchContext={matchContext}
+>>>>>>> c3ab9f5a9b4cd8526bd59a67e392f28cffebafe7
               insight={playerInsight}
             />
           </SectionShell>
@@ -227,9 +279,14 @@ export default function AFLAIInsights() {
               rows={teamPredict}
               mode={mode}
               statLabel={STAT_LABEL[stat]}
+<<<<<<< HEAD
               hint="Search teams"
               contextLabel="AI round snapshot"
               insight="Team predictability is computed from recent weekly outputs. Higher confidence suggests repeatable roles; higher volatility signals matchup sensitivity."
+=======
+              matchContext={matchContext}
+              insight={teamInsight}
+>>>>>>> c3ab9f5a9b4cd8526bd59a67e392f28cffebafe7
             />
           </SectionShell>
 
