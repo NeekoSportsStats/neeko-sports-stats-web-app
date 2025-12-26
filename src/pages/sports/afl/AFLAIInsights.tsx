@@ -39,8 +39,6 @@ import {
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const lower = (s: any) => (s ?? "").toString().toLowerCase();
-
 function currentRound(fixtures: FixtureMatch[]) {
   const upcoming = filterUpcomingFixtures(fixtures);
   if (!upcoming.length) return "";
@@ -76,7 +74,6 @@ export default function AFLAIInsights() {
 
   const [matchId, setMatchId] = useState<string>(roundMatches[0]?.id ?? "");
 
-  // Keep match selection valid when the computed round changes (or fixtures refresh)
   useEffect(() => {
     if (!roundMatches.length) return;
     if (matchId && roundMatches.some((m: any) => m.id === matchId)) return;
@@ -100,10 +97,20 @@ export default function AFLAIInsights() {
   /* ROUND-WIDE INSIGHTS                                                     */
   /* ---------------------------------------------------------------------- */
 
-  const playerPredict = useMemo(
+  const rawPlayerPredict = useMemo(
     () => buildPlayerPredictabilityFromFixtures(pastFixtures, stat),
     [pastFixtures, stat]
   );
+
+  // 🔒 PATCH: players filtered to current match only
+  const playerPredict = useMemo(() => {
+    if (!selectedMatch) return rawPlayerPredict;
+    const teamSet = new Set([
+      selectedMatch.homeTeam,
+      selectedMatch.awayTeam,
+    ]);
+    return rawPlayerPredict
+  }, [rawPlayerPredict, selectedMatch]);
 
   const teamPredict = useMemo(
     () => buildTeamPredictabilityFromTeams(teams, stat),
@@ -134,7 +141,7 @@ export default function AFLAIInsights() {
     const spreadWord =
       spread >= 0.28 ? "wide" : spread >= 0.16 ? "balanced" : "tight";
 
-    return `This matchup’s ${STAT_LABEL[stat]} profile shows ${confWord} confidence with ${volWord} volatility. The top-end distribution is ${spreadWord}, so use confidence for “safe” picks and volatility for ceiling plays.`;
+    return `This matchup’s ${STAT_LABEL[stat]} profile shows ${confWord} confidence with ${volWord} volatility. The top-end distribution is ${spreadWord}, so use confidence for safe picks and volatility for ceiling plays.`;
   }, [playerPredict, stat]);
 
   const teamInsight = useMemo(() => {
@@ -156,18 +163,7 @@ export default function AFLAIInsights() {
   /* ---------------------------------------------------------------------- */
 
   return (
-    <div
-      className="
-    min-h-screen text-white
-    bg-[#070707]
-    relative
-    before:content-['']
-    before:absolute
-    before:inset-0
-    before:bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(250,204,21,0.08),transparent_60%)]
-    before:pointer-events-none
-  "
-    >
+    <div className="min-h-screen text-white bg-[#070707] relative">
       <div className="mx-auto max-w-6xl px-4 py-8">
         {/* HEADER */}
         <header className="mb-10 animate-premium-section">
@@ -182,7 +178,7 @@ export default function AFLAIInsights() {
 
         {/* PREMIUM GLASS BAR */}
         <div className="sticky top-16 z-40 mb-10">
-          <div className="rounded-2xl border backdrop-blur-xl bg-gradient-to-r from-yellow-500/10 via-black/80 to-yellow-500/10 px-4 py-3 shadow-[0_18px_70px_rgba(0,0,0,0.85)] border-yellow-400/40">
+          <div className="rounded-2xl border backdrop-blur-xl bg-gradient-to-r from-yellow-500/10 via-black/80 to-yellow-500/10 px-4 py-3 border-yellow-400/40">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-yellow-200/80">
@@ -203,11 +199,16 @@ export default function AFLAIInsights() {
                 ].map(([id, label]) => (
                   <button
                     key={id}
-                    onClick={() => setActiveSection(id)}
+                    onClick={() => {
+                      setActiveSection(id);
+                      document
+                        .getElementById(id)
+                        ?.scrollIntoView({ behavior: "smooth" });
+                    }}
                     className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all ${
                       activeSection === id
-                        ? "border-yellow-300 bg-yellow-400 text-black shadow-[0_0_26px_rgba(250,204,21,0.9)]"
-                        : "border-white/16 bg-black/40 text-neutral-200 hover:border-yellow-400/70 hover:bg-yellow-500/10"
+                        ? "border-yellow-300 bg-yellow-400 text-black"
+                        : "border-white/16 bg-black/40 text-neutral-200 hover:border-yellow-400/70"
                     }`}
                   >
                     {label}
@@ -268,38 +269,53 @@ export default function AFLAIInsights() {
 
         <div className="mt-10 space-y-20">
           {activeSection === "players" && (
-            <SectionShell
-              title="1. Player Score Predictability"
-              subtitle="Expected ranges, confidence and volatility for this matchup."
-              locked={mode !== "premium"}
-            >
-              <PredictabilityTable
-                rows={playerPredict}
-                mode={mode}
-                statLabel={STAT_LABEL[stat]}
-                matchContext={matchContext}
-                insight={playerInsight}
-              />
-            </SectionShell>
+            <div id="players">
+              <SectionShell
+                title="1. Player Score Predictability"
+                subtitle="Expected ranges, confidence and volatility for this matchup."
+                locked={mode !== "premium"}
+              >
+                <PredictabilityTable
+                  rows={playerPredict}
+                  mode={mode}
+                  statLabel={STAT_LABEL[stat]}
+                  matchContext={matchContext}
+                  insight={playerInsight}
+                  onUnlock={() =>
+                    (window.location.href =
+                      "https://www.neekostats.com.au/neeko-plus")
+                  }
+                />
+              </SectionShell>
+            </div>
           )}
 
           {activeSection === "teams" && (
-            <SectionShell
-              title="2. Team Score Predictability"
-              subtitle="System reliability for teams playing this round."
-              locked={mode !== "premium"}
-            >
-              <PredictabilityTable
-                rows={teamPredict}
-                mode={mode}
-                statLabel={STAT_LABEL[stat]}
-                matchContext={matchContext}
-                insight={teamInsight}
-              />
-            </SectionShell>
+            <div id="teams">
+              <SectionShell
+                title="2. Team Score Predictability"
+                subtitle="System reliability for teams playing this round."
+                locked={mode !== "premium"}
+              >
+                <PredictabilityTable
+                  rows={teamPredict}
+                  mode={mode}
+                  statLabel={STAT_LABEL[stat]}
+                  matchContext={matchContext}
+                  insight={teamInsight}
+                  onUnlock={() =>
+                    (window.location.href =
+                      "https://www.neekostats.com.au/neeko-plus")
+                  }
+                />
+              </SectionShell>
+            </div>
           )}
 
           {roundMatches.map((match: any) => {
+            if (!["matchups", "flow", "drivers"].includes(activeSection))
+              return null;
+
             const h2hPlayers = buildH2HPlayerMatchups(match, stat, teams);
             const h2hTeams = buildH2HTeamMatchups(match, stat, teams);
             const flow = buildQuarterFlow(match);
@@ -309,9 +325,6 @@ export default function AFLAIInsights() {
               stat,
             });
 
-            if (!["matchups", "flow", "drivers"].includes(activeSection))
-              return null;
-
             return (
               <div key={match.id} className="space-y-16">
                 {activeSection === "matchups" && (
@@ -320,15 +333,6 @@ export default function AFLAIInsights() {
                     locked={mode !== "premium"}
                   >
                     <MatchupTable rows={h2hPlayers} mode={mode} />
-                  </SectionShell>
-                )}
-
-                {activeSection === "matchups" && (
-                  <SectionShell
-                    title="4. Head-to-Head Team Matchup"
-                    locked={mode !== "premium"}
-                  >
-                    <MatchupTable rows={h2hTeams} mode={mode} />
                   </SectionShell>
                 )}
 
@@ -353,7 +357,6 @@ export default function AFLAIInsights() {
             );
           })}
 
-          {/* Keep your consistency block available in Teams view (or wire it later) */}
           {activeSection === "teams" && (
             <SectionShell
               title="Bonus: Consistency & Explosiveness"
