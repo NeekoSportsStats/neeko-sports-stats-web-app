@@ -149,7 +149,19 @@ export default function AFLAIInsights() {
   /* ---------------------------------------------------------------------- */
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0b0f18] via-black to-black text-white">
+    <div
+  className="
+    min-h-screen text-white
+    bg-[#070707]
+    relative
+    before:content-['']
+    before:absolute
+    before:inset-0
+    before:bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(250,204,21,0.08),transparent_60%)]
+    before:pointer-events-none
+  "
+>
+
       <div className="mx-auto max-w-6xl px-4 py-8">
 
         {/* HEADER */}
