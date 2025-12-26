@@ -6,6 +6,11 @@ import { confLabel, volLabel } from "./utils";
 type SortKey = "confidence" | "volatility" | "ceiling";
 type Chip = "all" | "safe" | "ceiling" | "risky";
 
+type PlaceholderRow = {
+  __placeholder: true;
+  key: string;
+};
+
 export default function PredictabilityTable(props: {
   rows: PredictRow[];
   mode: PremiumMode;
@@ -27,7 +32,9 @@ export default function PredictabilityTable(props: {
   } = props;
 
   const locked = mode !== "premium";
+
   const FREE_PREVIEW_COUNT = 3;
+  const MAX_LOCKED_PLACEHOLDERS = 16;
 
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<SortKey>("confidence");
@@ -42,12 +49,9 @@ export default function PredictabilityTable(props: {
   /* -------------------------------------------------------------------------- */
   useEffect(() => {
     const s = (statLabel ?? "").toLowerCase();
-    // Goals tends to be “ceiling” (spiky), disposals tends to be “safe” (floor),
-    // fantasy is mixed.
     if (s.includes("goal")) setChip("ceiling");
     else if (s.includes("disposal")) setChip("safe");
     else setChip("all");
-    // do not reset search every time, only chip
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statLabel]);
 
@@ -58,12 +62,9 @@ export default function PredictabilityTable(props: {
     const c = r.confidence01;
     const v = r.volatility01;
 
-    if (c >= 0.72 && v <= 0.4)
-      return "Reliable role + stable scoring floor.";
-    if (v >= 0.65)
-      return "High ceiling profile — matchup sensitive.";
-    if (c <= 0.45)
-      return "Wide outcome band — role/opposition risk.";
+    if (c >= 0.72 && v <= 0.4) return "Reliable role + stable scoring floor.";
+    if (v >= 0.65) return "High ceiling profile — matchup sensitive.";
+    if (c <= 0.45) return "Wide outcome band — role/opposition risk.";
     return "Balanced profile with moderate confidence and variability.";
   }
 
@@ -78,7 +79,6 @@ export default function PredictabilityTable(props: {
       if (lo === hi) return String(hi);
       return `${lo}–${hi}`;
     }
-    // if only one exists, don't pretend it's a range
     if (typeof lo === "number" && typeof hi !== "number") return `${lo}–—`;
     if (typeof hi === "number" && typeof lo !== "number") return `—–${hi}`;
     return "—";
@@ -91,7 +91,6 @@ export default function PredictabilityTable(props: {
   const ranked = useMemo(() => {
     let r = rows;
 
-    // chip filters
     if (chip === "safe") {
       r = r.filter((x) => x.confidence01 >= 0.7 && x.volatility01 <= 0.4);
     }
@@ -102,7 +101,6 @@ export default function PredictabilityTable(props: {
       r = r.filter((x) => x.confidence01 <= 0.45);
     }
 
-    // sort
     r = [...r].sort((a, b) => {
       if (sort === "confidence") return b.confidence01 - a.confidence01;
       if (sort === "volatility") return b.volatility01 - a.volatility01;
@@ -112,9 +110,7 @@ export default function PredictabilityTable(props: {
     return r;
   }, [rows, chip, sort]);
 
-  // Hard gating rule:
-  // In FREE mode, search only applies to the preview set so users cannot
-  // “find” locked players by searching.
+  // Hard gating: in free mode, search ONLY applies to the preview set
   const previewBase = useMemo(() => {
     if (!locked) return ranked;
     return ranked.slice(0, FREE_PREVIEW_COUNT);
@@ -126,24 +122,40 @@ export default function PredictabilityTable(props: {
     return previewBase.filter((x) => x.name.toLowerCase().includes(s));
   }, [previewBase, q]);
 
-  // What you render:
-  // - Premium: everything (with search over everything)
-  // - Free: top 3 (searchable) + remaining rows as locked placeholders (non-searchable)
+  // Placeholders (IMPORTANT): never pass real locked rows through render list
+  const lockedPlaceholderCount = useMemo(() => {
+    if (!locked) return 0;
+    const remaining = Math.max(0, ranked.length - FREE_PREVIEW_COUNT);
+    // show enough to feel “full”, without leaking the exact count via huge scroll
+    return Math.min(remaining, MAX_LOCKED_PLACEHOLDERS);
+  }, [locked, ranked.length]);
+
+  const placeholders: PlaceholderRow[] = useMemo(() => {
+    if (!lockedPlaceholderCount) return [];
+    return Array.from({ length: lockedPlaceholderCount }, (_, i) => ({
+      __placeholder: true,
+      key: `locked-${i}`,
+    }));
+  }, [lockedPlaceholderCount]);
+
   const renderRows = useMemo(() => {
     if (!locked) {
-      // premium: apply q across everything
-      if (!q.trim()) return ranked;
+      // premium: search across everything
+      if (!q.trim()) return ranked as Array<PredictRow | PlaceholderRow>;
       const s = q.toLowerCase();
-      return ranked.filter((x) => x.name.toLowerCase().includes(s));
+      return ranked.filter((x) => x.name.toLowerCase().includes(s)) as Array<
+        PredictRow | PlaceholderRow
+      >;
     }
 
-    // free: show previewFiltered, then locked placeholders for the rest of ranked (not filtered)
-    const lockedRest = ranked.slice(FREE_PREVIEW_COUNT);
-    return [...previewFiltered, ...lockedRest];
-  }, [locked, ranked, previewFiltered, q]);
+    // free: show previewFiltered (real), then placeholders only
+    return [...previewFiltered, ...placeholders] as Array<
+      PredictRow | PlaceholderRow
+    >;
+  }, [locked, ranked, q, previewFiltered, placeholders]);
 
   /* -------------------------------------------------------------------------- */
-  /* MODAL HANDLERS                                                              */
+  /* MODAL + SCROLL LOCK + ESC                                                   */
   /* -------------------------------------------------------------------------- */
 
   const closeModal = () => {
@@ -161,6 +173,16 @@ export default function PredictabilityTable(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Body scroll lock while modal open
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   const proTip =
     chip === "safe"
       ? "Tip: Prioritise these players for reliable floor and cash contests."
@@ -169,6 +191,23 @@ export default function PredictabilityTable(props: {
       : chip === "risky"
       ? "Tip: Risky picks can bust — pair with safer cores."
       : "Tip: Confidence = safety. Volatility = upside.";
+
+  /* -------------------------------------------------------------------------- */
+  /* UI HELPERS                                                                  */
+  /* -------------------------------------------------------------------------- */
+
+  const sortLabel =
+    sort === "confidence"
+      ? "Sort: Confidence"
+      : sort === "volatility"
+      ? "Sort: Volatility"
+      : "Sort: Max Projection";
+
+  const searchPlaceholder = locked
+    ? hint
+      ? `${hint} (top ${FREE_PREVIEW_COUNT} only)…`
+      : `Search (top ${FREE_PREVIEW_COUNT} only)…`
+    : hint ?? "Search…";
 
   /* -------------------------------------------------------------------------- */
   /* RENDER                                                                     */
@@ -220,6 +259,7 @@ export default function PredictabilityTable(props: {
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
             className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80"
+            aria-label="Sort"
           >
             <option value="confidence">Sort: Confidence</option>
             <option value="volatility">Sort: Volatility</option>
@@ -229,10 +269,9 @@ export default function PredictabilityTable(props: {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder={
-              locked ? (hint ? `${hint} (top 3 only)…` : "Search (top 3 only)…") : hint ?? "Search…"
-            }
+            placeholder={searchPlaceholder}
             className="w-44 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white placeholder:text-white/40"
+            aria-label="Search"
           />
         </div>
       </div>
@@ -249,43 +288,84 @@ export default function PredictabilityTable(props: {
         </div>
 
         <div className="divide-y divide-white/10">
-          {renderRows.map((r, i) => {
-            const isPreview =
-              !locked || i < (locked ? previewFiltered.length : Number.MAX_SAFE_INTEGER);
+          {renderRows.map((row, i) => {
+            const isPlaceholder =
+              (row as PlaceholderRow).__placeholder === true;
 
-            // In free mode:
-            // - The preview list is real rows (clickable)
-            // - The rest are locked placeholders and should not reveal names or open modal
-            const isLockedRow = locked && !isPreview;
+            if (isPlaceholder) {
+              // No real data in placeholders → prevents freemium bypass
+              const fauxBar = 58 + (i % 4) * 8; // 58,66,74,82
+              return (
+                <div
+                  key={(row as PlaceholderRow).key}
+                  className="grid grid-cols-[1.6fr_0.9fr_2.2fr] px-3 py-3"
+                >
+                  <div className="opacity-70">
+                    <div className="text-sm font-medium text-white">
+                      Locked player
+                    </div>
 
-            const rangeText = fmtRange(r);
+                    <div className="mt-1 flex flex-wrap gap-1 text-[11px] text-white/60">
+                      <span className="rounded-full border border-white/10 px-2 py-0.5">
+                        —
+                      </span>
+                      <span className="rounded-full border border-white/10 px-2 py-0.5">
+                        —
+                      </span>
+
+                      <span className="ml-1 inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-200">
+                        <Lock className="h-3 w-3" />
+                        locked
+                      </span>
+                    </div>
+
+                    <div className="mt-2 h-[6px] w-full rounded-full bg-white/10">
+                      <div
+                        className="h-[6px] rounded-full bg-amber-400/60"
+                        style={{ width: `${fauxBar}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center">
+                    <span className="text-sm text-white/40">—</span>
+                  </div>
+
+                  <div className="text-sm text-white/70">
+                    <span className="select-none blur-sm">
+                      Unlock to view full range + reasoning.
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+
+            const r = row as PredictRow;
+
+            // Premium: all rows clickable
+            // Free: only previewFiltered rows exist here (real), so they’re safe to click
+            const canOpen = !locked || true;
 
             // Confidence bar width based on confidence01 (0..1)
-            const w = Math.max(0, Math.min(100, Math.round((r.confidence01 ?? 0) * 100)));
-
-            const displayName = isLockedRow ? "Locked player" : r.name;
-            const displayInsight = isLockedRow ? "Unlock to view full range + reasoning." : aiSentence(r);
+            const w = Math.max(
+              0,
+              Math.min(100, Math.round((r.confidence01 ?? 0) * 100))
+            );
 
             return (
               <button
                 type="button"
-                key={`${r.id}-${i}`}
+                key={r.id}
                 onClick={() => {
-                  if (isLockedRow) return;
+                  if (!canOpen) return;
                   setSelected(r);
                   setOpen(true);
                 }}
-                className={`w-full text-left grid grid-cols-[1.6fr_0.9fr_2.2fr] px-3 py-3 transition ${
-                  isLockedRow
-                    ? "cursor-default"
-                    : "hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-amber-400/30"
-                }`}
-                // prevent free users from clicking locked rows
-                disabled={isLockedRow}
+                className="w-full text-left grid grid-cols-[1.6fr_0.9fr_2.2fr] px-3 py-3 transition hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-amber-400/30"
               >
                 {/* NAME + CHIPS + BAR */}
-                <div className={isLockedRow ? "opacity-60" : ""}>
-                  <div className="text-sm font-medium text-white">{displayName}</div>
+                <div>
+                  <div className="text-sm font-medium text-white">{r.name}</div>
 
                   <div className="mt-1 flex flex-wrap gap-1 text-[11px] text-white/60">
                     <span className="rounded-full border border-white/10 px-2 py-0.5">
@@ -294,13 +374,6 @@ export default function PredictabilityTable(props: {
                     <span className="rounded-full border border-white/10 px-2 py-0.5">
                       {volLabel(r.volatility01)}
                     </span>
-
-                    {isLockedRow && (
-                      <span className="ml-1 inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-200">
-                        <Lock className="h-3 w-3" />
-                        locked
-                      </span>
-                    )}
                   </div>
 
                   {/* Confidence bar */}
@@ -314,21 +387,11 @@ export default function PredictabilityTable(props: {
 
                 {/* RANGE */}
                 <div className="flex items-center justify-start">
-                  {isLockedRow ? (
-                    <span className="text-sm text-white/40">—</span>
-                  ) : (
-                    <span className="text-sm text-white">{rangeText}</span>
-                  )}
+                  <span className="text-sm text-white">{fmtRange(r)}</span>
                 </div>
 
                 {/* AI */}
-                <div className="text-sm text-white/70">
-                  {isLockedRow ? (
-                    <span className="select-none blur-sm">{displayInsight}</span>
-                  ) : (
-                    displayInsight
-                  )}
-                </div>
+                <div className="text-sm text-white/70">{aiSentence(r)}</div>
               </button>
             );
           })}
@@ -355,11 +418,13 @@ export default function PredictabilityTable(props: {
         </div>
       )}
 
-      {/* MODAL (centered, click outside to close) */}
+      {/* MODAL (true centered, click-off to close, esc, scroll lock) */}
       {open && selected && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={closeModal}
+          onMouseDown={closeModal}
+          role="dialog"
+          aria-modal="true"
         >
           {/* backdrop */}
           <div className="absolute inset-0 bg-black/70" />
@@ -367,7 +432,7 @@ export default function PredictabilityTable(props: {
           {/* panel */}
           <div
             className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#0b0f18] p-4 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -412,7 +477,8 @@ export default function PredictabilityTable(props: {
             </div>
 
             <div className="mt-3 text-[11px] text-white/45">
-              Tip: Press <span className="text-white/70">Esc</span> or click outside to close.
+              Tip: Press <span className="text-white/70">Esc</span> or click
+              outside to close.
             </div>
           </div>
         </div>
