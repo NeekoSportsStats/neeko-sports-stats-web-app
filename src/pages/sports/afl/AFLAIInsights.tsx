@@ -76,6 +76,13 @@ export default function AFLAIInsights() {
 
   const [matchId, setMatchId] = useState<string>(roundMatches[0]?.id ?? "");
 
+  // Keep match selection valid when the computed round changes (or fixtures refresh)
+  useEffect(() => {
+    if (!roundMatches.length) return;
+    if (matchId && roundMatches.some((m: any) => m.id === matchId)) return;
+    setMatchId(roundMatches[0]?.id ?? "");
+  }, [roundMatches, matchId]);
+
   const selectedMatch = useMemo(
     () => roundMatches.find((m: any) => m.id === matchId),
     [roundMatches, matchId]
@@ -150,7 +157,7 @@ export default function AFLAIInsights() {
 
   return (
     <div
-  className="
+      className="
     min-h-screen text-white
     bg-[#070707]
     relative
@@ -160,10 +167,8 @@ export default function AFLAIInsights() {
     before:bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(250,204,21,0.08),transparent_60%)]
     before:pointer-events-none
   "
->
-
+    >
       <div className="mx-auto max-w-6xl px-4 py-8">
-
         {/* HEADER */}
         <header className="mb-10 animate-premium-section">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
@@ -211,7 +216,9 @@ export default function AFLAIInsights() {
               </div>
 
               <button
-                onClick={() => setMode((m) => (m === "premium" ? "free" : "premium"))}
+                onClick={() =>
+                  setMode((m) => (m === "premium" ? "free" : "premium"))
+                }
                 className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/20 px-3 py-1.5 text-xs text-amber-100"
               >
                 <Crown className="h-4 w-4" />
@@ -260,34 +267,37 @@ export default function AFLAIInsights() {
         </div>
 
         <div className="mt-10 space-y-20">
+          {activeSection === "players" && (
+            <SectionShell
+              title="1. Player Score Predictability"
+              subtitle="Expected ranges, confidence and volatility for this matchup."
+              locked={mode !== "premium"}
+            >
+              <PredictabilityTable
+                rows={playerPredict}
+                mode={mode}
+                statLabel={STAT_LABEL[stat]}
+                matchContext={matchContext}
+                insight={playerInsight}
+              />
+            </SectionShell>
+          )}
 
-          <SectionShell
-            title="1. Player Score Predictability"
-            subtitle="Expected ranges, confidence and volatility for this matchup."
-            locked={mode !== "premium"}
-          >
-            <PredictabilityTable
-              rows={playerPredict}
-              mode={mode}
-              statLabel={STAT_LABEL[stat]}
-              matchContext={matchContext}
-              insight={playerInsight}
-            />
-          </SectionShell>
-
-          <SectionShell
-            title="2. Team Score Predictability"
-            subtitle="System reliability for teams playing this round."
-            locked={mode !== "premium"}
-          >
-            <PredictabilityTable
-              rows={teamPredict}
-              mode={mode}
-              statLabel={STAT_LABEL[stat]}
-              matchContext={matchContext}
-              insight={teamInsight}
-            />
-          </SectionShell>
+          {activeSection === "teams" && (
+            <SectionShell
+              title="2. Team Score Predictability"
+              subtitle="System reliability for teams playing this round."
+              locked={mode !== "premium"}
+            >
+              <PredictabilityTable
+                rows={teamPredict}
+                mode={mode}
+                statLabel={STAT_LABEL[stat]}
+                matchContext={matchContext}
+                insight={teamInsight}
+              />
+            </SectionShell>
+          )}
 
           {roundMatches.map((match: any) => {
             const h2hPlayers = buildH2HPlayerMatchups(match, stat, teams);
@@ -299,26 +309,60 @@ export default function AFLAIInsights() {
               stat,
             });
 
+            if (!["matchups", "flow", "drivers"].includes(activeSection))
+              return null;
+
             return (
               <div key={match.id} className="space-y-16">
-                <SectionShell title="3. Head-to-Head Player Matchups" locked={mode !== "premium"}>
-                  <MatchupTable rows={h2hPlayers} mode={mode} />
-                </SectionShell>
+                {activeSection === "matchups" && (
+                  <SectionShell
+                    title="3. Head-to-Head Player Matchups"
+                    locked={mode !== "premium"}
+                  >
+                    <MatchupTable rows={h2hPlayers} mode={mode} />
+                  </SectionShell>
+                )}
 
-                <SectionShell title="4. Head-to-Head Team Matchup" locked={mode !== "premium"}>
-                  <MatchupTable rows={h2hTeams} mode={mode} />
-                </SectionShell>
+                {activeSection === "matchups" && (
+                  <SectionShell
+                    title="4. Head-to-Head Team Matchup"
+                    locked={mode !== "premium"}
+                  >
+                    <MatchupTable rows={h2hTeams} mode={mode} />
+                  </SectionShell>
+                )}
 
-                <SectionShell title="5. Game Flow & Timing" locked={mode !== "premium"}>
-                  <QuarterFlowGrid rows={flow} mode={mode} />
-                </SectionShell>
+                {activeSection === "flow" && (
+                  <SectionShell
+                    title="5. Game Flow & Timing"
+                    locked={mode !== "premium"}
+                  >
+                    <QuarterFlowGrid rows={flow} mode={mode} />
+                  </SectionShell>
+                )}
 
-                <SectionShell title="6. What Decides This Match?" locked={mode !== "premium"}>
-                  <DriversList rows={drivers} mode={mode} />
-                </SectionShell>
+                {activeSection === "drivers" && (
+                  <SectionShell
+                    title="6. What Decides This Match?"
+                    locked={mode !== "premium"}
+                  >
+                    <DriversList rows={drivers} mode={mode} />
+                  </SectionShell>
+                )}
               </div>
             );
           })}
+
+          {/* Keep your consistency block available in Teams view (or wire it later) */}
+          {activeSection === "teams" && (
+            <SectionShell
+              title="Bonus: Consistency & Explosiveness"
+              subtitle="Which teams are stable vs swingy for this stat lens."
+              locked={mode !== "premium"}
+            >
+              <ConsistencyList rows={consistencyRows} mode={mode} />
+            </SectionShell>
+          )}
         </div>
       </div>
     </div>

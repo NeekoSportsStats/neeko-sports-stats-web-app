@@ -20,6 +20,8 @@ export default function PredictabilityTable(props: {
 
   hint?: string;
   contextLabel?: string;
+  onUnlock?: () => void;
+  unlockLabel?: string;
 }) {
   const {
     rows,
@@ -29,12 +31,23 @@ export default function PredictabilityTable(props: {
     insight,
     hint,
     contextLabel,
+    onUnlock,
+    unlockLabel,
   } = props;
 
   const locked = mode !== "premium";
 
   const FREE_PREVIEW_COUNT = 3;
   const MAX_LOCKED_PLACEHOLDERS = 16;
+
+  const UNLOCK_LABEL = unlockLabel ?? "Unlock Neeko+";
+  const handleUnlock = () => {
+    try {
+      onUnlock?.();
+    } catch (e) {
+      // no-op
+    }
+  };
 
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<SortKey>("confidence");
@@ -131,12 +144,12 @@ export default function PredictabilityTable(props: {
   }, [locked, ranked.length]);
 
   const placeholders: PlaceholderRow[] = useMemo(() => {
-    if (!lockedPlaceholderCount) return [];
+    if (!locked) return [];
     return Array.from({ length: lockedPlaceholderCount }, (_, i) => ({
       __placeholder: true,
       key: `locked-${i}`,
     }));
-  }, [lockedPlaceholderCount]);
+  }, [locked, lockedPlaceholderCount]);
 
   const renderRows = useMemo(() => {
     if (!locked) {
@@ -158,56 +171,43 @@ export default function PredictabilityTable(props: {
   /* MODAL + SCROLL LOCK + ESC                                                   */
   /* -------------------------------------------------------------------------- */
 
-  const closeModal = () => {
+  function closeModal() {
     setOpen(false);
     setSelected(null);
-  };
+  }
 
   useEffect(() => {
     if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
+
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeModal();
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKey);
+
+    // scroll lock
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Body scroll lock while modal open
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+  /* -------------------------------------------------------------------------- */
+  /* MICROCOPY                                                                  */
+  /* -------------------------------------------------------------------------- */
 
   const proTip =
-    chip === "safe"
-      ? "Tip: Prioritise these players for reliable floor and cash contests."
-      : chip === "ceiling"
-      ? "Tip: Use these for upside — volatility can win GPPs."
-      : chip === "risky"
-      ? "Tip: Risky picks can bust — pair with safer cores."
-      : "Tip: Confidence = safety. Volatility = upside.";
-
-  /* -------------------------------------------------------------------------- */
-  /* UI HELPERS                                                                  */
-  /* -------------------------------------------------------------------------- */
-
-  const sortLabel =
-    sort === "confidence"
-      ? "Sort: Confidence"
-      : sort === "volatility"
-      ? "Sort: Volatility"
-      : "Sort: Max Projection";
+    hint ??
+    (statLabel?.toLowerCase().includes("goal")
+      ? "Tip: Ceiling = big games. Confidence = role stability."
+      : "Tip: Confidence = safety. Volatility = upside.");
 
   const searchPlaceholder = locked
-    ? hint
-      ? `${hint} (top ${FREE_PREVIEW_COUNT} only)…`
-      : `Search (top ${FREE_PREVIEW_COUNT} only)…`
-    : hint ?? "Search…";
+    ? `Search (top ${FREE_PREVIEW_COUNT} only)…`
+    : "Search…";
 
   /* -------------------------------------------------------------------------- */
   /* RENDER                                                                     */
@@ -283,11 +283,16 @@ export default function PredictabilityTable(props: {
       <div className="overflow-hidden rounded-xl border border-white/10">
         <div className="sticky top-0 z-10 grid grid-cols-[1.6fr_0.9fr_2.2fr] bg-[#0b0f18] px-3 py-2 text-[11px] uppercase tracking-wide text-white/50">
           <div>Name</div>
-          <div>Range</div>
+          <div className="text-right pr-2">Range</div>
           <div>AI Insight</div>
         </div>
 
         <div className="divide-y divide-white/10">
+          {renderRows.length === 0 && (
+            <div className="px-3 py-8 text-center text-sm text-white/60">
+              No players match your filters.
+            </div>
+          )}
           {renderRows.map((row, i) => {
             const isPlaceholder =
               (row as PlaceholderRow).__placeholder === true;
@@ -295,46 +300,62 @@ export default function PredictabilityTable(props: {
             if (isPlaceholder) {
               // No real data in placeholders → prevents freemium bypass
               const fauxBar = 58 + (i % 4) * 8; // 58,66,74,82
+              const fauxNameW = 120 + (i % 5) * 18;
+              const fauxInsightW1 = 180 + (i % 6) * 22;
+              const fauxInsightW2 = 140 + (i % 7) * 18;
+
               return (
                 <div
                   key={(row as PlaceholderRow).key}
                   className="grid grid-cols-[1.6fr_0.9fr_2.2fr] px-3 py-3"
+                  aria-hidden="true"
                 >
+                  {/* NAME + CHIPS + BAR (SKELETON) */}
                   <div className="opacity-70">
-                    <div className="text-sm font-medium text-white">
-                      Locked player
-                    </div>
-
-                    <div className="mt-1 flex flex-wrap gap-1 text-[11px] text-white/60">
-                      <span className="rounded-full border border-white/10 px-2 py-0.5">
-                        —
-                      </span>
-                      <span className="rounded-full border border-white/10 px-2 py-0.5">
-                        —
-                      </span>
-
-                      <span className="ml-1 inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-200">
-                        <Lock className="h-3 w-3" />
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-4 rounded bg-white/10"
+                        style={{ width: `${fauxNameW}px` }}
+                      />
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-200/80">
+                        <Lock className="h-3.5 w-3.5" />
                         locked
                       </span>
                     </div>
 
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      <div className="h-5 w-16 rounded-full border border-white/10 bg-white/5" />
+                      <div className="h-5 w-14 rounded-full border border-white/10 bg-white/5" />
+                    </div>
+
                     <div className="mt-2 h-[6px] w-full rounded-full bg-white/10">
                       <div
-                        className="h-[6px] rounded-full bg-amber-400/60"
+                        className="h-[6px] rounded-full bg-amber-400/35"
                         style={{ width: `${fauxBar}%` }}
                       />
                     </div>
                   </div>
 
-                  <div className="flex items-center">
-                    <span className="text-sm text-white/40">—</span>
+                  {/* RANGE (LOCKED) */}
+                  <div className="flex items-center justify-end pr-2">
+                    <span className="text-sm text-white/50">—</span>
                   </div>
 
-                  <div className="text-sm text-white/70">
-                    <span className="select-none blur-sm">
-                      Unlock to view full range + reasoning.
-                    </span>
+                  {/* AI (BLURRED/SKELETON) */}
+                  <div className="flex flex-col gap-2">
+                    <div
+                      className="h-3 rounded bg-white/10"
+                      style={{ width: `${fauxInsightW1}px` }}
+                    />
+                    <div
+                      className="h-3 rounded bg-white/10"
+                      style={{ width: `${fauxInsightW2}px` }}
+                    />
+                    <div className="text-sm text-white/60">
+                      <span className="select-none blur-sm">
+                        Unlock to view full range + reasoning.
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
@@ -344,7 +365,7 @@ export default function PredictabilityTable(props: {
 
             // Premium: all rows clickable
             // Free: only previewFiltered rows exist here (real), so they’re safe to click
-            const canOpen = !locked || true;
+            const canOpen = true;
 
             // Confidence bar width based on confidence01 (0..1)
             const w = Math.max(
@@ -361,7 +382,7 @@ export default function PredictabilityTable(props: {
                   setSelected(r);
                   setOpen(true);
                 }}
-                className="w-full text-left grid grid-cols-[1.6fr_0.9fr_2.2fr] px-3 py-3 transition hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-amber-400/30"
+                className="group w-full text-left grid grid-cols-[1.6fr_0.9fr_2.2fr] px-3 py-3 transition hover:bg-white/6 focus:outline-none focus:ring-2 focus:ring-amber-400/30 relative"
               >
                 {/* NAME + CHIPS + BAR */}
                 <div>
@@ -379,14 +400,14 @@ export default function PredictabilityTable(props: {
                   {/* Confidence bar */}
                   <div className="mt-2 h-[6px] w-full rounded-full bg-white/10">
                     <div
-                      className="h-[6px] rounded-full bg-amber-400/80"
+                      className="h-[6px] rounded-full bg-amber-400/80 transition-all duration-300"
                       style={{ width: `${w}%` }}
                     />
                   </div>
                 </div>
 
                 {/* RANGE */}
-                <div className="flex items-center justify-start">
+                <div className="flex items-center justify-end pr-2">
                   <span className="text-sm text-white">{fmtRange(r)}</span>
                 </div>
 
@@ -400,7 +421,7 @@ export default function PredictabilityTable(props: {
 
       {/* CTA */}
       {locked && (
-        <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100 flex items-center justify-between gap-3">
+        <div className="sticky bottom-3 z-20 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100 flex items-center justify-between gap-3 backdrop-blur">
           <div>
             <div className="font-medium">
               You’re viewing top {FREE_PREVIEW_COUNT} picks only.
@@ -411,10 +432,14 @@ export default function PredictabilityTable(props: {
             </div>
           </div>
 
-          <div className="shrink-0 inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/20 px-3 py-1.5 text-sm text-amber-100">
+          <button
+            type="button"
+            onClick={handleUnlock}
+            className="shrink-0 inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/20 px-3 py-1.5 text-sm text-amber-100 hover:bg-amber-500/30 focus:outline-none focus:ring-2 focus:ring-amber-400/30"
+          >
             <Lock className="h-4 w-4" />
-            Unlock Neeko+
-          </div>
+            {UNLOCK_LABEL}
+          </button>
         </div>
       )}
 
