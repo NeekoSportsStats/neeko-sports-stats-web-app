@@ -3,8 +3,8 @@ import { Lock } from "lucide-react";
 import type { PredictRow, PremiumMode } from "./types";
 import { confLabel, volLabel } from "./utils";
 
-type SortKey = "confidence" | "volatility" | "ceiling";
-type Chip = "all" | "safe" | "ceiling" | "risky";
+type SortKey = "confidence" | "volatility" | "max";
+type Chip = "all" | "safe" | "ceiling";
 
 export default function PredictabilityTable(props: {
   rows: PredictRow[];
@@ -13,7 +13,7 @@ export default function PredictabilityTable(props: {
   matchContext?: string;
   insight?: string;
 
-  /* optional – fixes TS error */
+  /* optional – compatibility */
   hint?: string;
   contextLabel?: string;
 }) {
@@ -48,11 +48,9 @@ export default function PredictabilityTable(props: {
     if (chip === "safe") {
       r = r.filter((r) => r.confidence01 >= 0.7 && r.volatility01 <= 0.4);
     }
+
     if (chip === "ceiling") {
       r = r.filter((r) => r.volatility01 >= 0.65);
-    }
-    if (chip === "risky") {
-      r = r.filter((r) => r.confidence01 <= 0.45);
     }
 
     r = [...r].sort((a, b) => {
@@ -105,12 +103,13 @@ export default function PredictabilityTable(props: {
 
       {/* CONTROLS */}
       <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* PRIMARY FILTERS */}
         <div className="flex gap-2">
-          {(["all", "safe", "ceiling", "risky"] as Chip[]).map((c) => (
+          {(["all", "safe", "ceiling"] as Chip[]).map((c) => (
             <button
               key={c}
               onClick={() => setChip(c)}
-              className={`rounded-full px-3 py-1 text-xs ${
+              className={`rounded-full px-3 py-1 text-xs transition ${
                 chip === c
                   ? "bg-amber-500/20 text-amber-200 border border-amber-400/30"
                   : "border border-white/10 text-white/60 hover:bg-white/5"
@@ -120,13 +119,12 @@ export default function PredictabilityTable(props: {
                 ? "All"
                 : c === "safe"
                 ? "Safe Picks"
-                : c === "ceiling"
-                ? "Ceiling Plays"
-                : "Risky"}
+                : "Ceiling Plays"}
             </button>
           ))}
         </div>
 
+        {/* SECONDARY CONTROLS */}
         <div className="flex items-center gap-2">
           <select
             value={sort}
@@ -135,7 +133,7 @@ export default function PredictabilityTable(props: {
           >
             <option value="confidence">Sort: Confidence</option>
             <option value="volatility">Sort: Volatility</option>
-            <option value="ceiling">Sort: Ceiling</option>
+            <option value="max">Sort: Max Projection</option>
           </select>
 
           <input
