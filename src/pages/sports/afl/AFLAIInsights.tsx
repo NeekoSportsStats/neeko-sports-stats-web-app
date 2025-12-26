@@ -39,12 +39,22 @@ import {
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
+const lower = (s: any) => (s ?? "").toString().toLowerCase();
+
 function currentRound(fixtures: FixtureMatch[]) {
   const upcoming = filterUpcomingFixtures(fixtures);
   if (!upcoming.length) return "";
   return [...upcoming].sort(
     (a: any, b: any) => roundOrder(a.roundLabel) - roundOrder(b.roundLabel)
   )[0].roundLabel;
+}
+
+function scrollToSection(id: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  // Offset the sticky header a bit
+  const y = el.getBoundingClientRect().top + window.scrollY - 110;
+  window.scrollTo({ top: y, behavior: "smooth" });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -57,7 +67,11 @@ export default function AFLAIInsights() {
 
   const [mode, setMode] = useState<PremiumMode>("free");
   const [stat, setStat] = useState<StatLens>("fantasy");
-  const [activeSection, setActiveSection] = useState("players");
+
+  // Used for highlight + scroll target (NOT for conditional rendering)
+  const [activeSection, setActiveSection] = useState<
+    "players" | "teams" | "matchups" | "flow" | "drivers"
+  >("players");
 
   const pastFixtures = useMemo(() => filterPastFixtures(fixtures), [fixtures]);
   const roundLabel = useMemo(() => currentRound(fixtures), [fixtures]);
@@ -74,6 +88,7 @@ export default function AFLAIInsights() {
 
   const [matchId, setMatchId] = useState<string>(roundMatches[0]?.id ?? "");
 
+  // Keep match selection valid when the computed round changes (or fixtures refresh)
   useEffect(() => {
     if (!roundMatches.length) return;
     if (matchId && roundMatches.some((m: any) => m.id === matchId)) return;
@@ -93,27 +108,34 @@ export default function AFLAIInsights() {
     return `${home} vs ${away}${venue}`;
   }, [selectedMatch]);
 
+  // IMPORTANT: Make match selector actually affect Player Predictability.
+  // We filter historical fixtures to only those involving the selected match teams,
+  // then build player predictability from that subset.
+  const matchPastFixtures = useMemo(() => {
+    if (!selectedMatch) return pastFixtures;
+
+    const home = lower((selectedMatch as any).homeTeam);
+    const away = lower((selectedMatch as any).awayTeam);
+
+    // If we can't read teams, fall back to full history
+    if (!home && !away) return pastFixtures;
+
+    return pastFixtures.filter((fx: any) => {
+      const h = lower(fx.homeTeam);
+      const a = lower(fx.awayTeam);
+      // include games where either team participated (history for both sides)
+      return h === home || a === home || h === away || a === away;
+    });
+  }, [pastFixtures, selectedMatch]);
+
   /* ---------------------------------------------------------------------- */
-  /* ROUND-WIDE INSIGHTS (DATA FIXED HERE)                                    */
+  /* ROUND-WIDE INSIGHTS                                                     */
   /* ---------------------------------------------------------------------- */
 
-  const rawPlayerPredict = useMemo(
-    () => buildPlayerPredictabilityFromFixtures(pastFixtures, stat),
-    [pastFixtures, stat]
+  const playerPredict = useMemo(
+    () => buildPlayerPredictabilityFromFixtures(matchPastFixtures, stat),
+    [matchPastFixtures, stat]
   );
-
-  const playerPredict = useMemo(() => {
-    if (!selectedMatch) return rawPlayerPredict;
-
-    const teamSet = new Set([
-      selectedMatch.homeTeam,
-      selectedMatch.awayTeam,
-    ]);
-
-    return rawPlayerPredict.filter((r: any) =>
-      teamSet.has(r.team)
-    );
-  }, [rawPlayerPredict, selectedMatch]);
 
   const teamPredict = useMemo(
     () => buildTeamPredictabilityFromTeams(teams, stat),
@@ -144,8 +166,9 @@ export default function AFLAIInsights() {
     const spreadWord =
       spread >= 0.28 ? "wide" : spread >= 0.16 ? "balanced" : "tight";
 
-    return `This matchup’s ${STAT_LABEL[stat]} profile shows ${confWord} confidence with ${volWord} volatility. The top-end distribution is ${spreadWord}, meaning confidence-driven selections suit safe builds while volatility-driven profiles carry ceiling upside.`;
+    return `This matchup’s ${STAT_LABEL[stat]} profile shows ${confWord} confidence with ${volWord} volatility. The top-end distribution is ${spreadWord}, so use confidence for “safe” picks and volatility for ceiling plays.`;
   }, [playerPredict, stat]);
+
   const teamInsight = useMemo(() => {
     const top = teamPredict.slice(0, Math.min(10, teamPredict.length));
 
@@ -157,8 +180,25 @@ export default function AFLAIInsights() {
     const volWord =
       avgVol >= 0.72 ? "high" : avgVol >= 0.52 ? "moderate" : "low";
 
-    return `Team predictability is derived from recent match outputs and role consistency. This round’s profile appears ${confWord} overall with ${volWord} volatility — matchup and venue effects may amplify variance.`;
+    return `Team predictability is computed from weekly outputs. This round’s team profile looks ${confWord} overall, with ${volWord} volatility—matchups and venue can amplify swings.`;
   }, [teamPredict]);
+
+  /* ---------------------------------------------------------------------- */
+  /* NAV                                                                      */
+  /* ---------------------------------------------------------------------- */
+
+  const navItems: Array<[typeof activeSection, string, string]> = [
+    ["players", "Players", "ai-players"],
+    ["teams", "Teams", "ai-teams"],
+    ["matchups", "Matchups", "ai-matchups"],
+    ["flow", "Game Flow", "ai-flow"],
+    ["drivers", "Drivers", "ai-drivers"],
+  ];
+
+  function onNav(id: typeof activeSection, anchorId: string) {
+    setActiveSection(id);
+    scrollToSection(anchorId);
+  }
 
   /* ---------------------------------------------------------------------- */
   /* RENDER                                                                  */
@@ -167,15 +207,15 @@ export default function AFLAIInsights() {
   return (
     <div
       className="
-        min-h-screen text-white
-        bg-[#070707]
-        relative
-        before:content-['']
-        before:absolute
-        before:inset-0
-        before:bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(250,204,21,0.08),transparent_60%)]
-        before:pointer-events-none
-      "
+    min-h-screen text-white
+    bg-[#070707]
+    relative
+    before:content-['']
+    before:absolute
+    before:inset-0
+    before:bg-[radial-gradient(1200px_600px_at_50%_-200px,rgba(250,204,21,0.08),transparent_60%)]
+    before:pointer-events-none
+  "
     >
       <div className="mx-auto max-w-6xl px-4 py-8">
         {/* HEADER */}
@@ -203,16 +243,10 @@ export default function AFLAIInsights() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {[
-                  ["players", "Players"],
-                  ["teams", "Teams"],
-                  ["matchups", "Matchups"],
-                  ["flow", "Game Flow"],
-                  ["drivers", "Drivers"],
-                ].map(([id, label]) => (
+                {navItems.map(([id, label, anchorId]) => (
                   <button
                     key={id}
-                    onClick={() => setActiveSection(id)}
+                    onClick={() => onNav(id, anchorId)}
                     className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all ${
                       activeSection === id
                         ? "border-yellow-300 bg-yellow-400 text-black shadow-[0_0_26px_rgba(250,204,21,0.9)]"
@@ -276,7 +310,8 @@ export default function AFLAIInsights() {
         </div>
 
         <div className="mt-10 space-y-20">
-          {activeSection === "players" && (
+          {/* PLAYERS */}
+          <div id="ai-players" className="scroll-mt-28">
             <SectionShell
               title="1. Player Score Predictability"
               subtitle="Expected ranges, confidence and volatility for this matchup."
@@ -290,9 +325,10 @@ export default function AFLAIInsights() {
                 insight={playerInsight}
               />
             </SectionShell>
-          )}
+          </div>
 
-          {activeSection === "teams" && (
+          {/* TEAMS */}
+          <div id="ai-teams" className="scroll-mt-28">
             <SectionShell
               title="2. Team Score Predictability"
               subtitle="System reliability for teams playing this round."
@@ -306,71 +342,88 @@ export default function AFLAIInsights() {
                 insight={teamInsight}
               />
             </SectionShell>
-          )}
+          </div>
 
-          {roundMatches.map((match: any) => {
-            if (!["matchups", "flow", "drivers"].includes(activeSection))
-              return null;
-
-            const h2hPlayers = buildH2HPlayerMatchups(match, stat, teams);
-            const h2hTeams = buildH2HTeamMatchups(match, stat, teams);
-            const flow = buildQuarterFlow(match);
-            const drivers = buildOutcomeDrivers({
-              match,
-              fixtures: pastFixtures,
-              stat,
-            });
-
-            return (
-              <div key={match.id} className="space-y-16">
-                {activeSection === "matchups" && (
-                  <SectionShell
-                    title="3. Head-to-Head Player Matchups"
-                    locked={mode !== "premium"}
-                  >
-                    <MatchupTable rows={h2hPlayers} mode={mode} />
-                  </SectionShell>
-                )}
-
-                {activeSection === "matchups" && (
-                  <SectionShell
-                    title="4. Head-to-Head Team Matchup"
-                    locked={mode !== "premium"}
-                  >
-                    <MatchupTable rows={h2hTeams} mode={mode} />
-                  </SectionShell>
-                )}
-
-                {activeSection === "flow" && (
-                  <SectionShell
-                    title="5. Game Flow & Timing"
-                    locked={mode !== "premium"}
-                  >
-                    <QuarterFlowGrid rows={flow} mode={mode} />
-                  </SectionShell>
-                )}
-
-                {activeSection === "drivers" && (
-                  <SectionShell
-                    title="6. What Decides This Match?"
-                    locked={mode !== "premium"}
-                  >
-                    <DriversList rows={drivers} mode={mode} />
-                  </SectionShell>
-                )}
-              </div>
-            );
-          })}
-
-          {activeSection === "teams" && (
+          
+          {/* MATCHUPS (per selected match only) */}
+          <div id="ai-matchups" className="scroll-mt-28 space-y-16">
             <SectionShell
-              title="Bonus: Consistency & Explosiveness"
-              subtitle="Which teams are stable vs swingy for this stat lens."
+              title="3. Head-to-Head Player Matchups"
               locked={mode !== "premium"}
             >
-              <ConsistencyList rows={consistencyRows} mode={mode} />
+              {selectedMatch ? (
+                <MatchupTable
+                  rows={buildH2HPlayerMatchups(selectedMatch as any, stat, teams)}
+                  mode={mode}
+                />
+              ) : (
+                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-6 text-sm text-white/70">
+                  Select a match above to view head-to-head matchups.
+                </div>
+              )}
             </SectionShell>
-          )}
+
+            <SectionShell
+              title="4. Head-to-Head Team Matchup"
+              locked={mode !== "premium"}
+            >
+              {selectedMatch ? (
+                <MatchupTable
+                  rows={buildH2HTeamMatchups(selectedMatch as any, stat, teams)}
+                  mode={mode}
+                />
+              ) : (
+                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-6 text-sm text-white/70">
+                  Select a match above to view team matchup breakdown.
+                </div>
+              )}
+            </SectionShell>
+          </div>
+
+          {/* FLOW */}
+          <div id="ai-flow" className="scroll-mt-28">
+            <SectionShell title="5. Game Flow & Timing" locked={mode !== "premium"}>
+              {selectedMatch ? (
+                <QuarterFlowGrid
+                  rows={buildQuarterFlow(selectedMatch as any)}
+                  mode={mode}
+                />
+              ) : (
+                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-6 text-sm text-white/70">
+                  Select a match above to view game flow.
+                </div>
+              )}
+            </SectionShell>
+          </div>
+
+          {/* DRIVERS */}
+          <div id="ai-drivers" className="scroll-mt-28">
+            <SectionShell title="6. What Decides This Match?" locked={mode !== "premium"}>
+              {selectedMatch ? (
+                <DriversList
+                  rows={buildOutcomeDrivers({
+                    match: selectedMatch as any,
+                    fixtures: pastFixtures,
+                    stat,
+                  })}
+                  mode={mode}
+                />
+              ) : (
+                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-6 text-sm text-white/70">
+                  Select a match above to view outcome drivers.
+                </div>
+              )}
+            </SectionShell>
+          </div>
+
+          {/* BONUS */}
+          <SectionShell
+            title="Bonus: Consistency & Explosiveness"
+            subtitle="Which teams are stable vs swingy for this stat lens."
+            locked={mode !== "premium"}
+          >
+            <ConsistencyList rows={consistencyRows} mode={mode} />
+          </SectionShell>
         </div>
       </div>
     </div>
