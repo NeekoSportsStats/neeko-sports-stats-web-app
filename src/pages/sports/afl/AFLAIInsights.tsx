@@ -1,6 +1,4 @@
-// src/pages/sports/afl/AFLAIInsights.tsx
-
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Crown, ChevronDown } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/afl/match-center/types";
@@ -61,6 +59,7 @@ export default function AFLAIInsights() {
 
   const [mode, setMode] = useState<PremiumMode>("free");
   const [stat, setStat] = useState<StatLens>("fantasy");
+  const [activeSection, setActiveSection] = useState("players");
 
   const pastFixtures = useMemo(() => filterPastFixtures(fixtures), [fixtures]);
   const roundLabel = useMemo(() => currentRound(fixtures), [fixtures]);
@@ -145,65 +144,83 @@ export default function AFLAIInsights() {
     return `Team predictability is computed from weekly outputs. This round’s team profile looks ${confWord} overall, with ${volWord} volatility—matchups and venue can amplify swings.`;
   }, [teamPredict]);
 
-  const roundOverview = useMemo(() => {
-    const teamNames = new Set<string>();
-    roundMatches.forEach((m: any) => {
-      teamNames.add(m.homeTeam);
-      teamNames.add(m.awayTeam);
-    });
-
-    const rows = teamPredict.filter((r) =>
-      Array.from(teamNames).some((n) => lower(n) === lower(r.name))
-    );
-
-    return {
-      matchCount: roundMatches.length,
-      avgConf: rows.length ? mean(rows.map((r) => r.confidence01)) : 0.55,
-      avgVol: rows.length ? mean(rows.map((r) => r.volatility01)) : 0.55,
-    };
-  }, [roundMatches, teamPredict]);
-
   /* ---------------------------------------------------------------------- */
   /* RENDER                                                                  */
   /* ---------------------------------------------------------------------- */
 
   return (
-    <div className="min-h-screen bg-[#070A10] text-white">
-      <div className="mx-auto max-w-[1180px] px-4 py-6 sm:px-6 sm:py-8">
-        {/* Header */}
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold sm:text-2xl">
-              AFL AI Insights
-            </h1>
-            <p className="mt-1 text-sm text-white/65">
-              Pre-game analysis for the{" "}
-              <span className="text-white/85 font-medium">current round</span>,
-              driven from past matches only.
-            </p>
-          </div>
+    <div className="min-h-screen bg-gradient-to-b from-[#0b0f18] via-black to-black text-white">
+      <div className="mx-auto max-w-6xl px-4 py-8">
 
-          <button
-            onClick={() => setMode((m) => (m === "premium" ? "free" : "premium"))}
-            className="inline-flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-500/10 px-3 py-1.5 text-sm text-amber-100"
-          >
-            <Crown className="h-4 w-4" />
-            {mode === "premium" ? "Neeko+ On" : "Neeko+ Off"}
-          </button>
+        {/* HEADER */}
+        <header className="mb-10 animate-premium-section">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+            AFL AI Insights
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm text-white/70 leading-relaxed">
+            Pre-game intelligence for the current round, derived from historical
+            match data — confidence, volatility and matchup-driven outcomes.
+          </p>
+        </header>
+
+        {/* PREMIUM GLASS BAR */}
+        <div className="sticky top-16 z-40 mb-10">
+          <div className="rounded-2xl border backdrop-blur-xl bg-gradient-to-r from-yellow-500/10 via-black/80 to-yellow-500/10 px-4 py-3 shadow-[0_18px_70px_rgba(0,0,0,0.85)] border-yellow-400/40">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.3em] text-yellow-200/80">
+                  Sections
+                </div>
+                <p className="text-[11px] text-neutral-300/90">
+                  Predictability, matchups and outcome drivers.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {[
+                  ["players", "Players"],
+                  ["teams", "Teams"],
+                  ["matchups", "Matchups"],
+                  ["flow", "Game Flow"],
+                  ["drivers", "Drivers"],
+                ].map(([id, label]) => (
+                  <button
+                    key={id}
+                    onClick={() => setActiveSection(id)}
+                    className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all ${
+                      activeSection === id
+                        ? "border-yellow-300 bg-yellow-400 text-black shadow-[0_0_26px_rgba(250,204,21,0.9)]"
+                        : "border-white/16 bg-black/40 text-neutral-200 hover:border-yellow-400/70 hover:bg-yellow-500/10"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setMode((m) => (m === "premium" ? "free" : "premium"))}
+                className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/20 px-3 py-1.5 text-xs text-amber-100"
+              >
+                <Crown className="h-4 w-4" />
+                {mode === "premium" ? "Neeko+ On" : "Neeko+ Off"}
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Round Overview */}
+        {/* ROUND OVERVIEW */}
         <RoundOverview
           roundLabel={roundLabel}
-          matchCount={roundOverview.matchCount}
-          avgConfidence01={roundOverview.avgConf}
-          avgVolatility01={roundOverview.avgVol}
+          matchCount={roundMatches.length}
+          avgConfidence01={mean(teamPredict.map((r) => r.confidence01))}
+          avgVolatility01={mean(teamPredict.map((r) => r.volatility01))}
           updatedText="Updated daily · Based on last 6–8 matches"
         />
 
-        {/* Match selector */}
-        <div className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* MATCH SELECTOR */}
+        <div className="mt-6 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
             <div className="text-sm text-white/70">
               Match context:{" "}
               <span className="text-white font-medium">{matchContext}</span>
@@ -226,11 +243,12 @@ export default function AFLAIInsights() {
           </div>
         </div>
 
-        <div className="mt-5">
+        <div className="mt-6">
           <ControlsBar stat={stat} onChange={setStat} />
         </div>
 
-        <div className="mt-6 grid gap-6">
+        <div className="mt-10 space-y-20">
+
           <SectionShell
             title="1. Player Score Predictability"
             subtitle="Expected ranges, confidence and volatility for this matchup."
@@ -270,16 +288,7 @@ export default function AFLAIInsights() {
             });
 
             return (
-              <div key={match.id} className="grid gap-6">
-                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                  <div className="text-sm font-semibold text-white">
-                    {match.homeTeam} vs {match.awayTeam}
-                  </div>
-                  <div className="mt-1 text-xs text-white/60">
-                    {match.venue} · {match.roundLabel}
-                  </div>
-                </div>
-
+              <div key={match.id} className="space-y-16">
                 <SectionShell title="3. Head-to-Head Player Matchups" locked={mode !== "premium"}>
                   <MatchupTable rows={h2hPlayers} mode={mode} />
                 </SectionShell>
@@ -292,28 +301,7 @@ export default function AFLAIInsights() {
                   <QuarterFlowGrid rows={flow} mode={mode} />
                 </SectionShell>
 
-                <SectionShell title="6. Consistency vs Explosiveness" locked={mode !== "premium"}>
-                  {(() => {
-                    const home = consistencyRows.find(
-                      (r) => lower(r.name) === lower(match.homeTeam)
-                    );
-                    const away = consistencyRows.find(
-                      (r) => lower(r.name) === lower(match.awayTeam)
-                    );
-                    const rows = [home, away].filter(Boolean) as any[];
-                    return (
-                      <ConsistencyList
-                        rows={rows}
-                        mode={mode}
-                        maxRows={2}
-                        hideSearch
-                        titleLeft="How stable each side is week-to-week (and how spike-driven they are)."
-                      />
-                    );
-                  })()}
-                </SectionShell>
-
-                <SectionShell title="7. What Decides This Match?" locked={mode !== "premium"}>
+                <SectionShell title="6. What Decides This Match?" locked={mode !== "premium"}>
                   <DriversList rows={drivers} mode={mode} />
                 </SectionShell>
               </div>
