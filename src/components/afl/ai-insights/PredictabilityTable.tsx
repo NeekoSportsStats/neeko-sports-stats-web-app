@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { Lock } from "lucide-react";
+import React, { useMemo, useState, useEffect } from "react";
+import { Lock, X } from "lucide-react";
 import type { PredictRow, PremiumMode } from "./types";
 import { confLabel, volLabel } from "./utils";
 
@@ -12,8 +12,6 @@ export default function PredictabilityTable(props: {
   statLabel: string;
   matchContext?: string;
   insight?: string;
-
-  /* optional – compatibility */
   hint?: string;
   contextLabel?: string;
 }) {
@@ -32,6 +30,18 @@ export default function PredictabilityTable(props: {
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<SortKey>("confidence");
   const [chip, setChip] = useState<Chip>("all");
+  const [activeRow, setActiveRow] = useState<PredictRow | null>(null);
+
+  /* -------------------------------------------------------------------------- */
+  /* AUTO DEFAULT CHIP BY STAT                                                  */
+  /* -------------------------------------------------------------------------- */
+
+  useEffect(() => {
+    const s = statLabel.toLowerCase();
+    if (s.includes("goal")) setChip("ceiling");
+    else if (s.includes("fantasy")) setChip("safe");
+    else setChip("all");
+  }, [statLabel]);
 
   /* -------------------------------------------------------------------------- */
   /* FILTER + SORT                                                              */
@@ -80,6 +90,13 @@ export default function PredictabilityTable(props: {
     return "Balanced profile with moderate confidence and variability.";
   }
 
+  const proTip =
+    chip === "safe"
+      ? "Tip: Prioritise these players for reliable floor and cash contests."
+      : chip === "ceiling"
+      ? "Tip: These profiles suit upside chasing and tournament builds."
+      : "Tip: Use confidence for safety and volatility to find upside.";
+
   /* -------------------------------------------------------------------------- */
   /* RENDER                                                                     */
   /* -------------------------------------------------------------------------- */
@@ -103,13 +120,12 @@ export default function PredictabilityTable(props: {
 
       {/* CONTROLS */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* PRIMARY FILTERS */}
         <div className="flex gap-2">
           {(["all", "safe", "ceiling"] as Chip[]).map((c) => (
             <button
               key={c}
               onClick={() => setChip(c)}
-              className={`rounded-full px-3 py-1 text-xs transition ${
+              className={`rounded-full px-3 py-1 text-xs ${
                 chip === c
                   ? "bg-amber-500/20 text-amber-200 border border-amber-400/30"
                   : "border border-white/10 text-white/60 hover:bg-white/5"
@@ -124,7 +140,6 @@ export default function PredictabilityTable(props: {
           ))}
         </div>
 
-        {/* SECONDARY CONTROLS */}
         <div className="flex items-center gap-2">
           <select
             value={sort}
@@ -145,9 +160,11 @@ export default function PredictabilityTable(props: {
         </div>
       </div>
 
+      <div className="text-xs text-white/50 px-1">{proTip}</div>
+
       {/* TABLE */}
       <div className="overflow-hidden rounded-xl border border-white/10">
-        <div className="sticky top-0 z-10 grid grid-cols-[1.5fr_0.8fr_2.2fr] bg-[#0b0f18] px-3 py-2 text-[11px] uppercase tracking-wide text-white/50">
+        <div className="sticky top-0 z-10 grid grid-cols-[1.6fr_0.9fr_2.3fr] bg-[#0b0f18] px-3 py-2 text-[11px] uppercase tracking-wide text-white/50">
           <div>Name</div>
           <div>Range</div>
           <div>AI Insight</div>
@@ -155,27 +172,35 @@ export default function PredictabilityTable(props: {
 
         <div className="divide-y divide-white/10">
           {filtered.map((r, i) => {
+            const isFreeVisible = !locked || i < 3;
             const range =
               r.rangeLow === r.rangeHigh
                 ? r.rangeHigh
                 : `${r.rangeLow}–${r.rangeHigh}`;
 
-            const isFreeVisible = !locked || i < 3;
-
             return (
               <div
                 key={r.id}
-                className="grid grid-cols-[1.5fr_0.8fr_2.2fr] px-3 py-3"
+                onClick={() => setActiveRow(r)}
+                className="grid cursor-pointer grid-cols-[1.6fr_0.9fr_2.3fr] px-3 py-3 hover:bg-white/5"
               >
                 <div>
                   <div className="text-sm font-medium text-white">{r.name}</div>
-                  <div className="mt-1 flex gap-1 text-[11px] text-white/60">
-                    <span className="rounded-full border border-white/10 px-2 py-0.5">
-                      {confLabel(r.confidence01)}
-                    </span>
-                    <span className="rounded-full border border-white/10 px-2 py-0.5">
-                      {volLabel(r.volatility01)}
-                    </span>
+
+                  {/* Confidence bars */}
+                  <div className="mt-2 space-y-1">
+                    <div className="h-1.5 w-full rounded bg-white/10">
+                      <div
+                        className="h-1.5 rounded bg-amber-400"
+                        style={{ width: `${r.confidence01 * 100}%` }}
+                      />
+                    </div>
+                    <div className="h-1 w-full rounded bg-white/10">
+                      <div
+                        className="h-1 rounded bg-white/50"
+                        style={{ width: `${r.volatility01 * 100}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -191,13 +216,7 @@ export default function PredictabilityTable(props: {
                 </div>
 
                 <div className="text-sm text-white/70">
-                  {isFreeVisible ? (
-                    aiSentence(r)
-                  ) : (
-                    <span className="blur-sm select-none">
-                      {aiSentence(r)}
-                    </span>
-                  )}
+                  {isFreeVisible ? aiSentence(r) : <span className="blur-sm">{aiSentence(r)}</span>}
                 </div>
               </div>
             );
@@ -207,8 +226,26 @@ export default function PredictabilityTable(props: {
 
       {locked && (
         <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-          Unlock full ranges and AI explanations with{" "}
+          Unlock full ranges and player-level insights with{" "}
           <span className="font-semibold">Neeko+</span>.
+        </div>
+      )}
+
+      {/* MODAL */}
+      {activeRow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="w-full max-w-md rounded-xl bg-[#0b0f18] p-4 border border-white/10">
+            <div className="flex items-center justify-between">
+              <div className="text-lg font-semibold text-white">{activeRow.name}</div>
+              <button onClick={() => setActiveRow(null)}>
+                <X className="h-4 w-4 text-white/60" />
+              </button>
+            </div>
+
+            <div className="mt-3 text-sm text-white/70">
+              {aiSentence(activeRow)}
+            </div>
+          </div>
         </div>
       )}
     </div>
