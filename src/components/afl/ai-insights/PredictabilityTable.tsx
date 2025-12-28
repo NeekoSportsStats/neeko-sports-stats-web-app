@@ -15,6 +15,7 @@ type Chip = "all" | "safe" | "ceiling" | "risky";
 
 const TOTAL_ROWS = 10;
 const FREE_ROWS = 3;
+const PER_TEAM = 5;
 
 /* -------------------------------------------------------------------------- */
 /* COMPONENT                                                                  */
@@ -62,7 +63,7 @@ export default function PredictabilityTable(props: {
   }, [statLabel]);
 
   /* -------------------------------------------------------------------------- */
-  /* FILTER + SORT (CONFIDENCE DESC ONLY)                                       */
+  /* FILTER + RANK (confidence only)                                            */
   /* -------------------------------------------------------------------------- */
 
   const ranked = useMemo(() => {
@@ -82,15 +83,30 @@ export default function PredictabilityTable(props: {
   }, [rows, chip]);
 
   /* -------------------------------------------------------------------------- */
-  /* EXACT 10 ROW WINDOW                                                       */
+  /* 5 + 5 TEAM SPLIT                                                          */
   /* -------------------------------------------------------------------------- */
 
   const visibleRows = useMemo(() => {
-    return ranked.slice(0, TOTAL_ROWS);
+    const byTeam = new Map<string, PredictRow[]>();
+
+    for (const r of ranked) {
+      if (!r.team) continue;
+      const arr = byTeam.get(r.team) ?? [];
+      arr.push(r);
+      byTeam.set(r.team, arr);
+    }
+
+    const teams = Array.from(byTeam.keys()).slice(0, 2);
+    if (teams.length < 2) return [];
+
+    const home = byTeam.get(teams[0])?.slice(0, PER_TEAM) ?? [];
+    const away = byTeam.get(teams[1])?.slice(0, PER_TEAM) ?? [];
+
+    return [...home, ...away].slice(0, TOTAL_ROWS);
   }, [ranked]);
 
   /* -------------------------------------------------------------------------- */
-  /* RANGE FORMAT                                                              */
+  /* HELPERS                                                                   */
   /* -------------------------------------------------------------------------- */
 
   function fmtRange(r: PredictRow) {
@@ -100,22 +116,18 @@ export default function PredictabilityTable(props: {
     return "—";
   }
 
-  /* -------------------------------------------------------------------------- */
-  /* AI SENTENCE                                                               */
-  /* -------------------------------------------------------------------------- */
-
   function aiSentence(r: PredictRow) {
     const c = r.confidence01;
     const v = r.volatility01;
 
     if (c >= 0.72 && v <= 0.4) {
-      return "Strong role stability with repeatable output. Reliable floor unless game flow shifts.";
+      return "Strong role stability with repeatable output.";
     }
     if (v >= 0.65) {
-      return "High-variance profile with genuine ceiling outcomes driven by matchup volatility.";
+      return "High-variance profile with genuine ceiling upside.";
     }
     if (c <= 0.45) {
-      return "Wide outcome range driven by role or opposition risk. High variance selection.";
+      return "Wide outcome band driven by role or opposition risk.";
     }
     return "Balanced profile with moderate confidence and volatility.";
   }
@@ -188,7 +200,15 @@ export default function PredictabilityTable(props: {
                 <div className="text-xs text-white/40">#{i + 1}</div>
 
                 <div className={isLockedRow ? "blur-sm select-none" : ""}>
-                  <div className="text-sm font-medium text-white">{r.name}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-medium text-white">
+                      {r.name}
+                    </div>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-white/70">
+                      {r.team}
+                    </span>
+                  </div>
+
                   <div className="mt-1 flex gap-1 text-[11px] text-white/60">
                     <span className="rounded-full border border-white/10 px-2 py-0.5">
                       {confLabel(r.confidence01)}
@@ -226,7 +246,7 @@ export default function PredictabilityTable(props: {
               Viewing 3 of 10 player projections
             </div>
             <div className="text-xs text-amber-100/80">
-              Unlock full predictability insights, ranges and AI breakdowns.
+              Unlock full team-by-team predictability insights.
             </div>
           </div>
 
