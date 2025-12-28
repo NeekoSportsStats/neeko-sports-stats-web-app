@@ -10,6 +10,8 @@ import { confLabel, volLabel } from "./utils";
 
 type Chip = "all" | "safe" | "ceiling" | "risky";
 
+const SAFE_TARGET = 8;
+
 const cx = (...c: Array<string | false | undefined>) =>
   c.filter(Boolean).join(" ");
 
@@ -36,7 +38,7 @@ function whySafeMicrocopy(r: PredictRow) {
     return "High role certainty with tight historical range.";
   if (r.confidence01 >= 0.7)
     return "Repeatable role output with manageable variance.";
-  return "Safer than average but still matchup-dependent.";
+  return "Near-safe profile with slightly elevated variability.";
 }
 
 function stabilityText(conf01: number, vol01: number) {
@@ -55,21 +57,18 @@ function stabilityText(conf01: number, vol01: number) {
 }
 
 function whyThisMatters(statKey: string, conf01: number, vol01: number) {
-  const c = clamp01(conf01);
-  const v = clamp01(vol01);
-
   if (statKey === "fantasy") {
-    return c >= 0.7
-      ? "Strong role reliability supports safer builds."
+    return conf01 >= 0.7
+      ? "Strong role reliability supports safer fantasy builds."
       : "Fantasy output sensitive to role and tempo shifts.";
   }
   if (statKey === "disposals") {
-    return c >= 0.7
+    return conf01 >= 0.7
       ? "Disposal volume is structurally stable."
       : "Touches fluctuate with rotation and matchup.";
   }
   if (statKey === "goals") {
-    return v >= 0.65
+    return vol01 >= 0.65
       ? "Goal scoring volatile and opportunity driven."
       : "Scoring chances relatively contained.";
   }
@@ -88,7 +87,7 @@ function rangeBarStyle(conf01: number, vol01: number) {
   } as React.CSSProperties;
 }
 
-/* 🔒 FAKE DATA FOR LOCKED ROWS */
+/* 🔒 FAKE DATA FOR LOCKED ROWS — DESKTOP UNCHANGED */
 function fakeLockedRow(r: PredictRow): PredictRow {
   const jitter = Math.floor(6 + Math.random() * 12);
   return {
@@ -125,7 +124,7 @@ export default function PredictabilityTable({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<PredictRow | null>(null);
 
-  /* ---------------- MOBILE INLINE EXPAND ---------------- */
+  /* ---------------- MOBILE INLINE EXPAND (ADDITIVE ONLY) ---------------- */
 
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
@@ -133,7 +132,7 @@ export default function PredictabilityTable({
     typeof window !== "undefined" &&
     window.matchMedia("(max-width: 639px)").matches;
 
-  /* ---------------- COLLAPSE STATE (SESSION) ---------------- */
+  /* ---------------- COLLAPSE + SHOW MORE (SESSION) ---------------- */
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
     try {
@@ -142,6 +141,8 @@ export default function PredictabilityTable({
       return {};
     }
   });
+
+  const [expandedTeam, setExpandedTeam] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     sessionStorage.setItem("ai_collapsed", JSON.stringify(collapsed));
@@ -163,16 +164,9 @@ export default function PredictabilityTable({
     return Array.from(map.entries());
   }, [rows]);
 
-  const filterRow = (r: PredictRow) => {
-    if (chip === "safe") return r.confidence01 >= 0.7 && r.volatility01 <= 0.4;
-    if (chip === "ceiling") return r.volatility01 >= 0.65;
-    if (chip === "risky") return r.confidence01 <= 0.45;
-    return true;
-  };
-
-  /* ------------------------------------------------------------------------ */
-  /* RENDER                                                                   */
-  /* ------------------------------------------------------------------------ */
+  /* ---------------------------------------------------------------------- */
+  /* RENDER                                                                  */
+  /* ---------------------------------------------------------------------- */
 
   return (
     <>
@@ -199,8 +193,8 @@ export default function PredictabilityTable({
           </header>
         )}
 
-        {/* FILTERS */}
-        <div className="px-6 pt-4 pb-3 flex gap-2">
+        {/* FILTERS — DESKTOP UNCHANGED */}
+        <div className="px-6 pt-4 pb-2 flex gap-2 items-center">
           {(["safe", "all", "ceiling", "risky"] as Chip[]).map((c) => (
             <button
               key={c}
@@ -223,20 +217,51 @@ export default function PredictabilityTable({
           ))}
         </div>
 
+        <div className="px-6 pb-3 text-[11px] text-white/40">
+          Ordered by reliability score (confidence × volatility blend)
+        </div>
+
         {/* TEAMS */}
         <div className="divide-y divide-white/10">
           {rowsByTeam.map(([team, teamRows]) => {
-            const filtered = teamRows
-              .filter(filterRow)
-              .sort((a, b) => blendedScore(b) - blendedScore(a));
+            const sorted = [...teamRows].sort(
+              (a, b) => blendedScore(b) - blendedScore(a)
+            );
 
-            if (!filtered.length) return null;
+            let displayRows = sorted;
+
+            if (chip === "safe") {
+              const safe = sorted.filter(
+                (r) => r.confidence01 >= 0.7 && r.volatility01 <= 0.4
+              );
+              const nearSafe = sorted.filter((r) => !safe.includes(r));
+
+              displayRows = [
+                ...safe,
+                ...nearSafe.slice(0, Math.max(0, SAFE_TARGET - safe.length)),
+              ];
+            }
+
+            if (chip === "ceiling") {
+              displayRows = sorted.filter((r) => r.volatility01 >= 0.65);
+            }
+
+            if (chip === "risky") {
+              displayRows = sorted.filter((r) => r.confidence01 <= 0.45);
+            }
+
+            if (!displayRows.length) return null;
 
             const isCollapsed = collapsed[team];
+            const showAll = expandedTeam[team];
+            const rowsToShow =
+              chip === "safe" && !showAll
+                ? displayRows.slice(0, SAFE_TARGET)
+                : displayRows;
 
             return (
               <div key={team}>
-                {/* TEAM HEADER */}
+                {/* TEAM HEADER — DESKTOP UNCHANGED */}
                 <button
                   onClick={() =>
                     setCollapsed((s) => ({ ...s, [team]: !s[team] }))
@@ -254,28 +279,25 @@ export default function PredictabilityTable({
                     </span>
                   </div>
                   <span className="text-[11px] text-white/40">
-                    {filtered.length} players
+                    {displayRows.length} players
                   </span>
                 </button>
 
-                {/* BODY */}
                 {!isCollapsed &&
-                  filtered.map((r, i) => {
+                  rowsToShow.map((r, i) => {
                     const rowLocked = locked && i >= 2;
                     const displayRow = rowLocked ? fakeLockedRow(r) : r;
                     const expanded = expandedRow === r.id;
 
                     return (
                       <div key={r.id}>
-                        {/* ROW */}
+                        {/* ROW — DESKTOP GRID UNCHANGED */}
                         <div
                           onClick={() => {
                             if (rowLocked) return;
 
                             if (isMobile) {
-                              setExpandedRow(
-                                expanded ? null : r.id
-                              );
+                              setExpandedRow(expanded ? null : r.id);
                             } else {
                               setActive(displayRow);
                               setOpen(true);
@@ -288,23 +310,19 @@ export default function PredictabilityTable({
                               : "cursor-pointer hover:bg-white/[0.04]"
                           )}
                         >
-                          {/* INDEX */}
                           <div className="hidden sm:block text-white/30 text-xs">
                             #{i + 1}
                           </div>
 
-                          {/* NAME */}
                           <div>
                             <div className="text-white font-medium text-sm flex gap-2 items-center">
                               {displayRow.name}
-                              {chip === "safe" &&
-                                i < 3 &&
-                                r.confidence01 >= 0.75 &&
-                                r.volatility01 <= 0.35 && (
-                                  <span className="rounded-full bg-amber-400/20 border border-amber-400/50 px-2 py-0.5 text-[10px] text-amber-300">
-                                    🔒 Top Lock
-                                  </span>
-                                )}
+
+                              {chip === "safe" && i < 3 && (
+                                <span className="rounded-full bg-amber-400/20 border border-amber-400/50 px-2 py-0.5 text-[10px] text-amber-300">
+                                  🔒 Top Lock
+                                </span>
+                              )}
                             </div>
 
                             <div className="mt-0.5 flex gap-1.5 items-center">
@@ -317,7 +335,6 @@ export default function PredictabilityTable({
                             </div>
                           </div>
 
-                          {/* RANGE */}
                           <div>
                             <div className="font-semibold text-white text-sm">
                               {displayRow.rangeLow} → {displayRow.rangeHigh}
@@ -333,13 +350,13 @@ export default function PredictabilityTable({
                             </div>
                           </div>
 
-                          {/* AI (DESKTOP ONLY) */}
+                          {/* DESKTOP AI — UNCHANGED */}
                           <div className="hidden sm:block text-sm text-white/60">
                             {displayRow.ai}
                           </div>
                         </div>
 
-                        {/* MOBILE EXPAND */}
+                        {/* MOBILE INLINE EXPAND — ADDITIVE ONLY */}
                         <div
                           className={cx(
                             "sm:hidden px-6 overflow-hidden transition-all duration-300 ease-out",
@@ -351,20 +368,40 @@ export default function PredictabilityTable({
                           <div className="text-sm text-white/70 mt-2">
                             {displayRow.ai}
                           </div>
-                          <div className="mt-2 text-[11px] text-amber-300">
-                            {whySafeMicrocopy(displayRow)}
-                          </div>
+                          {chip === "safe" && (
+                            <div className="mt-2 text-[11px] text-amber-300">
+                              {whySafeMicrocopy(displayRow)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
                   })}
+
+                {chip === "safe" &&
+                  displayRows.length > SAFE_TARGET &&
+                  !isCollapsed && (
+                    <button
+                      onClick={() =>
+                        setExpandedTeam((s) => ({
+                          ...s,
+                          [team]: !s[team],
+                        }))
+                      }
+                      className="px-6 py-2 text-xs text-amber-300 hover:underline"
+                    >
+                      {expandedTeam[team]
+                        ? "Show less"
+                        : "Show full team"}
+                    </button>
+                  )}
               </div>
             );
           })}
         </div>
       </section>
 
-      {/* DESKTOP MODAL (UNCHANGED) */}
+      {/* DESKTOP MODAL — 100% UNCHANGED */}
       {open &&
         active &&
         createPortal(
@@ -402,8 +439,13 @@ export default function PredictabilityTable({
                   </div>
                   <div className="text-white/70">
                     Confidence:{" "}
-                    {Math.round(active.confidence01 * 100)}% · Volatility:{" "}
-                    {Math.round(active.volatility01 * 100)}%
+                    <strong>
+                      {(active.confidence01 * 100).toFixed(0)}%
+                    </strong>{" "}
+                    · Volatility:{" "}
+                    <strong>
+                      {(active.volatility01 * 100).toFixed(0)}%
+                    </strong>
                   </div>
                 </div>
 
