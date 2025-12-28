@@ -9,9 +9,8 @@ import { confLabel, volLabel } from "./utils";
 
 type Chip = "all" | "safe" | "ceiling" | "risky";
 
-type PlaceholderRow = {
-  __placeholder: true;
-  key: string;
+type DistributionStripProps = {
+  row: PredictRow;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -20,6 +19,47 @@ type PlaceholderRow = {
 
 const FREE_ROWS = 3;
 const TOTAL_ROWS = 10;
+
+/* -------------------------------------------------------------------------- */
+/* DISTRIBUTION STRIP (MODAL)                                                 */
+/* -------------------------------------------------------------------------- */
+
+function DistributionStrip({ row }: DistributionStripProps) {
+  const { rangeLow, rangeHigh } = row;
+
+  if (
+    typeof rangeLow !== "number" ||
+    typeof rangeHigh !== "number"
+  ) {
+    return null;
+  }
+
+  const mid = Math.round(rangeLow + (rangeHigh - rangeLow) * 0.5);
+
+  return (
+    <div className="mt-5">
+      <div className="flex justify-between text-[11px] text-white/45 mb-1">
+        <span>Floor</span>
+        <span>Median</span>
+        <span>Ceiling</span>
+      </div>
+
+      <div className="relative h-2 rounded-full bg-white/10">
+        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-amber-400/30 via-amber-400/70 to-amber-400/30" />
+        <div
+          className="absolute top-1/2 h-4 w-[2px] bg-white/90 -translate-y-1/2"
+          style={{ left: "50%" }}
+        />
+      </div>
+
+      <div className="mt-2 flex justify-between text-sm text-white tabular-nums">
+        <span>{rangeLow}</span>
+        <span className="font-semibold">{mid}</span>
+        <span>{rangeHigh}</span>
+      </div>
+    </div>
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /* COMPONENT                                                                  */
@@ -105,7 +145,7 @@ export default function PredictabilityTable(props: {
   }
 
   /* -------------------------------------------------------------------------- */
-  /* FILTER + SORT (CONFIDENCE DEFAULT)                                          */
+  /* FILTER + SORT                                                              */
   /* -------------------------------------------------------------------------- */
 
   const ranked = useMemo(() => {
@@ -126,9 +166,10 @@ export default function PredictabilityTable(props: {
     return [...r].sort((a, b) => b.confidence01 - a.confidence01);
   }, [rows, chip]);
 
-  const visibleRows = useMemo(() => {
-    return ranked.slice(0, TOTAL_ROWS);
-  }, [ranked]);
+  const visibleRows = useMemo(
+    () => ranked.slice(0, TOTAL_ROWS),
+    [ranked]
+  );
 
   /* -------------------------------------------------------------------------- */
   /* MODAL HANDLING                                                             */
@@ -162,66 +203,31 @@ export default function PredictabilityTable(props: {
 
   return (
     <div className="grid gap-6">
-      {/* SECTION HEADER */}
-      <div className="border-b border-white/10 pb-4">
-        <h2 className="text-lg font-semibold text-white">
-          Player Score Predictability
-        </h2>
-        <p className="mt-1 text-sm text-white/60 max-w-2xl">
-          Projection ranges and confidence profiles for the most influential
-          players in this matchup.
-        </p>
-      </div>
-
-      {/* AI SNAPSHOT */}
-      {insight && (
-        <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3">
-          <div className="text-[11px] uppercase tracking-wide text-amber-200/80">
-            {contextLabel ?? "AI Context"} · {statLabel}
-          </div>
-          <div className="mt-1 text-sm text-amber-50/90">{insight}</div>
-          {matchContext && (
-            <div className="mt-1 text-xs text-amber-100/50">
-              Adjusted for {matchContext}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* FILTERS */}
-      <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-        <div className="flex flex-wrap gap-2">
-          {(["all", "safe", "ceiling", "risky"] as Chip[]).map((c) => (
-            <button
-              key={c}
-              onClick={() => setChip(c)}
-              className={`rounded-full px-3 py-1 text-xs transition ${
-                chip === c
-                  ? "bg-amber-500/20 text-amber-200 border border-amber-400/30"
-                  : "border border-white/10 text-white/60 hover:bg-white/10"
-              }`}
-            >
-              {c === "all"
-                ? "All"
-                : c === "safe"
-                ? "Safe Picks"
-                : c === "ceiling"
-                ? "Ceiling Plays"
-                : "Risky"}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-wrap gap-2">
+        {(["all", "safe", "ceiling", "risky"] as Chip[]).map((c) => (
+          <button
+            key={c}
+            onClick={() => setChip(c)}
+            className={`rounded-full px-3 py-1 text-xs ${
+              chip === c
+                ? "bg-amber-500/20 text-amber-200 border border-amber-400/30"
+                : "border border-white/10 text-white/60 hover:bg-white/10"
+            }`}
+          >
+            {c === "all"
+              ? "All"
+              : c === "safe"
+              ? "Safe Picks"
+              : c === "ceiling"
+              ? "Ceiling Plays"
+              : "Risky"}
+          </button>
+        ))}
       </div>
 
       {/* TABLE */}
       <div className="overflow-hidden rounded-xl border border-white/10">
-        <div className="sticky top-0 z-10 grid grid-cols-[40px_1.8fr_1fr_2.4fr] bg-[#0f1422] px-3 py-2 text-[11px] uppercase tracking-wide text-white/60">
-          <div>#</div>
-          <div>Player</div>
-          <div className="text-right pr-2">Range</div>
-          <div>AI Insight</div>
-        </div>
-
         <div className="divide-y divide-white/10">
           {visibleRows.map((r, i) => {
             const isLockedRow = locked && i >= FREE_ROWS;
@@ -229,7 +235,7 @@ export default function PredictabilityTable(props: {
             return (
               <div
                 key={r.id}
-                className="relative grid grid-cols-[40px_1.8fr_1fr_2.4fr] px-3 py-3 hover:bg-white/6"
+                className="relative px-3 py-3 hover:bg-white/6 cursor-pointer"
                 onClick={() => {
                   if (!isLockedRow) {
                     setSelected(r);
@@ -237,44 +243,24 @@ export default function PredictabilityTable(props: {
                   }
                 }}
               >
-                <div className="text-xs text-white/40">#{i + 1}</div>
-
-                <div className={isLockedRow ? "blur-sm select-none" : ""}>
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between">
+                  <div className={isLockedRow ? "blur-sm" : ""}>
                     <div className="text-sm font-medium text-white">
-                      {r.name}
+                      #{i + 1} {r.name}
                     </div>
-                    {r.team && (
-                      <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-white/70">
-                        {r.team}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-1 flex gap-1 text-[11px] text-white/60">
-                    <span className="rounded-full border border-white/10 px-2 py-0.5">
-                      {confLabel(r.confidence01)}
-                    </span>
-                    <span className="rounded-full border border-white/10 px-2 py-0.5">
+                    <div className="text-xs text-white/60">
+                      {confLabel(r.confidence01)} ·{" "}
                       {volLabel(r.volatility01)}
-                    </span>
+                    </div>
                   </div>
-                </div>
 
-                <div
-                  className={`text-right pr-2 text-sm text-white ${
-                    isLockedRow ? "blur-sm" : ""
-                  }`}
-                >
-                  {fmtRange(r)}
-                </div>
-
-                <div
-                  className={`text-sm text-white/70 ${
-                    isLockedRow ? "blur-sm" : ""
-                  }`}
-                >
-                  {aiSentence(r)}
+                  <div
+                    className={`text-sm text-white ${
+                      isLockedRow ? "blur-sm" : ""
+                    }`}
+                  >
+                    {fmtRange(r)}
+                  </div>
                 </div>
 
                 {isLockedRow && (
@@ -288,28 +274,6 @@ export default function PredictabilityTable(props: {
         </div>
       </div>
 
-      {/* CTA */}
-      {locked && (
-        <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 flex items-center justify-between gap-3">
-          <div>
-            <div className="font-medium text-amber-100">
-              Viewing 3 of 10 player projections
-            </div>
-            <div className="text-xs text-amber-100/80">
-              Unlock full team-by-team predictability insights with Neeko+.
-            </div>
-          </div>
-
-          <button
-            onClick={onUnlock}
-            className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/20 px-4 py-2 text-sm text-amber-100"
-          >
-            <Lock className="h-4 w-4" />
-            {UNLOCK_LABEL}
-          </button>
-        </div>
-      )}
-
       {/* MODAL */}
       {open && selected && (
         <div
@@ -318,15 +282,15 @@ export default function PredictabilityTable(props: {
         >
           <div className="absolute inset-0 bg-black/70" />
           <div
-            className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#0b0f18] p-4"
+            className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#0b0f18] p-5"
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between">
+            <div className="flex justify-between items-start">
               <div>
-                <div className="text-base font-semibold text-white">
+                <div className="text-lg font-semibold text-white">
                   {selected.name}
                 </div>
-                <div className="text-xs text-white/60">
+                <div className="text-xs text-white/60 mt-0.5">
                   {statLabel}
                   {matchContext ? ` · ${matchContext}` : ""}
                 </div>
@@ -336,13 +300,19 @@ export default function PredictabilityTable(props: {
               </button>
             </div>
 
-            <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
-              <div className="text-sm font-semibold text-white">
-                {fmtRange(selected)}
-              </div>
-              <div className="mt-3 text-sm text-white/75">
-                {aiSentence(selected)}
-              </div>
+            <div className="mt-4 text-sm text-white/75">
+              {aiSentence(selected)}
+            </div>
+
+            <DistributionStrip row={selected} />
+
+            <div className="mt-4 flex gap-2 text-xs text-white/60">
+              <span className="rounded-full border border-white/10 px-2 py-0.5">
+                Confidence: {confLabel(selected.confidence01)}
+              </span>
+              <span className="rounded-full border border-white/10 px-2 py-0.5">
+                Volatility: {volLabel(selected.volatility01)}
+              </span>
             </div>
           </div>
         </div>
