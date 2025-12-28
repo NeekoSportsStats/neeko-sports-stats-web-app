@@ -9,13 +9,17 @@ import { confLabel, volLabel } from "./utils";
 
 type Chip = "all" | "safe" | "ceiling" | "risky";
 
+type PlaceholderRow = {
+  __placeholder: true;
+  key: string;
+};
+
 /* -------------------------------------------------------------------------- */
 /* CONSTANTS                                                                  */
 /* -------------------------------------------------------------------------- */
 
-const TOTAL_ROWS = 10;
 const FREE_ROWS = 3;
-const PER_TEAM = 5;
+const TOTAL_ROWS = 10;
 
 /* -------------------------------------------------------------------------- */
 /* COMPONENT                                                                  */
@@ -52,92 +56,128 @@ export default function PredictabilityTable(props: {
   const [selected, setSelected] = useState<PredictRow | null>(null);
 
   /* -------------------------------------------------------------------------- */
-  /* AUTO CHIP DEFAULT                                                         */
+  /* AUTO CHIP DEFAULT                                                          */
   /* -------------------------------------------------------------------------- */
 
   useEffect(() => {
-    const s = (statLabel ?? "").toLowerCase();
+    const s = statLabel.toLowerCase();
     if (s.includes("goal")) setChip("ceiling");
     else if (s.includes("disposal")) setChip("safe");
     else setChip("all");
   }, [statLabel]);
 
   /* -------------------------------------------------------------------------- */
-  /* FILTER + RANK (confidence only)                                            */
+  /* AI SENTENCE                                                                */
   /* -------------------------------------------------------------------------- */
-
-  const ranked = useMemo(() => {
-    let r = rows;
-
-    if (chip === "safe") {
-      r = r.filter(x => x.confidence01 >= 0.7 && x.volatility01 <= 0.4);
-    }
-    if (chip === "ceiling") {
-      r = r.filter(x => x.volatility01 >= 0.65);
-    }
-    if (chip === "risky") {
-      r = r.filter(x => x.confidence01 <= 0.45);
-    }
-
-    return [...r].sort((a, b) => b.confidence01 - a.confidence01);
-  }, [rows, chip]);
-
-  /* -------------------------------------------------------------------------- */
-  /* 5 + 5 TEAM SPLIT                                                          */
-  /* -------------------------------------------------------------------------- */
-
-  const visibleRows = useMemo(() => {
-    const byTeam = new Map<string, PredictRow[]>();
-
-    for (const r of ranked) {
-      if (!r.team) continue;
-      const arr = byTeam.get(r.team) ?? [];
-      arr.push(r);
-      byTeam.set(r.team, arr);
-    }
-
-    const teams = Array.from(byTeam.keys()).slice(0, 2);
-    if (teams.length < 2) return [];
-
-    const home = byTeam.get(teams[0])?.slice(0, PER_TEAM) ?? [];
-    const away = byTeam.get(teams[1])?.slice(0, PER_TEAM) ?? [];
-
-    return [...home, ...away].slice(0, TOTAL_ROWS);
-  }, [ranked]);
-
-  /* -------------------------------------------------------------------------- */
-  /* HELPERS                                                                   */
-  /* -------------------------------------------------------------------------- */
-
-  function fmtRange(r: PredictRow) {
-    if (typeof r.rangeLow === "number" && typeof r.rangeHigh === "number") {
-      return `${r.rangeLow}–${r.rangeHigh}`;
-    }
-    return "—";
-  }
 
   function aiSentence(r: PredictRow) {
     const c = r.confidence01;
     const v = r.volatility01;
 
     if (c >= 0.72 && v <= 0.4) {
-      return "Strong role stability with repeatable output.";
+      return "Strong role stability with repeatable scoring output. Reliable floor unless game flow shifts materially.";
     }
     if (v >= 0.65) {
-      return "High-variance profile with genuine ceiling upside.";
+      return "High-upside profile driven by volatility. Ceiling outcomes are matchup and game-flow dependent.";
     }
     if (c <= 0.45) {
-      return "Wide outcome band driven by role or opposition risk.";
+      return "Wide outcome range due to role or opposition risk. Best suited to contrarian builds.";
     }
-    return "Balanced profile with moderate confidence and volatility.";
+    return "Balanced profile with moderate confidence and variability across likely game scripts.";
   }
+
+  /* -------------------------------------------------------------------------- */
+  /* RANGE FORMAT                                                               */
+  /* -------------------------------------------------------------------------- */
+
+  function fmtRange(r: PredictRow) {
+    if (
+      typeof r.rangeLow === "number" &&
+      typeof r.rangeHigh === "number"
+    ) {
+      return (
+        <span className="tabular-nums">
+          {r.rangeLow}–{r.rangeHigh}
+        </span>
+      );
+    }
+    return "—";
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /* FILTER + SORT (CONFIDENCE DEFAULT)                                          */
+  /* -------------------------------------------------------------------------- */
+
+  const ranked = useMemo(() => {
+    let r = rows;
+
+    if (chip === "safe") {
+      r = r.filter(
+        (x) => x.confidence01 >= 0.7 && x.volatility01 <= 0.4
+      );
+    }
+    if (chip === "ceiling") {
+      r = r.filter((x) => x.volatility01 >= 0.65);
+    }
+    if (chip === "risky") {
+      r = r.filter((x) => x.confidence01 <= 0.45);
+    }
+
+    return [...r].sort((a, b) => b.confidence01 - a.confidence01);
+  }, [rows, chip]);
+
+  const visibleRows = useMemo(() => {
+    return ranked.slice(0, TOTAL_ROWS);
+  }, [ranked]);
+
+  /* -------------------------------------------------------------------------- */
+  /* MODAL HANDLING                                                             */
+  /* -------------------------------------------------------------------------- */
+
+  function closeModal() {
+    setOpen(false);
+    setSelected(null);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeModal();
+    };
+
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  /* -------------------------------------------------------------------------- */
+  /* RENDER                                                                     */
+  /* -------------------------------------------------------------------------- */
+
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-6">
+      {/* SECTION HEADER */}
+      <div className="border-b border-white/10 pb-4">
+        <h2 className="text-lg font-semibold text-white">
+          Player Score Predictability
+        </h2>
+        <p className="mt-1 text-sm text-white/60 max-w-2xl">
+          Projection ranges and confidence profiles for the most influential
+          players in this matchup.
+        </p>
+      </div>
+
       {/* AI SNAPSHOT */}
       {insight && (
         <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3">
           <div className="text-[11px] uppercase tracking-wide text-amber-200/80">
-            {contextLabel ?? "AI Round Snapshot"} · {statLabel}
+            {contextLabel ?? "AI Context"} · {statLabel}
           </div>
           <div className="mt-1 text-sm text-amber-50/90">{insight}</div>
           {matchContext && (
@@ -148,34 +188,36 @@ export default function PredictabilityTable(props: {
         </div>
       )}
 
-      {/* FILTER CHIPS */}
-      <div className="flex flex-wrap gap-2">
-        {(["all", "safe", "ceiling", "risky"] as Chip[]).map(c => (
-          <button
-            key={c}
-            onClick={() => setChip(c)}
-            className={`rounded-full px-3 py-1 text-xs ${
-              chip === c
-                ? "bg-amber-500/20 text-amber-200 border border-amber-400/30"
-                : "border border-white/10 text-white/60 hover:bg-white/5"
-            }`}
-          >
-            {c === "all"
-              ? "All"
-              : c === "safe"
-              ? "Safe Picks"
-              : c === "ceiling"
-              ? "Ceiling Plays"
-              : "Risky"}
-          </button>
-        ))}
+      {/* FILTERS */}
+      <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+        <div className="flex flex-wrap gap-2">
+          {(["all", "safe", "ceiling", "risky"] as Chip[]).map((c) => (
+            <button
+              key={c}
+              onClick={() => setChip(c)}
+              className={`rounded-full px-3 py-1 text-xs transition ${
+                chip === c
+                  ? "bg-amber-500/20 text-amber-200 border border-amber-400/30"
+                  : "border border-white/10 text-white/60 hover:bg-white/10"
+              }`}
+            >
+              {c === "all"
+                ? "All"
+                : c === "safe"
+                ? "Safe Picks"
+                : c === "ceiling"
+                ? "Ceiling Plays"
+                : "Risky"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* TABLE */}
       <div className="overflow-hidden rounded-xl border border-white/10">
-        <div className="grid grid-cols-[40px_1.6fr_0.9fr_2.2fr] bg-[#0b0f18] px-3 py-2 text-[11px] uppercase tracking-wide text-white/50">
+        <div className="sticky top-0 z-10 grid grid-cols-[40px_1.8fr_1fr_2.4fr] bg-[#0f1422] px-3 py-2 text-[11px] uppercase tracking-wide text-white/60">
           <div>#</div>
-          <div>Name</div>
+          <div>Player</div>
           <div className="text-right pr-2">Range</div>
           <div>AI Insight</div>
         </div>
@@ -187,9 +229,7 @@ export default function PredictabilityTable(props: {
             return (
               <div
                 key={r.id}
-                className={`relative grid grid-cols-[40px_1.6fr_0.9fr_2.2fr] px-3 py-3 ${
-                  isLockedRow ? "cursor-not-allowed" : "hover:bg-white/6"
-                }`}
+                className="relative grid grid-cols-[40px_1.8fr_1fr_2.4fr] px-3 py-3 hover:bg-white/6"
                 onClick={() => {
                   if (!isLockedRow) {
                     setSelected(r);
@@ -204,9 +244,11 @@ export default function PredictabilityTable(props: {
                     <div className="text-sm font-medium text-white">
                       {r.name}
                     </div>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-white/70">
-                      {r.team}
-                    </span>
+                    {r.team && (
+                      <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-white/70">
+                        {r.team}
+                      </span>
+                    )}
                   </div>
 
                   <div className="mt-1 flex gap-1 text-[11px] text-white/60">
@@ -219,11 +261,19 @@ export default function PredictabilityTable(props: {
                   </div>
                 </div>
 
-                <div className={`text-right pr-2 tabular-nums text-sm text-white ${isLockedRow ? "blur-sm" : ""}`}>
+                <div
+                  className={`text-right pr-2 text-sm text-white ${
+                    isLockedRow ? "blur-sm" : ""
+                  }`}
+                >
                   {fmtRange(r)}
                 </div>
 
-                <div className={`text-sm text-white/70 ${isLockedRow ? "blur-sm" : ""}`}>
+                <div
+                  className={`text-sm text-white/70 ${
+                    isLockedRow ? "blur-sm" : ""
+                  }`}
+                >
                   {aiSentence(r)}
                 </div>
 
@@ -246,7 +296,7 @@ export default function PredictabilityTable(props: {
               Viewing 3 of 10 player projections
             </div>
             <div className="text-xs text-amber-100/80">
-              Unlock full team-by-team predictability insights.
+              Unlock full team-by-team predictability insights with Neeko+.
             </div>
           </div>
 
@@ -257,6 +307,44 @@ export default function PredictabilityTable(props: {
             <Lock className="h-4 w-4" />
             {UNLOCK_LABEL}
           </button>
+        </div>
+      )}
+
+      {/* MODAL */}
+      {open && selected && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onMouseDown={closeModal}
+        >
+          <div className="absolute inset-0 bg-black/70" />
+          <div
+            className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#0b0f18] p-4"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between">
+              <div>
+                <div className="text-base font-semibold text-white">
+                  {selected.name}
+                </div>
+                <div className="text-xs text-white/60">
+                  {statLabel}
+                  {matchContext ? ` · ${matchContext}` : ""}
+                </div>
+              </div>
+              <button onClick={closeModal}>
+                <X className="h-4 w-4 text-white/70" />
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="text-sm font-semibold text-white">
+                {fmtRange(selected)}
+              </div>
+              <div className="mt-3 text-sm text-white/75">
+                {aiSentence(selected)}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
