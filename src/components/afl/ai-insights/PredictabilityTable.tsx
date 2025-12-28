@@ -220,55 +220,56 @@ export default function PredictabilityTable(props: {
                 </div>
               )}
 
-              <button
-                onClick={() => {
-                  if (lockedRow) return;
-                  setSelected(r);
-                  setOpen(true);
-                }}
-                className="relative grid w-full grid-cols-[40px_1.4fr_1fr_2fr] px-4 py-3 text-left hover:bg-white/5"
-              >
-                <div className="text-xs text-white/40">#{i + 1}</div>
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    if (lockedRow) return;
+                    setSelected(r);
+                    setOpen(true);
+                  }}
+                  className="relative grid w-full grid-cols-[40px_1.4fr_1fr_2fr] px-4 py-3 text-left transition hover:bg-white/5"
+                >
+                  <div className="text-xs text-white/40">#{i + 1}</div>
 
-                <div className={lockedRow ? "blur-sm" : ""}>
-                  <div className="font-medium">{r.name}</div>
-                  <div className="mt-1 flex gap-2 text-xs">
-                    {teamBadge(r.team)}
-                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-300">
-                      {confLabel(r.confidence01)}
-                    </span>
-                    <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-sky-300">
-                      {volLabel(r.volatility01)}
-                    </span>
+                  <div>
+                    <div className="font-medium">{r.name}</div>
+                    <div className="mt-1 flex gap-2 text-xs">
+                      {teamBadge(r.team)}
+                      <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-300">
+                        {confLabel(r.confidence01)}
+                      </span>
+                      <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-sky-300">
+                        {volLabel(r.volatility01)}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                <div className={lockedRow ? "blur-sm" : ""}>
-                  <div className="flex justify-between text-xs text-white/60">
-                    <span>{Math.round(r.rangeLow)}</span>
-                    <span>{Math.round(r.rangeHigh)}</span>
+                  <div>
+                    <div className="flex justify-between text-xs text-white/60">
+                      <span>{Math.round(r.rangeLow)}</span>
+                      <span>{Math.round(r.rangeHigh)}</span>
+                    </div>
+                    <div className="mt-1 h-2 rounded-full bg-white/10">
+                      <div
+                        className="h-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-300"
+                        style={{ width: `${rangeBarWidth(r)}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="mt-1 h-2 rounded-full bg-white/10">
-                    <div
-                      className="h-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-300"
-                      style={{ width: `${rangeBarWidth(r)}%` }}
-                    />
-                  </div>
-                </div>
 
-                <div className={`text-white/70 ${lockedRow ? "blur-sm" : ""}`}>
-                  {aiSentence(r)}
-                </div>
+                  <div className="text-white/70">{aiSentence(r)}</div>
+                </button>
 
                 {lockedRow && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur">
-                    <div className="flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/20 px-3 py-1 text-xs text-amber-200">
+                    <div className="relative w-full h-full animate-pulse bg-gradient-to-r from-white/5 via-white/10 to-white/5" />
+                    <div className="absolute flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/20 px-3 py-1 text-xs text-amber-200">
                       <Lock className="h-3.5 w-3.5" />
                       Neeko+
                     </div>
                   </div>
                 )}
-              </button>
+              </div>
             </React.Fragment>
           );
         })}
