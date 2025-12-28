@@ -94,13 +94,24 @@ function rangeBarStyle(conf01: number, vol01: number) {
   } as React.CSSProperties;
 }
 
+/* 🔒 FAKE DATA FOR LOCKED ROWS */
+function fakeLockedRow(r: PredictRow): PredictRow {
+  const jitter = Math.floor(6 + Math.random() * 12);
+  return {
+    ...r,
+    rangeLow: Math.max(0, (r.rangeLow ?? 80) - jitter),
+    rangeHigh: (r.rangeHigh ?? 95) + jitter,
+    ai: "Premium insight available with Neeko+.",
+  };
+}
+
 export default function PredictabilityTable({
   rows,
   mode,
   statLabel,
   matchContext,
   insight,
-  showHeader = true, // ✅ NEW
+  showHeader = true,
 }: {
   rows: PredictRow[];
   mode: PremiumMode;
@@ -121,7 +132,7 @@ export default function PredictabilityTable({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<PredictRow | null>(null);
 
-  /* ---------------- GROUP BY TEAM ---------------- */
+  /* ---------------- GROUP BY TEAM (FULL LIST) ---------------- */
 
   const rowsByTeam = useMemo(() => {
     const map = new Map<string, PredictRow[]>();
@@ -129,10 +140,7 @@ export default function PredictabilityTable({
       if (!map.has(r.team)) map.set(r.team, []);
       map.get(r.team)!.push(r);
     });
-    return Array.from(map.entries()).map(([team, rs]) => [
-      team,
-      rs.slice(0, 5),
-    ]) as Array<[string, PredictRow[]]>;
+    return Array.from(map.entries()) as Array<[string, PredictRow[]]>;
   }, [rows]);
 
   const filterRow = (r: PredictRow) => {
@@ -147,7 +155,6 @@ export default function PredictabilityTable({
   return (
     <>
       <section className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden">
-        {/* HEADER (OPTIONAL) */}
         {showHeader && (
           <header className="px-6 pt-5 pb-4 border-b border-white/10">
             <h2 className="text-lg font-semibold text-white">
@@ -194,9 +201,6 @@ export default function PredictabilityTable({
               </button>
             ))}
           </div>
-          <div className="text-xs text-white/35 hidden sm:block">
-            Tip: Confidence = safety. Volatility = upside.
-          </div>
         </div>
 
         {/* TEAMS */}
@@ -216,19 +220,20 @@ export default function PredictabilityTable({
                     <div className="h-px flex-1 bg-amber-400/30" />
                   </div>
                   <div className="mt-1 text-[11px] text-white/40">
-                    Top 5 players · 2 free
+                    Full team · 2 free
                   </div>
                 </div>
 
                 {filtered.map((r, i) => {
                   const rowLocked = locked && i >= 2;
+                  const displayRow = rowLocked ? fakeLockedRow(r) : r;
 
                   return (
                     <div
                       key={r.id}
                       onClick={() => {
                         if (!rowLocked) {
-                          setActive(r);
+                          setActive(displayRow);
                           setOpen(true);
                         }
                       }}
@@ -242,35 +247,42 @@ export default function PredictabilityTable({
                       <div className="text-white/30 text-xs">#{i + 1}</div>
 
                       <div>
-                        <div className="text-white font-medium text-sm">
-                          {r.name}
+                        <div className="text-white font-medium text-sm flex gap-2 items-center">
+                          {displayRow.name}
+                          {rowLocked && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/40 px-2 py-0.5 text-[10px] text-amber-300">
+                              <Lock size={10} /> Neeko+
+                            </span>
+                          )}
                         </div>
                         <div className="mt-0.5 flex gap-1.5">
                           <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
-                            {confLabel(r.confidence01)}
+                            {confLabel(displayRow.confidence01)}
                           </span>
                           <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
-                            {volLabel(r.volatility01)}
+                            {volLabel(displayRow.volatility01)}
                           </span>
                         </div>
                       </div>
 
                       <div className="text-sm">
                         <div className="font-semibold text-white">
-                          {r.rangeLow} → {r.rangeHigh}
+                          {displayRow.rangeLow} → {displayRow.rangeHigh}
                         </div>
                         <div className="mt-1 h-1.5 w-full rounded bg-white/10">
                           <div
                             className="h-1.5 rounded"
                             style={rangeBarStyle(
-                              r.confidence01,
-                              r.volatility01
+                              displayRow.confidence01,
+                              displayRow.volatility01
                             )}
                           />
                         </div>
                       </div>
 
-                      <div className="text-sm text-white/60">{r.ai}</div>
+                      <div className="text-sm text-white/60">
+                        {displayRow.ai}
+                      </div>
                     </div>
                   );
                 })}
