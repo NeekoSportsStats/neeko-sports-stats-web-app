@@ -4,30 +4,22 @@ import type { PredictRow, PremiumMode } from "./types";
 import { confLabel, volLabel } from "./utils";
 
 /* -------------------------------------------------------------------------- */
+/* CONSTANTS                                                                  */
+/* -------------------------------------------------------------------------- */
+
+const FREE_PER_TEAM = 2;
+const TOTAL_PER_TEAM = 5;
+
+/* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
 
 type Chip = "all" | "safe" | "ceiling" | "risky";
 
-type GroupedRow = PredictRow & {
-  locked?: boolean;
+type PlaceholderRow = {
+  __placeholder: true;
+  key: string;
 };
-
-/* -------------------------------------------------------------------------- */
-/* HELPERS                                                                    */
-/* -------------------------------------------------------------------------- */
-
-const cx = (...c: Array<string | false | undefined>) =>
-  c.filter(Boolean).join(" ");
-
-function formatRange(lo?: number, hi?: number) {
-  if (typeof lo === "number" && typeof hi === "number") {
-    return `${lo}–${hi}`;
-  }
-  if (typeof lo === "number") return `${lo}–—`;
-  if (typeof hi === "number") return `—–${hi}`;
-  return "—";
-}
 
 /* -------------------------------------------------------------------------- */
 /* COMPONENT                                                                  */
@@ -39,138 +31,145 @@ export default function PredictabilityTable(props: {
   statLabel: string;
   matchContext?: string;
   insight?: string;
+  hint?: string;
+  contextLabel?: string;
+  onUnlock?: () => void;
+  unlockLabel?: string;
 }) {
-  const { rows, mode, statLabel, matchContext, insight } = props;
-  const isPremium = mode === "premium";
+  const {
+    rows,
+    mode,
+    statLabel,
+    matchContext,
+    insight,
+    hint,
+    contextLabel,
+    onUnlock,
+    unlockLabel,
+  } = props;
+
+  const locked = mode !== "premium";
+  const UNLOCK_LABEL = unlockLabel ?? "Unlock Neeko+";
+
+  /* -------------------------------------------------------------------------- */
+  /* STATE                                                                     */
+  /* -------------------------------------------------------------------------- */
 
   const [chip, setChip] = useState<Chip>("all");
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<PredictRow | null>(null);
 
-  /* ---------------------------------------------------------------------- */
-  /* FILTERING                                                              */
-  /* ---------------------------------------------------------------------- */
+  /* -------------------------------------------------------------------------- */
+  /* GROUP BY TEAM                                                             */
+  /* -------------------------------------------------------------------------- */
 
-  const filtered = useMemo(() => {
-    let r = [...rows];
-
-    if (chip === "safe") {
-      r = r.filter((x) => x.confidence01 >= 0.7 && x.volatility01 <= 0.4);
+  const byTeam = useMemo(() => {
+    const map = new Map<string, PredictRow[]>();
+    for (const r of rows) {
+      if (!map.has(r.team)) map.set(r.team, []);
+      map.get(r.team)!.push(r);
     }
-    if (chip === "ceiling") {
-      r = r.filter((x) => x.volatility01 >= 0.65);
+    return map;
+  }, [rows]);
+
+  /* -------------------------------------------------------------------------- */
+  /* SORT + FILTER (WITHIN TEAM)                                                */
+  /* -------------------------------------------------------------------------- */
+
+  const processed = useMemo(() => {
+    const out: Array<PredictRow | PlaceholderRow> = [];
+
+    for (const [, teamRows] of byTeam) {
+      let r = [...teamRows];
+
+      if (chip === "safe") {
+        r = r.filter((x) => x.confidence01 >= 0.7 && x.volatility01 <= 0.4);
+      } else if (chip === "ceiling") {
+        r = r.filter((x) => x.volatility01 >= 0.65);
+      } else if (chip === "risky") {
+        r = r.filter((x) => x.confidence01 <= 0.45);
+      }
+
+      r.sort((a, b) => b.confidence01 - a.confidence01);
+      r = r.slice(0, TOTAL_PER_TEAM);
+
+      const visible = locked ? r.slice(0, FREE_PER_TEAM) : r;
+      out.push(...visible);
+
+      if (locked) {
+        const hidden = r.length - visible.length;
+        for (let i = 0; i < hidden; i++) {
+          out.push({ __placeholder: true, key: `${r[0]?.team}-locked-${i}` });
+        }
+      }
     }
-    if (chip === "risky") {
-      r = r.filter((x) => x.confidence01 <= 0.45);
+
+    return out;
+  }, [byTeam, chip, locked]);
+
+  /* -------------------------------------------------------------------------- */
+  /* HELPERS                                                                   */
+  /* -------------------------------------------------------------------------- */
+
+  function fmtRange(r: PredictRow) {
+    if (typeof r.rangeLow === "number" && typeof r.rangeHigh === "number") {
+      return `${r.rangeLow} → ${r.rangeHigh}`;
     }
-
-    return r.sort((a, b) => b.confidence01 - a.confidence01);
-  }, [rows, chip]);
-
-  /* ---------------------------------------------------------------------- */
-  /* TEAM SPLIT + GATING                                                     */
-  /* ---------------------------------------------------------------------- */
-
-  const grouped = useMemo(() => {
-    const map = new Map<string, GroupedRow[]>();
-
-    filtered.forEach((r) => {
-      const team = r.team ?? "Unknown";
-      if (!map.has(team)) map.set(team, []);
-      map.get(team)!.push(r);
-    });
-
-    return Array.from(map.entries()).map(([team, players]) => {
-      const visibleCount = isPremium ? 5 : 2;
-
-      return [
-        team,
-        players.slice(0, 5).map((p, i) => ({
-          ...p,
-          locked: !isPremium && i >= visibleCount,
-        })),
-      ] as const;
-    });
-  }, [filtered, isPremium]);
-
-  /* ---------------------------------------------------------------------- */
-  /* MODAL                                                                  */
-  /* ---------------------------------------------------------------------- */
+    return "—";
+  }
 
   function closeModal() {
     setOpen(false);
     setSelected(null);
   }
 
+  /* -------------------------------------------------------------------------- */
+  /* MODAL ESC + SCROLL LOCK                                                    */
+  /* -------------------------------------------------------------------------- */
+
   useEffect(() => {
     if (!open) return;
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeModal();
-    };
-
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeModal();
     window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
   }, [open]);
-
-  /* ---------------------------------------------------------------------- */
-  /* RENDER                                                                 */
-  /* ---------------------------------------------------------------------- */
+  /* -------------------------------------------------------------------------- */
+  /* RENDER                                                                     */
+  /* -------------------------------------------------------------------------- */
 
   return (
-    <section id="player-predictability" className="scroll-mt-28">
-      {/* HEADER */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold tracking-widest text-yellow-400">
-            1
-          </span>
-          <h2 className="text-xl font-semibold text-white">
-            Player Score Predictability
-          </h2>
-        </div>
-
-        <p className="mt-1 text-sm text-white/55">
-          Expected scoring range and reliability for this matchup
-        </p>
-
-        {matchContext && (
-          <div className="mt-2 text-xs text-white/45">
-            {matchContext} · {statLabel}
-          </div>
-        )}
-      </div>
-
+    <div className="grid gap-4">
       {/* AI SNAPSHOT */}
       {insight && (
-        <div className="mb-6 rounded-xl border border-yellow-400/25 bg-gradient-to-br from-yellow-500/15 to-black/40 px-4 py-3">
-          <div className="text-[11px] uppercase tracking-wider text-yellow-300/80">
-            AI Snapshot
+        <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3">
+          <div className="text-[11px] uppercase tracking-wide text-amber-200/80">
+            {contextLabel ?? "AI Player Predictability"} · {statLabel}
           </div>
-          <div className="mt-1 text-sm text-white/85 leading-relaxed">
-            {insight}
-          </div>
+          <div className="mt-1 text-sm text-amber-50/90">{insight}</div>
+          {matchContext && (
+            <div className="mt-1 text-xs text-amber-100/50">
+              Adjusted for {matchContext}
+            </div>
+          )}
         </div>
       )}
 
       {/* FILTERS */}
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
         {(["all", "safe", "ceiling", "risky"] as Chip[]).map((c) => (
           <button
             key={c}
             onClick={() => setChip(c)}
-            className={cx(
-              "rounded-full px-3 py-1 text-xs border transition",
+            className={`rounded-full px-3 py-1 text-xs ${
               chip === c
-                ? "bg-yellow-500/20 border-yellow-400/40 text-yellow-300"
-                : "border-white/10 text-white/60 hover:bg-white/5"
-            )}
+                ? "bg-amber-500/20 text-amber-200 border border-amber-400/30"
+                : "border border-white/10 text-white/60 hover:bg-white/5"
+            }`}
           >
             {c === "all"
               ? "All"
@@ -184,44 +183,49 @@ export default function PredictabilityTable(props: {
       </div>
 
       {/* TABLE */}
-      <div className="overflow-hidden rounded-xl border border-white/10 bg-black/30">
-        {grouped.map(([team, players]) => (
-          <div key={team}>
-            <div className="bg-black/40 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-white/55">
-              {team}
-            </div>
+      <div className="overflow-hidden rounded-xl border border-white/10">
+        <div className="grid grid-cols-[40px_1.4fr_0.8fr_2fr] bg-[#0b0f18] px-3 py-2 text-[11px] uppercase tracking-wide text-white/50">
+          <div>#</div>
+          <div>Player</div>
+          <div className="text-right pr-2">Range</div>
+          <div>Insight</div>
+        </div>
 
-            {players.map((r) => (
+        <div className="divide-y divide-white/10">
+          {processed.map((row, i) => {
+            if ((row as PlaceholderRow).__placeholder) {
+              return (
+                <div
+                  key={(row as PlaceholderRow).key}
+                  className="grid grid-cols-[40px_1.4fr_0.8fr_2fr] px-3 py-3 opacity-50 blur-[2px]"
+                >
+                  <div>—</div>
+                  <div className="h-4 w-32 rounded bg-white/10" />
+                  <div className="text-right pr-2">—</div>
+                  <div className="h-3 w-40 rounded bg-white/10" />
+                </div>
+              );
+            }
+
+            const r = row as PredictRow;
+            const w = Math.round(r.confidence01 * 100);
+
+            return (
               <button
                 key={r.id}
-                disabled={r.locked}
                 onClick={() => {
-                  if (r.locked) return;
                   setSelected(r);
                   setOpen(true);
                 }}
-                className={cx(
-                  "grid w-full grid-cols-[1fr_140px] items-center px-4 py-3 text-left transition",
-                  r.locked
-                    ? "cursor-not-allowed bg-black/20"
-                    : "hover:bg-white/[0.04]"
-                )}
+                className="grid grid-cols-[40px_1.4fr_0.8fr_2fr] px-3 py-3 text-left hover:bg-white/6"
               >
-                <div className={cx(r.locked && "opacity-60")}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-white">
-                      {r.name}
-                    </span>
+                <div className="text-xs text-white/40">#{i + 1}</div>
 
-                    {r.locked && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-yellow-400/40 bg-yellow-400/10 px-2 py-0.5 text-[10px] text-yellow-300">
-                        <Lock className="h-3 w-3" />
-                        Locked
-                      </span>
-                    )}
+                <div>
+                  <div className="text-sm font-medium text-white">
+                    {r.name}
                   </div>
-
-                  <div className="mt-1 flex gap-1 text-[11px] text-white/55">
+                  <div className="mt-1 flex gap-1 text-[11px] text-white/60">
                     <span className="rounded-full border border-white/10 px-2 py-0.5">
                       {confLabel(r.confidence01)}
                     </span>
@@ -229,23 +233,42 @@ export default function PredictabilityTable(props: {
                       {volLabel(r.volatility01)}
                     </span>
                   </div>
+                  <div className="mt-2 h-[6px] w-full rounded-full bg-white/10">
+                    <div
+                      className="h-[6px] rounded-full bg-amber-400"
+                      style={{ width: `${w}%` }}
+                    />
+                  </div>
                 </div>
 
-                <div
-                  className={cx(
-                    "text-right text-sm text-white",
-                    r.locked && "blur-sm select-none"
-                  )}
-                >
-                  {formatRange(r.rangeLow, r.rangeHigh)}
+                <div className="flex items-center justify-end pr-2 text-sm text-white">
+                  {fmtRange(r)}
                 </div>
+
+                <div className="text-sm text-white/70">{r.ai}</div>
               </button>
-            ))}
-          </div>
-        ))}
+            );
+          })}
+        </div>
       </div>
 
-      {/* MODAL */}
+      {/* CTA */}
+      {locked && (
+        <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 flex items-center justify-between gap-3 backdrop-blur">
+          <div className="text-sm text-amber-100">
+            Unlock full player predictability with Neeko+.
+          </div>
+          <button
+            onClick={onUnlock}
+            className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/20 px-3 py-1.5"
+          >
+            <Lock className="h-4 w-4" />
+            {UNLOCK_LABEL}
+          </button>
+        </div>
+      )}
+
+      {/* MODAL (UNCHANGED) */}
       {open && selected && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -271,32 +294,23 @@ export default function PredictabilityTable(props: {
               </button>
             </div>
 
-            {/* RANGE STRIP */}
-            <div className="mt-4">
-              <div className="flex justify-between text-xs text-white/55">
-                <span>Floor</span>
-                <span>Ceiling</span>
-              </div>
-
-              <div className="relative mt-1 h-2 rounded-full bg-white/10">
-                <div className="absolute inset-y-0 left-0 right-0 rounded-full bg-gradient-to-r from-yellow-400/30 via-yellow-500/70 to-yellow-400/30" />
-              </div>
-
-              <div className="mt-1 flex justify-between text-sm text-white">
-                <span>{selected.rangeLow ?? "—"}</span>
-                <span>{selected.rangeHigh ?? "—"}</span>
-              </div>
-            </div>
-
-            {/* AI */}
             <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
-              <div className="text-sm text-white/80 leading-relaxed">
+              <div className="text-sm font-semibold text-white">
+                {fmtRange(selected)}
+              </div>
+              <div className="mt-2 h-2 rounded-full bg-white/10">
+                <div
+                  className="h-2 rounded-full bg-amber-400"
+                  style={{ width: `${Math.round(selected.confidence01 * 100)}%` }}
+                />
+              </div>
+              <div className="mt-3 text-sm text-white/75">
                 {selected.ai}
               </div>
             </div>
           </div>
         </div>
       )}
-    </section>
+    </div>
   );
 }
