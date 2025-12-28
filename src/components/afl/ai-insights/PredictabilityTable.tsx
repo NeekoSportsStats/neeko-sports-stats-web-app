@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Lock, X } from "lucide-react";
+import { Lock, X, ChevronDown, ChevronRight } from "lucide-react";
+import { createPortal } from "react-dom";
 import type { PredictRow, PremiumMode } from "./types";
 import { confLabel, volLabel } from "./utils";
 
-type Chip = "all" | "safe" | "ceiling" | "risky";
+/* -------------------------------------------------------------------------- */
+/* TYPES & HELPERS                                                             */
+/* -------------------------------------------------------------------------- */
 
-const MAX_SAFE_PER_TEAM = 8;
+type Chip = "all" | "safe" | "ceiling" | "risky";
 
 const cx = (...c: Array<string | false | undefined>) =>
   c.filter(Boolean).join(" ");
@@ -15,12 +18,27 @@ function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
+function blendedScore(r: PredictRow) {
+  // Confidence is king, volatility penalised
+  return r.confidence01 * 0.7 + (1 - r.volatility01) * 0.3;
+}
+
 function inferStatKey(statLabel: string) {
   const s = (statLabel || "").toLowerCase();
   if (s.includes("fantasy")) return "fantasy";
   if (s.includes("disposal")) return "disposals";
   if (s.includes("goal")) return "goals";
   return "generic";
+}
+
+function whySafeMicrocopy(r: PredictRow) {
+  if (r.confidence01 >= 0.75 && r.volatility01 <= 0.35) {
+    return "High role certainty with tight historical range.";
+  }
+  if (r.confidence01 >= 0.7) {
+    return "Repeatable role output with manageable variance.";
+  }
+  return "Safer than average but still matchup-dependent.";
 }
 
 function stabilityText(conf01: number, vol01: number) {
@@ -43,50 +61,26 @@ function whyThisMatters(statKey: string, conf01: number, vol01: number) {
   const v = clamp01(vol01);
 
   if (statKey === "fantasy") {
-    const a =
-      c >= 0.7
-        ? "This profile suits safer builds with repeatable role output."
-        : "This profile is more build-dependent due to role variability.";
-    const b =
-      v >= 0.65
-        ? "Ceiling exists, but results can swing with game flow."
-        : "Expect tighter outcomes unless tempo shifts.";
-    return `${a} ${b}`;
+    return c >= 0.7
+      ? "Strong role reliability supports safer builds."
+      : "Fantasy output sensitive to role and tempo shifts.";
   }
-
   if (statKey === "disposals") {
-    const a =
-      c >= 0.7
-        ? "Disposal volume is stable across recent matches."
-        : "Touch counts fluctuate with role and rotation.";
-    const b =
-      v >= 0.65
-        ? "High variance from tagging and tempo."
-        : "Lower variance with a narrower range.";
-    return `${a} ${b}`;
+    return c >= 0.7
+      ? "Disposal volume is structurally stable."
+      : "Touches fluctuate with rotation and matchup.";
   }
-
   if (statKey === "goals") {
-    const a =
-      c >= 0.7
-        ? "Scoring opportunities look repeatable in this matchup."
-        : "Goal output depends heavily on supply.";
-    const b =
-      v >= 0.65
-        ? "High volatility driven by accuracy and inside-50 flow."
-        : "Fewer extremes unless supply lifts.";
-    return `${a} ${b}`;
+    return v >= 0.65
+      ? "Goal scoring volatile and opportunity driven."
+      : "Scoring chances relatively contained.";
   }
-
-  return "Projection reliability reflects recent role and matchup context.";
+  return "Projection reliability reflects recent role context.";
 }
 
 function rangeBarStyle(conf01: number, vol01: number) {
-  const c = clamp01(conf01);
-  const v = clamp01(vol01);
-
-  const alpha = 0.35 + c * 0.45;
-  const warm = 0.12 + v * 0.35;
+  const alpha = 0.35 + clamp01(conf01) * 0.45;
+  const warm = 0.12 + clamp01(vol01) * 0.35;
 
   return {
     background: `linear-gradient(90deg,
@@ -96,7 +90,6 @@ function rangeBarStyle(conf01: number, vol01: number) {
   } as React.CSSProperties;
 }
 
-/* 🔒 FAKE DATA FOR LOCKED ROWS */
 function fakeLockedRow(r: PredictRow): PredictRow {
   const jitter = Math.floor(6 + Math.random() * 12);
   return {
@@ -106,6 +99,10 @@ function fakeLockedRow(r: PredictRow): PredictRow {
     ai: "Premium insight available with Neeko+.",
   };
 }
+
+/* -------------------------------------------------------------------------- */
+/* COMPONENT                                                                   */
+/* -------------------------------------------------------------------------- */
 
 export default function PredictabilityTable({
   rows,
@@ -123,26 +120,16 @@ export default function PredictabilityTable({
   showHeader?: boolean;
 }) {
   const locked = mode !== "premium";
-
-  /* ✅ DEFAULT TO SAFE PICKS */
   const [chip, setChip] = useState<Chip>("safe");
-
-  useEffect(() => {
-    setChip("safe");
-  }, [statLabel]);
-
   const statKey = useMemo(() => inferStatKey(statLabel), [statLabel]);
 
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<PredictRow | null>(null);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
-  /* 🔒 LOCK BODY SCROLL WHEN MODAL OPEN */
   useEffect(() => {
-    if (open) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = "";
-  }, [open]);
-
-  /* ---------------- GROUP BY TEAM ---------------- */
+    setChip("safe");
+  }, [statLabel]);
 
   const rowsByTeam = useMemo(() => {
     const map = new Map<string, PredictRow[]>();
@@ -150,7 +137,7 @@ export default function PredictabilityTable({
       if (!map.has(r.team)) map.set(r.team, []);
       map.get(r.team)!.push(r);
     });
-    return Array.from(map.entries()) as Array<[string, PredictRow[]]>;
+    return Array.from(map.entries());
   }, [rows]);
 
   const filterRow = (r: PredictRow) => {
@@ -159,6 +146,10 @@ export default function PredictabilityTable({
     if (chip === "risky") return r.confidence01 <= 0.45;
     return true;
   };
+
+  /* ------------------------------------------------------------------------ */
+  /* RENDER                                                                   */
+  /* ------------------------------------------------------------------------ */
 
   return (
     <>
@@ -169,9 +160,8 @@ export default function PredictabilityTable({
               1. Player Score Predictability
             </h2>
             <p className="mt-1 text-sm text-white/60">
-              Expected scoring ranges, confidence and volatility for this matchup.
+              Expected scoring ranges, confidence and volatility.
             </p>
-
             {insight && (
               <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
                 {insight}
@@ -186,165 +176,186 @@ export default function PredictabilityTable({
         )}
 
         {/* FILTERS */}
-        <div className="px-6 pt-4 pb-3 flex items-center justify-between gap-3">
-          <div className="flex gap-2">
-            {(["all", "safe", "ceiling", "risky"] as Chip[]).map((c) => (
-              <button
-                key={c}
-                onClick={() => setChip(c)}
-                className={cx(
-                  "rounded-full px-3 py-1 text-xs transition",
-                  chip === c
-                    ? "bg-amber-400/20 text-amber-300 border border-amber-400/40"
-                    : "border border-white/10 text-white/60 hover:text-white"
-                )}
-              >
-                {c === "all"
-                  ? "All"
-                  : c === "safe"
-                  ? "Safe Picks"
-                  : c === "ceiling"
-                  ? "Ceiling Plays"
-                  : "Risky"}
-              </button>
-            ))}
-          </div>
+        <div className="px-6 pt-4 pb-3 flex gap-2">
+          {(["safe", "all", "ceiling", "risky"] as Chip[]).map((c) => (
+            <button
+              key={c}
+              onClick={() => setChip(c)}
+              className={cx(
+                "rounded-full px-3 py-1 text-xs border transition",
+                chip === c
+                  ? "bg-amber-400/20 text-amber-300 border-amber-400/40"
+                  : "border-white/10 text-white/60 hover:text-white"
+              )}
+            >
+              {c === "safe"
+                ? "Safe Picks"
+                : c === "all"
+                ? "All"
+                : c === "ceiling"
+                ? "Ceiling Plays"
+                : "Risky"}
+            </button>
+          ))}
         </div>
 
         {/* TEAMS */}
         <div className="divide-y divide-white/10">
           {rowsByTeam.map(([team, teamRows]) => {
-            const filtered = teamRows.filter(filterRow);
+            const filtered = teamRows.filter(filterRow).sort(
+              (a, b) => blendedScore(b) - blendedScore(a)
+            );
             if (!filtered.length) return null;
 
-            const visible =
-              chip === "safe"
-                ? filtered.slice(0, MAX_SAFE_PER_TEAM)
-                : filtered;
+            const isCollapsed = collapsed[team];
 
             return (
               <div key={team}>
-                <div className="px-6 py-2 bg-white/5 border-y border-white/10">
-                  <div className="flex items-center gap-3">
-                    <div className="h-px flex-1 bg-amber-400/30" />
+                {/* TEAM HEADER */}
+                <button
+                  onClick={() =>
+                    setCollapsed((s) => ({ ...s, [team]: !s[team] }))
+                  }
+                  className="w-full px-6 py-2 bg-white/5 border-y border-white/10 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    {isCollapsed ? (
+                      <ChevronRight size={14} />
+                    ) : (
+                      <ChevronDown size={14} />
+                    )}
                     <span className="text-xs font-semibold tracking-widest text-white/70 uppercase">
                       {team}
                     </span>
-                    <div className="h-px flex-1 bg-amber-400/30" />
                   </div>
-                  <div className="mt-1 text-[11px] text-white/40">
-                    {chip === "safe"
-                      ? `Top ${MAX_SAFE_PER_TEAM} · safest roles`
-                      : "Full team"}
-                  </div>
-                </div>
+                  <span className="text-[11px] text-white/40">
+                    {filtered.length} players
+                  </span>
+                </button>
 
-                {visible.map((r, i) => {
-                  const rowLocked = locked && i >= 2;
-                  const displayRow = rowLocked ? fakeLockedRow(r) : r;
+                {!isCollapsed &&
+                  filtered.map((r, i) => {
+                    const rowLocked = locked && i >= 2;
+                    const displayRow = rowLocked ? fakeLockedRow(r) : r;
 
-                  return (
-                    <div
-                      key={r.id}
-                      onClick={() => {
-                        if (!rowLocked) {
-                          setActive(displayRow);
-                          setOpen(true);
-                        }
-                      }}
-                      className={cx(
-                        "px-6 py-3 grid grid-cols-[36px_1.1fr_180px_1.4fr] gap-4 items-center border-b border-white/10 transition",
-                        rowLocked
-                          ? "cursor-not-allowed blur-sm"
-                          : "cursor-pointer hover:bg-white/[0.04]"
-                      )}
-                    >
-                      <div className="text-white/30 text-xs">#{i + 1}</div>
+                    return (
+                      <div
+                        key={r.id}
+                        onClick={() => {
+                          if (!rowLocked) {
+                            setActive(displayRow);
+                            setOpen(true);
+                          }
+                        }}
+                        className={cx(
+                          "px-6 py-3 grid grid-cols-[36px_1.1fr_180px_1.4fr] gap-4 items-center border-b border-white/10 transition",
+                          rowLocked
+                            ? "cursor-not-allowed blur-sm"
+                            : "cursor-pointer hover:bg-white/[0.04]"
+                        )}
+                      >
+                        <div className="text-white/30 text-xs">#{i + 1}</div>
 
-                      <div>
-                        <div className="text-white font-medium text-sm flex gap-2 items-center">
-                          {displayRow.name}
-                          {rowLocked && (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/40 px-2 py-0.5 text-[10px] text-amber-300">
-                              <Lock size={10} /> Neeko+
+                        <div>
+                          <div className="text-white font-medium text-sm flex gap-2 items-center">
+                            {displayRow.name}
+                            {chip === "safe" &&
+                              i < 3 &&
+                              r.confidence01 >= 0.75 &&
+                              r.volatility01 <= 0.35 && (
+                                <span className="rounded-full bg-amber-400/20 border border-amber-400/50 px-2 py-0.5 text-[10px] text-amber-300">
+                                  🔒 Top Lock
+                                </span>
+                              )}
+                          </div>
+
+                          <div className="mt-0.5 flex gap-1.5 items-center">
+                            <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
+                              {confLabel(displayRow.confidence01)}
                             </span>
-                          )}
-                        </div>
-                        <div className="mt-0.5 flex gap-1.5">
-                          <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
-                            {confLabel(displayRow.confidence01)}
-                          </span>
-                          <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
-                            {volLabel(displayRow.volatility01)}
-                          </span>
-                        </div>
-                      </div>
+                            <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
+                              {volLabel(displayRow.volatility01)}
+                            </span>
 
-                      <div className="text-sm">
-                        <div className="font-semibold text-white">
-                          {displayRow.rangeLow} → {displayRow.rangeHigh}
-                        </div>
-                        <div className="mt-1 h-1.5 w-full rounded bg-white/10">
-                          <div
-                            className="h-1.5 rounded"
-                            style={rangeBarStyle(
-                              displayRow.confidence01,
-                              displayRow.volatility01
+                            {chip === "safe" && (
+                              <span className="ml-2 text-[11px] text-amber-300/80">
+                                ⓘ {whySafeMicrocopy(displayRow)}
+                              </span>
                             )}
-                          />
+                          </div>
+                        </div>
+
+                        <div className="text-sm">
+                          <div className="font-semibold text-white">
+                            {displayRow.rangeLow} → {displayRow.rangeHigh}
+                          </div>
+                          <div className="mt-1 h-1.5 w-full rounded bg-white/10">
+                            <div
+                              className="h-1.5 rounded"
+                              style={rangeBarStyle(
+                                displayRow.confidence01,
+                                displayRow.volatility01
+                              )}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="text-sm text-white/60">
+                          {displayRow.ai}
                         </div>
                       </div>
-
-                      <div className="text-sm text-white/60">
-                        {displayRow.ai}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             );
           })}
         </div>
       </section>
 
-      {/* MODAL */}
-      {open && active && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center px-4 bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-[620px] rounded-2xl bg-[#050912] border border-white/10 p-6 relative">
-            <button
-              onClick={() => setOpen(false)}
-              className="absolute top-4 right-4 text-white/60 hover:text-white"
-            >
-              <X size={16} />
-            </button>
+      {/* MODAL (PORTAL FIXED) */}
+      {open &&
+        active &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+            <div className="w-full max-w-[620px] rounded-2xl bg-[#050912] border border-white/10 p-6 relative">
+              <button
+                onClick={() => setOpen(false)}
+                className="absolute top-4 right-4 text-white/60 hover:text-white"
+              >
+                <X size={16} />
+              </button>
 
-            <h3 className="text-xl font-semibold text-white">{active.name}</h3>
-            <p className="text-sm text-white/50 mt-1">{matchContext}</p>
+              <h3 className="text-xl font-semibold text-white">
+                {active.name}
+              </h3>
+              <p className="text-sm text-white/50 mt-1">{matchContext}</p>
 
-            <div className="mt-4">
-              <div className="text-lg font-semibold">
-                {active.rangeLow} → {active.rangeHigh}
-              </div>
-              <p className="mt-2 text-sm text-white/70">{active.ai}</p>
+              <div className="mt-4">
+                <div className="text-lg font-semibold">
+                  {active.rangeLow} → {active.rangeHigh}
+                </div>
 
-              <div className="mt-4 text-sm text-amber-200">
-                {whyThisMatters(
-                  statKey,
-                  active.confidence01,
-                  active.volatility01
-                )}
-              </div>
+                <p className="mt-2 text-sm text-white/70">{active.ai}</p>
 
-              <div className="mt-4 text-xs text-white/40">
-                {stabilityText(
-                  active.confidence01,
-                  active.volatility01
-                )}
+                <div className="mt-4 text-sm text-amber-200">
+                  {whyThisMatters(
+                    statKey,
+                    active.confidence01,
+                    active.volatility01
+                  )}
+                </div>
+
+                <div className="mt-4 text-xs text-white/40">
+                  {stabilityText(
+                    active.confidence01,
+                    active.volatility01
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </>
   );
 }
