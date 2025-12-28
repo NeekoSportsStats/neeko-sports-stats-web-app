@@ -128,12 +128,10 @@ export default function AFLAIInsights() {
     const homePlayers = rawPlayerPredict
       .filter((p) => p.team === home)
       .sort((a, b) => b.confidence01 - a.confidence01)
-      .slice(0, 5);
 
     const awayPlayers = rawPlayerPredict
       .filter((p) => p.team === away)
       .sort((a, b) => b.confidence01 - a.confidence01)
-      .slice(0, 5);
 
     return [...homePlayers, ...awayPlayers];
   }, [rawPlayerPredict, selectedMatch]);
