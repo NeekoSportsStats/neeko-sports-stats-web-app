@@ -23,59 +23,35 @@ import type { AFLTeam } from "@/components/afl/teams/mockTeams";
 const WINDOW = 8;
 
 /* -------------------------------------------------------------------------- */
-/* LOW-LEVEL HELPERS                                                          */
+/* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
 function lastN<T>(arr: T[], n: number) {
   return arr.slice(Math.max(0, arr.length - n));
 }
 
-function lower(s: any) {
+function lower(s: string) {
   return (s ?? "").toString().trim().toLowerCase();
-}
-
-function clamp01(x: number) {
-  return clamp(x, 0, 1);
-}
-
-function toNum(v: any) {
-  const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-function toNumArray(arr: any): number[] {
-  if (!Array.isArray(arr)) return [];
-  const out: number[] = [];
-  for (const v of arr) {
-    const n = toNum(v);
-    if (n !== null) out.push(n);
-  }
-  return out;
 }
 
 function findTeamByName(teams: AFLTeam[], name: string) {
   const n = lower(name);
   if (!n) return null;
-
   return (
-    (teams.find((t: any) => lower(t.name) === n) as any) ??
-    (teams.find(
-      (t: any) => lower(t.name).includes(n) || n.includes(lower(t.name))
-    ) as any) ??
+    teams.find((t: any) => lower(t.name) === n) ??
+    teams.find(
+      (t: any) =>
+        lower(t.name).includes(n) || n.includes(lower(t.name))
+    ) ??
     null
   );
 }
 
 function seriesForTeam(t: AFLTeam | null, stat: StatLens): number[] {
   if (!t) return [];
-  const raw =
-    stat === "fantasy"
-      ? (t as any).fantasy
-      : stat === "disposals"
-      ? (t as any).disposals
-      : (t as any).goals;
-
-  return toNumArray(raw);
+  if (stat === "fantasy") return ((t as any).fantasy ?? []).map(Number);
+  if (stat === "disposals") return ((t as any).disposals ?? []).map(Number);
+  return ((t as any).goals ?? []).map(Number);
 }
 
 function findStat(lines: TeamStatLine[] | undefined, key: StatLens) {
@@ -88,21 +64,46 @@ function findStat(lines: TeamStatLine[] | undefined, key: StatLens) {
     key === "fantasy" ? "total fantasy" : key,
   ].map(lower);
 
-  const found = lines.find((l) => candidates.includes(lower((l as any).label)));
-  if (found) return (found as any).value;
-
-  const f2 = lines.find((l) =>
-    candidates.some((c) => lower((l as any).label).includes(c))
+  const direct = lines.find((l) =>
+    candidates.includes(lower(l.label))
   );
-  return f2 ? (f2 as any).value : null;
+  if (direct) return Number(direct.value);
+
+  const fuzzy = lines.find((l) =>
+    candidates.some((c) => lower(l.label).includes(c))
+  );
+  return fuzzy ? Number(fuzzy.value) : null;
 }
 
 /* -------------------------------------------------------------------------- */
-/* FIXTURE HELPERS                                                            */
+/* FIXED RANGE LOGIC (CORE ISSUE)                                              */
+/* -------------------------------------------------------------------------- */
+
+function computeProjectionBand(values: number[]) {
+  if (!values.length) {
+    return { low: 0, high: 0, mean: 0 };
+  }
+
+  const clean = values.filter((v) => Number.isFinite(v));
+  if (!clean.length) {
+    return { low: 0, high: 0, mean: 0 };
+  }
+
+  const m = mean(clean);
+  const sd = stdev(clean);
+
+  // tighter than raw IQR — avoids stupidly wide ranges
+  const low = Math.max(0, Math.round(m - sd * 0.85));
+  const high = Math.round(m + sd * 0.85);
+
+  return { low, high, mean: m };
+}
+
+/* -------------------------------------------------------------------------- */
+/* FIXTURES FILTERING                                                         */
 /* -------------------------------------------------------------------------- */
 
 export function filterPastFixtures(fixtures: FixtureMatch[]) {
-  // Use "final" as your canonical complete state. If your data uses "completed" too, it's still handled.
   return fixtures.filter((m: any) => {
     const s = lower(m.status);
     return s === "final" || s === "completed" || s === "ft";
@@ -112,7 +113,12 @@ export function filterPastFixtures(fixtures: FixtureMatch[]) {
 export function filterUpcomingFixtures(fixtures: FixtureMatch[]) {
   return fixtures.filter((m: any) => {
     const s = lower(m.status);
-    return s === "upcoming" || s === "scheduled" || s === "pre" || s === "preview";
+    return (
+      s === "upcoming" ||
+      s === "scheduled" ||
+      s === "pre" ||
+      s === "preview"
+    );
   });
 }
 
@@ -128,113 +134,101 @@ export function roundOrder(label: string) {
 /* -------------------------------------------------------------------------- */
 /* 1) PLAYER SCORE PREDICTABILITY                                              */
 /* -------------------------------------------------------------------------- */
-/**
- * Fixtures currently expose per-player values via match.topFantasy blocks (fantasy-only).
- * We attach team when present (teamBlock.team/teamName).
- */
+
 export function buildPlayerPredictabilityFromFixtures(
   fixtures: FixtureMatch[],
   stat: StatLens
 ): PredictRow[] {
-  const rows: PredictRow[] = [];
-
-  type Bucket = { name: string; team: string; values: number[] };
-  const byPlayer = new Map<string, Bucket>();
+  const byPlayer = new Map<
+    string,
+    { name: string; team?: string; values: number[] }
+  >();
 
   for (const m of fixtures) {
-    const t = (m as any).topFantasy as any[] | undefined;
-    if (!t?.length) continue;
+    const top = (m as any).topFantasy as any[] | undefined;
+    if (!top?.length) continue;
 
-    for (const teamBlock of t) {
-      const teamName = (teamBlock?.team ?? teamBlock?.teamName ?? "").toString();
-      const players = teamBlock.players ?? teamBlock.top ?? teamBlock.items ?? [];
+    for (const block of top) {
+      const teamName = block.team ?? block.teamName ?? "";
+      const players = block.players ?? block.top ?? [];
 
       for (const p of players) {
-        const name = (p?.name ?? p?.playerName ?? "Unknown").toString();
-        const id = `${name}__${teamName}`.trim();
+        const name = p.name ?? p.playerName ?? "Unknown";
+        const key = `${name}__${teamName}`;
+        const val =
+          stat === "fantasy"
+            ? Number(p.fantasy ?? p.value)
+            : NaN;
 
-        const raw = stat === "fantasy" ? (p?.fantasy ?? p?.value ?? 0) : null;
-        const n = raw === null ? null : toNum(raw);
+        if (!Number.isFinite(val)) continue;
 
-        const cur = byPlayer.get(id) ?? { name, team: teamName, values: [] };
-        if (n !== null) cur.values.push(n);
-        byPlayer.set(id, cur);
+        const cur =
+          byPlayer.get(key) ??
+          { name, team: teamName, values: [] };
+
+        cur.values.push(val);
+        byPlayer.set(key, cur);
       }
     }
   }
 
   const vols: number[] = [];
-  const withins: number[] = [];
+  const confs: number[] = [];
 
   const pre = Array.from(byPlayer.entries()).map(([id, it]) => {
-    const values = lastN(it.values, WINDOW);
-    const m = mean(values);
-    const sd = stdev(values);
-    const b = band(values, 0.25, 0.75);
+    const recent = lastN(it.values, WINDOW);
+    const { low, high, mean: m } = computeProjectionBand(recent);
 
-    const within = values.length
-      ? values.filter((x) => Math.abs(x - m) <= sd * 0.65 + 1e-6).length /
-        values.length
-      : 0;
-
-    const vol = cv(values);
-
-    vols.push(vol);
-    withins.push(within);
-
-    const trend =
-      values.length >= 6
-        ? safeDiv(
-            mean(values.slice(-3)) - mean(values.slice(-6, -3)),
-            Math.abs(mean(values.slice(-6, -3))) + 1e-6
-          )
+    const sd = stdev(recent);
+    const within =
+      recent.length > 0
+        ? recent.filter((x) => Math.abs(x - m) <= sd * 0.65)
+            .length / recent.length
         : 0;
 
-    const ai =
-      stat !== "fantasy"
-        ? `Predictability for this stat becomes available once per-player match-centre data is ingested. (Fantasy predictability is live.)`
-        : `${confLabel(within)} repeatability; ${
-            trend > 0.2 ? "trending up" : trend < -0.2 ? "trending down" : "stable recently"
-          }.`;
+    const vol = cv(recent);
+
+    vols.push(vol);
+    confs.push(within);
 
     return {
       id,
       name: it.name,
       team: it.team,
-      rangeLow: b.low,
-      rangeHigh: b.high,
+      rangeLow: low,
+      rangeHigh: high,
       within,
       vol,
-      ai,
+      ai: `${confLabel(within)} role repeatability with ${
+        vol < 0.25 ? "contained" : "elevated"
+      } volatility.`,
     };
   });
 
-  const confMin = Math.min(...withins, 0);
-  const confMax = Math.max(...withins, 1);
+  const confMin = Math.min(...confs, 0);
+  const confMax = Math.max(...confs, 1);
   const volMin = Math.min(...vols, 0);
   const volMax = Math.max(...vols, 1);
 
-  for (const it of pre) {
-    rows.push({
-      id: it.id,
-      name: it.name,
-      team: it.team,
-      rangeLow: it.rangeLow,
-      rangeHigh: it.rangeHigh,
-      confidence01: normalize01(it.within, confMin, confMax),
-      volatility01: normalize01(it.vol, volMin, volMax),
-      ai: it.ai,
-    } as any);
-  }
+  const rows: PredictRow[] = pre.map((p) => ({
+    id: p.id,
+    name: p.name,
+    team: p.team,
+    rangeLow: p.rangeLow,
+    rangeHigh: p.rangeHigh,
+    confidence01: normalize01(p.within, confMin, confMax),
+    volatility01: normalize01(p.vol, volMin, volMax),
+    ai: p.ai,
+  }));
 
   rows.sort(
-    (a: any, b: any) =>
-      (b.confidence01 - a.confidence01) || (a.volatility01 - b.volatility01)
+    (a, b) =>
+      b.confidence01 - a.confidence01 ||
+      a.volatility01 - b.volatility01
   );
 
   return rows;
 }
-
 /* -------------------------------------------------------------------------- */
 /* 2) TEAM SCORE PREDICTABILITY                                                */
 /* -------------------------------------------------------------------------- */
@@ -243,26 +237,27 @@ export function buildTeamPredictabilityFromTeams(
   teams: AFLTeam[],
   stat: StatLens
 ): PredictRow[] {
-  const rows: PredictRow[] = [];
   const vols: number[] = [];
-  const withins: number[] = [];
+  const confs: number[] = [];
 
-  const pre = (teams as any[]).map((t) => {
-    const series = lastN(seriesForTeam(t, stat), WINDOW);
+  const pre = teams.map((t: any) => {
+    const series = lastN(seriesForTeam(t as any, stat), WINDOW).filter((n) =>
+      Number.isFinite(n)
+    );
 
-    const m = mean(series);
+    const { low, high, mean: m } = computeProjectionBand(series);
     const sd = stdev(series);
-    const b = band(series, 0.25, 0.75);
 
-    const within = series.length
-      ? series.filter((x) => Math.abs(x - m) <= sd * 0.65 + 1e-6).length /
-        series.length
-      : 0;
+    const within =
+      series.length > 0
+        ? series.filter((x) => Math.abs(x - m) <= sd * 0.65).length /
+          series.length
+        : 0;
 
     const vol = cv(series);
 
     vols.push(vol);
-    withins.push(within);
+    confs.push(within);
 
     const trend =
       series.length >= 6
@@ -278,62 +273,43 @@ export function buildTeamPredictabilityFromTeams(
 
     return {
       id: String(t.code ?? t.name),
-      name: t.name,
-      team: t.name,
-      rangeLow: b.low,
-      rangeHigh: b.high,
+      name: String(t.name ?? "Team"),
+      team: String(t.name ?? "Team"),
+      rangeLow: low,
+      rangeHigh: high,
       within,
       vol,
       ai,
     };
   });
 
-  const confMin = Math.min(...withins, 0);
-  const confMax = Math.max(...withins, 1);
+  const confMin = Math.min(...confs, 0);
+  const confMax = Math.max(...confs, 1);
   const volMin = Math.min(...vols, 0);
   const volMax = Math.max(...vols, 1);
 
-  for (const it of pre) {
-    rows.push({
-      id: it.id,
-      name: it.name,
-      team: it.team,
-      rangeLow: it.rangeLow,
-      rangeHigh: it.rangeHigh,
-      confidence01: normalize01(it.within, confMin, confMax),
-      volatility01: normalize01(it.vol, volMin, volMax),
-      ai: it.ai,
-    } as any);
-  }
+  const rows: PredictRow[] = pre.map((p) => ({
+    id: p.id,
+    name: p.name,
+    team: p.team,
+    rangeLow: p.rangeLow,
+    rangeHigh: p.rangeHigh,
+    confidence01: normalize01(p.within, confMin, confMax),
+    volatility01: normalize01(p.vol, volMin, volMax),
+    ai: p.ai,
+  }));
 
   rows.sort(
-    (a: any, b: any) =>
-      (b.confidence01 - a.confidence01) || (a.volatility01 - b.volatility01)
+    (a, b) =>
+      b.confidence01 - a.confidence01 ||
+      a.volatility01 - b.volatility01
   );
 
   return rows;
 }
 
 /* -------------------------------------------------------------------------- */
-/* INTERNAL: MAP EDGE (DELTA) -> MatchupRow.edge01                             */
-/* -------------------------------------------------------------------------- */
-
-function edgeFromDelta(deltaPct: number) {
-  const d = clamp(deltaPct, -0.35, 0.35);
-  return clamp01(0.5 + d * 0.9);
-}
-
-function matchupRow(id: string, label: string, deltaPct: number, ai: string): MatchupRow {
-  return {
-    id,
-    label,
-    edge01: edgeFromDelta(deltaPct),
-    ai,
-  } as any;
-}
-
-/* -------------------------------------------------------------------------- */
-/* 3) H2H PLAYER MATCHUPS (UPCOMING-AWARE)                                     */
+/* 3) H2H PLAYER MATCHUPS (SAFE SHAPE)                                          */
 /* -------------------------------------------------------------------------- */
 
 export function buildH2HPlayerMatchups(
@@ -343,10 +319,14 @@ export function buildH2HPlayerMatchups(
 ): MatchupRow[] {
   if (!match) return [];
 
+  // We keep objects minimal: id/key + label + delta + ai
+  // because your MatchupRow has been changing (title/reliability/key etc).
+  const out: MatchupRow[] = [];
+
   const status = lower((match as any).status);
   const top = (match as any).topFantasy as any[] | undefined;
 
-  // Finished match: use topFantasy for fantasy only.
+  // Completed match fantasy: use topFantasy as a "swing" explainer
   if (
     (status === "final" || status === "completed" || status === "ft") &&
     top?.length &&
@@ -356,33 +336,31 @@ export function buildH2HPlayerMatchups(
     const b = top[1];
 
     const sumA = (a?.players ?? []).reduce(
-      (s: number, p: any) => s + (toNum(p?.fantasy) ?? 0),
+      (s: number, p: any) => s + Number(p.fantasy ?? 0),
       0
     );
     const sumB = (b?.players ?? []).reduce(
-      (s: number, p: any) => s + (toNum(p?.fantasy) ?? 0),
+      (s: number, p: any) => s + Number(p.fantasy ?? 0),
       0
     );
 
     const delta = safeDiv(sumA - sumB, Math.max(1, Math.abs(sumB)));
     const label = advantageLabel(delta);
 
-    const rows: MatchupRow[] = [
-      matchupRow(
-        "top3_fantasy_swing",
-        `Top-3 fantasy ceiling (by team) — ${label}`,
-        delta,
-        `${label} indicated: top-3 fantasy totals ${Math.round(sumA)} vs ${Math.round(
-          sumB
-        )}. This explains ceiling swings and tag risk.`
-      ),
-    ];
+    out.push({
+      key: "top3_fantasy_swing",
+      label,
+      deltaPct: delta,
+      ai: `${label} indicated: top fantasy totals (team blocks) ${Math.round(
+        sumA
+      )} vs ${Math.round(sumB)}. This helps explain ceiling swings and tag risk.`,
+    } as any);
 
     const flat = top.flatMap((tb: any) =>
       (tb.players ?? []).map((p: any) => ({
         team: tb.team ?? tb.teamName ?? "",
-        name: p.name ?? p.playerName ?? "Unknown",
-        fantasy: toNum(p.fantasy) ?? 0,
+        name: p.name,
+        fantasy: Number(p.fantasy ?? 0),
       }))
     );
 
@@ -390,39 +368,36 @@ export function buildH2HPlayerMatchups(
     const star = flat[0];
 
     if (star) {
-      rows.push(
-        matchupRow(
-          "star_lever",
-          `Star lever: ${star.name}`,
-          0.1,
-          `${star.name} profiles as a key lever. If role/tag shifts, volatility rises and the matchup compresses toward Neutral.`
-        )
-      );
+      out.push({
+        key: "star_lever",
+        label: "Advantage",
+        deltaPct: 0.1,
+        ai: `${star.name} profiles as a key lever. If role/tag shifts, volatility rises and the matchup compresses toward Neutral.`,
+      } as any);
     }
 
-    return rows;
+    return out;
   }
 
-  // Upcoming match: infer matchup risk from team volatility + venue proxy.
-  const home = ((match as any).homeTeam ?? "").toString();
-  const away = ((match as any).awayTeam ?? "").toString();
-  const venue = ((match as any).venue ?? "").toString();
+  // Upcoming match: proxy from team volatility + baseline delta + venue
+  const home = String((match as any).homeTeam ?? "");
+  const away = String((match as any).awayTeam ?? "");
+  const venue = String((match as any).venue ?? "");
 
   const homeT = findTeamByName(teams, home);
   const awayT = findTeamByName(teams, away);
 
-  const hSeries = lastN(seriesForTeam(homeT, stat), WINDOW);
-  const aSeries = lastN(seriesForTeam(awayT, stat), WINDOW);
+  const hSeries = lastN(seriesForTeam(homeT, stat), WINDOW).filter((n) =>
+    Number.isFinite(n)
+  );
+  const aSeries = lastN(seriesForTeam(awayT, stat), WINDOW).filter((n) =>
+    Number.isFinite(n)
+  );
 
   const hVol = cv(hSeries);
   const aVol = cv(aSeries);
-
-  const combinedVol = clamp01(clamp((hVol + aVol) / 2, 0, 1));
+  const combinedVol = clamp((hVol + aVol) / 2, 0, 1);
   const volatilityLabel = combinedVol >= 0.22 ? "Variable" : "Stable";
-
-  const venueTravel = /gmhba|adelaide|perth|optus|gabba/i.test(lower(venue))
-    ? 0.1
-    : 0.04;
 
   const delta = safeDiv(
     mean(hSeries) - mean(aSeries),
@@ -430,31 +405,38 @@ export function buildH2HPlayerMatchups(
   );
   const label = advantageLabel(delta);
 
-  return [
-    matchupRow(
-      "role_risk",
-      "Role/Tag risk proxy (from volatility)",
-      combinedVol > 0.22 ? 0.08 : 0,
-      `Upcoming matchup projected as ${volatilityLabel}. Higher volatility often comes from role swings, tagging, and contest profile changes.`
-    ),
-    matchupRow(
-      "midfield_battle",
-      `Midfield battle expectation (system proxy) — ${label}`,
-      delta,
-      `Based on last ${WINDOW} games for team output under the ${stat} lens. This is a pre-game proxy until you store unit splits (MID vs MID, DEF vs FWD).`
-    ),
-    matchupRow(
-      "venue_travel",
-      "Venue & travel impact on matchups",
-      venueTravel,
-      `Venue profile suggests a ${
-        venueTravel > 0.08 ? "meaningful" : "minor"
-      } travel/comfort adjustment. This amplifies matchup variance if one side is already volatile.`
-    ),
-  ];
+  const venueTravel = /gmhba|adelaide|perth|optus|gabba/i.test(lower(venue))
+    ? 0.1
+    : 0.04;
+
+  out.push({
+    key: "role_risk_proxy",
+    label: combinedVol > 0.22 ? "Advantage" : "Neutral",
+    deltaPct: combinedVol > 0.22 ? 0.08 : 0,
+    ai: `Upcoming matchup projected as ${volatilityLabel}. Higher volatility often comes from role swings, tagging, and contest profile changes.`,
+  } as any);
+
+  out.push({
+    key: "baseline_delta_proxy",
+    label,
+    deltaPct: delta,
+    ai: `Based on last ${WINDOW} games under the ${stat} lens: ${home} vs ${away}. This is a pre-game proxy until you store unit splits.`,
+  } as any);
+
+  out.push({
+    key: "venue_travel_proxy",
+    label: venueTravel > 0.08 ? "Advantage" : "Neutral",
+    deltaPct: venueTravel,
+    ai: `Venue profile suggests a ${
+      venueTravel > 0.08 ? "meaningful" : "minor"
+    } travel/comfort adjustment. This amplifies matchup variance if one side is already volatile.`,
+  } as any);
+
+  return out;
 }
+
 /* -------------------------------------------------------------------------- */
-/* 4) H2H TEAM MATCHUPS (UPCOMING-AWARE)                                       */
+/* 4) H2H TEAM MATCHUPS (SAFE SHAPE)                                           */
 /* -------------------------------------------------------------------------- */
 
 export function buildH2HTeamMatchups(
@@ -464,58 +446,64 @@ export function buildH2HTeamMatchups(
 ): MatchupRow[] {
   if (!match) return [];
 
+  const out: MatchupRow[] = [];
+
+  const home = String((match as any).homeTeam ?? "");
+  const away = String((match as any).awayTeam ?? "");
+  const venue = String((match as any).venue ?? "");
+
   const teamStats = (match as any).teamStats as any[] | undefined;
 
-  const home = ((match as any).homeTeam ?? "").toString();
-  const away = ((match as any).awayTeam ?? "").toString();
-  const venue = ((match as any).venue ?? "").toString();
-
-  // Completed matches: use stat lines if present.
+  // If completed / has stat lines
   if (teamStats?.length) {
     const hBlock =
       teamStats.find((x: any) => x.team === home || x.teamName === home) ??
       teamStats[0];
-
     const aBlock =
       teamStats.find((x: any) => x.team === away || x.teamName === away) ??
       teamStats[1];
 
     const hVal =
-      toNum(findStat(hBlock?.lines ?? hBlock?.stats ?? hBlock?.teamStats, stat)) ??
-      0;
+      findStat(hBlock?.lines ?? hBlock?.stats ?? hBlock?.teamStats, stat) ?? 0;
     const aVal =
-      toNum(findStat(aBlock?.lines ?? aBlock?.stats ?? aBlock?.teamStats, stat)) ??
-      0;
+      findStat(aBlock?.lines ?? aBlock?.stats ?? aBlock?.teamStats, stat) ?? 0;
 
     const delta = safeDiv(hVal - aVal, Math.max(1, Math.abs(aVal)));
     const label = advantageLabel(delta);
 
-    const travel = /gmhba|adelaide|perth|optus|gabba/i.test(lower(venue)) ? 0.1 : 0.04;
+    out.push({
+      key: "overall_team_edge",
+      label,
+      deltaPct: delta,
+      ai: `${label} indicated from match stat lines: ${Math.round(hVal)} vs ${Math.round(
+        aVal
+      )}. This is a high-signal explainer.`,
+    } as any);
 
-    return [
-      matchupRow(
-        "overall_team_edge",
-        `Overall ${stat} edge: ${home} vs ${away} — ${label}`,
-        delta,
-        `${label} indicated from match stat lines: ${Math.round(hVal)} vs ${Math.round(
-          aVal
-        )}. This is a high-signal explainer.`
-      ),
-      matchupRow(
-        "venue_travel",
-        "Venue & travel impact",
-        travel,
-        "Venue familiarity can shift scoring efficiency and repeat entries. This is modeled as a small but stable adjustment."
-      ),
-    ];
+    const travel = /gmhba|adelaide|perth|optus|gabba/i.test(lower(venue))
+      ? 0.1
+      : 0.04;
+
+    out.push({
+      key: "venue_travel",
+      label: travel > 0.08 ? "Advantage" : "Neutral",
+      deltaPct: travel,
+      ai: "Venue familiarity can shift efficiency and repeat entries. Modeled as a small but stable adjustment.",
+    } as any);
+
+    return out;
   }
 
-  // Upcoming: compare baselines + preview win prob if present.
+  // Upcoming matches: compare recent team baselines + preview probability if present.
   const hT = findTeamByName(teams, home);
   const aT = findTeamByName(teams, away);
 
-  const hSeries = lastN(seriesForTeam(hT, stat), WINDOW);
-  const aSeries = lastN(seriesForTeam(aT, stat), WINDOW);
+  const hSeries = lastN(seriesForTeam(hT, stat), WINDOW).filter((n) =>
+    Number.isFinite(n)
+  );
+  const aSeries = lastN(seriesForTeam(aT, stat), WINDOW).filter((n) =>
+    Number.isFinite(n)
+  );
 
   const hMean = mean(hSeries);
   const aMean = mean(aSeries);
@@ -530,34 +518,41 @@ export function buildH2HTeamMatchups(
   const winDelta = hw !== null && aw !== null ? hw - aw : 0;
   const winLabel = advantageLabel(winDelta);
 
-  const travel = /gmhba|adelaide|perth|optus|gabba/i.test(lower(venue)) ? 0.1 : 0.04;
+  const travel = /gmhba|adelaide|perth|optus|gabba/i.test(lower(venue))
+    ? 0.1
+    : 0.04;
 
-  return [
-    matchupRow(
-      "system_edge",
-      `System edge (${stat} baseline) — ${label}`,
-      delta,
-      `Based on last ${WINDOW} games: ${home} avg ${Math.round(hMean)} vs ${away} avg ${Math.round(
-        aMean
-      )}. Pre-game signal only (no live data).`
-    ),
-    matchupRow(
-      "model_win_prob",
-      "Model win probability edge",
-      hw !== null && aw !== null ? winDelta : 0,
+  out.push({
+    key: "system_edge",
+    label,
+    deltaPct: delta,
+    ai: `Based on last ${WINDOW} games: ${home} avg ${Math.round(
+      hMean
+    )} vs ${away} avg ${Math.round(aMean)}. Pre-game signal only.`,
+  } as any);
+
+  out.push({
+    key: "model_win_prob",
+    label: hw !== null && aw !== null ? winLabel : "Neutral",
+    deltaPct: hw !== null && aw !== null ? winDelta : 0,
+    ai:
       hw !== null && aw !== null
-        ? `${winLabel} based on model win probability: ${Math.round(hw * 100)}% vs ${Math.round(
-            aw * 100
-          )}%.`
-        : "Preview win probability not available for this fixture yet."
-    ),
-    matchupRow(
-      "venue_travel",
-      "Venue & travel impact",
-      travel,
-      `Venue profile suggests a ${travel > 0.08 ? "meaningful" : "minor"} travel/comfort adjustment. Stable pre-game modifier.`
-    ),
-  ];
+        ? `${winLabel} based on model win probability: ${Math.round(
+            hw * 100
+          )}% vs ${Math.round(aw * 100)}%.`
+        : "Preview win probability not available for this fixture yet.",
+  } as any);
+
+  out.push({
+    key: "venue_travel",
+    label: travel > 0.08 ? "Advantage" : "Neutral",
+    deltaPct: travel,
+    ai: `Venue profile suggests a ${
+      travel > 0.08 ? "meaningful" : "minor"
+    } travel/comfort adjustment. Stable pre-game modifier.`,
+  } as any);
+
+  return out;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -579,7 +574,7 @@ export function buildQuarterFlow(match: FixtureMatch | undefined): QuarterFlowRo
     ];
   }
 
-  const margins = qs.map((q) => (toNum(q.home) ?? 0) - (toNum(q.away) ?? 0));
+  const margins = qs.map((q) => Number(q.home) - Number(q.away));
   const abs = margins.map((m) => Math.abs(m));
 
   const sd = stdev(margins);
@@ -588,8 +583,10 @@ export function buildQuarterFlow(match: FixtureMatch | undefined): QuarterFlowRo
   const absMin = Math.min(...abs, 0);
   const absMax = Math.max(...abs, 1);
 
+  const clamp01 = (x: number) => clamp(x, 0, 1);
+
   return qs.map((q) => {
-    const m = (toNum(q.home) ?? 0) - (toNum(q.away) ?? 0);
+    const m = Number(q.home) - Number(q.away);
     const decisive01 = normalize01(Math.abs(m), absMin, absMax);
     const swing01 = clamp01(sdN * 0.7 + decisive01 * 0.3);
 
@@ -598,14 +595,18 @@ export function buildQuarterFlow(match: FixtureMatch | undefined): QuarterFlowRo
       swing01,
       decisive01,
       ai: `${q.label} margin ${m > 0 ? "+" : ""}${m}. ${
-        decisive01 > 0.7 ? "Often decisive swing quarter." : swing01 > 0.65 ? "Swing-prone quarter." : "Typically stable."
+        decisive01 > 0.7
+          ? "Often decisive swing quarter."
+          : swing01 > 0.65
+          ? "Swing-prone quarter."
+          : "Typically stable."
       }`,
     };
   });
 }
 
 /* -------------------------------------------------------------------------- */
-/* 6) CONSISTENCY vs EXPLOSIVENESS                                             */
+/* 6) CONSISTENCY VS EXPLOSIVENESS                                            */
 /* -------------------------------------------------------------------------- */
 
 export function buildConsistencyExplosivenessTeams(
@@ -614,25 +615,35 @@ export function buildConsistencyExplosivenessTeams(
 ): ConsistencyRow[] {
   const rows: ConsistencyRow[] = [];
 
+  const clamp01 = (x: number) => clamp(x, 0, 1);
+
   for (const t of teams as any[]) {
-    const series = lastN(seriesForTeam(t, stat), WINDOW);
+    const series = lastN(seriesForTeam(t as any, stat), WINDOW).filter((n) =>
+      Number.isFinite(n)
+    );
 
     const consistency01 = clamp01(1 - normalize01(cv(series), 0.06, 0.45));
+
     const b = band(series, 0.1, 0.9);
     const m = mean(series);
 
-    const tail = series.filter((x) => x >= b.high);
-    const tailRate = series.length ? tail.length / series.length : 0;
+    const tailRate = series.length
+      ? series.filter((x) => x >= b.high).length / series.length
+      : 0;
 
-    const tailMag = tail.length
-      ? mean(tail.map((x) => safeDiv(x - m, Math.max(1, m))))
+    const tailMag = series.length
+      ? mean(
+          series
+            .filter((x) => x >= b.high)
+            .map((x) => safeDiv(x - m, Math.max(1, m)))
+        )
       : 0;
 
     const explosiveness01 = clamp01(tailRate * 0.65 + tailMag * 0.35);
 
     rows.push({
       id: String(t.code ?? t.name),
-      name: t.name,
+      name: String(t.name ?? "Team"),
       consistency01,
       explosiveness01,
       ai:
@@ -643,20 +654,20 @@ export function buildConsistencyExplosivenessTeams(
           : explosiveness01 > 0.65
           ? "Upside-driven: spikes decide outcomes."
           : "Balanced: moderate stability and moderate upside.",
-    } as any);
+    });
   }
 
   rows.sort(
-    (a: any, b: any) =>
-      (b.explosiveness01 - a.explosiveness01) ||
-      (b.consistency01 - a.consistency01)
+    (a, b) =>
+      b.explosiveness01 - a.explosiveness01 ||
+      b.consistency01 - a.consistency01
   );
 
   return rows;
 }
 
 /* -------------------------------------------------------------------------- */
-/* 7) OUTCOME DRIVER SENSITIVITY                                               */
+/* 7) OUTCOME DRIVERS                                                          */
 /* -------------------------------------------------------------------------- */
 
 export function buildOutcomeDrivers(params: {
@@ -665,29 +676,31 @@ export function buildOutcomeDrivers(params: {
   stat: StatLens;
 }): DriverRow[] {
   const { match } = params;
-  const out: DriverRow[] = [];
 
-  const baseDrivers: Array<{ id: string; title: string }> = [
-    { id: "conversion", title: "Forward Conversion (Goals → Points)" },
-    { id: "territory", title: "Territory & Repeat Entries (Disposals proxy)" },
-    { id: "system", title: "System Output (Fantasy proxy)" },
-    { id: "start", title: "Fast Start (Q1 impact)" },
-    { id: "travel", title: "Venue & Travel Impact" },
+  const baseDrivers: Array<{ key: string; title: string }> = [
+    { key: "conversion", title: "Forward Conversion (Goals → Points)" },
+    { key: "territory", title: "Territory & Repeat Entries (Disposals proxy)" },
+    { key: "system", title: "System Output (Fantasy proxy)" },
+    { key: "start", title: "Fast Start (Q1 impact)" },
+    { key: "travel", title: "Venue & Travel Impact" },
   ];
 
   const preview = (match as any)?.preview;
   const q1 = (match as any)?.quarters?.find((q: any) => q.label === "Q1");
-  const q1Swing = q1 ? Math.abs((toNum(q1.home) ?? 0) - (toNum(q1.away) ?? 0)) : 0;
+  const q1Swing = q1 ? Math.abs(Number(q1.home ?? 0) - Number(q1.away ?? 0)) : 0;
 
-  const venue = ((match as any)?.venue ?? "").toString();
+  const venue = String((match as any)?.venue ?? "");
   const travelPenalty = /gmhba|adelaide|perth|optus|gabba/i.test(lower(venue))
     ? 0.65
     : 0.45;
 
   const winSpread =
-    typeof preview?.homeWinProb === "number" && typeof preview?.awayWinProb === "number"
+    typeof preview?.homeWinProb === "number" &&
+    typeof preview?.awayWinProb === "number"
       ? Math.abs(preview.homeWinProb - preview.awayWinProb)
       : 0.12;
+
+  const clamp01 = (x: number) => clamp(x, 0, 1);
 
   const influence = (k: string) => {
     if (k === "conversion") return 0.55 + winSpread * 0.35;
@@ -707,12 +720,14 @@ export function buildOutcomeDrivers(params: {
     return 0.6;
   };
 
+  const out: DriverRow[] = [];
+
   for (const d of baseDrivers) {
-    const inf = clamp01(influence(d.id));
-    const stab = clamp01(stability(d.id));
+    const inf = clamp01(influence(d.key));
+    const stab = clamp01(stability(d.key));
 
     out.push({
-      id: d.id,
+      id: d.key,
       title: d.title,
       influence01: inf,
       stability01: stab,
@@ -721,9 +736,9 @@ export function buildOutcomeDrivers(params: {
       } influence with ${
         stab >= 0.72 ? "stable" : stab >= 0.56 ? "moderately stable" : "fragile"
       } repeatability.`,
-    } as any);
+    });
   }
 
-  out.sort((a: any, b: any) => b.influence01 - a.influence01);
+  out.sort((a, b) => b.influence01 - a.influence01);
   return out;
 }
