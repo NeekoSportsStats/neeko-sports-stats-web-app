@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import PlayerTable from "@/components/dashboard/PlayerTable";
-import TeamTiles from "@/components/dashboard/TeamTiles";
-import TopTeamRankings from "@/components/dashboard/TopTeamRankings";
-import TeamComparison from "@/components/dashboard/TeamComparison";
+import PlayerTable from "@/components/Archived/dashboard/PlayerTable";
+import TeamTiles from "@/components/Archived/dashboard/TeamTiles";
+import TopTeamRankings from "@/components/Archived/dashboard/TopTeamRankings";
+import TeamComparison from "@/components/Archived/dashboard/TeamComparison";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabaseClient";
 
