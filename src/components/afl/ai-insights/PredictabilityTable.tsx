@@ -5,6 +5,8 @@ import { confLabel, volLabel } from "./utils";
 
 type Chip = "all" | "safe" | "ceiling" | "risky";
 
+const MAX_SAFE_PER_TEAM = 8;
+
 const cx = (...c: Array<string | false | undefined>) =>
   c.filter(Boolean).join(" ");
 
@@ -121,10 +123,12 @@ export default function PredictabilityTable({
   showHeader?: boolean;
 }) {
   const locked = mode !== "premium";
-  const [chip, setChip] = useState<Chip>("all");
+
+  /* ✅ DEFAULT TO SAFE PICKS */
+  const [chip, setChip] = useState<Chip>("safe");
 
   useEffect(() => {
-    setChip("all");
+    setChip("safe");
   }, [statLabel]);
 
   const statKey = useMemo(() => inferStatKey(statLabel), [statLabel]);
@@ -132,7 +136,13 @@ export default function PredictabilityTable({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<PredictRow | null>(null);
 
-  /* ---------------- GROUP BY TEAM (FULL LIST) ---------------- */
+  /* 🔒 LOCK BODY SCROLL WHEN MODAL OPEN */
+  useEffect(() => {
+    if (open) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+  }, [open]);
+
+  /* ---------------- GROUP BY TEAM ---------------- */
 
   const rowsByTeam = useMemo(() => {
     const map = new Map<string, PredictRow[]>();
@@ -149,8 +159,6 @@ export default function PredictabilityTable({
     if (chip === "risky") return r.confidence01 <= 0.45;
     return true;
   };
-
-  /* ---------------- RENDER ---------------- */
 
   return (
     <>
@@ -209,6 +217,11 @@ export default function PredictabilityTable({
             const filtered = teamRows.filter(filterRow);
             if (!filtered.length) return null;
 
+            const visible =
+              chip === "safe"
+                ? filtered.slice(0, MAX_SAFE_PER_TEAM)
+                : filtered;
+
             return (
               <div key={team}>
                 <div className="px-6 py-2 bg-white/5 border-y border-white/10">
@@ -220,11 +233,13 @@ export default function PredictabilityTable({
                     <div className="h-px flex-1 bg-amber-400/30" />
                   </div>
                   <div className="mt-1 text-[11px] text-white/40">
-                    Full team · 2 free
+                    {chip === "safe"
+                      ? `Top ${MAX_SAFE_PER_TEAM} · safest roles`
+                      : "Full team"}
                   </div>
                 </div>
 
-                {filtered.map((r, i) => {
+                {visible.map((r, i) => {
                   const rowLocked = locked && i >= 2;
                   const displayRow = rowLocked ? fakeLockedRow(r) : r;
 
@@ -294,8 +309,8 @@ export default function PredictabilityTable({
 
       {/* MODAL */}
       {open && active && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="w-[92vw] max-w-[620px] rounded-2xl bg-[#050912] border border-white/10 p-6 relative">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center px-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-[620px] rounded-2xl bg-[#050912] border border-white/10 p-6 relative">
             <button
               onClick={() => setOpen(false)}
               className="absolute top-4 right-4 text-white/60 hover:text-white"
