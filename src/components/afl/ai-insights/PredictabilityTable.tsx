@@ -9,21 +9,30 @@ import { confLabel, volLabel } from "./utils";
 
 type Chip = "all" | "safe" | "ceiling" | "risky";
 
-type PlaceholderRow = {
-  __placeholder: true;
-  key: string;
-};
+/* -------------------------------------------------------------------------- */
+/* CONSTANTS                                                                  */
+/* -------------------------------------------------------------------------- */
+
+const FREE_ROWS = 3;
+const LOCKED_ROWS = 7;
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
-function clamp(n: number, min = 0, max = 1) {
-  return Math.min(max, Math.max(min, n));
-}
+const clamp = (n: number, min = 0, max = 1) =>
+  Math.min(max, Math.max(min, n));
 
-function pct(n: number) {
-  return Math.round(clamp(n, 0, 1) * 100);
+const pct = (n: number) => Math.round(clamp(n) * 100);
+
+function rangeBarWidth(r: PredictRow) {
+  if (
+    typeof r.rangeLow !== "number" ||
+    typeof r.rangeHigh !== "number" ||
+    r.rangeHigh <= 0
+  )
+    return 0;
+  return pct((r.rangeHigh - r.rangeLow) / r.rangeHigh);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -52,59 +61,25 @@ export default function PredictabilityTable(props: {
   } = props;
 
   const locked = mode !== "premium";
-
-  const FREE_ROWS = 3;
-  const LOCKED_ROWS = 7;
-
   const UNLOCK_LABEL = unlockLabel ?? "Unlock Neeko+";
 
   const [chip, setChip] = useState<Chip>("all");
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<PredictRow | null>(null);
 
   /* -------------------------------------------------------------------------- */
-  /* AUTO CHIP DEFAULT                                                         */
+  /* DEFAULT CHIP                                                              */
   /* -------------------------------------------------------------------------- */
 
   useEffect(() => {
-    const s = (statLabel ?? "").toLowerCase();
+    const s = statLabel.toLowerCase();
     if (s.includes("goal")) setChip("ceiling");
     else if (s.includes("disposal")) setChip("safe");
     else setChip("all");
   }, [statLabel]);
 
   /* -------------------------------------------------------------------------- */
-  /* AI SENTENCE                                                               */
-  /* -------------------------------------------------------------------------- */
-
-  function aiSentence(r: PredictRow) {
-    const c = r.confidence01;
-    const v = r.volatility01;
-
-    if (c >= 0.72 && v <= 0.4) {
-      return "Strong role stability with repeatable scoring output. Expect a reliable floor unless game flow or role shifts materially.";
-    }
-    if (v >= 0.65) {
-      return "High-variance profile with ceiling outcomes driven by matchup and game flow. Upside is real, but volatility is elevated.";
-    }
-    if (c <= 0.45) {
-      return "Wide outcome distribution caused by role uncertainty or opposition pressure. Best suited to contrarian builds.";
-    }
-    return "Balanced profile with moderate confidence and variability. Suitable for neutral game scripts.";
-  }
-
-  /* -------------------------------------------------------------------------- */
-  /* RANGE FORMAT                                                              */
-  /* -------------------------------------------------------------------------- */
-
-  function fmtLow(r: PredictRow) {
-    return typeof r.rangeLow === "number" ? Math.round(r.rangeLow) : "—";
-  }
-
-  function fmtHigh(r: PredictRow) {
-    return typeof r.rangeHigh === "number" ? Math.round(r.rangeHigh) : "—";
-  }
-
-  /* -------------------------------------------------------------------------- */
-  /* FILTER + RANK                                                             */
+  /* FILTER + SORT                                                             */
   /* -------------------------------------------------------------------------- */
 
   const ranked = useMemo(() => {
@@ -125,20 +100,53 @@ export default function PredictabilityTable(props: {
     return [...r].sort((a, b) => b.confidence01 - a.confidence01);
   }, [rows, chip]);
 
+  const visible = ranked.slice(0, FREE_ROWS + LOCKED_ROWS);
+  const isLockedRow = (i: number) => locked && i >= FREE_ROWS;
+
   /* -------------------------------------------------------------------------- */
-  /* GATING                                                                    */
+  /* AI COPY                                                                   */
   /* -------------------------------------------------------------------------- */
 
-  const visibleRows = useMemo(() => {
-    if (!locked) return ranked.slice(0, FREE_ROWS + LOCKED_ROWS);
-    return ranked.slice(0, FREE_ROWS + LOCKED_ROWS);
-  }, [ranked, locked]);
+  function aiSentence(r: PredictRow) {
+    const c = r.confidence01;
+    const v = r.volatility01;
 
-  const isRowLocked = (idx: number) => locked && idx >= FREE_ROWS;
+    if (c >= 0.72 && v <= 0.4) {
+      return "Strong role stability with repeatable scoring output. Expect a reliable floor unless game flow or role shifts materially.";
+    }
+    if (v >= 0.65) {
+      return "High-variance profile with ceiling outcomes driven by matchup and game flow. Upside is real, but volatility is elevated.";
+    }
+    if (c <= 0.45) {
+      return "Wide outcome distribution caused by role uncertainty or opposition pressure. Best suited to contrarian builds.";
+    }
+    return "Balanced profile with moderate confidence and variability. Suitable for neutral game scripts.";
+  }
 
-  const proTip =
-    hint ??
-    "Safe Picks = high confidence & stable floor · Ceiling Plays = volatility-driven upside · Risky = wide outcome range";
+  /* -------------------------------------------------------------------------- */
+  /* MODAL HANDLERS                                                            */
+  /* -------------------------------------------------------------------------- */
+
+  function closeModal() {
+    setOpen(false);
+    setSelected(null);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeModal();
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   /* -------------------------------------------------------------------------- */
   /* RENDER                                                                    */
@@ -146,7 +154,7 @@ export default function PredictabilityTable(props: {
 
   return (
     <div className="grid gap-4">
-      {/* AI SNAPSHOT */}
+      {/* SNAPSHOT */}
       {insight && (
         <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3">
           <div className="text-[11px] uppercase tracking-wide text-amber-200/80">
@@ -161,142 +169,162 @@ export default function PredictabilityTable(props: {
         </div>
       )}
 
-      {/* CHIPS */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          {(["all", "safe", "ceiling", "risky"] as Chip[]).map((c) => (
-            <button
-              key={c}
-              onClick={() => setChip(c)}
-              className={`rounded-full px-3 py-1 text-xs transition ${
-                chip === c
-                  ? "bg-amber-500/20 text-amber-200 border border-amber-400/30"
-                  : "border border-white/10 text-white/60 hover:bg-white/5"
-              }`}
-            >
-              {c === "all"
-                ? "All"
-                : c === "safe"
-                ? "Safe Picks"
-                : c === "ceiling"
-                ? "Ceiling Plays"
-                : "Risky"}
-            </button>
-          ))}
-        </div>
+      {/* FILTER CHIPS */}
+      <div className="flex gap-2">
+        {(["all", "safe", "ceiling", "risky"] as Chip[]).map((c) => (
+          <button
+            key={c}
+            onClick={() => setChip(c)}
+            className={`rounded-full px-3 py-1 text-xs ${
+              chip === c
+                ? "bg-amber-500/20 text-amber-200 border border-amber-400/30"
+                : "border border-white/10 text-white/60"
+            }`}
+          >
+            {c === "all"
+              ? "All"
+              : c === "safe"
+              ? "Safe Picks"
+              : c === "ceiling"
+              ? "Ceiling Plays"
+              : "Risky"}
+          </button>
+        ))}
       </div>
-
-      <div className="text-xs text-white/45">{proTip}</div>
 
       {/* TABLE */}
       <div className="overflow-hidden rounded-xl border border-white/10">
-        <div className="sticky top-0 z-10 grid grid-cols-[40px_1.3fr_1fr_2fr] bg-[#0b0f18] px-4 py-2 text-[11px] uppercase tracking-wide text-white/50">
+        <div className="grid grid-cols-[40px_1.3fr_1fr_2fr] bg-[#0b0f18] px-4 py-2 text-[11px] uppercase text-white/50">
           <div>#</div>
           <div>Player</div>
           <div>Range</div>
           <div>AI Insight</div>
         </div>
-        <div className="divide-y divide-white/10">
-          {visibleRows.map((row, i) => {
-            const lockedRow = isRowLocked(i);
 
-            return (
-              <div
-                key={row.id}
-                onClick={() => {
-                  if (lockedRow) {
-                    window.location.href =
-                      "https://www.neekostats.com.au/neeko-plus";
-                  } else {
-                    // modal hook (next step)
-                  }
-                }}
-                className={`relative grid grid-cols-[40px_1.3fr_1fr_2fr] px-4 py-3 text-sm transition ${
-                  lockedRow
-                    ? "cursor-pointer hover:bg-white/[0.03]"
-                    : "cursor-pointer hover:bg-white/[0.04]"
-                }`}
-              >
-                {/* RANK */}
-                <div className="text-xs text-white/40">
-                  #{i + 1}
+        {visible.map((r, i) => {
+          const lockedRow = isLockedRow(i);
+
+          return (
+            <button
+              key={r.id}
+              onClick={() => {
+                if (lockedRow) {
+                  window.location.href =
+                    "https://www.neekostats.com.au/neeko-plus";
+                } else {
+                  setSelected(r);
+                  setOpen(true);
+                }
+              }}
+              className="relative grid w-full grid-cols-[40px_1.3fr_1fr_2fr] px-4 py-3 text-left hover:bg-white/5"
+            >
+              <div className="text-xs text-white/40">#{i + 1}</div>
+
+              <div className={lockedRow ? "blur-sm" : ""}>
+                <div className="font-medium">{r.name}</div>
+                <div className="mt-1 flex gap-1 text-xs">
+                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-300">
+                    {confLabel(r.confidence01)}
+                  </span>
+                  <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-sky-300">
+                    {volLabel(r.volatility01)}
+                  </span>
                 </div>
-
-                {/* PLAYER */}
-                <div className="space-y-1">
-                  <div className={`font-medium ${lockedRow && "blur-sm"}`}>
-                    {row.name}
-                  </div>
-
-                  <div className={`flex gap-1 text-xs ${lockedRow && "blur-sm"}`}>
-                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-300">
-                      {confLabel(row.confidence01)}
-                    </span>
-                    <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-sky-300">
-                      {volLabel(row.volatility01)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* RANGE */}
-                <div className={`space-y-1 ${lockedRow && "blur-sm"}`}>
-                  <div className="flex justify-between text-xs text-white/60">
-                    <span>{fmtLow(row)}</span>
-                    <span>{fmtHigh(row)}</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-amber-400 to-amber-300"
-                      style={{
-                        width: `${pct(
-                          (row.rangeHigh - row.rangeLow) /
-                            Math.max(row.rangeHigh, 1)
-                        )}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* AI */}
-                <div className={`text-white/70 ${lockedRow && "blur-sm"}`}>
-                  {aiSentence(row)}
-                </div>
-
-                {/* LOCK OVERLAY */}
-                {lockedRow && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
-                    <div className="flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/20 px-3 py-1 text-xs text-amber-200">
-                      <Lock className="h-3.5 w-3.5" />
-                      Neeko+ Required
-                    </div>
-                  </div>
-                )}
               </div>
-            );
-          })}
-        </div>
+
+              <div className={lockedRow ? "blur-sm" : ""}>
+                <div className="flex justify-between text-xs text-white/60">
+                  <span>{Math.round(r.rangeLow)}</span>
+                  <span>{Math.round(r.rangeHigh)}</span>
+                </div>
+                <div className="mt-1 h-2 rounded-full bg-white/10">
+                  <div
+                    className="h-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-300"
+                    style={{ width: `${rangeBarWidth(r)}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className={`text-white/70 ${lockedRow ? "blur-sm" : ""}`}>
+                {aiSentence(r)}
+              </div>
+
+              {lockedRow && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur">
+                  <div className="flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/20 px-3 py-1 text-xs text-amber-200">
+                    <Lock className="h-3.5 w-3.5" />
+                    Neeko+
+                  </div>
+                </div>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {/* CTA */}
-      {locked && (
-        <div className="sticky bottom-3 z-20 rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 flex items-center justify-between gap-3 backdrop-blur">
-          <div>
-            <div className="font-medium">
-              You’re viewing 3 free picks.
+      {/* MODAL */}
+      {open && selected && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onMouseDown={closeModal}
+        >
+          <div className="absolute inset-0 bg-black/70" />
+
+          <div
+            className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#0b0f18] p-5"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="text-lg font-semibold">{selected.name}</div>
+                <div className="text-xs text-white/60">
+                  {statLabel}
+                  {matchContext && ` · ${matchContext}`}
+                </div>
+              </div>
+              <button onClick={closeModal}>
+                <X className="h-5 w-5 text-white/70" />
+              </button>
             </div>
-            <div className="text-xs text-amber-100/80">
-              Unlock all players, ranges and deep AI reasoning with{" "}
-              <span className="font-semibold">Neeko+</span>.
+
+            {/* DISTRIBUTION STRIP */}
+            <div className="mt-4">
+              <div className="text-xs text-white/60 mb-1">
+                Projection range
+              </div>
+              <div className="h-2 rounded-full bg-white/10">
+                <div
+                  className="h-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-300"
+                  style={{ width: `${rangeBarWidth(selected)}%` }}
+                />
+              </div>
+              <div className="mt-1 flex justify-between text-xs text-white/50">
+                <span>{Math.round(selected.rangeLow)}</span>
+                <span>{Math.round(selected.rangeHigh)}</span>
+              </div>
+            </div>
+
+            {/* LEGEND */}
+            <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <div className="text-white/60">Confidence</div>
+                <div className="font-medium">
+                  {confLabel(selected.confidence01)}
+                </div>
+              </div>
+              <div>
+                <div className="text-white/60">Volatility</div>
+                <div className="font-medium">
+                  {volLabel(selected.volatility01)}
+                </div>
+              </div>
+            </div>
+
+            {/* AI TEXT */}
+            <div className="mt-4 text-sm text-white/80">
+              {aiSentence(selected)}
             </div>
           </div>
-
-          <a
-            href="https://www.neekostats.com.au/neeko-plus"
-            className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/20 px-3 py-1.5 text-sm hover:bg-amber-500/30"
-          >
-            <Lock className="h-4 w-4" />
-            {UNLOCK_LABEL}
-          </a>
         </div>
       )}
     </div>
