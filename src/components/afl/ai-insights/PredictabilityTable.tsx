@@ -18,8 +18,8 @@ function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
+/** Confidence-first ordering with volatility penalty */
 function blendedScore(r: PredictRow) {
-  // Confidence is king, volatility penalised
   return r.confidence01 * 0.7 + (1 - r.volatility01) * 0.3;
 }
 
@@ -32,12 +32,10 @@ function inferStatKey(statLabel: string) {
 }
 
 function whySafeMicrocopy(r: PredictRow) {
-  if (r.confidence01 >= 0.75 && r.volatility01 <= 0.35) {
+  if (r.confidence01 >= 0.75 && r.volatility01 <= 0.35)
     return "High role certainty with tight historical range.";
-  }
-  if (r.confidence01 >= 0.7) {
+  if (r.confidence01 >= 0.7)
     return "Repeatable role output with manageable variance.";
-  }
   return "Safer than average but still matchup-dependent.";
 }
 
@@ -90,6 +88,7 @@ function rangeBarStyle(conf01: number, vol01: number) {
   } as React.CSSProperties;
 }
 
+/* 🔒 FAKE DATA FOR LOCKED ROWS */
 function fakeLockedRow(r: PredictRow): PredictRow {
   const jitter = Math.floor(6 + Math.random() * 12);
   return {
@@ -120,16 +119,31 @@ export default function PredictabilityTable({
   showHeader?: boolean;
 }) {
   const locked = mode !== "premium";
-  const [chip, setChip] = useState<Chip>("safe");
   const statKey = useMemo(() => inferStatKey(statLabel), [statLabel]);
 
+  const [chip, setChip] = useState<Chip>("safe");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<PredictRow | null>(null);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  /* ---------------- COLLAPSE STATE (SESSION) ---------------- */
+
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("ai_collapsed") || "{}");
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem("ai_collapsed", JSON.stringify(collapsed));
+  }, [collapsed]);
 
   useEffect(() => {
     setChip("safe");
   }, [statLabel]);
+
+  /* ---------------- GROUP BY TEAM ---------------- */
 
   const rowsByTeam = useMemo(() => {
     const map = new Map<string, PredictRow[]>();
@@ -162,6 +176,7 @@ export default function PredictabilityTable({
             <p className="mt-1 text-sm text-white/60">
               Expected scoring ranges, confidence and volatility.
             </p>
+
             {insight && (
               <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
                 {insight}
@@ -202,9 +217,10 @@ export default function PredictabilityTable({
         {/* TEAMS */}
         <div className="divide-y divide-white/10">
           {rowsByTeam.map(([team, teamRows]) => {
-            const filtered = teamRows.filter(filterRow).sort(
-              (a, b) => blendedScore(b) - blendedScore(a)
-            );
+            const filtered = teamRows
+              .filter(filterRow)
+              .sort((a, b) => blendedScore(b) - blendedScore(a));
+
             if (!filtered.length) return null;
 
             const isCollapsed = collapsed[team];
@@ -233,8 +249,14 @@ export default function PredictabilityTable({
                   </span>
                 </button>
 
-                {!isCollapsed &&
-                  filtered.map((r, i) => {
+                {/* ANIMATED BODY */}
+                <div
+                  className={cx(
+                    "overflow-hidden transition-all duration-300 ease-out",
+                    isCollapsed ? "max-h-0 opacity-0" : "max-h-[2000px] opacity-100"
+                  )}
+                >
+                  {filtered.map((r, i) => {
                     const rowLocked = locked && i >= 2;
                     const displayRow = rowLocked ? fakeLockedRow(r) : r;
 
@@ -259,6 +281,7 @@ export default function PredictabilityTable({
                         <div>
                           <div className="text-white font-medium text-sm flex gap-2 items-center">
                             {displayRow.name}
+
                             {chip === "safe" &&
                               i < 3 &&
                               r.confidence01 >= 0.75 &&
@@ -306,18 +329,25 @@ export default function PredictabilityTable({
                       </div>
                     );
                   })}
+                </div>
               </div>
             );
           })}
         </div>
       </section>
 
-      {/* MODAL (PORTAL FIXED) */}
+      {/* MODAL (PORTAL + CLICK-OFF) */}
       {open &&
         active &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-            <div className="w-full max-w-[620px] rounded-2xl bg-[#050912] border border-white/10 p-6 relative">
+          <div
+            className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center px-4"
+            onClick={() => setOpen(false)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-[620px] rounded-2xl bg-[#050912] border border-white/10 p-6 relative"
+            >
               <button
                 onClick={() => setOpen(false)}
                 className="absolute top-4 right-4 text-white/60 hover:text-white"
@@ -330,14 +360,33 @@ export default function PredictabilityTable({
               </h3>
               <p className="text-sm text-white/50 mt-1">{matchContext}</p>
 
-              <div className="mt-4">
-                <div className="text-lg font-semibold">
-                  {active.rangeLow} → {active.rangeHigh}
+              <div className="mt-4 space-y-4">
+                <div>
+                  <div className="text-lg font-semibold">
+                    {active.rangeLow} → {active.rangeHigh}
+                  </div>
+                  <p className="mt-2 text-sm text-white/70">{active.ai}</p>
                 </div>
 
-                <p className="mt-2 text-sm text-white/70">{active.ai}</p>
+                {/* COMPARE TO TEAM AVG */}
+                <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
+                  <div className="font-medium text-white mb-1">
+                    Compared to team average
+                  </div>
+                  <div className="text-white/70">
+                    This player projects{" "}
+                    {active.confidence01 >= 0.7
+                      ? "more reliably"
+                      : "less reliably"}{" "}
+                    than most teammates, with{" "}
+                    {active.volatility01 <= 0.4
+                      ? "a tighter range"
+                      : "greater variance"}{" "}
+                    than the team baseline.
+                  </div>
+                </div>
 
-                <div className="mt-4 text-sm text-amber-200">
+                <div className="text-sm text-amber-200">
                   {whyThisMatters(
                     statKey,
                     active.confidence01,
@@ -345,7 +394,7 @@ export default function PredictabilityTable({
                   )}
                 </div>
 
-                <div className="mt-4 text-xs text-white/40">
+                <div className="text-xs text-white/40">
                   {stabilityText(
                     active.confidence01,
                     active.volatility01
