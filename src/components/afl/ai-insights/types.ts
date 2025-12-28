@@ -116,6 +116,7 @@ export type PremiumMode = "free" | "premium";
 export type PredictRow = {
   id: string;
   name: string;
+  team: string; // ✅ ADD THIS
   confidence01: number;
   volatility01: number;
   rangeLow: number;
