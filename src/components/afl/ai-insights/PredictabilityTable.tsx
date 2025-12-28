@@ -41,12 +41,7 @@ export default function PredictabilityTable(props: {
   insight?: string;
 }) {
   const { rows, mode, statLabel, matchContext, insight } = props;
-
   const isPremium = mode === "premium";
-
-  /* ---------------------------------------------------------------------- */
-  /* STATE                                                                  */
-  /* ---------------------------------------------------------------------- */
 
   const [chip, setChip] = useState<Chip>("all");
   const [open, setOpen] = useState(false);
@@ -130,7 +125,7 @@ export default function PredictabilityTable(props: {
 
   return (
     <section id="player-predictability" className="scroll-mt-28">
-      {/* SECTION HEADER */}
+      {/* HEADER */}
       <div className="mb-6">
         <div className="flex items-center gap-3">
           <span className="text-xs font-semibold tracking-widest text-yellow-400">
@@ -164,7 +159,7 @@ export default function PredictabilityTable(props: {
         </div>
       )}
 
-      {/* FILTER CHIPS */}
+      {/* FILTERS */}
       <div className="mb-4 flex flex-wrap gap-2">
         {(["all", "safe", "ceiling", "risky"] as Chip[]).map((c) => (
           <button
@@ -250,29 +245,6 @@ export default function PredictabilityTable(props: {
         ))}
       </div>
 
-      {/* CTA */}
-      {!isPremium && (
-        <div className="mt-4 rounded-lg border border-yellow-500/30 bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold text-yellow-300">
-                Unlock full player predictability
-              </div>
-              <div className="text-xs text-white/60">
-                View all players, full ranges, and detailed AI reasoning.
-              </div>
-            </div>
-
-            <a
-              href="https://www.neekostats.com.au/neeko-plus"
-              className="rounded-full border border-yellow-400/40 bg-yellow-400/20 px-4 py-2 text-sm font-medium text-yellow-200 hover:bg-yellow-400/30 transition"
-            >
-              Unlock Neeko+
-            </a>
-          </div>
-        </div>
-      )}
-
       {/* MODAL */}
       {open && selected && (
         <div
@@ -299,12 +271,26 @@ export default function PredictabilityTable(props: {
               </button>
             </div>
 
-            <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
-              <div className="text-sm font-semibold text-white">
-                {formatRange(selected.rangeLow, selected.rangeHigh)}
+            {/* RANGE STRIP */}
+            <div className="mt-4">
+              <div className="flex justify-between text-xs text-white/55">
+                <span>Floor</span>
+                <span>Ceiling</span>
               </div>
 
-              <div className="mt-3 text-sm text-white/75">
+              <div className="relative mt-1 h-2 rounded-full bg-white/10">
+                <div className="absolute inset-y-0 left-0 right-0 rounded-full bg-gradient-to-r from-yellow-400/30 via-yellow-500/70 to-yellow-400/30" />
+              </div>
+
+              <div className="mt-1 flex justify-between text-sm text-white">
+                <span>{selected.rangeLow ?? "—"}</span>
+                <span>{selected.rangeHigh ?? "—"}</span>
+              </div>
+            </div>
+
+            {/* AI */}
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="text-sm text-white/80 leading-relaxed">
                 {selected.ai}
               </div>
             </div>
