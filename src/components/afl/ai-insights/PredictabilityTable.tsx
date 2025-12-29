@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Lock, X, ChevronDown, ChevronRight } from "lucide-react";
+import { X, ChevronDown, ChevronRight } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { PredictRow, PremiumMode } from "./types";
 import { confLabel, volLabel } from "./utils";
@@ -64,7 +64,7 @@ function whyThisMatters(statKey: string, conf01: number, vol01: number) {
   }
   if (statKey === "disposals") {
     return conf01 >= 0.7
-      ? "Disposal volume is structurically stable."
+      ? "Disposal volume is structurally stable."
       : "Touches fluctuate with rotation and matchup.";
   }
   if (statKey === "goals") {
@@ -109,7 +109,6 @@ export default function PredictabilityTable({
   matchContext,
   insight,
   showHeader = true,
-  groupByTeam = true, // ✅ NEW — defaults to current behaviour
 }: {
   rows: PredictRow[];
   mode: PremiumMode;
@@ -117,7 +116,6 @@ export default function PredictabilityTable({
   matchContext?: string;
   insight?: string;
   showHeader?: boolean;
-  groupByTeam?: boolean;
 }) {
   const locked = mode !== "premium";
   const statKey = useMemo(() => inferStatKey(statLabel), [statLabel]);
@@ -125,39 +123,30 @@ export default function PredictabilityTable({
   const [chip, setChip] = useState<Chip>("safe");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<PredictRow | null>(null);
-
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   const isMobile =
     typeof window !== "undefined" &&
     window.matchMedia("(max-width: 639px)").matches;
 
-  const sortedRows = useMemo(() => {
-    let sorted = [...rows].sort(
-      (a, b) => blendedScore(b) - blendedScore(a)
-    );
+  /* ---------------- GROUP BY TEAM (RESTORED) ---------------- */
 
-    if (chip === "safe") {
-      const safe = sorted.filter(
-        (r) => r.confidence01 >= 0.7 && r.volatility01 <= 0.4
-      );
-      const nearSafe = sorted.filter((r) => !safe.includes(r));
-      sorted = [
-        ...safe,
-        ...nearSafe.slice(0, Math.max(0, SAFE_TARGET - safe.length)),
-      ];
-    }
+  const rowsByTeam = useMemo(() => {
+    const map = new Map<string, PredictRow[]>();
+    rows.forEach((r) => {
+      if (!map.has(r.team)) map.set(r.team, []);
+      map.get(r.team)!.push(r);
+    });
+    return Array.from(map.entries());
+  }, [rows]);
 
-    if (chip === "ceiling") {
-      sorted = sorted.filter((r) => r.volatility01 >= 0.65);
-    }
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [expandedTeam, setExpandedTeam] = useState<Record<string, boolean>>({});
 
-    if (chip === "risky") {
-      sorted = sorted.filter((r) => r.confidence01 <= 0.45);
-    }
-
-    return sorted;
-  }, [rows, chip]);
+  useEffect(() => {
+    setChip("safe");
+    setExpandedRow(null);
+  }, [statLabel]);
 
   /* ---------------------------------------------------------------------- */
   /* RENDER                                                                  */
@@ -216,95 +205,177 @@ export default function PredictabilityTable({
           Ordered by reliability score (confidence × volatility blend)
         </div>
 
-        {/* PLAYER ROWS — TEAM GROUPING DISABLED WHEN groupByTeam=false */}
+        {/* TEAMS */}
         <div className="divide-y divide-white/10">
-          {sortedRows.map((r, i) => {
-            const rowLocked = locked && i >= 2;
-            const displayRow = rowLocked ? fakeLockedRow(r) : r;
-            const expanded = expandedRow === r.id;
+          {rowsByTeam.map(([team, teamRows]) => {
+            const sorted = [...teamRows].sort(
+              (a, b) => blendedScore(b) - blendedScore(a)
+            );
+
+            let displayRows = sorted;
+
+            if (chip === "safe") {
+              const safe = sorted.filter(
+                (r) => r.confidence01 >= 0.7 && r.volatility01 <= 0.4
+              );
+              const nearSafe = sorted.filter((r) => !safe.includes(r));
+
+              displayRows = [
+                ...safe,
+                ...nearSafe.slice(0, Math.max(0, SAFE_TARGET - safe.length)),
+              ];
+            }
+
+            if (chip === "ceiling") {
+              displayRows = sorted.filter((r) => r.volatility01 >= 0.65);
+            }
+
+            if (chip === "risky") {
+              displayRows = sorted.filter((r) => r.confidence01 <= 0.45);
+            }
+
+            if (!displayRows.length) return null;
+
+            const isCollapsed = collapsed[team];
+            const showAll = expandedTeam[team];
+            const rowsToShow =
+              chip === "safe" && !showAll
+                ? displayRows.slice(0, SAFE_TARGET)
+                : displayRows;
 
             return (
-              <div key={r.id}>
-                <div
-                  onClick={() => {
-                    if (rowLocked) return;
-
-                    if (isMobile) {
-                      setExpandedRow(expanded ? null : r.id);
-                    } else {
-                      setActive(displayRow);
-                      setOpen(true);
-                    }
-                  }}
-                  className={cx(
-                    "px-6 py-3 grid grid-cols-1 sm:grid-cols-[36px_1.1fr_180px_1.4fr] gap-3 sm:gap-4 items-center border-b border-white/10 transition",
-                    rowLocked
-                      ? "cursor-not-allowed blur-sm"
-                      : "cursor-pointer hover:bg-white/[0.04]"
-                  )}
+              <div key={team}>
+                {/* TEAM HEADER */}
+                <button
+                  onClick={() =>
+                    setCollapsed((s) => ({ ...s, [team]: !s[team] }))
+                  }
+                  className="w-full px-6 py-2 bg-white/5 border-y border-white/10 flex items-center justify-between"
                 >
-                  <div className="hidden sm:block text-white/30 text-xs">
-                    #{i + 1}
+                  <div className="flex items-center gap-2">
+                    {isCollapsed ? (
+                      <ChevronRight size={14} />
+                    ) : (
+                      <ChevronDown size={14} />
+                    )}
+                    <span className="text-xs font-semibold tracking-widest text-white/70 uppercase">
+                      {team}
+                    </span>
                   </div>
+                  <span className="text-[11px] text-white/40">
+                    {displayRows.length} players
+                  </span>
+                </button>
 
-                  <div>
-                    <div className="text-white font-medium text-sm flex gap-2 items-center">
-                      {displayRow.name}
-                      {chip === "safe" && i < 3 && (
-                        <span className="rounded-full bg-amber-400/20 border border-amber-400/50 px-2 py-0.5 text-[10px] text-amber-300">
-                          🔒 Top Lock
-                        </span>
-                      )}
-                    </div>
+                {!isCollapsed &&
+                  rowsToShow.map((r, i) => {
+                    const rowLocked = locked && i >= 2;
+                    const displayRow = rowLocked ? fakeLockedRow(r) : r;
+                    const expanded = expandedRow === r.id;
 
-                    <div className="mt-0.5 flex gap-1.5 items-center">
-                      <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
-                        {confLabel(displayRow.confidence01)}
-                      </span>
-                      <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
-                        {volLabel(displayRow.volatility01)}
-                      </span>
-                    </div>
-                  </div>
+                    return (
+                      <div key={r.id}>
+                        <div
+                          onClick={() => {
+                            if (rowLocked) return;
 
-                  <div>
-                    <div className="font-semibold text-white text-sm">
-                      {displayRow.rangeLow} → {displayRow.rangeHigh}
-                    </div>
-                    <div className="mt-1 h-1.5 w-full rounded bg-white/10">
-                      <div
-                        className="h-1.5 rounded"
-                        style={rangeBarStyle(
-                          displayRow.confidence01,
-                          displayRow.volatility01
-                        )}
-                      />
-                    </div>
-                  </div>
+                            if (isMobile) {
+                              setExpandedRow(expanded ? null : r.id);
+                            } else {
+                              setActive(displayRow);
+                              setOpen(true);
+                            }
+                          }}
+                          className={cx(
+                            "px-6 py-3 grid grid-cols-1 sm:grid-cols-[36px_1.1fr_180px_1.4fr] gap-3 sm:gap-4 items-center border-b border-white/10 transition",
+                            rowLocked
+                              ? "cursor-not-allowed blur-sm"
+                              : "cursor-pointer hover:bg-white/[0.04]"
+                          )}
+                        >
+                          <div className="hidden sm:block text-white/30 text-xs">
+                            #{i + 1}
+                          </div>
 
-                  <div className="hidden sm:block text-sm text-white/60">
-                    {displayRow.ai}
-                  </div>
-                </div>
+                          <div>
+                            <div className="text-white font-medium text-sm flex gap-2 items-center">
+                              {displayRow.name}
+                              {chip === "safe" && i < 3 && (
+                                <span className="rounded-full bg-amber-400/20 border border-amber-400/50 px-2 py-0.5 text-[10px] text-amber-300">
+                                  🔒 Top Lock
+                                </span>
+                              )}
+                            </div>
 
-                {/* MOBILE INLINE EXPAND */}
-                <div
-                  className={cx(
-                    "sm:hidden px-6 overflow-hidden transition-all duration-300 ease-out",
-                    expanded
-                      ? "max-h-40 opacity-100 pb-3"
-                      : "max-h-0 opacity-0"
+                            <div className="mt-0.5 flex gap-1.5 items-center">
+                              <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
+                                {confLabel(displayRow.confidence01)}
+                              </span>
+                              <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
+                                {volLabel(displayRow.volatility01)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="font-semibold text-white text-sm">
+                              {displayRow.rangeLow} → {displayRow.rangeHigh}
+                            </div>
+                            <div className="mt-1 h-1.5 w-full rounded bg-white/10">
+                              <div
+                                className="h-1.5 rounded"
+                                style={rangeBarStyle(
+                                  displayRow.confidence01,
+                                  displayRow.volatility01
+                                )}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="hidden sm:block text-sm text-white/60">
+                            {displayRow.ai}
+                          </div>
+                        </div>
+
+                        {/* MOBILE INLINE EXPAND */}
+                        <div
+                          className={cx(
+                            "sm:hidden px-6 overflow-hidden transition-all duration-300 ease-out",
+                            expanded
+                              ? "max-h-40 opacity-100 pb-3"
+                              : "max-h-0 opacity-0"
+                          )}
+                        >
+                          <div className="text-sm text-white/70 mt-2">
+                            {displayRow.ai}
+                          </div>
+                          {chip === "safe" && (
+                            <div className="mt-2 text-[11px] text-amber-300">
+                              {whySafeMicrocopy(displayRow)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                {chip === "safe" &&
+                  displayRows.length > SAFE_TARGET &&
+                  !isCollapsed && (
+                    <button
+                      onClick={() =>
+                        setExpandedTeam((s) => ({
+                          ...s,
+                          [team]: !s[team],
+                        }))
+                      }
+                      className="px-6 py-2 text-xs text-amber-300 hover:underline"
+                    >
+                      {expandedTeam[team]
+                        ? "Show less"
+                        : "Show full team"}
+                    </button>
                   )}
-                >
-                  <div className="text-sm text-white/70 mt-2">
-                    {displayRow.ai}
-                  </div>
-                  {chip === "safe" && (
-                    <div className="mt-2 text-[11px] text-amber-300">
-                      {whySafeMicrocopy(displayRow)}
-                    </div>
-                  )}
-                </div>
               </div>
             );
           })}
