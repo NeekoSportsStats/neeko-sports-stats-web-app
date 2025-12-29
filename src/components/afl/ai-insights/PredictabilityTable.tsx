@@ -64,7 +64,7 @@ function whyThisMatters(statKey: string, conf01: number, vol01: number) {
   }
   if (statKey === "disposals") {
     return conf01 >= 0.7
-      ? "Disposal volume is structurally stable."
+      ? "Disposal volume is structurically stable."
       : "Touches fluctuate with rotation and matchup.";
   }
   if (statKey === "goals") {
@@ -109,7 +109,7 @@ export default function PredictabilityTable({
   matchContext,
   insight,
   showHeader = true,
-  groupByTeam = true, // 🔑 NEW
+  groupByTeam = true, // ✅ NEW — defaults to current behaviour
 }: {
   rows: PredictRow[];
   mode: PremiumMode;
@@ -125,18 +125,12 @@ export default function PredictabilityTable({
   const [chip, setChip] = useState<Chip>("safe");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<PredictRow | null>(null);
+
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   const isMobile =
     typeof window !== "undefined" &&
     window.matchMedia("(max-width: 639px)").matches;
-
-  useEffect(() => {
-    setChip("safe");
-    setExpandedRow(null);
-  }, [statLabel]);
-
-  /* ---------------- FLAT SORT (PLAYER MODE) ---------------- */
 
   const sortedRows = useMemo(() => {
     let sorted = [...rows].sort(
@@ -165,17 +159,6 @@ export default function PredictabilityTable({
     return sorted;
   }, [rows, chip]);
 
-  /* ---------------- GROUP BY TEAM (TEAM MODE) ---------------- */
-
-  const rowsByTeam = useMemo(() => {
-    const map = new Map<string, PredictRow[]>();
-    rows.forEach((r) => {
-      if (!map.has(r.team)) map.set(r.team, []);
-      map.get(r.team)!.push(r);
-    });
-    return Array.from(map.entries());
-  }, [rows]);
-
   /* ---------------------------------------------------------------------- */
   /* RENDER                                                                  */
   /* ---------------------------------------------------------------------- */
@@ -183,7 +166,6 @@ export default function PredictabilityTable({
   return (
     <>
       <section className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden">
-        {/* HEADER, FILTERS — UNCHANGED */}
         {showHeader && (
           <header className="px-6 pt-5 pb-4 border-b border-white/10">
             <h2 className="text-lg font-semibold text-white">
@@ -206,6 +188,7 @@ export default function PredictabilityTable({
           </header>
         )}
 
+        {/* FILTERS */}
         <div className="px-6 pt-4 pb-2 flex gap-2 items-center">
           {(["safe", "all", "ceiling", "risky"] as Chip[]).map((c) => (
             <button
@@ -233,33 +216,99 @@ export default function PredictabilityTable({
           Ordered by reliability score (confidence × volatility blend)
         </div>
 
-        {/* ================= RENDER SWITCH ================= */}
+        {/* PLAYER ROWS — TEAM GROUPING DISABLED WHEN groupByTeam=false */}
+        <div className="divide-y divide-white/10">
+          {sortedRows.map((r, i) => {
+            const rowLocked = locked && i >= 2;
+            const displayRow = rowLocked ? fakeLockedRow(r) : r;
+            const expanded = expandedRow === r.id;
 
-        {!groupByTeam && (
-          <div className="divide-y divide-white/10">
-            {sortedRows.map((r, i) => {
-              const rowLocked = locked && i >= 2;
-              const displayRow = rowLocked ? fakeLockedRow(r) : r;
-              const expanded = expandedRow === r.id;
+            return (
+              <div key={r.id}>
+                <div
+                  onClick={() => {
+                    if (rowLocked) return;
 
-              return (
-                <div key={r.id}>
-                  {/* ROW (unchanged) */}
-                  {/* ...same as your flat version... */}
+                    if (isMobile) {
+                      setExpandedRow(expanded ? null : r.id);
+                    } else {
+                      setActive(displayRow);
+                      setOpen(true);
+                    }
+                  }}
+                  className={cx(
+                    "px-6 py-3 grid grid-cols-1 sm:grid-cols-[36px_1.1fr_180px_1.4fr] gap-3 sm:gap-4 items-center border-b border-white/10 transition",
+                    rowLocked
+                      ? "cursor-not-allowed blur-sm"
+                      : "cursor-pointer hover:bg-white/[0.04]"
+                  )}
+                >
+                  <div className="hidden sm:block text-white/30 text-xs">
+                    #{i + 1}
+                  </div>
+
+                  <div>
+                    <div className="text-white font-medium text-sm flex gap-2 items-center">
+                      {displayRow.name}
+                      {chip === "safe" && i < 3 && (
+                        <span className="rounded-full bg-amber-400/20 border border-amber-400/50 px-2 py-0.5 text-[10px] text-amber-300">
+                          🔒 Top Lock
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-0.5 flex gap-1.5 items-center">
+                      <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
+                        {confLabel(displayRow.confidence01)}
+                      </span>
+                      <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
+                        {volLabel(displayRow.volatility01)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="font-semibold text-white text-sm">
+                      {displayRow.rangeLow} → {displayRow.rangeHigh}
+                    </div>
+                    <div className="mt-1 h-1.5 w-full rounded bg-white/10">
+                      <div
+                        className="h-1.5 rounded"
+                        style={rangeBarStyle(
+                          displayRow.confidence01,
+                          displayRow.volatility01
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="hidden sm:block text-sm text-white/60">
+                    {displayRow.ai}
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
 
-        {groupByTeam && (
-          <div className="divide-y divide-white/10">
-            {/* YOUR ORIGINAL TEAM LOGIC — UNTOUCHED */}
-            {rowsByTeam.map(([team]) => (
-              <div key={team}>{/* existing team rendering */}</div>
-            ))}
-          </div>
-        )}
+                {/* MOBILE INLINE EXPAND */}
+                <div
+                  className={cx(
+                    "sm:hidden px-6 overflow-hidden transition-all duration-300 ease-out",
+                    expanded
+                      ? "max-h-40 opacity-100 pb-3"
+                      : "max-h-0 opacity-0"
+                  )}
+                >
+                  <div className="text-sm text-white/70 mt-2">
+                    {displayRow.ai}
+                  </div>
+                  {chip === "safe" && (
+                    <div className="mt-2 text-[11px] text-amber-300">
+                      {whySafeMicrocopy(displayRow)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       {/* DESKTOP MODAL — UNCHANGED */}
@@ -270,7 +319,62 @@ export default function PredictabilityTable({
             className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center px-4"
             onClick={() => setOpen(false)}
           >
-            {/* unchanged */}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-[620px] rounded-2xl bg-[#050912] border border-white/10 p-6 relative"
+            >
+              <button
+                onClick={() => setOpen(false)}
+                className="absolute top-4 right-4 text-white/60 hover:text-white"
+              >
+                <X size={16} />
+              </button>
+
+              <h3 className="text-xl font-semibold text-white">
+                {active.name}
+              </h3>
+              <p className="text-sm text-white/50 mt-1">{matchContext}</p>
+
+              <div className="mt-4 space-y-4">
+                <div>
+                  <div className="text-lg font-semibold">
+                    {active.rangeLow} → {active.rangeHigh}
+                  </div>
+                  <p className="mt-2 text-sm text-white/70">{active.ai}</p>
+                </div>
+
+                <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
+                  <div className="font-medium text-white mb-1">
+                    Compared to team average
+                  </div>
+                  <div className="text-white/70">
+                    Confidence:{" "}
+                    <strong>
+                      {(active.confidence01 * 100).toFixed(0)}%
+                    </strong>{" "}
+                    · Volatility:{" "}
+                    <strong>
+                      {(active.volatility01 * 100).toFixed(0)}%
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="text-sm text-amber-200">
+                  {whyThisMatters(
+                    statKey,
+                    active.confidence01,
+                    active.volatility01
+                  )}
+                </div>
+
+                <div className="text-xs text-white/40">
+                  {stabilityText(
+                    active.confidence01,
+                    active.volatility01
+                  )}
+                </div>
+              </div>
+            </div>
           </div>,
           document.body
         )}
