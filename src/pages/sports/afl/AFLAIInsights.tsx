@@ -27,7 +27,7 @@ import {
   filterUpcomingFixtures,
   roundOrder,
   buildPlayerPredictabilityFromFixtures,
-  buildTeamPredictabilityFromTeams,
+  // buildTeamPredictabilityFromTeams, // REMOVED (Teams section no longer uses PredictabilityTable)
   buildH2HPlayerMatchups,
   buildH2HTeamMatchups,
   buildQuarterFlow,
@@ -74,21 +74,13 @@ export default function AFLAIInsights() {
 
   /* ---------------- ROUND + MATCH ---------------- */
 
-  const pastFixtures = useMemo(
-    () => filterPastFixtures(fixtures),
-    [fixtures]
-  );
+  const pastFixtures = useMemo(() => filterPastFixtures(fixtures), [fixtures]);
 
-  const roundLabel = useMemo(
-    () => currentRound(fixtures),
-    [fixtures]
-  );
+  const roundLabel = useMemo(() => currentRound(fixtures), [fixtures]);
 
   const roundMatches = useMemo(
     () =>
-      filterUpcomingFixtures(fixtures).filter(
-        (m) => m.roundLabel === roundLabel
-      ),
+      filterUpcomingFixtures(fixtures).filter((m) => m.roundLabel === roundLabel),
     [fixtures, roundLabel]
   );
 
@@ -127,23 +119,18 @@ export default function AFLAIInsights() {
 
     const homePlayers = rawPlayerPredict
       .filter((p) => p.team === home)
-      .sort((a, b) => b.confidence01 - a.confidence01)
+      .sort((a, b) => b.confidence01 - a.confidence01);
 
     const awayPlayers = rawPlayerPredict
       .filter((p) => p.team === away)
-      .sort((a, b) => b.confidence01 - a.confidence01)
+      .sort((a, b) => b.confidence01 - a.confidence01);
 
     return [...homePlayers, ...awayPlayers];
   }, [rawPlayerPredict, selectedMatch]);
 
   /* -------------------------------------------------------------------------- */
-  /* TEAM PREDICTABILITY (STAT-ONLY, NOT MATCH)                                 */
+  /* BONUS: CONSISTENCY & EXPLOSIVENESS                                        */
   /* -------------------------------------------------------------------------- */
-
-  const teamPredict = useMemo(
-    () => buildTeamPredictabilityFromTeams(teams, stat),
-    [teams, stat]
-  );
 
   const consistencyRows = useMemo(
     () => buildConsistencyExplosivenessTeams(teams, stat),
@@ -173,14 +160,6 @@ export default function AFLAIInsights() {
         : "Top-end outcomes are relatively compressed."
     }`;
   }, [playerPredict]);
-
-  const teamInsight = useMemo(() => {
-    if (!teamPredict.length) return "";
-    const avgConf = mean(teamPredict.map((r) => r.confidence01));
-    return `Team predictability reflects ${
-      avgConf >= 0.65 ? "repeatable systems" : "inconsistent scoring patterns"
-    } across recent matches.`;
-  }, [teamPredict]);
 
   /* -------------------------------------------------------------------------- */
   /* RENDER                                                                    */
@@ -262,17 +241,8 @@ export default function AFLAIInsights() {
           </SectionShell>
         </div>
 
-        {/* TEAMS */}
+        {/* TEAMS (TEAM PREDICTABILITY REMOVED) */}
         <div ref={teamsRef} className="mt-20">
-          <SectionShell title="2. Team Score Predictability">
-            <PredictabilityTable
-              rows={teamPredict}
-              mode={mode}
-              statLabel={STAT_LABEL[stat]}
-              insight={teamInsight}
-            />
-          </SectionShell>
-
           <SectionShell title="Bonus: Consistency & Explosiveness">
             <ConsistencyList rows={consistencyRows} mode={mode} />
           </SectionShell>
@@ -292,10 +262,7 @@ export default function AFLAIInsights() {
 
             <div ref={flowRef}>
               <SectionShell title="4. Game Flow & Timing">
-                <QuarterFlowGrid
-                  rows={buildQuarterFlow(selectedMatch)}
-                  mode={mode}
-                />
+                <QuarterFlowGrid rows={buildQuarterFlow(selectedMatch)} mode={mode} />
               </SectionShell>
             </div>
 
