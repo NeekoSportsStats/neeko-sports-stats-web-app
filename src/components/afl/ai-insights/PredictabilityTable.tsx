@@ -143,10 +143,47 @@ export default function PredictabilityTable({
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [expandedTeam, setExpandedTeam] = useState<Record<string, boolean>>({});
 
+  /* ---------------- MOBILE POLISH (ADDITIVE ONLY) ---------------- */
+  const [seenTapHint, setSeenTapHint] = useState(false);
+
   useEffect(() => {
     setChip("safe");
     setExpandedRow(null);
+
+    // Mobile: gently collapse the 2nd team by default to reduce scroll fatigue (only when "safe" is active)
+    if (isMobile) {
+      setCollapsed((prev) => {
+        // If user already has collapse preferences in state, don't override
+        if (Object.keys(prev).length) return prev;
+        if (rowsByTeam.length < 2) return prev;
+        const secondTeam = rowsByTeam[1]?.[0];
+        if (!secondTeam) return prev;
+        return { ...prev, [secondTeam]: true };
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statLabel]);
+
+  /* One-time mobile "tap to expand" affordance memory */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const v = window.localStorage.getItem("ai_predict_tap_hint_seen");
+      setSeenTapHint(v === "1");
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const markTapHintSeen = () => {
+    if (seenTapHint) return;
+    setSeenTapHint(true);
+    try {
+      window.localStorage.setItem("ai_predict_tap_hint_seen", "1");
+    } catch {
+      // ignore
+    }
+  };
 
   /* ---------------------------------------------------------------------- */
   /* RENDER                                                                  */
@@ -207,7 +244,7 @@ export default function PredictabilityTable({
 
         {/* TEAMS */}
         <div className="divide-y divide-white/10">
-          {rowsByTeam.map(([team, teamRows]) => {
+          {rowsByTeam.map(([team, teamRows], teamIndex) => {
             const sorted = [...teamRows].sort(
               (a, b) => blendedScore(b) - blendedScore(a)
             );
@@ -243,14 +280,27 @@ export default function PredictabilityTable({
                 ? displayRows.slice(0, SAFE_TARGET)
                 : displayRows;
 
+            // Mobile-only: show a subtle "Tap for details" hint once (first visible team, first row)
+            const shouldShowTapHint =
+              isMobile &&
+              !seenTapHint &&
+              !isCollapsed &&
+              teamIndex === 0 &&
+              rowsToShow.length > 0;
+
             return (
               <div key={team}>
-                {/* TEAM HEADER */}
+                {/* TEAM HEADER (mobile spacing tightened ONLY under sm) */}
                 <button
                   onClick={() =>
                     setCollapsed((s) => ({ ...s, [team]: !s[team] }))
                   }
-                  className="w-full px-6 py-2 bg-white/5 border-y border-white/10 flex items-center justify-between"
+                  className={cx(
+                    "w-full px-6 bg-white/5 border-y border-white/10 flex items-center justify-between",
+                    // mobile polish only (desktop unchanged)
+                    "py-2 sm:py-2",
+                    "sm:px-6"
+                  )}
                 >
                   <div className="flex items-center gap-2">
                     {isCollapsed ? (
@@ -267,97 +317,134 @@ export default function PredictabilityTable({
                   </span>
                 </button>
 
-                {!isCollapsed &&
-                  rowsToShow.map((r, i) => {
-                    const rowLocked = locked && i >= 2;
-                    const displayRow = rowLocked ? fakeLockedRow(r) : r;
-                    const expanded = expandedRow === r.id;
+                {!isCollapsed && (
+                  <>
+                    {/* One-time mobile affordance */}
+                    {shouldShowTapHint && (
+                      <div className="sm:hidden px-6 pt-2 pb-1">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[11px] text-white/60">
+                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-300/80" />
+                          Tap a player to expand details
+                        </div>
+                      </div>
+                    )}
 
-                    return (
-                      <div key={r.id}>
-                        <div
-                          onClick={() => {
-                            if (rowLocked) return;
+                    {rowsToShow.map((r, i) => {
+                      const rowLocked = locked && i >= 2;
+                      const displayRow = rowLocked ? fakeLockedRow(r) : r;
+                      const expanded = expandedRow === r.id;
 
-                            if (isMobile) {
-                              setExpandedRow(expanded ? null : r.id);
-                            } else {
-                              setActive(displayRow);
-                              setOpen(true);
-                            }
-                          }}
-                          className={cx(
-                            "px-6 py-3 grid grid-cols-1 sm:grid-cols-[36px_1.1fr_180px_1.4fr] gap-3 sm:gap-4 items-center border-b border-white/10 transition",
-                            rowLocked
-                              ? "cursor-not-allowed blur-sm"
-                              : "cursor-pointer hover:bg-white/[0.04]"
-                          )}
-                        >
-                          <div className="hidden sm:block text-white/30 text-xs">
-                            #{i + 1}
-                          </div>
+                      return (
+                        <div key={r.id}>
+                          <div
+                            onClick={() => {
+                              if (rowLocked) return;
 
-                          <div>
-                            <div className="text-white font-medium text-sm flex gap-2 items-center">
-                              {displayRow.name}
-                              {chip === "safe" && i < 3 && (
-                                <span className="rounded-full bg-amber-400/20 border border-amber-400/50 px-2 py-0.5 text-[10px] text-amber-300">
-                                  🔒 Top Lock
+                              // Once user interacts, remove future hints
+                              if (isMobile) markTapHintSeen();
+
+                              if (isMobile) {
+                                setExpandedRow(expanded ? null : r.id);
+                              } else {
+                                setActive(displayRow);
+                                setOpen(true);
+                              }
+                            }}
+                            className={cx(
+                              "px-6 py-3 grid grid-cols-1 sm:grid-cols-[36px_1.1fr_180px_1.4fr] gap-3 sm:gap-4 items-center border-b border-white/10 transition",
+                              rowLocked
+                                ? "cursor-not-allowed blur-sm"
+                                : "cursor-pointer hover:bg-white/[0.04]"
+                            )}
+                          >
+                            <div className="hidden sm:block text-white/30 text-xs">
+                              #{i + 1}
+                            </div>
+
+                            <div>
+                              <div className="text-white font-medium text-sm flex gap-2 items-center">
+                                {displayRow.name}
+
+                                {/* Mobile: small chevron affordance (desktop unchanged because hidden on sm+) */}
+                                <span
+                                  className={cx(
+                                    "sm:hidden ml-auto inline-flex items-center justify-center rounded-full border border-white/10 bg-white/[0.03] px-2 py-1 text-[11px] text-white/60",
+                                    expanded ? "text-amber-200" : ""
+                                  )}
+                                  aria-hidden="true"
+                                >
+                                  {expanded ? "Hide" : "Details"}
                                 </span>
-                              )}
+
+                                {/* Top Lock badge (unchanged desktop; slightly tighter on mobile via text size only) */}
+                                {chip === "safe" && i < 3 && (
+                                  <span className="rounded-full bg-amber-400/20 border border-amber-400/50 px-2 py-0.5 text-[10px] text-amber-300">
+                                    🔒 Top Lock
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="mt-0.5 flex gap-1.5 items-center">
+                                <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
+                                  {confLabel(displayRow.confidence01)}
+                                </span>
+                                <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
+                                  {volLabel(displayRow.volatility01)}
+                                </span>
+                              </div>
                             </div>
 
-                            <div className="mt-0.5 flex gap-1.5 items-center">
-                              <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
-                                {confLabel(displayRow.confidence01)}
-                              </span>
-                              <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-white/60">
-                                {volLabel(displayRow.volatility01)}
-                              </span>
+                            <div>
+                              <div className="font-semibold text-white text-sm">
+                                {displayRow.rangeLow} → {displayRow.rangeHigh}
+                              </div>
+                              <div className="mt-1 h-1.5 w-full rounded bg-white/10">
+                                <div
+                                  className="h-1.5 rounded"
+                                  style={rangeBarStyle(
+                                    displayRow.confidence01,
+                                    displayRow.volatility01
+                                  )}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="hidden sm:block text-sm text-white/60">
+                              {displayRow.ai}
                             </div>
                           </div>
 
-                          <div>
-                            <div className="font-semibold text-white text-sm">
-                              {displayRow.rangeLow} → {displayRow.rangeHigh}
-                            </div>
-                            <div className="mt-1 h-1.5 w-full rounded bg-white/10">
-                              <div
-                                className="h-1.5 rounded"
-                                style={rangeBarStyle(
+                          {/* MOBILE INLINE EXPAND — improved separation + spacing (sm:hidden only, desktop untouched) */}
+                          <div
+                            className={cx(
+                              "sm:hidden px-6 overflow-hidden transition-all duration-300 ease-out",
+                              expanded ? "max-h-80 opacity-100 pb-3" : "max-h-0 opacity-0"
+                            )}
+                          >
+                            <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                              <div className="text-sm text-white/70">
+                                {displayRow.ai}
+                              </div>
+
+                              {chip === "safe" && (
+                                <div className="mt-2 text-[11px] text-amber-300">
+                                  {whySafeMicrocopy(displayRow)}
+                                </div>
+                              )}
+
+                              <div className="mt-2 pt-2 border-t border-white/10 text-[11px] text-white/40">
+                                {stabilityText(
                                   displayRow.confidence01,
                                   displayRow.volatility01
                                 )}
-                              />
+                              </div>
                             </div>
                           </div>
-
-                          <div className="hidden sm:block text-sm text-white/60">
-                            {displayRow.ai}
-                          </div>
                         </div>
-
-                        {/* MOBILE INLINE EXPAND */}
-                        <div
-                          className={cx(
-                            "sm:hidden px-6 overflow-hidden transition-all duration-300 ease-out",
-                            expanded
-                              ? "max-h-40 opacity-100 pb-3"
-                              : "max-h-0 opacity-0"
-                          )}
-                        >
-                          <div className="text-sm text-white/70 mt-2">
-                            {displayRow.ai}
-                          </div>
-                          {chip === "safe" && (
-                            <div className="mt-2 text-[11px] text-amber-300">
-                              {whySafeMicrocopy(displayRow)}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </>
+                )}
 
                 {chip === "safe" &&
                   displayRows.length > SAFE_TARGET &&
@@ -371,9 +458,7 @@ export default function PredictabilityTable({
                       }
                       className="px-6 py-2 text-xs text-amber-300 hover:underline"
                     >
-                      {expandedTeam[team]
-                        ? "Show less"
-                        : "Show full team"}
+                      {expandedTeam[team] ? "Show less" : "Show full team"}
                     </button>
                   )}
               </div>
@@ -401,9 +486,7 @@ export default function PredictabilityTable({
                 <X size={16} />
               </button>
 
-              <h3 className="text-xl font-semibold text-white">
-                {active.name}
-              </h3>
+              <h3 className="text-xl font-semibold text-white">{active.name}</h3>
               <p className="text-sm text-white/50 mt-1">{matchContext}</p>
 
               <div className="mt-4 space-y-4">
@@ -420,13 +503,9 @@ export default function PredictabilityTable({
                   </div>
                   <div className="text-white/70">
                     Confidence:{" "}
-                    <strong>
-                      {(active.confidence01 * 100).toFixed(0)}%
-                    </strong>{" "}
-                    · Volatility:{" "}
-                    <strong>
-                      {(active.volatility01 * 100).toFixed(0)}%
-                    </strong>
+                    <strong>{(active.confidence01 * 100).toFixed(0)}%</strong> ·
+                    Volatility:{" "}
+                    <strong>{(active.volatility01 * 100).toFixed(0)}%</strong>
                   </div>
                 </div>
 
@@ -439,10 +518,7 @@ export default function PredictabilityTable({
                 </div>
 
                 <div className="text-xs text-white/40">
-                  {stabilityText(
-                    active.confidence01,
-                    active.volatility01
-                  )}
+                  {stabilityText(active.confidence01, active.volatility01)}
                 </div>
               </div>
             </div>
