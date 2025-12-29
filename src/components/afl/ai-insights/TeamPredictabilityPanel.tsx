@@ -3,7 +3,8 @@ import { Lock } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/types";
-import { StatLens, mean } from "@/components/afl/ai-insights/utils";
+import type { StatLens } from "@/components/afl/ai-insights/utils";
+import { mean } from "@/components/afl/ai-insights/utils";
 import { roundOrder } from "@/components/afl/ai-insights/engine";
 
 /* -------------------------------------------------------------------------- */
@@ -55,40 +56,19 @@ type TeamOutlook = {
 };
 
 /* -------------------------------------------------------------------------- */
-/* DATA ACCESS                                                                */
+/* DATA BUILDERS                                                              */
 /* -------------------------------------------------------------------------- */
 
 function gamesForTeam(fixtures: FixtureMatch[], team: string) {
   return fixtures
-    .filter((m: any) => m.homeTeam === team || m.awayTeam === team)
-    .filter((m: any) => safeNum(m.homeScore) != null)
+    .filter((m: any) => m?.homeTeam === team || m?.awayTeam === team)
+    .filter((m: any) => safeNum(m?.homeScore) != null && safeNum(m?.awayScore) != null)
     .sort((a: any, b: any) => roundOrder(a.roundLabel) - roundOrder(b.roundLabel));
 }
 
-function statScoreForTeam(
-  m: any,
-  team: string,
-  stat: StatLens
-): number | null {
-  if (stat === "fantasy") {
-    if (m.homeTeam === team) return m.homeScore;
-    if (m.awayTeam === team) return m.awayScore;
-    return null;
-  }
-
-  // Conservative proxies (until team stat feeds exist)
-  if (stat === "goals") {
-    if (m.homeTeam === team) return Math.round(m.homeScore / 6);
-    if (m.awayTeam === team) return Math.round(m.awayScore / 6);
-    return null;
-  }
-
-  if (stat === "disposals") {
-    if (m.homeTeam === team) return Math.round(m.homeScore * 0.85);
-    if (m.awayTeam === team) return Math.round(m.awayScore * 0.85);
-    return null;
-  }
-
+function scoreForTeam(m: any, team: string) {
+  if (m.homeTeam === team) return m.homeScore;
+  if (m.awayTeam === team) return m.awayScore;
   return null;
 }
 
@@ -97,10 +77,6 @@ function concededForTeam(m: any, team: string) {
   if (m.awayTeam === team) return m.homeScore;
   return null;
 }
-
-/* -------------------------------------------------------------------------- */
-/* CORE BUILDER                                                               */
-/* -------------------------------------------------------------------------- */
 
 function buildTeamOutlook(
   team: string,
@@ -111,62 +87,40 @@ function buildTeamOutlook(
   const games = gamesForTeam(fixtures, team);
   const last5 = games.slice(-5);
 
-  const scores = games
-    .map((m) => statScoreForTeam(m, team, stat))
-    .filter((v): v is number => typeof v === "number");
-
-  const last5Scores = last5
-    .map((m) => statScoreForTeam(m, team, stat))
-    .filter((v): v is number => typeof v === "number");
-
-  const conceded = games
-    .map((m) => concededForTeam(m, team))
-    .filter((v): v is number => typeof v === "number");
+  const scores = games.map((m) => scoreForTeam(m, team)).filter(Number.isFinite);
+  const last5Scores = last5.map((m) => scoreForTeam(m, team)).filter(Number.isFinite);
+  const conceded = games.map((m) => concededForTeam(m, team)).filter(Number.isFinite);
 
   const avg = mean(last5Scores.length ? last5Scores : scores);
   const cv = stdev(last5Scores.length ? last5Scores : scores) / Math.max(1, avg);
 
-  const stability =
-    cv <= 0.11 ? "High" : cv <= 0.16 ? "Medium" : "Low";
-  const volatility =
-    cv <= 0.11 ? "Low" : cv <= 0.18 ? "Low–Moderate" : "Elevated";
+  const stability = cv <= 0.11 ? "High" : cv <= 0.16 ? "Medium" : "Low";
+  const volatility = cv <= 0.11 ? "Low" : cv <= 0.18 ? "Low–Moderate" : "Elevated";
 
   const floor = quantile([...scores].sort((a, b) => a - b), 0.25);
   const ceil = quantile([...scores].sort((a, b) => a - b), 0.75);
 
-  const oppConcededAvg = mean(
-    gamesForTeam(fixtures, opponent)
-      .map((m) => concededForTeam(m, opponent))
-      .filter((v): v is number => typeof v === "number")
-  );
-
-  const matchupBias = clamp((oppConcededAvg - avg) * 0.15, -8, 8);
-
-  const expectedLow = Math.round(clamp(floor + matchupBias, 20, 180));
-  const expectedHigh = Math.round(clamp(ceil + matchupBias, 30, 220));
-
-  const concededStd = stdev(conceded);
-
-  const tempoControl =
-    concededStd <= 12 ? "Strong" : concededStd <= 18 ? "Moderate" : "Inconsistent";
-
-  const defensiveRisk =
-    concededStd <= 14 ? "Low" : concededStd <= 20 ? "Moderate" : "Moderate–High";
+  const context =
+    stat === "fantasy"
+      ? "fantasy output"
+      : stat === "disposals"
+      ? "possession volume"
+      : "goal scoring";
 
   return {
     team,
     stability,
     volatility,
-    expectedLow,
-    expectedHigh,
-    tempoControl,
-    defensiveRisk,
-    read: `${team} show a ${stability.toLowerCase()} ${stat} profile with ${volatility.toLowerCase()} variance in this matchup.`,
+    expectedLow: Math.round(clamp(floor, 40, 160)),
+    expectedHigh: Math.round(clamp(ceil, 60, 180)),
+    tempoControl: stdev(conceded) <= 15 ? "Strong" : "Inconsistent",
+    defensiveRisk: stdev(conceded) <= 14 ? "Low" : "Moderate",
+    read: `${team} show a ${stability.toLowerCase()} ${context} profile with ${volatility.toLowerCase()} variance in this matchup.`,
     deepRead: [
-      `Recent form weighted (${last5Scores.length ? "last 5" : "season profile"}).`,
-      `Volatility coefficient: ${cv.toFixed(2)}.`,
-      `Opponent defence ${
-        concededStd > 18 ? "widens outcome range" : "compresses expected output"
+      `Last 5 average: ${Math.round(avg)}`,
+      `Volatility coefficient: ${cv.toFixed(2)}`,
+      `Opponent pressure historically ${
+        stdev(conceded) > 16 ? "creates scoring swings" : "keeps bands controlled"
       }.`,
     ],
   };
@@ -183,10 +137,13 @@ export default function TeamPredictabilityPanel({
   stat,
 }: {
   mode: PremiumMode;
-  match: FixtureMatch;
+  match?: FixtureMatch;
   fixtures: FixtureMatch[];
   stat: StatLens;
 }) {
+  // 🔒 CRITICAL GUARD — PREVENTS BLACK SCREEN
+  if (!match) return null;
+
   const locked = mode !== "premium";
 
   const home = (match as any).homeTeam;
@@ -209,26 +166,11 @@ export default function TeamPredictabilityPanel({
       </div>
 
       <div className="mt-3 space-y-1 text-sm">
-        <div className="flex justify-between">
-          <span>Stability</span>
-          <span>{o.stability}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Volatility</span>
-          <span>{o.volatility}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Expected range</span>
-          <span>{o.expectedLow}–{o.expectedHigh}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Tempo control</span>
-          <span>{o.tempoControl}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Defensive risk</span>
-          <span>{o.defensiveRisk}</span>
-        </div>
+        <div className="flex justify-between"><span>Stability</span><span>{o.stability}</span></div>
+        <div className="flex justify-between"><span>Volatility</span><span>{o.volatility}</span></div>
+        <div className="flex justify-between"><span>Expected range</span><span>{o.expectedLow}–{o.expectedHigh}</span></div>
+        <div className="flex justify-between"><span>Tempo control</span><span>{o.tempoControl}</span></div>
+        <div className="flex justify-between"><span>Defensive risk</span><span>{o.defensiveRisk}</span></div>
       </div>
 
       <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
@@ -236,17 +178,9 @@ export default function TeamPredictabilityPanel({
       </div>
 
       <div className="mt-3 relative">
-        <div
-          className={
-            locked
-              ? "blur-sm select-none rounded-lg border border-white/10 bg-white/5 p-3"
-              : "rounded-lg border border-white/10 bg-white/5 p-3"
-          }
-        >
+        <div className={locked ? "blur-sm select-none rounded-lg border border-white/10 bg-white/5 p-3" : "rounded-lg border border-white/10 bg-white/5 p-3"}>
           <ul className="text-sm space-y-1">
-            {o.deepRead.map((l, i) => (
-              <li key={i}>• {l}</li>
-            ))}
+            {o.deepRead.map((l, i) => <li key={i}>• {l}</li>)}
           </ul>
         </div>
 
@@ -267,7 +201,7 @@ export default function TeamPredictabilityPanel({
       <header className="px-6 pt-5 pb-4 border-b border-white/10">
         <h2 className="text-lg font-semibold">2. Team Score Predictability</h2>
         <p className="text-sm text-white/60">
-          Match-scoped team outlook using form, matchup and volatility signals.
+          Match-scoped team outlook using recent form and scoring bands.
         </p>
       </header>
 
