@@ -1,71 +1,45 @@
-// src/pages/sports/afl/AFLAIInsights.tsx
-
-import React, { useMemo, useState, useEffect, useRef } from "react";
-import { Crown, ChevronDown, Lock } from "lucide-react";
+import React, { useMemo } from "react";
+import { Lock } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/afl/match-center/types";
-import { MOCK_FIXTURES } from "@/components/afl/match-center/mockData";
-import { MOCK_TEAMS } from "@/components/afl/teams/mockTeams";
-
 import type { PremiumMode } from "@/components/afl/ai-insights/types";
-import { STAT_LABEL, StatLens, mean, cv } from "@/components/afl/ai-insights/utils";
-
-import SectionShell from "@/components/afl/ai-insights/SectionShell";
-import ControlsBar from "@/components/afl/ai-insights/ControlsBar";
-import PredictabilityTable from "@/components/afl/ai-insights/PredictabilityTable";
-import MatchupTable from "@/components/afl/ai-insights/MatchupTable";
-import QuarterFlowGrid from "@/components/afl/ai-insights/QuarterFlowGrid";
-import ConsistencyList from "@/components/afl/ai-insights/ConsistencyList";
-import DriversList from "@/components/afl/ai-insights/DriversList";
-
-import {
-  filterPastFixtures,
-  filterUpcomingFixtures,
-  roundOrder,
-  buildPlayerPredictabilityFromFixtures,
-  buildH2HPlayerMatchups,
-  buildQuarterFlow,
-  buildConsistencyExplosivenessTeams,
-  buildOutcomeDrivers,
-} from "@/components/afl/ai-insights/engine";
+import { mean } from "@/components/afl/ai-insights/utils";
+import { roundOrder } from "@/components/afl/ai-insights/engine";
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
-function currentRound(fixtures: FixtureMatch[]) {
-  const upcoming = filterUpcomingFixtures(fixtures);
-  if (!upcoming.length) return "";
-  return [...upcoming].sort(
-    (a, b) => roundOrder(a.roundLabel) - roundOrder(b.roundLabel)
-  )[0].roundLabel;
-}
-
-const safeNum = (n: any) => {
+function safeNum(n: any) {
   const v = Number(n);
   return Number.isFinite(v) ? v : null;
-};
+}
 
-const stdev = (vals: number[]) => {
+function stdev(vals: number[]) {
   if (!vals.length) return 0;
-  const m = mean(vals);
-  return Math.sqrt(mean(vals.map((x) => (x - m) ** 2)));
-};
+  const m = vals.reduce((a, b) => a + b, 0) / vals.length;
+  const v =
+    vals.reduce((acc, x) => acc + (x - m) * (x - m), 0) /
+    Math.max(1, vals.length - 1);
+  return Math.sqrt(v);
+}
 
-const quantile = (arr: number[], q: number) => {
-  if (!arr.length) return 0;
-  const s = [...arr].sort((a, b) => a - b);
-  const pos = (s.length - 1) * q;
+function quantile(sortedAsc: number[], q: number) {
+  if (!sortedAsc.length) return 0;
+  const pos = (sortedAsc.length - 1) * q;
   const base = Math.floor(pos);
   const rest = pos - base;
-  return s[base] + (s[base + 1] - s[base]) * rest;
-};
+  const a = sortedAsc[base] ?? sortedAsc[0];
+  const b = sortedAsc[base + 1] ?? a;
+  return a + rest * (b - a);
+}
 
-const clamp = (n: number, a: number, b: number) =>
-  Math.max(a, Math.min(b, n));
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
+}
 
 /* -------------------------------------------------------------------------- */
-/* TEAM PREDICTABILITY                                                        */
+/* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
 
 type TeamOutlook = {
@@ -77,201 +51,177 @@ type TeamOutlook = {
   tempoControl: string;
   defensiveRisk: string;
   read: string;
+  deepRead: string[];
 };
 
-function buildTeamOutlook({
-  team,
-  opponent,
-  fixtures,
-  stat,
-  isHome,
-}: {
-  team: string;
-  opponent: string;
-  fixtures: FixtureMatch[];
-  stat: StatLens;
-  isHome: boolean;
-}): TeamOutlook {
-  const games = fixtures.filter(
-    (m: any) =>
-      (m.homeTeam === team || m.awayTeam === team) &&
-      safeNum(m.homeScore) != null
-  );
+/* -------------------------------------------------------------------------- */
+/* CORE BUILDERS                                                              */
+/* -------------------------------------------------------------------------- */
 
-  const scores = games.map((m: any) => {
-    const raw =
-      m.homeTeam === team ? m.homeScore : m.awayScore;
+function gamesForTeam(fixtures: FixtureMatch[], team: string) {
+  return fixtures
+    .filter((m: any) => m.homeTeam === team || m.awayTeam === team)
+    .filter((m: any) => safeNum(m.homeScore) != null)
+    .sort((a: any, b: any) => roundOrder(a.roundLabel) - roundOrder(b.roundLabel));
+}
 
-    if (stat === "disposals") return raw * 0.8;
-    if (stat === "goals") return raw * 0.25;
-    return raw;
-  });
+function scoreForTeam(m: any, team: string) {
+  if (m.homeTeam === team) return m.homeScore;
+  if (m.awayTeam === team) return m.awayScore;
+  return null;
+}
 
-  const avg = mean(scores);
-  const sd = stdev(scores);
-  const cvv = sd / Math.max(1, avg);
+function concededForTeam(m: any, team: string) {
+  if (m.homeTeam === team) return m.awayScore;
+  if (m.awayTeam === team) return m.homeScore;
+  return null;
+}
+
+function buildTeamOutlook(
+  team: string,
+  opponent: string,
+  fixtures: FixtureMatch[]
+): TeamOutlook {
+  const games = gamesForTeam(fixtures, team);
+  const last5 = games.slice(-5);
+
+  const scores = games.map((m) => scoreForTeam(m, team)).filter(Number.isFinite);
+  const last5Scores = last5.map((m) => scoreForTeam(m, team)).filter(Number.isFinite);
+  const conceded = games
+    .map((m) => concededForTeam(m, team))
+    .filter(Number.isFinite);
+
+  const avg = mean(last5Scores.length ? last5Scores : scores);
+  const cv = stdev(last5Scores.length ? last5Scores : scores) / Math.max(1, avg);
 
   const stability =
-    cvv < 0.12 ? "High" : cvv < 0.18 ? "Medium" : "Low";
+    cv <= 0.11 ? "High" : cv <= 0.16 ? "Medium" : "Low";
   const volatility =
-    cvv < 0.12 ? "Low" : cvv < 0.22 ? "Moderate" : "High";
+    cv <= 0.11 ? "Low" : cv <= 0.18 ? "Low–Moderate" : "Elevated";
 
-  const expectedLow = Math.round(clamp(avg - sd * 1.1, 30, 160));
-  const expectedHigh = Math.round(clamp(avg + sd * 1.4, 40, 180));
-
-  const tempoControl =
-    sd < 14 ? "Strong" : sd < 20 ? "Moderate" : "Inconsistent";
-
-  const defensiveRisk =
-    volatility === "High" ? "Moderate–High" : "Low";
-
-  const read =
-    stat === "goals"
-      ? `${team} rely on burst scoring phases, increasing ceiling volatility.`
-      : stat === "disposals"
-      ? `${team} show structured possession control with tighter output bands.`
-      : `${team} maintain a balanced scoring profile shaped by recent form.`;
+  const floor = quantile([...scores].sort((a, b) => a - b), 0.25);
+  const ceil = quantile([...scores].sort((a, b) => a - b), 0.75);
 
   return {
     team,
     stability,
     volatility,
-    expectedLow,
-    expectedHigh,
-    tempoControl,
-    defensiveRisk,
-    read,
+    expectedLow: Math.round(clamp(floor, 40, 160)),
+    expectedHigh: Math.round(clamp(ceil, 60, 180)),
+    tempoControl: stdev(conceded) <= 15 ? "Strong" : "Inconsistent",
+    defensiveRisk: stdev(conceded) <= 14 ? "Low" : "Moderate",
+    read: `${team} show a ${stability.toLowerCase()} scoring profile with ${volatility.toLowerCase()} variance in this matchup.`,
+    deepRead: [
+      `Recent scoring average: ${Math.round(avg)}`,
+      `Last 5 volatility coefficient: ${cv.toFixed(2)}`,
+      `Opponent pressure historically ${
+        stdev(conceded) > 16 ? "creates swings" : "keeps bands tight"
+      }.`,
+    ],
   };
 }
 
-function TeamPredictabilityPanel({
+/* -------------------------------------------------------------------------- */
+/* COMPONENT                                                                  */
+/* -------------------------------------------------------------------------- */
+
+export default function TeamPredictabilityPanel({
   mode,
   match,
   fixtures,
-  stat,
 }: {
   mode: PremiumMode;
   match: FixtureMatch;
   fixtures: FixtureMatch[];
-  stat: StatLens;
 }) {
+  const locked = mode !== "premium";
+
   const home = (match as any).homeTeam;
   const away = (match as any).awayTeam;
 
   const homeOutlook = useMemo(
-    () =>
-      buildTeamOutlook({
-        team: home,
-        opponent: away,
-        fixtures,
-        stat,
-        isHome: true,
-      }),
-    [home, away, fixtures, stat]
+    () => buildTeamOutlook(home, away, fixtures),
+    [home, away, fixtures]
   );
 
   const awayOutlook = useMemo(
-    () =>
-      buildTeamOutlook({
-        team: away,
-        opponent: home,
-        fixtures,
-        stat,
-        isHome: false,
-      }),
-    [away, home, fixtures, stat]
+    () => buildTeamOutlook(away, home, fixtures),
+    [away, home, fixtures]
   );
 
   const card = (o: TeamOutlook) => (
     <div className="rounded-2xl border border-white/10 bg-black/35 p-5">
-      <div className="text-xs uppercase tracking-widest text-white/50">
+      <div className="text-xs tracking-widest text-white/50 uppercase">
         {o.team} — Team AI Outlook
       </div>
 
-      <div className="mt-3 text-sm space-y-1">
-        <div>Scoring stability: {o.stability}</div>
-        <div>Volatility: {o.volatility}</div>
-        <div>
-          Expected range: {o.expectedLow}–{o.expectedHigh}
+      <div className="mt-3 space-y-1 text-sm">
+        <div className="flex justify-between">
+          <span>Stability</span>
+          <span>{o.stability}</span>
         </div>
-        <div>Tempo control: {o.tempoControl}</div>
-        <div>Defensive risk: {o.defensiveRisk}</div>
+        <div className="flex justify-between">
+          <span>Volatility</span>
+          <span>{o.volatility}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Expected range</span>
+          <span>{o.expectedLow}–{o.expectedHigh}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Tempo control</span>
+          <span>{o.tempoControl}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Defensive risk</span>
+          <span>{o.defensiveRisk}</span>
+        </div>
       </div>
 
-      <div className="mt-4 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
+      <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
         “{o.read}”
       </div>
-    </div>
-  );
 
-  return (
-    <SectionShell title="2. Team Score Predictability">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {card(homeOutlook)}
-        {card(awayOutlook)}
-      </div>
-    </SectionShell>
-  );
-}
+      <div className="mt-3 relative">
+        <div
+          className={
+            locked
+              ? "blur-sm select-none rounded-lg border border-white/10 bg-white/5 p-3"
+              : "rounded-lg border border-white/10 bg-white/5 p-3"
+          }
+        >
+          <ul className="text-sm space-y-1">
+            {o.deepRead.map((l, i) => (
+              <li key={i}>• {l}</li>
+            ))}
+          </ul>
+        </div>
 
-/* -------------------------------------------------------------------------- */
-/* PAGE                                                                       */
-/* -------------------------------------------------------------------------- */
-
-export default function AFLAIInsights() {
-  const fixtures = MOCK_FIXTURES as unknown as FixtureMatch[];
-  const teams = MOCK_TEAMS as any[];
-
-  const [mode, setMode] = useState<PremiumMode>("free");
-  const [stat, setStat] = useState<StatLens>("fantasy");
-
-  const playersRef = useRef<HTMLDivElement>(null);
-  const teamsRef = useRef<HTMLDivElement>(null);
-
-  const pastFixtures = useMemo(() => filterPastFixtures(fixtures), [fixtures]);
-  const roundLabel = useMemo(() => currentRound(fixtures), [fixtures]);
-
-  const roundMatches = useMemo(
-    () =>
-      filterUpcomingFixtures(fixtures).filter(
-        (m) => m.roundLabel === roundLabel
-      ),
-    [fixtures, roundLabel]
-  );
-
-  const [matchId, setMatchId] = useState<string>("");
-
-  useEffect(() => {
-    if (roundMatches.length) setMatchId(roundMatches[0].id);
-  }, [roundMatches]);
-
-  const selectedMatch = roundMatches.find((m) => m.id === matchId);
-
-  return (
-    <div className="min-h-screen bg-[#070707] text-white">
-      <div className="mx-auto max-w-6xl px-4 py-8">
-        <ControlsBar stat={stat} onChange={setStat} />
-
-        {selectedMatch && (
-          <>
-            <PredictabilityTable
-              rows={buildPlayerPredictabilityFromFixtures(
-                pastFixtures,
-                stat
-              )}
-              mode={mode}
-              statLabel={STAT_LABEL[stat]}
-            />
-
-            <TeamPredictabilityPanel
-              mode={mode}
-              match={selectedMatch}
-              fixtures={pastFixtures}
-              stat={stat}
-            />
-          </>
+        {locked && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="rounded-full border border-amber-400/40 bg-black/70 px-3 py-1.5 text-xs text-amber-200 flex items-center gap-2">
+              <Lock className="h-4 w-4" />
+              Unlock Team AI (Neeko+)
+            </div>
+          </div>
         )}
       </div>
     </div>
+  );
+
+  return (
+    <section className="rounded-2xl border border-white/10 bg-black/40">
+      <header className="px-6 pt-5 pb-4 border-b border-white/10">
+        <h2 className="text-lg font-semibold">2. Team Score Predictability</h2>
+        <p className="text-sm text-white/60">
+          Match-scoped team outlook using recent form and scoring bands.
+        </p>
+      </header>
+
+      <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {card(homeOutlook)}
+        {card(awayOutlook)}
+      </div>
+    </section>
   );
 }
