@@ -136,14 +136,30 @@ export default function TeamPredictabilityPanel({
   fixtures: FixtureMatch[];
 }) {
   const locked = mode !== "premium";
-
-  // ✅ SAFETY: ensure setOpen always exists
   const [open, setOpen] = useState(false);
 
-  // 🔒 HARD GUARD — prevents black screen crashes
+  /* ------------------------------------------------------------------------ */
+  /* SAFE PLACEHOLDER — NO MATCH YET                                           */
+  /* ------------------------------------------------------------------------ */
+
   if (!match || !match.homeTeam || !match.awayTeam) {
-    return null;
+    return (
+      <section className="rounded-2xl border border-white/10 bg-black/40">
+        <header className="px-6 pt-5 pb-4 border-b border-white/10">
+          <h2 className="text-lg font-semibold">2. Team Score Predictability</h2>
+          <p className="text-sm text-white/60">
+            Match-scoped team outlook using recent form and scoring bands.
+          </p>
+        </header>
+
+        <div className="px-6 py-8 text-sm text-white/40">
+          Select a match to view team predictability insights.
+        </div>
+      </section>
+    );
   }
+
+  /* ------------------------------------------------------------------------ */
 
   const home = match.homeTeam;
   const away = match.awayTeam;
