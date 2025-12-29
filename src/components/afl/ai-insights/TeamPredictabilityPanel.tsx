@@ -1,77 +1,50 @@
 import React, { useMemo } from "react";
+import { Lock } from "lucide-react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
-import type { StatLens } from "./utils";
+import type { StatLens } from "@/components/afl/ai-insights/utils";
+import { mean, cv } from "@/components/afl/ai-insights/utils";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
 
 type Props = {
-  match: FixtureMatch | undefined;
+  match?: FixtureMatch;
   teams: any[];
-  stat: StatLens;
   fixtures: FixtureMatch[];
-};
-
-type TeamOutlook = {
-  team: string;
-  stability: "High" | "Medium" | "Low";
-  volatility: "Low" | "Low–Moderate" | "Moderate" | "Elevated";
-  rangeLow: number;
-  rangeHigh: number;
-  tempo: "Strong" | "Moderate" | "Inconsistent";
-  defensiveRisk: "Low" | "Moderate" | "Moderate–High" | "High";
-  aiRead: string;
+  stat: StatLens;
 };
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
-function computeTeamOutlook(team: string): TeamOutlook {
-  // ⚠️ Deterministic heuristic logic for now
-  // (AI-ready later without changing UI)
+function classifyStability(avgConf: number, vol: number) {
+  if (avgConf >= 0.7 && vol <= 0.35) return "High";
+  if (avgConf >= 0.6 && vol <= 0.5) return "Medium";
+  return "Low";
+}
 
-  if (team.toLowerCase().includes("richmond")) {
-    return {
-      team,
-      stability: "High",
-      volatility: "Low–Moderate",
-      rangeLow: 78,
-      rangeHigh: 92,
-      tempo: "Strong",
-      defensiveRisk: "Low",
-      aiRead:
-        "Richmond’s system-driven scoring profile holds well against Carlton’s pressure, keeping their floor intact even under contested conditions.",
-    };
-  }
+function classifyVolatility(vol: number) {
+  if (vol <= 0.35) return "Low";
+  if (vol <= 0.55) return "Low–Moderate";
+  if (vol <= 0.7) return "Elevated";
+  return "High";
+}
 
-  if (team.toLowerCase().includes("carlton")) {
-    return {
-      team,
-      stability: "Medium",
-      volatility: "Elevated",
-      rangeLow: 72,
-      rangeHigh: 98,
-      tempo: "Inconsistent",
-      defensiveRisk: "Moderate–High",
-      aiRead:
-        "Carlton rely on surge scoring runs, increasing volatility when momentum shifts against them in this matchup.",
-    };
-  }
+function expectedRange(meanScore: number, vol: number) {
+  const spread = Math.round(meanScore * vol);
+  return `${Math.max(40, Math.round(meanScore - spread))}–${Math.round(
+    meanScore + spread
+  )}`;
+}
 
-  // Fallback (safe generic)
-  return {
-    team,
-    stability: "Medium",
-    volatility: "Moderate",
-    rangeLow: 75,
-    rangeHigh: 95,
-    tempo: "Moderate",
-    defensiveRisk: "Moderate",
-    aiRead:
-      "This team shows a balanced scoring profile with moderate variance influenced by game tempo and opposition pressure.",
-  };
+function aiRead(team: string, stability: string, vol: string) {
+  if (stability === "High" && vol.includes("Low"))
+    return `${team}'s system-driven scoring profile holds consistently under pressure.`;
+  if (vol.includes("High"))
+    return `${team} rely on surge scoring phases, increasing volatility in this matchup.`;
+  return `${team} show a mixed scoring profile influenced by matchup dynamics.`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -80,76 +53,84 @@ function computeTeamOutlook(team: string): TeamOutlook {
 
 export default function TeamPredictabilityPanel({
   match,
+  teams,
+  fixtures,
+  stat,
 }: Props) {
-  const outlooks = useMemo(() => {
-    if (!match) return [];
-
-    return [
-      computeTeamOutlook(match.homeTeam),
-      computeTeamOutlook(match.awayTeam),
-    ];
-  }, [match]);
-
   if (!match) return null;
 
+  const { homeTeam, awayTeam } = match;
+
+  const teamBlocks = useMemo(() => {
+    return [homeTeam, awayTeam].map((teamName) => {
+      const teamFixtures = fixtures.filter(
+        (f) => f.homeTeam === teamName || f.awayTeam === teamName
+      );
+
+      // Mock scoring until real engine arrives
+      const scores = teamFixtures.map(
+        () => 70 + Math.random() * 30
+      );
+
+      const avg = mean(scores);
+      const volatility = cv(scores);
+
+      const stability = classifyStability(0.65, volatility);
+      const volLabel = classifyVolatility(volatility);
+
+      return {
+        team: teamName,
+        avg,
+        volatility,
+        stability,
+        range: expectedRange(avg, volatility),
+        tempo:
+          volatility <= 0.4 ? "Strong" : volatility <= 0.6 ? "Mixed" : "Chaotic",
+        defence:
+          volatility <= 0.4
+            ? "Low"
+            : volatility <= 0.6
+            ? "Moderate"
+            : "High",
+        ai: aiRead(teamName, stability, volLabel),
+      };
+    });
+  }, [homeTeam, awayTeam, fixtures]);
+
   return (
-    <div className="space-y-8">
+    <div className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden">
       {/* MATCH HEADER */}
-      <div className="flex items-center justify-center gap-4 text-sm text-white/70">
-        <span className="font-semibold text-white">
-          {match.homeTeam}
-        </span>
-        <span className="opacity-50">vs</span>
-        <span className="font-semibold text-white">
-          {match.awayTeam}
-        </span>
+      <div className="px-6 py-4 border-b border-white/10 text-center text-sm text-white/70">
+        {homeTeam} <span className="mx-2 text-white/40">vs</span> {awayTeam}
       </div>
 
-      {/* TEAM OUTLOOKS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {outlooks.map((o) => (
-          <div
-            key={o.team}
-            className="rounded-2xl border border-white/10 bg-black/40 p-5"
-          >
-            <h3 className="text-sm font-semibold tracking-wide text-white mb-4">
-              {o.team} — Team AI Outlook
+      <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-white/10">
+        {teamBlocks.map((t) => (
+          <div key={t.team} className="px-6 py-5 space-y-3">
+            <h3 className="text-sm font-semibold tracking-widest uppercase text-white/80">
+              {t.team} — Team AI Outlook
             </h3>
 
-            <div className="space-y-2 text-sm text-white/70">
-              <div className="flex justify-between">
-                <span>Scoring stability</span>
-                <span className="text-white">{o.stability}</span>
-              </div>
+            <ul className="space-y-1 text-sm text-white/70">
+              <li>
+                <strong>Scoring stability:</strong> {t.stability}
+              </li>
+              <li>
+                <strong>Volatility:</strong> {classifyVolatility(t.volatility)}
+              </li>
+              <li>
+                <strong>Expected range:</strong> {t.range}
+              </li>
+              <li>
+                <strong>Tempo control:</strong> {t.tempo}
+              </li>
+              <li>
+                <strong>Defensive risk:</strong> {t.defence}
+              </li>
+            </ul>
 
-              <div className="flex justify-between">
-                <span>Volatility</span>
-                <span className="text-white">{o.volatility}</span>
-              </div>
-
-              <div className="flex justify-between">
-                <span>Expected range</span>
-                <span className="text-white font-semibold">
-                  {o.rangeLow} → {o.rangeHigh}
-                </span>
-              </div>
-
-              <div className="flex justify-between">
-                <span>Tempo control</span>
-                <span className="text-white">{o.tempo}</span>
-              </div>
-
-              <div className="flex justify-between">
-                <span>Defensive risk</span>
-                <span className="text-white">{o.defensiveRisk}</span>
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white/80">
-              <div className="text-xs uppercase tracking-wide text-white/40 mb-1">
-                AI read
-              </div>
-              {o.aiRead}
+            <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
+              “{t.ai}”
             </div>
           </div>
         ))}
