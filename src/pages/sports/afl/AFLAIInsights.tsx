@@ -60,20 +60,20 @@ type TeamOutlook = {
 
 function gamesForTeam(fixtures: FixtureMatch[], team: string) {
   return fixtures
-    .filter((m: any) => m.homeTeam === team || m.awayTeam === team)
-    .filter((m: any) => safeNum(m.homeScore) != null)
+    .filter((m: any) => m?.homeTeam === team || m?.awayTeam === team)
+    .filter((m: any) => safeNum(m?.homeScore) != null)
     .sort((a: any, b: any) => roundOrder(a.roundLabel) - roundOrder(b.roundLabel));
 }
 
 function scoreForTeam(m: any, team: string) {
-  if (m.homeTeam === team) return m.homeScore;
-  if (m.awayTeam === team) return m.awayScore;
+  if (m?.homeTeam === team) return m?.homeScore;
+  if (m?.awayTeam === team) return m?.awayScore;
   return null;
 }
 
 function concededForTeam(m: any, team: string) {
-  if (m.homeTeam === team) return m.awayScore;
-  if (m.awayTeam === team) return m.homeScore;
+  if (m?.homeTeam === team) return m?.awayScore;
+  if (m?.awayTeam === team) return m?.homeScore;
   return null;
 }
 
@@ -86,7 +86,9 @@ function buildTeamOutlook(
   const last5 = games.slice(-5);
 
   const scores = games.map((m) => scoreForTeam(m, team)).filter(Number.isFinite);
-  const last5Scores = last5.map((m) => scoreForTeam(m, team)).filter(Number.isFinite);
+  const last5Scores = last5
+    .map((m) => scoreForTeam(m, team))
+    .filter(Number.isFinite);
   const conceded = games
     .map((m) => concededForTeam(m, team))
     .filter(Number.isFinite);
@@ -94,8 +96,7 @@ function buildTeamOutlook(
   const avg = mean(last5Scores.length ? last5Scores : scores);
   const cv = stdev(last5Scores.length ? last5Scores : scores) / Math.max(1, avg);
 
-  const stability =
-    cv <= 0.11 ? "High" : cv <= 0.16 ? "Medium" : "Low";
+  const stability = cv <= 0.11 ? "High" : cv <= 0.16 ? "Medium" : "Low";
   const volatility =
     cv <= 0.11 ? "Low" : cv <= 0.18 ? "Low–Moderate" : "Elevated";
 
@@ -131,13 +132,18 @@ export default function TeamPredictabilityPanel({
   fixtures,
 }: {
   mode: PremiumMode;
-  match: FixtureMatch;
+  match?: FixtureMatch;
   fixtures: FixtureMatch[];
 }) {
   const locked = mode !== "premium";
 
-  const home = (match as any).homeTeam;
-  const away = (match as any).awayTeam;
+  // 🔒 HARD GUARD — prevents black screen crashes
+  if (!match || !match.homeTeam || !match.awayTeam) {
+    return null;
+  }
+
+  const home = match.homeTeam;
+  const away = match.awayTeam;
 
   const homeOutlook = useMemo(
     () => buildTeamOutlook(home, away, fixtures),
@@ -166,7 +172,9 @@ export default function TeamPredictabilityPanel({
         </div>
         <div className="flex justify-between">
           <span>Expected range</span>
-          <span>{o.expectedLow}–{o.expectedHigh}</span>
+          <span>
+            {o.expectedLow}–{o.expectedHigh}
+          </span>
         </div>
         <div className="flex justify-between">
           <span>Tempo control</span>
