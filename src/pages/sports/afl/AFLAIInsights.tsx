@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Lock } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/afl/match-center/types";
@@ -137,6 +137,9 @@ export default function TeamPredictabilityPanel({
 }) {
   const locked = mode !== "premium";
 
+  // ✅ SAFETY: ensure setOpen always exists
+  const [open, setOpen] = useState(false);
+
   // 🔒 HARD GUARD — prevents black screen crashes
   if (!match || !match.homeTeam || !match.awayTeam) {
     return null;
@@ -162,28 +165,11 @@ export default function TeamPredictabilityPanel({
       </div>
 
       <div className="mt-3 space-y-1 text-sm">
-        <div className="flex justify-between">
-          <span>Stability</span>
-          <span>{o.stability}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Volatility</span>
-          <span>{o.volatility}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Expected range</span>
-          <span>
-            {o.expectedLow}–{o.expectedHigh}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span>Tempo control</span>
-          <span>{o.tempoControl}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Defensive risk</span>
-          <span>{o.defensiveRisk}</span>
-        </div>
+        <div className="flex justify-between"><span>Stability</span><span>{o.stability}</span></div>
+        <div className="flex justify-between"><span>Volatility</span><span>{o.volatility}</span></div>
+        <div className="flex justify-between"><span>Expected range</span><span>{o.expectedLow}–{o.expectedHigh}</span></div>
+        <div className="flex justify-between"><span>Tempo control</span><span>{o.tempoControl}</span></div>
+        <div className="flex justify-between"><span>Defensive risk</span><span>{o.defensiveRisk}</span></div>
       </div>
 
       <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3 text-sm">
@@ -206,7 +192,10 @@ export default function TeamPredictabilityPanel({
         </div>
 
         {locked && (
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div
+            className="absolute inset-0 flex items-center justify-center cursor-pointer"
+            onClick={() => setOpen(true)}
+          >
             <div className="rounded-full border border-amber-400/40 bg-black/70 px-3 py-1.5 text-xs text-amber-200 flex items-center gap-2">
               <Lock className="h-4 w-4" />
               Unlock Team AI (Neeko+)
