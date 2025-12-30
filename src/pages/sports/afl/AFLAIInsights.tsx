@@ -76,10 +76,10 @@ export default function AFLAIInsights() {
   const [matchId, setMatchId] = useState<string>("");
 
   useEffect(() => {
-    if (roundMatches.length) {
+    if (roundMatches.length && !matchId) {
       setMatchId(roundMatches[0].id);
     }
-  }, [roundMatches]);
+  }, [roundMatches, matchId]);
 
   const selectedMatch = useMemo(
     () => roundMatches.find((m) => m.id === matchId),
@@ -87,7 +87,7 @@ export default function AFLAIInsights() {
   );
 
   /* -------------------------------------------------------------------------- */
-  /* PLAYER PREDICTABILITY (MATCH-SCOPED)                                      */
+  /* PLAYER PREDICTABILITY (MATCH-SCOPED + STAT-DRIVEN)                        */
   /* -------------------------------------------------------------------------- */
 
   const rawPlayerPredict = useMemo(
@@ -107,7 +107,7 @@ export default function AFLAIInsights() {
   }, [rawPlayerPredict, selectedMatch]);
 
   /* -------------------------------------------------------------------------- */
-  /* PLAYER INSIGHT SUMMARY                                                    */
+  /* PLAYER INSIGHT SUMMARY (STAT AWARE)                                       */
   /* -------------------------------------------------------------------------- */
 
   const playerInsight = useMemo(() => {
@@ -118,13 +118,13 @@ export default function AFLAIInsights() {
 
     if (stat === "goals") {
       return avgVol >= 0.6
-        ? "Goal output profiles suggest volatile scoring runs and late separation risk."
-        : "Goal scoring is tightly clustered, reducing blow-out probability.";
+        ? "Goal scoring profiles indicate volatile surge phases and late separation risk."
+        : "Goal output is tightly clustered, suggesting fewer momentum swings.";
     }
 
     if (stat === "disposals") {
       return avgConf >= 0.7
-        ? "Disposal roles are highly repeatable across both teams."
+        ? "Disposal roles appear highly repeatable across both teams."
         : "Midfield rotations introduce moderate possession volatility.";
     }
 
@@ -134,7 +134,7 @@ export default function AFLAIInsights() {
   }, [playerPredict, stat]);
 
   /* -------------------------------------------------------------------------- */
-  /* BONUS METRICS                                                             */
+  /* BONUS: CONSISTENCY & EXPLOSIVENESS                                        */
   /* -------------------------------------------------------------------------- */
 
   const consistencyRows = useMemo(
@@ -149,6 +149,7 @@ export default function AFLAIInsights() {
   return (
     <div className="min-h-screen bg-[#070707] text-white">
       <div className="mx-auto max-w-6xl px-4 py-8 space-y-10">
+
         {/* HEADER */}
         <header className="flex items-center justify-between">
           <div>
@@ -192,10 +193,10 @@ export default function AFLAIInsights() {
           </div>
         </div>
 
-        {/* STAT FILTER */}
+        {/* STAT FILTER — GLOBAL DRIVER */}
         <ControlsBar stat={stat} onChange={setStat} />
 
-        {/* PLAYERS */}
+        {/* 1. PLAYER SCORE PREDICTABILITY */}
         {selectedMatch && (
           <SectionShell title="1. Player Score Predictability">
             <PredictabilityTable
@@ -209,7 +210,7 @@ export default function AFLAIInsights() {
           </SectionShell>
         )}
 
-        {/* TEAMS — FULLY STAT-DRIVEN */}
+        {/* 2. TEAM SCORE PREDICTABILITY — STAT DRIVEN */}
         {selectedMatch && (
           <TeamPredictabilityPanel
             mode={mode}
@@ -219,7 +220,12 @@ export default function AFLAIInsights() {
           />
         )}
 
-        {/* OTHER SECTIONS */}
+        {/* BONUS */}
+        <SectionShell title="Bonus: Consistency & Explosiveness">
+          <ConsistencyList rows={consistencyRows} mode={mode} />
+        </SectionShell>
+
+        {/* MATCH-SCOPED SECTIONS */}
         {selectedMatch && (
           <>
             <SectionShell title="3. Head-to-Head Matchups">
