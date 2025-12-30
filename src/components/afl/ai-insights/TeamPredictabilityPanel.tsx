@@ -18,11 +18,8 @@ function safeNum(n: any) {
 
 function stdev(vals: number[]) {
   if (!vals.length) return 0;
-  const m = vals.reduce((a, b) => a + b, 0) / vals.length;
-  const v =
-    vals.reduce((acc, x) => acc + (x - m) * (x - m), 0) /
-    Math.max(1, vals.length - 1);
-  return Math.sqrt(v);
+  const m = mean(vals);
+  return Math.sqrt(mean(vals.map((x) => (x - m) ** 2)));
 }
 
 function quantile(sortedAsc: number[], q: number) {
@@ -39,6 +36,14 @@ function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
 }
 
+function trendArrow(last5: number[], season: number[]) {
+  if (!last5.length || !season.length) return "→";
+  const d = mean(last5) - mean(season);
+  if (d >= 5) return "↑";
+  if (d <= -5) return "↓";
+  return "→";
+}
+
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -51,7 +56,9 @@ type TeamOutlook = {
   expectedHigh: number;
   tempoControl: string;
   defensiveRisk: string;
+  trend: "↑" | "↓" | "→";
   read: string;
+  gameScript: string;
   deepRead: string[];
 };
 
@@ -62,8 +69,14 @@ type TeamOutlook = {
 function gamesForTeam(fixtures: FixtureMatch[], team: string) {
   return fixtures
     .filter((m: any) => m?.homeTeam === team || m?.awayTeam === team)
-    .filter((m: any) => safeNum(m?.homeScore) != null && safeNum(m?.awayScore) != null)
-    .sort((a: any, b: any) => roundOrder(a.roundLabel) - roundOrder(b.roundLabel));
+    .filter(
+      (m: any) =>
+        safeNum(m?.homeScore) != null && safeNum(m?.awayScore) != null
+    )
+    .sort(
+      (a: any, b: any) =>
+        roundOrder(a.roundLabel) - roundOrder(b.roundLabel)
+    );
 }
 
 function scoreForTeam(m: any, team: string) {
@@ -88,21 +101,66 @@ function buildTeamOutlook(
   const last5 = games.slice(-5);
 
   const scores = games.map((m) => scoreForTeam(m, team)).filter(Number.isFinite);
-  const last5Scores = last5.map((m) => scoreForTeam(m, team)).filter(Number.isFinite);
-  const conceded = games.map((m) => concededForTeam(m, team)).filter(Number.isFinite);
+  const last5Scores = last5
+    .map((m) => scoreForTeam(m, team))
+    .filter(Number.isFinite);
+  const conceded = games
+    .map((m) => concededForTeam(m, team))
+    .filter(Number.isFinite);
 
   const avg = mean(last5Scores.length ? last5Scores : scores);
-  const cv = stdev(last5Scores.length ? last5Scores : scores) / Math.max(1, avg);
+  const cv =
+    stdev(last5Scores.length ? last5Scores : scores) / Math.max(1, avg);
 
-  const stability = cv <= 0.11 ? "High" : cv <= 0.16 ? "Medium" : "Low";
-  const volatility = cv <= 0.11 ? "Low" : cv <= 0.18 ? "Low–Moderate" : "Elevated";
+  /* ---------------- STAT-SPECIFIC CALIBRATION ---------------- */
+
+  const stability =
+    stat === "disposals"
+      ? cv <= 0.09
+        ? "High"
+        : cv <= 0.14
+        ? "Medium"
+        : "Low"
+      : cv <= 0.11
+      ? "High"
+      : cv <= 0.16
+      ? "Medium"
+      : "Low";
+
+  const volatility =
+    stat === "goals"
+      ? cv <= 0.14
+        ? "Low–Moderate"
+        : "Elevated"
+      : cv <= 0.11
+      ? "Low"
+      : cv <= 0.18
+      ? "Low–Moderate"
+      : "Elevated";
 
   const floor = quantile([...scores].sort((a, b) => a - b), 0.25);
   const ceil = quantile([...scores].sort((a, b) => a - b), 0.75);
 
+  const trend = trendArrow(last5Scores, scores);
+
+  const tempoControl =
+    stdev(conceded) <= 14 ? "Strong" : stdev(conceded) <= 18 ? "Moderate" : "Inconsistent";
+
+  const defensiveRisk =
+    volatility === "Elevated" && tempoControl !== "Strong"
+      ? "Moderate–High"
+      : "Low–Moderate";
+
+  const gameScript =
+    tempoControl === "Strong"
+      ? "Likely to control tempo early and suppress scoring swings."
+      : volatility === "Elevated"
+      ? "Game may hinge on momentum runs and late volatility."
+      : "Expect periods of control punctuated by short scoring bursts.";
+
   const context =
     stat === "fantasy"
-      ? "fantasy output"
+      ? "fantasy production"
       : stat === "disposals"
       ? "possession volume"
       : "goal scoring";
@@ -113,14 +171,16 @@ function buildTeamOutlook(
     volatility,
     expectedLow: Math.round(clamp(floor, 40, 160)),
     expectedHigh: Math.round(clamp(ceil, 60, 180)),
-    tempoControl: stdev(conceded) <= 15 ? "Strong" : "Inconsistent",
-    defensiveRisk: stdev(conceded) <= 14 ? "Low" : "Moderate",
-    read: `${team} show a ${stability.toLowerCase()} ${context} profile with ${volatility.toLowerCase()} variance in this matchup.`,
+    tempoControl,
+    defensiveRisk,
+    trend,
+    read: `${team} show a ${stability.toLowerCase()} ${context} profile with ${volatility.toLowerCase()} variance against ${opponent}.`,
+    gameScript,
     deepRead: [
-      `Last 5 average: ${Math.round(avg)}`,
-      `Volatility coefficient: ${cv.toFixed(2)}`,
-      `Opponent pressure historically ${
-        stdev(conceded) > 16 ? "creates scoring swings" : "keeps bands controlled"
+      `Trend signal: ${trend} over last 5 games.`,
+      `Last 5 average: ${Math.round(avg)}.`,
+      `Opponent pressure ${
+        stdev(conceded) > 16 ? "creates scoring swings" : "is being absorbed cleanly"
       }.`,
     ],
   };
@@ -141,13 +201,11 @@ export default function TeamPredictabilityPanel({
   fixtures: FixtureMatch[];
   stat: StatLens;
 }) {
-  // 🔒 CRITICAL GUARD — PREVENTS BLACK SCREEN
   if (!match) return null;
 
   const locked = mode !== "premium";
-
-  const home = (match as any).homeTeam;
-  const away = (match as any).awayTeam;
+  const home = match.homeTeam;
+  const away = match.awayTeam;
 
   const homeOutlook = useMemo(
     () => buildTeamOutlook(home, away, fixtures, stat),
@@ -159,10 +217,22 @@ export default function TeamPredictabilityPanel({
     [away, home, fixtures, stat]
   );
 
+  const trendBadge = (t: "↑" | "↓" | "→") =>
+    t === "↑"
+      ? "text-emerald-400"
+      : t === "↓"
+      ? "text-red-400"
+      : "text-white/50";
+
   const card = (o: TeamOutlook) => (
-    <div className="rounded-2xl border border-white/10 bg-black/35 p-5">
-      <div className="text-xs tracking-widest text-white/50 uppercase">
-        {o.team} — Team AI Outlook
+    <div className="relative rounded-2xl border border-white/10 bg-black/35 p-5">
+      <div className="flex items-center justify-between">
+        <div className="text-xs tracking-widest text-white/50 uppercase">
+          {o.team} — Team AI Outlook
+        </div>
+        <div className={`text-lg font-semibold ${trendBadge(o.trend)}`}>
+          {o.trend}
+        </div>
       </div>
 
       <div className="mt-3 space-y-1 text-sm">
@@ -177,10 +247,22 @@ export default function TeamPredictabilityPanel({
         “{o.read}”
       </div>
 
+      <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-white/70">
+        {o.gameScript}
+      </div>
+
       <div className="mt-3 relative">
-        <div className={locked ? "blur-sm select-none rounded-lg border border-white/10 bg-white/5 p-3" : "rounded-lg border border-white/10 bg-white/5 p-3"}>
+        <div
+          className={
+            locked
+              ? "blur-sm select-none rounded-lg border border-white/10 bg-gradient-to-br from-white/10 to-white/5 p-3"
+              : "rounded-lg border border-white/10 bg-white/5 p-3"
+          }
+        >
           <ul className="text-sm space-y-1">
-            {o.deepRead.map((l, i) => <li key={i}>• {l}</li>)}
+            {o.deepRead.map((l, i) => (
+              <li key={i}>• {l}</li>
+            ))}
           </ul>
         </div>
 
@@ -201,7 +283,7 @@ export default function TeamPredictabilityPanel({
       <header className="px-6 pt-5 pb-4 border-b border-white/10">
         <h2 className="text-lg font-semibold">2. Team Score Predictability</h2>
         <p className="text-sm text-white/60">
-          Match-scoped team outlook using recent form and scoring bands.
+          Stat-driven AI · {stat.toUpperCase()} lens
         </p>
       </header>
 
