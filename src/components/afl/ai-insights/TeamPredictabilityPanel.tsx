@@ -718,7 +718,7 @@ export default function TeamPredictabilityPanel({
           locked
             ? [
                 "rounded-2xl border border-white/10 bg-white/5 p-4",
-                "blur-[2px] select-none",
+                "blur-[2.5px] select-none",
                 "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]",
               ].join(" ")
             : [
