@@ -101,11 +101,37 @@ export default function AFLAIInsights() {
     const home = selectedMatch.homeTeam;
     const away = selectedMatch.awayTeam;
 
-    const homePlayers = rawPlayerPredict.filter((p) => p.team === home);
-    const awayPlayers = rawPlayerPredict.filter((p) => p.team === away);
-
-    return [...homePlayers, ...awayPlayers];
+    return rawPlayerPredict.filter(
+      (p) => p.team === home || p.team === away
+    );
   }, [rawPlayerPredict, selectedMatch]);
+
+  /* -------------------------------------------------------------------------- */
+  /* PLAYER INSIGHT SUMMARY                                                    */
+  /* -------------------------------------------------------------------------- */
+
+  const playerInsight = useMemo(() => {
+    if (!playerPredict.length) return "";
+
+    const avgConf = mean(playerPredict.map((r) => r.confidence01));
+    const avgVol = mean(playerPredict.map((r) => r.volatility01));
+
+    if (stat === "goals") {
+      return avgVol >= 0.6
+        ? "Goal output profiles suggest volatile scoring runs and late separation risk."
+        : "Goal scoring is tightly clustered, reducing blow-out probability.";
+    }
+
+    if (stat === "disposals") {
+      return avgConf >= 0.7
+        ? "Disposal roles are highly repeatable across both teams."
+        : "Midfield rotations introduce moderate possession volatility.";
+    }
+
+    return avgConf >= 0.7
+      ? "Fantasy production shows strong role reliability across the matchup."
+      : "Fantasy output varies by role dependency and matchup conditions.";
+  }, [playerPredict, stat]);
 
   /* -------------------------------------------------------------------------- */
   /* BONUS METRICS                                                             */
@@ -115,22 +141,6 @@ export default function AFLAIInsights() {
     () => buildConsistencyExplosivenessTeams(teams, stat),
     [teams, stat]
   );
-
-  const playerInsight = useMemo(() => {
-    if (!playerPredict.length) return "";
-
-    const avgConf = mean(playerPredict.map((r) => r.confidence01));
-    const avgVol = mean(playerPredict.map((r) => r.volatility01));
-    const ceilingSpread = cv(
-      playerPredict.map((r) => r.rangeHigh ?? 0).filter(Boolean)
-    );
-
-    return `Across both teams, this matchup shows ${
-      avgConf >= 0.7 ? "strong role reliability" : "mixed role confidence"
-    } with ${
-      avgVol >= 0.6 ? "heightened volatility" : "tighter scoring bands"
-    }.`;
-  }, [playerPredict]);
 
   /* -------------------------------------------------------------------------- */
   /* RENDER                                                                    */
@@ -144,11 +154,11 @@ export default function AFLAIInsights() {
           <div>
             <h1 className="text-3xl font-bold">AFL AI Insights</h1>
             <p className="mt-1 text-sm text-white/60">
-              Pre-game intelligence for the current round
+              Match-scoped intelligence · {STAT_LABEL[stat]} lens
             </p>
           </div>
 
-          {/* 🔥 NEEKO+ TOGGLE (TEST MODE) */}
+          {/* NEEKO+ TOGGLE (TEST MODE) */}
           <button
             onClick={() =>
               setMode((m) => (m === "premium" ? "free" : "premium"))
@@ -199,7 +209,7 @@ export default function AFLAIInsights() {
           </SectionShell>
         )}
 
-        {/* TEAMS */}
+        {/* TEAMS — FULLY STAT-DRIVEN */}
         {selectedMatch && (
           <TeamPredictabilityPanel
             mode={mode}
