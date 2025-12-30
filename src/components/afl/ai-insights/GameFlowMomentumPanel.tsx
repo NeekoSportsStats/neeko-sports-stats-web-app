@@ -677,7 +677,7 @@ export default function GameFlowMomentumPanel({
         </div>
       </header>
 
-      <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4">
+      <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-3">
         {/* CARD 1 — Momentum Timeline (FREE) */}
         <div
           className={[
@@ -757,7 +757,7 @@ export default function GameFlowMomentumPanel({
             <div
               key={t.team}
               className={[
-                "rounded-2xl border border-white/10 bg-black/35 p-4 sm:p-5",
+                "rounded-2xl border border-white/10 bg-black/35 p-3 sm:p-4",
                 "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]",
                 "transition-all duration-300 hover:-translate-y-[1px] hover:border-amber-400/20 hover:bg-black/40",
               ].join(" ")}
@@ -785,7 +785,7 @@ export default function GameFlowMomentumPanel({
                 </div>
               </div>
 
-              <div className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/75">
+              <div className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white/65">
                 “{t.editorial}”
               </div>
             </div>
@@ -841,25 +841,30 @@ export default function GameFlowMomentumPanel({
               ctaText="Unlock full momentum windows (Neeko+)"
               blurPx={2.4}
             >
-              <div className="text-[11px] font-semibold tracking-widest text-white/55 uppercase">
-                Additional windows
-              </div>
-              <div className="mt-2 space-y-2">
-                {remainingWindows.map((w) => (
-                  <div
-                    key={w.id}
-                    className="rounded-xl border border-white/10 bg-black/30 px-4 py-3"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm text-white/80">{w.title}</div>
-                      <div className="text-[11px] text-white/50">
-                        Strength {fmtPct(w.weight01)}
+              <details className="group">
+                <summary className="cursor-pointer list-none text-[11px] font-semibold tracking-widest text-white/55 uppercase flex items-center justify-between">
+                  Additional windows
+                  <span className="text-[10px] text-white/40 group-open:hidden">▼</span>
+                  <span className="text-[10px] text-white/40 hidden group-open:inline">▲</span>
+                </summary>
+
+                <div className="mt-2 space-y-2">
+                  {remainingWindows.map((w) => (
+                    <div
+                      key={w.id}
+                      className="rounded-xl border border-white/10 bg-black/30 px-4 py-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-sm text-white/80">{w.title}</div>
+                        <div className="text-[11px] text-white/50">
+                          Strength {fmtPct(w.weight01)}
+                        </div>
                       </div>
+                      <div className="mt-1 text-xs text-white/55">{w.why}</div>
                     </div>
-                    <div className="mt-1 text-xs text-white/55">{w.why}</div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </details>
             </PremiumBlock>
           </div>
         </div>
@@ -886,11 +891,11 @@ export default function GameFlowMomentumPanel({
             </Chip>
           </div>
 
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 space-y-1.5">
             {model.deepTriggers.map((t) => (
               <div
                 key={t.id}
-                className="rounded-xl border border-white/10 bg-black/30 px-4 py-3"
+                className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5"
               >
                 <div className="text-sm text-white/80">
                   <span className="text-white/60">IF </span>
