@@ -24,6 +24,9 @@ import ConsistencyList from "@/components/afl/ai-insights/ConsistencyList";
 import DriversList from "@/components/afl/ai-insights/DriversList";
 import TeamPredictabilityPanel from "@/components/afl/ai-insights/TeamPredictabilityPanel";
 
+// 🔹 ADDED: new Section 3 component
+import GameFlowMomentumPanel from "@/components/afl/ai-insights/GameFlowMomentumPanel";
+
 import {
   filterPastFixtures,
   filterUpcomingFixtures,
@@ -220,6 +223,15 @@ export default function AFLAIInsights() {
           />
         )}
 
+        {/* 🔹 3. GAME FLOW & MOMENTUM (NEW SECTION) */}
+        {selectedMatch && (
+          <GameFlowMomentumPanel
+            mode={mode}
+            match={selectedMatch}
+            fixtures={pastFixtures}
+          />
+        )}
+
         {/* BONUS */}
         <SectionShell title="Bonus: Consistency & Explosiveness">
           <ConsistencyList rows={consistencyRows} mode={mode} />
@@ -228,21 +240,21 @@ export default function AFLAIInsights() {
         {/* MATCH-SCOPED SECTIONS */}
         {selectedMatch && (
           <>
-            <SectionShell title="3. Head-to-Head Matchups">
+            <SectionShell title="4. Head-to-Head Matchups">
               <MatchupTable
                 rows={buildH2HPlayerMatchups(selectedMatch, stat, teams)}
                 mode={mode}
               />
             </SectionShell>
 
-            <SectionShell title="4. Game Flow & Timing">
+            <SectionShell title="5. Game Flow & Timing">
               <QuarterFlowGrid
                 rows={buildQuarterFlow(selectedMatch)}
                 mode={mode}
               />
             </SectionShell>
 
-            <SectionShell title="5. What Decides This Match?">
+            <SectionShell title="6. What Decides This Match?">
               <DriversList
                 rows={buildOutcomeDrivers({
                   match: selectedMatch,
