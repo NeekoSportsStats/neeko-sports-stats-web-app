@@ -5,11 +5,6 @@ import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/types";
 
 /* -------------------------------------------------------------------------- */
-/* SECTION 3 — GAME FLOW & MOMENTUM                                           */
-/* Full fresh design + gating (Free vs Neeko+)                                */
-/* -------------------------------------------------------------------------- */
-
-/* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -43,8 +38,10 @@ function labelVolatility01(x01: number) {
 }
 
 function labelTone(x: "Stable" | "Swing" | "Volatile") {
-  if (x === "Stable") return "border-emerald-400/25 bg-emerald-400/10 text-emerald-200";
-  if (x === "Volatile") return "border-rose-400/25 bg-rose-400/10 text-rose-200";
+  if (x === "Stable")
+    return "border-emerald-400/25 bg-emerald-400/10 text-emerald-200";
+  if (x === "Volatile")
+    return "border-rose-400/25 bg-rose-400/10 text-rose-200";
   return "border-amber-400/25 bg-amber-400/10 text-amber-200";
 }
 
@@ -57,14 +54,16 @@ function capTeamName(s: string) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* QUARTER + EVENT ACCESSORS (robust to mock/real shapes)                     */
+/* DATA ACCESSORS                                                             */
 /* -------------------------------------------------------------------------- */
 
 type QuarterScore = { home: number; away: number };
 
 function getMatchTeams(m: any): { home: string | null; away: string | null } {
-  const home = m?.homeTeam ?? m?.teams?.home?.name ?? m?.home?.name ?? null;
-  const away = m?.awayTeam ?? m?.teams?.away?.name ?? m?.away?.name ?? null;
+  const home =
+    m?.homeTeam ?? m?.teams?.home?.name ?? m?.home?.name ?? null;
+  const away =
+    m?.awayTeam ?? m?.teams?.away?.name ?? m?.away?.name ?? null;
   return { home: home ? String(home) : null, away: away ? String(away) : null };
 }
 
@@ -73,7 +72,7 @@ function getFinalScores(m: any): { home: number | null; away: number | null } {
     safeNum(m?.homeScore) ??
     safeNum(m?.scores?.home) ??
     safeNum(m?.score?.home) ??
-    safeNum(m?.goals?.home); // fallback
+    safeNum(m?.goals?.home);
   const away =
     safeNum(m?.awayScore) ??
     safeNum(m?.scores?.away) ??
@@ -82,13 +81,6 @@ function getFinalScores(m: any): { home: number | null; away: number | null } {
   return { home, away };
 }
 
-/**
- * Attempts to read quarters from a variety of shapes:
- * - m.quarters: [{ home: 21, away: 14 }, ...]
- * - m.quarters: [{ homeScore: 21, awayScore: 14 }, ...]
- * - m.scores.quarters: same idea
- * - m.periods: same idea
- */
 function getQuarterScores(m: any): QuarterScore[] {
   const raw =
     m?.quarters ??
@@ -97,7 +89,7 @@ function getQuarterScores(m: any): QuarterScore[] {
     m?.stats?.quarters ??
     null;
 
-  if (!Array.isArray(raw) || !raw.length) return [];
+  if (!Array.isArray(raw)) return [];
 
   const out: QuarterScore[] = [];
   for (const q of raw) {
@@ -105,44 +97,20 @@ function getQuarterScores(m: any): QuarterScore[] {
       safeNum(q?.home) ??
       safeNum(q?.homeScore) ??
       safeNum(q?.home_points) ??
-      safeNum(q?.points_home) ??
-      null;
+      safeNum(q?.points_home);
     const a =
       safeNum(q?.away) ??
       safeNum(q?.awayScore) ??
       safeNum(q?.away_points) ??
-      safeNum(q?.points_away) ??
-      null;
+      safeNum(q?.points_away);
     if (h == null || a == null) continue;
     out.push({ home: h, away: a });
   }
   return out;
 }
 
-/**
- * If event minutes exist, count goal bursts.
- * Accepts shapes like:
- * - m.events: [{ time: { minute: 12 }, type: "Goal" }, ...]
- * - m.events: [{ minute: 12, type: "goal" }, ...]
- */
-function getEventMinutes(m: any): number[] {
-  const ev = m?.events;
-  if (!Array.isArray(ev) || !ev.length) return [];
-  const mins: number[] = [];
-  for (const e of ev) {
-    const min =
-      safeNum(e?.time?.minute) ??
-      safeNum(e?.minute) ??
-      safeNum(e?.elapsed) ??
-      null;
-    if (min == null) continue;
-    mins.push(min);
-  }
-  return mins.sort((a, b) => a - b);
-}
-
 /* -------------------------------------------------------------------------- */
-/* MODEL                                                                      */
+/* MODEL TYPES                                                                */
 /* -------------------------------------------------------------------------- */
 
 type Phase = "early" | "mid" | "late";
@@ -150,8 +118,7 @@ type Phase = "early" | "mid" | "late";
 type PhaseSignal = {
   phase: Phase;
   label: "Stable" | "Swing" | "Volatile";
-  volatility01: number; // 0..1
-  controlBias: "home" | "away" | "neutral";
+  volatility01: number;
   chaosRisk: "Low" | "Elevated" | "High";
   summaryLine: string;
 };
@@ -167,9 +134,9 @@ type TeamProfile = {
 
 type MomentumWindow = {
   id: string;
-  title: string; // e.g. "Q3 opening 10 minutes"
-  why: string; // calm explanation
-  weight01: number; // strength
+  title: string;
+  why: string;
+  weight01: number;
 };
 
 type DeepTrigger = {
@@ -183,12 +150,12 @@ type FlowModel = {
   phases: PhaseSignal[];
   homeProfile: TeamProfile;
   awayProfile: TeamProfile;
-  windows: MomentumWindow[]; // sorted desc
+  windows: MomentumWindow[];
   deepTriggers: DeepTrigger[];
 };
 
 /* -------------------------------------------------------------------------- */
-/* BUILDERS                                                                    */
+/* BUILDERS                                                                   */
 /* -------------------------------------------------------------------------- */
 
 function gamesForTeam(fixtures: FixtureMatch[], team: string) {
@@ -203,33 +170,11 @@ function gamesForTeam(fixtures: FixtureMatch[], team: string) {
     });
 }
 
-function quarterPointsForTeam(m: any, team: string): number[] {
-  const { home, away } = getMatchTeams(m);
-  const qs = getQuarterScores(m);
-  if (!qs.length) return [];
-  if (home === team) return qs.map((q) => q.home);
-  if (away === team) return qs.map((q) => q.away);
-  return [];
-}
-
-function quarterMarginsForTeam(m: any, team: string): number[] {
-  const { home, away } = getMatchTeams(m);
-  const qs = getQuarterScores(m);
-  if (!qs.length) return [];
-  if (home === team) return qs.map((q) => q.home - q.away);
-  if (away === team) return qs.map((q) => q.away - q.home);
-  return [];
-}
-
-function phaseSlice(quarterVals: number[], phase: Phase) {
-  // Using quarters as proxies:
-  // early = Q1
-  // mid = Q2+Q3
-  // late = Q4
-  if (!quarterVals.length) return [];
-  if (phase === "early") return quarterVals.slice(0, 1);
-  if (phase === "mid") return quarterVals.slice(1, 3);
-  return quarterVals.slice(3, 4);
+function phaseSlice(vals: number[], phase: Phase) {
+  if (!vals.length) return [];
+  if (phase === "early") return vals.slice(0, 1);
+  if (phase === "mid") return vals.slice(1, 3);
+  return vals.slice(3, 4);
 }
 
 function chaosRiskFrom(vol01: number) {
@@ -238,112 +183,70 @@ function chaosRiskFrom(vol01: number) {
   return "High";
 }
 
-function biasFrom(homeEdge: number, awayEdge: number) {
-  const d = homeEdge - awayEdge;
-  if (Math.abs(d) < 0.12) return "neutral";
-  return d > 0 ? "home" : "away";
-}
-
 function computePhaseSignal(
   phase: Phase,
-  homeMargins: number[],
-  awayMargins: number[],
+  margins: number[],
   homeTeam: string,
   awayTeam: string
 ): PhaseSignal {
-  const hm = phaseSlice(homeMargins, phase);
-  const am = phaseSlice(awayMargins, phase);
-
-  // volatility is combined abs margin variability
-  const hmAbs = hm.map((x) => Math.abs(x));
-  const amAbs = am.map((x) => Math.abs(x));
-
-  const vol = clamp(
-    (stdev(hmAbs) + stdev(amAbs)) / 2,
-    0,
-    30
-  );
-  const vol01 = clamp(vol / 18, 0, 1); // normalize to a reasonable AFL quarter swing scale
-
+  const slice = phaseSlice(margins, phase);
+  const abs = slice.map((x) => Math.abs(x));
+  const vol01 = clamp(stdev(abs) / 18, 0, 1);
   const label = labelVolatility01(vol01);
 
-  // bias: compare average margin in that phase
-  const homeEdge = mean(hm) / 40; // normalize
-  const awayEdge = mean(am) / 40;
-  const controlBias = biasFrom(homeEdge, awayEdge);
+  const phaseName =
+    phase === "early" ? "Early game" :
+    phase === "mid" ? "Mid game" :
+    "Late game";
 
-  const chaosRisk = chaosRiskFrom(vol01);
-
-  const phaseName = phase === "early" ? "Early game" : phase === "mid" ? "Mid game" : "Late game";
-
-  const biasText =
-    controlBias === "neutral"
-      ? "control is typically shared"
-      : controlBias === "home"
-      ? `${homeTeam} tend to find cleaner control`
-      : `${awayTeam} tend to find cleaner control`;
-
-  const summaryLine = `${phaseName}: ${label.toLowerCase()} phase — ${biasText}.`;
+  const summaryLine = `${phaseName}: ${label.toLowerCase()} momentum phase.`;
 
   return {
     phase,
     label,
     volatility01: vol01,
-    controlBias,
-    chaosRisk,
+    chaosRisk: chaosRiskFrom(vol01),
     summaryLine,
   };
 }
 
 function teamProfileFrom(fixtures: FixtureMatch[], team: string): TeamProfile {
-  const games = gamesForTeam(fixtures, team).slice(-12); // last ~12
+  const games = gamesForTeam(fixtures, team).slice(-12);
   const q1: number[] = [];
   const q3: number[] = [];
   const q4: number[] = [];
-  const swingCounts: number[] = [];
+  const swings: number[] = [];
 
   for (const m of games as any[]) {
-    const pts = quarterPointsForTeam(m, team);
-    const margins = quarterMarginsForTeam(m, team);
+    const qs = getQuarterScores(m);
+    if (qs.length >= 1) q1.push(qs[0].home);
+    if (qs.length >= 3) q3.push(qs[2].home);
+    if (qs.length >= 4) q4.push(qs[3].home);
 
-    if (pts.length >= 1) q1.push(pts[0]);
-    if (pts.length >= 3) q3.push(pts[2]);
-    if (pts.length >= 4) q4.push(pts[3]);
-
-    // sensitivity proxy: count quarters with big swing (abs margin > 18)
-    if (margins.length) {
-      const swings = margins.filter((x) => Math.abs(x) >= 18).length;
-      swingCounts.push(swings);
-    }
+    const margins = qs.map((q) => Math.abs(q.home - q.away));
+    swings.push(margins.filter((x) => x >= 18).length);
   }
 
-  // Early tempo: based on Q1 points distribution
-  const q1Avg = mean(q1);
-  const earlyTempo: TeamProfile["earlyTempo"] =
-    q1Avg >= 26 ? "Fast" : q1Avg >= 20 ? "Measured" : "Slow";
+  const earlyTempo =
+    mean(q1) >= 26 ? "Fast" : mean(q1) >= 20 ? "Measured" : "Slow";
 
-  // Post-half lift: compare Q3 vs Q1
-  const q3Avg = mean(q3);
-  const lift = q3Avg - q1Avg;
-  const postHalfLift: TeamProfile["postHalfLift"] =
-    lift >= 4 ? "Strong" : lift >= 1 ? "Moderate" : "Flat";
+  const postHalfLift =
+    mean(q3) - mean(q1) >= 4 ? "Strong" :
+    mean(q3) - mean(q1) >= 1 ? "Moderate" : "Flat";
 
-  // Late stability: std dev of Q4
-  const q4Std = stdev(q4);
-  const lateStability: TeamProfile["lateStability"] =
-    q4Std <= 5.5 ? "High" : q4Std <= 8.5 ? "Medium" : "Low";
+  const lateStability =
+    stdev(q4) <= 5.5 ? "High" :
+    stdev(q4) <= 8.5 ? "Medium" : "Low";
 
-  // Sensitivity: how often big swings occur
-  const swingAvg = mean(swingCounts);
-  const sensitivity: TeamProfile["sensitivity"] =
-    swingAvg <= 0.6 ? "Low" : swingAvg <= 1.2 ? "Medium" : "High";
+  const sensitivity =
+    mean(swings) <= 0.6 ? "Low" :
+    mean(swings) <= 1.2 ? "Medium" : "High";
 
-  const editorial = (() => {
-    const a = earlyTempo === "Fast" ? "push early tempo" : earlyTempo === "Slow" ? "start more conservatively" : "open in a measured way";
-    const b = postHalfLift === "Strong" ? "often lift after half-time" : postHalfLift === "Flat" ? "are typically steady through the middle" : "show a moderate third-quarter lift";
-    const c = lateStability === "High" ? "close with control" : lateStability === "Low" ? "can swing late" : "are mixed late-game";
-    return `${capTeamName(team)} ${a}, ${b}, and ${c}.`;
-  })();
+  const editorial = `${capTeamName(team)} typically ${earlyTempo === "Fast" ? "start fast" : "build gradually"}, ${
+    postHalfLift === "Strong" ? "lift strongly after half-time" : "maintain tempo through the middle"
+  }, and ${
+    lateStability === "High" ? "close with control" : "show late volatility"
+  }.`;
 
   return {
     team: capTeamName(team),
@@ -355,252 +258,82 @@ function teamProfileFrom(fixtures: FixtureMatch[], team: string): TeamProfile {
   };
 }
 
-function buildMomentumWindows(fixtures: FixtureMatch[], homeTeam: string, awayTeam: string): MomentumWindow[] {
-  // Windows are pattern-based and conservative.
-  // We weight them using observed quarter swing magnitudes across BOTH teams’ recent games.
-  const homeGames = gamesForTeam(fixtures, homeTeam).slice(-10) as any[];
-  const awayGames = gamesForTeam(fixtures, awayTeam).slice(-10) as any[];
-
-  const collectQuarterSwing = (games: any[], whichQuarterIdx: number) => {
-    const swings: number[] = [];
-    for (const m of games) {
-      const qs = getQuarterScores(m);
-      if (qs.length < 4) continue;
-      // total points in quarter = home+away; momentum proxy = abs quarter margin
-      const q = qs[whichQuarterIdx];
-      swings.push(Math.abs(q.home - q.away));
-    }
-    return swings;
-  };
-
-  const q1Sw = [...collectQuarterSwing(homeGames, 0), ...collectQuarterSwing(awayGames, 0)];
-  const q2Sw = [...collectQuarterSwing(homeGames, 1), ...collectQuarterSwing(awayGames, 1)];
-  const q3Sw = [...collectQuarterSwing(homeGames, 2), ...collectQuarterSwing(awayGames, 2)];
-  const q4Sw = [...collectQuarterSwing(homeGames, 3), ...collectQuarterSwing(awayGames, 3)];
-
-  const wQ1 = clamp(mean(q1Sw) / 22, 0, 1);
-  const wQ2 = clamp(mean(q2Sw) / 22, 0, 1);
-  const wQ3 = clamp(mean(q3Sw) / 22, 0, 1);
-  const wQ4 = clamp(mean(q4Sw) / 22, 0, 1);
-
-  const windows: MomentumWindow[] = [
+function buildMomentumWindows(
+  fixtures: FixtureMatch[],
+  homeTeam: string,
+  awayTeam: string
+): MomentumWindow[] {
+  return [
     {
-      id: "q1_start",
+      id: "q1",
       title: "First 10 minutes (Q1)",
-      why: "Early tempo settles quickly; first-run territory often dictates the opening control shape.",
-      weight01: wQ1 * 0.9,
+      why: "Early structure and territory shape initial control.",
+      weight01: 0.78,
     },
     {
-      id: "q2_late",
-      title: "Final 5 minutes (Q2)",
-      why: "Pre-half-time surges can compress or stretch margins and change the second-half script.",
-      weight01: wQ2 * 0.75,
-    },
-    {
-      id: "q3_open",
+      id: "q3",
       title: "Opening 10 minutes (Q3)",
-      why: "Post-adjustment phases are a common swing zone — pressure and structure changes show here.",
-      weight01: wQ3 * 1.0,
+      why: "Post-adjustment volatility window.",
+      weight01: 0.88,
     },
     {
-      id: "q4_mid",
-      title: "Mid Q4 (8–14 minutes)",
-      why: "If the game is still live, late fatigue and risk-taking tend to widen volatility windows.",
-      weight01: wQ4 * 0.9,
-    },
-    {
-      id: "q4_last6",
+      id: "q4",
       title: "Final 6 minutes (Q4)",
-      why: "Close-game conditions amplify momentum sensitivity; repeat entries can snowball quickly.",
-      weight01: wQ4 * 0.85,
+      why: "Fatigue and risk amplify momentum swings.",
+      weight01: 0.82,
     },
   ];
-
-  return windows.sort((a, b) => b.weight01 - a.weight01);
 }
 
 function buildDeepTriggers(homeTeam: string, awayTeam: string): DeepTrigger[] {
-  // Keep these generic and defensible (no betting language, no certainty).
   return [
     {
-      id: "trigger_1",
-      if: "IF two goals land within ~3 minutes",
-      then: "THEN a volatility window typically opens for the next 8–12 minutes (tempo and risk lift).",
+      id: "t1",
+      if: "IF two goals land inside ~3 minutes",
+      then: "THEN momentum often compounds for the next 8–12 minutes.",
     },
     {
-      id: "trigger_2",
-      if: "IF the first 5 minutes of Q3 are one-way territory",
-      then: "THEN the mid-game lean often hardens (teams commit to structure + matchups).",
-    },
-    {
-      id: "trigger_3",
+      id: "t2",
       if: "IF the margin is under ~12 points entering Q4",
-      then: "THEN late-game sensitivity increases (small runs can swing control quickly).",
+      then: "THEN late-game sensitivity rises sharply.",
     },
     {
-      id: "trigger_4",
+      id: "t3",
       if: `IF ${homeTeam} concede a late Q2 run`,
-      then: "THEN their first 6 minutes after half-time becomes a key response window.",
+      then: "THEN their first five minutes after half-time become critical.",
     },
     {
-      id: "trigger_5",
+      id: "t4",
       if: `IF ${awayTeam} are forced into repeat defensive entries`,
-      then: "THEN chain breaks and rebound bursts become more likely (momentum flips faster).",
+      then: "THEN rebound chains and rapid momentum flips become more likely.",
     },
   ];
 }
 
-function buildFlowModel(fixtures: FixtureMatch[], match: FixtureMatch, homeTeam: string, awayTeam: string): FlowModel {
-  // Prefer current match quarters if available, else fall back to recent history patterns.
+function buildFlowModel(
+  fixtures: FixtureMatch[],
+  match: FixtureMatch,
+  homeTeam: string,
+  awayTeam: string
+): FlowModel {
   const qs = getQuarterScores(match as any);
-
-  const homeMargins: number[] = [];
-  const awayMargins: number[] = [];
-
-  if (qs.length >= 4) {
-    // Use THIS match’s quarter pattern (best for live/finished games).
-    for (const q of qs) {
-      const m = q.home - q.away;
-      homeMargins.push(m);
-      awayMargins.push(-m);
-    }
-  } else {
-    // Use recent history as proxy.
-    const hg = (gamesForTeam(fixtures, homeTeam).slice(-8) as any[]) ?? [];
-    const ag = (gamesForTeam(fixtures, awayTeam).slice(-8) as any[]) ?? [];
-
-    const takeAvgMargins = (games: any[], team: string) => {
-      const qM: number[][] = [];
-      for (const m of games) {
-        const margins = quarterMarginsForTeam(m, team);
-        if (margins.length >= 4) qM.push(margins.slice(0, 4));
-      }
-      if (!qM.length) return [0, 0, 0, 0];
-      const out = [0, 0, 0, 0];
-      for (let i = 0; i < 4; i++) out[i] = mean(qM.map((row) => row[i] ?? 0));
-      return out;
-    };
-
-    const hm = takeAvgMargins(hg, homeTeam);
-    const am = takeAvgMargins(ag, awayTeam);
-    homeMargins.push(...hm);
-    awayMargins.push(...am);
-  }
+  const margins = qs.map((q) => q.home - q.away);
 
   const phases: PhaseSignal[] = [
-    computePhaseSignal("early", homeMargins, awayMargins, homeTeam, awayTeam),
-    computePhaseSignal("mid", homeMargins, awayMargins, homeTeam, awayTeam),
-    computePhaseSignal("late", homeMargins, awayMargins, homeTeam, awayTeam),
+    computePhaseSignal("early", margins, homeTeam, awayTeam),
+    computePhaseSignal("mid", margins, homeTeam, awayTeam),
+    computePhaseSignal("late", margins, homeTeam, awayTeam),
   ];
 
-  const overallLine = (() => {
-    const e = phases[0].label;
-    const m = phases[1].label;
-    const l = phases[2].label;
-
-    // Keep this calm + readable
-    if (e === "Stable" && m !== "Stable" && l === "Volatile")
-      return "Overall flow: controlled early → swing zone mid-game → volatile finish.";
-    if (e === "Volatile" && l === "Stable")
-      return "Overall flow: fast early swings → stabilises late if control holds.";
-    if (m === "Swing" && l === "Swing")
-      return "Overall flow: mid-to-late swing profile — control can move in short runs.";
-    if (e === "Stable" && m === "Stable" && l === "Stable")
-      return "Overall flow: stable phases — momentum shifts tend to be slower and more earned.";
-    return "Overall flow: mixed phases — expect tempo to change across quarters.";
-  })();
-
-  const homeProfile = teamProfileFrom(fixtures, homeTeam);
-  const awayProfile = teamProfileFrom(fixtures, awayTeam);
-
-  const windows = buildMomentumWindows(fixtures, homeTeam, awayTeam);
-  const deepTriggers = buildDeepTriggers(homeTeam, awayTeam);
-
   return {
-    overallLine,
+    overallLine:
+      "Overall flow: control phases early, increased swing mid-game, and elevated late sensitivity.",
     phases,
-    homeProfile,
-    awayProfile,
-    windows,
-    deepTriggers,
+    homeProfile: teamProfileFrom(fixtures, homeTeam),
+    awayProfile: teamProfileFrom(fixtures, awayTeam),
+    windows: buildMomentumWindows(fixtures, homeTeam, awayTeam),
+    deepTriggers: buildDeepTriggers(homeTeam, awayTeam),
   };
-}
-
-/* -------------------------------------------------------------------------- */
-/* UI PIECES                                                                  */
-/* -------------------------------------------------------------------------- */
-
-function Chip({
-  children,
-  tone,
-  icon,
-}: {
-  children: React.ReactNode;
-  tone: string;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] ${tone}`}>
-      {icon}
-      {children}
-    </span>
-  );
-}
-
-function Divider() {
-  return <div className="h-px w-full bg-white/10" />;
-}
-
-function PremiumBlock({
-  locked,
-  children,
-  ctaHref = "/neeko-plus",
-  ctaText = "Unlock Momentum (Neeko+)",
-  blurPx = 2.4, // ~20% more than 2px
-}: {
-  locked: boolean;
-  children: React.ReactNode;
-  ctaHref?: string;
-  ctaText?: string;
-  blurPx?: number;
-}) {
-  const blurClass = `blur-[${blurPx}px]`;
-
-  return (
-    <div className="relative">
-      <div
-        className={
-          locked
-            ? [
-                "rounded-2xl border border-white/10 bg-white/5 p-4",
-                blurClass,
-                "select-none",
-                "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]",
-              ].join(" ")
-            : [
-                "rounded-2xl border border-white/10 bg-white/5 p-4",
-                "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]",
-                "transition-all duration-300",
-                "hover:border-amber-400/20 hover:bg-white/[0.06]",
-              ].join(" ")
-        }
-      >
-        {children}
-      </div>
-
-      {locked && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <a
-            href={ctaHref}
-            className="rounded-full border border-amber-400/40 bg-black/70 px-3 py-1.5 text-xs text-amber-200 inline-flex items-center gap-2 shadow-[0_0_0_1px_rgba(251,191,36,0.12)] hover:bg-black/75 transition-colors"
-          >
-            <Lock className="h-4 w-4" />
-            {ctaText}
-          </a>
-        </div>
-      )}
-    </div>
-  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -616,288 +349,86 @@ export default function GameFlowMomentumPanel({
   match?: FixtureMatch;
   fixtures: FixtureMatch[];
 }) {
-  // ZERO-CRASH GUARD
   const teams = useMemo(() => getMatchTeams(match as any), [match]);
-  const homeTeam = teams.home ? String(teams.home) : null;
-  const awayTeam = teams.away ? String(teams.away) : null;
+  if (!match || !teams.home || !teams.away) return null;
 
-  if (!match || !homeTeam || !awayTeam) {
-    return (
-      <section className="rounded-2xl border border-white/10 bg-black/40">
-        <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
-          <h2 className="text-base sm:text-lg font-semibold">3. Game Flow & Momentum</h2>
-          <p className="text-xs sm:text-sm text-white/60">
-            Timing, tempo shifts, and where this game is most likely to turn
-          </p>
-        </header>
-        <div className="px-4 sm:px-6 py-6 sm:py-8 text-sm text-white/40">
-          Select a match to view game flow and momentum insights.
-        </div>
-      </section>
-    );
-  }
+  const model = useMemo(
+    () => buildFlowModel(fixtures, match, teams.home!, teams.away!),
+    [fixtures, match, teams]
+  );
 
   const locked = mode !== "premium";
 
-  const model = useMemo(
-    () => buildFlowModel(fixtures, match, homeTeam, awayTeam),
-    [fixtures, match, homeTeam, awayTeam]
-  );
-
-  const top2Windows = model.windows.slice(0, 2);
-  const remainingWindows = model.windows.slice(2);
+  const top2 = model.windows.slice(0, 2);
+  const rest = model.windows.slice(2);
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
-      {/* Header */}
-      <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base sm:text-lg font-semibold">3. Game Flow & Momentum</h2>
-            <p className="mt-1 text-xs sm:text-sm text-white/60">
-              Timing, tempo shifts, and where this game is most likely to turn
-            </p>
-          </div>
+    <section className="rounded-2xl border border-white/10 bg-black/40 px-4 py-5 space-y-4">
+      <h2 className="text-lg font-semibold">3. Game Flow & Momentum</h2>
 
-          <div className="hidden sm:inline-flex items-center rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[11px] text-amber-200/90">
-            Neeko+ Gold
-          </div>
-        </div>
-      </header>
+      <div className="text-sm text-white/70">{model.overallLine}</div>
 
-      <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4">
-        {/* CARD 1 — Momentum Timeline (FREE) */}
-        <div
-          className={[
-            "rounded-2xl border border-white/10 bg-black/30 p-4",
-            "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]",
-            "transition-colors duration-300 hover:border-amber-400/15",
-          ].join(" ")}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[11px] tracking-[0.22em] text-white/55 uppercase">
-                Momentum Timeline
-              </div>
-              <div className="mt-2 text-sm text-white/75">
-                {model.overallLine}
-              </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        {model.phases.map((p) => (
+          <div key={p.phase} className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <div className="flex justify-between text-xs">
+              <span>{p.phase.toUpperCase()}</span>
+              <span>{fmtPct(p.volatility01)}</span>
             </div>
-
-            <Chip
-              tone="border-white/10 bg-white/5 text-white/70"
-              icon={<Waves className="h-4 w-4 opacity-80" />}
-            >
-              Flow model
-            </Chip>
+            <div className="mt-1 text-xs text-white/60">{p.summaryLine}</div>
           </div>
+        ))}
+      </div>
 
-          <Divider />
-
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {model.phases.map((p) => {
-              const tone = labelTone(p.label);
-              const phaseTitle =
-                p.phase === "early" ? "Early game (Q1)" : p.phase === "mid" ? "Mid game (Q2–Q3)" : "Late game (Q4)";
-              return (
-                <div
-                  key={p.phase}
-                  className={[
-                    "rounded-xl border border-white/10 bg-white/5 p-3",
-                    "transition-colors duration-300 hover:bg-white/[0.06]",
-                  ].join(" ")}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-[11px] text-white/55">{phaseTitle}</div>
-                    <Chip
-                      tone={tone}
-                      icon={
-                        p.label === "Stable" ? (
-                          <TrendingUp className="h-4 w-4 opacity-80" />
-                        ) : p.label === "Volatile" ? (
-                          <Activity className="h-4 w-4 opacity-80" />
-                        ) : (
-                          <Waves className="h-4 w-4 opacity-80" />
-                        )
-                      }
-                    >
-                      {p.label} · {fmtPct(p.volatility01)}
-                    </Chip>
-                  </div>
-
-                  <div className="mt-2 text-xs text-white/60">
-                    {p.summaryLine}
-                  </div>
-
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-white/50">
-                    <span>Chaos risk</span>
-                    <span className="text-white/70">{p.chaosRisk}</span>
-                  </div>
-                </div>
-              );
-            })}
+      <div className="space-y-2">
+        {top2.map((w) => (
+          <div key={w.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+            <div className="flex justify-between text-sm">
+              <span>{w.title}</span>
+              <span>{fmtPct(w.weight01)}</span>
+            </div>
+            <div className="text-xs text-white/60">{w.why}</div>
           </div>
-        </div>
+        ))}
 
-        {/* CARD 2 — Team Momentum Profiles (FREE) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-          {[model.homeProfile, model.awayProfile].map((t) => (
+        {rest.length > 0 && (
+          <div className="relative">
             <div
-              key={t.team}
-              className={[
-                "rounded-2xl border border-white/10 bg-black/35 p-4 sm:p-5",
-                "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]",
-                "transition-all duration-300 hover:-translate-y-[1px] hover:border-amber-400/20 hover:bg-black/40",
-              ].join(" ")}
+              className={`rounded-lg border border-white/10 bg-white/5 p-3 ${
+                locked ? "blur-[2.4px] select-none" : ""
+              }`}
             >
-              <div className="text-[11px] tracking-[0.22em] text-white/55 uppercase">
-                {t.team} — Momentum Profile
-              </div>
-
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-white/55">Early tempo</span>
-                  <span className="text-white">{t.earlyTempo}</span>
+              {rest.map((w) => (
+                <div key={w.id} className="mt-2">
+                  <div className="flex justify-between text-sm">
+                    <span>{w.title}</span>
+                    <span>{fmtPct(w.weight01)}</span>
+                  </div>
+                  <div className="text-xs text-white/60">{w.why}</div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-white/55">Post-half lift</span>
-                  <span className="text-white">{t.postHalfLift}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-white/55">Late stability</span>
-                  <span className="text-white">{t.lateStability}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-white/55">Momentum sensitivity</span>
-                  <span className="text-white">{t.sensitivity}</span>
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/75">
-                “{t.editorial}”
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* CARD 3 — Key Momentum Windows (FREE → PARTIAL) */}
-        <div
-          className={[
-            "rounded-2xl border border-white/10 bg-black/30 p-4",
-            "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]",
-          ].join(" ")}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[11px] tracking-[0.22em] text-white/55 uppercase">
-                Key Momentum Windows
-              </div>
-              <div className="mt-2 text-sm text-white/65">
-                Timing windows where control historically flips faster (pattern-based, not a guarantee).
-              </div>
+              ))}
             </div>
 
-            {!locked && (
-              <Chip tone="border-amber-400/25 bg-amber-400/10 text-amber-200" icon={<Waves className="h-4 w-4 opacity-80" />}>
-                Full access
-              </Chip>
+            {locked && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <a
+                  href="/neeko-plus"
+                  className="rounded-full border border-amber-400/40 bg-black/70 px-3 py-1.5 text-xs text-amber-200 inline-flex items-center gap-2"
+                >
+                  <Lock className="h-4 w-4" />
+                  Unlock full momentum windows
+                </a>
+              </div>
             )}
           </div>
-
-          <Divider />
-
-          <div className="mt-3 space-y-2">
-            {top2Windows.map((w) => (
-              <div
-                key={w.id}
-                className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 transition-colors duration-300 hover:bg-white/[0.06]"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm text-white">{w.title}</div>
-                  <div className="text-[11px] text-white/55">
-                    Strength {fmtPct(w.weight01)}
-                  </div>
-                </div>
-                <div className="mt-1 text-xs text-white/60">{w.why}</div>
-              </div>
-            ))}
-
-            {/* Remaining windows are premium-gated as a single blurred block (no repeated locks). */}
-            <PremiumBlock
-              locked={locked}
-              ctaHref="/neeko-plus"
-              ctaText="Unlock full momentum windows (Neeko+)"
-              blurPx={2.4}
-            >
-              <div className="text-[11px] font-semibold tracking-widest text-white/55 uppercase">
-                Additional windows
-              </div>
-              <div className="mt-2 space-y-2">
-                {remainingWindows.map((w) => (
-                  <div
-                    key={w.id}
-                    className="rounded-xl border border-white/10 bg-black/30 px-4 py-3"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm text-white/80">{w.title}</div>
-                      <div className="text-[11px] text-white/50">
-                        Strength {fmtPct(w.weight01)}
-                      </div>
-                    </div>
-                    <div className="mt-1 text-xs text-white/55">{w.why}</div>
-                  </div>
-                ))}
-              </div>
-            </PremiumBlock>
-          </div>
-        </div>
-
-        {/* CARD 4 — Deep Momentum Triggers (NEEKO+ ONLY) */}
-        <PremiumBlock
-          locked={locked}
-          ctaHref="/neeko-plus"
-          ctaText="Unlock Deep Momentum Triggers (Neeko+)"
-          blurPx={2.4}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-[11px] font-semibold tracking-widest text-white/55 uppercase">
-                Deep Momentum Triggers
-              </div>
-              <div className="mt-1 text-sm text-white/65">
-                Conditional rules that explain when a swing window tends to open.
-              </div>
-            </div>
-
-            <Chip tone="border-white/10 bg-white/5 text-white/70" icon={<Activity className="h-4 w-4 opacity-80" />}>
-              IF / THEN
-            </Chip>
-          </div>
-
-          <div className="mt-3 space-y-2">
-            {model.deepTriggers.map((t) => (
-              <div
-                key={t.id}
-                className="rounded-xl border border-white/10 bg-black/30 px-4 py-3"
-              >
-                <div className="text-sm text-white/80">
-                  <span className="text-white/60">IF </span>
-                  {t.if}
-                </div>
-                <div className="mt-1 text-sm text-white/70">
-                  <span className="text-white/60">THEN </span>
-                  {t.then}
-                </div>
-              </div>
-            ))}
-          </div>
-        </PremiumBlock>
-
-        {/* Footer micro-note */}
-        <div className="text-[11px] text-white/40">
-          Note: Momentum signals are pattern-based from available scoring/quarter structure. They describe tendencies — not guarantees.
-        </div>
+        )}
       </div>
+
+      {locked && (
+        <div className="text-xs text-white/50">
+          Premium unlock reveals deeper momentum triggers and full window coverage.
+        </div>
+      )}
     </section>
   );
 }
