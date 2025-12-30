@@ -125,6 +125,82 @@ function minSpreadForLens(stat: StatLens) {
   return 8;
 }
 
+/** -------------------------------------------------------------------------
+ * UI RENDER HELPERS (Surgical UX fixes only)
+ * - keyword emphasis for IF/THEN lines
+ * - CV tooltip for Deep AI Read lines
+ * -------------------------------------------------------------------------- */
+
+const EMPHASIS_WORDS = [
+  "rotations",
+  "transition",
+  "clearances",
+  "conversion",
+  "stoppage",
+  "tagging",
+  "entries",
+] as const;
+
+function escapeRegExp(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function renderWithEmphasis(text: string) {
+  // Wrap important keywords with <strong> for scanability (esp. mobile)
+  const pattern = new RegExp(
+    `(${EMPHASIS_WORDS.map(escapeRegExp).join("|")})`,
+    "ig"
+  );
+  const parts = text.split(pattern);
+
+  return (
+    <>
+      {parts.map((p, i) => {
+        const isEmph = EMPHASIS_WORDS.some(
+          (w) => p.toLowerCase() === w.toLowerCase()
+        );
+        return isEmph ? (
+          <strong key={i} className="text-white font-semibold">
+            {p}
+          </strong>
+        ) : (
+          <span key={i}>{p}</span>
+        );
+      })}
+    </>
+  );
+}
+
+function renderDeepLine(line: string) {
+  // Add a tooltip for CV without changing the content string generation.
+  // Example line: "Last 5 avg: 91 · CV 0.00"
+  const m = line.match(/^(.*?\bCV)\s+([0-9]+(?:\.[0-9]+)?)\b(.*)$/i);
+  if (!m) return <>{line}</>;
+
+  const before = m[1]; // includes "CV"
+  const cvVal = m[2];
+  const after = m[3] ?? "";
+
+  return (
+    <>
+      {before.replace(/\bCV$/i, "").trim()}
+      {before.toLowerCase().includes("cv") && (
+        <>
+          {before.trim().endsWith("CV") ? " " : ""}
+          <span
+            title="CV = Coefficient of Variation (consistency: stdev ÷ mean). Lower CV = more predictable."
+            className="underline decoration-dotted underline-offset-2 text-white/80"
+          >
+            CV
+          </span>{" "}
+          <span className="text-white/85">{cvVal}</span>
+          {after}
+        </>
+      )}
+    </>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -171,8 +247,13 @@ type MatchMeta = {
 function gamesForTeam(fixtures: FixtureMatch[], team: string) {
   return fixtures
     .filter((m: any) => m?.homeTeam === team || m?.awayTeam === team)
-    .filter((m: any) => safeNum(m?.homeScore) != null && safeNum(m?.awayScore) != null)
-    .sort((a: any, b: any) => roundOrder(a.roundLabel) - roundOrder(b.roundLabel));
+    .filter(
+      (m: any) =>
+        safeNum(m?.homeScore) != null && safeNum(m?.awayScore) != null
+    )
+    .sort(
+      (a: any, b: any) => roundOrder(a.roundLabel) - roundOrder(b.roundLabel)
+    );
 }
 
 function scoreForTeam(m: any, team: string) {
@@ -204,8 +285,13 @@ function lastNH2H(fixtures: FixtureMatch[], a: string, b: string, n = 5) {
       const t2 = m?.awayTeam;
       return (t1 === a && t2 === b) || (t1 === b && t2 === a);
     })
-    .filter((m: any) => safeNum(m?.homeScore) != null && safeNum(m?.awayScore) != null)
-    .sort((x: any, y: any) => roundOrder(x.roundLabel) - roundOrder(y.roundLabel))
+    .filter(
+      (m: any) =>
+        safeNum(m?.homeScore) != null && safeNum(m?.awayScore) != null
+    )
+    .sort(
+      (x: any, y: any) => roundOrder(x.roundLabel) - roundOrder(y.roundLabel)
+    )
     .slice(-n);
 }
 
@@ -214,7 +300,10 @@ function computeExpectedRange(vals: number[], stat: StatLens) {
   if (!s.length) {
     // fallback
     const base = stat === "goals" ? 12 : stat === "disposals" ? 340 : 90;
-    return { low: base - minSpreadForLens(stat), high: base + minSpreadForLens(stat) };
+    return {
+      low: base - minSpreadForLens(stat),
+      high: base + minSpreadForLens(stat),
+    };
   }
 
   const q25 = quantile(s, 0.25);
@@ -236,7 +325,12 @@ function computeExpectedRange(vals: number[], stat: StatLens) {
   return { low: Math.round(low), high: Math.round(high) };
 }
 
-function buildTeamOutlook(team: string, opponent: string, fixtures: FixtureMatch[], stat: StatLens): TeamOutlook {
+function buildTeamOutlook(
+  team: string,
+  opponent: string,
+  fixtures: FixtureMatch[],
+  stat: StatLens
+): TeamOutlook {
   const games = gamesForTeam(fixtures, team);
   const last10 = games.slice(-10);
   const last5 = games.slice(-5);
@@ -272,7 +366,9 @@ function buildTeamOutlook(team: string, opponent: string, fixtures: FixtureMatch
   const volatility = labelVolatility(cv);
 
   // opponent interaction: do they force your conceded volatility?
-  const concededCv = rawConceded.length ? stdev(rawConceded) / Math.max(1, mean(rawConceded)) : 0.18;
+  const concededCv = rawConceded.length
+    ? stdev(rawConceded) / Math.max(1, mean(rawConceded))
+    : 0.18;
 
   // H2H influence (lens uses your score in H2H)
   const h2h = lastNH2H(fixtures, team, opponent, 5);
@@ -319,23 +415,35 @@ function buildTeamOutlook(team: string, opponent: string, fixtures: FixtureMatch
   const wLast5 = 0.3;
   const wH2H = 0.2;
 
-  let expectedLow = seasonRange.low * wSeason + last5Range.low * wLast5 + h2hRange.low * wH2H;
-  let expectedHigh = seasonRange.high * wSeason + last5Range.high * wLast5 + h2hRange.high * wH2H;
+  let expectedLow =
+    seasonRange.low * wSeason + last5Range.low * wLast5 + h2hRange.low * wH2H;
+  let expectedHigh =
+    seasonRange.high * wSeason + last5Range.high * wLast5 + h2hRange.high * wH2H;
 
   expectedLow = clampForLens(expectedLow, stat);
   expectedHigh = clampForLens(expectedHigh, stat);
 
   const minSpread = minSpreadForLens(stat);
-  if (expectedHigh < expectedLow + minSpread) expectedHigh = clampForLens(expectedLow + minSpread, stat);
+  if (expectedHigh < expectedLow + minSpread)
+    expectedHigh = clampForLens(expectedLow + minSpread, stat);
 
   // confidence score (0..100)
   const sample = clamp(scores.length / 10, 0, 1);
   const h2hBoost = clamp(h2hScores.length / 5, 0, 1) * 0.15;
-  const stabilityBoost = stability === "High" ? 0.18 : stability === "Medium" ? 0.08 : 0.0;
+  const stabilityBoost =
+    stability === "High" ? 0.18 : stability === "Medium" ? 0.08 : 0.0;
   const trendBoost = clamp(trendConf01, 0, 1) * 0.12;
-  const defensivePenalty = defensiveRisk.includes("High") ? 0.12 : defensiveRisk.includes("Moderate") ? 0.06 : 0.0;
+  const defensivePenalty = defensiveRisk.includes("High")
+    ? 0.12
+    : defensiveRisk.includes("Moderate")
+    ? 0.06
+    : 0.0;
 
-  const conf01 = clamp(0.38 + sample * 0.25 + stabilityBoost + trendBoost + h2hBoost - defensivePenalty, 0.25, 0.92);
+  const conf01 = clamp(
+    0.38 + sample * 0.25 + stabilityBoost + trendBoost + h2hBoost - defensivePenalty,
+    0.25,
+    0.92
+  );
   const confidencePct = Math.round(conf01 * 100);
 
   // lens narrative
@@ -352,9 +460,11 @@ function buildTeamOutlook(team: string, opponent: string, fixtures: FixtureMatch
     parts.push(`${team} show a ${stability.toLowerCase()} ${ctx} profile`);
     parts.push(`with ${volatility.toLowerCase()} variance`);
     parts.push(`vs ${opponent}.`);
-    if (trend !== "→") parts.push(`Trend is ${trend === "↑" ? "up" : "down"} over the last 5.`);
+    if (trend !== "→")
+      parts.push(`Trend is ${trend === "↑" ? "up" : "down"} over the last 5.`);
     if (tempoControl === "Strong") parts.push("Tempo control signal is strong.");
-    if (defensiveRisk.includes("High")) parts.push("Defensive exposure widens the ceiling tail.");
+    if (defensiveRisk.includes("High"))
+      parts.push("Defensive exposure widens the ceiling tail.");
     return parts.join(" ");
   })();
 
@@ -362,15 +472,23 @@ function buildTeamOutlook(team: string, opponent: string, fixtures: FixtureMatch
   const deepRead: string[] = [
     `Lens: ${stat.toUpperCase()} · Confidence ${confidencePct}% · Trend ${trend}`,
     `Last 5 avg: ${Math.round(mean(last5Scores.length ? last5Scores : scores))} · CV ${cv.toFixed(2)}`,
-    `Opponent interaction: conceded volatility ${labelVolatility(concededCv)} · ceiling bias ${Math.round(oppCeilingBias * 100)}%`,
+    `Opponent interaction: conceded volatility ${labelVolatility(concededCv)} · ceiling bias ${Math.round(
+      oppCeilingBias * 100
+    )}%`,
     lensLine,
   ];
 
   const ifThen: string[] = (() => {
     const chaosWord =
-      volatility.includes("High") || volatility.includes("Elevated") ? "chaos rises" : "bands stay tighter";
+      volatility.includes("High") || volatility.includes("Elevated")
+        ? "chaos rises"
+        : "bands stay tighter";
     const tempoWord =
-      tempoControl === "Strong" ? "tempo compresses" : tempoControl === "Inconsistent" ? "tempo swings" : "tempo drifts";
+      tempoControl === "Strong"
+        ? "tempo compresses"
+        : tempoControl === "Inconsistent"
+        ? "tempo swings"
+        : "tempo drifts";
 
     if (stat === "goals") {
       return [
@@ -399,9 +517,12 @@ function buildTeamOutlook(team: string, opponent: string, fixtures: FixtureMatch
     const out: string[] = [];
     if (scores.length < 6) out.push("Low sample size: model confidence is limited.");
     if (last5Scores.length < 3) out.push("Limited recent form: last-5 trend signal is weak.");
-    if (defensiveRisk.includes("High")) out.push("High defensive exposure: late-game volatility can exceed the band.");
-    if (!h2hScores.length) out.push("No H2H sample: matchup weight shifts to season profile.");
-    if (stat === "goals") out.push("Goals are conversion-sensitive: wind/accuracy swings can break the band.");
+    if (defensiveRisk.includes("High"))
+      out.push("High defensive exposure: late-game volatility can exceed the band.");
+    if (!h2hScores.length)
+      out.push("No H2H sample: matchup weight shifts to season profile.");
+    if (stat === "goals")
+      out.push("Goals are conversion-sensitive: wind/accuracy swings can break the band.");
     return out;
   })();
 
@@ -427,18 +548,29 @@ function buildMatchMeta(home: TeamOutlook, away: TeamOutlook, stat: StatLens): M
   // volatility meter combines both vol + defensive risk
   const volScore = (o: TeamOutlook) => {
     const v =
-      o.volatility === "Low" ? 0.15 :
-      o.volatility === "Low–Moderate" ? 0.35 :
-      o.volatility === "Elevated" ? 0.62 : 0.78;
+      o.volatility === "Low"
+        ? 0.15
+        : o.volatility === "Low–Moderate"
+        ? 0.35
+        : o.volatility === "Elevated"
+        ? 0.62
+        : 0.78;
 
     const d =
-      o.defensiveRisk === "Low" ? 0.08 :
-      o.defensiveRisk === "Low–Moderate" ? 0.16 :
-      o.defensiveRisk === "Moderate" ? 0.26 : 0.36;
+      o.defensiveRisk === "Low"
+        ? 0.08
+        : o.defensiveRisk === "Low–Moderate"
+        ? 0.16
+        : o.defensiveRisk === "Moderate"
+        ? 0.26
+        : 0.36;
 
     const t =
-      o.tempoControl === "Strong" ? -0.08 :
-      o.tempoControl === "Moderate" ? 0.0 : 0.10;
+      o.tempoControl === "Strong"
+        ? -0.08
+        : o.tempoControl === "Moderate"
+        ? 0.0
+        : 0.10;
 
     return clamp(v + d + t, 0, 1);
   };
@@ -524,10 +656,19 @@ export default function TeamPredictabilityPanel({
   const home = (match as any).homeTeam as string;
   const away = (match as any).awayTeam as string;
 
-  const homeOutlook = useMemo(() => buildTeamOutlook(home, away, fixtures, stat), [home, away, fixtures, stat]);
-  const awayOutlook = useMemo(() => buildTeamOutlook(away, home, fixtures, stat), [away, home, fixtures, stat]);
+  const homeOutlook = useMemo(
+    () => buildTeamOutlook(home, away, fixtures, stat),
+    [home, away, fixtures, stat]
+  );
+  const awayOutlook = useMemo(
+    () => buildTeamOutlook(away, home, fixtures, stat),
+    [away, home, fixtures, stat]
+  );
 
-  const meta = useMemo(() => buildMatchMeta(homeOutlook, awayOutlook, stat), [homeOutlook, awayOutlook, stat]);
+  const meta = useMemo(
+    () => buildMatchMeta(homeOutlook, awayOutlook, stat),
+    [homeOutlook, awayOutlook, stat]
+  );
 
   const leanChip = (which: "home" | "away" | "even") => {
     if (which === "even") {
@@ -565,6 +706,11 @@ export default function TeamPredictabilityPanel({
     );
   };
 
+  /**
+   * PATCH:
+   * - Keep blur behavior
+   * - Remove repeated overlay CTA (was causing mobile fatigue)
+   */
   const premiumBlock = (children: React.ReactNode) => (
     <div className="relative group">
       <div
@@ -585,17 +731,38 @@ export default function TeamPredictabilityPanel({
       >
         {children}
       </div>
-
-      {locked && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="rounded-full border border-amber-400/40 bg-black/70 px-3 py-1.5 text-xs text-amber-200 inline-flex items-center gap-2 shadow-[0_0_0_1px_rgba(251,191,36,0.12)]">
-            <Lock className="h-4 w-4" />
-            Unlock Team AI (Neeko+)
-          </div>
-        </div>
-      )}
+      {/* 🔥 Intentionally no overlay CTA here anymore (single CTA per team card below) */}
     </div>
   );
+
+  const upgradeHref = "https://www.neekostats.com.au/neeko-plus";
+
+  const teamCTA = () =>
+    locked ? (
+      <div className="mt-4">
+        <a
+          href={upgradeHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={[
+            "w-full inline-flex items-center justify-center gap-2",
+            "rounded-full border border-amber-400/40 bg-black/70",
+            "px-4 py-2 text-xs text-amber-200",
+            "shadow-[0_0_0_1px_rgba(251,191,36,0.12)]",
+            "transition-transform duration-200 hover:-translate-y-[1px]",
+          ].join(" ")}
+        >
+          <Lock className="h-4 w-4" />
+          Unlock Team AI (Neeko+)
+          <span className="hidden sm:inline text-[11px] text-amber-300/80">
+            · Includes Deep AI Read + Game Script Scenarios
+          </span>
+        </a>
+        <div className="mt-2 text-center text-[11px] text-white/40">
+          Unlock gives full Deep AI Read, IF/THEN scripts, and model limits for this matchup.
+        </div>
+      </div>
+    ) : null;
 
   const card = (o: TeamOutlook, opponentName: string) => {
     const ctx = statContext(stat);
@@ -691,7 +858,7 @@ export default function TeamPredictabilityPanel({
               <ul className="mt-2 space-y-1 text-sm text-white/70">
                 {o.deepRead.map((line, i) => (
                   <li key={i} className="leading-snug">
-                    • {line}
+                    • {renderDeepLine(line)}
                   </li>
                 ))}
               </ul>
@@ -706,7 +873,7 @@ export default function TeamPredictabilityPanel({
               <ul className="mt-2 space-y-1 text-sm text-white/70">
                 {o.ifThen.map((line, i) => (
                   <li key={i} className="leading-snug">
-                    • {line}
+                    • {renderWithEmphasis(line)}
                   </li>
                 ))}
               </ul>
@@ -728,6 +895,9 @@ export default function TeamPredictabilityPanel({
             </>
           )}
         </div>
+
+        {/* ✅ Single consolidated Neeko+ CTA per team card */}
+        {teamCTA()}
       </div>
     );
   };
@@ -787,7 +957,7 @@ export default function TeamPredictabilityPanel({
 
           <div className="mt-3 text-xs text-white/50">
             {meta.ifThen.map((l, i) => (
-              <div key={i}>• {l}</div>
+              <div key={i}>• {renderWithEmphasis(l)}</div>
             ))}
           </div>
         </div>
