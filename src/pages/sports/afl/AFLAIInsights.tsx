@@ -1,5 +1,4 @@
 // src/pages/sports/afl/AFLAIInsights.tsx
-
 import React, { useMemo, useState, useEffect } from "react";
 import { Crown, ChevronDown } from "lucide-react";
 
@@ -8,18 +7,16 @@ import { MOCK_FIXTURES } from "@/components/afl/match-center/mockData";
 import { MOCK_TEAMS } from "@/components/afl/teams/mockTeams";
 
 import type { PremiumMode } from "@/components/afl/ai-insights/types";
-import {
-  STAT_LABEL,
-  StatLens,
-  mean,
-} from "@/components/afl/ai-insights/utils";
+import { STAT_LABEL, StatLens, mean } from "@/components/afl/ai-insights/utils";
 
 import SectionShell from "@/components/afl/ai-insights/SectionShell";
 import ControlsBar from "@/components/afl/ai-insights/ControlsBar";
 import PredictabilityTable from "@/components/afl/ai-insights/PredictabilityTable";
 import TeamPredictabilityPanel from "@/components/afl/ai-insights/TeamPredictabilityPanel";
 import GameFlowMomentumPanel from "@/components/afl/ai-insights/GameFlowMomentumPanel";
-import PlayerImpactSignalsPanel from "@/components/afl/ai-insights/PlayerImpactSignalsPanel";
+
+// ✅ New Section 4 visual (Players only)
+import PlayerImpactScatterPanel from "@/components/afl/ai-insights/PlayerImpactScatterPanel";
 
 import {
   filterPastFixtures,
@@ -46,7 +43,7 @@ function currentRound(fixtures: FixtureMatch[]) {
 
 export default function AFLAIInsights() {
   const fixtures = MOCK_FIXTURES as unknown as FixtureMatch[];
-  const teams = MOCK_TEAMS as any[];
+  const teams = MOCK_TEAMS as any[]; // kept for future toggles/sections
 
   /* ---------------- GLOBAL STATE ---------------- */
 
@@ -90,13 +87,9 @@ export default function AFLAIInsights() {
 
   const playerPredict = useMemo(() => {
     if (!selectedMatch) return [];
-
     const home = selectedMatch.homeTeam;
     const away = selectedMatch.awayTeam;
-
-    return rawPlayerPredict.filter(
-      (p) => p.team === home || p.team === away
-    );
+    return rawPlayerPredict.filter((p) => p.team === home || p.team === away);
   }, [rawPlayerPredict, selectedMatch]);
 
   const playerInsight = useMemo(() => {
@@ -129,7 +122,6 @@ export default function AFLAIInsights() {
   return (
     <div className="min-h-screen bg-[#070707] text-white">
       <div className="mx-auto max-w-6xl px-4 py-8 space-y-10">
-
         {/* HEADER */}
         <header className="flex items-center justify-between">
           <div>
@@ -141,9 +133,7 @@ export default function AFLAIInsights() {
 
           {/* NEEKO+ TOGGLE (TEST MODE) */}
           <button
-            onClick={() =>
-              setMode((m) => (m === "premium" ? "free" : "premium"))
-            }
+            onClick={() => setMode((m) => (m === "premium" ? "free" : "premium"))}
             className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/10 px-4 py-2 text-sm text-amber-200 hover:bg-amber-400/20"
           >
             <Crown className="h-4 w-4" />
@@ -207,16 +197,17 @@ export default function AFLAIInsights() {
           />
         )}
 
-        {/* 4. MATCH IMPACT VISUAL — PLAYERS (HERO) */}
+        {/* 4. PLAYER IMPACT MAP (Players only) */}
         {selectedMatch && (
-          <PlayerImpactSignalsPanel
+          <PlayerImpactScatterPanel
             mode={mode}
-            match={selectedMatch}
-            fixtures={pastFixtures}
-            stat={stat}
+            rows={playerPredict}
+            statLabel={STAT_LABEL[stat]}
+            matchContext={`${selectedMatch.homeTeam} vs ${selectedMatch.awayTeam}`}
           />
         )}
 
+        {/* ✅ Removed: Bonus, H2H, Drivers (optional later) */}
       </div>
     </div>
   );
