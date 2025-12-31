@@ -1,3 +1,5 @@
+// src/pages/sports/afl/AFLAIInsights.tsx
+
 import React, { useMemo, useState, useEffect } from "react";
 import { Crown, ChevronDown } from "lucide-react";
 
@@ -15,10 +17,6 @@ import {
 import SectionShell from "@/components/afl/ai-insights/SectionShell";
 import ControlsBar from "@/components/afl/ai-insights/ControlsBar";
 import PredictabilityTable from "@/components/afl/ai-insights/PredictabilityTable";
-import MatchupTable from "@/components/afl/ai-insights/MatchupTable";
-import QuarterFlowGrid from "@/components/afl/ai-insights/QuarterFlowGrid";
-import ConsistencyList from "@/components/afl/ai-insights/ConsistencyList";
-import DriversList from "@/components/afl/ai-insights/DriversList";
 import TeamPredictabilityPanel from "@/components/afl/ai-insights/TeamPredictabilityPanel";
 import GameFlowMomentumPanel from "@/components/afl/ai-insights/GameFlowMomentumPanel";
 import PlayerImpactSignalsPanel from "@/components/afl/ai-insights/PlayerImpactSignalsPanel";
@@ -28,10 +26,6 @@ import {
   filterUpcomingFixtures,
   roundOrder,
   buildPlayerPredictabilityFromFixtures,
-  buildH2HPlayerMatchups,
-  buildQuarterFlow,
-  buildConsistencyExplosivenessTeams,
-  buildOutcomeDrivers,
 } from "@/components/afl/ai-insights/engine";
 
 /* -------------------------------------------------------------------------- */
@@ -129,15 +123,6 @@ export default function AFLAIInsights() {
   }, [playerPredict, stat]);
 
   /* -------------------------------------------------------------------------- */
-  /* BONUS — CONSISTENCY & EXPLOSIVENESS                                        */
-  /* -------------------------------------------------------------------------- */
-
-  const consistencyRows = useMemo(
-    () => buildConsistencyExplosivenessTeams(teams, stat),
-    [teams, stat]
-  );
-
-  /* -------------------------------------------------------------------------- */
   /* RENDER                                                                    */
   /* -------------------------------------------------------------------------- */
 
@@ -222,7 +207,7 @@ export default function AFLAIInsights() {
           />
         )}
 
-        {/* 4. PLAYER IMPACT SIGNALS */}
+        {/* 4. MATCH IMPACT VISUAL — PLAYERS (HERO) */}
         {selectedMatch && (
           <PlayerImpactSignalsPanel
             mode={mode}
@@ -232,40 +217,6 @@ export default function AFLAIInsights() {
           />
         )}
 
-        {/* BONUS */}
-        <SectionShell title="Bonus: Consistency & Explosiveness">
-          <ConsistencyList rows={consistencyRows} mode={mode} />
-        </SectionShell>
-
-        {/* MATCH-SCOPED CLOSING SECTIONS */}
-        {selectedMatch && (
-          <>
-            <SectionShell title="5. Head-to-Head Matchups">
-              <MatchupTable
-                rows={buildH2HPlayerMatchups(selectedMatch, stat, teams)}
-                mode={mode}
-              />
-            </SectionShell>
-
-            <SectionShell title="6. Game Flow Timing">
-              <QuarterFlowGrid
-                rows={buildQuarterFlow(selectedMatch)}
-                mode={mode}
-              />
-            </SectionShell>
-
-            <SectionShell title="7. What Decides This Match?">
-              <DriversList
-                rows={buildOutcomeDrivers({
-                  match: selectedMatch,
-                  fixtures: pastFixtures,
-                  stat,
-                })}
-                mode={mode}
-              />
-            </SectionShell>
-          </>
-        )}
       </div>
     </div>
   );
