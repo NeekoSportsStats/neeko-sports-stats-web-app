@@ -1,8 +1,3 @@
-// src/pages/sports/afl/AFLAIInsights.tsx
-// NOTE: Full replacement file.
-// Page is now: 1) Player Predictability, 2) Team Predictability, 3) Team Game Flow & Momentum, 4) Player Impact Visual.
-// Removed: Bonus, Head-to-Head, Quarter Flow, Drivers (per request).
-
 import React, { useMemo, useState, useEffect } from "react";
 import { Crown, ChevronDown } from "lucide-react";
 
@@ -35,7 +30,9 @@ function currentRound(fixtures: FixtureMatch[]) {
   const upcoming = filterUpcomingFixtures(fixtures);
   if (!upcoming.length) return "";
   return [...upcoming].sort(
-    (a, b) => roundOrder((a as any).roundLabel) - roundOrder((b as any).roundLabel)
+    (a, b) =>
+      roundOrder((a as any).roundLabel) -
+      roundOrder((b as any).roundLabel)
   )[0].roundLabel;
 }
 
@@ -54,8 +51,15 @@ export default function AFLAIInsights() {
 
   /* ---------------- ROUND + MATCH ---------------- */
 
-  const pastFixtures = useMemo(() => filterPastFixtures(fixtures), [fixtures]);
-  const roundLabel = useMemo(() => currentRound(fixtures), [fixtures]);
+  const pastFixtures = useMemo(
+    () => filterPastFixtures(fixtures),
+    [fixtures]
+  );
+
+  const roundLabel = useMemo(
+    () => currentRound(fixtures),
+    [fixtures]
+  );
 
   const roundMatches = useMemo(
     () =>
@@ -74,7 +78,10 @@ export default function AFLAIInsights() {
   }, [roundMatches, matchId]);
 
   const selectedMatch = useMemo(
-    () => roundMatches.find((m: any) => String(m.id) === String(matchId)),
+    () =>
+      roundMatches.find(
+        (m: any) => String(m.id) === String(matchId)
+      ),
     [roundMatches, matchId]
   );
 
@@ -93,7 +100,9 @@ export default function AFLAIInsights() {
     const home = (selectedMatch as any).homeTeam;
     const away = (selectedMatch as any).awayTeam;
 
-    return rawPlayerPredict.filter((p) => p.team === home || p.team === away);
+    return rawPlayerPredict.filter(
+      (p) => p.team === home || p.team === away
+    );
   }, [rawPlayerPredict, selectedMatch]);
 
   const playerInsight = useMemo(() => {
@@ -137,7 +146,9 @@ export default function AFLAIInsights() {
 
           {/* NEEKO+ TOGGLE (TEST MODE) */}
           <button
-            onClick={() => setMode((m) => (m === "premium" ? "free" : "premium"))}
+            onClick={() =>
+              setMode((m) => (m === "premium" ? "free" : "premium"))
+            }
             className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/10 px-4 py-2 text-sm text-amber-200 hover:bg-amber-400/20"
           >
             <Crown className="h-4 w-4" />
@@ -201,13 +212,12 @@ export default function AFLAIInsights() {
           />
         )}
 
-        {/* 4. PLAYER IMPACT VISUAL */}
+        {/* 4. PLAYER IMPACT VISUAL (FIXED) */}
         {selectedMatch && (
           <PlayerImpactScatterPanel
             mode={mode}
             match={selectedMatch as any}
-            fixtures={pastFixtures}
-            stat={stat}
+            initialLens={stat}
           />
         )}
       </div>
