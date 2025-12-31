@@ -1,3 +1,4 @@
+// src/pages/sports/afl/AFLAIInsights.tsx
 import React, { useMemo, useState, useEffect } from "react";
 import { Crown, ChevronDown } from "lucide-react";
 
@@ -42,7 +43,6 @@ function currentRound(fixtures: FixtureMatch[]) {
 
 export default function AFLAIInsights() {
   const fixtures = MOCK_FIXTURES as unknown as FixtureMatch[];
-  const teams = MOCK_TEAMS as any[];
 
   /* ---------------- GLOBAL STATE ---------------- */
 
@@ -212,7 +212,7 @@ export default function AFLAIInsights() {
           />
         )}
 
-        {/* 4. PLAYER IMPACT VISUAL (FIXED) */}
+        {/* 4. PLAYER IMPACT VISUAL */}
         {selectedMatch && (
           <PlayerImpactScatterPanel
             mode={mode}
