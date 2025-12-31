@@ -1,4 +1,8 @@
 // src/pages/sports/afl/AFLAIInsights.tsx
+// NOTE: Full replacement file.
+// Page is now: 1) Player Predictability, 2) Team Predictability, 3) Team Game Flow & Momentum, 4) Player Impact Visual.
+// Removed: Bonus, Head-to-Head, Quarter Flow, Drivers (per request).
+
 import React, { useMemo, useState, useEffect } from "react";
 import { Crown, ChevronDown } from "lucide-react";
 
@@ -14,8 +18,6 @@ import ControlsBar from "@/components/afl/ai-insights/ControlsBar";
 import PredictabilityTable from "@/components/afl/ai-insights/PredictabilityTable";
 import TeamPredictabilityPanel from "@/components/afl/ai-insights/TeamPredictabilityPanel";
 import GameFlowMomentumPanel from "@/components/afl/ai-insights/GameFlowMomentumPanel";
-
-// ✅ New Section 4 visual (Players only)
 import PlayerImpactScatterPanel from "@/components/afl/ai-insights/PlayerImpactScatterPanel";
 
 import {
@@ -33,7 +35,7 @@ function currentRound(fixtures: FixtureMatch[]) {
   const upcoming = filterUpcomingFixtures(fixtures);
   if (!upcoming.length) return "";
   return [...upcoming].sort(
-    (a, b) => roundOrder(a.roundLabel) - roundOrder(b.roundLabel)
+    (a, b) => roundOrder((a as any).roundLabel) - roundOrder((b as any).roundLabel)
   )[0].roundLabel;
 }
 
@@ -43,7 +45,7 @@ function currentRound(fixtures: FixtureMatch[]) {
 
 export default function AFLAIInsights() {
   const fixtures = MOCK_FIXTURES as unknown as FixtureMatch[];
-  const teams = MOCK_TEAMS as any[]; // kept for future toggles/sections
+  const teams = MOCK_TEAMS as any[];
 
   /* ---------------- GLOBAL STATE ---------------- */
 
@@ -58,7 +60,7 @@ export default function AFLAIInsights() {
   const roundMatches = useMemo(
     () =>
       filterUpcomingFixtures(fixtures).filter(
-        (m) => m.roundLabel === roundLabel
+        (m: any) => m.roundLabel === roundLabel
       ),
     [fixtures, roundLabel]
   );
@@ -67,12 +69,12 @@ export default function AFLAIInsights() {
 
   useEffect(() => {
     if (roundMatches.length && !matchId) {
-      setMatchId(roundMatches[0].id);
+      setMatchId(String((roundMatches[0] as any).id));
     }
   }, [roundMatches, matchId]);
 
   const selectedMatch = useMemo(
-    () => roundMatches.find((m) => m.id === matchId),
+    () => roundMatches.find((m: any) => String(m.id) === String(matchId)),
     [roundMatches, matchId]
   );
 
@@ -87,8 +89,10 @@ export default function AFLAIInsights() {
 
   const playerPredict = useMemo(() => {
     if (!selectedMatch) return [];
-    const home = selectedMatch.homeTeam;
-    const away = selectedMatch.awayTeam;
+
+    const home = (selectedMatch as any).homeTeam;
+    const away = (selectedMatch as any).awayTeam;
+
     return rawPlayerPredict.filter((p) => p.team === home || p.team === away);
   }, [rawPlayerPredict, selectedMatch]);
 
@@ -100,14 +104,14 @@ export default function AFLAIInsights() {
 
     if (stat === "goals") {
       return avgVol >= 0.6
-        ? "Goal scoring profiles suggest surge-prone phases and late separation risk."
-        : "Goal output is tightly clustered, limiting momentum swings.";
+        ? "Goal profiles suggest surge-prone phases and late separation risk."
+        : "Goal output is tightly clustered, limiting swing phases.";
     }
 
     if (stat === "disposals") {
       return avgConf >= 0.7
         ? "Disposal roles appear highly repeatable across both sides."
-        : "Midfield rotations introduce moderate possession volatility.";
+        : "Rotations introduce moderate possession volatility.";
     }
 
     return avgConf >= 0.7
@@ -151,8 +155,8 @@ export default function AFLAIInsights() {
               onChange={(e) => setMatchId(e.target.value)}
               className="appearance-none rounded-full border border-white/10 bg-black/40 py-1.5 pl-3 pr-9 text-sm"
             >
-              {roundMatches.map((m) => (
-                <option key={m.id} value={m.id}>
+              {roundMatches.map((m: any) => (
+                <option key={String(m.id)} value={String(m.id)}>
                   {m.homeTeam} vs {m.awayTeam}
                 </option>
               ))}
@@ -171,7 +175,7 @@ export default function AFLAIInsights() {
               rows={playerPredict}
               mode={mode}
               statLabel={STAT_LABEL[stat]}
-              matchContext={`${selectedMatch.homeTeam} vs ${selectedMatch.awayTeam}`}
+              matchContext={`${(selectedMatch as any).homeTeam} vs ${(selectedMatch as any).awayTeam}`}
               insight={playerInsight}
               showHeader={false}
             />
@@ -182,7 +186,7 @@ export default function AFLAIInsights() {
         {selectedMatch && (
           <TeamPredictabilityPanel
             mode={mode}
-            match={selectedMatch}
+            match={selectedMatch as any}
             fixtures={pastFixtures}
             stat={stat}
           />
@@ -192,22 +196,20 @@ export default function AFLAIInsights() {
         {selectedMatch && (
           <GameFlowMomentumPanel
             mode={mode}
-            match={selectedMatch}
+            match={selectedMatch as any}
             fixtures={pastFixtures}
           />
         )}
 
-        {/* 4. PLAYER IMPACT MAP (Players only) */}
+        {/* 4. PLAYER IMPACT VISUAL */}
         {selectedMatch && (
           <PlayerImpactScatterPanel
             mode={mode}
-            rows={playerPredict}
-            statLabel={STAT_LABEL[stat]}
-            matchContext={`${selectedMatch.homeTeam} vs ${selectedMatch.awayTeam}`}
+            match={selectedMatch as any}
+            fixtures={pastFixtures}
+            stat={stat}
           />
         )}
-
-        {/* ✅ Removed: Bonus, H2H, Drivers (optional later) */}
       </div>
     </div>
   );

@@ -1,4 +1,6 @@
-// src/components/afl/match-center/types.ts
+/* -------------------------------------------------------------------------- */
+/* MATCH CENTER — CORE TYPES                                                  */
+/* -------------------------------------------------------------------------- */
 
 export type MatchStatus = "upcoming" | "final";
 
@@ -11,9 +13,7 @@ export type FixtureQuarter = {
 export type TeamStatLine = {
   label: string;
   value: number;
-  /** Optional league average for a ghost marker line */
   leagueAvg?: number;
-  /** If false, lower is better (e.g. Turnovers). Default true */
   higherIsBetter?: boolean;
 };
 
@@ -33,90 +33,59 @@ export type TopFantasyTeam = {
 };
 
 export type TeamLists = {
-  /** If false, we show the full club list as “Not yet announced (projected)” */
   announced: boolean;
   caption?: string;
-
-  /** Usually 22 when announced; can be full list when not announced */
   home: string[];
   away: string[];
-
-  /** Optional bench labels (subset of home/away) */
   homeBench?: string[];
   awayBench?: string[];
-
-  /** Optional change notes (purely mock for now) */
   lateChanges?: { team: string; in: string; out?: string; note?: string }[];
   insOuts?: { team: string; ins: string[]; outs: string[] }[];
 };
 
 export type MatchPreview = {
-  homeWinProb: number; // 0-100
-  awayWinProb: number; // 0-100
-  reasons: [string, string]; // exactly 2 lines
+  homeWinProb: number;
+  awayWinProb: number;
+  reasons: [string, string];
   ladderPos?: { home: number; away: number };
   last5?: { home: ("W" | "L")[]; away: ("W" | "L")[] };
 };
 
 export type FixtureMatch = {
   id: string;
-
-  /** Season context */
   season: 2025 | 2026;
-
-  /** Round context */
-  roundNumber: number; // 0 = Opening Round
-  roundLabel: string; // OR, R1…R23
-
-  /** Match info */
+  roundNumber: number;
+  roundLabel: string;
   dateISO: string;
   timeLocal: string;
   venue: string;
-
   homeTeam: string;
   awayTeam: string;
-
   status: MatchStatus;
-
-  /** FINAL-only fields */
   homeScore?: number;
   awayScore?: number;
-
   quarters?: FixtureQuarter[];
-
   crowd?: number;
-
-  /** Optional: existing (kept) */
-  topPlayers?: {
-    home: string[];
-    away: string[];
-  };
-
-  /** Post-match ladder movement (optional) */
+  topPlayers?: { home: string[]; away: string[] };
   ladderDelta?: { team: string; delta: number }[];
-
-  /** FINAL: team stats shown in overlay */
   teamStats?: MatchTeamStats[];
-
-  /** FINAL: top 3 fantasy performers per team (card + overlay optional) */
   topFantasy?: TopFantasyTeam[];
-
-  /** UPCOMING: squads & lists (overlay only) */
   teamLists?: TeamLists;
-
-  /** UPCOMING: win probability + reasons + ladder + last5 */
   preview?: MatchPreview;
 };
+
 /* -------------------------------------------------------------------------- */
-/* AFL AI INSIGHTS TYPES (added - does not remove existing match-center types) */
+/* AFL AI INSIGHTS — SHARED TYPES                                              */
 /* -------------------------------------------------------------------------- */
 
 export type PremiumMode = "free" | "premium";
 
+/* ---------------- PREDICTABILITY ---------------- */
+
 export type PredictRow = {
   id: string;
   name: string;
-  team: string; // ✅ ADD THIS
+  team: string;
   confidence01: number;
   volatility01: number;
   rangeLow: number;
@@ -124,12 +93,16 @@ export type PredictRow = {
   ai: string;
 };
 
+/* ---------------- MATCHUPS ---------------- */
+
 export type MatchupRow = {
   id: string;
   label: string;
-  edge01: number; // 0..1
+  edge01: number;
   ai: string;
 };
+
+/* ---------------- GAME FLOW ---------------- */
 
 export type QuarterFlowRow = {
   q: "Q1" | "Q2" | "Q3" | "Q4";
@@ -138,6 +111,8 @@ export type QuarterFlowRow = {
   ai: string;
 };
 
+/* ---------------- CONSISTENCY ---------------- */
+
 export type ConsistencyRow = {
   id: string;
   name: string;
@@ -145,6 +120,8 @@ export type ConsistencyRow = {
   explosiveness01: number;
   ai: string;
 };
+
+/* ---------------- DRIVERS ---------------- */
 
 export type DriverRow = {
   id: string;
@@ -161,6 +138,8 @@ export type OutcomeDriver = {
   stability01: number;
   aiSummary: string;
 };
+
+/* ---------------- H2H DETAIL ---------------- */
 
 export type PlayerMatchupRow = {
   id: string;
@@ -188,4 +167,57 @@ export type ConsistencyExplosivenessRow = {
   consistency01: number;
   explosiveness01: number;
   ai: string;
+};
+
+/* -------------------------------------------------------------------------- */
+/* SECTION 4 — PLAYER IMPACT VISUAL                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Trend point used by Player Impact visuals
+ * (line chart + NEXT round shaded column)
+ */
+export type PlayerTrendPoint = {
+  /** Round label (OR, R1–R23, NEXT) */
+  label: string;
+
+  /** Actual or projected stat value */
+  value: number;
+
+  /** Projection band (NEXT round only) */
+  low?: number;
+  high?: number;
+
+  /** Visual hint for styling */
+  kind?: "actual" | "projected";
+};
+
+/**
+ * Unified data shape for Player Impact visualisations
+ */
+export type PlayerImpactPoint = {
+  id: string;
+  name: string;
+  team: string;
+
+  /* Scatter axes */
+  safety01: number;
+  impact01: number;
+  size01: number;
+
+  /* Predictive signals */
+  confidence01: number;
+  volatility01: number;
+  expected01: number;
+
+  /* Projection */
+  expected: number;
+  rangeLow: number;
+  rangeHigh: number;
+
+  /* Trend */
+  trend?: PlayerTrendPoint[];
+
+  /* Copy */
+  ai?: string;
 };
