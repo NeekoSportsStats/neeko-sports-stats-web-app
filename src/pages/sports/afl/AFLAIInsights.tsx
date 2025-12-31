@@ -1,5 +1,3 @@
-// src/pages/sports/afl/AFLAIInsights.tsx
-
 import React, { useMemo, useState, useEffect } from "react";
 import { Crown, ChevronDown } from "lucide-react";
 
@@ -12,7 +10,6 @@ import {
   STAT_LABEL,
   StatLens,
   mean,
-  cv,
 } from "@/components/afl/ai-insights/utils";
 
 import SectionShell from "@/components/afl/ai-insights/SectionShell";
@@ -23,9 +20,8 @@ import QuarterFlowGrid from "@/components/afl/ai-insights/QuarterFlowGrid";
 import ConsistencyList from "@/components/afl/ai-insights/ConsistencyList";
 import DriversList from "@/components/afl/ai-insights/DriversList";
 import TeamPredictabilityPanel from "@/components/afl/ai-insights/TeamPredictabilityPanel";
-
-// 🔹 ADDED: new Section 3 component
 import GameFlowMomentumPanel from "@/components/afl/ai-insights/GameFlowMomentumPanel";
+import PlayerImpactSignalsPanel from "@/components/afl/ai-insights/PlayerImpactSignalsPanel";
 
 import {
   filterPastFixtures,
@@ -90,7 +86,7 @@ export default function AFLAIInsights() {
   );
 
   /* -------------------------------------------------------------------------- */
-  /* PLAYER PREDICTABILITY (MATCH-SCOPED + STAT-DRIVEN)                        */
+  /* 1. PLAYER SCORE PREDICTABILITY                                             */
   /* -------------------------------------------------------------------------- */
 
   const rawPlayerPredict = useMemo(
@@ -109,10 +105,6 @@ export default function AFLAIInsights() {
     );
   }, [rawPlayerPredict, selectedMatch]);
 
-  /* -------------------------------------------------------------------------- */
-  /* PLAYER INSIGHT SUMMARY (STAT AWARE)                                       */
-  /* -------------------------------------------------------------------------- */
-
   const playerInsight = useMemo(() => {
     if (!playerPredict.length) return "";
 
@@ -121,13 +113,13 @@ export default function AFLAIInsights() {
 
     if (stat === "goals") {
       return avgVol >= 0.6
-        ? "Goal scoring profiles indicate volatile surge phases and late separation risk."
-        : "Goal output is tightly clustered, suggesting fewer momentum swings.";
+        ? "Goal scoring profiles suggest surge-prone phases and late separation risk."
+        : "Goal output is tightly clustered, limiting momentum swings.";
     }
 
     if (stat === "disposals") {
       return avgConf >= 0.7
-        ? "Disposal roles appear highly repeatable across both teams."
+        ? "Disposal roles appear highly repeatable across both sides."
         : "Midfield rotations introduce moderate possession volatility.";
     }
 
@@ -137,7 +129,7 @@ export default function AFLAIInsights() {
   }, [playerPredict, stat]);
 
   /* -------------------------------------------------------------------------- */
-  /* BONUS: CONSISTENCY & EXPLOSIVENESS                                        */
+  /* BONUS — CONSISTENCY & EXPLOSIVENESS                                        */
   /* -------------------------------------------------------------------------- */
 
   const consistencyRows = useMemo(
@@ -176,9 +168,7 @@ export default function AFLAIInsights() {
 
         {/* MATCH SELECTOR */}
         <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-          <div className="text-sm text-white/70">
-            Match this round
-          </div>
+          <div className="text-sm text-white/70">Match this round</div>
 
           <div className="relative">
             <select
@@ -196,7 +186,7 @@ export default function AFLAIInsights() {
           </div>
         </div>
 
-        {/* STAT FILTER — GLOBAL DRIVER */}
+        {/* STAT FILTER */}
         <ControlsBar stat={stat} onChange={setStat} />
 
         {/* 1. PLAYER SCORE PREDICTABILITY */}
@@ -213,7 +203,7 @@ export default function AFLAIInsights() {
           </SectionShell>
         )}
 
-        {/* 2. TEAM SCORE PREDICTABILITY — STAT DRIVEN */}
+        {/* 2. TEAM SCORE PREDICTABILITY */}
         {selectedMatch && (
           <TeamPredictabilityPanel
             mode={mode}
@@ -223,7 +213,7 @@ export default function AFLAIInsights() {
           />
         )}
 
-        {/* 🔹 3. GAME FLOW & MOMENTUM (NEW SECTION) */}
+        {/* 3. TEAM GAME FLOW & MOMENTUM */}
         {selectedMatch && (
           <GameFlowMomentumPanel
             mode={mode}
@@ -232,29 +222,39 @@ export default function AFLAIInsights() {
           />
         )}
 
+        {/* 4. PLAYER IMPACT SIGNALS */}
+        {selectedMatch && (
+          <PlayerImpactSignalsPanel
+            mode={mode}
+            match={selectedMatch}
+            fixtures={pastFixtures}
+            stat={stat}
+          />
+        )}
+
         {/* BONUS */}
         <SectionShell title="Bonus: Consistency & Explosiveness">
           <ConsistencyList rows={consistencyRows} mode={mode} />
         </SectionShell>
 
-        {/* MATCH-SCOPED SECTIONS */}
+        {/* MATCH-SCOPED CLOSING SECTIONS */}
         {selectedMatch && (
           <>
-            <SectionShell title="4. Head-to-Head Matchups">
+            <SectionShell title="5. Head-to-Head Matchups">
               <MatchupTable
                 rows={buildH2HPlayerMatchups(selectedMatch, stat, teams)}
                 mode={mode}
               />
             </SectionShell>
 
-            <SectionShell title="5. Game Flow & Timing">
+            <SectionShell title="6. Game Flow Timing">
               <QuarterFlowGrid
                 rows={buildQuarterFlow(selectedMatch)}
                 mode={mode}
               />
             </SectionShell>
 
-            <SectionShell title="6. What Decides This Match?">
+            <SectionShell title="7. What Decides This Match?">
               <DriversList
                 rows={buildOutcomeDrivers({
                   match: selectedMatch,
