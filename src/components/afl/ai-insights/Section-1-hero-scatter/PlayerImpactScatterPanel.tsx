@@ -1,69 +1,25 @@
-// src/components/afl/ai-insights/Section-1-hero-scatter/PlayerImpactScatterPanel.tsx
-
-import React, { useState, useMemo } from "react";
-import type { FixtureMatch } from "@/components/afl/match-center/types";
-import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
-
-import usePlayerScatterData, {
-  PlayerPoint,
-  LensKey,
-  TeamFilter,
-  LabelMode,
-} from "./usePlayerScatterData";
-
+import React from "react";
 import PlayerImpactHeroScatter from "./PlayerImpactHeroScatter";
-import PlayerTrendModal from "./PlayerTrendModal";
 
-type Props = {
-  match?: FixtureMatch;
-  mode: PremiumMode;
-  initialLens?: LensKey;
-};
+/**
+ * SECTION 1 — HERO SCATTER (LOCKED STEP 1)
+ *
+ * This file intentionally does ONE thing:
+ * Render the Hero Scatter.
+ *
+ * No props
+ * No modal
+ * No trends
+ * No legacy wiring
+ *
+ * This prevents regression and type mismatch
+ * while we rebuild the section correctly.
+ */
 
-export default function PlayerImpactScatterPanel({
-  match,
-  mode,
-  initialLens = "fantasy",
-}: Props) {
-  const locked = mode !== "premium";
-
-  const [lens, setLens] = useState<LensKey>(initialLens);
-  const [teamFilter, setTeamFilter] = useState<TeamFilter>("both");
-  const [labelMode, setLabelMode] = useState<LabelMode>("smart");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
-
-  const players = usePlayerScatterData({ match, lens, teamFilter });
-
-  const selected = useMemo(
-    () => players.find((p) => p.id === selectedId) ?? null,
-    [players, selectedId]
-  );
-
+export default function PlayerImpactScatterPanel() {
   return (
-    <>
-      <PlayerImpactHeroScatter
-        players={players}
-        selectedId={selectedId}
-        lens={lens}
-        teamFilter={teamFilter}
-        labelMode={labelMode}
-        locked={locked}
-        onChangeLens={setLens}
-        onChangeTeam={setTeamFilter}
-        onChangeLabels={setLabelMode}
-        onSelectPlayer={(id) => {
-          setSelectedId(id);
-          setOpen(true);
-        }}
-      />
-
-      <PlayerTrendModal
-        open={open}
-        onClose={() => setOpen(false)}
-        player={selected}
-        lens={lens}
-      />
-    </>
+    <div className="w-full">
+      <PlayerImpactHeroScatter />
+    </div>
   );
 }

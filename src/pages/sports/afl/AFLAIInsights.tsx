@@ -188,9 +188,6 @@ export default function AFLAIInsights() {
             subtitle="Momentum vs ceiling · Click any player to explore trend, projection, and risk"
           >
             <PlayerImpactScatterPanel
-              mode={mode}
-              match={selectedMatch as any}
-              initialLens={stat}
             />
           </SectionShell>
         )}

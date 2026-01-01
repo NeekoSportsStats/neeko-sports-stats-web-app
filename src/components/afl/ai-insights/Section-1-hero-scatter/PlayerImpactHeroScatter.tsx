@@ -1,104 +1,198 @@
-// src/components/afl/ai-insights/Section-1-hero-scatter/PlayerImpactHeroScatter.tsx
+import React, { useMemo, useState } from "react";
+import { Sparkles } from "lucide-react";
 
-import React from "react";
-import { PlayerPoint, LensKey, TeamFilter, LabelMode } from "./usePlayerScatterData";
-
-type Props = {
-  players: PlayerPoint[];
-  selectedId: string | null;
-  lens: LensKey;
-  teamFilter: TeamFilter;
-  labelMode: LabelMode;
-  locked: boolean;
-  onChangeLens: (l: LensKey) => void;
-  onChangeTeam: (t: TeamFilter) => void;
-  onChangeLabels: (m: LabelMode) => void;
-  onSelectPlayer: (id: string) => void;
+export type PlayerPoint = {
+  id: string;
+  name: string;
+  team: "home" | "away";
+  momentum: number; // X-axis
+  ceiling: number; // Y-axis
 };
 
-export default function PlayerImpactHeroScatter({
-  players,
-  selectedId,
-  lens,
-  teamFilter,
-  labelMode,
-  locked,
-  onChangeLens,
-  onChangeTeam,
-  onChangeLabels,
-  onSelectPlayer,
-}: Props) {
+/* -------------------------------------------------------------------------- */
+/* HELPERS                                                                    */
+/* -------------------------------------------------------------------------- */
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function seededValue(seed: string, min: number, max: number) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (h << 5) - h + seed.charCodeAt(i);
+    h |= 0;
+  }
+  const t = Math.abs(h) % 1000;
+  return clamp(min + (t / 1000) * (max - min), min, max);
+}
+
+function buildMockPlayers(): PlayerPoint[] {
+  const names = [
+    "Marcus Bontempelli",
+    "Nick Daicos",
+    "Christian Petracca",
+    "Zach Merrett",
+    "Errol Gulden",
+    "Clayton Oliver",
+    "Jordan Dawson",
+    "Patrick Cripps",
+    "Caleb Serong",
+    "Sam Walsh",
+    "Isaac Heeney",
+    "Charlie Curnow",
+    "Jeremy Cameron",
+    "Touk Miller",
+    "Andrew Brayshaw",
+    "Josh Dunkley",
+    "Max Gawn",
+    "Tom Liberatore",
+  ];
+
+  return names.map((name, i) => ({
+    id: String(i),
+    name,
+    team: i % 2 === 0 ? "home" : "away",
+    momentum: seededValue(name + "_m", 20, 95),
+    ceiling: seededValue(name + "_c", 25, 98),
+  }));
+}
+
+/* -------------------------------------------------------------------------- */
+/* COMPONENT                                                                  */
+/* -------------------------------------------------------------------------- */
+
+export default function PlayerImpactHeroScatter() {
+  const players = useMemo(() => buildMockPlayers(), []);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const selected = players.find((p) => p.id === selectedId) ?? null;
+
+  /* Layout */
   const W = 760;
-  const H = 420;
+  const H = 440;
   const PAD = 56;
 
   const x = (v: number) => PAD + (v / 100) * (W - PAD * 2);
   const y = (v: number) => PAD + (1 - v / 100) * (H - PAD * 2);
 
+  const xMid = x(50);
+  const yMid = y(50);
+
+  function isFinale(p: PlayerPoint) {
+    return p.momentum >= 70 && p.ceiling >= 70;
+  }
+
+  function showLabel(p: PlayerPoint) {
+    if (p.id === selectedId) return true;
+    return isFinale(p);
+  }
+
   return (
-    <section className="rounded-3xl border border-white/10 bg-black/40 p-4">
-      {/* Controls */}
-      <div className="mb-3 flex flex-wrap gap-2">
-        {(["fantasy", "disposals", "goals"] as LensKey[]).map((l) => (
-          <button
-            key={l}
-            onClick={() => onChangeLens(l)}
-            className={`rounded-full px-3 py-1 text-xs ${
-              lens === l ? "bg-amber-400/20 text-amber-200" : "bg-white/5 text-white/70"
-            }`}
-          >
-            {l}
-          </button>
-        ))}
-        <span className="mx-2 opacity-30">|</span>
-        {(["both", "home", "away"] as TeamFilter[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => onChangeTeam(t)}
-            className={`rounded-full px-3 py-1 text-xs ${
-              teamFilter === t ? "bg-white/15 text-white" : "bg-white/5 text-white/70"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+    <section className="rounded-3xl border border-amber-400/20 bg-gradient-to-b from-[#0b0b0b] to-black p-6 shadow-[0_0_0_1px_rgba(255,215,128,0.08)]">
+      {/* Header */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 text-amber-300 text-sm">
+          <Sparkles className="h-4 w-4" />
+          PLAYER IMPACT MAP
+        </div>
+        <h2 className="mt-1 text-xl font-semibold text-white">
+          Momentum vs Ceiling
+        </h2>
+        <p className="mt-1 text-sm text-white/60">
+          Top-right = finale targets · Click to select
+        </p>
       </div>
 
       {/* Scatter */}
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
-        {players.map((p) => {
-          const cx = x(p.momentum);
-          const cy = y(p.ceiling);
-          const selected = p.id === selectedId;
-
-          return (
-            <g key={p.id} onClick={() => onSelectPlayer(p.id)} style={{ cursor: "pointer" }}>
-              {selected && (
-                <circle cx={cx} cy={cy} r={18} fill="rgba(251,191,36,0.15)" />
-              )}
-              <circle
-                cx={cx}
-                cy={cy}
-                r={selected ? 7 : 5}
-                fill={p.teamSide === "home" ? "#60a5fa" : "#34d399"}
-                stroke={selected ? "#fbbf24" : "rgba(255,255,255,0.3)"}
-                strokeWidth={selected ? 2 : 1}
-              />
-              {labelMode !== "none" && (
-                <text
-                  x={cx}
-                  y={cy + 16}
-                  textAnchor="middle"
-                  fontSize={11}
-                  fill="rgba(255,255,255,0.85)"
-                >
-                  {p.name}
-                </text>
-              )}
+      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+        <svg viewBox={`0 0 ${W} ${H}`} className="block w-full">
+          {/* Grid */}
+          {[0, 25, 50, 75, 100].map((v) => (
+            <g key={v} opacity={0.22}>
+              <line x1={x(v)} y1={PAD} x2={x(v)} y2={H - PAD} stroke="white" />
+              <line x1={PAD} y1={y(v)} x2={W - PAD} y2={y(v)} stroke="white" />
             </g>
-          );
-        })}
-      </svg>
+          ))}
+
+          {/* Midlines */}
+          <line x1={xMid} y1={PAD} x2={xMid} y2={H - PAD} stroke="rgba(255,255,255,0.3)" />
+          <line x1={PAD} y1={yMid} x2={W - PAD} y2={yMid} stroke="rgba(255,255,255,0.3)" />
+
+          {/* Quadrant labels */}
+          <text x={W - PAD - 130} y={PAD + 20} fontSize={12} fill="rgba(255,215,128,0.9)">
+            Finale targets
+          </text>
+          <text x={PAD + 10} y={PAD + 20} fontSize={12} fill="rgba(255,255,255,0.5)">
+            Volatile upside
+          </text>
+          <text x={PAD + 10} y={H - PAD - 10} fontSize={12} fill="rgba(255,255,255,0.5)">
+            Avoid
+          </text>
+          <text x={W - PAD - 120} y={H - PAD - 10} fontSize={12} fill="rgba(255,255,255,0.5)">
+            Safe floor
+          </text>
+
+          {/* Axis labels */}
+          <text x={W / 2} y={H - 12} textAnchor="middle" fontSize={12} fill="rgba(255,255,255,0.65)">
+            Momentum →
+          </text>
+          <text
+            x={16}
+            y={H / 2}
+            transform={`rotate(-90 16 ${H / 2})`}
+            textAnchor="middle"
+            fontSize={12}
+            fill="rgba(255,255,255,0.65)"
+          >
+            Ceiling ↑
+          </text>
+
+          {/* Points */}
+          {players.map((p) => {
+            const cx = x(p.momentum);
+            const cy = y(p.ceiling);
+            const selected = p.id === selectedId;
+
+            return (
+              <g key={p.id}>
+                {selected && (
+                  <circle cx={cx} cy={cy} r={18} fill="rgba(251,191,36,0.18)" />
+                )}
+
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={selected ? 7 : 5.5}
+                  fill={
+                    selected
+                      ? "#fbbf24"
+                      : isFinale(p)
+                      ? "#fbbf24"
+                      : "rgba(255,255,255,0.55)"
+                  }
+                  stroke="rgba(255,255,255,0.5)"
+                  strokeWidth={selected ? 2 : 1}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setSelectedId(p.id)}
+                />
+
+                {showLabel(p) && (
+                  <text
+                    x={cx}
+                    y={cy + 18}
+                    textAnchor="middle"
+                    fontSize={11}
+                    fill="rgba(255,255,255,0.9)"
+                  >
+                    {p.name}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
     </section>
   );
 }
