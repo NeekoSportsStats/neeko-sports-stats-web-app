@@ -1,5 +1,5 @@
-// src/components/afl/ai-insights/Section-1-hero-scatter/usePlayerScatterData.ts
-
+// Section-1-hero-scatter/usePlayerScatterData.ts
+import { useMemo, useState } from "react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 
 export type LensKey = "fantasy" | "disposals" | "goals";
@@ -15,15 +15,9 @@ export type PlayerPoint = {
   ceiling: number;
 };
 
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function hash(str: string) {
+function hash(s: string) {
   let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = (h << 5) - h + str.charCodeAt(i);
-  }
+  for (let i = 0; i < s.length; i++) h = (h << 5) - h + s.charCodeAt(i);
   return Math.abs(h);
 }
 
@@ -36,60 +30,66 @@ function seeded(seed: number) {
   };
 }
 
-export default function usePlayerScatterData(args: {
-  match?: FixtureMatch;
-  lens: LensKey;
-  teamFilter: TeamFilter;
-}): PlayerPoint[] {
-  const { match, lens, teamFilter } = args;
+export default function usePlayerScatterData(match?: FixtureMatch) {
+  const home = String((match as any)?.homeTeam ?? "Home");
+  const away = String((match as any)?.awayTeam ?? "Away");
 
-  const home =
-    (match as any)?.homeTeam?.name ??
-    (match as any)?.homeTeam ??
-    "Home";
+  const [lens, setLens] = useState<LensKey>("fantasy");
+  const [teamFilter, setTeamFilter] = useState<TeamFilter>("both");
+  const [labelMode, setLabelMode] = useState<LabelMode>("smart");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const away =
-    (match as any)?.awayTeam?.name ??
-    (match as any)?.awayTeam ??
-    "Away";
+  const players = useMemo<PlayerPoint[]>(() => {
+    const base = [
+      "Patrick Cripps",
+      "Sam Walsh",
+      "Nick Daicos",
+      "Christian Petracca",
+      "Zach Merrett",
+      "Caleb Serong",
+      "Errol Gulden",
+      "Clayton Oliver",
+      "Jeremy Cameron",
+      "Max Gawn",
+    ];
 
-  const names = [
-    "Marcus Bontempelli",
-    "Nick Daicos",
-    "Christian Petracca",
-    "Zach Merrett",
-    "Errol Gulden",
-    "Clayton Oliver",
-    "Patrick Cripps",
-    "Jordan Dawson",
-    "Max Gawn",
-    "Charlie Curnow",
-    "Jeremy Cameron",
-    "Sam Walsh",
-    "Caleb Serong",
-    "Andrew Brayshaw",
-    "Touk Miller",
-    "Isaac Heeney",
-  ];
+    return base.map((name, i) => {
+      const side: "home" | "away" = i % 2 === 0 ? "home" : "away";
+      const teamName = side === "home" ? home : away;
+      const r = seeded(hash(`${name}:${lens}`));
 
-  const points: PlayerPoint[] = names.map((name, i) => {
-    const side: "home" | "away" = i % 2 === 0 ? "home" : "away";
-    const teamName = side === "home" ? home : away;
+      return {
+        id: `${name}-${lens}`,
+        name,
+        teamSide: side,
+        teamName,
+        momentum: Math.round(35 + r() * 55),
+        ceiling: Math.round(40 + r() * 50),
+      };
+    });
+  }, [home, away, lens]);
 
-    const r = seeded(hash(`${name}:${teamName}:${lens}`));
+  const visible = useMemo(
+    () =>
+      players.filter(
+        (p) => teamFilter === "both" || p.teamSide === teamFilter
+      ),
+    [players, teamFilter]
+  );
 
-    const lensBias = lens === "goals" ? 6 : lens === "disposals" ? 3 : 0;
+  const selected =
+    visible.find((p) => p.id === selectedId) ?? visible[0] ?? null;
 
-    return {
-      id: `${side}-${hash(name)}`,
-      name,
-      teamSide: side,
-      teamName,
-      momentum: clamp(30 + r() * 60, 0, 100),
-      ceiling: clamp(35 + r() * 55 + lensBias, 0, 100),
-    };
-  });
-
-  if (teamFilter === "both") return points;
-  return points.filter((p) => p.teamSide === teamFilter);
+  return {
+    lens,
+    setLens,
+    teamFilter,
+    setTeamFilter,
+    labelMode,
+    setLabelMode,
+    players: visible,
+    selected,
+    selectedId,
+    setSelectedId,
+  };
 }
