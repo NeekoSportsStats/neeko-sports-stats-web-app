@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Sparkles, TrendingUp, BarChart3, Info, Lock } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/afl/match-center/types";
-import type { PremiumMode } from "@/components/afl/ai-insights/types";
+import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 
 /* -------------------------------------------------------------------------------------------------
   Hero Scatter (Step 4B)

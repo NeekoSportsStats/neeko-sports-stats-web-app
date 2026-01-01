@@ -1,11 +1,14 @@
-export * from "./types";
-export * from "./utils";
-export * from "./engine";
-export { default as SectionShell } from "./SectionShell";
-export { default as ControlsBar } from "./ControlsBar";
-export { default as PredictabilityTable } from "./PredictabilityTable";
-export { default as MatchupTable } from "./MatchupTable";
-export { default as QuarterFlowGrid } from "./QuarterFlowGrid";
-export { default as ConsistencyList } from "./ConsistencyList";
-export { default as DriversList } from "./DriversList";
-export { default as RoundOverview } from "./RoundOverview";
+// src/components/afl/ai-insights/index.ts
+
+export * from "./shared/ControlsBar";
+export * from "./shared/MetricPills";
+export * from "./shared/SectionShell";
+
+export * from "./data/types";
+export * from "./data/utils";
+export * from "./data/engine";
+
+export * from "./Section-1-hero-scatter/PlayerImpactScatterPanel";
+export * from "./Section-2-player-predictability/PredictabilityTable";
+export * from "./Section-3-team-prediction/TeamPredictabilityPanel";
+export * from "./Section-4-game-flow/GameFlowMomentumPanel";

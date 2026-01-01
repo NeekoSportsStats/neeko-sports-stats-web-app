@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { X, ChevronDown, ChevronRight } from "lucide-react";
 import { createPortal } from "react-dom";
-import type { PredictRow, PremiumMode } from "./types";
-import { confLabel, volLabel } from "./utils";
+import type { PredictRow, PremiumMode } from "../data/types";
+import { confLabel, volLabel } from "../data/utils";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES & HELPERS                                                             */

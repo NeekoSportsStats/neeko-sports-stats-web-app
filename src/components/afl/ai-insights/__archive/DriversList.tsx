@@ -1,7 +1,7 @@
 import React from "react";
 import { Lock } from "lucide-react";
-import type { DriverRow, PremiumMode } from "./types";
-import { clamp } from "./utils";
+import type { DriverRow, PremiumMode } from "../data/types";
+import { clamp } from "../data/utils";
 
 function meter(v01: number) {
   const w = Math.round(clamp(v01, 0, 1) * 100);

@@ -1,5 +1,5 @@
 import React from "react";
-import { StatLens, STAT_LABEL, cx } from "./utils";
+import { StatLens, STAT_LABEL, cx } from "../data/utils";
 
 export default function ControlsBar(props: {
   stat: StatLens;

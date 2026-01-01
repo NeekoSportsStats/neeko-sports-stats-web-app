@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { Lock, TrendingUp, Activity, Waves } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/afl/match-center/types";
-import type { PremiumMode } from "@/components/afl/ai-insights/types";
+import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 
 /* -------------------------------------------------------------------------- */
 /* SECTION 3 — GAME FLOW & MOMENTUM                                           */

@@ -6,22 +6,22 @@ import { Crown, ChevronDown } from "lucide-react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import { MOCK_FIXTURES } from "@/components/afl/match-center/mockData";
 
-import type { PremiumMode } from "@/components/afl/ai-insights/types";
-import { STAT_LABEL, StatLens, mean } from "@/components/afl/ai-insights/utils";
+import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
+import { STAT_LABEL, StatLens, mean } from "@/components/afl/ai-insights/data/utils";
 
-import SectionShell from "@/components/afl/ai-insights/SectionShell";
-import ControlsBar from "@/components/afl/ai-insights/ControlsBar";
-import PredictabilityTable from "@/components/afl/ai-insights/PredictabilityTable";
-import TeamPredictabilityPanel from "@/components/afl/ai-insights/TeamPredictabilityPanel";
-import GameFlowMomentumPanel from "@/components/afl/ai-insights/GameFlowMomentumPanel";
-import PlayerImpactScatterPanel from "@/components/afl/ai-insights/PlayerImpactScatterPanel";
+import SectionShell from "@/components/afl/ai-insights/shared/SectionShell";
+import ControlsBar from "@/components/afl/ai-insights/shared/ControlsBar";
+import PredictabilityTable from "@/components/afl/ai-insights/Section-2-player-predictability/PredictabilityTable";
+import TeamPredictabilityPanel from "@/components/afl/ai-insights/Section-3-team-prediction/TeamPredictabilityPanel";
+import GameFlowMomentumPanel from "@/components/afl/ai-insights/Section-4-game-flow/GameFlowMomentumPanel";
+import PlayerImpactScatterPanel from "@/components/afl/ai-insights/Section-1-hero-scatter/PlayerImpactScatterPanel";
 
 import {
   filterPastFixtures,
   filterUpcomingFixtures,
   roundOrder,
   buildPlayerPredictabilityFromFixtures,
-} from "@/components/afl/ai-insights/engine";
+} from "@/components/afl/ai-insights/data/engine";
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */

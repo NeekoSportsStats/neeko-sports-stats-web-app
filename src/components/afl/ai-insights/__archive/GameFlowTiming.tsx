@@ -1,6 +1,6 @@
 import React from "react";
-import type { QuarterFlow, PremiumMode } from "./types";
-import { cx } from "./utils";
+import type { QuarterFlow, PremiumMode } from "../data/types";
+import { cx } from "../data/utils";
 import { Lock } from "lucide-react";
 
 function meter(v01: number) {

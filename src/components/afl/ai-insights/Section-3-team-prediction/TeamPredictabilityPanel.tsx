@@ -2,10 +2,10 @@ import React, { useMemo } from "react";
 import { Lock } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/afl/match-center/types";
-import type { PremiumMode } from "@/components/afl/ai-insights/types";
-import type { StatLens } from "@/components/afl/ai-insights/utils";
-import { mean } from "@/components/afl/ai-insights/utils";
-import { roundOrder } from "@/components/afl/ai-insights/engine";
+import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
+import type { StatLens } from "@/components/afl/ai-insights/data/utils";
+import { mean } from "@/components/afl/ai-insights/data/utils";
+import { roundOrder } from "@/components/afl/ai-insights/data/engine";
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */

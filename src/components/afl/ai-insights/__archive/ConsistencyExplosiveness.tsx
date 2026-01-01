@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
-import type { ConsistencyExplosivenessRow, PremiumMode } from "./types";
+import type { ConsistencyExplosivenessRow, PremiumMode } from "../data/types";
 import { CEStack } from "./MetricPills";
 import { Lock } from "lucide-react";
-import { cx } from "./utils";
+import { cx } from "../data/utils";
 
 export function ConsistencyExplosiveness(props: {
   titleLeft: string;
