@@ -1,90 +1,95 @@
-// src/components/afl/ai-insights/usePlayerScatterData.ts
+// src/components/afl/ai-insights/Section-1-hero-scatter/usePlayerScatterData.ts
 
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 
-export type ScatterLens = "fantasy" | "disposals" | "goals";
+export type LensKey = "fantasy" | "disposals" | "goals";
+export type TeamFilter = "both" | "home" | "away";
+export type LabelMode = "smart" | "all" | "none";
 
-export type ScatterPlayer = {
+export type PlayerPoint = {
   id: string;
   name: string;
-  teamId: string;
+  teamSide: "home" | "away";
   teamName: string;
-
-  momentum: number; // X-axis
-  ceiling: number;  // Y-axis
-
-  series: number[];
+  momentum: number;
+  ceiling: number;
 };
 
-/* ---------------------------------------------------------
-  Math helpers (pure, deterministic)
---------------------------------------------------------- */
-
-function mean(values: number[]) {
-  if (!values.length) return 0;
-  return values.reduce((a, b) => a + b, 0) / values.length;
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
 }
 
-function percentile(values: number[], p: number) {
-  if (!values.length) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const idx = Math.floor(p * (sorted.length - 1));
-  return sorted[idx];
+function hash(str: string) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (h << 5) - h + str.charCodeAt(i);
+  }
+  return Math.abs(h);
 }
 
-/* ---------------------------------------------------------
-  Metric calculations (LOCKED)
---------------------------------------------------------- */
-
-function computeMomentum(series: number[]) {
-  if (series.length < 6) return 0;
-
-  const last5 = series.slice(-5);
-  const prev5 = series.slice(-10, -5);
-
-  return mean(last5) - mean(prev5);
+function seeded(seed: number) {
+  let t = seed + 0x6d2b79f5;
+  return () => {
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
-function computeCeiling(series: number[]) {
-  const window = series.slice(-8);
-  return percentile(window, 0.8);
-}
+export default function usePlayerScatterData(args: {
+  match?: FixtureMatch;
+  lens: LensKey;
+  teamFilter: TeamFilter;
+}): PlayerPoint[] {
+  const { match, lens, teamFilter } = args;
 
-/* ---------------------------------------------------------
-  MAIN SELECTOR (PURE)
---------------------------------------------------------- */
+  const home =
+    (match as any)?.homeTeam?.name ??
+    (match as any)?.homeTeam ??
+    "Home";
 
-export function usePlayerScatterData(
-  _match: FixtureMatch | undefined,
-  lens: ScatterLens,
-  players: {
-    id: string;
-    name: string;
-    teamId: string;
-    teamName: string;
-    fantasy: number[];
-    disposals: number[];
-    goals: number[];
-  }[]
-): ScatterPlayer[] {
-  return players.map((p) => {
-    const series =
-      lens === "fantasy"
-        ? p.fantasy
-        : lens === "disposals"
-        ? p.disposals
-        : p.goals;
+  const away =
+    (match as any)?.awayTeam?.name ??
+    (match as any)?.awayTeam ??
+    "Away";
+
+  const names = [
+    "Marcus Bontempelli",
+    "Nick Daicos",
+    "Christian Petracca",
+    "Zach Merrett",
+    "Errol Gulden",
+    "Clayton Oliver",
+    "Patrick Cripps",
+    "Jordan Dawson",
+    "Max Gawn",
+    "Charlie Curnow",
+    "Jeremy Cameron",
+    "Sam Walsh",
+    "Caleb Serong",
+    "Andrew Brayshaw",
+    "Touk Miller",
+    "Isaac Heeney",
+  ];
+
+  const points: PlayerPoint[] = names.map((name, i) => {
+    const side: "home" | "away" = i % 2 === 0 ? "home" : "away";
+    const teamName = side === "home" ? home : away;
+
+    const r = seeded(hash(`${name}:${teamName}:${lens}`));
+
+    const lensBias = lens === "goals" ? 6 : lens === "disposals" ? 3 : 0;
 
     return {
-      id: p.id,
-      name: p.name,
-      teamId: p.teamId,
-      teamName: p.teamName,
-
-      momentum: computeMomentum(series),
-      ceiling: computeCeiling(series),
-
-      series,
+      id: `${side}-${hash(name)}`,
+      name,
+      teamSide: side,
+      teamName,
+      momentum: clamp(30 + r() * 60, 0, 100),
+      ceiling: clamp(35 + r() * 55 + lensBias, 0, 100),
     };
   });
+
+  if (teamFilter === "both") return points;
+  return points.filter((p) => p.teamSide === teamFilter);
 }
