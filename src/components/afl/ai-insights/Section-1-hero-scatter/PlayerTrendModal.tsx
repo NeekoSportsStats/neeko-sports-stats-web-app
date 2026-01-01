@@ -12,212 +12,194 @@ export type PlayerPoint = {
   ceiling: number;
 };
 
-export default function PlayerTrendModal(props: {
+type Props = {
   open: boolean;
   onClose: () => void;
   player: PlayerPoint | null;
   allPlayers: PlayerPoint[];
   lens: LensKey;
-}) {
-  const { open, onClose, player, allPlayers, lens } = props;
+};
 
+export default function PlayerTrendModal({
+  open,
+  onClose,
+  player,
+  allPlayers,
+  lens,
+}: Props) {
   const [compareId, setCompareId] = useState<string>("");
 
-  // Reset compare when opening / player changes
+  /* ------------------------------ lifecycle ------------------------------ */
+
   useEffect(() => {
     if (!open) return;
     setCompareId("");
   }, [open, player?.id]);
 
-  const compare = useMemo(() => {
-    if (!compareId) return null;
-    return allPlayers.find((p) => p.id === compareId) ?? null;
-  }, [allPlayers, compareId]);
+  // ESC to close (desktop)
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
-  const lensLabel = useMemo(() => {
-    if (lens === "disposals") return "Disposals";
-    if (lens === "goals") return "Goals";
-    return "Fantasy";
-  }, [lens]);
+  const compare = useMemo(
+    () => allPlayers.find((p) => p.id === compareId) ?? null,
+    [allPlayers, compareId]
+  );
 
-  // -------- Deterministic weekly series (mock but stable) --------
-  // 12 rounds + "Next" projection band
-  const rounds = useMemo(() => Array.from({ length: 12 }, (_, i) => `R${i + 1}`), []);
+  const lensLabel =
+    lens === "disposals" ? "Disposals" : lens === "goals" ? "Goals" : "Fantasy";
 
-  const makeSeries = (seedKey: string) => {
-    // deterministic pseudo-rand
+  if (!open || !player) return null;
+
+  /* --------------------------- deterministic data -------------------------- */
+
+  const rounds = Array.from({ length: 12 }, (_, i) => `R${i + 1}`);
+
+  const makeSeries = (seed: string) => {
     let h = 0;
-    for (let i = 0; i < seedKey.length; i++) h = (h << 5) - h + seedKey.charCodeAt(i);
+    for (let i = 0; i < seed.length; i++) h = (h << 5) - h + seed.charCodeAt(i);
     h = Math.abs(h);
 
-    const base =
-      lens === "goals" ? 1.6 :
-      lens === "disposals" ? 22 :
-      78;
-
-    const amp =
-      lens === "goals" ? 2.2 :
-      lens === "disposals" ? 10 :
-      18;
+    const base = lens === "goals" ? 1.5 : lens === "disposals" ? 22 : 78;
+    const amp = lens === "goals" ? 2.2 : lens === "disposals" ? 10 : 18;
 
     const series = rounds.map((_, i) => {
-      // smooth-ish wiggle
-      const t = (h % 97) / 97;
-      const w1 = Math.sin((i + 1) * (0.55 + t));
-      const w2 = Math.cos((i + 1) * (0.25 + t * 0.3));
-      const noise = (w1 * 0.65 + w2 * 0.35);
-      const v = base + amp * (0.55 + 0.45 * noise);
-      return Math.max(0, v);
+      const w =
+        Math.sin((i + 1) * 0.55 + h * 0.001) +
+        Math.cos((i + 1) * 0.25 + h * 0.002);
+      return Math.max(0, base + amp * (0.55 + 0.25 * w));
     });
 
-    // Projection band for "Next"
-    const last = series[series.length - 1] ?? base;
-    const expected = last * (0.98 + ((h % 11) / 100)); // small drift
-    const spread = (lens === "goals" ? 1.2 : lens === "disposals" ? 6 : 10) * (0.9 + ((h % 7) / 20));
-    const low = Math.max(0, expected - spread);
-    const high = expected + spread;
+    const last = series.at(-1) ?? base;
+    const spread = lens === "goals" ? 1.2 : lens === "disposals" ? 6 : 10;
 
-    return { series, expected, low, high };
+    return {
+      series,
+      expected: last * 1.01,
+      low: Math.max(0, last - spread),
+      high: last + spread,
+    };
   };
 
-  const pData = useMemo(() => {
-    if (!player) return null;
-    return makeSeries(`${player.id}:${player.team}:${lens}`);
-  }, [player, lens]);
+  const primary = makeSeries(`${player.id}:${lens}`);
+  const secondary = compare ? makeSeries(`${compare.id}:${lens}`) : null;
 
-  const cData = useMemo(() => {
-    if (!compare) return null;
-    return makeSeries(`${compare.id}:${compare.team}:${lens}`);
-  }, [compare, lens]);
+  /* ------------------------------- chart math ------------------------------ */
 
-  // Team + league averages (mock but stable)
-  const leagueAvg = useMemo(() => {
-    if (!pData) return null;
-    const m = pData.series.reduce((a, b) => a + b, 0) / Math.max(1, pData.series.length);
-    return m * 0.92;
-  }, [pData]);
+  const W = 860;
+  const H = 320;
+  const PX = 44;
+  const PY = 28;
 
-  const teamAvg = useMemo(() => {
-    if (!pData || !player) return null;
-    const boost = player.side === "home" ? 1.02 : 0.98;
-    const m = pData.series.reduce((a, b) => a + b, 0) / Math.max(1, pData.series.length);
-    return m * boost;
-  }, [pData, player]);
+  const allVals = [
+    ...primary.series,
+    primary.low,
+    primary.high,
+    ...(secondary?.series ?? []),
+  ];
 
-  // -------- Chart layout (SVG, no libs) --------
-  const CW = 860;
-  const CH = 320;
-  const PADX = 44;
-  const PADY = 28;
+  const minV = Math.floor(Math.min(...allVals) * 0.9);
+  const maxV = Math.ceil(Math.max(...allVals) * 1.12);
 
-  const allVals = useMemo(() => {
-    const vals: number[] = [];
-    if (pData) vals.push(...pData.series, pData.low, pData.high, pData.expected);
-    if (cData) vals.push(...cData.series, cData.low, cData.high, cData.expected);
-    if (leagueAvg != null) vals.push(leagueAvg);
-    if (teamAvg != null) vals.push(teamAvg);
-    return vals;
-  }, [pData, cData, leagueAvg, teamAvg]);
+  const x = (i: number) =>
+    PX + (i / Math.max(1, rounds.length)) * (W - PX * 2);
+  const y = (v: number) =>
+    PY + (1 - (v - minV) / (maxV - minV)) * (H - PY * 2);
 
-  const minV = useMemo(() => {
-    if (!allVals.length) return 0;
-    const m = Math.min(...allVals);
-    return Math.floor(m * 0.9);
-  }, [allVals]);
+  const pathFrom = (arr: number[]) =>
+    arr.map((v, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(v)}`).join(" ");
 
-  const maxV = useMemo(() => {
-    if (!allVals.length) return 100;
-    const m = Math.max(...allVals);
-    return Math.ceil(m * 1.12);
-  }, [allVals]);
-
-  const x = (i: number) => PADX + (i / Math.max(1, rounds.length)) * (CW - PADX * 2);
-  const y = (v: number) => PADY + (1 - (v - minV) / Math.max(1e-6, (maxV - minV))) * (CH - PADY * 2);
-
-  const pathFrom = (arr: number[]) => {
-    if (!arr.length) return "";
-    return arr
-      .map((v, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(v)}`)
-      .join(" ");
-  };
-
-  const overlayOpen = open && !!player;
-
-  if (!overlayOpen) return null;
+  /* ------------------------------- render --------------------------------- */
 
   return (
     <div className="fixed inset-0 z-[80]">
-      {/* Backdrop */}
+      {/* backdrop */}
       <button
-        type="button"
-        aria-label="Close"
         onClick={onClose}
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        aria-label="Close modal"
       />
 
-      {/* Modal */}
-      <div className="absolute left-1/2 top-[7%] w-[min(980px,92vw)] -translate-x-1/2 rounded-3xl border border-white/12 bg-[#0b0b0b] shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
+      {/* modal / bottom sheet */}
+      <div
+        className="
+          absolute left-1/2 top-[8%] w-[min(980px,92vw)] -translate-x-1/2
+          rounded-3xl border border-white/12 bg-[#0b0b0b]
+          shadow-[0_0_0_1px_rgba(255,255,255,0.05)]
+          max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:rounded-t-3xl
+        "
+      >
+        {/* drag handle (mobile) */}
+        <div className="hidden max-sm:flex justify-center pt-3">
+          <div className="h-1 w-10 rounded-full bg-white/25" />
+        </div>
+
+        {/* header */}
         <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
-          <div className="min-w-0">
-            <div className="text-[11px] tracking-[0.28em] text-white/55">PLAYER TREND</div>
-            <div className="mt-1 truncate text-xl font-semibold text-white">{player?.name}</div>
+          <div>
+            <div className="text-[11px] tracking-[0.28em] text-white/55">
+              PLAYER TREND
+            </div>
+            <div className="mt-1 text-xl font-semibold text-white">
+              {player.name}
+            </div>
             <div className="mt-1 text-sm text-white/60">
-              {player?.team} · <span className="text-white/75">{lensLabel}</span>
+              {player.team} · {lensLabel}
             </div>
           </div>
 
           <button
-            type="button"
             onClick={onClose}
             className="rounded-full border border-white/10 bg-white/5 p-2 text-white/70 hover:bg-white/10"
-            aria-label="Close modal"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="px-5 py-5">
-          {/* Compare row */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {/* body */}
+        <div className="px-5 py-5 max-sm:pb-8">
+          {/* compare */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm text-white/70">
-              Weekly trend + projection band · next round shaded
+              Weekly trend + projection band
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70">
-                <ArrowLeftRight className="h-4 w-4 text-white/60" />
-                Compare
-                <select
-                  value={compareId}
-                  onChange={(e) => setCompareId(e.target.value)}
-                  className="ml-2 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-xs text-white/85"
-                >
-                  <option value="">None</option>
-                  {allPlayers
-                    .filter((p) => p.id !== player?.id)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} · {p.team}
-                      </option>
-                    ))}
-                </select>
-              </div>
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70">
+              <ArrowLeftRight className="h-4 w-4" />
+              <select
+                value={compareId}
+                onChange={(e) => setCompareId(e.target.value)}
+                className="ml-2 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-xs"
+              >
+                <option value="">Compare</option>
+                {allPlayers
+                  .filter((p) => p.id !== player.id)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+              </select>
             </div>
           </div>
 
-          {/* Chart */}
+          {/* chart */}
           <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/35">
-            <svg viewBox={`0 0 ${CW} ${CH}`} className="w-full">
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
               {/* grid */}
               {[0.25, 0.5, 0.75].map((t) => {
-                const yy = PADY + t * (CH - PADY * 2);
+                const yy = PY + t * (H - PY * 2);
                 return (
                   <line
                     key={t}
-                    x1={PADX}
+                    x1={PX}
                     y1={yy}
-                    x2={CW - PADX}
+                    x2={W - PX}
                     y2={yy}
                     stroke="white"
                     opacity={0.12}
@@ -225,108 +207,50 @@ export default function PlayerTrendModal(props: {
                 );
               })}
 
-              {/* Next round shading */}
+              {/* next round shading */}
               <rect
                 x={x(rounds.length - 1)}
-                y={PADY}
-                width={(CW - PADX * 2) / Math.max(1, rounds.length)}
-                height={CH - PADY * 2}
+                y={PY}
+                width={(W - PX * 2) / rounds.length}
+                height={H - PY * 2}
                 fill="#fbbf24"
                 opacity={0.08}
               />
 
-              {/* league avg */}
-              {leagueAvg != null ? (
-                <>
-                  <line
-                    x1={PADX}
-                    y1={y(leagueAvg)}
-                    x2={CW - PADX}
-                    y2={y(leagueAvg)}
-                    stroke="white"
-                    opacity={0.20}
-                    strokeDasharray="5 5"
-                  />
-                  <text x={PADX + 6} y={y(leagueAvg) - 6} fontSize={11} fill="rgba(255,255,255,0.55)">
-                    League avg
-                  </text>
-                </>
-              ) : null}
-
-              {/* team avg */}
-              {teamAvg != null ? (
-                <>
-                  <line
-                    x1={PADX}
-                    y1={y(teamAvg)}
-                    x2={CW - PADX}
-                    y2={y(teamAvg)}
-                    stroke="#60a5fa"
-                    opacity={0.22}
-                    strokeDasharray="6 6"
-                  />
-                  <text x={PADX + 6} y={y(teamAvg) + 14} fontSize={11} fill="rgba(96,165,250,0.60)">
-                    Team avg
-                  </text>
-                </>
-              ) : null}
-
               {/* projection band */}
-              {pData ? (
-                <>
-                  <line
-                    x1={x(rounds.length - 1)}
-                    y1={y(pData.low)}
-                    x2={x(rounds.length - 1) + (CW - PADX * 2) / Math.max(1, rounds.length)}
-                    y2={y(pData.low)}
-                    stroke="#fbbf24"
-                    opacity={0.28}
-                  />
-                  <line
-                    x1={x(rounds.length - 1)}
-                    y1={y(pData.high)}
-                    x2={x(rounds.length - 1) + (CW - PADX * 2) / Math.max(1, rounds.length)}
-                    y2={y(pData.high)}
-                    stroke="#fbbf24"
-                    opacity={0.28}
-                  />
-                  <rect
-                    x={x(rounds.length - 1)}
-                    y={y(pData.high)}
-                    width={(CW - PADX * 2) / Math.max(1, rounds.length)}
-                    height={Math.max(2, y(pData.low) - y(pData.high))}
-                    fill="#fbbf24"
-                    opacity={0.10}
-                  />
-                </>
-              ) : null}
+              <rect
+                x={x(rounds.length - 1)}
+                y={y(primary.high)}
+                width={(W - PX * 2) / rounds.length}
+                height={Math.max(2, y(primary.low) - y(primary.high))}
+                fill="#fbbf24"
+                opacity={0.14}
+              />
 
-              {/* main line */}
-              {pData ? (
-                <>
-                  <path d={pathFrom(pData.series)} fill="none" stroke="#fbbf24" strokeWidth={2.5} />
-                  {pData.series.map((v, i) => (
-                    <circle key={i} cx={x(i)} cy={y(v)} r={3.6} fill="#fbbf24" opacity={0.9} />
-                  ))}
-                </>
-              ) : null}
+              {/* primary */}
+              <path
+                d={pathFrom(primary.series)}
+                stroke="#fbbf24"
+                strokeWidth={2.5}
+                fill="none"
+              />
 
-              {/* compare line */}
-              {cData ? (
-                <>
-                  <path d={pathFrom(cData.series)} fill="none" stroke="#34d399" strokeWidth={2} opacity={0.95} />
-                  {cData.series.map((v, i) => (
-                    <circle key={i} cx={x(i)} cy={y(v)} r={3.1} fill="#34d399" opacity={0.85} />
-                  ))}
-                </>
-              ) : null}
+              {/* compare */}
+              {secondary && (
+                <path
+                  d={pathFrom(secondary.series)}
+                  stroke="#34d399"
+                  strokeWidth={2}
+                  fill="none"
+                />
+              )}
 
               {/* x labels */}
               {rounds.map((r, i) => (
                 <text
                   key={r}
                   x={x(i)}
-                  y={CH - 10}
+                  y={H - 10}
                   textAnchor="middle"
                   fontSize={11}
                   fill="rgba(255,255,255,0.45)"
@@ -337,61 +261,32 @@ export default function PlayerTrendModal(props: {
             </svg>
           </div>
 
-          {/* Projection summary + AI lines */}
-          {pData ? (
-            <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[1fr,1fr]">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="text-[11px] tracking-[0.26em] text-white/55">NEXT ROUND BAND</div>
-                <div className="mt-2 flex flex-wrap gap-4 text-sm">
-                  <div className="text-white/85">
-                    Expected: <span className="font-semibold text-white">{Math.round(pData.expected)}</span>
-                  </div>
-                  <div className="text-white/70">
-                    Low: <span className="font-semibold text-white">{Math.round(pData.low)}</span>
-                  </div>
-                  <div className="text-white/70">
-                    High: <span className="font-semibold text-white">{Math.round(pData.high)}</span>
-                  </div>
-                </div>
-                <div className="mt-2 text-xs text-white/55">
-                  Band is deterministic mock for now (premium-safe). Real data can drop in later without layout changes.
-                </div>
+          {/* summary */}
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="text-[11px] tracking-[0.26em] text-white/55">
+                NEXT ROUND
               </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="text-[11px] tracking-[0.26em] text-white/55">AI TREND NOTES</div>
-                <ul className="mt-2 space-y-1.5 text-sm text-white/70">
-                  <li>
-                    • Trend shape suggests{" "}
-                    <span className="text-white/85 font-medium">
-                      {player?.momentum >= 65 ? "accelerating form" : "mixed role signal"}
-                    </span>{" "}
-                    over the last month.
-                  </li>
-                  <li>
-                    • Ceiling marker implies{" "}
-                    <span className="text-white/85 font-medium">
-                      {player?.ceiling >= 70 ? "true spike potential" : "more capped outcomes"}
-                    </span>{" "}
-                    under this lens.
-                  </li>
-                  <li>• Use compare to sanity-check against a direct matchup alternative.</li>
-                </ul>
+              <div className="mt-2 text-sm text-white/85">
+                Expected <b>{Math.round(primary.expected)}</b> · Low{" "}
+                <b>{Math.round(primary.low)}</b> · High{" "}
+                <b>{Math.round(primary.high)}</b>
+              </div>
+              <div className="mt-1 text-xs text-white/50">
+                Deterministic mock — safe for free users
               </div>
             </div>
-          ) : null}
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/70">
+              • Momentum trend shows{" "}
+              <b>{player.momentum >= 65 ? "acceleration" : "mixed signal"}</b>
+              <br />• Ceiling suggests{" "}
+              <b>{player.ceiling >= 70 ? "true spike potential" : "capped range"}</b>
+              <br />• Compare to validate role confidence
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* Mobile sizing tweak */}
-      <style>{`
-        @media (max-width: 640px) {
-          .fixed.inset-0.z-\\[80\\] > div.absolute.left-1\\/2.top-\\[7\\%\\] {
-            top: 4% !important;
-            width: 94vw !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }
