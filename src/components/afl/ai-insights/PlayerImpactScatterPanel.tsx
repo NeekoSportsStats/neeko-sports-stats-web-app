@@ -418,6 +418,14 @@ export default function PlayerImpactScatterPanel(props: { match?: FixtureMatch; 
   const verdictTone: "gold" | "green" | "red" | "neutral" =
     verdict.verdict === "SAFE PICK" ? "green" : verdict.verdict === "CEILING PLAY" ? "gold" : "red";
 
+  const [projAnimKey, setProjAnimKey] = useState(0);
+  useEffect(() => {
+    // Restart micro-animations when selection or lens changes.
+    setProjAnimKey((k) => k + 1);
+  }, [selectedId, lens]);
+
+
+
   const insightHeader = useMemo(() => {
     if (!selected) return "Select a player to view ceiling vs safety and a match projection.";
     const teamName = selected.teamName;
@@ -533,6 +541,9 @@ export default function PlayerImpactScatterPanel(props: { match?: FixtureMatch; 
   // Hover tooltip state (relative to container)
 
 const mapWrapRef = useRef<HTMLDivElement | null>(null);
+  const mapSvgRef = useRef<SVGSVGElement | null>(null);
+  const MAGNET_PX = 16; // snap radius for premium-feeling hover
+
 const [mapSize, setMapSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
 const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
 
@@ -565,12 +576,12 @@ const hoverStyle = useMemo(() => {
   const TIP_H = 72;
   const PAD = 10;
 
-  let left = hover.x + 14;
-  let top = hover.y - 10;
+  let left = hover.x + 8;
+  let top = hover.y - 8;
 
   // Prefer right + slightly above, but flip if near edges.
-  if (mapSize.w && left + TIP_W > mapSize.w - PAD) left = hover.x - TIP_W - 14;
-  if (mapSize.h && top + TIP_H > mapSize.h - PAD) top = hover.y - TIP_H - 16;
+  if (mapSize.w && left + TIP_W > mapSize.w - PAD) left = hover.x - TIP_W - 8;
+  if (mapSize.h && top + TIP_H > mapSize.h - PAD) top = hover.y - TIP_H - 12;
 
   // Clamp into container.
   const maxL = Math.max(PAD, (mapSize.w || 0) - TIP_W - PAD);
@@ -581,6 +592,35 @@ const hoverStyle = useMemo(() => {
     top: clamp(top, PAD, maxT),
   };
 }, [hover, mapSize.h, mapSize.w]);
+
+
+  const hoverTether = useMemo(() => {
+    if (!hover) return null;
+    // Draw a subtle tether from the hovered point to the tooltip to eliminate "detached" feel.
+    const tipX = hoverStyle.left;
+    const tipY = hoverStyle.top;
+    const tipW = 232;
+    const tipH = 72;
+
+    const start = { x: hover.x, y: hover.y };
+    const end = {
+      x: tipX + (hover.x >= tipX ? tipW : 0),
+      y: clamp(start.y, tipY + 12, tipY + tipH - 12),
+    };
+
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const length = Math.max(0, Math.hypot(dx, dy));
+    const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+
+    return {
+      left: start.x,
+      top: start.y,
+      width: length,
+      transform: `rotate(${angle}deg)`,
+    } as React.CSSProperties;
+  }, [hover, hoverStyle.left, hoverStyle.top]);
+
 
 
   /* -------------------------------------------------------------------------------------------------
@@ -638,6 +678,19 @@ const projMidX = trendSvg.proj.xBand + trendSvg.proj.wBand / 2;
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/25 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]">
+
+      <style>{`
+        @keyframes neekoFadeUp {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes neekoPulseOnce {
+          0% { transform: scale(0.9); opacity: 0.65; }
+          40% { transform: scale(1.15); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
+
       <div className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -818,6 +871,8 @@ const projMidX = trendSvg.proj.xBand + trendSvg.proj.wBand / 2;
                   ) : null}
 
                   {/* Projection band (next) */}
+                  <g key={`proj-${projAnimKey}`} style={{ transformOrigin: `${projMidX}px ${trendSvg.proj.yExp}px` }}>
+
                   <rect
                     x={trendSvg.proj.xBand}
                     y={Math.min(trendSvg.proj.yLow, trendSvg.proj.yHigh)}
@@ -825,6 +880,7 @@ const projMidX = trendSvg.proj.xBand + trendSvg.proj.wBand / 2;
                     height={Math.abs(trendSvg.proj.yHigh - trendSvg.proj.yLow)}
                     rx={12}
                     fill="url(#projFill)"
+                    style={{ animation: "neekoFadeUp 220ms ease-out both" }}
                     stroke="rgba(245, 158, 11, 0.35)"
                   />
 
@@ -845,6 +901,7 @@ const projMidX = trendSvg.proj.xBand + trendSvg.proj.wBand / 2;
                     cy={trendSvg.proj.yExp}
                     r={4.5}
                     fill="rgba(245,158,11,0.95)"
+                    style={{ animation: "neekoPulseOnce 520ms ease-out both" }}
                     stroke="rgba(0,0,0,0.45)"
                     strokeWidth={2}
                   />
@@ -866,6 +923,7 @@ const projMidX = trendSvg.proj.xBand + trendSvg.proj.wBand / 2;
                     <text x={trendSvg.proj.xBand + 46} y={tPad + 20} fontSize="11" fill="rgba(255,255,255,0.65)">
                       Proj
                     </text>
+                  </g>
                   </g>
                 </svg>
               </div>
@@ -939,10 +997,19 @@ const projMidX = trendSvg.proj.xBand + trendSvg.proj.wBand / 2;
               <div ref={mapWrapRef} className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/20">
                 {/* Tooltip */}
                 {hover && hoverPlayer ? (
-                  <div
-                    className="pointer-events-none absolute z-10 rounded-xl border border-white/10 bg-[#0b0b0c]/95 px-3 py-2 text-xs shadow-2xl"
-                    style={hoverStyle}
-                  >
+                  <>
+                    {/* tether */}
+                    {hoverTether ? (
+                      <div
+                        className="pointer-events-none absolute z-[9] h-px origin-left bg-white/25"
+                        style={hoverTether}
+                      />
+                    ) : null}
+
+                    <div
+                      className="pointer-events-none absolute z-10 rounded-xl border border-white/10 bg-[#0b0b0c]/95 px-3 py-2 text-xs shadow-2xl"
+                      style={hoverStyle}
+                    >
                     <div className="text-white/90 font-medium">{hoverPlayer.name}</div>
                     <div className="mt-0.5 text-white/55">
                       {hoverPlayer.role} · {hoverPlayer.teamName}
@@ -953,9 +1020,30 @@ const projMidX = trendSvg.proj.xBand + trendSvg.proj.wBand / 2;
                       <span>Var {Math.round(hoverPlayer.variance)}</span>
                     </div>
                   </div>
+                  </>
                 ) : null}
 
-                <svg width="100%" viewBox={`0 0 ${chartW} ${chartH}`} className="block">
+                <svg ref={mapSvgRef} width="100%" viewBox={`0 0 ${chartW} ${chartH}`} className="block"
+                  onMouseMove={(e) => {
+                    const sp = mouseToSvgPoint(e.clientX, e.clientY);
+                    if (!sp) return;
+                    const svgRect = mapSvgRef.current?.getBoundingClientRect();
+                    if (!svgRect) return;
+                    const pxToSvg = (MAGNET_PX / svgRect.width) * chartW;
+
+                    let best: { id: string; d: number; cx: number; cy: number } | null = null;
+                    for (const p of svgPoints) {
+                      const d = Math.hypot(p.cx - sp.x, p.cy - sp.y);
+                      if (d <= pxToSvg && (!best || d < best.d)) best = { id: p.id, d, cx: p.cx, cy: p.cy };
+                    }
+
+                    if (!best) return;
+                    const a = anchorFromSvgPoint(best.cx, best.cy);
+                    if (!a) return;
+                    setHover({ id: best.id, x: a.x, y: a.y });
+                  }}
+                  onMouseLeave={() => setHover(null)}
+                >
                   <defs>
                     <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
                       <feGaussianBlur stdDeviation="4" result="blur" />
