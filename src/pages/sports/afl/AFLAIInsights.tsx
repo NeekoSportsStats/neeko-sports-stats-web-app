@@ -1,10 +1,10 @@
 // src/pages/sports/afl/AFLAIInsights.tsx
+
 import React, { useMemo, useState, useEffect } from "react";
 import { Crown, ChevronDown } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import { MOCK_FIXTURES } from "@/components/afl/match-center/mockData";
-import { MOCK_TEAMS } from "@/components/afl/teams/mockTeams";
 
 import type { PremiumMode } from "@/components/afl/ai-insights/types";
 import { STAT_LABEL, StatLens, mean } from "@/components/afl/ai-insights/utils";
@@ -86,7 +86,7 @@ export default function AFLAIInsights() {
   );
 
   /* -------------------------------------------------------------------------- */
-  /* 1. PLAYER SCORE PREDICTABILITY                                             */
+  /*  PLAYER SCORE PREDICTABILITY DATA                                          */
   /* -------------------------------------------------------------------------- */
 
   const rawPlayerPredict = useMemo(
@@ -134,7 +134,7 @@ export default function AFLAIInsights() {
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
-      <div className="mx-auto max-w-6xl px-4 py-8 space-y-10">
+      <div className="mx-auto max-w-6xl px-4 py-8 space-y-12">
         {/* HEADER */}
         <header className="flex items-center justify-between">
           <div>
@@ -179,9 +179,27 @@ export default function AFLAIInsights() {
         {/* STAT FILTER */}
         <ControlsBar stat={stat} onChange={setStat} />
 
-        {/* 1. PLAYER SCORE PREDICTABILITY */}
+        {/* ------------------------------------------------------------------ */}
+        {/* 1. HERO — PLAYER IMPACT MAP                                         */}
+        {/* ------------------------------------------------------------------ */}
         {selectedMatch && (
-          <SectionShell title="1. Player Score Predictability">
+          <SectionShell
+            title="Player Impact Map"
+            subtitle="Momentum vs ceiling · Click any player to explore trend, projection, and risk"
+          >
+            <PlayerImpactScatterPanel
+              mode={mode}
+              match={selectedMatch as any}
+              initialLens={stat}
+            />
+          </SectionShell>
+        )}
+
+        {/* ------------------------------------------------------------------ */}
+        {/* 2. PLAYER SCORE PREDICTABILITY                                      */}
+        {/* ------------------------------------------------------------------ */}
+        {selectedMatch && (
+          <SectionShell title="Player Score Predictability">
             <PredictabilityTable
               rows={playerPredict}
               mode={mode}
@@ -193,7 +211,9 @@ export default function AFLAIInsights() {
           </SectionShell>
         )}
 
-        {/* 2. TEAM SCORE PREDICTABILITY */}
+        {/* ------------------------------------------------------------------ */}
+        {/* 3. TEAM SCORE PREDICTABILITY                                        */}
+        {/* ------------------------------------------------------------------ */}
         {selectedMatch && (
           <TeamPredictabilityPanel
             mode={mode}
@@ -203,21 +223,14 @@ export default function AFLAIInsights() {
           />
         )}
 
-        {/* 3. TEAM GAME FLOW & MOMENTUM */}
+        {/* ------------------------------------------------------------------ */}
+        {/* 4. GAME FLOW & MOMENTUM                                             */}
+        {/* ------------------------------------------------------------------ */}
         {selectedMatch && (
           <GameFlowMomentumPanel
             mode={mode}
             match={selectedMatch as any}
             fixtures={pastFixtures}
-          />
-        )}
-
-        {/* 4. PLAYER IMPACT VISUAL */}
-        {selectedMatch && (
-          <PlayerImpactScatterPanel
-            mode={mode}
-            match={selectedMatch as any}
-            initialLens={stat}
           />
         )}
       </div>
