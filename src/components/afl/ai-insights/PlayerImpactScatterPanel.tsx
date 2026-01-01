@@ -43,6 +43,16 @@ type Projection = {
   high: number;
 };
 
+type TapTooltipState = {
+  id: string;
+  name: string;
+  role: RoleGroup;
+  team: string;
+  ceiling: number;
+  safety: number;
+  variance: number;
+};
+
 /* -------------------------------------------------------------------------------------------------
   Small helpers (safe, deterministic)
 -------------------------------------------------------------------------------------------------- */
@@ -125,17 +135,22 @@ export default function PlayerImpactScatterPanel(props: {
   mode: PremiumMode;
   initialLens?: LensKey;
 }) {
-  const { match, mode, initialLens } = props;
+  const { mode, initialLens } = props;
   const locked = mode !== "premium";
 
   const [lens, setLens] = useState<LensKey>(initialLens ?? "fantasy");
+
+  const isMobile = useMemo(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches,
+    []
+  );
 
   /* -------------------------------- Trend + Projection ------------------------------- */
 
   const series = useMemo(() => buildSeries("selected", lens, 7), [lens]);
   const projection = useMemo(() => computeProjection(series), [series]);
 
-  /* -------------------------------- Impact Map (re-merged) ------------------------------- */
+  /* -------------------------------- Impact Map ------------------------------- */
 
   const players = useMemo<PlayerRow[]>(() => {
     const names = [
@@ -175,6 +190,7 @@ export default function PlayerImpactScatterPanel(props: {
   const mapWrapRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [tapTooltip, setTapTooltip] = useState<TapTooltipState | null>(null);
 
   const chartW = 520;
   const chartH = 300;
@@ -215,7 +231,7 @@ export default function PlayerImpactScatterPanel(props: {
           <MapIcon className="h-4 w-4" /> Impact map (ceiling vs safety)
         </div>
         <div ref={mapWrapRef} className="relative rounded-xl border border-white/10 bg-black/30">
-          {hover ? (
+          {!isMobile && hover ? (
             <div
               className="pointer-events-none absolute z-10 rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-xs text-white"
               style={{ left: hover.x + 8, top: hover.y - 8 }}
@@ -235,7 +251,22 @@ export default function PlayerImpactScatterPanel(props: {
                   cy={cy}
                   r={7}
                   fill="rgba(245,158,11,0.85)"
+                  style={{ cursor: "pointer" }}
+                  onClick={() => {
+                    if (isMobile) {
+                      setTapTooltip({
+                        id: p.id,
+                        name: p.name,
+                        role: p.role,
+                        team: p.teamName,
+                        ceiling: p.ceiling,
+                        safety: p.safety,
+                        variance: p.variance,
+                      });
+                    }
+                  }}
                   onMouseEnter={() => {
+                    if (isMobile) return;
                     const a = anchorFromSvgPoint(cx, cy, svgRef.current, mapWrapRef.current);
                     if (a) setHover({ id: p.id, x: a.x, y: a.y });
                   }}
@@ -246,6 +277,32 @@ export default function PlayerImpactScatterPanel(props: {
           </svg>
         </div>
       </div>
+
+      {/* Mobile tap tooltip */}
+      {tapTooltip && (
+        <div className="fixed inset-0 z-[90] sm:hidden">
+          <button
+            className="absolute inset-0 bg-black/70"
+            onClick={() => setTapTooltip(null)}
+          />
+          <div className="absolute inset-x-0 bottom-0 rounded-t-2xl border border-white/10 bg-black/95 p-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold text-white">{tapTooltip.name}</div>
+              <button onClick={() => setTapTooltip(null)}>
+                <X className="h-4 w-4 text-white/70" />
+              </button>
+            </div>
+            <div className="mt-1 text-xs text-white/60">
+              {tapTooltip.role} · {tapTooltip.team}
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-white">
+              <div>Ceiling {Math.round(tapTooltip.ceiling)}%</div>
+              <div>Safety {Math.round(tapTooltip.safety)}%</div>
+              <div>Var {Math.round(tapTooltip.variance)}%</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {locked && (
         <div className="mt-3 flex items-center gap-2 text-xs text-white/55">
