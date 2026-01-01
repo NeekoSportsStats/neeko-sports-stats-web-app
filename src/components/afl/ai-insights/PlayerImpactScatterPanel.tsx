@@ -394,6 +394,22 @@ export default function PlayerImpactScatterPanel(props: { match?: FixtureMatch; 
   // Mobile: collapse impact map by default
   const [showMapMobile, setShowMapMobile] = useState(false);
 
+  // Touch devices: disable hover tooling (prevents weird iOS "hover" + improves tap UX)
+  const [isCoarsePointer, setIsCoarsePointer] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(pointer: coarse)");
+    const apply = () => setIsCoarsePointer(!!mq.matches);
+    apply();
+    // Safari fallback
+    if ((mq as any).addEventListener) (mq as any).addEventListener("change", apply);
+    else (mq as any).addListener(apply);
+    return () => {
+      if ((mq as any).removeEventListener) (mq as any).removeEventListener("change", apply);
+      else (mq as any).removeListener(apply);
+    };
+  }, []);
+
   const allPlayers = useMemo(() => {
     const homePlayers = fallbackPlayers(teams.homeId, teams.homeName, 22);
     const awayPlayers = fallbackPlayers(teams.awayId, teams.awayName, 22);
@@ -784,9 +800,24 @@ export default function PlayerImpactScatterPanel(props: { match?: FixtureMatch; 
                     strokeLinecap="round"
                   />
 
-                  <text x={trendSvg.proj.xBand + 6} y={tPad + 14} fontSize="11" fill="rgba(245,158,11,0.75)">
-                    Projected
-                  </text>
+                  {/* Label */}
+                  <g>
+                    <rect
+                      x={trendSvg.proj.xBand + 6}
+                      y={tPad + 6}
+                      width={Math.max(74, trendSvg.proj.wBand - 12)}
+                      height={20}
+                      rx={10}
+                      fill="rgba(0,0,0,0.45)"
+                      stroke="rgba(245,158,11,0.35)"
+                    />
+                    <text x={trendSvg.proj.xBand + 12} y={tPad + 20} fontSize="11" fill="rgba(245,158,11,0.85)">
+                      NEXT
+                    </text>
+                    <text x={trendSvg.proj.xBand + 46} y={tPad + 20} fontSize="11" fill="rgba(255,255,255,0.65)">
+                      Proj
+                    </text>
+                  </g>
                 </svg>
               </div>
 
@@ -858,7 +889,7 @@ export default function PlayerImpactScatterPanel(props: { match?: FixtureMatch; 
 
               <div ref={mapWrapRef} className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/20">
                 {/* Tooltip */}
-                {hover && hoverPlayer ? (
+                {!isCoarsePointer && hover && hoverPlayer ? (
                   <div
                     className="pointer-events-none absolute z-10 rounded-xl border border-white/10 bg-[#0b0b0c]/95 px-3 py-2 text-xs shadow-2xl"
                     style={{
@@ -961,23 +992,11 @@ export default function PlayerImpactScatterPanel(props: { match?: FixtureMatch; 
                           strokeWidth={p.isSelected ? 2 : 1}
                           style={{ cursor: "pointer" }}
                           onClick={() => setSelectedId(p.id)}
-                          onMouseEnter={(e) => {
-                            const rect = mapWrapRef.current?.getBoundingClientRect();
-                            if (!rect) return;
-                            setHover({
-                              id: p.id,
-                              x: e.clientX - rect.left,
-                              y: e.clientY - rect.top,
-                            });
-                          }}
-                          onMouseMove={(e) => {
-                            const rect = mapWrapRef.current?.getBoundingClientRect();
-                            if (!rect) return;
-                            setHover((prev) =>
-                              prev && prev.id === p.id
-                                ? { id: p.id, x: e.clientX - rect.left, y: e.clientY - rect.top }
-                                : { id: p.id, x: e.clientX - rect.left, y: e.clientY - rect.top }
-                            );
+                          onMouseEnter={() => {
+                            if (isCoarsePointer) return;
+                            const a = anchorFromSvgPoint(p.cx, p.cy);
+                            if (!a) return;
+                            setHover({ id: p.id, x: a.x, y: a.y });
                           }}
                           onMouseLeave={() => setHover(null)}
                         />
@@ -1043,7 +1062,7 @@ function PlayerPicker(props: {
 
       {open ? (
         <div className="absolute right-0 z-50 mt-2 w-[380px] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0c]/95 shadow-2xl">
-          <div className="border-b border-white/10 p-3">
+          <div className="border-b border-white/10 px-3 pb-2 pt-3">
             <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-2 py-1.5">
               <Search className="h-4 w-4 text-white/45" />
               <input
@@ -1060,9 +1079,11 @@ function PlayerPicker(props: {
                 <span className="text-amber-200">{props.showAll ? "Show top only" : "Show all"}</span>
               </button>
 
+              {!isMobile ? (
               <button type="button" onClick={() => setOpen(false)} className="text-xs text-white/45 hover:text-white/70">
                 Close
               </button>
+            ) : null}
             </div>
           </div>
 
@@ -1146,7 +1167,7 @@ function PlayerPicker(props: {
         <div className="fixed inset-0 z-[80]">
           <button
             type="button"
-            className="absolute inset-0 bg-black/60"
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             onClick={() => setOpen(false)}
             aria-label="Close player picker"
           />
