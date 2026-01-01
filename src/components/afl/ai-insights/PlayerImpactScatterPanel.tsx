@@ -1,5 +1,5 @@
 // src/components/afl/ai-insights/PlayerImpactScatterPanel.tsx
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   Info,
@@ -11,6 +11,44 @@ import {
   BarChart3,
   Map as MapIcon,
 } from "lucide-react";
+
+
+/* -------------------------------------------------------------------------------------------------
+  SVG ↔ DOM helpers (PATCHED IN — no duplicate imports)
+-------------------------------------------------------------------------------------------------- */
+
+function mouseToSvgPoint(
+  clientX: number,
+  clientY: number,
+  svgEl: SVGSVGElement
+): { x: number; y: number } | null {
+  const pt = svgEl.createSVGPoint();
+  pt.x = clientX;
+  pt.y = clientY;
+  const ctm = svgEl.getScreenCTM();
+  if (!ctm) return null;
+  return pt.matrixTransform(ctm.inverse());
+}
+
+function anchorFromSvgPoint(
+  svgX: number,
+  svgY: number,
+  svgEl: SVGSVGElement,
+  containerEl: HTMLElement
+): { x: number; y: number } | null {
+  const ctm = svgEl.getScreenCTM();
+  if (!ctm) return null;
+
+  const screenX = ctm.a * svgX + ctm.e;
+  const screenY = ctm.d * svgY + ctm.f;
+
+  const rect = containerEl.getBoundingClientRect();
+  return {
+    x: screenX - rect.left,
+    y: screenY - rect.top,
+  };
+}
+
 
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/types";
@@ -213,7 +251,6 @@ function fallbackTeamsFromMatch(match?: any): { homeId: string; awayId: string; 
   return { homeId, awayId, homeName, awayName };
 }
 
-
 function fallbackPlayers(teamId: string, teamName: string, count: number) {
   const baseNames = [
     "Sam Young",
@@ -250,20 +287,12 @@ function fallbackPlayers(teamId: string, teamName: string, count: number) {
     "Liam Anderson",
   ];
 
-  // Avoid duplicate names inside the same team (looks buggy + breaks search UX).
-  const counts: Record<string, number> = {};
   const out: PlayerRow[] = [];
-
   for (let i = 0; i < count; i++) {
-    const base = baseNames[(hashString(`${teamName}:${i}`) + i) % baseNames.length];
-    const n = (counts[base] = (counts[base] ?? 0) + 1);
-
-    // Deterministic suffix so it doesn't flicker between renders.
-    const name = n === 1 ? base : `${base} (${n})`;
-
+    const nm = baseNames[(hashString(`${teamName}:${i}`) + i) % baseNames.length];
+    const name = `${nm}`;
     const role = roleFromNameHeuristic(`${teamName}:${name}`);
     const impact = deriveImpactMetrics(`${teamName}:${name}`);
-
     out.push({
       id: `${teamId}:${hashString(name)}`,
       name,
@@ -278,7 +307,6 @@ function fallbackPlayers(teamId: string, teamName: string, count: number) {
       variance: impact.variance,
     });
   }
-
   return out;
 }
 
@@ -418,14 +446,6 @@ export default function PlayerImpactScatterPanel(props: { match?: FixtureMatch; 
   const verdictTone: "gold" | "green" | "red" | "neutral" =
     verdict.verdict === "SAFE PICK" ? "green" : verdict.verdict === "CEILING PLAY" ? "gold" : "red";
 
-  const [projAnimKey, setProjAnimKey] = useState(0);
-  useEffect(() => {
-    // Restart micro-animations when selection or lens changes.
-    setProjAnimKey((k) => k + 1);
-  }, [selectedId, lens]);
-
-
-
   const insightHeader = useMemo(() => {
     if (!selected) return "Select a player to view ceiling vs safety and a match projection.";
     const teamName = selected.teamName;
@@ -539,89 +559,13 @@ export default function PlayerImpactScatterPanel(props: { match?: FixtureMatch; 
   const yMid = pad + 0.5 * (chartH - pad * 2);
 
   // Hover tooltip state (relative to container)
-
-const mapWrapRef = useRef<HTMLDivElement | null>(null);
-  const mapSvgRef = useRef<SVGSVGElement | null>(null);
-  const MAGNET_PX = 16; // snap radius for premium-feeling hover
-
-const [mapSize, setMapSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
-const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
-
-// Track container size so hover tooltips never render off-card.
-useLayoutEffect(() => {
-  const el = mapWrapRef.current;
-  if (!el) return;
-
-  const update = () => {
-    const r = el.getBoundingClientRect();
-    setMapSize({ w: Math.round(r.width), h: Math.round(r.height) });
-  };
-
-  update();
-
-  const ro = new ResizeObserver(() => update());
-  ro.observe(el);
-
-  return () => ro.disconnect();
-}, []);
+  const mapWrapRef = useRef<HTMLDivElement | null>(null);
+  const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
 
   const hoverPlayer = useMemo(() => {
     if (!hover) return null;
     return mapPlayers.find((p) => p.id === hover.id) ?? null;
   }, [hover, mapPlayers]);
-
-const hoverStyle = useMemo(() => {
-  if (!hover) return { left: 0, top: 0 };
-  const TIP_W = 232;
-  const TIP_H = 72;
-  const PAD = 10;
-
-  let left = hover.x + 8;
-  let top = hover.y - 8;
-
-  // Prefer right + slightly above, but flip if near edges.
-  if (mapSize.w && left + TIP_W > mapSize.w - PAD) left = hover.x - TIP_W - 8;
-  if (mapSize.h && top + TIP_H > mapSize.h - PAD) top = hover.y - TIP_H - 12;
-
-  // Clamp into container.
-  const maxL = Math.max(PAD, (mapSize.w || 0) - TIP_W - PAD);
-  const maxT = Math.max(PAD, (mapSize.h || 0) - TIP_H - PAD);
-
-  return {
-    left: clamp(left, PAD, maxL),
-    top: clamp(top, PAD, maxT),
-  };
-}, [hover, mapSize.h, mapSize.w]);
-
-
-  const hoverTether = useMemo(() => {
-    if (!hover) return null;
-    // Draw a subtle tether from the hovered point to the tooltip to eliminate "detached" feel.
-    const tipX = hoverStyle.left;
-    const tipY = hoverStyle.top;
-    const tipW = 232;
-    const tipH = 72;
-
-    const start = { x: hover.x, y: hover.y };
-    const end = {
-      x: tipX + (hover.x >= tipX ? tipW : 0),
-      y: clamp(start.y, tipY + 12, tipY + tipH - 12),
-    };
-
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const length = Math.max(0, Math.hypot(dx, dy));
-    const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-
-    return {
-      left: start.x,
-      top: start.y,
-      width: length,
-      transform: `rotate(${angle}deg)`,
-    } as React.CSSProperties;
-  }, [hover, hoverStyle.left, hoverStyle.top]);
-
-
 
   /* -------------------------------------------------------------------------------------------------
     Trend chart layout (bars + line)
@@ -668,29 +612,12 @@ const hoverStyle = useMemo(() => {
     return { max, xStep, yTo: yTv, bars, line, proj };
   }, [trend.vals, projection.expected, projection.high, projection.low]);
 
-const lastActual = trendSvg.line[trendSvg.line.length - 1];
-const projMidX = trendSvg.proj.xBand + trendSvg.proj.wBand / 2;
-
-
   /* -------------------------------------------------------------------------------------------------
     Render
   -------------------------------------------------------------------------------------------------- */
 
   return (
     <div className="rounded-2xl border border-white/10 bg-black/25 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]">
-
-      <style>{`
-        @keyframes neekoFadeUp {
-          from { opacity: 0; transform: translateY(6px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes neekoPulseOnce {
-          0% { transform: scale(0.9); opacity: 0.65; }
-          40% { transform: scale(1.15); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-      `}</style>
-
       <div className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -815,24 +742,8 @@ const projMidX = trendSvg.proj.xBand + trendSvg.proj.wBand / 2;
                       <stop offset="0" stopColor="rgba(245, 158, 11, 0.22)" />
                       <stop offset="1" stopColor="rgba(245, 158, 11, 0.05)" />
                     </linearGradient>
-                    <linearGradient id="projCol" x1="0" x2="1" y1="0" y2="0">
-                      <stop offset="0" stopColor="rgba(245, 158, 11, 0.06)" />
-                      <stop offset="1" stopColor="rgba(245, 158, 11, 0.015)" />
-                    </linearGradient>
                   </defs>
 
-                  {/* Projection column backdrop */}
-                  <rect
-                    x={trendSvg.proj.xBand - 10}
-                    y={tPad}
-                    width={trendSvg.proj.wBand + 20}
-                    height={trendH - tPad * 2}
-                    rx={14}
-                    fill="url(#projCol)"
-                    stroke="rgba(245, 158, 11, 0.14)"
-                  />
-
-                  {/* Bars */}
                   {trendSvg.bars.map((b) => (
                     <rect
                       key={b.i}
@@ -846,85 +757,36 @@ const projMidX = trendSvg.proj.xBand + trendSvg.proj.wBand / 2;
                     />
                   ))}
 
-                  {/* Line (recent) */}
                   <path
-                    d={trendSvg.line
-                      .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
-                      .join(" ")}
+                    d={trendSvg.line.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ")}
                     fill="none"
                     stroke="rgba(252, 211, 77, 0.75)"
                     strokeWidth={2.5}
                   />
-
-                  {/* Connector to projection */}
-                  {lastActual ? (
-                    <line
-                      x1={lastActual.x}
-                      y1={lastActual.y}
-                      x2={projMidX}
-                      y2={trendSvg.proj.yExp}
-                      stroke="rgba(245,158,11,0.35)"
-                      strokeWidth={2}
-                      strokeDasharray="4 5"
-                      strokeLinecap="round"
-                    />
-                  ) : null}
-
-                  {/* Projection band (next) */}
-                  <g key={`proj-${projAnimKey}`} style={{ transformOrigin: `${projMidX}px ${trendSvg.proj.yExp}px` }}>
 
                   <rect
                     x={trendSvg.proj.xBand}
                     y={Math.min(trendSvg.proj.yLow, trendSvg.proj.yHigh)}
                     width={trendSvg.proj.wBand}
                     height={Math.abs(trendSvg.proj.yHigh - trendSvg.proj.yLow)}
-                    rx={12}
+                    rx={10}
                     fill="url(#projFill)"
-                    style={{ animation: "neekoFadeUp 220ms ease-out both" }}
                     stroke="rgba(245, 158, 11, 0.35)"
                   />
 
-                  {/* Expected marker */}
                   <line
                     x1={trendSvg.proj.xBand}
                     x2={trendSvg.proj.xBand + trendSvg.proj.wBand}
                     y1={trendSvg.proj.yExp}
                     y2={trendSvg.proj.yExp}
-                    stroke="rgba(245,158,11,0.75)"
-                    strokeWidth={2.2}
+                    stroke="rgba(245,158,11,0.65)"
+                    strokeWidth={2}
                     strokeLinecap="round"
                   />
 
-                  {/* Expected dot */}
-                  <circle
-                    cx={projMidX}
-                    cy={trendSvg.proj.yExp}
-                    r={4.5}
-                    fill="rgba(245,158,11,0.95)"
-                    style={{ animation: "neekoPulseOnce 520ms ease-out both" }}
-                    stroke="rgba(0,0,0,0.45)"
-                    strokeWidth={2}
-                  />
-
-                  {/* Projection label (pill-like) */}
-                  <g>
-                    <rect
-                      x={trendSvg.proj.xBand + 6}
-                      y={tPad + 6}
-                      width={Math.max(74, trendSvg.proj.wBand - 12)}
-                      height={20}
-                      rx={10}
-                      fill="rgba(0,0,0,0.45)"
-                      stroke="rgba(245,158,11,0.35)"
-                    />
-                    <text x={trendSvg.proj.xBand + 12} y={tPad + 20} fontSize="11" fill="rgba(245,158,11,0.85)">
-                      NEXT
-                    </text>
-                    <text x={trendSvg.proj.xBand + 46} y={tPad + 20} fontSize="11" fill="rgba(255,255,255,0.65)">
-                      Proj
-                    </text>
-                  </g>
-                  </g>
+                  <text x={trendSvg.proj.xBand + 6} y={tPad + 14} fontSize="11" fill="rgba(245,158,11,0.75)">
+                    Projected
+                  </text>
                 </svg>
               </div>
 
@@ -997,19 +859,13 @@ const projMidX = trendSvg.proj.xBand + trendSvg.proj.wBand / 2;
               <div ref={mapWrapRef} className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/20">
                 {/* Tooltip */}
                 {hover && hoverPlayer ? (
-                  <>
-                    {/* tether */}
-                    {hoverTether ? (
-                      <div
-                        className="pointer-events-none absolute z-[9] h-px origin-left bg-white/25"
-                        style={hoverTether}
-                      />
-                    ) : null}
-
-                    <div
-                      className="pointer-events-none absolute z-10 rounded-xl border border-white/10 bg-[#0b0b0c]/95 px-3 py-2 text-xs shadow-2xl"
-                      style={hoverStyle}
-                    >
+                  <div
+                    className="pointer-events-none absolute z-10 rounded-xl border border-white/10 bg-[#0b0b0c]/95 px-3 py-2 text-xs shadow-2xl"
+                    style={{
+                      left: clamp(hover.x + 12, 8, 520),
+                      top: clamp(hover.y - 8, 8, 260),
+                    }}
+                  >
                     <div className="text-white/90 font-medium">{hoverPlayer.name}</div>
                     <div className="mt-0.5 text-white/55">
                       {hoverPlayer.role} · {hoverPlayer.teamName}
@@ -1020,30 +876,9 @@ const projMidX = trendSvg.proj.xBand + trendSvg.proj.wBand / 2;
                       <span>Var {Math.round(hoverPlayer.variance)}</span>
                     </div>
                   </div>
-                  </>
                 ) : null}
 
-                <svg ref={mapSvgRef} width="100%" viewBox={`0 0 ${chartW} ${chartH}`} className="block"
-                  onMouseMove={(e) => {
-                    const sp = mouseToSvgPoint(e.clientX, e.clientY);
-                    if (!sp) return;
-                    const svgRect = mapSvgRef.current?.getBoundingClientRect();
-                    if (!svgRect) return;
-                    const pxToSvg = (MAGNET_PX / svgRect.width) * chartW;
-
-                    let best: { id: string; d: number; cx: number; cy: number } | null = null;
-                    for (const p of svgPoints) {
-                      const d = Math.hypot(p.cx - sp.x, p.cy - sp.y);
-                      if (d <= pxToSvg && (!best || d < best.d)) best = { id: p.id, d, cx: p.cx, cy: p.cy };
-                    }
-
-                    if (!best) return;
-                    const a = anchorFromSvgPoint(best.cx, best.cy);
-                    if (!a) return;
-                    setHover({ id: best.id, x: a.x, y: a.y });
-                  }}
-                  onMouseLeave={() => setHover(null)}
-                >
+                <svg width="100%" viewBox={`0 0 ${chartW} ${chartH}`} className="block">
                   <defs>
                     <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
                       <feGaussianBlur stdDeviation="4" result="blur" />
@@ -1182,209 +1017,239 @@ function PlayerPicker(props: {
   onSelect: (id: string) => void;
 }) {
   const { selected, grouped } = props;
-
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-
-  // Responsive: render as a premium sheet on mobile, dropdown on desktop.
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia("(max-width: 768px)");
-    const apply = () => setIsMobile(mql.matches);
-    apply();
-    // Safari < 14 compatibility
-    if ((mql as any).addEventListener) (mql as any).addEventListener("change", apply);
-    else (mql as any).addListener(apply);
-    return () => {
-      if ((mql as any).removeEventListener) (mql as any).removeEventListener("change", apply);
-      else (mql as any).removeListener(apply);
-    };
-  }, []);
-
-  // ESC to close
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
-
-  // Click outside to close (desktop dropdown)
-  useEffect(() => {
-    if (!open || isMobile) return;
-    const onDown = (e: MouseEvent) => {
-      const el = rootRef.current;
-      if (!el) return;
-      if (!el.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown, true);
-    return () => document.removeEventListener("mousedown", onDown, true);
-  }, [open, isMobile]);
-
   const roles: RoleGroup[] = ["MID", "FWD", "DEF", "RUC", "UNK"];
   const roleLabel: Record<RoleGroup, string> = { MID: "MID", FWD: "FWD", DEF: "DEF", RUC: "RUC", UNK: "OTHER" };
 
-  const button = (
-    <button
-      type="button"
-      onClick={() => setOpen(true)}
-      className={[
-        "flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition",
-        "border-white/10 bg-white/[0.03] text-white/80 hover:bg-white/[0.05]",
-        "min-w-[320px] justify-between",
-      ].join(" ")}
-    >
-      <span className="truncate">
-        <span className="text-white/55">Selected</span>{" "}
-        <span className="text-white/90">{selected ? `${shortName(selected.name)} · ${selected.teamName}` : "—"}</span>
-      </span>
-      <ChevronDown className="h-4 w-4 text-white/55" />
-    </button>
-  );
+  const [open, setOpen] = useState(false);
 
-  const content = (
-    <>
-      <div className="border-b border-white/10 p-3">
-        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-2 py-1.5">
-          <Search className="h-4 w-4 text-white/45" />
-          <input
-            value={props.q}
-            onChange={(e) => props.onChangeQ(e.target.value)}
-            placeholder="Search players (name or role)…"
-            className="w-full bg-transparent text-xs text-white/80 placeholder:text-white/35 outline-none"
-            autoFocus={isMobile}
-          />
-        </div>
+  // Desktop dropdown (>= sm)
+  const Desktop = (
+    <div className="relative hidden sm:block">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={[
+          "flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition",
+          "border-white/10 bg-white/[0.03] text-white/80 hover:bg-white/[0.05]",
+          "min-w-[320px] justify-between",
+        ].join(" ")}
+      >
+        <span className="truncate">
+          <span className="text-white/55">Selected</span>{" "}
+          <span className="text-white/90">{selected ? `${shortName(selected.name)} · ${selected.teamName}` : "—"}</span>
+        </span>
+        <ChevronDown className="h-4 w-4 text-white/55" />
+      </button>
 
-        <div className="mt-2 flex items-center justify-between">
-          <button type="button" onClick={props.onToggleShowAll} className="text-xs text-white/60 hover:text-white/80">
-            {props.showAll ? "Showing all players" : "Showing top impact players"} ·{" "}
-            <span className="text-amber-200">{props.showAll ? "Show top only" : "Show all"}</span>
-          </button>
+      {open ? (
+        <div className="absolute right-0 z-50 mt-2 w-[380px] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0c]/95 shadow-2xl">
+          <div className="border-b border-white/10 p-3">
+            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-2 py-1.5">
+              <Search className="h-4 w-4 text-white/45" />
+              <input
+                value={props.q}
+                onChange={(e) => props.onChangeQ(e.target.value)}
+                placeholder="Search players (name or role)…"
+                className="w-full bg-transparent text-xs text-white/80 placeholder:text-white/35 outline-none"
+              />
+            </div>
 
-          <button type="button" onClick={() => setOpen(false)} className="text-xs text-white/45 hover:text-white/70">
-            Close
-          </button>
-        </div>
-      </div>
+            <div className="mt-2 flex items-center justify-between">
+              <button type="button" onClick={props.onToggleShowAll} className="text-xs text-white/60 hover:text-white/80">
+                {props.showAll ? "Showing all players" : "Showing top impact players"} ·{" "}
+                <span className="text-amber-200">{props.showAll ? "Show top only" : "Show all"}</span>
+              </button>
 
-      <div className="max-h-[420px] overflow-auto p-2">
-        {roles.map((r) => {
-          const items = grouped[r];
-          if (!items?.length) return null;
-          return (
-            <div key={r} className="mb-2">
-              <div className="px-2 py-1 text-[11px] tracking-[0.22em] text-white/45">{roleLabel[r]}</div>
-              <div className="space-y-1">
-                {items.map((p) => {
-                  const active = selected?.id === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => {
-                        props.onSelect(p.id);
-                        setOpen(false);
-                      }}
-                      className={[
-                        "w-full rounded-xl border px-3 py-2 text-left text-xs transition",
-                        active
-                          ? "border-amber-400/30 bg-amber-500/10 text-white"
-                          : "border-white/10 bg-white/[0.02] text-white/80 hover:bg-white/[0.05]",
-                      ].join(" ")}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="truncate">
-                          <span className="font-medium">{p.name}</span>
-                          <span className="text-white/50"> · {p.teamName}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[11px] text-white/60">
-                            {p.role}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="mt-1 flex items-center gap-3 text-[11px] text-white/45">
-                        <span>Ceil {Math.round(p.ceiling)}</span>
-                        <span>Safe {Math.round(p.safety)}</span>
-                        <span>Var {Math.round(p.variance)}</span>
-                      </div>
-                    </button>
-                  );
-                })}
+              <button type="button" onClick={() => setOpen(false)} className="text-xs text-white/45 hover:text-white/70">
+                Close
+              </button>
+            </div>
+          </div>
+
+          <div className="max-h-[420px] overflow-auto p-2">
+            {roles.map((r) => {
+              const items = grouped[r];
+              if (!items?.length) return null;
+              return (
+                <div key={r} className="mb-2">
+                  <div className="px-2 py-1 text-[11px] tracking-[0.22em] text-white/45">{roleLabel[r]}</div>
+                  <div className="space-y-1">
+                    {items.map((p) => {
+                      const active = selected?.id === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            props.onSelect(p.id);
+                            setOpen(false);
+                          }}
+                          className={[
+                            "w-full rounded-xl border px-3 py-2 text-left text-xs transition",
+                            active
+                              ? "border-amber-400/30 bg-amber-500/10 text-white"
+                              : "border-white/10 bg-white/[0.02] text-white/80 hover:bg-white/[0.05]",
+                          ].join(" ")}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="truncate">
+                              <span className="font-medium">{p.name}</span>
+                              <span className="text-white/50"> · {p.teamName}</span>
+                            </div>
+                            <span className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[11px] text-white/60">
+                              {p.role}
+                            </span>
+                          </div>
+                          <div className="mt-1 flex items-center gap-3 text-[11px] text-white/45">
+                            <span>Ceil {Math.round(p.ceiling)}</span>
+                            <span>Safe {Math.round(p.safety)}</span>
+                            <span>Var {Math.round(p.variance)}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {props.locked ? (
+            <div className="border-t border-white/10 p-3 text-xs text-white/55">
+              <div className="flex items-center gap-2">
+                <Lock className="h-4 w-4 text-white/45" />
+                Neeko+ unlocks role-adjusted projections, matchup weighting, and richer tooltips.
               </div>
             </div>
-          );
-        })}
-      </div>
-
-      {props.locked ? (
-        <div className="border-t border-white/10 p-3 text-xs text-white/55">
-          <div className="flex items-center gap-2">
-            <Lock className="h-4 w-4 text-white/45" />
-            Neeko+ unlocks full weighting, matchup-adjusted roles, and richer tooltips.
-          </div>
+          ) : null}
         </div>
       ) : null}
-    </>
+    </div>
   );
 
-  return (
-    <div ref={rootRef} className="relative">
-      {button}
+  // Mobile bottom sheet (< sm)
+  const Mobile = (
+    <div className="relative sm:hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex w-full items-center justify-between gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/80"
+      >
+        <span className="truncate">
+          <span className="text-white/55">Selected</span>{" "}
+          <span className="text-white/90">{selected ? `${shortName(selected.name)} · ${selected.teamName}` : "—"}</span>
+        </span>
+        <ChevronDown className="h-4 w-4 text-white/55" />
+      </button>
 
-      {/* Desktop dropdown */}
-      {!isMobile && open ? (
-        <div className="absolute right-0 z-50 mt-2 w-[380px] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0c]/95 shadow-2xl">
-          {content}
-        </div>
-      ) : null}
-
-      {/* Mobile sheet */}
-      {isMobile && open ? (
-        <div className="fixed inset-0 z-[60]">
-          {/* Backdrop (click outside to close) */}
+      {open ? (
+        <div className="fixed inset-0 z-[80]">
           <button
             type="button"
-            aria-label="Close player picker"
-            onClick={() => setOpen(false)}
             className="absolute inset-0 bg-black/60"
+            onClick={() => setOpen(false)}
+            aria-label="Close player picker"
           />
+          <div className="absolute inset-x-0 bottom-0 max-h-[82vh] rounded-t-3xl border border-white/10 bg-[#0b0b0c]/98 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="text-sm font-semibold text-white">Choose player</div>
+              <button type="button" onClick={() => setOpen(false)} className="rounded-full border border-white/10 bg-white/[0.03] p-2">
+                <X className="h-4 w-4 text-white/70" />
+              </button>
+            </div>
 
-          <div className="absolute inset-x-0 bottom-0">
-            <div className="mx-auto max-w-2xl">
-              <div className="rounded-t-3xl border border-white/10 bg-[#0b0b0c]/98 shadow-[0_-20px_50px_rgba(0,0,0,0.55)]">
-                <div className="flex items-center justify-between px-4 pb-2 pt-3">
-                  <div className="flex flex-col">
-                    <div className="text-[11px] tracking-[0.28em] text-white/45">PLAYER PICKER</div>
-                    <div className="mt-1 text-sm text-white/80">
-                      {selected ? `${shortName(selected.name)} · ${selected.teamName}` : "Select a player"}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setOpen(false)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
-                    aria-label="Close"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
+            <div className="px-4 py-3">
+              <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                <Search className="h-4 w-4 text-white/45" />
+                <input
+                  value={props.q}
+                  onChange={(e) => props.onChangeQ(e.target.value)}
+                  placeholder="Search players (name or role)…"
+                  className="w-full bg-transparent text-sm text-white/80 placeholder:text-white/35 outline-none"
+                />
+              </div>
 
-                <div className="px-4 pb-3">
-                  <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/10" />
-                </div>
-
-                {/* Content */}
-                <div className="px-2 pb-[max(16px,env(safe-area-inset-bottom))]">{content}</div>
+              <div className="mt-2 flex items-center justify-between text-xs text-white/60">
+                <button type="button" onClick={props.onToggleShowAll} className="hover:text-white/80">
+                  {props.showAll ? "Showing all players" : "Showing top impact players"} ·{" "}
+                  <span className="text-amber-200">{props.showAll ? "Top only" : "Show all"}</span>
+                </button>
+                {props.locked ? (
+                  <span className="inline-flex items-center gap-1 text-white/45">
+                    <Lock className="h-3.5 w-3.5" /> Free
+                  </span>
+                ) : (
+                  <span className="text-amber-200">Neeko+</span>
+                )}
               </div>
             </div>
+
+            <div className="max-h-[56vh] overflow-auto px-3 pb-5">
+              {roles.map((r) => {
+                const items = grouped[r];
+                if (!items?.length) return null;
+                return (
+                  <div key={r} className="mb-3">
+                    <div className="px-2 py-1 text-[11px] tracking-[0.22em] text-white/45">{roleLabel[r]}</div>
+                    <div className="space-y-1">
+                      {items.map((p) => {
+                        const active = selected?.id === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              props.onSelect(p.id);
+                              setOpen(false);
+                            }}
+                            className={[
+                              "w-full rounded-2xl border px-3 py-3 text-left transition",
+                              active
+                                ? "border-amber-400/30 bg-amber-500/10 text-white"
+                                : "border-white/10 bg-white/[0.02] text-white/80 hover:bg-white/[0.05]",
+                            ].join(" ")}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="truncate">
+                                <div className="font-medium">{p.name}</div>
+                                <div className="text-xs text-white/55">{p.teamName}</div>
+                              </div>
+                              <span className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[11px] text-white/60">
+                                {p.role}
+                              </span>
+                            </div>
+                            <div className="mt-2 flex items-center gap-3 text-[11px] text-white/45">
+                              <span>Ceil {Math.round(p.ceiling)}</span>
+                              <span>Safe {Math.round(p.safety)}</span>
+                              <span>Var {Math.round(p.variance)}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {props.locked ? (
+              <div className="border-t border-white/10 px-4 py-3 text-xs text-white/60">
+                <div className="flex items-center gap-2">
+                  <Lock className="h-4 w-4 text-white/45" />
+                  Neeko+ unlocks role-adjusted projections and matchup-weighted confidence bands.
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
     </div>
+  );
+
+  return (
+    <>
+      {Desktop}
+      {Mobile}
+    </>
   );
 }
