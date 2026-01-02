@@ -69,7 +69,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
 
   const premiumNarrative = useMemo(() => {
     // tiny “sugar” line; stays tasteful
-    if (dominantQuadrant === "finale") return "Finale targets often align with role stability and late-game scoring control.";
+    if (dominantQuadrant === "finale") return "Finale targets · {d.buckets.finale.length} often align with role stability and late-game scoring control.";
     if (dominantQuadrant === "volatile") return "Volatile ceiling profiles can win slates — but swing hard week-to-week.";
     if (dominantQuadrant === "safe") return "Safe floors reduce downside, but limit explosive upside.";
     return "Low-impact profiles require role change or matchup spike to matter.";
@@ -226,7 +226,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
       <div className="mt-4">{controls}</div>
 
       {/* Lean meter */}
-      <div className="mt-4 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+      <div className="mt-4 rounded-full border border-white/10 bg-black/30 px-3 py-1.5">
         <div className="flex items-center justify-between text-xs text-white/60">
           <span>{homeTeam}</span>
           <span className="text-white/40">Lean meter</span>
@@ -328,16 +328,16 @@ export default function PlayerImpactHeroScatterDesktop(props: {
 
                 {/* quadrant labels */}
                 <text x={PAD + 8} y={PAD + 18} fill="rgba(255,255,255,0.35)" fontSize="14">
-                  Volatile upside
+                  Volatile upside · {d.buckets.volatileUpside.length}
                 </text>
                 <text x={W - PAD - 150} y={PAD + 18} fill="rgba(251,191,36,0.85)" fontSize="14">
-                  Finale targets
+                  Finale targets · {d.buckets.finale.length}
                 </text>
                 <text x={PAD + 8} y={H - PAD - 10} fill="rgba(255,255,255,0.28)" fontSize="14">
-                  Low impact
+                  Low impact · {d.buckets.avoid.length}
                 </text>
                 <text x={W - PAD - 150} y={H - PAD - 10} fill="rgba(255,255,255,0.28)" fontSize="14">
-                  Safe / capped
+                  Safe / capped · {d.buckets.safeFloors.length}
                 </text>
 
                 {/* points */}
@@ -401,7 +401,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
             />
 
             {!isPremium ? (
-              <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+              <div className="rounded-full border border-white/10 bg-black/30 px-3 py-1.5">
                 <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">Neeko+ note</div>
                 <div className="mt-2 text-sm text-white/70">
                   <span className="inline-flex items-center gap-1 text-white/60">
@@ -433,7 +433,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
         />
 
         <SidebarCard
-          title="Finale targets"
+          title="Finale targets · {d.buckets.finale.length}"
           subtitle="High momentum, high ceiling"
           badge="Hot"
           items={buckets.finale.slice(0, 4)}
@@ -441,7 +441,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
         />
 
         <SidebarCard
-          title="Volatile upside"
+          title="Volatile upside · {d.buckets.volatileUpside.length}"
           subtitle="Ceiling spikes with risk"
           items={buckets.volatileUpside.slice(0, 4)}
           onRowClick={handleRowClick}
@@ -508,7 +508,7 @@ function SidebarCard(props: {
             <button
               key={p.id}
               onClick={() => onRowClick(p.id)}
-              className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left hover:bg-white/5"
+              className="w-full rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-left hover:bg-white/5"
             >
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -563,7 +563,7 @@ function SelectedCard(props: {
             </>
           ) : (
             <div className="mt-2 text-sm text-white/55 leading-relaxed">
-              Select a player to view details.
+              Select a player
             </div>
           )}
         </div>
