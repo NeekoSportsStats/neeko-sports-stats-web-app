@@ -165,7 +165,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
 
       {/* Plot (bigger, less dead space) */}
       <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
-        <svg viewBox={`0 0 ${W} ${H}`} className="h-[360px] w-full">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto aspect-[760/420]">
           {Array.from({ length: 5 }).map((_, i) => {
             const gx = PAD + ((W - PAD * 2) / 4) * i;
             const gy = PAD + ((H - PAD * 2) / 4) * i;
@@ -206,7 +206,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
       {/* Selected (tight) */}
       {selected && (
         <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-sm font-semibold text-white">{selected.name}</div>
               <div className="text-xs text-white/55">{selected.teamName}</div>
