@@ -35,7 +35,7 @@ import TermsConditions from "@/pages/policies/TermsConditions";
 import UserConductPolicy from "@/pages/policies/UserConductPolicy";
 
 /* =========================
-   AFL Pages (Nested)
+   AFL Pages (lowercase)
 ========================= */
 import AFLPlayers from "@/pages/sports/afl/AFLPlayers";
 import AFLTeams from "@/pages/sports/afl/AFLTeams";
@@ -43,20 +43,20 @@ import AFLAIInsights from "@/pages/sports/afl/AFLAIInsights";
 import AFLMatchCentre from "@/pages/sports/afl/AFLMatchCentre";
 
 /* =========================
-   EPL Pages (Nested)
+   EPL Pages (lowercase)
 ========================= */
-import EPLPlayers from "@/pages/sports/EPL/EPLPlayers";
-import EPLTeams from "@/pages/sports/EPL/EPLTeams";
-import EPLCompleteAIAnalysis from "@/pages/sports/EPL/EPLCompleteAIAnalysis";
-import EPLMatchCentre from "@/pages/sports/EPL/EPLMatchCentre";
+import EPLPlayers from "@/pages/sports/epl/EPLPlayers";
+import EPLTeams from "@/pages/sports/epl/EPLTeams";
+import EPLCompleteAIAnalysis from "@/pages/sports/epl/EPLCompleteAIAnalysis";
+import EPLMatchCentre from "@/pages/sports/epl/EPLMatchCentre";
 
 /* =========================
-   NBA Pages (Nested)
+   NBA Pages (lowercase)
 ========================= */
-import NBAPlayers from "@/pages/sports/NBA/NBAPlayers";
-import NBATeams from "@/pages/sports/NBA/NBATeams";
-import NBACompleteAIAnalysis from "@/pages/sports/NBA/NBACompleteAIAnalysis";
-import NBAMatchCentre from "@/pages/sports/NBA/NBAMatchCentre";
+import NBAPlayers from "@/pages/sports/nba/NBAPlayers";
+import NBATeams from "@/pages/sports/nba/NBATeams";
+import NBACompleteAIAnalysis from "@/pages/sports/nba/NBACompleteAIAnalysis";
+import NBAMatchCentre from "@/pages/sports/nba/NBAMatchCentre";
 
 function App() {
   return (
