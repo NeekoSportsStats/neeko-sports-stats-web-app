@@ -1,5 +1,5 @@
 import React from "react";
-import type { MatchPlayer } from "./types";
+import type { MatchPlayer } from "../data/types";
 
 /* -------------------------------------------------------------------------- */
 /*                                   TYPES                                    */

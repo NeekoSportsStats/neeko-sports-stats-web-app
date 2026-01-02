@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import MatchCard from "./MatchCard";
-import type { FixtureMatch } from "./types";
+import type { FixtureMatch } from "../data/types";
 
 type Props = {
   matches: FixtureMatch[];

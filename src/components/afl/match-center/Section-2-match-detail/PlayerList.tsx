@@ -1,6 +1,6 @@
 import React from "react";
-import MatchCard from "./MatchCard";
-import type { FixtureMatch } from "./types";
+import MatchCard from "../Section-1-match-overview/MatchCard";
+import type { FixtureMatch } from "../data/types";
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */

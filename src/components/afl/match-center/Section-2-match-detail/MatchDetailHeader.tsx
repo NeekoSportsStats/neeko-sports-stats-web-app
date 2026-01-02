@@ -1,6 +1,6 @@
 import React from "react";
-import type { FixtureMatch } from "./types";
-import { formatDateLong } from "./utils";
+import type { FixtureMatch } from "../data/types";
+import { formatDateLong } from "../data/utils";
 
 export default function MatchDetailHeader({ match }: { match: FixtureMatch }) {
   return (

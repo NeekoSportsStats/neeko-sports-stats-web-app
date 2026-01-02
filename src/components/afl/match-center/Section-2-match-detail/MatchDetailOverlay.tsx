@@ -1,6 +1,6 @@
 // src/components/afl/match-center/MatchDetailOverlay.tsx
 import React, { useMemo, useState } from "react";
-import type { FixtureMatch, TeamStatLine } from "./types";
+import type { FixtureMatch, TeamStatLine } from "../data/types";
 import { X, ChevronDown } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */

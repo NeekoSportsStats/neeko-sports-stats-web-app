@@ -1,5 +1,5 @@
 import React from "react";
-import type { FixtureMatch } from "./types";
+import type { FixtureMatch } from "../data/types";
 
 export default function VenueIntelChips({ match }: { match: FixtureMatch }) {
   return (
