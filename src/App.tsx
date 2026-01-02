@@ -43,19 +43,19 @@ import AFLAIInsights from "@/pages/sports/afl/AFLAIInsights";
 import AFLMatchCentre from "@/pages/sports/afl/AFLMatchCentre";
 
 /* =========================
-   EPL Pages (CORRECT FILE NAMES)
+   EPL Pages (CORRECT)
 ========================= */
 import EPLPlayers from "@/pages/sports/epl/EPLPlayers";
 import EPLTeams from "@/pages/sports/epl/EPLTeams";
-import EPLAIInsight from "@/pages/sports/epl/EPLAIInsight";
+import EPLAIInsights from "@/pages/sports/epl/EPLAIInsights";
 import EPLMatchCentre from "@/pages/sports/epl/EPLMatchCentre";
 
 /* =========================
-   NBA Pages (CORRECT FILE NAMES)
+   NBA Pages (CORRECT)
 ========================= */
 import NBAPlayers from "@/pages/sports/nba/NBAPlayers";
 import NBATeams from "@/pages/sports/nba/NBATeams";
-import NBAAIInsight from "@/pages/sports/nba/NBAAIInsight";
+import NBAAIInsights from "@/pages/sports/nba/NBAAIInsights";
 import NBAMatchCentre from "@/pages/sports/nba/NBAMatchCentre";
 
 function App() {
@@ -180,7 +180,7 @@ function App() {
       <Route path="/sports/epl" element={<Navigate to="/sports/epl/players" replace />} />
       <Route path="/sports/epl/players" element={<Layout><EPLPlayers /></Layout>} />
       <Route path="/sports/epl/teams" element={<Layout><EPLTeams /></Layout>} />
-      <Route path="/sports/epl/ai-analysis" element={<Layout><EPLAIInsight /></Layout>} />
+      <Route path="/sports/epl/ai-analysis" element={<Layout><EPLAIInsights /></Layout>} />
       <Route path="/sports/epl/match-centre" element={<Layout><EPLMatchCentre /></Layout>} />
 
       {/* =========================
@@ -189,7 +189,7 @@ function App() {
       <Route path="/sports/nba" element={<Navigate to="/sports/nba/players" replace />} />
       <Route path="/sports/nba/players" element={<Layout><NBAPlayers /></Layout>} />
       <Route path="/sports/nba/teams" element={<Layout><NBATeams /></Layout>} />
-      <Route path="/sports/nba/ai-analysis" element={<Layout><NBAAIInsight /></Layout>} />
+      <Route path="/sports/nba/ai-analysis" element={<Layout><NBAAIInsights /></Layout>} />
       <Route path="/sports/nba/match-centre" element={<Layout><NBAMatchCentre /></Layout>} />
 
       {/* =========================
