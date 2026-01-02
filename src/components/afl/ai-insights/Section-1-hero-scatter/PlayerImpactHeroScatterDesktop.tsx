@@ -57,6 +57,8 @@ export default function PlayerImpactHeroScatterDesktop(props: {
     whyLean,
   } = d;
 
+  if (!playersVisible || playersVisible.length === 0) return null;
+
   const [modalOpen, setModalOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
 
@@ -82,15 +84,17 @@ export default function PlayerImpactHeroScatterDesktop(props: {
   }, [dominantQuadrant]);
 
   const handleDotClick = (id: string) => {
+    if (!id) return;
     if (openId !== id) {
-      setOpenId(id);          // A1: select + update sidebar + selected card
+      setOpenId(id);
       setModalOpen(false);
       return;
     }
-    setModalOpen(true);       // A2: second click opens modal
+    setModalOpen(true);
   };
 
   const handleRowClick = (id: string) => {
+    if (!id) return;
     if (openId !== id) {
       setOpenId(id);
       setModalOpen(false);

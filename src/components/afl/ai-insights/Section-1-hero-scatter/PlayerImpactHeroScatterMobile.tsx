@@ -48,12 +48,15 @@ export default function PlayerImpactHeroScatterMobile(props: {
     whyLean,
   } = d;
 
+  if (!playersVisible || playersVisible.length === 0) return null;
+
   const [modalOpen, setModalOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
 
   const [hoverId, setHoverId] = useState<string | null>(null);
 
   const handleDotClick = (id: string) => {
+    if (!id) return;
     if (openId !== id) {
       setOpenId(id);
       setModalOpen(false);
@@ -63,6 +66,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
   };
 
   const handleRowClick = (id: string) => {
+    if (!id) return;
     if (openId !== id) {
       setOpenId(id);
       setModalOpen(false);

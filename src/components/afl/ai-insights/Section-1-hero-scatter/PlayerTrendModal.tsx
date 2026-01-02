@@ -45,7 +45,7 @@ export default function PlayerTrendModal(props: {
   lens: LensKey;
   locked: boolean;
 }) {
-  const { open, onClose, player, allPlayers, locked } = props;
+  const { open, onClose, player, allPlayers, locked, lens } = props;
 
   const [compareId, setCompareId] = useState<string>("");
 
@@ -88,7 +88,9 @@ export default function PlayerTrendModal(props: {
     return "Monitor role signals — current profile is sensitive to matchup conditions.";
   }, [player]);
 
-  if (!open || !player) return null;
+  if (!open || !player || !player.trend || player.trend.length === 0) return null;
+
+  const statLabel = lens === "fantasy" ? "Fantasy" : lens === "disposals" ? "Disposals" : "Goals";
 
   const CH_W = 760;
   const CH_H = 340;
@@ -106,7 +108,7 @@ export default function PlayerTrendModal(props: {
             <div>
               <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Player Trend</div>
               <div className="mt-1 text-2xl font-semibold text-white">{player.name}</div>
-              <div className="mt-1 text-sm text-white/55">Weekly {props.lens} output</div>
+              <div className="mt-1 text-sm text-white/55">Weekly {statLabel} output</div>
             </div>
 
             <button
@@ -188,6 +190,30 @@ export default function PlayerTrendModal(props: {
                     </span>
                   </div>
                 )}
+              </div>
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 overflow-hidden">
+              <div className="px-4 py-2 border-b border-white/10">
+                <div className="text-xs uppercase tracking-[0.15em] text-white/50">Round-by-Round</div>
+              </div>
+              <div className="max-h-[240px] overflow-y-auto">
+                <table className="w-full">
+                  <thead className="sticky top-0 bg-black/80 backdrop-blur-sm">
+                    <tr className="border-b border-white/10">
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-white/70">Round</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-white/70">{statLabel}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {player.trend.map((row) => (
+                      <tr key={row.week} className="border-b border-white/[0.06] hover:bg-white/[0.02]">
+                        <td className="px-4 py-2 text-sm text-white/80">{row.week}</td>
+                        <td className="px-4 py-2 text-right text-sm text-white/90 font-medium">{row.value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
 
