@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { MOCK_TEAMS } from "../data/mockTeams";
 import { Flame, TrendingUp, Shield, Activity, Sparkles } from "lucide-react";
-import { SectionHeader } from "@/components/shared/SectionHeader";
+import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 /* -------------------------------------------------------------------------- */
 /*                         SPARKLINE PLACEHOLDER (UI-ONLY)                    */

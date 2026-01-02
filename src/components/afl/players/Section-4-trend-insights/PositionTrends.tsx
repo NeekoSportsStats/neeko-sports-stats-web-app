@@ -8,7 +8,7 @@ import {
   TrendingDown,
   Zap,
 } from "lucide-react";
-import { SectionHeader } from "@/components/shared/SectionHeader";
+import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 import {
   useAFLMockPlayers,

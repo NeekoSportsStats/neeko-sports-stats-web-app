@@ -2,6 +2,7 @@
 import React, { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Sparkles, ChevronDown } from "lucide-react";
+import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 import {
   useAFLMockPlayers,
@@ -413,21 +414,13 @@ export default function FormStabilityGrid() {
       <div className="relative space-y-5">
         {/* Header */}
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 rounded-full border border-yellow-500/40 bg-black/80 px-3 py-1 text-xs text-yellow-200/90">
-              <Sparkles className="h-3.5 w-3.5 text-yellow-300" />
-              <span className="uppercase tracking-[0.18em]">Form Stability Grid</span>
-            </div>
-
-            <h2 className="text-xl font-semibold md:text-2xl">
-              Hot risers, rock-solid anchors &amp; form slumps
-            </h2>
-
-            <p className="max-w-xl text-xs text-white/70 md:text-sm">
-              Last 5 rounds of{" "}
-              <span className="font-semibold text-yellow-200">{statLabel.toLowerCase()}</span>{" "}
-              — split into recent surges, stability leaders and cooling risks.
-            </p>
+          <div>
+            <SectionHeader
+              pillLabel="Form Stability Grid"
+              title="Hot risers, rock-solid anchors & form slumps"
+              description={`Last 5 rounds of ${statLabel.toLowerCase()} — split into recent surges, stability leaders and cooling risks.`}
+              icon={Sparkles}
+            />
           </div>
 
           {/* stat lens */}

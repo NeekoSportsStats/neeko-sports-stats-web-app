@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Sparkles, ChevronDown } from "lucide-react";
-import { SectionHeader } from "@/components/shared/SectionHeader";
+import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 import {
   useAFLMockPlayers,

@@ -1,6 +1,7 @@
 // src/components/afl/teams/TeamFormStabilityGrid.tsx
 import React, { useState } from "react";
 import { Flame, Snowflake, Activity } from "lucide-react";
+import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 type TeamTrend = {
   team: string;
@@ -47,21 +48,13 @@ const TeamFormStabilityGrid: React.FC = () => {
 
         {/* Header */}
         <div className="mb-10 flex flex-col gap-4 md:flex-row md:justify-between md:items-start">
-          <div className="space-y-3 md:max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-yellow-600/60 bg-black/70 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-yellow-300 shadow-[0_0_18px_rgba(234,179,8,0.45)]">
-              <Activity className="h-3.5 w-3.5" />
-              <span>Team Form &amp; Stability</span>
-            </div>
-
-            <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">
-              Long-term momentum, role stability & performance consistency
-            </h2>
-
-            <p className="text-sm text-zinc-300 md:text-[0.95rem]">
-              Breaking down +5 round trajectories across fantasy scoring,
-              disposals and goals. These indicators reflect role continuity,
-              tactical stability and genuine scoring reliability.
-            </p>
+          <div>
+            <SectionHeader
+              pillLabel="Team Form & Stability"
+              title="Long-term momentum, role stability & performance consistency"
+              description="Breaking down +5 round trajectories across fantasy scoring, disposals and goals. These indicators reflect role continuity, tactical stability and genuine scoring reliability."
+              icon={Activity}
+            />
           </div>
 
           {/* Stat lens selection */}

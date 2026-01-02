@@ -8,6 +8,7 @@ import {
   TrendingDown,
   Zap,
 } from "lucide-react";
+import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 import {
   useAFLMockPlayers,
@@ -377,28 +378,13 @@ export default function PositionTrends() {
       <div className="relative space-y-5">
         {/* Header */}
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 rounded-full border border-violet-400/50 bg-black/80 px-3 py-1 text-xs text-violet-100/90">
-              <Sparkles className="h-3.5 w-3.5 text-violet-200" />
-              <span className="uppercase tracking-[0.18em]">
-                Position Trends
-              </span>
-            </div>
-            <h2 className="text-xl font-semibold md:text-2xl">
-              Role-driven trends by line
-            </h2>
-            <p className="max-w-xl text-xs text-white/70 md:text-sm">
-              Blends{" "}
-              <span className="font-semibold text-emerald-200">
-                recent fantasy output
-              </span>{" "}
-              with{" "}
-              <span className="font-semibold text-sky-200">
-                stability and volatility
-              </span>{" "}
-              to surface the most important movers and softening role signals
-              across each position.
-            </p>
+          <div>
+            <SectionHeader
+              pillLabel="Position Trends"
+              title="Role-driven trends by line"
+              description="Blends recent fantasy output with stability and volatility to surface the most important movers and softening role signals across each position."
+              icon={Sparkles}
+            />
           </div>
 
           {/* Position lens */}
