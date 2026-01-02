@@ -9,7 +9,7 @@ import { usePlayerScatterData, type LabelMode, type LensKey, type PlayerPoint } 
 const W = 760;
 const H = 420;
 // Slightly tighter padding = bigger usable plot area (less "dead" edge space)
-const PAD = 44;
+const PAD = 28;
 
 const x = (v: number) => PAD + (v / 100) * (W - PAD * 2);
 const y = (v: number) => PAD + (1 - v / 100) * (H - PAD * 2);
@@ -291,8 +291,8 @@ export default function PlayerImpactHeroScatterDesktop(props: {
       <div className="mt-3 grid grid-cols-12 gap-4">
         {/* Plot */}
         <div className="col-span-12 lg:col-span-8">
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-2 md:p-3">
-            <div className="flex items-center justify-between gap-2 px-1">
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-2">
+            <div className="flex items-center justify-between gap-2">
               <div className="text-xs text-white/60">
                 X: Momentum · Y: Ceiling
               </div>
@@ -309,9 +309,9 @@ export default function PlayerImpactHeroScatterDesktop(props: {
               </div>
             </div>
 
-            <div className="mt-2 overflow-hidden rounded-xl border border-white/10 bg-black/30">
+          
               {/* Larger rendered height + tighter PAD above = clearer dots/labels */}
-              <svg viewBox={`0 0 ${W} ${H}`} className="h-[440px] w-full">
+              <svg viewBox={`0 0 ${W} ${H}`} className="h-[560px] w-full">
                 {/* grid */}
                 {Array.from({ length: 5 }).map((_, i) => {
                   const gx = PAD + ((W - PAD * 2) / 4) * i;
@@ -386,7 +386,6 @@ export default function PlayerImpactHeroScatterDesktop(props: {
                   );
                 })}
               </svg>
-            </div>
           </div>
         </div>
 

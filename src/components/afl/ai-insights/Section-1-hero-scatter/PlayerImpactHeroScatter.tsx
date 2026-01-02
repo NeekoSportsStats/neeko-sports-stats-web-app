@@ -25,13 +25,15 @@ export default function PlayerImpactHeroScatter(props: {
   mode: PremiumMode;
   initialLens?: LensKey;
 }) {
-  const { match, mode, initialLens } = props;
   const isMobile = useIsMobile();
-
   const Component = useMemo(
     () => (isMobile ? PlayerImpactHeroScatterMobile : PlayerImpactHeroScatterDesktop),
     [isMobile]
   );
 
-  return <Component match={match} mode={mode} initialLens={initialLens} />;
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+      <Component {...props} />
+    </div>
+  );
 }
