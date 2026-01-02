@@ -69,24 +69,20 @@ export default function PlayerImpactHeroScatterDesktop({
         </p>
       </div>
 
-      {/* CONTROLS */}
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      {/* CONTROLS (visually demoted) */}
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
         {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
           <button
             key={k}
             onClick={() => setLens(k)}
             className={
-              "rounded-full border px-3 py-1.5 text-sm " +
+              "rounded-full border px-2.5 py-1 transition-colors " +
               (lens === k
                 ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
-                : "border-white/10 bg-black/20 text-white/70")
+                : "border-white/10 bg-black/20 text-white/60")
             }
           >
-            {k === "fantasy"
-              ? "Fantasy"
-              : k === "disposals"
-              ? "Disposals"
-              : "Goals"}
+            {k}
           </button>
         ))}
 
@@ -96,10 +92,10 @@ export default function PlayerImpactHeroScatterDesktop({
               key={k}
               onClick={() => setTeamFilter(k)}
               className={
-                "rounded-full border px-3 py-1.5 text-sm " +
+                "rounded-full border px-2.5 py-1 transition-colors " +
                 (teamFilter === k
                   ? "border-white/25 bg-white/10 text-white"
-                  : "border-white/10 bg-black/20 text-white/60")
+                  : "border-white/10 bg-black/20 text-white/50")
               }
             >
               {k}
@@ -123,39 +119,15 @@ export default function PlayerImpactHeroScatterDesktop({
                 const gy = PAD + ((H - PAD * 2) / 4) * i;
                 return (
                   <g key={i}>
-                    <line
-                      x1={gx}
-                      y1={PAD}
-                      x2={gx}
-                      y2={H - PAD}
-                      stroke="rgba(255,255,255,0.1)"
-                    />
-                    <line
-                      x1={PAD}
-                      y1={gy}
-                      x2={W - PAD}
-                      y2={gy}
-                      stroke="rgba(255,255,255,0.1)"
-                    />
+                    <line x1={gx} y1={PAD} x2={gx} y2={H - PAD} stroke="rgba(255,255,255,0.08)" />
+                    <line x1={PAD} y1={gy} x2={W - PAD} y2={gy} stroke="rgba(255,255,255,0.08)" />
                   </g>
                 );
               })}
 
               {/* AXES */}
-              <line
-                x1={x(50)}
-                y1={PAD}
-                x2={x(50)}
-                y2={H - PAD}
-                stroke="rgba(255,255,255,0.18)"
-              />
-              <line
-                x1={PAD}
-                y1={y(50)}
-                x2={W - PAD}
-                y2={y(50)}
-                stroke="rgba(255,255,255,0.18)"
-              />
+              <line x1={x(50)} y1={PAD} x2={x(50)} y2={H - PAD} stroke="rgba(255,255,255,0.18)" />
+              <line x1={PAD} y1={y(50)} x2={W - PAD} y2={y(50)} stroke="rgba(255,255,255,0.18)" />
 
               {/* POINTS */}
               {playersVisible.map((p) => {
@@ -171,8 +143,8 @@ export default function PlayerImpactHeroScatterDesktop({
                     onMouseLeave={() => setHoverId(null)}
                     onClick={() => setOpenId(p.id)}
                     style={{ cursor: "pointer" }}
+                    className="transition-all duration-200 ease-out"
                   >
-                    {/* Gold selection ring */}
                     {isSelected && (
                       <circle
                         cx={cx}
@@ -181,10 +153,10 @@ export default function PlayerImpactHeroScatterDesktop({
                         fill="rgba(251,191,36,0.12)"
                         stroke="rgba(251,191,36,0.75)"
                         strokeWidth={2}
+                        className="animate-[pulse_2s_ease-in-out_infinite]"
                       />
                     )}
 
-                    {/* Dot */}
                     <circle
                       cx={cx}
                       cy={cy}
@@ -192,7 +164,6 @@ export default function PlayerImpactHeroScatterDesktop({
                       fill={p.teamSide === "home" ? "#60a5fa" : "#34d399"}
                     />
 
-                    {/* Name label */}
                     {(isHover || isSelected) && (
                       <text
                         x={cx + 10}
@@ -208,22 +179,6 @@ export default function PlayerImpactHeroScatterDesktop({
                 );
               })}
             </svg>
-
-            {/* QUADRANT SUMMARY */}
-            <div className="pointer-events-none absolute inset-0 text-[11px] text-white/45">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                Finale · {quadrantCounts.finale}
-              </div>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-right">
-                Safe · {quadrantCounts.safe}
-              </div>
-              <div className="absolute left-3 bottom-3">
-                Volatile · {quadrantCounts.volatile}
-              </div>
-              <div className="absolute right-3 bottom-3 text-right">
-                Low · {quadrantCounts.avoid}
-              </div>
-            </div>
           </div>
         </div>
 
@@ -246,8 +201,15 @@ export default function PlayerImpactHeroScatterDesktop({
               </button>
             </div>
           ) : (
-            <div className="text-sm text-white/60">
-              Select a player to explore trend & projection
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
+              <div className="font-semibold text-white mb-2">
+                Matchup signal (AI)
+              </div>
+              <ul className="space-y-1 text-xs text-white/60">
+                <li>• Ceiling concentrated in away midfielders</li>
+                <li>• Volatility skewed to top-right quadrant</li>
+                <li>• Home side shows stronger floor stability</li>
+              </ul>
             </div>
           )}
 
