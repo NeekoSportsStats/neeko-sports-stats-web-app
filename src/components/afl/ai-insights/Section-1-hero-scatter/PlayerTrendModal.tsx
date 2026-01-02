@@ -102,7 +102,7 @@ export default function PlayerTrendModal(props: {
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-3xl -translate-x-1/2 -translate-y-1/2">
         <div className="rounded-3xl border border-white/10 bg-[#0b0b0b] shadow-2xl">
-          <div className="flex items-start justify-between gap-3 px-6 pt-5">
+          <div className="flex items-start justify-between gap-2 px-6 pt-5">
             <div>
               <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Player Trend</div>
               <div className="mt-1 text-2xl font-semibold text-white">{player.name}</div>

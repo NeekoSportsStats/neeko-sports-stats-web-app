@@ -69,7 +69,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
 
   const premiumNarrative = useMemo(() => {
     // tiny “sugar” line; stays tasteful
-    if (dominantQuadrant === "finale") return "Finale targets · {d.buckets.finale.length} often align with role stability and late-game scoring control.";
+    if (dominantQuadrant === "finale") return "Finale targets often align with role stability and late-game scoring control.";
     if (dominantQuadrant === "volatile") return "Volatile ceiling profiles can win slates — but swing hard week-to-week.";
     if (dominantQuadrant === "safe") return "Safe floors reduce downside, but limit explosive upside.";
     return "Low-impact profiles require role change or matchup spike to matter.";
@@ -94,7 +94,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
   };
 
   const controls = (
-    <div className="flex flex-wrap items-center gap-3 md:gap-4">
+    <div className="flex flex-wrap items-center gap-2 md:gap-4">
       {/* Metric */}
       <div className="flex items-center gap-2">
         <span className="text-xs text-white/50">Metric</span>
@@ -244,7 +244,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
           <div className="absolute left-1/2 top-0 h-full w-px bg-white/15" />
         </div>
 
-        <div className="mt-2 flex items-center justify-between gap-3">
+        <div className="mt-2 flex items-center justify-between gap-2">
           <div className="text-xs text-white/60">
             <span className="inline-flex items-center gap-2">
               Lean: Δ {lean.diff > 0 ? "+" : ""}
@@ -297,7 +297,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
                 X: Momentum · Y: Ceiling
               </div>
 
-              <div className="flex items-center gap-3 text-xs text-white/60">
+              <div className="flex items-center gap-2 text-xs text-white/60">
                 <span className="inline-flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full" style={{ background: "#60a5fa" }} />
                   {homeTeam}
@@ -311,7 +311,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
 
           
               {/* Larger rendered height + tighter PAD above = clearer dots/labels */}
-              <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto aspect-[760/420]">
+              <svg viewBox={`0 0 ${W} ${H}`} className="h-[560px] w-full">
                 {/* grid */}
                 {Array.from({ length: 5 }).map((_, i) => {
                   const gx = PAD + ((W - PAD * 2) / 4) * i;
@@ -328,16 +328,16 @@ export default function PlayerImpactHeroScatterDesktop(props: {
 
                 {/* quadrant labels */}
                 <text x={PAD + 8} y={PAD + 18} fill="rgba(255,255,255,0.35)" fontSize="14">
-                  Volatile upside · {d.buckets.volatileUpside.length}
+                  Volatile upside
                 </text>
                 <text x={W - PAD - 150} y={PAD + 18} fill="rgba(251,191,36,0.85)" fontSize="14">
-                  Finale targets · {d.buckets.finale.length}
+                  Finale targets
                 </text>
                 <text x={PAD + 8} y={H - PAD - 10} fill="rgba(255,255,255,0.28)" fontSize="14">
-                  Low impact · {d.buckets.avoid.length}
+                  Low impact
                 </text>
                 <text x={W - PAD - 150} y={H - PAD - 10} fill="rgba(255,255,255,0.28)" fontSize="14">
-                  Safe / capped · {d.buckets.safeFloors.length}
+                  Safe / capped
                 </text>
 
                 {/* points */}
@@ -424,7 +424,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
       </div>
 
       {/* Buckets below the scatter: multi-column to reduce overall scroll */}
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         <SidebarCard
           title="Top targets"
           subtitle="Best combined momentum + ceiling"
@@ -433,7 +433,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
         />
 
         <SidebarCard
-          title="Finale targets · {d.buckets.finale.length}"
+          title="Finale targets"
           subtitle="High momentum, high ceiling"
           badge="Hot"
           items={buckets.finale.slice(0, 4)}
@@ -441,7 +441,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
         />
 
         <SidebarCard
-          title="Volatile upside · {d.buckets.volatileUpside.length}"
+          title="Volatile upside"
           subtitle="Ceiling spikes with risk"
           items={buckets.volatileUpside.slice(0, 4)}
           onRowClick={handleRowClick}
@@ -543,7 +543,7 @@ function SelectedCard(props: {
       "rounded-2xl border bg-black/20 p-4",
       selected ? "border-amber-400/20" : "border-white/10"
     )}>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2">
         <div>
           <div className={cls(
             "text-[11px] uppercase tracking-[0.18em]",
@@ -563,12 +563,12 @@ function SelectedCard(props: {
             </>
           ) : (
             <div className="mt-2 text-sm text-white/55 leading-relaxed">
-              Select a player
+              Select a player to view details.
             </div>
           )}
         </div>
 
-        {selected && (<button
+        <button
           onClick={onOpenTrend}
           disabled={!selected}
           className={cls(
@@ -577,7 +577,9 @@ function SelectedCard(props: {
               ? "border-white/10 bg-black/20 text-white/75 hover:bg-white/5"
               : "border-white/10 bg-black/10 text-white/35 cursor-not-allowed"
           )}
-        >Open trend</button>)}
+        >
+          Open trend
+        </button>
       </div>
 
       {!isPremium && selected && (
