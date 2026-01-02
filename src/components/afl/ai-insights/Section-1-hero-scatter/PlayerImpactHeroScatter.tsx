@@ -1,23 +1,25 @@
-import PlayerImpactHeroScatterDesktop from "./PlayerImpactHeroScatterDesktop";
-import PlayerImpactHeroScatterMobile from "./PlayerImpactHeroScatterMobile";
+import React from "react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
-import type { LensKey } from "./usePlayerScatterData";
 
-type Props = {
+import type { LensKey } from "./usePlayerScatterData";
+import PlayerImpactHeroScatterDesktop from "./PlayerImpactHeroScatterDesktop";
+import PlayerImpactHeroScatterMobile from "./PlayerImpactHeroScatterMobile";
+
+export default function PlayerImpactHeroScatter(props: {
   match?: FixtureMatch;
   mode: PremiumMode;
   initialLens?: LensKey;
-};
+}) {
+  const { match, mode, initialLens } = props;
 
-export default function PlayerImpactHeroScatter(props: Props) {
   return (
     <>
       <div className="hidden md:block">
-        <PlayerImpactHeroScatterDesktop {...props} />
+        <PlayerImpactHeroScatterDesktop match={match} mode={mode} initialLens={initialLens} />
       </div>
-      <div className="block md:hidden">
-        <PlayerImpactHeroScatterMobile {...props} />
+      <div className="md:hidden">
+        <PlayerImpactHeroScatterMobile match={match} mode={mode} initialLens={initialLens} />
       </div>
     </>
   );
