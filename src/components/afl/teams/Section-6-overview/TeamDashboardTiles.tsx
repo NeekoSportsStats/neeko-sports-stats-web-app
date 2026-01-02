@@ -1,7 +1,7 @@
 // src/components/afl/teams/TeamDashboardTiles.tsx
 
 import React from "react";
-import { MOCK_TEAMS, AFLTeam } from "./mockTeams";
+import { MOCK_TEAMS, AFLTeam } from "../data/mockTeams";
 import {
   Activity,
   ShieldCheck,

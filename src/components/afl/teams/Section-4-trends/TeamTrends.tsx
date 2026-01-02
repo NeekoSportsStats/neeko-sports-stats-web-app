@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { MOCK_TEAMS } from "./mockTeams";
+import { MOCK_TEAMS } from "../data/mockTeams";
 import { TrendingUp, Shield, Activity, MoveVertical } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */

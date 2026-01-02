@@ -6,7 +6,7 @@
 // E) Fully patched BACK CARD with balanced JSX
 
 import React, { useMemo, useState } from "react";
-import { MOCK_TEAMS, AFLTeam } from "./mockTeams";
+import { MOCK_TEAMS, AFLTeam } from "../data/mockTeams";
 import { Flame, CircleDot, Snowflake } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */

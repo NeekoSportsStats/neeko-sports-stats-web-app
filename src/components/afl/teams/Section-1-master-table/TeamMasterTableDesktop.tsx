@@ -6,7 +6,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import type { TeamRow } from "./mockTeams";
+import type { TeamRow } from "../data/mockTeams";
 import type { StatLens } from "./TeamMasterTable";
 
 /* -------------------------------------------------------------------------- */

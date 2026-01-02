@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Search, Lock, X, ArrowRight, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { TeamRow } from "./mockTeams";
+import type { TeamRow } from "../data/mockTeams";
 import type { StatLens } from "./TeamMasterTable";
 
 /* -------------------------------------------------------------------------- */

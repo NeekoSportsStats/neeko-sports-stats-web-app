@@ -4,11 +4,11 @@ import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/lib/auth";
 
-import TeamInsightsOverlay from "./TeamInsightsOverlay";
+import TeamInsightsOverlay from "../Section-2-team-insights/TeamInsightsOverlay";
 import TeamMasterTableDesktop from "./TeamMasterTableDesktop";
 import TeamMasterTableMobile from "./TeamMasterTableMobile";
 
-import { MOCK_TEAMS, TeamRow } from "./mockTeams";
+import { MOCK_TEAMS, TeamRow } from "../data/mockTeams";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */

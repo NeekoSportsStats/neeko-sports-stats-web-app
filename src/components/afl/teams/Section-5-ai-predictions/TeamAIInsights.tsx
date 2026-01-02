@@ -1,7 +1,7 @@
 // src/components/afl/teams/TeamAIInsights.tsx
 
 import React from "react";
-import { MOCK_TEAMS, AFLTeam } from "./mockTeams";
+import { MOCK_TEAMS, AFLTeam } from "../data/mockTeams";
 import { Lock, X, ArrowRight } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */

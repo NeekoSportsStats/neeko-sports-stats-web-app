@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
-import type { TeamRow } from "./mockTeams";
-import type { StatLens } from "./TeamMasterTable";
+import type { TeamRow } from "../data/mockTeams";
+import type { StatLens } from "../Section-1-master-table/TeamMasterTable";
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */

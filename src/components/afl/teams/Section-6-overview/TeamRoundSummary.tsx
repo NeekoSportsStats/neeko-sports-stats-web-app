@@ -1,7 +1,7 @@
 // src/components/afl/teams/TeamMomentumPulse.tsx
 
 import React, { useMemo } from "react";
-import { MOCK_TEAMS } from "./mockTeams";
+import { MOCK_TEAMS } from "../data/mockTeams";
 import { Flame, TrendingUp, Shield, Activity } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */

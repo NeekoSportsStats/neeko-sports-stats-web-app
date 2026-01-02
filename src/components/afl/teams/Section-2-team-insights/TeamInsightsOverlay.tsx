@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import type { TeamRow } from "./mockTeams";
-import type { StatLens } from "./TeamMasterTable";
+import type { TeamRow } from "../data/mockTeams";
+import type { StatLens } from "../Section-1-master-table/TeamMasterTable";
 import TeamInsightsContent from "./TeamInsightsContent";
 
 /* -------------------------------------------------------------------------- */

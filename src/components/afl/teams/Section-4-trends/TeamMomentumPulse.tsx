@@ -8,7 +8,7 @@
 // - 6 editorial headlines
 
 import React from "react";
-import { MOCK_TEAMS } from "./mockTeams";
+import { MOCK_TEAMS } from "../data/mockTeams";
 import { Flame, Shield, TrendingUp, BarChart3, Zap } from "lucide-react";
 
 /* ============================================================================
