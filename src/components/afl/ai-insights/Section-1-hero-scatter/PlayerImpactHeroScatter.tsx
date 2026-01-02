@@ -2,29 +2,31 @@ import React from "react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 
-import PlayerImpactHeroScatterDesktop from "./PlayerImpactHeroScatterDesktop";
-import PlayerImpactHeroScatterMobile from "./PlayerImpactHeroScatterMobile";
+import PlayerImpactHeroScatter from "./PlayerImpactHeroScatter";
 import type { LensKey } from "./usePlayerScatterData";
 
-export type PlayerImpactHeroScatterProps = {
+export default function PlayerImpactScatterPanel(props: {
   match?: FixtureMatch;
   mode: PremiumMode;
   initialLens?: LensKey;
-};
+}) {
+  const { match, mode, initialLens } = props;
 
-/**
- * Responsive wrapper.
- * Desktop does the main experience; mobile is a simplified layout.
- */
-export default function PlayerImpactHeroScatter(props: PlayerImpactHeroScatterProps) {
   return (
-    <div className="w-full">
-      <div className="hidden lg:block">
-        <PlayerImpactHeroScatterDesktop {...props} />
+    <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-white">Player Impact Map</h2>
+        <p className="mt-1 text-sm text-white/60">
+          Momentum vs ceiling · Click a player to select, click again to open
+          trend/projection
+        </p>
       </div>
-      <div className="lg:hidden">
-        <PlayerImpactHeroScatterMobile {...props} />
-      </div>
-    </div>
+
+      <PlayerImpactHeroScatter
+        match={match}
+        mode={mode}
+        initialLens={initialLens}
+      />
+    </section>
   );
 }
