@@ -13,20 +13,10 @@ export default function PlayerImpactScatterPanel(props: {
   const { match, mode, initialLens } = props;
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-white">Player Impact Map</h2>
-        <p className="mt-1 text-sm text-white/60">
-          Momentum vs ceiling · Click a player to select, click again to open
-          trend/projection
-        </p>
-      </div>
-
-      <PlayerImpactHeroScatter
-        match={match}
-        mode={mode}
-        initialLens={initialLens}
-      />
-    </section>
+    <PlayerImpactHeroScatter
+      match={match}
+      mode={mode}
+      initialLens={initialLens}
+    />
   );
 }

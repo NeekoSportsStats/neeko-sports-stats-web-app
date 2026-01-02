@@ -83,92 +83,105 @@ export default function PlayerImpactHeroScatterDesktop(props: {
 
   const handleDotClick = (id: string) => {
     if (!id) return;
-    if (openId !== id) {
-      setOpenId(id);
-      setModalOpen(false);
-      return;
-    }
+    setOpenId(id);
     setModalOpen(true);
   };
 
   const handleRowClick = (id: string) => {
     if (!id) return;
-    if (openId !== id) {
-      setOpenId(id);
-      setModalOpen(false);
-      return;
-    }
+    setOpenId(id);
     setModalOpen(true);
   };
 
   if (!playersVisible || playersVisible.length === 0) return null;
 
   const controls = (
-    <div className="flex flex-wrap items-center gap-3 md:gap-4">
-      {/* Metric */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-white/50">Metric</span>
-        <div className="flex gap-1.5">
-          {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
-            <button
-              key={k}
-              onClick={() => setLens(k)}
-              className={cls(
-                "rounded-full border px-3 py-1 text-xs transition",
-                lens === k
-                  ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
-                  : "border-white/10 bg-black/20 text-white/70 hover:bg-white/5"
-              )}
-            >
-              {k === "fantasy" ? "Fantasy" : k === "disposals" ? "Disposals" : "Goals"}
-            </button>
-          ))}
-        </div>
+    <div className="space-y-3">
+      {/* Analysis State (Cluster 1) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] uppercase tracking-[0.15em] text-white/40">Analysis State</span>
+        <span className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] text-white/70">
+          Lean:{" "}
+          {lean.direction === "even"
+            ? "Even"
+            : `${lean.direction === "home" ? homeTeam : awayTeam}`}{" "}
+          <span className="text-amber-200">
+            {lean.direction === "even" ? "" : `${lean.diff > 0 ? "+" : ""}${lean.diff.toFixed(1)}`}
+          </span>
+        </span>
+        <span className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] text-white/70">
+          Volatility: <span className="text-white/85">{volatility.label}</span>
+        </span>
+        <span className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[11px] text-white/70">
+          Dominant: <span className="text-white/85">{dominantLabel}</span>
+        </span>
       </div>
 
-      <div className="hidden md:block h-5 w-px bg-white/10" />
-
-      {/* Team */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-white/50">Team</span>
-        <div className="flex gap-1.5">
-          {(["both", "home", "away"] as const).map((k) => (
-            <button
-              key={k}
-              onClick={() => setTeamFilter(k)}
-              className={cls(
-                "rounded-full border px-3 py-1 text-xs transition",
-                teamFilter === k
-                  ? "border-white/25 bg-white/10 text-white"
-                  : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
-              )}
-            >
-              {k}
-            </button>
-          ))}
+      {/* Primary Controls (Cluster 2 - Metric) */}
+      <div className="flex flex-wrap items-center gap-3 md:gap-4">
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs font-medium text-white/60">Metric</span>
+          <div className="flex gap-1.5">
+            {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => setLens(k)}
+                className={cls(
+                  "rounded-full border px-4 py-1.5 text-sm font-medium transition",
+                  lens === k
+                    ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+                    : "border-white/10 bg-black/20 text-white/70 hover:bg-white/5"
+                )}
+              >
+                {k === "fantasy" ? "Fantasy" : k === "disposals" ? "Disposals" : "Goals"}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className="hidden md:block h-5 w-px bg-white/10" />
+        <div className="hidden md:block h-5 w-px bg-white/10" />
 
-      {/* Labels */}
-      <div className="ml-auto flex items-center gap-2">
-        <span className="text-xs text-white/50">Labels</span>
-        <div className="flex gap-1.5">
-          {(["smart", "all", "none"] as LabelMode[]).map((k) => (
-            <button
-              key={k}
-              onClick={() => setLabelMode(k)}
-              className={cls(
-                "rounded-full border px-3 py-1 text-xs transition",
-                labelMode === k
-                  ? "border-amber-400/35 bg-amber-400/10 text-amber-200"
-                  : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
-              )}
-            >
-              {k}
-            </button>
-          ))}
+        {/* Secondary Filters (Cluster 3) */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-white/40">Team</span>
+            <div className="flex gap-1">
+              {(["both", "home", "away"] as const).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => setTeamFilter(k)}
+                  className={cls(
+                    "rounded-full border px-2.5 py-1 text-[11px] transition",
+                    teamFilter === k
+                      ? "border-white/25 bg-white/10 text-white"
+                      : "border-white/10 bg-black/20 text-white/50 hover:bg-white/5"
+                  )}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-white/40">Labels</span>
+            <div className="flex gap-1">
+              {(["smart", "all", "none"] as LabelMode[]).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => setLabelMode(k)}
+                  className={cls(
+                    "rounded-full border px-2.5 py-1 text-[11px] transition",
+                    labelMode === k
+                      ? "border-amber-400/35 bg-amber-400/10 text-amber-200"
+                      : "border-white/10 bg-black/20 text-white/50 hover:bg-white/5"
+                  )}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -185,7 +198,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
           </div>
           <h3 className="mt-1 text-2xl font-semibold text-white">Momentum vs Ceiling</h3>
           <p className="mt-1 text-sm text-white/60">
-            {homeTeam} vs {awayTeam} · Analyst view
+            {homeTeam} vs {awayTeam} · Click any player to explore trend, projection, and risk
           </p>
 
           {/* Premium/locked narrative line (polished) */}
@@ -198,37 +211,11 @@ export default function PlayerImpactHeroScatterDesktop(props: {
               <>
                 <span className="inline-flex items-center gap-1 text-white/55">
                   <Lock className="h-3 w-3" />
-                  Analyst read locked:
-                </span>{" "}
-                Upgrade to reveal matchup narrative + projection bands.
+                  Neeko+ insight locked
+                </span>
               </>
             )}
           </p>
-        </div>
-
-        {/* Pills (tight) */}
-        <div className="flex flex-wrap items-center gap-2 md:gap-2.5">
-          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/75">
-            Lean:{" "}
-            {lean.direction === "even"
-              ? "Even"
-              : `${lean.direction === "home" ? homeTeam : awayTeam} (${lean.strength})`}{" "}
-            <span className="text-amber-200">
-              {lean.direction === "even" ? "" : `${lean.diff > 0 ? "+" : ""}${lean.diff.toFixed(1)}`}
-            </span>
-          </span>
-          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/75">
-            Volatility: <span className="text-white/90">{volatility.label}</span>
-          </span>
-          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/75">
-            Dominant: <span className="text-white/90">{dominantLabel}</span>
-          </span>
-
-          {!isPremium && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
-              <Lock className="h-3 w-3" /> Neeko+ insight (locked)
-            </span>
-          )}
         </div>
       </div>
 
@@ -252,6 +239,10 @@ export default function PlayerImpactHeroScatterDesktop(props: {
             }}
           />
           <div className="absolute left-1/2 top-0 h-full w-px bg-white/15" />
+        </div>
+
+        <div className="mt-2 text-[11px] text-white/40 text-center">
+          Lean reflects average momentum + ceiling across selected players
         </div>
 
         <div className="mt-2 flex items-center justify-between gap-3">
@@ -426,21 +417,8 @@ export default function PlayerImpactHeroScatterDesktop(props: {
               onOpenTrend={() => setModalOpen(true)}
             />
 
-            {!isPremium ? (
-              <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">Neeko+ note</div>
-                <div className="mt-2 text-sm text-white/70">
-                  <span className="inline-flex items-center gap-1 text-white/60">
-                    <Lock className="h-3.5 w-3.5" />
-                    Upgrade to reveal matchup narrative + projection bands
-                  </span>
-                </div>
-                <div className="mt-2 text-xs text-white/45">
-                  Premium adds: stronger “why”, projection ranges, and role-stability context.
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-amber-400/15 bg-amber-400/[0.05] p-4">
+            {isPremium && (
+              <div className="rounded-2xl border border-amber-400/15 bg-amber-400/[0.05] p-3">
                 <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">Analyst note</div>
                 <div className="mt-2 text-sm text-amber-100/90">{premiumNarrative}</div>
               </div>
@@ -471,7 +449,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
           subtitle="Ceiling spikes with risk"
           items={buckets.volatileUpside.slice(0, 4)}
           onRowClick={handleRowClick}
-          empty="No players in this filter."
+          empty="No players match the current filters. Try switching metric or team."
         />
 
         <SidebarCard
@@ -479,7 +457,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
           subtitle="Stable momentum, capped ceiling"
           items={buckets.safeFloors.slice(0, 4)}
           onRowClick={handleRowClick}
-          empty="No players in this filter."
+          empty="No players match the current filters. Try switching metric or team."
         />
 
         <SidebarCard
@@ -487,7 +465,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
           subtitle="Low leverage unless role changes"
           items={buckets.avoid.slice(0, 4)}
           onRowClick={handleRowClick}
-          empty="No players in this filter."
+          empty="No players match the current filters. Try switching metric or team."
         />
       </div>
 
@@ -548,7 +526,7 @@ function SidebarCard(props: {
             </button>
           ))
         ) : (
-          <div className="text-xs text-white/40">{empty ?? "No players in this filter."}</div>
+          <div className="text-xs text-white/40 leading-relaxed">{empty ?? "No players match the current filters. Try switching metric or team."}</div>
         )}
       </div>
     </div>
@@ -562,58 +540,32 @@ function SelectedCard(props: {
   isPremium: boolean;
   onOpenTrend: () => void;
 }) {
-  const { selected, isPremium, onOpenTrend } = props;
+  const { selected } = props;
 
   return (
     <div className={cls(
       "rounded-2xl border bg-black/20 p-4",
       selected ? "border-amber-400/20" : "border-white/10"
     )}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className={cls(
-            "text-[11px] uppercase tracking-[0.18em]",
-            selected ? "text-amber-300/80" : "text-white/35"
-          )}>
-            Selected
-          </div>
-          {selected ? (
-            <>
-              <div className="mt-0.5 text-lg font-semibold text-white">{selected.name}</div>
-              <div className="text-sm text-white/60">{selected.teamName}</div>
-              <div className="mt-2 text-sm text-white/70">
-                Momentum: <span className="text-white">{selected.momentum}</span>{" "}
-                <span className="text-white/40">·</span>{" "}
-                Ceiling: <span className="text-white">{selected.ceiling}</span>
-              </div>
-            </>
-          ) : (
-            <div className="mt-2 text-sm text-white/55 leading-relaxed">
-              Select a player to view details.
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={onOpenTrend}
-          disabled={!selected}
-          className={cls(
-            "rounded-full border px-3 py-1.5 text-xs transition",
-            selected
-              ? "border-white/10 bg-black/20 text-white/75 hover:bg-white/5"
-              : "border-white/10 bg-black/10 text-white/35 cursor-not-allowed"
-          )}
-        >
-          Open trend
-        </button>
+      <div className={cls(
+        "text-[11px] uppercase tracking-[0.18em]",
+        selected ? "text-amber-300/80" : "text-white/35"
+      )}>
+        Selected
       </div>
-
-      {!isPremium && selected && (
-        <div className="mt-3 text-xs text-white/45">
-          <span className="inline-flex items-center gap-1 text-white/55">
-            <Lock className="h-3.5 w-3.5" />
-            Neeko+ Projection (locked)
-          </span>
+      {selected ? (
+        <>
+          <div className="mt-0.5 text-lg font-semibold text-white">{selected.name}</div>
+          <div className="text-sm text-white/60">{selected.teamName}</div>
+          <div className="mt-2 text-sm text-white/70">
+            Momentum: <span className="text-white">{selected.momentum}</span>{" "}
+            <span className="text-white/40">·</span>{" "}
+            Ceiling: <span className="text-white">{selected.ceiling}</span>
+          </div>
+        </>
+      ) : (
+        <div className="mt-2 text-sm text-white/55 leading-relaxed">
+          Click any player dot or name to view full trend and projection
         </div>
       )}
     </div>

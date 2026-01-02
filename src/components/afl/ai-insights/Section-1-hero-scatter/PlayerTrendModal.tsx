@@ -130,32 +130,39 @@ export default function PlayerTrendModal(props: {
 
           <div className="px-6 pb-6 pt-4">
             <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={compareId}
-                onChange={(e) => setCompareId(e.target.value)}
-                className="w-full flex-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/80 outline-none"
-              >
-                <option value="">Compare to another player…</option>
-                {allPlayers
-                  .filter((p) => p.id !== player.id)
-                  .slice(0, 40)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.teamName})
-                    </option>
-                  ))}
-              </select>
-
-              {!locked ? (
-                <span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1 text-xs text-amber-200">
-                  Neeko+ unlocked
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
-                  <Lock className="h-3 w-3" /> Neeko+
-                </span>
-              )}
+              <div className="relative flex-1">
+                <select
+                  value={compareId}
+                  onChange={(e) => setCompareId(e.target.value)}
+                  disabled={locked}
+                  className={`w-full rounded-xl border border-white/10 px-3 py-2 text-sm outline-none ${
+                    locked
+                      ? "bg-black/10 text-white/40 cursor-not-allowed"
+                      : "bg-black/20 text-white/80"
+                  }`}
+                >
+                  <option value="">Compare to another player…</option>
+                  {allPlayers
+                    .filter((p) => p.id !== player.id)
+                    .slice(0, 40)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.teamName})
+                      </option>
+                    ))}
+                </select>
+                {locked && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <Lock className="h-3.5 w-3.5 text-white/40" />
+                  </div>
+                )}
+              </div>
             </div>
+            {locked && (
+              <div className="mt-2 text-xs text-white/45">
+                Neeko+ required to compare players
+              </div>
+            )}
 
             <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
               <div className="relative">

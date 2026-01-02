@@ -55,21 +55,13 @@ export default function PlayerImpactHeroScatterMobile(props: {
 
   const handleDotClick = (id: string) => {
     if (!id) return;
-    if (openId !== id) {
-      setOpenId(id);
-      setModalOpen(false);
-      return;
-    }
+    setOpenId(id);
     setModalOpen(true);
   };
 
   const handleRowClick = (id: string) => {
     if (!id) return;
-    if (openId !== id) {
-      setOpenId(id);
-      setModalOpen(false);
-      return;
-    }
+    setOpenId(id);
     setModalOpen(true);
   };
 
@@ -138,6 +130,10 @@ export default function PlayerImpactHeroScatterMobile(props: {
             }}
           />
           <div className="absolute left-1/2 top-0 h-full w-px bg-white/15" />
+        </div>
+
+        <div className="mt-1.5 text-[10px] text-white/35 text-center">
+          Lean reflects avg momentum + ceiling
         </div>
 
         <div className="mt-2 flex items-center justify-between gap-2">
@@ -246,20 +242,11 @@ export default function PlayerImpactHeroScatterMobile(props: {
       {/* Selected (tight) */}
       {selected && (
         <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold text-white">{selected.name}</div>
-              <div className="text-xs text-white/55">{selected.teamName}</div>
-              <div className="mt-1 text-xs text-white/70">
-                M {selected.momentum} · C {selected.ceiling}
-              </div>
-            </div>
-            <button
-              onClick={() => setModalOpen(true)}
-              className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-white/75"
-            >
-              Trend
-            </button>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-amber-300/80">Selected</div>
+          <div className="mt-0.5 text-sm font-semibold text-white">{selected.name}</div>
+          <div className="text-xs text-white/55">{selected.teamName}</div>
+          <div className="mt-1 text-xs text-white/70">
+            M {selected.momentum} · C {selected.ceiling}
           </div>
         </div>
       )}
