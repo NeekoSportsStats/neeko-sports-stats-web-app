@@ -173,18 +173,7 @@ export default function AFLAIInsights() {
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-60" />
           </div>
         </div>
-{selectedMatch && (
-  <SectionShell
-    title="Player Impact Map"
-    subtitle="Momentum vs ceiling · Click any player to explore trend, projection, and risk"
-  >
-    <PlayerImpactScatterPanel
-      match={selectedMatch}
-      mode={mode}
-      initialLens={stat}   // ✅ STEP 1: global stat sync
-    />
-  </SectionShell>
-)}
+
         {/* STAT FILTER */}
         <ControlsBar stat={stat} onChange={setStat} />
 
@@ -199,6 +188,7 @@ export default function AFLAIInsights() {
             <PlayerImpactScatterPanel
               match={selectedMatch}
               mode={mode}
+              initialLens={stat}
             />
           </SectionShell>
         )}
