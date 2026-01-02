@@ -22,7 +22,7 @@ export default function PlayerImpactHeroScatterDesktop({
   match,
   mode,
   initialLens,
-}: Props): JSX.Element {
+}: Props) {
   const isPremium = mode === "premium";
   const d = usePlayerScatterData({ match, initialLens });
 
@@ -61,8 +61,8 @@ export default function PlayerImpactHeroScatterDesktop({
           {homeTeam} vs {awayTeam} · Analyst view
         </p>
         <p className="mt-1 text-sm text-white/80">
-          {lean.team} lean ({lean.diff > 0 ? "+" : ""}
-          {lean.diff.toFixed(1)}) · {lean.label} · {lean.dominant}
+          {lean.direction} lean ({lean.diff > 0 ? "+" : ""}
+          {lean.diff.toFixed(1)}) · {lean.strength}
         </p>
       </div>
 
