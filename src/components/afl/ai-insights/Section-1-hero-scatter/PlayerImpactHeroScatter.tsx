@@ -11,9 +11,13 @@ import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 export default function PlayerImpactHeroScatter(props: {
   match?: FixtureMatch;
   mode: PremiumMode;
+  initialLens?: "fantasy" | "disposals" | "goals";
 }) {
+  const locked = props.mode !== "premium";
+
   const {
     players,
+    playersAll,
     selected,
     selectedId,
     setSelectedId,
@@ -23,20 +27,27 @@ export default function PlayerImpactHeroScatter(props: {
     setLens,
     setTeamFilter,
     setLabelMode,
-  } = usePlayerScatterData(props.match);
+    home,
+    away,
+  } = usePlayerScatterData(props.match, { initialLens: props.initialLens });
 
   const [open, setOpen] = useState(false);
+  const [compareId, setCompareId] = useState<string | null>(null);
 
   return (
     <>
       {/* DESKTOP */}
       <div className="hidden md:block">
         <PlayerImpactHeroScatterDesktop
+          homeTeam={home}
+          awayTeam={away}
           players={players}
+          allPlayers={playersAll}
           selectedId={selectedId}
           lens={lens}
           teamFilter={teamFilter}
           labelMode={labelMode}
+          locked={locked}
           onChangeLens={setLens}
           onChangeTeam={setTeamFilter}
           onChangeLabels={setLabelMode}
@@ -44,14 +55,26 @@ export default function PlayerImpactHeroScatter(props: {
             setSelectedId(id);
             setOpen(true);
           }}
+          onHoverPlayer={(id) => {
+            // keep selection stable; hover handled inside desktop
+            // this hook is here if you ever want "hover highlights rail" later
+          }}
         />
       </div>
 
       {/* MOBILE */}
       <div className="md:hidden">
         <PlayerImpactHeroScatterMobile
+          homeTeam={home}
+          awayTeam={away}
           players={players}
+          allPlayers={playersAll}
           selectedId={selectedId}
+          lens={lens}
+          teamFilter={teamFilter}
+          locked={locked}
+          onChangeLens={setLens}
+          onChangeTeam={setTeamFilter}
           onSelectPlayer={(id) => {
             setSelectedId(id);
             setOpen(true);
@@ -65,9 +88,11 @@ export default function PlayerImpactHeroScatter(props: {
           open={open}
           onClose={() => setOpen(false)}
           player={selected}
-          allPlayers={players}
+          allPlayers={playersAll}
           lens={lens}
-          locked={props.mode !== "premium"}
+          locked={locked}
+          comparePlayerId={compareId}
+          onChangeCompare={setCompareId}
         />
       )}
     </>

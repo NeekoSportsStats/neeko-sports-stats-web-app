@@ -4,7 +4,7 @@ import { X, Lock } from "lucide-react";
 import { PlayerPoint, LensKey } from "./usePlayerScatterData";
 
 /* -------------------------------------------------------------------------------------------------
-  Player Trend Modal — FINAL (Steps 8–10)
+  Player Trend Modal — premium-feel locked scaffolding
 -------------------------------------------------------------------------------------------------- */
 
 type Props = {
@@ -74,7 +74,7 @@ function buildWeeklySeries(playerId: string, lens: LensKey) {
 }
 
 /* -------------------------------------------------------------------------------------------------
-  AI-style insight
+  AI-style insight (safe)
 -------------------------------------------------------------------------------------------------- */
 
 function buildInsight(values: number[]) {
@@ -115,10 +115,7 @@ export default function PlayerTrendModal({
 }: Props) {
   if (!open) return null;
 
-  const main = useMemo(
-    () => buildWeeklySeries(player.id, lens),
-    [player.id, lens]
-  );
+  const main = useMemo(() => buildWeeklySeries(player.id, lens), [player.id, lens]);
 
   const comparePlayer = useMemo(
     () => allPlayers.find((p) => p.id === comparePlayerId) ?? null,
@@ -130,10 +127,7 @@ export default function PlayerTrendModal({
     [comparePlayer, lens]
   );
 
-  const insight = useMemo(
-    () => buildInsight(main.values),
-    [main.values]
-  );
+  const insight = useMemo(() => buildInsight(main.values), [main.values]);
 
   /* ---------------- SVG layout ---------------- */
 
@@ -174,8 +168,6 @@ export default function PlayerTrendModal({
     setAnimate(true);
   }, []);
 
-  /* ---------------- Render ---------------- */
-
   return (
     <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center">
       <button className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
@@ -186,9 +178,7 @@ export default function PlayerTrendModal({
           <div>
             <div className="text-xs tracking-[0.3em] text-white/50">PLAYER TREND</div>
             <div className="mt-1 text-lg font-semibold text-white">{player.name}</div>
-            <div className="text-sm text-white/60">
-              Weekly {lens} output
-            </div>
+            <div className="text-sm text-white/60">Weekly {lens} output</div>
           </div>
 
           <button onClick={onClose} className="rounded-full border border-white/10 bg-white/[0.03] p-2">
@@ -198,33 +188,41 @@ export default function PlayerTrendModal({
 
         {/* Compare selector */}
         <div className="px-5 pt-4">
-          <select
-            value={comparePlayerId ?? ""}
-            onChange={(e) =>
-              onChangeCompare?.(e.target.value || null)
-            }
-            className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
-          >
-            <option value="">Compare to another player…</option>
-            {allPlayers
-              .filter((p) => p.id !== player.id)
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-          </select>
+          <div className="relative">
+            <select
+              value={comparePlayerId ?? ""}
+              onChange={(e) => onChangeCompare?.(e.target.value || null)}
+              className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
+              disabled={locked}
+            >
+              <option value="">Compare to another player…</option>
+              {allPlayers
+                .filter((p) => p.id !== player.id)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+            </select>
+
+            {locked && (
+              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-2 text-xs text-white/55">
+                <Lock className="h-3.5 w-3.5" />
+                Neeko+
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Chart */}
         <div className="px-5 py-4">
           <div className="relative rounded-2xl border border-white/10 bg-black/30 overflow-hidden">
-            {/* Lock overlay */}
+            {/* soft locked veil (still shows movement underneath) */}
             {locked && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
                 <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/70 px-4 py-2 text-sm text-white/80">
                   <Lock className="h-4 w-4" />
-                  Neeko+ Projection
+                  Neeko+ Projection (locked)
                 </div>
               </div>
             )}
@@ -236,9 +234,7 @@ export default function PlayerTrendModal({
                   x={x(upcoming) - 14}
                   y={animate ? y(main.projection.high) : y(main.projection.expected)}
                   width={28}
-                  height={animate
-                    ? y(main.projection.low) - y(main.projection.high)
-                    : 0}
+                  height={animate ? y(main.projection.low) - y(main.projection.high) : 0}
                   fill="rgba(251,191,36,0.22)"
                   style={{ transition: "all 600ms ease-out" }}
                 />
@@ -246,12 +242,7 @@ export default function PlayerTrendModal({
 
               {/* Expected */}
               {!locked && (
-                <circle
-                  cx={x(upcoming)}
-                  cy={y(main.projection.expected)}
-                  r={4.5}
-                  fill="#fbbf24"
-                />
+                <circle cx={x(upcoming)} cy={y(main.projection.expected)} r={4.5} fill="#fbbf24" />
               )}
 
               {/* Compare */}
@@ -269,18 +260,35 @@ export default function PlayerTrendModal({
               <path
                 d={path(main.values)}
                 fill="none"
-                stroke="#fbbf24"
+                stroke={locked ? "rgba(251,191,36,0.35)" : "#fbbf24"}
                 strokeWidth={3}
               />
             </svg>
           </div>
 
-          {/* Insight */}
-          {!locked && (
-            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/70">
-              <span className="text-amber-300">AI Insight:</span> {insight}
-            </div>
-          )}
+          {/* Insight + scaffolding */}
+          <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/70">
+            {locked ? (
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 text-xs text-white/65">
+                  <Lock className="h-4 w-4" />
+                  Premium includes:
+                </div>
+                <ul className="list-disc pl-5 text-sm text-white/65 space-y-1">
+                  <li>Projection range (low / expected / high)</li>
+                  <li>Role stability note + matchup context</li>
+                  <li>Trend acceleration / cooling flag</li>
+                </ul>
+                <div className="mt-2 text-xs text-white/50">
+                  You’re seeing deterministic preview output only (safe for free users).
+                </div>
+              </div>
+            ) : (
+              <div>
+                <span className="text-amber-300">AI Insight:</span> {insight}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

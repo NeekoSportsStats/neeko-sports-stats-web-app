@@ -1,5 +1,5 @@
 // Section-1-hero-scatter/usePlayerScatterData.ts
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 
 export type LensKey = "fantasy" | "disposals" | "goals";
@@ -11,8 +11,8 @@ export type PlayerPoint = {
   name: string;
   teamSide: "home" | "away";
   teamName: string;
-  momentum: number;
-  ceiling: number;
+  momentum: number; // 0..100
+  ceiling: number;  // 0..100
 };
 
 function hash(s: string) {
@@ -30,16 +30,29 @@ function seeded(seed: number) {
   };
 }
 
-export default function usePlayerScatterData(match?: FixtureMatch) {
+type Opts = {
+  initialLens?: LensKey;
+};
+
+export default function usePlayerScatterData(match?: FixtureMatch, opts?: Opts) {
   const home = String((match as any)?.homeTeam ?? "Home");
   const away = String((match as any)?.awayTeam ?? "Away");
 
-  const [lens, setLens] = useState<LensKey>("fantasy");
+  const [lens, setLens] = useState<LensKey>(opts?.initialLens ?? "fantasy");
   const [teamFilter, setTeamFilter] = useState<TeamFilter>("both");
   const [labelMode, setLabelMode] = useState<LabelMode>("smart");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const players = useMemo<PlayerPoint[]>(() => {
+  // keep lens in sync if parent passes a new initialLens
+  useEffect(() => {
+    if (opts?.initialLens && opts.initialLens !== lens) {
+      setLens(opts.initialLens);
+      setSelectedId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opts?.initialLens]);
+
+  const playersAll = useMemo<PlayerPoint[]>(() => {
     const base = [
       "Patrick Cripps",
       "Sam Walsh",
@@ -69,16 +82,15 @@ export default function usePlayerScatterData(match?: FixtureMatch) {
     });
   }, [home, away, lens]);
 
-  const visible = useMemo(
+  const players = useMemo(
     () =>
-      players.filter(
+      playersAll.filter(
         (p) => teamFilter === "both" || p.teamSide === teamFilter
       ),
-    [players, teamFilter]
+    [playersAll, teamFilter]
   );
 
-  const selected =
-    visible.find((p) => p.id === selectedId) ?? visible[0] ?? null;
+  const selected = players.find((p) => p.id === selectedId) ?? null;
 
   return {
     lens,
@@ -87,9 +99,12 @@ export default function usePlayerScatterData(match?: FixtureMatch) {
     setTeamFilter,
     labelMode,
     setLabelMode,
-    players: visible,
+    players,
+    playersAll, // sometimes useful for rail comparisons, etc.
     selected,
     selectedId,
     setSelectedId,
+    home,
+    away,
   };
 }
