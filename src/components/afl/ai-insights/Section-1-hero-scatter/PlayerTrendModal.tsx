@@ -111,7 +111,7 @@ export default function PlayerTrendModal(props: {
   return (
     <div className="fixed inset-0 z-[80]">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-3xl -translate-x-1/2 -translate-y-1/2">
+      <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-3xl -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto">
         <div className="rounded-3xl border border-white/10 bg-[#0b0b0b] shadow-2xl">
           <div className="flex items-start justify-between gap-3 px-6 pt-5">
             <div>
@@ -167,6 +167,61 @@ export default function PlayerTrendModal(props: {
             <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
               <div className="relative">
                 <svg viewBox={`0 0 ${CH_W} ${CH_H}`} className="h-[320px] w-full">
+                  {/* Horizontal grid lines */}
+                  {Array.from({ length: 5 }).map((_, i) => {
+                    const gy = PAD + ((CH_H - PAD * 2) / 4) * i;
+                    return (
+                      <line
+                        key={i}
+                        x1={PAD}
+                        y1={gy}
+                        x2={CH_W - PAD}
+                        y2={gy}
+                        stroke="rgba(255,255,255,0.08)"
+                        strokeWidth={1}
+                      />
+                    );
+                  })}
+
+                  {/* Y-axis labels */}
+                  {(() => {
+                    const allVals = [...series.ys, ...(compare ? series2.ys : [])];
+                    const min = Math.min(...allVals);
+                    const max = Math.max(...allVals);
+                    const mid = Math.round((min + max) / 2);
+                    return (
+                      <>
+                        <text x={PAD - 8} y={PAD + 5} fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="end">
+                          {Math.round(max)}
+                        </text>
+                        <text x={PAD - 8} y={PAD + (CH_H - PAD * 2) / 2 + 4} fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="end">
+                          {mid}
+                        </text>
+                        <text x={PAD - 8} y={CH_H - PAD + 4} fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="end">
+                          {Math.round(min)}
+                        </text>
+                      </>
+                    );
+                  })()}
+
+                  {/* X-axis labels (rounds) */}
+                  {player.trend && player.trend.slice(0, 12).map((pt, i) => {
+                    const totalPoints = Math.min(player.trend.length, 12);
+                    const xPos = PAD + ((CH_W - PAD * 2) / (totalPoints - 1)) * i;
+                    return (
+                      <text
+                        key={i}
+                        x={xPos}
+                        y={CH_H - PAD + 16}
+                        fill="rgba(255,255,255,0.4)"
+                        fontSize="10"
+                        textAnchor="middle"
+                      >
+                        {pt.week}
+                      </text>
+                    );
+                  })}
+
                   {compare && (
                     <path
                       d={comparePath}

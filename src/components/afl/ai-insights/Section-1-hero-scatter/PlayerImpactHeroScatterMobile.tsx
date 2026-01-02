@@ -56,13 +56,11 @@ export default function PlayerImpactHeroScatterMobile(props: {
   const handleDotClick = (id: string) => {
     if (!id) return;
     setOpenId(id);
-    setModalOpen(true);
   };
 
   const handleRowClick = (id: string) => {
     if (!id) return;
     setOpenId(id);
-    setModalOpen(true);
   };
 
   const playersVisibleMemo = useMemo(() => playersVisible, [playersVisible]);
@@ -242,11 +240,21 @@ export default function PlayerImpactHeroScatterMobile(props: {
       {/* Selected (tight) */}
       {selected && (
         <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-amber-300/80">Selected</div>
-          <div className="mt-0.5 text-sm font-semibold text-white">{selected.name}</div>
-          <div className="text-xs text-white/55">{selected.teamName}</div>
-          <div className="mt-1 text-xs text-white/70">
-            M {selected.momentum} · C {selected.ceiling}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-amber-300/80">Selected</div>
+              <div className="mt-0.5 text-sm font-semibold text-white">{selected.name}</div>
+              <div className="text-xs text-white/55">{selected.teamName}</div>
+              <div className="mt-1 text-xs text-white/70">
+                M {selected.momentum} · C {selected.ceiling}
+              </div>
+            </div>
+            <button
+              onClick={() => setModalOpen(true)}
+              className="shrink-0 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-white/75"
+            >
+              Trend
+            </button>
           </div>
         </div>
       )}

@@ -84,13 +84,11 @@ export default function PlayerImpactHeroScatterDesktop(props: {
   const handleDotClick = (id: string) => {
     if (!id) return;
     setOpenId(id);
-    setModalOpen(true);
   };
 
   const handleRowClick = (id: string) => {
     if (!id) return;
     setOpenId(id);
-    setModalOpen(true);
   };
 
   if (!playersVisible || playersVisible.length === 0) return null;
@@ -291,7 +289,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
       */}
       <div className="mt-3 grid grid-cols-12 gap-4">
         {/* Plot */}
-        <div className="col-span-12 lg:col-span-8">
+        <div className="col-span-12 lg:col-span-9">
           <div className="rounded-2xl border border-white/10 bg-black/20 p-2">
             <div className="flex items-center justify-between gap-2">
               <div className="text-xs text-white/60">
@@ -407,7 +405,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
         </div>
 
         {/* Selected (right) */}
-        <div className="col-span-12 lg:col-span-4">
+        <div className="col-span-12 lg:col-span-3">
           <div className="space-y-3 lg:sticky lg:top-24">
             <SelectedCard
               homeTeam={homeTeam}
@@ -540,34 +538,47 @@ function SelectedCard(props: {
   isPremium: boolean;
   onOpenTrend: () => void;
 }) {
-  const { selected } = props;
+  const { selected, onOpenTrend } = props;
 
   return (
     <div className={cls(
       "rounded-2xl border bg-black/20 p-4",
       selected ? "border-amber-400/20" : "border-white/10"
     )}>
-      <div className={cls(
-        "text-[11px] uppercase tracking-[0.18em]",
-        selected ? "text-amber-300/80" : "text-white/35"
-      )}>
-        Selected
-      </div>
-      {selected ? (
-        <>
-          <div className="mt-0.5 text-lg font-semibold text-white">{selected.name}</div>
-          <div className="text-sm text-white/60">{selected.teamName}</div>
-          <div className="mt-2 text-sm text-white/70">
-            Momentum: <span className="text-white">{selected.momentum}</span>{" "}
-            <span className="text-white/40">·</span>{" "}
-            Ceiling: <span className="text-white">{selected.ceiling}</span>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1">
+          <div className={cls(
+            "text-[11px] uppercase tracking-[0.18em]",
+            selected ? "text-amber-300/80" : "text-white/35"
+          )}>
+            Selected
           </div>
-        </>
-      ) : (
-        <div className="mt-2 text-sm text-white/55 leading-relaxed">
-          Click any player dot or name to view full trend and projection
+          {selected ? (
+            <>
+              <div className="mt-0.5 text-lg font-semibold text-white">{selected.name}</div>
+              <div className="text-sm text-white/60">{selected.teamName}</div>
+              <div className="mt-2 text-sm text-white/70">
+                Momentum: <span className="text-white">{selected.momentum}</span>{" "}
+                <span className="text-white/40">·</span>{" "}
+                Ceiling: <span className="text-white">{selected.ceiling}</span>
+              </div>
+            </>
+          ) : (
+            <div className="mt-2 text-sm text-white/55 leading-relaxed">
+              Click any player dot or name to select
+            </div>
+          )}
         </div>
-      )}
+
+        {selected && (
+          <button
+            onClick={onOpenTrend}
+            className="mt-1 shrink-0 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-white/75 hover:bg-white/5 transition"
+          >
+            Open trend
+          </button>
+        )}
+      </div>
     </div>
   );
 }
