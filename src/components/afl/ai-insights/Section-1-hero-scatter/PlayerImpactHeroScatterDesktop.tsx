@@ -226,7 +226,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
       <div className="mt-4">{controls}</div>
 
       {/* Lean meter */}
-      <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+      <div className="mt-4 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
         <div className="flex items-center justify-between text-xs text-white/60">
           <span>{homeTeam}</span>
           <span className="text-white/40">Lean meter</span>
@@ -311,7 +311,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
 
           
               {/* Larger rendered height + tighter PAD above = clearer dots/labels */}
-              <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto aspect-[760/420]">
+              <svg viewBox={`0 0 ${W} ${H}`} className="h-[560px] w-full">
                 {/* grid */}
                 {Array.from({ length: 5 }).map((_, i) => {
                   const gx = PAD + ((W - PAD * 2) / 4) * i;
@@ -401,7 +401,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
             />
 
             {!isPremium ? (
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
                 <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">Neeko+ note</div>
                 <div className="mt-2 text-sm text-white/70">
                   <span className="inline-flex items-center gap-1 text-white/60">
@@ -563,7 +563,7 @@ function SelectedCard(props: {
             </>
           ) : (
             <div className="mt-2 text-sm text-white/55 leading-relaxed">
-              Click a dot (or a name in the lists) to focus a player. Click again to open the trend/projection.
+              Select a player to view details.
             </div>
           )}
         </div>
