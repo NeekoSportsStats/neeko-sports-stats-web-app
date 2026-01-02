@@ -628,22 +628,26 @@ export default function TeamPredictabilityPanel({
   match,
   fixtures,
   stat,
+  showHeader = true,
 }: {
   mode: PremiumMode;
   match?: FixtureMatch;
   fixtures: FixtureMatch[];
   stat: StatLens;
+  showHeader?: boolean;
 }) {
   // ✅ ZERO-CRASH GUARD
   if (!match || !(match as any)?.homeTeam || !(match as any)?.awayTeam) {
     return (
       <section className="rounded-2xl border border-white/10 bg-black/40">
-        <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
-          <h2 className="text-base sm:text-lg font-semibold">2. Team Score Predictability</h2>
-          <p className="text-xs sm:text-sm text-white/60">
-            Stat-driven AI · opponent interaction · game script + volatility
-          </p>
-        </header>
+        {showHeader && (
+          <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
+            <h2 className="text-base sm:text-lg font-semibold">2. Team Score Predictability</h2>
+            <p className="text-xs sm:text-sm text-white/60">
+              Stat-driven AI · opponent interaction · game script + volatility
+            </p>
+          </header>
+        )}
         <div className="px-4 sm:px-6 py-6 sm:py-8 text-sm text-white/40">
           Select a match to view team predictability insights.
         </div>
@@ -904,21 +908,23 @@ export default function TeamPredictabilityPanel({
 
   return (
     <section className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
-      <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base sm:text-lg font-semibold">2. Team Score Predictability</h2>
-            <p className="mt-1 text-xs sm:text-sm text-white/60">
-              Stat-driven AI · opponent interaction · game script + volatility
-            </p>
-          </div>
+      {showHeader && (
+        <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base sm:text-lg font-semibold">2. Team Score Predictability</h2>
+              <p className="mt-1 text-xs sm:text-sm text-white/60">
+                Stat-driven AI · opponent interaction · game script + volatility
+              </p>
+            </div>
 
-          {/* tiny Neeko+ hint chip (visual only, no behavior) */}
-          <div className="hidden sm:inline-flex items-center rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[11px] text-amber-200/90">
-            Neeko+ Gold
+            {/* tiny Neeko+ hint chip (visual only, no behavior) */}
+            <div className="hidden sm:inline-flex items-center rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[11px] text-amber-200/90">
+              Neeko+ Gold
           </div>
         </div>
       </header>
+      )}
 
       {/* Match volatility + AI lean */}
       <div className="px-4 sm:px-6 py-4 border-b border-white/10">

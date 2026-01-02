@@ -6,8 +6,10 @@ import {
   ChevronDown,
   Search,
   X,
+  Table,
 } from "lucide-react";
 import type { PlayerRow, StatLens } from "./MasterTable";
+import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 /* -------------------------------------------------------------------------- */
 /* CONSTANTS                                                                  */
@@ -88,6 +90,7 @@ export default function MasterTableDesktop({
   query,
   setQuery,
   onSelectPlayer,
+  showHeader = true,
 }: {
   players: PlayerRow[];
   selectedStat: StatLens;
@@ -96,6 +99,7 @@ export default function MasterTableDesktop({
   query: string;
   setQuery: (v: string) => void;
   onSelectPlayer: (p: PlayerRow) => void;
+  showHeader?: boolean;
 }) {
 
   const [team, setTeam] = useState("All");

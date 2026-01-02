@@ -1,6 +1,8 @@
 import React from "react";
 import SectionDividerGlow from "@/components/ui/SectionDividerGlow";
 import FilterBarPro from "../Section-7-filtration/FilterBarPro";
+import { SectionHeader } from "@/components/sports/shared/SectionHeader";
+import { Table } from "lucide-react";
 
 interface FilterValues {
   team: string;
@@ -43,11 +45,12 @@ export default function MasterTableProShell({
 
       <div className="flex justify-between items-start md:items-center gap-4 flex-col md:flex-row">
         <div>
-          <h2 className="text-lg font-bold">📚 Master Player Table</h2>
-          <p className="text-xs text-neutral-500">
-            Season overview, trends and volatility. This is the anchor of the
-            page.
-          </p>
+          <SectionHeader
+            pillLabel="Master Player Table"
+            title="Season overview, trends and volatility"
+            description="This is the anchor of the page."
+            icon={Table}
+          />
         </div>
 
         {!isPremium && (

@@ -644,10 +644,12 @@ export default function GameFlowMomentumPanel({
   mode,
   match,
   fixtures,
+  showHeader = true,
 }: {
   mode: PremiumMode;
   match?: FixtureMatch;
   fixtures: FixtureMatch[];
+  showHeader?: boolean;
 }) {
   // ZERO-CRASH GUARD
   const teams = useMemo(() => getMatchTeams(match as any), [match]);
@@ -657,14 +659,16 @@ export default function GameFlowMomentumPanel({
   if (!match || !homeTeam || !awayTeam) {
     return (
       <section className="rounded-2xl border border-white/10 bg-black/40">
-        <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
-          <h2 className="text-base sm:text-lg font-semibold">
-            3. Game Flow & Momentum
-          </h2>
-          <p className="text-xs sm:text-sm text-white/60">
-            Tempo shifts, turning points, and when control tends to move
-          </p>
-        </header>
+        {showHeader && (
+          <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
+            <h2 className="text-base sm:text-lg font-semibold">
+              3. Game Flow & Momentum
+            </h2>
+            <p className="text-xs sm:text-sm text-white/60">
+              Tempo shifts, turning points, and when control tends to move
+            </p>
+          </header>
+        )}
         <div className="px-4 sm:px-6 py-6 sm:py-8 text-sm text-white/40">
           Select a match to view game flow and momentum insights.
         </div>
@@ -684,23 +688,27 @@ export default function GameFlowMomentumPanel({
 
   return (
     <section className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
-      {/* Header */}
-      <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base sm:text-lg font-semibold">
-              3. Game Flow & Momentum
-            </h2>
-            <p className="mt-1 text-xs sm:text-sm text-white/60">
-              Tempo shifts, turning points, and when control tends to move
-            </p>
-          </div>
+      {showHeader && (
+        <>
+          {/* Header */}
+          <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base sm:text-lg font-semibold">
+                  3. Game Flow & Momentum
+                </h2>
+                <p className="mt-1 text-xs sm:text-sm text-white/60">
+                  Tempo shifts, turning points, and when control tends to move
+                </p>
+              </div>
 
-          <div className="hidden sm:inline-flex items-center rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[11px] text-amber-200/90">
-            Neeko+
-          </div>
-        </div>
-      </header>
+              <div className="hidden sm:inline-flex items-center rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[11px] text-amber-200/90">
+                Neeko+
+              </div>
+            </div>
+          </header>
+        </>
+      )}
 
       <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-3">
         {/* CARD 1 — Momentum Timeline (FREE) */}
