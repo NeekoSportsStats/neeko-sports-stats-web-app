@@ -35,6 +35,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
     homeTeam,
     awayTeam,
     lens,
+    setLens,
     teamFilter,
     setTeamFilter,
     playersVisible,
@@ -81,9 +82,21 @@ export default function PlayerImpactHeroScatterMobile(props: {
 
       {/* Controls (mobile) */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/70">
-          Lens: {lens === "fantasy" ? "Fantasy points" : lens === "disposals" ? "Disposals" : "Goals"}
-        </span>
+        {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
+          <button
+            key={k}
+            onClick={() => setLens(k)}
+            className={
+              "rounded-full border px-3 py-1 text-xs " +
+              (lens === k
+                ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+                : "border-white/10 bg-black/20 text-white/70")
+            }
+          >
+            {k === "fantasy" ? "Fantasy" : k === "disposals" ? "Disposals" : "Goals"}
+          </button>
+        ))}
+
         <div className="ml-auto flex gap-1.5">
           {(["both", "home", "away"] as const).map((k) => (
             <button
@@ -211,37 +224,37 @@ export default function PlayerImpactHeroScatterMobile(props: {
         </div>
       )}
 
+      {/* Top targets */}
+      <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="text-sm font-semibold text-white">Top targets</div>
+        <div className="mt-0.5 text-xs text-white/50">Best combined momentum + ceiling</div>
+        <div className="mt-3 space-y-2">
+          {ranked.slice(0, 4).map((p) => (
+            <button
+              key={p.id}
+              onClick={() => handleRowClick(p.id)}
+              className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-medium text-white/90">{p.name}</div>
+                  <div className="text-xs text-white/45">{p.teamName}</div>
+                </div>
+                <div className="text-xs text-white/60">
+                  M {p.momentum} · C {p.ceiling}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
 
-      {/* Quadrant summary (buckets removed) */}
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-          <div className="flex items-center justify-between">
-            <div className="text-xs font-medium text-white/80">Finale targets</div>
-            <div className="text-xs text-white/55">{d.quadrantCounts.finale}</div>
-          </div>
-          <div className="mt-0.5 text-[11px] text-white/45">High momentum + high ceiling</div>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-          <div className="flex items-center justify-between">
-            <div className="text-xs font-medium text-white/80">Volatile upside</div>
-            <div className="text-xs text-white/55">{d.quadrantCounts.volatileUpside}</div>
-          </div>
-          <div className="mt-0.5 text-[11px] text-white/45">Ceiling spikes with risk</div>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-          <div className="flex items-center justify-between">
-            <div className="text-xs font-medium text-white/80">Safe floors</div>
-            <div className="text-xs text-white/55">{d.quadrantCounts.safeFloors}</div>
-          </div>
-          <div className="mt-0.5 text-[11px] text-white/45">Stable role, capped ceiling</div>
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-          <div className="flex items-center justify-between">
-            <div className="text-xs font-medium text-white/80">Low impact</div>
-            <div className="text-xs text-white/55">{d.quadrantCounts.avoid}</div>
-          </div>
-          <div className="mt-0.5 text-[11px] text-white/45">Low leverage unless role changes</div>
-        </div>
+      {/* Buckets (2-col grid so the page feels less "endless") */}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <BucketCard title="Finale" subtitle="High momentum + ceiling" items={d.buckets.finale.slice(0, 3)} onRowClick={handleRowClick} />
+        <BucketCard title="Volatile" subtitle="Ceiling with risk" items={d.buckets.volatileUpside.slice(0, 3)} onRowClick={handleRowClick} empty="None" />
+        <BucketCard title="Safe" subtitle="Stable / capped" items={d.buckets.safeFloors.slice(0, 3)} onRowClick={handleRowClick} empty="None" />
+        <BucketCard title="Avoid" subtitle="Low leverage" items={d.buckets.avoid.slice(0, 3)} onRowClick={handleRowClick} empty="None" />
       </div>
 
       <PlayerTrendModal
@@ -252,6 +265,47 @@ export default function PlayerImpactHeroScatterMobile(props: {
         lens={lens}
         locked={!isPremium}
       />
+    </div>
+  );
+}
+
+function BucketCard(props: {
+  title: string;
+  subtitle: string;
+  items: PlayerPoint[];
+  empty?: string;
+  onRowClick: (id: string) => void;
+}) {
+  const { title, subtitle, items, empty, onRowClick } = props;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+      <div className="text-sm font-semibold text-white">{title}</div>
+      <div className="mt-0.5 text-[11px] text-white/50">{subtitle}</div>
+
+      <div className="mt-2 space-y-1.5">
+        {items.length ? (
+          items.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => onRowClick(p.id)}
+              className="w-full rounded-xl border border-white/10 bg-black/20 px-2.5 py-2 text-left"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-xs font-medium text-white/90">{p.name}</div>
+                  <div className="truncate text-[11px] text-white/45">{p.teamName}</div>
+                </div>
+                <div className="shrink-0 text-[11px] text-white/60">
+                  M {p.momentum} · C {p.ceiling}
+                </div>
+              </div>
+            </button>
+          ))
+        ) : (
+          <div className="text-[11px] text-white/40">{empty ?? "No players"}</div>
+        )}
+      </div>
     </div>
   );
 }

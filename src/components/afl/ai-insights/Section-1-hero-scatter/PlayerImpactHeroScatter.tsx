@@ -2,25 +2,29 @@ import React from "react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 
-import type { LensKey } from "./usePlayerScatterData";
 import PlayerImpactHeroScatterDesktop from "./PlayerImpactHeroScatterDesktop";
 import PlayerImpactHeroScatterMobile from "./PlayerImpactHeroScatterMobile";
+import type { LensKey } from "./usePlayerScatterData";
 
-export default function PlayerImpactHeroScatter(props: {
+export type PlayerImpactHeroScatterProps = {
   match?: FixtureMatch;
   mode: PremiumMode;
   initialLens?: LensKey;
-}) {
-  const { match, mode, initialLens } = props;
+};
 
+/**
+ * Responsive wrapper.
+ * Desktop does the main experience; mobile is a simplified layout.
+ */
+export default function PlayerImpactHeroScatter(props: PlayerImpactHeroScatterProps) {
   return (
-    <>
-      <div className="hidden md:block">
-        <PlayerImpactHeroScatterDesktop match={match} mode={mode} initialLens={initialLens} />
+    <div className="w-full">
+      <div className="hidden lg:block">
+        <PlayerImpactHeroScatterDesktop {...props} />
       </div>
-      <div className="md:hidden">
-        <PlayerImpactHeroScatterMobile match={match} mode={mode} initialLens={initialLens} />
+      <div className="lg:hidden">
+        <PlayerImpactHeroScatterMobile {...props} />
       </div>
-    </>
+    </div>
   );
 }
