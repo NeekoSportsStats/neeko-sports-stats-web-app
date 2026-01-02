@@ -165,7 +165,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
 
       {/* Plot (bigger, less dead space) */}
       <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto aspect-[760/420]">
+        <svg viewBox={`0 0 ${W} ${H}`} className="h-[360px] w-full">
           {Array.from({ length: 5 }).map((_, i) => {
             const gx = PAD + ((W - PAD * 2) / 4) * i;
             const gy = PAD + ((H - PAD * 2) / 4) * i;
@@ -202,6 +202,12 @@ export default function PlayerImpactHeroScatterMobile(props: {
           })}
         </svg>
       </div>
+
+<div className="mt-2 text-xs text-white/50">
+  Finale {d.buckets.finale.length} · Volatile {d.buckets.volatileUpside.length} ·
+  Safe {d.buckets.safeFloors.length} · Low {d.buckets.avoid.length}
+</div>
+
 
       {/* Selected (tight) */}
       {selected && (
@@ -249,15 +255,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
         </div>
       </div>
 
-      {/* Buckets (2-col grid so the page feels less "endless") */}
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <BucketCard title="Finale" subtitle="High momentum + ceiling" items={d.buckets.finale.slice(0, 3)} onRowClick={handleRowClick} />
-        <BucketCard title="Volatile" subtitle="Ceiling with risk" items={d.buckets.volatileUpside.slice(0, 3)} onRowClick={handleRowClick} empty="None" />
-        <BucketCard title="Safe" subtitle="Stable / capped" items={d.buckets.safeFloors.slice(0, 3)} onRowClick={handleRowClick} empty="None" />
-        <BucketCard title="Avoid" subtitle="Low leverage" items={d.buckets.avoid.slice(0, 3)} onRowClick={handleRowClick} empty="None" />
-      </div>
-
-      <PlayerTrendModal
+      {<PlayerTrendModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         player={selected}
