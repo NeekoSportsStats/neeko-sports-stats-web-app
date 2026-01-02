@@ -8,13 +8,8 @@ export * from "./data/types";
 export * from "./data/utils";
 export * from "./data/engine";
 
-// 🔧 FIXED: explicit default + props re-export
-export {
-  default as PlayerImpactScatterPanel,
-} from "./Section-1-hero-scatter/PlayerImpactScatterPanel";
-export type {
-  PlayerImpactScatterPanelProps,
-} from "./Section-1-hero-scatter/PlayerImpactScatterPanel";
+// ✅ Default export only — no props type
+export { default as PlayerImpactScatterPanel } from "./Section-1-hero-scatter/PlayerImpactScatterPanel";
 
 export * from "./Section-2-player-predictability/PredictabilityTable";
 export * from "./Section-3-team-prediction/TeamPredictabilityPanel";

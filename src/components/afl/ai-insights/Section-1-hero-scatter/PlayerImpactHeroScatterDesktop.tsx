@@ -1,404 +1,374 @@
 import React, { useMemo, useState } from "react";
-import { Lock, Info } from "lucide-react";
+import { Info, Lock, Sparkles } from "lucide-react";
+import type { FixtureMatch } from "@/components/afl/match-center/types";
+import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 
 import PlayerTrendModal from "./PlayerTrendModal";
-import type { FixtureMatch } from "@/components/afl/match-center/types";
-
-import type { PlayerPoint, LensKey, TeamFilter, LabelMode } from "./usePlayerScatterData";
-
-/* -------------------------------------------------------------------------- */
-/* CONSTANTS                                                                  */
-/* -------------------------------------------------------------------------- */
+import { usePlayerScatterData, type LabelMode, type LensKey, type PlayerPoint } from "./usePlayerScatterData";
 
 const W = 760;
-const H = 440;
+const H = 420;
 const PAD = 56;
 
 const x = (v: number) => PAD + (v / 100) * (W - PAD * 2);
 const y = (v: number) => PAD + (1 - v / 100) * (H - PAD * 2);
 
-type Quadrant = "volatile" | "finale" | "safe" | "low";
-
-/* -------------------------------------------------------------------------- */
-/* HELPERS                                                                    */
-/* -------------------------------------------------------------------------- */
-
-function titleForLens(l: LensKey) {
-  if (l === "fantasy") return "Fantasy";
-  if (l === "disposals") return "Disposals";
-  return "Goals";
+function cls(...s: Array<string | false | null | undefined>) {
+  return s.filter(Boolean).join(" ");
 }
 
-function clamp(n: number, a: number, b: number) {
-  return Math.max(a, Math.min(b, n));
+function dotFill(side: "home" | "away") {
+  return side === "home" ? "#60a5fa" : "#34d399"; // blue / green
 }
 
-function quadrantOf(p: PlayerPoint): Quadrant {
-  if (p.momentum >= 50 && p.ceiling >= 50) return "finale";
-  if (p.momentum < 50 && p.ceiling >= 50) return "volatile";
-  if (p.momentum >= 50 && p.ceiling < 50) return "safe";
-  return "low";
+function isLabelSmart(p: PlayerPoint) {
+  // “smart” labels: only high combined + any ceiling spike
+  return p.momentum + p.ceiling >= 150 || p.ceiling >= 86;
 }
-
-function stdev(vals: number[]) {
-  if (!vals.length) return 0;
-  const m = vals.reduce((s, v) => s + v, 0) / vals.length;
-  const v =
-    vals.reduce((s, x) => s + (x - m) * (x - m), 0) /
-    Math.max(1, vals.length - 1);
-  return Math.sqrt(v);
-}
-
-/* -------------------------------------------------------------------------- */
-/* COMPONENT                                                                  */
-/* -------------------------------------------------------------------------- */
 
 export default function PlayerImpactHeroScatterDesktop(props: {
   match?: FixtureMatch;
-  homeTeam: string;
-  awayTeam: string;
-
-  lens: LensKey;
-  onChangeLens: (l: LensKey) => void;
-
-  teamFilter: TeamFilter;
-  onChangeTeam: (t: TeamFilter) => void;
-
-  labelMode: LabelMode;
-  onChangeLabels: (m: LabelMode) => void;
-
-  playersVisible: PlayerPoint[];
-  playersAll: PlayerPoint[];
-
-  openId: string | null;
-  onSelectPlayer: (id: string | null) => void;
-
-  locked: boolean;
+  mode: PremiumMode;
+  initialLens?: LensKey;
 }) {
-  const [openModal, setOpenModal] = useState(false);
+  const { match, mode, initialLens } = props;
+  const isPremium = mode === "premium";
 
-  const selected = useMemo(
-    () => (props.openId ? props.playersAll.find((p) => p.id === props.openId) ?? null : null),
-    [props.openId, props.playersAll]
-  );
+  const d = usePlayerScatterData({ match, initialLens });
+  const {
+    homeTeam,
+    awayTeam,
+    lens,
+    setLens,
+    teamFilter,
+    setTeamFilter,
+    labelMode,
+    setLabelMode,
+    playersVisible,
+    ranked,
+    buckets,
+    openId,
+    setOpenId,
+    selected,
+    dominantQuadrant,
+    lean,
+    volatility,
+    whyLean,
+  } = d;
 
-  const ranked = useMemo(() => {
-    return [...props.playersVisible].sort(
-      (a, b) => b.momentum + b.ceiling - (a.momentum + a.ceiling)
-    );
-  }, [props.playersVisible]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [whyOpen, setWhyOpen] = useState(false);
 
-  const byQuadrant = useMemo(() => {
-    const q: Record<Quadrant, PlayerPoint[]> = {
-      volatile: [],
-      finale: [],
-      safe: [],
-      low: [],
-    };
-    props.playersVisible.forEach((p) => q[quadrantOf(p)].push(p));
-    (Object.keys(q) as Quadrant[]).forEach((k) => {
-      q[k].sort((a, b) => b.momentum + b.ceiling - (a.momentum + a.ceiling));
-    });
-    return q;
-  }, [props.playersVisible]);
+  const dominantLabel = useMemo(() => {
+    if (dominantQuadrant === "finale") return "Finale";
+    if (dominantQuadrant === "volatile") return "Volatile";
+    if (dominantQuadrant === "safe") return "Safe";
+    return "Low";
+  }, [dominantQuadrant]);
 
-  const dominantQuadrant = useMemo<Quadrant>(() => {
-    const counts: Record<Quadrant, number> = { volatile: 0, finale: 0, safe: 0, low: 0 };
-    props.playersVisible.forEach((p) => counts[quadrantOf(p)]++);
-    return (Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ??
-      "finale") as Quadrant;
-  }, [props.playersVisible]);
+  const premiumNarrative = useMemo(() => {
+    // tiny “sugar” line; stays tasteful
+    if (dominantQuadrant === "finale") return "Finale targets often align with role stability and late-game scoring control.";
+    if (dominantQuadrant === "volatile") return "Volatile ceiling profiles can win slates — but swing hard week-to-week.";
+    if (dominantQuadrant === "safe") return "Safe floors reduce downside, but limit explosive upside.";
+    return "Low-impact profiles require role change or matchup spike to matter.";
+  }, [dominantQuadrant]);
 
-  const volatility = useMemo(() => {
-    const totals = props.playersVisible.map((p) => p.momentum + p.ceiling);
-    const s = stdev(totals);
-    const v01 = clamp((s - 6) / 12, 0, 1);
-    const label = v01 < 0.33 ? "Stable" : v01 < 0.66 ? "Swingy" : "Volatile";
-    return { label, v01, s };
-  }, [props.playersVisible]);
-
-  const premiumInsight =
-    dominantQuadrant === "finale"
-      ? "Finale targets often correlate with role stability and late-game scoring control."
-      : dominantQuadrant === "volatile"
-      ? "Volatile profiles spike ceiling, but widen the range of outcomes."
-      : dominantQuadrant === "safe"
-      ? "Safe profiles reduce downside, but cap explosive scores."
-      : "Low-impact profiles offer limited leverage unless roles change.";
-
-  const lean = useMemo(() => {
-    const homePts = props.playersVisible.filter((p) => p.teamSide === "home");
-    const awayPts = props.playersVisible.filter((p) => p.teamSide === "away");
-
-    const score = (arr: PlayerPoint[]) =>
-      arr.length ? arr.reduce((s, p) => s + (p.momentum + p.ceiling), 0) / arr.length : 0;
-
-    const homeScore = score(homePts);
-    const awayScore = score(awayPts);
-    const diff = awayScore - homeScore;
-
-    const direction = Math.abs(diff) < 3 ? "even" : diff > 0 ? "away" : "home";
-    const strength = Math.abs(diff) < 3 ? "Neutral" : Math.abs(diff) < 8 ? "Slight" : "Lean";
-
-    return { diff, direction, strength };
-  }, [props.playersVisible]);
-
-  const labelSet = useMemo(() => {
-    if (props.labelMode === "none") return new Set<string>();
-    if (props.labelMode === "all") return new Set(props.playersVisible.map((p) => p.id));
-
-    // smart labels: top combined + high momentum + high ceiling (unique, capped)
-    const top = [...props.playersVisible]
-      .sort((a, b) => b.momentum + b.ceiling - (a.momentum + a.ceiling))
-      .slice(0, 4);
-
-    const hiCeil = [...props.playersVisible].sort((a, b) => b.ceiling - a.ceiling)[0];
-    const hiMom = [...props.playersVisible].sort((a, b) => b.momentum - a.momentum)[0];
-
-    const ids = [...top.map((p) => p.id), hiCeil?.id, hiMom?.id].filter(Boolean) as string[];
-    return new Set(ids.slice(0, 6));
-  }, [props.playersVisible, props.labelMode]);
-
-  const onPick = (id: string) => {
-    props.onSelectPlayer(id);
-    setOpenModal(true);
+  const handleDotClick = (id: string) => {
+    if (openId !== id) {
+      setOpenId(id);          // A1: select + update sidebar + selected card
+      setModalOpen(false);
+      return;
+    }
+    setModalOpen(true);       // A2: second click opens modal
   };
 
+  const handleRowClick = (id: string) => {
+    if (openId !== id) {
+      setOpenId(id);
+      setModalOpen(false);
+      return;
+    }
+    setModalOpen(true);
+  };
+
+  const controls = (
+    <div className="flex flex-wrap items-center gap-3 md:gap-4">
+      {/* Metric */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-white/50">Metric</span>
+        <div className="flex gap-1.5">
+          {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
+            <button
+              key={k}
+              onClick={() => setLens(k)}
+              className={cls(
+                "rounded-full border px-3 py-1 text-xs transition",
+                lens === k
+                  ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+                  : "border-white/10 bg-black/20 text-white/70 hover:bg-white/5"
+              )}
+            >
+              {k === "fantasy" ? "Fantasy" : k === "disposals" ? "Disposals" : "Goals"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="hidden md:block h-5 w-px bg-white/10" />
+
+      {/* Team */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-white/50">Team</span>
+        <div className="flex gap-1.5">
+          {(["both", "home", "away"] as const).map((k) => (
+            <button
+              key={k}
+              onClick={() => setTeamFilter(k)}
+              className={cls(
+                "rounded-full border px-3 py-1 text-xs transition",
+                teamFilter === k
+                  ? "border-white/25 bg-white/10 text-white"
+                  : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
+              )}
+            >
+              {k}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="hidden md:block h-5 w-px bg-white/10" />
+
+      {/* Labels */}
+      <div className="ml-auto flex items-center gap-2">
+        <span className="text-xs text-white/50">Labels</span>
+        <div className="flex gap-1.5">
+          {(["smart", "all", "none"] as LabelMode[]).map((k) => (
+            <button
+              key={k}
+              onClick={() => setLabelMode(k)}
+              className={cls(
+                "rounded-full border px-3 py-1 text-xs transition",
+                labelMode === k
+                  ? "border-amber-400/35 bg-amber-400/10 text-amber-200"
+                  : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
+              )}
+            >
+              {k}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <section className="rounded-3xl border border-amber-400/20 bg-gradient-to-b from-[#0c0c0c] to-black p-4">
-      {/* Header */}
-      <div className="mb-3 flex items-start justify-between gap-4">
+    <div className="rounded-3xl border border-amber-400/15 bg-gradient-to-b from-[#0b0b0b] to-black p-5 md:p-6">
+      {/* Top meta row */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <div className="text-[11px] tracking-[0.18em] text-amber-300/90">
-            PLAYER IMPACT MAP
+          <div className="flex items-center gap-2 text-sm text-amber-300">
+            <Sparkles className="h-4 w-4" />
+            <span className="tracking-[0.12em] text-[11px] uppercase">Player Impact Map</span>
           </div>
-          <h2 className="mt-1 text-2xl font-semibold">Momentum vs Ceiling</h2>
-          <div className="mt-1 text-sm text-white/60">
-            {props.homeTeam} vs {props.awayTeam} · Analyst view
-          </div>
-          <div className="mt-2 text-xs text-white/55">
-            <span className="text-white/40">Analyst read:</span>{" "}
-            {!props.locked ? premiumInsight : "Upgrade to reveal the matchup narrative + projection bands."}
-          </div>
+          <h3 className="mt-1 text-2xl font-semibold text-white">Momentum vs Ceiling</h3>
+          <p className="mt-1 text-sm text-white/60">
+            {homeTeam} vs {awayTeam} · Analyst view
+          </p>
+
+          {/* Premium/locked narrative line (polished) */}
+          <p className="mt-2 text-xs text-white/45 max-w-[68ch]">
+            {isPremium ? (
+              <>
+                <span className="text-amber-200">Analyst read:</span> {premiumNarrative}
+              </>
+            ) : (
+              <>
+                <span className="inline-flex items-center gap-1 text-white/55">
+                  <Lock className="h-3 w-3" />
+                  Analyst read locked:
+                </span>{" "}
+                Upgrade to reveal matchup narrative + projection bands.
+              </>
+            )}
+          </p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/70">
+        {/* Pills (tight) */}
+        <div className="flex flex-wrap items-center gap-2 md:gap-2.5">
+          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/75">
             Lean:{" "}
-            <span className="text-white">
-              {lean.diff >= 0 ? props.awayTeam : props.homeTeam}
-            </span>{" "}
-            ({lean.strength}){" "}
+            {lean.direction === "even"
+              ? "Even"
+              : `${lean.direction === "home" ? homeTeam : awayTeam} (${lean.strength})`}{" "}
             <span className="text-amber-200">
-              {lean.diff >= 0 ? "+" : ""}
-              {lean.diff.toFixed(1)}
+              {lean.direction === "even" ? "" : `${lean.diff > 0 ? "+" : ""}${lean.diff.toFixed(1)}`}
             </span>
           </span>
-
-          <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/70">
-            Volatility: <span className="text-white">{volatility.label}</span>
+          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/75">
+            Volatility: <span className="text-white/90">{volatility.label}</span>
+          </span>
+          <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/75">
+            Dominant: <span className="text-white/90">{dominantLabel}</span>
           </span>
 
-          <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/70">
-            Dominant: <span className="text-white">{dominantQuadrant}</span>
-          </span>
-
-          {props.locked && (
-            <span className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/50">
-              <Lock className="h-3.5 w-3.5" />
-              Neeko+ insight (locked)
+          {!isPremium && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
+              <Lock className="h-3 w-3" /> Neeko+ insight (locked)
             </span>
           )}
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="mb-2 space-y-2">
-        {/* Primary: metric */}
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="rounded-full border border-white/10 bg-white/[0.02] px-2 py-1 text-[11px] text-white/50">
-            Metric
-          </span>
-          {(["fantasy", "disposals", "goals"] as LensKey[]).map((l) => (
-            <button
-              key={l}
-              onClick={() => props.onChangeLens(l)}
-              className={`rounded-full border px-3 py-1 ${
-                props.lens === l
-                  ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
-                  : "border-white/10 bg-white/[0.02] text-white/70 hover:bg-white/[0.05]"
-              }`}
-            >
-              {titleForLens(l)}
-            </button>
-          ))}
-        </div>
+      {/* Controls (clarified hierarchy) */}
+      <div className="mt-4">{controls}</div>
 
-        {/* Secondary: team + labels */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-white/45">Team</span>
-            {(["both", "home", "away"] as TeamFilter[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => props.onChangeTeam(t)}
-                className={`rounded-full border px-3 py-1 ${
-                  props.teamFilter === t
-                    ? "border-white/40 text-white"
-                    : "border-white/10 bg-white/[0.02] text-white/70 hover:bg-white/[0.05]"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-white/45">Labels</span>
-            {(["smart", "all", "none"] as LabelMode[]).map((m) => (
-              <button
-                key={m}
-                onClick={() => props.onChangeLabels(m)}
-                className={`rounded-full border px-3 py-1 ${
-                  props.labelMode === m
-                    ? "border-amber-400/35 bg-amber-400/10 text-amber-200"
-                    : "border-white/10 bg-white/[0.02] text-white/70 hover:bg-white/[0.05]"
-                }`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Lean meter */}
-      <div className="mb-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+      {/* Lean meter (tight + better “why”) */}
+      <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
         <div className="flex items-center justify-between text-xs text-white/70">
-          <span>{props.homeTeam}</span>
+          <span>{homeTeam}</span>
           <span className="text-white/50">Lean meter</span>
-          <span>{props.awayTeam}</span>
+          <span>{awayTeam}</span>
         </div>
 
-        <div className="mt-2 relative h-2 overflow-hidden rounded-full bg-black/40">
+        <div className="mt-2 relative h-2 rounded-full bg-black/40 overflow-hidden">
           <div
-            className="absolute left-0 top-0 h-full bg-blue-400/60"
-            style={{ width: `${clamp(50 - lean.diff * 2, 10, 90)}%` }}
+            className="absolute left-0 top-0 h-full"
+            style={{
+              width: `${Math.max(2, Math.min(98, lean.pct))}%`,
+              background: "linear-gradient(90deg, rgba(96,165,250,0.65), rgba(52,211,153,0.65))",
+            }}
           />
-          <div
-            className="absolute right-0 top-0 h-full bg-emerald-400/60"
-            style={{ width: `${clamp(50 + lean.diff * 2, 10, 90)}%` }}
-          />
+          <div className="absolute left-1/2 top-0 h-full w-px bg-white/15" />
         </div>
 
-        <div className="mt-2 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs text-white/70">
-            <span className="rounded-full border border-white/10 px-2 py-0.5">
-              {lean.strength}: Δ {lean.diff >= 0 ? "+" : ""}
-              {lean.diff.toFixed(1)} (avg momentum+ceiling)
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-xs text-white/65">
+            <span className="rounded-full border border-white/10 bg-black/20 px-2 py-0.5">
+              Lean: Δ {lean.diff > 0 ? "+" : ""}
+              {lean.diff.toFixed(1)} <span className="text-white/50">(avg momentum+ceiling)</span>
             </span>
           </div>
 
-          <button className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.02] px-2 py-0.5 text-xs text-white/60 hover:bg-white/[0.05]">
-            <Info className="h-3.5 w-3.5" />
-            Why this lean?
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setWhyOpen((v) => !v)}
+              className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-xs text-white/70 hover:bg-white/5"
+            >
+              <Info className="h-3.5 w-3.5" />
+              Why is it lean?
+            </button>
+
+            {whyOpen && (
+              <div className="absolute right-0 z-30 mt-2 w-[340px] rounded-2xl border border-white/10 bg-[#0b0b0b] p-3 shadow-2xl">
+                <div className="text-xs font-medium text-white/90">{whyLean.title}</div>
+                <ul className="mt-2 space-y-1 text-xs text-white/65">
+                  {whyLean.lines.map((ln, i) => (
+                    <li key={i} className="leading-relaxed">
+                      • {ln}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-2 text-[11px] text-white/40">
+                  (This is derived from the current filter state — metric/team/labels.)
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Main grid */}
-      <div className="grid grid-cols-12 gap-4">
-        {/* Scatter */}
-        <div className="col-span-8">
-          <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
-            <div className="mb-2 flex items-center justify-between text-xs text-white/60">
-              <span>X: Momentum · Y: Ceiling</span>
+      <div className="mt-3 grid grid-cols-12 gap-4">
+        {/* Plot */}
+        <div className="col-span-12 lg:col-span-8">
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+            <div className="flex items-center justify-between gap-2 px-1">
+              <div className="text-xs text-white/60">
+                X: Momentum · Y: Ceiling
+              </div>
 
-              <span className="flex items-center gap-3">
+              <div className="flex items-center gap-3 text-xs text-white/60">
                 <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-blue-400" />
-                  {props.homeTeam}
+                  <span className="h-2 w-2 rounded-full" style={{ background: "#60a5fa" }} />
+                  {homeTeam}
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                  {props.awayTeam}
+                  <span className="h-2 w-2 rounded-full" style={{ background: "#34d399" }} />
+                  {awayTeam}
                 </span>
-              </span>
+              </div>
             </div>
 
-            <div className="relative w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
-              <svg viewBox={`0 0 ${W} ${H}`} className="block w-full">
+            <div className="mt-2 overflow-hidden rounded-xl border border-white/10 bg-black/30">
+              <svg viewBox={`0 0 ${W} ${H}`} className="h-[380px] w-full">
                 {/* grid */}
-                {([25, 50, 75] as const).map((t) => (
-                  <g key={t} opacity={0.6}>
-                    <line
-                      x1={x(t)}
-                      y1={y(0)}
-                      x2={x(t)}
-                      y2={y(100)}
-                      stroke="rgba(255,255,255,0.10)"
-                    />
-                    <line
-                      x1={x(0)}
-                      y1={y(t)}
-                      x2={x(100)}
-                      y2={y(t)}
-                      stroke="rgba(255,255,255,0.10)"
-                    />
-                  </g>
-                ))}
+                {Array.from({ length: 5 }).map((_, i) => {
+                  const gx = PAD + ((W - PAD * 2) / 4) * i;
+                  const gy = PAD + ((H - PAD * 2) / 4) * i;
+                  return (
+                    <g key={i}>
+                      <line x1={gx} y1={PAD} x2={gx} y2={H - PAD} stroke="rgba(255,255,255,0.10)" />
+                      <line x1={PAD} y1={gy} x2={W - PAD} y2={gy} stroke="rgba(255,255,255,0.10)" />
+                    </g>
+                  );
+                })}
+                <line x1={x(50)} y1={PAD} x2={x(50)} y2={H - PAD} stroke="rgba(255,255,255,0.16)" />
+                <line x1={PAD} y1={y(50)} x2={W - PAD} y2={y(50)} stroke="rgba(255,255,255,0.16)" />
 
                 {/* quadrant labels */}
-                <text x={x(10)} y={y(88)} fill="rgba(255,255,255,0.35)" fontSize="16">
-                  Low impact
-                </text>
-                <text x={x(10)} y={y(10)} fill="rgba(255,255,255,0.35)" fontSize="16">
+                <text x={PAD + 8} y={PAD + 18} fill="rgba(255,255,255,0.35)" fontSize="14">
                   Volatile upside
                 </text>
-                <text x={x(72)} y={y(10)} fill="rgba(255,206,61,0.85)" fontSize="18">
+                <text x={W - PAD - 150} y={PAD + 18} fill="rgba(251,191,36,0.85)" fontSize="14">
                   Finale targets
                 </text>
-                <text x={x(72)} y={y(88)} fill="rgba(255,255,255,0.35)" fontSize="16">
+                <text x={PAD + 8} y={H - PAD - 10} fill="rgba(255,255,255,0.28)" fontSize="14">
+                  Low impact
+                </text>
+                <text x={W - PAD - 150} y={H - PAD - 10} fill="rgba(255,255,255,0.28)" fontSize="14">
                   Safe / capped
                 </text>
 
                 {/* points */}
-                {props.playersVisible.map((p) => {
+                {playersVisible.map((p) => {
                   const cx = x(p.momentum);
                   const cy = y(p.ceiling);
-                  const isSelected = selected?.id === p.id;
-                  const fill = p.teamSide === "home" ? "#60a5fa" : "#34d399";
+                  const isSel = p.id === openId;
+
+                  const showLabel =
+                    labelMode === "all"
+                      ? true
+                      : labelMode === "none"
+                      ? false
+                      : isSel || isLabelSmart(p);
 
                   return (
-                    <g
-                      key={p.id}
-                      onClick={() => onPick(p.id)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      {isSelected && (
-                        <circle
-                          cx={cx}
-                          cy={cy}
-                          r={16}
-                          fill="rgba(255,206,61,0.15)"
-                          stroke="rgba(255,206,61,0.8)"
-                          strokeWidth={2}
-                        />
-                      )}
-                      <circle cx={cx} cy={cy} r={10} fill={fill} opacity={0.95} />
+                    <g key={p.id} style={{ cursor: "pointer" }} onClick={() => handleDotClick(p.id)}>
                       <circle
                         cx={cx}
                         cy={cy}
-                        r={10}
-                        fill="transparent"
-                        stroke="rgba(255,255,255,0.15)"
+                        r={isSel ? 9 : 7}
+                        fill={dotFill(p.teamSide)}
+                        opacity={isSel ? 1 : 0.92}
                       />
-                      {labelSet.has(p.id) && (
+                      {isSel && (
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={14}
+                          fill="rgba(251,191,36,0.12)"
+                          stroke="rgba(251,191,36,0.55)"
+                          strokeWidth={2}
+                        />
+                      )}
+                      {showLabel && (
                         <text
-                          x={cx + 14}
+                          x={cx + 10}
                           y={cy + 4}
-                          fill="rgba(255,255,255,0.8)"
-                          fontSize="14"
+                          fill={isSel ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.65)"}
+                          fontSize="13"
                         >
                           {p.name}
                         </text>
@@ -409,29 +379,27 @@ export default function PlayerImpactHeroScatterDesktop(props: {
               </svg>
             </div>
 
-            {/* Selected dock (pulled closer) */}
+            {/* Selected (pulled tight to chart) */}
             {selected && (
-              <div className="mt-2 rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3">
-                <div className="flex items-start justify-between gap-3">
+              <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-[11px] tracking-[0.2em] text-amber-300/90">
-                      SELECTED
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-amber-300/80">
+                      Selected
                     </div>
-                    <div className="text-lg font-semibold">{selected.name}</div>
-                    <div className="text-xs text-white/60">{selected.teamName}</div>
-                    <div className="mt-1 text-xs text-white/70">
-                      Momentum:{" "}
-                      <span className="text-white">{Math.round(selected.momentum)}</span>{" "}
-                      · Ceiling:{" "}
-                      <span className="text-white">{Math.round(selected.ceiling)}</span>{" "}
-                      · Quadrant:{" "}
-                      <span className="text-white">{quadrantOf(selected)}</span>
+                    <div className="mt-0.5 text-lg font-semibold text-white">{selected.name}</div>
+                    <div className="text-sm text-white/60">{selected.teamName}</div>
+
+                    <div className="mt-2 text-sm text-white/70">
+                      Momentum: <span className="text-white">{selected.momentum}</span>{" "}
+                      <span className="text-white/40">·</span>{" "}
+                      Ceiling: <span className="text-white">{selected.ceiling}</span>
                     </div>
                   </div>
 
                   <button
-                    onClick={() => setOpenModal(true)}
-                    className="rounded-full border border-white/10 bg-white/[0.02] px-3 py-1 text-xs text-white/70 hover:bg-white/[0.05]"
+                    onClick={() => setModalOpen(true)}
+                    className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-white/75 hover:bg-white/5"
                   >
                     Open trend
                   </button>
@@ -441,98 +409,69 @@ export default function PlayerImpactHeroScatterDesktop(props: {
           </div>
         </div>
 
-        {/* Right rail */}
-        <div className="col-span-4 space-y-4">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-sm font-semibold">Top targets</div>
-            <div className="text-xs text-white/60">Best combined momentum + ceiling</div>
+        {/* Sidebar */}
+        <div className="col-span-12 lg:col-span-4 space-y-3">
+          <SidebarCard
+            title="Top targets"
+            subtitle="Best combined momentum + ceiling"
+            items={ranked.slice(0, 5)}
+            onRowClick={handleRowClick}
+          />
 
-            <div className="mt-3 space-y-2">
-              {ranked.slice(0, 4).map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => onPick(p.id)}
-                  className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left hover:bg-white/[0.04]"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-sm font-medium">{p.name}</div>
-                    <div className="text-xs text-white/60">
-                      M {Math.round(p.momentum)} · C {Math.round(p.ceiling)}
-                    </div>
-                  </div>
-                  <div className="text-xs text-white/55">{p.teamName}</div>
-                </button>
-              ))}
-            </div>
-          </div>
+          <SidebarCard
+            title="Finale targets"
+            subtitle="High momentum, high ceiling"
+            badge="Hot"
+            items={buckets.finale.slice(0, 4)}
+            onRowClick={handleRowClick}
+          />
 
-          {(
-            [
-              ["finale", "Finale targets", "High momentum, high ceiling", "Hot"],
-              ["volatile", "Volatile upside", "Ceiling spikes with risk", ""],
-              ["safe", "Safe floors", "Stable momentum, capped ceiling", ""],
-              ["low", "Avoid / capped", "Low leverage unless role changes", ""],
-            ] as const
-          ).map(([k, title, subtitle, badge]) => {
-            const list = byQuadrant[k as Quadrant] ?? [];
-            return (
-              <div key={k} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-semibold">{title}</div>
-                    <div className="text-xs text-white/60">{subtitle}</div>
-                  </div>
-                  {badge ? (
-                    <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-xs text-amber-200">
-                      {badge}
-                    </span>
-                  ) : null}
-                </div>
+          <SidebarCard
+            title="Volatile upside"
+            subtitle="Ceiling spikes with risk"
+            items={buckets.volatileUpside.slice(0, 4)}
+            onRowClick={handleRowClick}
+            empty="No players in this filter."
+          />
 
-                <div className="mt-3 space-y-2">
-                  {list.slice(0, 2).length ? (
-                    list.slice(0, 2).map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => onPick(p.id)}
-                        className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-sm font-medium">{p.name}</div>
-                          <div className="text-xs text-white/60">
-                            M {Math.round(p.momentum)} · C {Math.round(p.ceiling)}
-                          </div>
-                        </div>
-                        <div className="text-xs text-white/55">{p.teamName}</div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="text-xs text-white/45">No players in this filter.</div>
-                  )}
-                </div>
+          <SidebarCard
+            title="Safe floors"
+            subtitle="Stable momentum, capped ceiling"
+            items={buckets.safeFloors.slice(0, 4)}
+            onRowClick={handleRowClick}
+            empty="No players in this filter."
+          />
+
+          <SidebarCard
+            title="Avoid / capped"
+            subtitle="Low leverage unless role changes"
+            items={buckets.avoid.slice(0, 3)}
+            onRowClick={handleRowClick}
+            empty="No players in this filter."
+          />
+
+          {!isPremium ? (
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">
+                Neeko+ note
               </div>
-            );
-          })}
-
-          {/* Premium messaging polish */}
-          {props.locked ? (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-              <div className="text-[11px] tracking-[0.18em] text-white/45">NEEKO+ NOTE</div>
-              <div className="mt-2 flex items-start gap-2 text-sm text-white/70">
-                <Lock className="mt-0.5 h-4 w-4 text-white/60" />
-                <div>
-                  <div className="text-white/80">Upgrade to reveal matchup narrative + projection bands</div>
-                  <div className="mt-1 text-xs text-white/50">
-                    Premium adds: stronger “why”, projection ranges, and role stability context.
-                  </div>
-                </div>
+              <div className="mt-2 text-sm text-white/70">
+                <span className="inline-flex items-center gap-1 text-white/60">
+                  <Lock className="h-3.5 w-3.5" />
+                  Upgrade to reveal matchup narrative + projection bands
+                </span>
+              </div>
+              <div className="mt-2 text-xs text-white/45">
+                Premium adds: stronger “why”, projection ranges, and role-stability context.
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
-              <div className="text-[11px] tracking-[0.18em] text-amber-300/90">NEEKO+ NOTE</div>
-              <div className="mt-2 text-sm text-white/80">
-                <span className="text-amber-200">Analyst read:</span> {premiumInsight}
+            <div className="rounded-2xl border border-amber-400/15 bg-amber-400/[0.05] p-4">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">
+                Analyst note
+              </div>
+              <div className="mt-2 text-sm text-amber-100/90">
+                {premiumNarrative}
               </div>
             </div>
           )}
@@ -540,16 +479,65 @@ export default function PlayerImpactHeroScatterDesktop(props: {
       </div>
 
       {/* Modal */}
-      {selected && (
-        <PlayerTrendModal
-          open={openModal}
-          onClose={() => setOpenModal(false)}
-          player={selected}
-          allPlayers={props.playersAll}
-          lens={props.lens}
-          locked={props.locked}
-        />
-      )}
-    </section>
+      <PlayerTrendModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        player={selected}
+        allPlayers={d.playersAll}
+        lens={lens}
+        locked={!isPremium}
+      />
+    </div>
+  );
+}
+
+function SidebarCard(props: {
+  title: string;
+  subtitle: string;
+  items: PlayerPoint[];
+  badge?: string;
+  empty?: string;
+  onRowClick: (id: string) => void;
+}) {
+  const { title, subtitle, items, badge, empty, onRowClick } = props;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="text-sm font-semibold text-white">{title}</div>
+          <div className="mt-0.5 text-xs text-white/50">{subtitle}</div>
+        </div>
+        {badge && (
+          <span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[11px] text-amber-200">
+            {badge}
+          </span>
+        )}
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {items.length ? (
+          items.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => onRowClick(p.id)}
+              className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left hover:bg-white/5"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-medium text-white/90">{p.name}</div>
+                  <div className="text-xs text-white/45">{p.teamName}</div>
+                </div>
+                <div className="text-xs text-white/60">
+                  M {p.momentum} · C {p.ceiling}
+                </div>
+              </div>
+            </button>
+          ))
+        ) : (
+          <div className="text-xs text-white/40">{empty ?? "No players in this filter."}</div>
+        )}
+      </div>
+    </div>
   );
 }
