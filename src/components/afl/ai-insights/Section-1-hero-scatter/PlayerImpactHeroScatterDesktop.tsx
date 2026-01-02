@@ -290,7 +290,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
       */}
       <div className="mt-3 grid grid-cols-12 gap-4">
         {/* Plot */}
-        <div className="col-span-12 lg:col-span-9 xl:col-span-10">
+        <div className="col-span-12 lg:col-span-8">
           <div className="rounded-2xl border border-white/10 bg-black/20 p-2">
             <div className="flex items-center justify-between gap-2">
               <div className="text-xs text-white/60">
@@ -311,7 +311,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
 
           
               {/* Larger rendered height + tighter PAD above = clearer dots/labels */}
-              <svg viewBox={`0 0 ${W} ${H}`} className="h-[660px] w-full">
+              <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto aspect-[760/420]">
                 {/* grid */}
                 {Array.from({ length: 5 }).map((_, i) => {
                   const gx = PAD + ((W - PAD * 2) / 4) * i;
@@ -390,7 +390,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
         </div>
 
         {/* Selected (right) */}
-        <div className="col-span-12 lg:col-span-3 xl:col-span-2">
+        <div className="col-span-12 lg:col-span-4">
           <div className="space-y-3 lg:sticky lg:top-24">
             <SelectedCard
               homeTeam={homeTeam}
@@ -540,7 +540,7 @@ function SelectedCard(props: {
 
   return (
     <div className={cls(
-      "rounded-2xl border bg-black/20 p-3",
+      "rounded-2xl border bg-black/20 p-4",
       selected ? "border-amber-400/20" : "border-white/10"
     )}>
       <div className="flex items-start justify-between gap-3">
