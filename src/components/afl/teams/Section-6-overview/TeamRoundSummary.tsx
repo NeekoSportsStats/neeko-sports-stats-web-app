@@ -2,7 +2,8 @@
 
 import React, { useMemo } from "react";
 import { MOCK_TEAMS } from "../data/mockTeams";
-import { Flame, TrendingUp, Shield, Activity } from "lucide-react";
+import { Flame, TrendingUp, Shield, Activity, Sparkles } from "lucide-react";
+import { SectionHeader } from "@/components/shared/SectionHeader";
 
 /* -------------------------------------------------------------------------- */
 /*                         SPARKLINE PLACEHOLDER (UI-ONLY)                    */
@@ -83,23 +84,12 @@ export default function TeamMomentumPulse() {
         shadow-[0_0_46px_rgba(0,0,0,0.85)]
       "
     >
-      {/* SECTION LABEL */}
-      <div className="inline-flex items-center gap-2 rounded-full border border-yellow-500/60 bg-gradient-to-r from-yellow-500/25 via-yellow-500/10 to-transparent px-3 py-1">
-        <span className="h-1.5 w-1.5 rounded-full bg-yellow-300 shadow-[0_0_14px_rgba(250,204,21,0.95)]" />
-        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-yellow-100">
-          Round Momentum Pulse
-        </span>
-      </div>
-
-      {/* TITLE */}
-      <h2 className="mt-4 text-xl font-semibold tracking-tight text-neutral-50 md:text-2xl">
-        League-wide momentum trends &amp; team signals
-      </h2>
-
-      <p className="mt-2 max-w-2xl text-sm text-neutral-400">
-        Round-by-round scoring flow, defensive stability, movement indicators
-        and team-level momentum signals.
-      </p>
+      <SectionHeader
+        pillLabel="Round Momentum Pulse"
+        title="League-wide momentum trends & team signals"
+        description="Round-by-round scoring flow, defensive stability, movement indicators and team-level momentum signals."
+        icon={Sparkles}
+      />
 
       {/* LEAGUE-WIDE SCORING PULSE */}
       <div className="mt-6 rounded-2xl border border-neutral-800/80 bg-gradient-to-b from-neutral-900/70 via-neutral-950/90 to-black p-5 shadow-[0_0_32px_rgba(0,0,0,0.9)]">

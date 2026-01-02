@@ -8,6 +8,7 @@ import {
   Sparkles,
   Activity,
 } from "lucide-react";
+import { SectionHeader } from "@/components/shared/SectionHeader";
 
 import {
   useAFLMockPlayers,
@@ -234,33 +235,13 @@ export default function RoundSummary() {
       <div className="pointer-events-none absolute -top-40 left-1/2 h-72 w-[480px] -translate-x-1/2 bg-yellow-500/20 blur-3xl" />
 
       <div className="relative">
-        {/* HEADER (updated pill only) */}
-        <div className="mb-5 md:mb-7">
-
-          {/* NEW PILL — MATCHES SECTION 2 */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-yellow-500/40 bg-black/70 px-3 py-1 text-xs text-yellow-200/90 mb-2">
-            <Sparkles className="h-3.5 w-3.5 text-yellow-300" />
-            <span className="uppercase tracking-[0.18em]">
-              Round Momentum
-            </span>
-          </div>
-
-          <div className="flex flex-row items-center gap-2">
-            <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">
-              Round Momentum Summary
-            </h2>
-          </div>
-
-          <p className="mt-2 text-xs md:text-sm font-medium text-yellow-300/80">
-            Round {CURRENT_ROUND} • {selectedLabel} Snapshot
-          </p>
-
-          <p className="mt-3 text-sm md:text-[15px] text-white/70 max-w-2xl">
-            Live round snapshot — track {labelLower} trends, standout players and role/stability shifts
-            as this stat moves week to week.
-          </p>
-
-        </div>
+        <SectionHeader
+          pillLabel="Round Momentum"
+          title="Round Momentum Summary"
+          subtitle={`Round ${CURRENT_ROUND} • ${selectedLabel} Snapshot`}
+          description={`Live round snapshot — track ${labelLower} trends, standout players and role/stability shifts as this stat moves week to week.`}
+          icon={Sparkles}
+        />
 
         {/* FILTER PILLS — (unchanged) */}
         <div className="-mx-2 mb-4 mt-1 overflow-x-auto scrollbar-thin scrollbar-thumb-yellow-500/30">
