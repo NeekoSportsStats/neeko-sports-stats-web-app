@@ -45,7 +45,8 @@ function stdev(vals: number[]) {
   if (!vals.length) return 0;
   const m = vals.reduce((s, v) => s + v, 0) / vals.length;
   const v =
-    vals.reduce((s, x) => s + (x - m) * (x - m), 0) / Math.max(1, vals.length - 1);
+    vals.reduce((s, x) => s + (x - m) * (x - m), 0) /
+    Math.max(1, vals.length - 1);
   return Math.sqrt(v);
 }
 
@@ -116,9 +117,15 @@ export default function PlayerImpactScatterPanel(props: {
   /* ---------------- INSIGHTS ---------------- */
 
   const dominantQuadrant = useMemo<Quadrant>(() => {
-    const counts: Record<Quadrant, number> = { volatile: 0, finale: 0, low: 0, safe: 0 };
+    const counts: Record<Quadrant, number> = {
+      volatile: 0,
+      finale: 0,
+      low: 0,
+      safe: 0,
+    };
     visible.forEach(p => counts[quadrantOf(p)]++);
-    return (Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "finale") as Quadrant;
+    return (Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+      "finale") as Quadrant;
   }, [visible]);
 
   const lean = useMemo(() => {
@@ -126,7 +133,9 @@ export default function PlayerImpactScatterPanel(props: {
     const awayPts = visible.filter(p => p.teamSide === "away");
 
     const score = (arr: PlayerPoint[]) =>
-      arr.length ? arr.reduce((s, p) => s + (p.momentum + p.ceiling), 0) / arr.length : 0;
+      arr.length
+        ? arr.reduce((s, p) => s + (p.momentum + p.ceiling), 0) / arr.length
+        : 0;
 
     const homeScore = score(homePts);
     const awayScore = score(awayPts);
@@ -186,7 +195,6 @@ export default function PlayerImpactScatterPanel(props: {
 
       {/* INSIGHT STRIP */}
       <div className="mb-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 space-y-3">
-        {/* Lean bar */}
         <div>
           <div className="flex justify-between text-xs text-white/70 mb-1">
             <span>{home}</span>
@@ -194,18 +202,21 @@ export default function PlayerImpactScatterPanel(props: {
           </div>
           <div className="relative h-2 rounded-full bg-black/40 overflow-hidden">
             <div
-              className="absolute left-0 top-0 h-full bg-blue-400/60"
-              style={{ width: `${clamp(50 - lean.diff * 2, 10, 90)}%` }}
-            />
-            <div
-              className="absolute right-0 top-0 h-full bg-emerald-400/60"
-              style={{ width: `${clamp(50 + lean.diff * 2, 10, 90)}%` }}
+              className="absolute left-0 top-0 h-full bg-blue-400/60 transition-all"
+              style={{
+                width: `${
+                  lean.direction === "away"
+                    ? clamp(50 - Math.abs(lean.diff) * 2, 30, 50)
+                    : clamp(50 + Math.abs(lean.diff) * 2, 50, 70)
+                }%`,
+              }}
             />
           </div>
-          <p className="mt-1 text-xs text-white/60">Why this lean: {whyLean}</p>
+          <p className="mt-1 text-xs text-white/60">
+            Why this lean: {whyLean}
+          </p>
         </div>
 
-        {/* Volatility + premium line */}
         <div className="flex flex-wrap items-center gap-3 text-xs">
           <span className="rounded-full border border-white/10 px-2 py-0.5 text-white/80">
             Matchup volatility: {volatility.label}
@@ -224,21 +235,91 @@ export default function PlayerImpactScatterPanel(props: {
         </div>
       </div>
 
-      {/* TOP TARGETS */}
-      <div className="mb-3 flex flex-wrap gap-2">
-        {ranked.slice(0, 3).map((p, i) => (
+      {/* CONTROLS */}
+      <div className="mb-3 flex flex-wrap gap-2 text-xs">
+        {(["fantasy", "disposals", "goals"] as LensKey[]).map(l => (
           <button
-            key={p.id}
-            onClick={() => onPick(p.id)}
-            className={`rounded-full border px-3 py-1 text-xs ${
-              isPremium && i === 0
+            key={l}
+            onClick={() => setLens(l)}
+            className={`rounded-full px-3 py-1 border ${
+              lens === l
                 ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
-                : "border-white/10 bg-black/20 text-white/80 hover:bg-white/5"
+                : "border-white/10 text-white/60"
             }`}
           >
-            #{i + 1} {p.name} <span className="opacity-60">({p.teamName})</span>
+            {l}
           </button>
         ))}
+        <span className="mx-2 opacity-30">|</span>
+        {(["both", "home", "away"] as TeamFilter[]).map(t => (
+          <button
+            key={t}
+            onClick={() => setTeamFilter(t)}
+            className={`rounded-full px-3 py-1 border ${
+              teamFilter === t
+                ? "border-white/40 text-white"
+                : "border-white/10 text-white/60"
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {/* DESKTOP SCATTER */}
+      <div className="hidden md:block">
+        <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+          <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+            {[25, 50, 75].map(v => (
+              <g key={v}>
+                <line x1={x(v)} y1={PAD} x2={x(v)} y2={H - PAD} stroke="white" opacity={0.15} />
+                <line x1={PAD} y1={y(v)} x2={W - PAD} y2={y(v)} stroke="white" opacity={0.15} />
+              </g>
+            ))}
+
+            {/* QUADRANT LABELS */}
+            <text x={PAD + 6} y={PAD + 16} fontSize={12}
+              fill={dominantQuadrant === "volatile" ? "#fbbf24" : "rgba(255,255,255,0.35)"}>
+              Volatile upside
+            </text>
+            <text x={W - PAD - 110} y={PAD + 16} fontSize={12}
+              fill={dominantQuadrant === "finale" ? "#fbbf24" : "rgba(255,255,255,0.35)"}>
+              Finale targets
+            </text>
+            <text x={PAD + 6} y={H - PAD - 6} fontSize={12}
+              fill={dominantQuadrant === "low" ? "#fbbf24" : "rgba(255,255,255,0.35)"}>
+              Low impact
+            </text>
+            <text x={W - PAD - 100} y={H - PAD - 6} fontSize={12}
+              fill={dominantQuadrant === "safe" ? "#fbbf24" : "rgba(255,255,255,0.35)"}>
+              Safe, capped
+            </text>
+
+            {visible.map(p => {
+              const cx = x(p.momentum);
+              const cy = y(p.ceiling);
+              const isSelected = p.id === selectedId;
+
+              return (
+                <g key={p.id}>
+                  {isSelected && isPremium && (
+                    <circle cx={cx} cy={cy} r={12} fill="none"
+                      stroke="#fbbf24" strokeWidth={2} opacity={0.6} />
+                  )}
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={isSelected ? 7 : 5}
+                    fill={p.teamSide === "home" ? "#60a5fa" : "#34d399"}
+                    opacity={isSelected ? 1 : 0.85}
+                    onClick={() => onPick(p.id)}
+                    style={{ cursor: "pointer" }}
+                  />
+                </g>
+              );
+            })}
+          </svg>
+        </div>
       </div>
 
       {/* MODAL */}
