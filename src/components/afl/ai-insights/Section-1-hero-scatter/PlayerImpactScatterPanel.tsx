@@ -6,7 +6,7 @@ import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 import PlayerTrendModal from "./PlayerTrendModal";
 
 /* -------------------------------------------------------------------------------------------------
-  STEP 3 — Quadrant AI Labels (Inline-first, additive)
+  STEP 5 — Mobile-specific layout (inline-first, stable)
 -------------------------------------------------------------------------------------------------- */
 
 type LensKey = "fantasy" | "disposals" | "goals";
@@ -21,18 +21,14 @@ type PlayerPoint = {
   ceiling: number;
 };
 
+type Quadrant = "volatile" | "finale" | "low" | "safe";
+
 const W = 760;
 const H = 420;
 const PAD = 56;
 
 const x = (v: number) => PAD + (v / 100) * (W - PAD * 2);
 const y = (v: number) => PAD + (1 - v / 100) * (H - PAD * 2);
-
-type Quadrant =
-  | "volatile"
-  | "finale"
-  | "low"
-  | "safe";
 
 function quadrantOf(p: PlayerPoint): Quadrant {
   if (p.momentum >= 50 && p.ceiling >= 50) return "finale";
@@ -47,7 +43,7 @@ export default function PlayerImpactScatterPanel(props: {
   initialLens?: LensKey;
 }) {
   const { match, mode, initialLens } = props;
-  const locked = mode !== "premium";
+  const isPremium = mode === "premium";
 
   const home = String((match as any)?.homeTeam ?? "Home");
   const away = String((match as any)?.awayTeam ?? "Away");
@@ -106,8 +102,6 @@ export default function PlayerImpactScatterPanel(props: {
     [visible, selectedId]
   );
 
-  /* ---------------- STEP 3 — AI QUADRANT LOGIC ---------------- */
-
   const dominantQuadrant = useMemo<Quadrant>(() => {
     if (selected) return quadrantOf(selected);
 
@@ -118,13 +112,16 @@ export default function PlayerImpactScatterPanel(props: {
       safe: 0,
     };
 
-    visible.forEach(p => {
-      counts[quadrantOf(p)]++;
-    });
-
+    visible.forEach(p => counts[quadrantOf(p)]++);
     return (Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ??
       "finale") as Quadrant;
   }, [visible, selected]);
+
+  const rankedMobile = useMemo(() => {
+    return [...visible].sort(
+      (a, b) => b.momentum + b.ceiling - (a.momentum + a.ceiling)
+    );
+  }, [visible]);
 
   const onPick = (id: string) => {
     setSelectedId(id);
@@ -143,13 +140,8 @@ export default function PlayerImpactScatterPanel(props: {
         </div>
         <h2 className="mt-1 text-xl font-semibold">Momentum vs Ceiling</h2>
         <p className="mt-1 text-sm text-white/60">
-          AI quadrant interpretation · {home} vs {away}
+          {home} vs {away} · Neeko+ enhanced
         </p>
-        {locked && (
-          <p className="mt-1 text-xs text-white/45">
-            Deterministic mock (premium-safe)
-          </p>
-        )}
       </div>
 
       {/* CONTROLS */}
@@ -183,87 +175,74 @@ export default function PlayerImpactScatterPanel(props: {
         ))}
       </div>
 
-      {/* SCATTER */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
-          {/* GRID */}
-          {[25, 50, 75].map(v => (
-            <g key={v}>
-              <line x1={x(v)} y1={PAD} x2={x(v)} y2={H - PAD} stroke="white" opacity={0.15} />
-              <line x1={PAD} y1={y(v)} x2={W - PAD} y2={y(v)} stroke="white" opacity={0.15} />
-            </g>
-          ))}
-
-          {/* QUADRANT LABELS (AI) */}
-          <text
-            x={PAD + 6}
-            y={PAD + 16}
-            fontSize={12}
-            fill={dominantQuadrant === "volatile" ? "#fbbf24" : "rgba(255,255,255,0.4)"}
-          >
-            Volatile upside
-          </text>
-
-          <text
-            x={W - PAD - 110}
-            y={PAD + 16}
-            fontSize={12}
-            fill={dominantQuadrant === "finale" ? "#fbbf24" : "rgba(255,255,255,0.4)"}
-          >
-            Finale targets
-          </text>
-
-          <text
-            x={PAD + 6}
-            y={H - PAD - 6}
-            fontSize={12}
-            fill={dominantQuadrant === "low" ? "#fbbf24" : "rgba(255,255,255,0.4)"}
-          >
-            Low impact
-          </text>
-
-          <text
-            x={W - PAD - 100}
-            y={H - PAD - 6}
-            fontSize={12}
-            fill={dominantQuadrant === "safe" ? "#fbbf24" : "rgba(255,255,255,0.4)"}
-          >
-            Safe, capped
-          </text>
-
-          {/* POINTS */}
-          {visible.map(p => {
-            const cx = x(p.momentum);
-            const cy = y(p.ceiling);
-            const isSelected = p.id === selectedId;
-
-            const baseOpacity =
-              teamFilter === "both"
-                ? 1
-                : p.teamSide === teamFilter
-                ? 1
-                : 0.25;
-
-            return (
-              <g key={p.id}>
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={isSelected ? 7 : 5}
-                  fill={p.teamSide === "home" ? "#60a5fa" : "#34d399"}
-                  opacity={isSelected ? 1 : baseOpacity}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => onPick(p.id)}
-                />
-                {(isSelected || (p.momentum >= 70 && p.ceiling >= 70)) && (
-                  <text x={cx} y={cy + 16} textAnchor="middle" fontSize={11} fill="white">
-                    {p.name}
-                  </text>
-                )}
+      {/* ---------------- DESKTOP SCATTER ---------------- */}
+      <div className="hidden md:block">
+        <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+          <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+            {[25, 50, 75].map(v => (
+              <g key={v}>
+                <line x1={x(v)} y1={PAD} x2={x(v)} y2={H - PAD} stroke="white" opacity={0.15} />
+                <line x1={PAD} y1={y(v)} x2={W - PAD} y2={y(v)} stroke="white" opacity={0.15} />
               </g>
-            );
-          })}
-        </svg>
+            ))}
+
+            {visible.map(p => {
+              const cx = x(p.momentum);
+              const cy = y(p.ceiling);
+              const isSelected = p.id === selectedId;
+
+              return (
+                <g key={p.id}>
+                  {isSelected && isPremium && (
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={12}
+                      fill="none"
+                      stroke="#fbbf24"
+                      strokeWidth={2}
+                      opacity={0.6}
+                    />
+                  )}
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={isSelected ? 7 : 5}
+                    fill={p.teamSide === "home" ? "#60a5fa" : "#34d399"}
+                    opacity={isSelected ? 1 : 0.85}
+                    onClick={() => onPick(p.id)}
+                    style={{ cursor: "pointer" }}
+                  />
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      </div>
+
+      {/* ---------------- MOBILE LIST ---------------- */}
+      <div className="md:hidden space-y-2">
+        {rankedMobile.map((p, i) => (
+          <button
+            key={p.id}
+            onClick={() => onPick(p.id)}
+            className={`w-full rounded-xl border px-3 py-2 text-left ${
+              i < 3 && isPremium
+                ? "border-amber-400/40 bg-amber-400/10"
+                : "border-white/10 bg-black/30"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="font-medium text-white">{p.name}</div>
+              <div className="text-xs text-white/50">
+                {p.teamName}
+              </div>
+            </div>
+            <div className="mt-1 text-xs text-white/60">
+              Momentum {p.momentum} · Ceiling {p.ceiling}
+            </div>
+          </button>
+        ))}
       </div>
 
       {/* MODAL */}
@@ -273,7 +252,7 @@ export default function PlayerImpactScatterPanel(props: {
         player={players.find(p => p.id === selectedId) ?? null}
         allPlayers={players}
         lens={lens}
-        locked={locked}
+        locked={!isPremium}
       />
     </section>
   );
