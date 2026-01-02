@@ -165,7 +165,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
 
       {/* Plot (bigger, less dead space) */}
       <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
-        <svg viewBox={`0 0 ${W} ${H}`} className="h-[360px] w-full">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto aspect-[760/420]">
           {Array.from({ length: 5 }).map((_, i) => {
             const gx = PAD + ((W - PAD * 2) / 4) * i;
             const gy = PAD + ((H - PAD * 2) / 4) * i;

@@ -226,7 +226,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
       <div className="mt-4">{controls}</div>
 
       {/* Lean meter */}
-      <div className="mt-4 rounded-full border border-white/10 bg-black/30 px-3 py-1.5">
+      <div className="mt-4 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
         <div className="flex items-center justify-between text-xs text-white/60">
           <span>{homeTeam}</span>
           <span className="text-white/40">Lean meter</span>
@@ -311,7 +311,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
 
           
               {/* Larger rendered height + tighter PAD above = clearer dots/labels */}
-              <svg viewBox={`0 0 ${W} ${H}`} className="h-[560px] w-full">
+              <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto aspect-[760/420]">
                 {/* grid */}
                 {Array.from({ length: 5 }).map((_, i) => {
                   const gx = PAD + ((W - PAD * 2) / 4) * i;
@@ -401,7 +401,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
             />
 
             {!isPremium ? (
-              <div className="rounded-full border border-white/10 bg-black/30 px-3 py-1.5">
+              <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
                 <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">Neeko+ note</div>
                 <div className="mt-2 text-sm text-white/70">
                   <span className="inline-flex items-center gap-1 text-white/60">
@@ -508,7 +508,7 @@ function SidebarCard(props: {
             <button
               key={p.id}
               onClick={() => onRowClick(p.id)}
-              className="w-full rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-left hover:bg-white/5"
+              className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left hover:bg-white/5"
             >
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -568,7 +568,7 @@ function SelectedCard(props: {
           )}
         </div>
 
-        <button
+        {selected && (<button
           onClick={onOpenTrend}
           disabled={!selected}
           className={cls(
@@ -577,9 +577,7 @@ function SelectedCard(props: {
               ? "border-white/10 bg-black/20 text-white/75 hover:bg-white/5"
               : "border-white/10 bg-black/10 text-white/35 cursor-not-allowed"
           )}
-        >
-          Open trend
-        </button>
+        >Open trend</button>)}
       </div>
 
       {!isPremium && selected && (
