@@ -1,27 +1,21 @@
-import React from "react";
+import PlayerImpactHeroScatter from "./PlayerImpactHeroScatter";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
-
-import PlayerImpactHeroScatter from "./PlayerImpactHeroScatter";
 import type { LensKey } from "./usePlayerScatterData";
 
-export default function PlayerImpactScatterPanel(props: {
-  match?: FixtureMatch;
+type Props = {
+  match: FixtureMatch;
   mode: PremiumMode;
-  initialLens?: LensKey;
-}) {
-  const { match, mode, initialLens } = props;
+  initialLens: LensKey;
+};
 
+export default function PlayerImpactScatterPanel({
+  match,
+  mode,
+  initialLens,
+}: Props) {
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 md:p-6">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-white">Player Impact Map</h2>
-        <p className="mt-1 text-sm text-white/60">
-          Momentum vs ceiling · Click a player to select, click again to open
-          trend/projection
-        </p>
-      </div>
-
+    <section>
       <PlayerImpactHeroScatter
         match={match}
         mode={mode}
