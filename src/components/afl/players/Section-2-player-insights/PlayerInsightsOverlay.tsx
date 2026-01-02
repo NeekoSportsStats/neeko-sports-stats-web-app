@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import type { PlayerRow, StatLens } from "./MasterTable";
+import type { PlayerRow, StatLens } from "../Section-1-master-table/MasterTable";
 import InsightsContent from "./PlayerInsightsContent";
 
 /* -------------------------------------------------------------------------- */

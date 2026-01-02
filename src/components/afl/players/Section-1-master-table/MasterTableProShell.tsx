@@ -1,6 +1,6 @@
 import React from "react";
 import SectionDividerGlow from "@/components/ui/SectionDividerGlow";
-import FilterBarPro from "./FilterBarPro";
+import FilterBarPro from "../Section-7-filtration/FilterBarPro";
 
 interface FilterValues {
   team: string;

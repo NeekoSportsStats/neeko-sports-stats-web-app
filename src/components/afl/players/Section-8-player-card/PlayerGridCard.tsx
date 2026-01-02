@@ -1,7 +1,7 @@
 import React from "react";
-import { Player } from "./useAFLMockData";
-import TrendSparklineMini from "./TrendSparklineMini";
-import MiniTrendChips from "./MiniTrendChips";
+import { Player } from "../data/useAFLMockData";
+import TrendSparklineMini from "../Section-3-stability-analysis/TrendSparklineMini";
+import MiniTrendChips from "../Section-4-trend-insights/MiniTrendChips";
 
 interface Props {
   player: Player;

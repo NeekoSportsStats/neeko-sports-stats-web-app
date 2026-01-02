@@ -1,14 +1,14 @@
 import React from "react";
-import { ROUND_LABELS } from "./MasterTable";
-import type { PlayerRow, StatLens } from "./MasterTable";
+import { ROUND_LABELS } from "../Section-1-master-table/MasterTable";
+import type { PlayerRow, StatLens } from "../Section-1-master-table/MasterTable";
 
 import {
   computeSummary,
   computeHitRates,
   getRoundsForLens,
-} from "./playerInsightsUtils";
+} from "../data/playerInsightsUtils";
 
-import { STAT_CONFIG } from "./playerStatConfig";
+import { STAT_CONFIG } from "../data/playerStatConfig";
 
 /**
  * Full insights content for players — MOBILE SAFE / NO SPARKLINE

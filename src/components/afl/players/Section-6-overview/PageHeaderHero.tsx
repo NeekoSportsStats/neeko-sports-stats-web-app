@@ -1,5 +1,5 @@
 import React from "react";
-import PlayerNewsTicker from "./PlayerNewsTicker";
+import PlayerNewsTicker from "../Section-2-player-insights/PlayerNewsTicker";
 
 interface Props {
   selectedStat: string;

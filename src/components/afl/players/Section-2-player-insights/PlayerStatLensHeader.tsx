@@ -1,5 +1,5 @@
 import React from "react";
-import TrendSparklineMini from "./TrendSparklineMini";
+import TrendSparklineMini from "../Section-3-stability-analysis/TrendSparklineMini";
 
 interface Props {
   value: string;

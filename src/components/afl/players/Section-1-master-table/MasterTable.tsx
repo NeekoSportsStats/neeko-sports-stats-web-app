@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/lib/auth";
-import PlayerInsightsOverlay from "./PlayerInsightsOverlay";
+import PlayerInsightsOverlay from "../Section-2-player-insights/PlayerInsightsOverlay";
 import MasterTableDesktop from "./MasterTableDesktop";
 import MasterTableMobile from "./MasterTableMobile";
 

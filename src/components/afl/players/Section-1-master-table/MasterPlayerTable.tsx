@@ -6,9 +6,9 @@ import {
   average,
   stdDev,
   stabilityMeta,
-} from "./useAFLMockData";
-import TrendSparklineMini from "./TrendSparklineMini";
-import FormArrowBadge from "./FormArrowBadge";
+} from "../data/useAFLMockData";
+import TrendSparklineMini from "../Section-3-stability-analysis/TrendSparklineMini";
+import FormArrowBadge from "../Section-3-stability-analysis/FormArrowBadge";
 
 const FREE_ROWS = 25;
 
