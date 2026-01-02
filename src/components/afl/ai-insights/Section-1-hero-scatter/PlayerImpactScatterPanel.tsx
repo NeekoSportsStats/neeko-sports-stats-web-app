@@ -6,15 +6,12 @@ import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 import PlayerTrendModal from "./PlayerTrendModal";
 
 /* -------------------------------------------------------------------------------------------------
-  STEP 2 (LOCKED) + STEP 3 Modal Hookup
+  STEP 2 — Head-to-Head Emphasis (Inline-first)
 -------------------------------------------------------------------------------------------------- */
 
 type LensKey = "fantasy" | "disposals" | "goals";
 type TeamFilter = "both" | "home" | "away";
 
-/**
- * Canonical shape for PlayerTrendModal
- */
 type PlayerPoint = {
   id: string;
   name: string;
@@ -34,7 +31,7 @@ const y = (v: number) => PAD + (1 - v / 100) * (H - PAD * 2);
 export default function PlayerImpactScatterPanel(props: {
   match?: FixtureMatch;
   mode: PremiumMode;
-  initialLens?: LensKey; // 👈 controlled from parent
+  initialLens?: LensKey;
 }) {
   const { match, mode, initialLens } = props;
   const locked = mode !== "premium";
@@ -45,19 +42,17 @@ export default function PlayerImpactScatterPanel(props: {
   const [lens, setLens] = useState<LensKey>(initialLens ?? "fantasy");
   const [teamFilter, setTeamFilter] = useState<TeamFilter>("both");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [openModal, setOpenModal] = useState(false);
 
-  // 🔑 STEP 1: sync when parent stat changes
+  /* ---------------- STEP 1 SYNC ---------------- */
   useEffect(() => {
     if (initialLens && initialLens !== lens) {
       setLens(initialLens);
-      setSelectedId(null); // reset selection on lens change
+      setSelectedId(null);
     }
   }, [initialLens]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Modal state
-  const [openModal, setOpenModal] = useState(false);
-
-  /* ---------------- MOCK (LOCKED, DETERMINISTIC) ---------------- */
+  /* ---------------- MOCK DATA ---------------- */
 
   const players = useMemo<PlayerPoint[]>(() => {
     const base = [
@@ -88,23 +83,22 @@ export default function PlayerImpactScatterPanel(props: {
     });
   }, [home, away, lens]);
 
-  const visible = useMemo(() => {
-    return players.filter(
-      (p) => teamFilter === "both" || p.teamSide === teamFilter
-    );
-  }, [players, teamFilter]);
+  const visible = useMemo(
+    () => players.filter(p => teamFilter === "both" || p.teamSide === teamFilter),
+    [players, teamFilter]
+  );
 
-  const selected = useMemo(() => {
-    return visible.find((p) => p.id === selectedId) ?? null;
-  }, [visible, selectedId]);
-
-  const xMid = x(50);
-  const yMid = y(50);
+  const selected = useMemo(
+    () => visible.find(p => p.id === selectedId) ?? null,
+    [visible, selectedId]
+  );
 
   const onPick = (id: string) => {
     setSelectedId(id);
     setOpenModal(true);
   };
+
+  /* ---------------- RENDER ---------------- */
 
   return (
     <section className="rounded-3xl border border-amber-400/20 bg-gradient-to-b from-[#0c0c0c] to-black p-5">
@@ -116,7 +110,7 @@ export default function PlayerImpactScatterPanel(props: {
         </div>
         <h2 className="mt-1 text-xl font-semibold">Momentum vs Ceiling</h2>
         <p className="mt-1 text-sm text-white/60">
-          Synced to global stat lens · Click any player
+          Head-to-head matchup · {home} vs {away}
         </p>
         {locked && (
           <p className="mt-1 text-xs text-white/45">
@@ -125,9 +119,9 @@ export default function PlayerImpactScatterPanel(props: {
         )}
       </div>
 
-      {/* CONTROLS (still usable locally) */}
+      {/* CONTROLS */}
       <div className="mb-3 flex flex-wrap gap-2 text-xs">
-        {(["fantasy", "disposals", "goals"] as LensKey[]).map((l) => (
+        {(["fantasy", "disposals", "goals"] as LensKey[]).map(l => (
           <button
             key={l}
             onClick={() => setLens(l)}
@@ -141,7 +135,7 @@ export default function PlayerImpactScatterPanel(props: {
           </button>
         ))}
         <span className="mx-2 opacity-30">|</span>
-        {(["both", "home", "away"] as TeamFilter[]).map((t) => (
+        {(["both", "home", "away"] as TeamFilter[]).map(t => (
           <button
             key={t}
             onClick={() => setTeamFilter(t)}
@@ -156,23 +150,28 @@ export default function PlayerImpactScatterPanel(props: {
         ))}
       </div>
 
-      {/* SCATTER (unchanged SVG) */}
+      {/* SCATTER */}
       <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/40">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
-          {[25, 50, 75].map((v) => (
+          {[25, 50, 75].map(v => (
             <g key={v}>
               <line x1={x(v)} y1={PAD} x2={x(v)} y2={H - PAD} stroke="white" opacity={0.15} />
               <line x1={PAD} y1={y(v)} x2={W - PAD} y2={y(v)} stroke="white" opacity={0.15} />
             </g>
           ))}
 
-          <line x1={xMid} y1={PAD} x2={xMid} y2={H - PAD} stroke="white" opacity={0.25} />
-          <line x1={PAD} y1={yMid} x2={W - PAD} y2={yMid} stroke="white" opacity={0.25} />
-
-          {visible.map((p) => {
+          {visible.map(p => {
             const cx = x(p.momentum);
             const cy = y(p.ceiling);
             const isSelected = p.id === selectedId;
+
+            // 🔑 STEP 2: head-to-head emphasis
+            const baseOpacity =
+              teamFilter === "both"
+                ? 1
+                : p.teamSide === teamFilter
+                ? 1
+                : 0.25;
 
             return (
               <g key={p.id}>
@@ -181,18 +180,20 @@ export default function PlayerImpactScatterPanel(props: {
                   cy={cy}
                   r={isSelected ? 7 : 5}
                   fill={
-                    isSelected
-                      ? "#fbbf24"
-                      : p.teamSide === "home"
-                      ? "#60a5fa"
-                      : "#34d399"
+                    p.teamSide === "home" ? "#60a5fa" : "#34d399"
                   }
-                  opacity={isSelected ? 1 : selected ? 0.35 : 1}
+                  opacity={isSelected ? 1 : baseOpacity}
                   style={{ cursor: "pointer" }}
                   onClick={() => onPick(p.id)}
                 />
                 {(isSelected || (p.momentum >= 70 && p.ceiling >= 70)) && (
-                  <text x={cx} y={cy + 16} textAnchor="middle" fontSize={11} fill="white">
+                  <text
+                    x={cx}
+                    y={cy + 16}
+                    textAnchor="middle"
+                    fontSize={11}
+                    fill="white"
+                  >
                     {p.name}
                   </text>
                 )}
@@ -206,7 +207,7 @@ export default function PlayerImpactScatterPanel(props: {
       <PlayerTrendModal
         open={openModal}
         onClose={() => setOpenModal(false)}
-        player={players.find((p) => p.id === selectedId) ?? null}
+        player={players.find(p => p.id === selectedId) ?? null}
         allPlayers={players}
         lens={lens}
         locked={locked}
