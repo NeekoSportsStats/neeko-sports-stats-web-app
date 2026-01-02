@@ -149,7 +149,6 @@ export default function PlayerTrendModal(props: {
             <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
               <div className="relative">
                 <svg viewBox={`0 0 ${CH_W} ${CH_H}`} className="h-[320px] w-full">
-                  {/* compare (dotted) */}
                   {compare && (
                     <path
                       d={comparePath}
@@ -160,10 +159,8 @@ export default function PlayerTrendModal(props: {
                     />
                   )}
 
-                  {/* main line */}
                   <path d={mainPath} fill="none" stroke="#facc15" strokeWidth={4} />
 
-                  {/* projection band (premium only) */}
                   {!locked && (
                     <>
                       <rect
@@ -183,7 +180,6 @@ export default function PlayerTrendModal(props: {
                   )}
                 </svg>
 
-                {/* locked overlay */}
                 {locked && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/50 px-4 py-2 text-sm text-white/70">

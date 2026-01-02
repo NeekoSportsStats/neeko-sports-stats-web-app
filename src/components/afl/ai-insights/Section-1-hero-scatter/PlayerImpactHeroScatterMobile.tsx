@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Info, Lock, Sparkles } from "lucide-react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
@@ -21,6 +21,33 @@ function dotFill(side: "home" | "away") {
   return side === "home" ? "#60a5fa" : "#34d399";
 }
 
+function useDismissOnOutsideClick(open: boolean, onDismiss: () => void) {
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const onDown = (e: PointerEvent) => {
+      const el = ref.current;
+      if (!el) return;
+      if (e.target instanceof Node && !el.contains(e.target)) onDismiss();
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onDismiss();
+    };
+
+    window.addEventListener("pointerdown", onDown, { capture: true });
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDown, { capture: true } as any);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, onDismiss]);
+
+  return ref;
+}
+
 export default function PlayerImpactHeroScatterMobile(props: {
   match?: FixtureMatch;
   mode: PremiumMode;
@@ -34,6 +61,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
+  const whyRef = useDismissOnOutsideClick(whyOpen, () => setWhyOpen(false));
 
   const handleDotClick = (id: string) => {
     if (openId !== id) {
@@ -98,13 +126,14 @@ export default function PlayerImpactHeroScatterMobile(props: {
                 ? "rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs text-amber-200"
                 : "rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/65"
             }
+            aria-label={`Set metric ${k}`}
           >
             {k === "fantasy" ? "Fantasy" : k === "disposals" ? "Disposals" : "Goals"}
           </button>
         ))}
       </div>
 
-      {/* Lean meter (tight) */}
+      {/* Lean meter */}
       <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3">
         <div className="flex items-center justify-between text-xs text-white/70">
           <span>{homeTeam}</span>
@@ -129,10 +158,12 @@ export default function PlayerImpactHeroScatterMobile(props: {
             {lean.diff.toFixed(1)} · Volatility {volatility.label}
           </span>
 
-          <div className="relative">
+          <div className="relative" ref={whyRef}>
             <button
               onClick={() => setWhyOpen((v) => !v)}
               className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-xs text-white/70"
+              aria-expanded={whyOpen}
+              aria-label="Explain why this matchup leans"
             >
               <Info className="h-3.5 w-3.5" />
               Why?
@@ -154,7 +185,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
 
       {/* Plot */}
       <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
-        <svg viewBox={`0 0 ${W} ${H}`} className="h-[320px] w-full">
+        <svg viewBox={`0 0 ${W} ${H}`} className="h-[308px] w-full">
           {Array.from({ length: 5 }).map((_, i) => {
             const gx = PAD + ((W - PAD * 2) / 4) * i;
             const gy = PAD + ((H - PAD * 2) / 4) * i;
@@ -192,7 +223,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
         </svg>
       </div>
 
-      {/* Selected (tight) */}
+      {/* Selected */}
       {selected && (
         <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3">
           <div className="flex items-center justify-between gap-3">
@@ -206,6 +237,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
             <button
               onClick={() => setModalOpen(true)}
               className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-white/75"
+              aria-label="Open trend modal"
             >
               Trend
             </button>
@@ -213,7 +245,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
         </div>
       )}
 
-      {/* Top targets (stacked) */}
+      {/* Top targets */}
       <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-4">
         <div className="text-sm font-semibold text-white">Top targets</div>
         <div className="mt-0.5 text-xs text-white/50">Best combined momentum + ceiling</div>
@@ -223,6 +255,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
               key={p.id}
               onClick={() => handleRowClick(p.id)}
               className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left"
+              aria-label={`Select ${p.name}`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div>
