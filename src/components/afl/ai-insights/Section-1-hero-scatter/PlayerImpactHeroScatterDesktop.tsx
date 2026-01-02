@@ -18,6 +18,19 @@ type Props = {
   initialLens?: LensKey;
 };
 
+function lensLabel(lens: LensKey) {
+  switch (lens) {
+    case "fantasy":
+      return "Fantasy points";
+    case "disposals":
+      return "Disposals";
+    case "goals":
+      return "Goals";
+    default:
+      return lens;
+  }
+}
+
 export default function PlayerImpactHeroScatterDesktop({
   match,
   mode,
@@ -30,7 +43,6 @@ export default function PlayerImpactHeroScatterDesktop({
     homeTeam,
     awayTeam,
     lens,
-    setLens,
     teamFilter,
     setTeamFilter,
     playersVisible,
@@ -60,39 +72,33 @@ export default function PlayerImpactHeroScatterDesktop({
         <h3 className="text-xl font-semibold text-white">
           Momentum vs Ceiling
         </h3>
+
         <p className="mt-1 text-sm text-white/60">
           {homeTeam} vs {awayTeam} · Analyst view
         </p>
-        <p className="mt-1 text-sm text-white/80">
-          {lean.direction} lean ({lean.diff > 0 ? "+" : ""}
-          {lean.diff.toFixed(1)}) · {lean.strength}
-        </p>
+
+        <div className="mt-1 flex items-center gap-3 text-sm text-white/70">
+          <span>
+            {lean.direction} lean ({lean.diff > 0 ? "+" : ""}
+            {lean.diff.toFixed(1)}) · {lean.strength}
+          </span>
+
+          {/* Lens indicator (read-only) */}
+          <span className="rounded-full border border-white/10 bg-black/30 px-2.5 py-0.5 text-xs text-white/55">
+            Lens: {lensLabel(lens)}
+          </span>
+        </div>
       </div>
 
-      {/* CONTROLS (visually demoted) */}
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-        {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
-          <button
-            key={k}
-            onClick={() => setLens(k)}
-            className={
-              "rounded-full border px-2.5 py-1 transition-colors " +
-              (lens === k
-                ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
-                : "border-white/10 bg-black/20 text-white/60")
-            }
-          >
-            {k}
-          </button>
-        ))}
-
+      {/* TEAM FILTER ONLY */}
+      <div className="mt-4 flex items-center">
         <div className="ml-auto flex gap-1.5">
           {(["both", "home", "away"] as const).map((k) => (
             <button
               key={k}
               onClick={() => setTeamFilter(k)}
               className={
-                "rounded-full border px-2.5 py-1 transition-colors " +
+                "rounded-full border px-2.5 py-1 text-xs transition-colors " +
                 (teamFilter === k
                   ? "border-white/25 bg-white/10 text-white"
                   : "border-white/10 bg-black/20 text-white/50")
@@ -119,15 +125,39 @@ export default function PlayerImpactHeroScatterDesktop({
                 const gy = PAD + ((H - PAD * 2) / 4) * i;
                 return (
                   <g key={i}>
-                    <line x1={gx} y1={PAD} x2={gx} y2={H - PAD} stroke="rgba(255,255,255,0.08)" />
-                    <line x1={PAD} y1={gy} x2={W - PAD} y2={gy} stroke="rgba(255,255,255,0.08)" />
+                    <line
+                      x1={gx}
+                      y1={PAD}
+                      x2={gx}
+                      y2={H - PAD}
+                      stroke="rgba(255,255,255,0.08)"
+                    />
+                    <line
+                      x1={PAD}
+                      y1={gy}
+                      x2={W - PAD}
+                      y2={gy}
+                      stroke="rgba(255,255,255,0.08)"
+                    />
                   </g>
                 );
               })}
 
               {/* AXES */}
-              <line x1={x(50)} y1={PAD} x2={x(50)} y2={H - PAD} stroke="rgba(255,255,255,0.18)" />
-              <line x1={PAD} y1={y(50)} x2={W - PAD} y2={y(50)} stroke="rgba(255,255,255,0.18)" />
+              <line
+                x1={x(50)}
+                y1={PAD}
+                x2={x(50)}
+                y2={H - PAD}
+                stroke="rgba(255,255,255,0.18)"
+              />
+              <line
+                x1={PAD}
+                y1={y(50)}
+                x2={W - PAD}
+                y2={y(50)}
+                stroke="rgba(255,255,255,0.18)"
+              />
 
               {/* POINTS */}
               {playersVisible.map((p) => {
@@ -179,6 +209,22 @@ export default function PlayerImpactHeroScatterDesktop({
                 );
               })}
             </svg>
+
+            {/* QUADRANT SUMMARY */}
+            <div className="pointer-events-none absolute inset-0 text-[11px] text-white/45">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                Finale · {quadrantCounts.finale}
+              </div>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-right">
+                Safe · {quadrantCounts.safe}
+              </div>
+              <div className="absolute left-3 bottom-3">
+                Volatile · {quadrantCounts.volatile}
+              </div>
+              <div className="absolute right-3 bottom-3 text-right">
+                Low · {quadrantCounts.avoid}
+              </div>
+            </div>
           </div>
         </div>
 
