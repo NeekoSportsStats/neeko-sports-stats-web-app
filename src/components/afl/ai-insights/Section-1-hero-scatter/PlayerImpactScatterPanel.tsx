@@ -6,7 +6,7 @@ import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 import PlayerTrendModal from "./PlayerTrendModal";
 
 /* -------------------------------------------------------------------------------------------------
-  STEP 5 — Mobile-specific layout (inline-first, stable)
+  Insight Density Pass — Desktop Narrative + Lean + Top Targets (no refactor)
 -------------------------------------------------------------------------------------------------- */
 
 type LensKey = "fantasy" | "disposals" | "goals";
@@ -37,6 +37,18 @@ function quadrantOf(p: PlayerPoint): Quadrant {
   return "low";
 }
 
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
+}
+
+function stdev(vals: number[]) {
+  if (!vals.length) return 0;
+  const m = vals.reduce((s, v) => s + v, 0) / vals.length;
+  const v =
+    vals.reduce((s, x) => s + (x - m) * (x - m), 0) / Math.max(1, vals.length - 1);
+  return Math.sqrt(v);
+}
+
 export default function PlayerImpactScatterPanel(props: {
   match?: FixtureMatch;
   mode: PremiumMode;
@@ -62,7 +74,6 @@ export default function PlayerImpactScatterPanel(props: {
   }, [initialLens]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---------------- MOCK DATA ---------------- */
-
   const players = useMemo<PlayerPoint[]>(() => {
     const base = [
       "Patrick Cripps",
@@ -93,14 +104,20 @@ export default function PlayerImpactScatterPanel(props: {
   }, [home, away, lens]);
 
   const visible = useMemo(
-    () => players.filter(p => teamFilter === "both" || p.teamSide === teamFilter),
+    () => players.filter((p) => teamFilter === "both" || p.teamSide === teamFilter),
     [players, teamFilter]
   );
 
   const selected = useMemo(
-    () => visible.find(p => p.id === selectedId) ?? null,
+    () => visible.find((p) => p.id === selectedId) ?? null,
     [visible, selectedId]
   );
+
+  const ranked = useMemo(() => {
+    return [...visible].sort((a, b) => b.momentum + b.ceiling - (a.momentum + a.ceiling));
+  }, [visible]);
+
+  /* ---------------- Insight Metrics ---------------- */
 
   const dominantQuadrant = useMemo<Quadrant>(() => {
     if (selected) return quadrantOf(selected);
@@ -111,17 +128,61 @@ export default function PlayerImpactScatterPanel(props: {
       low: 0,
       safe: 0,
     };
-
-    visible.forEach(p => counts[quadrantOf(p)]++);
-    return (Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ??
-      "finale") as Quadrant;
+    visible.forEach((p) => counts[quadrantOf(p)]++);
+    return (Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "finale") as Quadrant;
   }, [visible, selected]);
 
-  const rankedMobile = useMemo(() => {
-    return [...visible].sort(
-      (a, b) => b.momentum + b.ceiling - (a.momentum + a.ceiling)
-    );
+  const lean = useMemo(() => {
+    const homePts = visible.filter((p) => p.teamSide === "home");
+    const awayPts = visible.filter((p) => p.teamSide === "away");
+
+    const score = (arr: PlayerPoint[]) =>
+      arr.length ? arr.reduce((s, p) => s + (p.momentum + p.ceiling), 0) / arr.length : 0;
+
+    const homeScore = score(homePts);
+    const awayScore = score(awayPts);
+
+    const diff = awayScore - homeScore; // + = away lean
+    const abs = Math.abs(diff);
+
+    const direction = abs < 3 ? "even" : diff > 0 ? "away" : "home";
+    const strength = abs < 3 ? "Neutral" : abs < 8 ? "Slight" : abs < 14 ? "Lean" : "Strong";
+
+    return { homeScore, awayScore, diff, direction, strength };
   }, [visible]);
+
+  const volatility = useMemo(() => {
+    // combine spread of momentum+ceiling; tuned to feel like a “matchup volatility” badge
+    const totals = visible.map((p) => p.momentum + p.ceiling);
+    const s = stdev(totals);
+
+    // map to 0..1 and label
+    const v01 = clamp((s - 6) / 12, 0, 1);
+    const label = v01 < 0.33 ? "Stable" : v01 < 0.66 ? "Swingy" : "Volatile";
+    return { s, v01, label };
+  }, [visible]);
+
+  const aiRead = useMemo(() => {
+    const q =
+      dominantQuadrant === "finale"
+        ? "finale targets (high momentum + high ceiling)"
+        : dominantQuadrant === "volatile"
+        ? "volatile upside (low momentum + high ceiling)"
+        : dominantQuadrant === "safe"
+        ? "safe but capped profiles (high momentum + lower ceiling)"
+        : "low impact profiles (low momentum + low ceiling)";
+
+    const leanText =
+      lean.direction === "even"
+        ? "No clear side advantage."
+        : lean.direction === "home"
+        ? `${home} lean (${lean.strength}).`
+        : `${away} lean (${lean.strength}).`;
+
+    return `AI read: This matchup clusters around ${q}. ${leanText}`;
+  }, [dominantQuadrant, lean.direction, lean.strength, home, away]);
+
+  const topTargets = useMemo(() => ranked.slice(0, 3), [ranked]);
 
   const onPick = (id: string) => {
     setSelectedId(id);
@@ -144,9 +205,60 @@ export default function PlayerImpactScatterPanel(props: {
         </p>
       </div>
 
+      {/* INSIGHT STRIP (Desktop) */}
+      <div className="hidden md:block mb-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-white/70">{aiRead}</span>
+
+          <span className="mx-1 opacity-30">•</span>
+
+          <span
+            className={`text-xs rounded-full border px-2 py-0.5 ${
+              volatility.label === "Stable"
+                ? "border-white/10 text-white/70"
+                : volatility.label === "Swingy"
+                ? "border-white/20 text-white"
+                : "border-amber-400/30 text-amber-200"
+            }`}
+          >
+            Matchup volatility: {volatility.label}
+          </span>
+
+          <span className="mx-1 opacity-30">•</span>
+
+          <span className="text-xs text-white/70">
+            Lean:{" "}
+            {lean.direction === "even"
+              ? "Even"
+              : lean.direction === "home"
+              ? `${home} (${lean.strength})`
+              : `${away} (${lean.strength})`}
+          </span>
+        </div>
+
+        {/* Top targets */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {topTargets.map((p, i) => (
+            <button
+              key={p.id}
+              onClick={() => onPick(p.id)}
+              className={`rounded-full border px-3 py-1 text-xs ${
+                isPremium && i === 0
+                  ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+                  : "border-white/10 bg-black/20 text-white/80 hover:bg-white/5"
+              }`}
+              title="Open trend + projection"
+            >
+              #{i + 1} {p.name}{" "}
+              <span className="opacity-60">({p.teamName})</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* CONTROLS */}
       <div className="mb-3 flex flex-wrap gap-2 text-xs">
-        {(["fantasy", "disposals", "goals"] as LensKey[]).map(l => (
+        {(["fantasy", "disposals", "goals"] as LensKey[]).map((l) => (
           <button
             key={l}
             onClick={() => setLens(l)}
@@ -160,14 +272,12 @@ export default function PlayerImpactScatterPanel(props: {
           </button>
         ))}
         <span className="mx-2 opacity-30">|</span>
-        {(["both", "home", "away"] as TeamFilter[]).map(t => (
+        {(["both", "home", "away"] as TeamFilter[]).map((t) => (
           <button
             key={t}
             onClick={() => setTeamFilter(t)}
             className={`rounded-full px-3 py-1 border ${
-              teamFilter === t
-                ? "border-white/40 text-white"
-                : "border-white/10 text-white/60"
+              teamFilter === t ? "border-white/40 text-white" : "border-white/10 text-white/60"
             }`}
           >
             {t}
@@ -179,14 +289,64 @@ export default function PlayerImpactScatterPanel(props: {
       <div className="hidden md:block">
         <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/40">
           <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
-            {[25, 50, 75].map(v => (
+            {/* GRID */}
+            {[25, 50, 75].map((v) => (
               <g key={v}>
-                <line x1={x(v)} y1={PAD} x2={x(v)} y2={H - PAD} stroke="white" opacity={0.15} />
-                <line x1={PAD} y1={y(v)} x2={W - PAD} y2={y(v)} stroke="white" opacity={0.15} />
+                <line
+                  x1={x(v)}
+                  y1={PAD}
+                  x2={x(v)}
+                  y2={H - PAD}
+                  stroke="white"
+                  opacity={0.15}
+                />
+                <line
+                  x1={PAD}
+                  y1={y(v)}
+                  x2={W - PAD}
+                  y2={y(v)}
+                  stroke="white"
+                  opacity={0.15}
+                />
               </g>
             ))}
 
-            {visible.map(p => {
+            {/* QUADRANT LABELS */}
+            <text
+              x={PAD + 6}
+              y={PAD + 16}
+              fontSize={12}
+              fill={dominantQuadrant === "volatile" ? "#fbbf24" : "rgba(255,255,255,0.35)"}
+            >
+              Volatile upside
+            </text>
+            <text
+              x={W - PAD - 110}
+              y={PAD + 16}
+              fontSize={12}
+              fill={dominantQuadrant === "finale" ? "#fbbf24" : "rgba(255,255,255,0.35)"}
+            >
+              Finale targets
+            </text>
+            <text
+              x={PAD + 6}
+              y={H - PAD - 6}
+              fontSize={12}
+              fill={dominantQuadrant === "low" ? "#fbbf24" : "rgba(255,255,255,0.35)"}
+            >
+              Low impact
+            </text>
+            <text
+              x={W - PAD - 100}
+              y={H - PAD - 6}
+              fontSize={12}
+              fill={dominantQuadrant === "safe" ? "#fbbf24" : "rgba(255,255,255,0.35)"}
+            >
+              Safe, capped
+            </text>
+
+            {/* POINTS */}
+            {visible.map((p) => {
               const cx = x(p.momentum);
               const cy = y(p.ceiling);
               const isSelected = p.id === selectedId;
@@ -204,6 +364,7 @@ export default function PlayerImpactScatterPanel(props: {
                       opacity={0.6}
                     />
                   )}
+
                   <circle
                     cx={cx}
                     cy={cy}
@@ -213,6 +374,18 @@ export default function PlayerImpactScatterPanel(props: {
                     onClick={() => onPick(p.id)}
                     style={{ cursor: "pointer" }}
                   />
+
+                  {(isSelected || (p.momentum >= 70 && p.ceiling >= 70)) && (
+                    <text
+                      x={cx}
+                      y={cy + 16}
+                      textAnchor="middle"
+                      fontSize={11}
+                      fill="white"
+                    >
+                      {p.name}
+                    </text>
+                  )}
                 </g>
               );
             })}
@@ -222,7 +395,7 @@ export default function PlayerImpactScatterPanel(props: {
 
       {/* ---------------- MOBILE LIST ---------------- */}
       <div className="md:hidden space-y-2">
-        {rankedMobile.map((p, i) => (
+        {ranked.map((p, i) => (
           <button
             key={p.id}
             onClick={() => onPick(p.id)}
@@ -233,10 +406,10 @@ export default function PlayerImpactScatterPanel(props: {
             }`}
           >
             <div className="flex items-center justify-between">
-              <div className="font-medium text-white">{p.name}</div>
-              <div className="text-xs text-white/50">
-                {p.teamName}
+              <div className="font-medium text-white">
+                {i < 3 ? `#${i + 1} ` : ""}{p.name}
               </div>
+              <div className="text-xs text-white/50">{p.teamName}</div>
             </div>
             <div className="mt-1 text-xs text-white/60">
               Momentum {p.momentum} · Ceiling {p.ceiling}
@@ -249,7 +422,7 @@ export default function PlayerImpactScatterPanel(props: {
       <PlayerTrendModal
         open={openModal}
         onClose={() => setOpenModal(false)}
-        player={players.find(p => p.id === selectedId) ?? null}
+        player={players.find((p) => p.id === selectedId) ?? null}
         allPlayers={players}
         lens={lens}
         locked={!isPremium}
