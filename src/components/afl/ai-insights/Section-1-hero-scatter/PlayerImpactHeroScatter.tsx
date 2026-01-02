@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 
@@ -6,34 +6,19 @@ import PlayerImpactHeroScatterDesktop from "./PlayerImpactHeroScatterDesktop";
 import PlayerImpactHeroScatterMobile from "./PlayerImpactHeroScatterMobile";
 import type { LensKey } from "./usePlayerScatterData";
 
-function useIsMobile(breakpointPx = 860) {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${breakpointPx}px)`);
-    const onChange = () => setIsMobile(mq.matches);
-    onChange();
-    mq.addEventListener?.("change", onChange);
-    return () => mq.removeEventListener?.("change", onChange);
-  }, [breakpointPx]);
-
-  return isMobile;
-}
-
 export default function PlayerImpactHeroScatter(props: {
   match?: FixtureMatch;
   mode: PremiumMode;
   initialLens?: LensKey;
 }) {
-  const isMobile = useIsMobile();
-  const Component = useMemo(
-    () => (isMobile ? PlayerImpactHeroScatterMobile : PlayerImpactHeroScatterDesktop),
-    [isMobile]
-  );
-
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-      <Component {...props} />
-    </div>
+    <>
+      <div className="hidden lg:block">
+        <PlayerImpactHeroScatterDesktop {...props} />
+      </div>
+      <div className="lg:hidden">
+        <PlayerImpactHeroScatterMobile {...props} />
+      </div>
+    </>
   );
 }

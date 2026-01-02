@@ -13,9 +13,8 @@ export default function PlayerImpactScatterPanel(props: {
   const { match, mode, initialLens } = props;
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-4 md:p-6">
-      {/* Title / intro */}
-      <div className="mb-3 md:mb-4">
+    <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 md:p-6">
+      <div className="mb-4">
         <h2 className="text-lg font-semibold text-white">Player Impact Map</h2>
         <p className="mt-1 text-sm text-white/60">
           Momentum vs ceiling · Click a player to select, click again to open
@@ -23,7 +22,6 @@ export default function PlayerImpactScatterPanel(props: {
         </p>
       </div>
 
-      {/* Hero owns ALL state (selection, modal, buckets, etc.) */}
       <PlayerImpactHeroScatter
         match={match}
         mode={mode}
