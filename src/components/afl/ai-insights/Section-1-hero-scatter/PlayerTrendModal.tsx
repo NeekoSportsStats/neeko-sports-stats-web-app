@@ -1,222 +1,166 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Lock, X } from "lucide-react";
-import type { LensKey, PlayerPoint, PlayerTrendPoint } from "./usePlayerScatterData";
+import type { LensKey } from "@/components/afl/ai-insights/types";
+import type { PlayerPoint } from "./usePlayerScatterData";
 
-function clamp(n: number, a: number, b: number) {
-  return Math.max(a, Math.min(b, n));
+function cn(...xs: Array<string | false | null | undefined>) {
+  return xs.filter(Boolean).join(" ");
 }
 
-function mean(vals: number[]) {
-  if (!vals.length) return 0;
-  return vals.reduce((s, v) => s + v, 0) / vals.length;
-}
+function Sparkline({ values }: { values: number[] }) {
+  const w = 240;
+  const h = 80;
+  const pad = 6;
 
-function stdev(vals: number[]) {
-  if (!vals.length) return 0;
-  const m = mean(vals);
-  const v = vals.reduce((s, x) => s + (x - m) * (x - m), 0) / Math.max(1, vals.length - 1);
-  return Math.sqrt(v);
-}
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const scaleX = (i: number) => pad + (i / Math.max(1, values.length - 1)) * (w - pad * 2);
+  const scaleY = (v: number) => pad + (1 - (v - min) / Math.max(1e-6, max - min)) * (h - pad * 2);
 
-function asSeries(trend?: PlayerTrendPoint[]) {
-  const t = trend?.length ? trend : [];
-  const xs = t.map((_, i) => i);
-  const ys = t.map((p) => p.value);
-  return { xs, ys, t };
-}
-
-function pathFrom(ys: number[], w: number, h: number, pad: number) {
-  if (!ys.length) return "";
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const scaleX = (i: number) => pad + (i / Math.max(1, ys.length - 1)) * (w - pad * 2);
-  const scaleY = (v: number) => pad + (1 - (v - minY) / Math.max(1, maxY - minY)) * (h - pad * 2);
-
-  return ys
-    .map((v, i) => `${i === 0 ? "M" : "L"} ${scaleX(i).toFixed(2)} ${scaleY(v).toFixed(2)}`)
+  const d = values
+    .map((v, i) => `${i === 0 ? "M" : "L"} ${scaleX(i).toFixed(1)} ${scaleY(v).toFixed(1)}`)
     .join(" ");
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="h-auto w-full">
+      <path d={d} fill="none" stroke="rgba(245,158,11,0.9)" strokeWidth={2.5} />
+      <path d={d} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={6} />
+    </svg>
+  );
+}
+
+function lensShort(lens: LensKey) {
+  switch (lens) {
+    case "fantasy":
+      return "Fantasy";
+    case "disposals":
+      return "Disposals";
+    case "goals":
+      return "Goals";
+    default:
+      return String(lens);
+  }
 }
 
 export default function PlayerTrendModal(props: {
   open: boolean;
   onClose: () => void;
-  player: PlayerPoint | null;
+  player?: PlayerPoint;
   allPlayers: PlayerPoint[];
   lens: LensKey;
   locked: boolean;
 }) {
-  const { open, onClose, player, allPlayers, locked } = props;
-
+  const { open, onClose, player, allPlayers, lens, locked } = props;
   const [compareId, setCompareId] = useState<string>("");
 
-  useEffect(() => {
-    if (!open) setCompareId("");
-  }, [open]);
+  const compare = useMemo(() => allPlayers.find((p) => p.id === compareId) ?? undefined, [allPlayers, compareId]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    if (open) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  const trendValues = useMemo(() => {
+    // deterministic pseudo trend based on player id + lens
+    const base = player ? (player.momentum + player.ceiling) / 2 : 55;
+    const out: number[] = [];
+    for (let i = 0; i < 10; i++) {
+      const wobble = Math.sin(i * 0.9) * 6 + Math.cos(i * 0.45) * 3;
+      out.push(Math.round(base + wobble));
+    }
+    return out;
+  }, [player, lens]);
 
-  const compare = useMemo(
-    () => allPlayers.find((p) => p.id === compareId) ?? null,
-    [allPlayers, compareId]
-  );
+  const compareValues = useMemo(() => {
+    if (!compare) return null;
+    const base = (compare.momentum + compare.ceiling) / 2;
+    const out: number[] = [];
+    for (let i = 0; i < 10; i++) {
+      const wobble = Math.sin(i * 0.8) * 5 + Math.cos(i * 0.38) * 2.5;
+      out.push(Math.round(base + wobble));
+    }
+    return out;
+  }, [compare]);
 
-  const series = useMemo(() => asSeries(player?.trend), [player]);
-  const series2 = useMemo(() => asSeries(compare?.trend), [compare]);
-
-  const projection = useMemo(() => {
-    const ys = series.ys;
-    if (!ys.length) return { low: 0, mid: 0, high: 0 };
-    const tail = ys.slice(-5);
-    const m = mean(tail);
-    const s = stdev(tail);
-    const low = Math.round(clamp(m - 0.9 * s, 20, 140));
-    const mid = Math.round(clamp(m, 20, 140));
-    const high = Math.round(clamp(m + 0.9 * s, 20, 140));
-    return { low, mid, high };
-  }, [series.ys]);
-
-  const aiLine = useMemo(() => {
-    if (!player) return "";
-    if (player.ceiling >= 85) return "Upside is strong, but week-to-week range is wide.";
-    if (player.momentum >= 75) return "Role and output remain stable week-to-week.";
-    return "Monitor role signals — current profile is sensitive to matchup conditions.";
-  }, [player]);
-
-  if (!open || !player) return null;
-
-  const CH_W = 760;
-  const CH_H = 340;
-  const PAD = 28;
-
-  const mainPath = pathFrom(series.ys, CH_W, CH_H, PAD);
-  const comparePath = compare ? pathFrom(series2.ys, CH_W, CH_H, PAD) : "";
+  if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80]">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-3xl -translate-x-1/2 -translate-y-1/2">
-        <div className="rounded-3xl border border-white/10 bg-[#0b0b0b] shadow-2xl">
-          <div className="flex items-start justify-between gap-3 px-6 pt-5">
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Player Trend</div>
-              <div className="mt-1 text-2xl font-semibold text-white">{player.name}</div>
-              <div className="mt-1 text-sm text-white/55">Weekly {props.lens} output</div>
-            </div>
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+      <button className="absolute inset-0 bg-black/60" onClick={onClose} aria-label="Close" />
 
-            <button
-              onClick={onClose}
-              className="rounded-full border border-white/10 bg-black/20 p-2 text-white/70 hover:bg-white/5"
-            >
-              <X className="h-4 w-4" />
-            </button>
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-black/80 shadow-2xl backdrop-blur">
+        <div className="flex items-start justify-between gap-3 border-b border-white/10 p-4">
+          <div>
+            <div className="text-xs text-white/50">{lensShort(lens)} · Trend / projection</div>
+            <div className="mt-1 text-xl font-semibold text-white">{player ? player.name : "Select a player"}</div>
+            <div className="text-sm text-white/50">{player?.teamName ?? "—"}</div>
           </div>
 
-          <div className="px-6 pb-6 pt-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={compareId}
-                onChange={(e) => setCompareId(e.target.value)}
-                className="w-full flex-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/80 outline-none"
-              >
-                <option value="">Compare to another player…</option>
-                {allPlayers
-                  .filter((p) => p.id !== player.id)
-                  .slice(0, 40)
-                  .map((p) => (
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-white/10 bg-white/[0.03] p-2 text-white/80 hover:bg-white/[0.06]"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="p-4">
+          {locked && (
+            <div className="mb-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-100">
+              <div className="flex items-center gap-2 font-medium">
+                <Lock className="h-4 w-4" />
+                Neeko+ locked
+              </div>
+              <div className="mt-1 text-amber-100/80">
+                Premium unlocks projection bands, role context, and deeper “why” analysis.
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+              <div className="text-xs text-white/50">Last 10 (proxy)</div>
+              <div className="mt-3">
+                <Sparkline values={trendValues} />
+              </div>
+              <div className="mt-2 text-xs text-white/45">Illustrative until real week-by-week ingestion lands.</div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs text-white/50">Compare</div>
+                <select
+                  value={compareId}
+                  onChange={(e) => setCompareId(e.target.value)}
+                  className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white/80"
+                >
+                  <option value="">None</option>
+                  {allPlayers.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name} ({p.teamName})
                     </option>
                   ))}
-              </select>
+                </select>
+              </div>
 
-              {!locked ? (
-                <span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1 text-xs text-amber-200">
-                  Neeko+ unlocked
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
-                  <Lock className="h-3 w-3" /> Neeko+
-                </span>
-              )}
-            </div>
-
-            <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
-              <div className="relative">
-                <svg viewBox={`0 0 ${CH_W} ${CH_H}`} className="h-[320px] w-full">
-                  {compare && (
-                    <path
-                      d={comparePath}
-                      fill="none"
-                      stroke="rgba(255,255,255,0.35)"
-                      strokeWidth={3}
-                      strokeDasharray="7 7"
-                    />
-                  )}
-
-                  <path d={mainPath} fill="none" stroke="#facc15" strokeWidth={4} />
-
-                  {!locked && (
-                    <>
-                      <rect
-                        x={CH_W - 70}
-                        y={PAD}
-                        width={46}
-                        height={CH_H - PAD * 2}
-                        fill="rgba(251,191,36,0.16)"
-                      />
-                      <circle
-                        cx={CH_W - 47}
-                        cy={PAD + 18}
-                        r={6}
-                        fill="rgba(251,191,36,0.85)"
-                      />
-                    </>
-                  )}
-                </svg>
-
-                {locked && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/50 px-4 py-2 text-sm text-white/70">
-                      <Lock className="h-4 w-4" />
-                      Neeko+ Projection (locked)
-                    </span>
-                  </div>
+              <div className={cn("mt-3", !compareValues && "text-sm text-white/50")}>
+                {!compareValues ? (
+                  "Pick a player to compare"
+                ) : (
+                  <>
+                    <Sparkline values={compareValues} />
+                    <div className="mt-2 text-xs text-white/45">Overlay comparison coming soon.</div>
+                  </>
                 )}
               </div>
             </div>
+          </div>
 
-            <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/75">
-              <span className="text-amber-200">AI Insight:</span> {aiLine}
+          <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-sm text-white/70">
+            <div className="text-xs text-white/50">Projection (placeholder)</div>
+            <div className="mt-1">
+              {locked ? (
+                <span className="text-white/50">Upgrade to see projection bands.</span>
+              ) : (
+                "Projected range: 68–92 (demo). Confidence: Moderate."
+              )}
             </div>
-
-            {locked ? (
-              <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-                <div className="inline-flex items-center gap-2 text-sm text-white/70">
-                  <Lock className="h-4 w-4" />
-                  <span className="font-medium">Premium includes:</span>
-                </div>
-                <ul className="mt-2 space-y-1 text-sm text-white/55">
-                  <li>• Projection range (low / expected / high)</li>
-                  <li>• Role stability note + matchup context</li>
-                  <li>• Trend acceleration / cooling flag</li>
-                </ul>
-                <div className="mt-2 text-xs text-white/40">
-                  You’re seeing deterministic preview output only (safe for free users).
-                </div>
-              </div>
-            ) : (
-              <div className="mt-3 rounded-2xl border border-amber-400/15 bg-amber-400/[0.06] px-4 py-3 text-sm text-amber-100/90">
-                Projection bands: low <span className="font-semibold">{projection.low}</span> · expected{" "}
-                <span className="font-semibold">{projection.mid}</span> · high{" "}
-                <span className="font-semibold">{projection.high}</span>
-              </div>
-            )}
           </div>
         </div>
       </div>

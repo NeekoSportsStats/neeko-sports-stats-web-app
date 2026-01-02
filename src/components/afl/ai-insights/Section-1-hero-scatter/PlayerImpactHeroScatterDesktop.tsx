@@ -1,16 +1,11 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
+import { Lock, Info, TrendingUp } from "lucide-react";
+
 import type { FixtureMatch } from "@/components/afl/match-center/types";
-import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
+import type { PremiumMode, LensKey } from "@/components/afl/ai-insights/types";
 
+import { usePlayerScatterData, type PlayerPoint, type QuadrantKey } from "./usePlayerScatterData";
 import PlayerTrendModal from "./PlayerTrendModal";
-import { usePlayerScatterData, type LensKey } from "./usePlayerScatterData";
-
-const W = 760;
-const H = 420;
-const PAD = 44;
-
-const x = (v: number) => PAD + (v / 100) * (W - PAD * 2);
-const y = (v: number) => PAD + (1 - v / 100) * (H - PAD * 2);
 
 type Props = {
   match?: FixtureMatch;
@@ -18,263 +13,379 @@ type Props = {
   initialLens?: LensKey;
 };
 
-function lensLabel(lens: LensKey) {
-  switch (lens) {
-    case "fantasy":
-      return "Fantasy points";
-    case "disposals":
-      return "Disposals";
-    case "goals":
-      return "Goals";
-    default:
-      return lens;
+type TeamFilter = "both" | "home" | "away";
+
+function cn(...xs: Array<string | false | null | undefined>) {
+  return xs.filter(Boolean).join(" ");
+}
+
+function riskLabel(p?: PlayerPoint): { label: string; tone: "good" | "warn" | "muted" } {
+  if (!p) return { label: "—", tone: "muted" };
+  // Simple proxy: higher ceiling with lower momentum = risky
+  const risk = p.ceiling - p.momentum;
+  if (risk >= 18) return { label: "High", tone: "warn" };
+  if (risk >= 8) return { label: "Med", tone: "warn" };
+  return { label: "Stable", tone: "good" };
+}
+
+function quadrantName(key: QuadrantKey) {
+  switch (key) {
+    case "volatile_upside":
+      return "Volatile upside";
+    case "finale_targets":
+      return "Finale targets";
+    case "safe_floors":
+      return "Safe floors";
+    case "low_impact":
+      return "Low impact";
   }
 }
 
-export default function PlayerImpactHeroScatterDesktop({
-  match,
-  mode,
-  initialLens,
-}: Props) {
+function quadrantFromPoint(p: PlayerPoint): QuadrantKey {
+  const highM = p.momentum >= 50;
+  const highC = p.ceiling >= 50;
+  if (highC && !highM) return "volatile_upside";
+  if (highC && highM) return "finale_targets";
+  if (!highC && !highM) return "low_impact";
+  return "safe_floors";
+}
+
+function MetricChip(props: { label: string; value: string; tone?: "good" | "warn" | "muted" }) {
+  const { label, value, tone = "muted" } = props;
+  return (
+    <div
+      className={cn(
+        "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs",
+        "bg-white/[0.03] border-white/10",
+        tone === "good" && "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+        tone === "warn" && "border-amber-400/30 bg-amber-400/10 text-amber-200"
+      )}
+    >
+      <span className="text-white/60">{label}</span>
+      <span className="font-medium text-white">{value}</span>
+    </div>
+  );
+}
+
+function ButtonPill(props: { active?: boolean; onClick?: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={props.onClick}
+      className={cn(
+        "rounded-full border px-3 py-1 text-xs transition",
+        "bg-white/[0.02] border-white/10 hover:bg-white/[0.05]",
+        props.active && "border-amber-400/40 bg-amber-400/10 text-amber-200"
+      )}
+    >
+      {props.children}
+    </button>
+  );
+}
+
+function TooltipBubble(props: { open: boolean; x: number; y: number; text: string }) {
+  if (!props.open) return null;
+  return (
+    <div
+      className="pointer-events-none absolute z-50 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-full border border-white/10 bg-black/70 px-3 py-1 text-xs text-white shadow-lg backdrop-blur"
+      style={{ left: props.x, top: props.y }}
+    >
+      {props.text}
+    </div>
+  );
+}
+
+export default function PlayerImpactHeroScatterDesktop({ match, mode, initialLens }: Props): JSX.Element {
   const isPremium = mode === "premium";
   const d = usePlayerScatterData({ match, initialLens });
 
-  const {
-    homeTeam,
-    awayTeam,
-    lens,
-    teamFilter,
-    setTeamFilter,
-    playersVisible,
-    openId,
-    setOpenId,
-    selected,
-    lean,
-  } = d;
+  const [teamFilter, setTeamFilter] = useState<TeamFilter>("both");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [openTrend, setOpenTrend] = useState(false);
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [hoverId, setHoverId] = useState<string | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [hover, setHover] = useState<{ x: number; y: number; text: string } | null>(null);
 
-  const quadrantCounts = useMemo(
-    () => ({
-      finale: d.buckets.finale.length,
-      volatile: d.buckets.volatileUpside.length,
-      safe: d.buckets.safeFloors.length,
-      avoid: d.buckets.avoid.length,
-    }),
-    [d.buckets]
-  );
+  const players = useMemo(() => {
+    if (teamFilter === "both") return d.players;
+    return d.players.filter((p) => p.teamSide === teamFilter);
+  }, [d.players, teamFilter]);
+
+  const selected = useMemo(() => players.find((p) => p.id === selectedId) ?? d.players.find((p) => p.id === selectedId) ?? null, [
+    players,
+    d.players,
+    selectedId,
+  ]);
+
+  const selectedQuadrant = selected ? d.quadrants[quadrantFromPoint(selected)] : null;
+
+  // chart layout
+  const PAD = 28;
+  const W = 900;
+  const H = 560;
+
+  const xScale = (m: number) => PAD + (m / 100) * (W - PAD * 2);
+  const yScale = (c: number) => PAD + (1 - c / 100) * (H - PAD * 2);
+
+  const onPointClick = (p: PlayerPoint) => {
+    if (selectedId === p.id) {
+      setOpenTrend(true);
+    } else {
+      setSelectedId(p.id);
+    }
+  };
+
+  const onMove = (e: React.MouseEvent, p?: PlayerPoint) => {
+    if (!svgRef.current) return;
+    if (!p) {
+      setHover(null);
+      return;
+    }
+    const rect = svgRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setHover({ x, y, text: p.name });
+  };
 
   return (
-    <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-[#0b0b0b] to-black px-6 py-5">
-      {/* HEADER */}
-      <div>
-        <h3 className="text-xl font-semibold text-white">
-          Momentum vs Ceiling
-        </h3>
+    <section className="relative rounded-3xl border border-white/10 bg-white/[0.03] p-5 md:p-6">
+      {/* Header system */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-amber-200/80">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-300/80" />
+            Player impact map
+          </div>
 
-        <p className="mt-1 text-sm text-white/60">
-          {homeTeam} vs {awayTeam} · Analyst view
-        </p>
+          <div className="flex flex-col gap-1">
+            <h2 className="text-3xl font-semibold text-white">Momentum vs Ceiling</h2>
+            <div className="text-sm text-white/60">
+              {d.homeTeam} vs {d.awayTeam} · Analyst view
+            </div>
+          </div>
 
-        <div className="mt-1 flex items-center gap-3 text-sm text-white/70">
-          <span>
-            {lean.direction} lean ({lean.diff > 0 ? "+" : ""}
-            {lean.diff.toFixed(1)}) · {lean.strength}
-          </span>
-
-          {/* Lens indicator (read-only) */}
-          <span className="rounded-full border border-white/10 bg-black/30 px-2.5 py-0.5 text-xs text-white/55">
-            Lens: {lensLabel(lens)}
-          </span>
-        </div>
-      </div>
-
-      {/* TEAM FILTER ONLY */}
-      <div className="mt-4 flex items-center">
-        <div className="ml-auto flex gap-1.5">
-          {(["both", "home", "away"] as const).map((k) => (
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <MetricChip label="Lean" value={d.lean.direction === "even" ? "Even" : `${d.lean.direction} (${d.lean.strength}) ${d.lean.diff > 0 ? "+" : ""}${d.lean.diff}`} tone="muted" />
+            <MetricChip label="Volatility" value={d.volatility.label} tone={d.volatility.label === "Volatile" ? "warn" : "good"} />
+            <MetricChip label="Dominant" value={d.dominant.label} tone="muted" />
+            <MetricChip label="Lens" value={d.lensLabel} tone="muted" />
             <button
-              key={k}
-              onClick={() => setTeamFilter(k)}
-              className={
-                "rounded-full border px-2.5 py-1 text-xs transition-colors " +
-                (teamFilter === k
-                  ? "border-white/25 bg-white/10 text-white"
-                  : "border-white/10 bg-black/20 text-white/50")
-              }
+              type="button"
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.02] px-3 py-1 text-xs text-white/70 hover:bg-white/[0.05]"
+              onClick={() => setOpenTrend(false)}
+              title="Explain lean / quadrant meaning"
             >
-              {k}
+              <Info className="h-3.5 w-3.5" />
+              Why is it lean?
             </button>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* SCATTER + SIDEBAR */}
-      <div className="mt-4 grid grid-cols-12 gap-4 items-start">
-        {/* SCATTER */}
-        <div className="col-span-12 lg:col-span-9">
-          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/20">
-            <svg
-              viewBox={`0 0 ${W} ${H}`}
-              className="w-full h-auto aspect-[760/420]"
-            >
-              {/* GRID */}
-              {Array.from({ length: 5 }).map((_, i) => {
-                const gx = PAD + ((W - PAD * 2) / 4) * i;
-                const gy = PAD + ((H - PAD * 2) / 4) * i;
-                return (
-                  <g key={i}>
-                    <line
-                      x1={gx}
-                      y1={PAD}
-                      x2={gx}
-                      y2={H - PAD}
-                      stroke="rgba(255,255,255,0.08)"
-                    />
-                    <line
-                      x1={PAD}
-                      y1={gy}
-                      x2={W - PAD}
-                      y2={gy}
-                      stroke="rgba(255,255,255,0.08)"
-                    />
-                  </g>
-                );
-              })}
-
-              {/* AXES */}
-              <line
-                x1={x(50)}
-                y1={PAD}
-                x2={x(50)}
-                y2={H - PAD}
-                stroke="rgba(255,255,255,0.18)"
-              />
-              <line
-                x1={PAD}
-                y1={y(50)}
-                x2={W - PAD}
-                y2={y(50)}
-                stroke="rgba(255,255,255,0.18)"
-              />
-
-              {/* POINTS */}
-              {playersVisible.map((p) => {
-                const cx = x(p.momentum);
-                const cy = y(p.ceiling);
-                const isSelected = p.id === openId;
-                const isHover = p.id === hoverId;
-
-                return (
-                  <g
-                    key={p.id}
-                    onMouseEnter={() => setHoverId(p.id)}
-                    onMouseLeave={() => setHoverId(null)}
-                    onClick={() => setOpenId(p.id)}
-                    style={{ cursor: "pointer" }}
-                    className="transition-all duration-200 ease-out"
-                  >
-                    {isSelected && (
-                      <circle
-                        cx={cx}
-                        cy={cy}
-                        r={14}
-                        fill="rgba(251,191,36,0.12)"
-                        stroke="rgba(251,191,36,0.75)"
-                        strokeWidth={2}
-                        className="animate-[pulse_2s_ease-in-out_infinite]"
-                      />
-                    )}
-
-                    <circle
-                      cx={cx}
-                      cy={cy}
-                      r={isHover || isSelected ? 9 : 7}
-                      fill={p.teamSide === "home" ? "#60a5fa" : "#34d399"}
-                    />
-
-                    {(isHover || isSelected) && (
-                      <text
-                        x={cx + 10}
-                        y={cy - 10}
-                        fontSize="11"
-                        fill="white"
-                        opacity={0.9}
-                      >
-                        {p.name}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
-            </svg>
-
-            {/* QUADRANT SUMMARY */}
-            <div className="pointer-events-none absolute inset-0 text-[11px] text-white/45">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                Finale · {quadrantCounts.finale}
+          <div className="flex items-center justify-between gap-3 pt-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-white/50">Team</span>
+              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/20 p-1">
+                <ButtonPill active={teamFilter === "both"} onClick={() => setTeamFilter("both")}>
+                  both
+                </ButtonPill>
+                <ButtonPill active={teamFilter === "home"} onClick={() => setTeamFilter("home")}>
+                  home
+                </ButtonPill>
+                <ButtonPill active={teamFilter === "away"} onClick={() => setTeamFilter("away")}>
+                  away
+                </ButtonPill>
               </div>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-right">
-                Safe · {quadrantCounts.safe}
-              </div>
-              <div className="absolute left-3 bottom-3">
-                Volatile · {quadrantCounts.volatile}
-              </div>
-              <div className="absolute right-3 bottom-3 text-right">
-                Low · {quadrantCounts.avoid}
-              </div>
+            </div>
+
+            <div className="text-xs text-white/40">
+              Click a dot to focus · click again to open trend/projection
             </div>
           </div>
         </div>
 
-        {/* SIDEBAR */}
-        <div className="col-span-12 lg:col-span-3">
-          {selected ? (
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="text-sm font-semibold text-white">
-                {selected.name}
-              </div>
-              <div className="text-xs text-white/55">
-                {selected.teamName}
-              </div>
+        {/* Chart + sidebar */}
+        <div className="grid gap-4 lg:grid-cols-[1.55fr_0.55fr]">
+          {/* chart card */}
+          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div className="absolute left-4 top-4 text-xs text-white/50">Ceiling ↑</div>
+            <div className="absolute bottom-4 right-4 text-xs text-white/50">Momentum →</div>
 
-              <button
-                onClick={() => setModalOpen(true)}
-                className="mt-3 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-xs text-white/80"
+            <div className="relative">
+              <TooltipBubble open={!!hover} x={hover?.x ?? 0} y={hover?.y ?? 0} text={hover?.text ?? ""} />
+
+              <svg
+                ref={svgRef}
+                viewBox={`0 0 ${W} ${H}`}
+                className="h-auto w-full"
+                style={{ aspectRatio: "16 / 10" }}
+                onMouseLeave={() => setHover(null)}
               >
-                Open trend
-              </button>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
-              <div className="font-semibold text-white mb-2">
-                Matchup signal (AI)
-              </div>
-              <ul className="space-y-1 text-xs text-white/60">
-                <li>• Ceiling concentrated in away midfielders</li>
-                <li>• Volatility skewed to top-right quadrant</li>
-                <li>• Home side shows stronger floor stability</li>
-              </ul>
-            </div>
-          )}
+                {/* grid */}
+                <rect x={PAD} y={PAD} width={W - PAD * 2} height={H - PAD * 2} rx={16} fill="transparent" stroke="rgba(255,255,255,0.08)" />
+                {/* mid lines */}
+                <line x1={xScale(50)} y1={PAD} x2={xScale(50)} y2={H - PAD} stroke="rgba(255,255,255,0.08)" />
+                <line x1={PAD} y1={yScale(50)} x2={W - PAD} y2={yScale(50)} stroke="rgba(255,255,255,0.08)" />
 
-          {!isPremium && (
-            <div className="mt-3 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-xs text-white/55">
-              🔒 Upgrade to unlock matchup narrative + projections
+                {/* quadrant labels */}
+                <text x={PAD + 14} y={PAD + 22} fill="rgba(255,255,255,0.35)" fontSize="14">
+                  Volatile upside
+                </text>
+                <text x={W - PAD - 170} y={PAD + 22} fill="rgba(255,255,255,0.35)" fontSize="14">
+                  Finale targets
+                </text>
+                <text x={PAD + 14} y={H - PAD - 12} fill="rgba(255,255,255,0.35)" fontSize="14">
+                  Low impact
+                </text>
+                <text x={W - PAD - 140} y={H - PAD - 12} fill="rgba(255,255,255,0.35)" fontSize="14">
+                  Safe floors
+                </text>
+
+                {/* points */}
+                {players.map((p) => {
+                  const cx = xScale(p.momentum);
+                  const cy = yScale(p.ceiling);
+                  const isSel = selectedId === p.id;
+                  const fill = p.teamSide === "home" ? "rgb(59,130,246)" : "rgb(16,185,129)"; // blue/emerald
+                  return (
+                    <g key={p.id}>
+                      {/* hit area */}
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={14}
+                        fill="transparent"
+                        onMouseMove={(e) => onMove(e, p)}
+                        onFocus={(e) => onMove(e as any, p)}
+                        onClick={() => onPointClick(p)}
+                        style={{ cursor: "pointer" }}
+                      />
+                      <circle cx={cx} cy={cy} r={7.5} fill={fill} opacity={0.95} />
+                      {isSel && (
+                        <circle cx={cx} cy={cy} r={12} fill="transparent" stroke="rgba(245, 158, 11, 0.9)" strokeWidth={3} />
+                      )}
+                    </g>
+                  );
+                })}
+              </svg>
             </div>
-          )}
+
+            {/* quadrant summary line cards */}
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {(Object.keys(d.quadrants) as QuadrantKey[]).map((k) => {
+                const q = d.quadrants[k];
+                const isActive = selectedQuadrant?.key === k;
+                return (
+                  <div
+                    key={k}
+                    className={cn(
+                      "rounded-xl border p-3 text-sm",
+                      "bg-white/[0.02] border-white/10",
+                      isActive && "border-amber-400/30 bg-amber-400/5"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-white">{q.title}</div>
+                      <div className="text-xs text-white/50">{q.count}</div>
+                    </div>
+                    <div className="mt-1 text-xs text-white/55">{q.blurb}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* sidebar */}
+          <aside className="flex flex-col gap-3">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-white/40">Selected</div>
+
+              {!selected ? (
+                <div className="mt-2 text-sm text-white/60">
+                  Select a player
+                  <div className="mt-1 text-xs text-white/40">Click a dot to focus</div>
+                </div>
+              ) : (
+                <div className="mt-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-lg font-semibold text-white">{selected.name}</div>
+                      <div className="text-sm text-white/50">{selected.teamName}</div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setOpenTrend(true)}
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs",
+                        "border-white/10 bg-white/[0.02] text-white/80 hover:bg-white/[0.05]"
+                      )}
+                    >
+                      <TrendingUp className="h-3.5 w-3.5" />
+                      Open trend
+                    </button>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <MetricChip label="Momentum" value={String(selected.momentum)} tone="muted" />
+                    <MetricChip label="Ceiling" value={String(selected.ceiling)} tone="muted" />
+                    {(() => {
+                      const r = riskLabel(selected);
+                      return <MetricChip label="Risk" value={r.label} tone={r.tone} />;
+                    })()}
+                  </div>
+
+                  <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.02] p-3 text-sm text-white/70">
+                    <div className="text-xs text-white/50">Read</div>
+                    <div className="mt-1">
+                      {selectedQuadrant ? (
+                        <>
+                          <span className="font-medium text-white">{quadrantName(selectedQuadrant.key)}:</span>{" "}
+                          {selectedQuadrant.blurb}.
+                        </>
+                      ) : (
+                        "Pick a dot to see a quick read."
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[11px] uppercase tracking-[0.22em] text-white/40">Neeko+ note</div>
+                {!isPremium && (
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.02] px-3 py-1 text-xs text-white/70">
+                    <Lock className="h-3.5 w-3.5" />
+                    Locked
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-2 text-sm text-white/70">
+                Premium adds stronger “why”, projection ranges, and role-stability context.
+              </div>
+
+              {!isPremium && (
+                <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs text-white/70">
+                  <div className="flex items-center gap-2">
+                    <Lock className="h-3.5 w-3.5 text-amber-300/90" />
+                    Upgrade to unlock matchup narrative + projections
+                  </div>
+                </div>
+              )}
+            </div>
+          </aside>
         </div>
       </div>
 
       <PlayerTrendModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        player={selected}
-        allPlayers={d.playersAll}
-        lens={lens}
+        open={openTrend}
+        onClose={() => setOpenTrend(false)}
+        player={selected ?? undefined}
+        allPlayers={d.players}
+        lens={d.lens}
         locked={!isPremium}
       />
-    </div>
+    </section>
   );
 }
