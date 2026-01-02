@@ -1,5 +1,3 @@
-// src/pages/sports/afl/AFLAIInsights.tsx
-
 import React, { useMemo, useState, useEffect } from "react";
 import { Crown, ChevronDown } from "lucide-react";
 
@@ -86,7 +84,7 @@ export default function AFLAIInsights() {
   );
 
   /* -------------------------------------------------------------------------- */
-  /*  PLAYER SCORE PREDICTABILITY DATA                                          */
+  /* PLAYER SCORE PREDICTABILITY DATA                                           */
   /* -------------------------------------------------------------------------- */
 
   const rawPlayerPredict = useMemo(
@@ -144,7 +142,7 @@ export default function AFLAIInsights() {
             </p>
           </div>
 
-          {/* NEEKO+ TOGGLE (TEST MODE) */}
+          {/* NEEKO+ TOGGLE */}
           <button
             onClick={() =>
               setMode((m) => (m === "premium" ? "free" : "premium"))
@@ -188,6 +186,8 @@ export default function AFLAIInsights() {
             subtitle="Momentum vs ceiling · Click any player to explore trend, projection, and risk"
           >
             <PlayerImpactScatterPanel
+              match={selectedMatch}
+              mode={mode}
             />
           </SectionShell>
         )}
