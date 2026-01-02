@@ -61,6 +61,15 @@ export default function PlayerTrendModal(props: {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "";
+      };
+    }
+  }, [open]);
+
   const compare = useMemo(
     () => allPlayers.find((p) => p.id === compareId) ?? null,
     [allPlayers, compareId]

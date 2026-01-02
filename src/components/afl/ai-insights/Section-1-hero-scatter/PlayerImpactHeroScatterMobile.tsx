@@ -48,8 +48,6 @@ export default function PlayerImpactHeroScatterMobile(props: {
     whyLean,
   } = d;
 
-  if (!playersVisible || playersVisible.length === 0) return null;
-
   const [modalOpen, setModalOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
 
@@ -76,6 +74,8 @@ export default function PlayerImpactHeroScatterMobile(props: {
   };
 
   const playersVisibleMemo = useMemo(() => playersVisible, [playersVisible]);
+
+  if (!playersVisible || playersVisible.length === 0) return null;
 
   return (
     <div className="rounded-3xl border border-amber-400/15 bg-gradient-to-b from-[#0b0b0b] to-black p-4">

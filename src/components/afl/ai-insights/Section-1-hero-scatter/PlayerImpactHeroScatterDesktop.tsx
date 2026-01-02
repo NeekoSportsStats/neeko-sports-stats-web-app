@@ -57,8 +57,6 @@ export default function PlayerImpactHeroScatterDesktop(props: {
     whyLean,
   } = d;
 
-  if (!playersVisible || playersVisible.length === 0) return null;
-
   const [modalOpen, setModalOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
 
@@ -102,6 +100,8 @@ export default function PlayerImpactHeroScatterDesktop(props: {
     }
     setModalOpen(true);
   };
+
+  if (!playersVisible || playersVisible.length === 0) return null;
 
   const controls = (
     <div className="flex flex-wrap items-center gap-3 md:gap-4">
