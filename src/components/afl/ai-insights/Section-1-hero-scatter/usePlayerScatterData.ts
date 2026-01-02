@@ -1,110 +1,153 @@
-// Section-1-hero-scatter/usePlayerScatterData.ts
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 
 export type LensKey = "fantasy" | "disposals" | "goals";
 export type TeamFilter = "both" | "home" | "away";
 export type LabelMode = "smart" | "all" | "none";
 
+export type PlayerTrendPoint = { week: string; value: number };
+
 export type PlayerPoint = {
   id: string;
   name: string;
   teamSide: "home" | "away";
   teamName: string;
-  momentum: number; // 0..100
-  ceiling: number;  // 0..100
+
+  momentum: number;
+  ceiling: number;
+
+  trend?: PlayerTrendPoint[];
 };
 
-function hash(s: string) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h << 5) - h + s.charCodeAt(i);
-  return Math.abs(h);
+function rnd(min: number, max: number) {
+  return Math.round(min + Math.random() * (max - min));
 }
 
-function seeded(seed: number) {
-  let t = seed + 0x6d2b79f5;
-  return () => {
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+function genTrend(seed: number) {
+  const weeks = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12"];
+  let v = seed;
+  return weeks.map((w, i) => {
+    v = v + (i % 3 === 0 ? rnd(-12, 14) : rnd(-8, 10));
+    return { week: w, value: Math.max(20, Math.min(130, v)) };
+  });
 }
 
-type Opts = {
-  initialLens?: LensKey;
-};
+export function usePlayerScatterData(args: { match?: FixtureMatch; initialLens?: LensKey }) {
+  const homeTeam = (args.match as any)?.homeTeam?.name ?? "Richmond";
+  const awayTeam = (args.match as any)?.awayTeam?.name ?? "Carlton";
 
-export default function usePlayerScatterData(match?: FixtureMatch, opts?: Opts) {
-  const home = String((match as any)?.homeTeam ?? "Home");
-  const away = String((match as any)?.awayTeam ?? "Away");
-
-  const [lens, setLens] = useState<LensKey>(opts?.initialLens ?? "fantasy");
+  const [lens, setLens] = useState<LensKey>(args.initialLens ?? "fantasy");
   const [teamFilter, setTeamFilter] = useState<TeamFilter>("both");
   const [labelMode, setLabelMode] = useState<LabelMode>("smart");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
 
-  // keep lens in sync if parent passes a new initialLens
+  // ✅ Sync lens if parent changes the global stat selector
   useEffect(() => {
-    if (opts?.initialLens && opts.initialLens !== lens) {
-      setLens(opts.initialLens);
-      setSelectedId(null);
+    if (args.initialLens && args.initialLens !== lens) {
+      setLens(args.initialLens);
+      setOpenId(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opts?.initialLens]);
+  }, [args.initialLens]);
 
   const playersAll = useMemo<PlayerPoint[]>(() => {
-    const base = [
-      "Patrick Cripps",
+    const home = [
+      "Dustin Martin",
+      "Tom Lynch",
+      "Noah Balta",
+      "Shai Bolton",
+      "Toby Nankervis",
+      "Jack Graham",
+      "Jayden Short",
+      "Nick Vlastuin",
+    ];
+    const away = [
       "Sam Walsh",
-      "Nick Daicos",
+      "Patrick Cripps",
+      "Charlie Curnow",
+      "Jacob Weitering",
       "Christian Petracca",
-      "Zach Merrett",
-      "Caleb Serong",
-      "Errol Gulden",
-      "Clayton Oliver",
-      "Jeremy Cameron",
-      "Max Gawn",
+      "George Hewett",
+      "Zac Williams",
+      "Adam Cerra",
     ];
 
-    return base.map((name, i) => {
-      const side: "home" | "away" = i % 2 === 0 ? "home" : "away";
-      const teamName = side === "home" ? home : away;
-      const r = seeded(hash(`${name}:${lens}`));
-
+    const mk = (name: string, side: "home" | "away", idx: number): PlayerPoint => {
+      const base = 60 + (idx % 5) * 6 + (side === "away" ? 3 : 0);
+      const momentum = Math.max(20, Math.min(95, base + rnd(-18, 18)));
+      const ceiling = Math.max(20, Math.min(95, base + rnd(-22, 22)));
       return {
-        id: `${name}-${lens}`,
+        id: `${side}-${idx}-${name.replace(/\s+/g, "-").toLowerCase()}`,
         name,
         teamSide: side,
-        teamName,
-        momentum: Math.round(35 + r() * 55),
-        ceiling: Math.round(40 + r() * 50),
+        teamName: side === "home" ? homeTeam : awayTeam,
+        momentum,
+        ceiling,
+        trend: genTrend(70 + idx * 3 + (side === "away" ? 4 : 0)),
       };
-    });
-  }, [home, away, lens]);
+    };
 
-  const players = useMemo(
-    () =>
-      playersAll.filter(
-        (p) => teamFilter === "both" || p.teamSide === teamFilter
-      ),
-    [playersAll, teamFilter]
-  );
+    const out: PlayerPoint[] = [];
+    home.forEach((n, i) => out.push(mk(n, "home", i)));
+    away.forEach((n, i) => out.push(mk(n, "away", i)));
 
-  const selected = players.find((p) => p.id === selectedId) ?? null;
+    if (!out.some((p) => p.name === "Max Gawn")) {
+      out.push({
+        id: "away-max-gawn",
+        name: "Max Gawn",
+        teamSide: "away",
+        teamName: awayTeam,
+        momentum: 62,
+        ceiling: 81,
+        trend: genTrend(78),
+      });
+    }
+
+    return out;
+  }, [homeTeam, awayTeam]);
+
+  const playersVisible = useMemo(() => {
+    let arr = playersAll;
+
+    if (teamFilter !== "both") {
+      arr = arr.filter((p) => p.teamSide === teamFilter);
+    }
+
+    // lens re-weight (still mock / deterministic-ish enough for UI)
+    if (lens === "disposals") {
+      arr = arr.map((p) => ({
+        ...p,
+        momentum: Math.max(20, Math.min(95, p.momentum + rnd(-6, 10))),
+        ceiling: Math.max(20, Math.min(95, p.ceiling + rnd(-10, 8))),
+      }));
+    } else if (lens === "goals") {
+      arr = arr.map((p) => ({
+        ...p,
+        momentum: Math.max(20, Math.min(95, p.momentum + rnd(-10, 6))),
+        ceiling: Math.max(20, Math.min(95, p.ceiling + rnd(-6, 14))),
+      }));
+    }
+
+    return arr;
+  }, [playersAll, lens, teamFilter]);
 
   return {
+    homeTeam,
+    awayTeam,
+
     lens,
     setLens,
+
     teamFilter,
     setTeamFilter,
+
     labelMode,
     setLabelMode,
-    players,
-    playersAll, // sometimes useful for rail comparisons, etc.
-    selected,
-    selectedId,
-    setSelectedId,
-    home,
-    away,
+
+    playersVisible,
+    playersAll,
+
+    openId,
+    setOpenId,
   };
 }

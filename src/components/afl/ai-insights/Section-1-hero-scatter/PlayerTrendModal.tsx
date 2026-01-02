@@ -1,291 +1,234 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { X, Lock } from "lucide-react";
+import { Lock, X } from "lucide-react";
 
-import { PlayerPoint, LensKey } from "./usePlayerScatterData";
+import type { PlayerPoint, LensKey } from "./usePlayerScatterData";
 
-/* -------------------------------------------------------------------------------------------------
-  Player Trend Modal — premium-feel locked scaffolding
--------------------------------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* HELPERS                                                                    */
+/* -------------------------------------------------------------------------- */
 
-type Props = {
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
+}
+
+function quantile(sortedAsc: number[], q: number) {
+  if (!sortedAsc.length) return 0;
+  const pos = (sortedAsc.length - 1) * q;
+  const base = Math.floor(pos);
+  const rest = pos - base;
+  const next = sortedAsc[base + 1];
+  if (next == null) return sortedAsc[base];
+  return sortedAsc[base] + rest * (next - sortedAsc[base]);
+}
+
+function mean(vals: number[]) {
+  if (!vals.length) return 0;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+/* -------------------------------------------------------------------------- */
+/* COMPONENT                                                                  */
+/* -------------------------------------------------------------------------- */
+
+export default function PlayerTrendModal(props: {
   open: boolean;
   onClose: () => void;
   player: PlayerPoint;
   allPlayers: PlayerPoint[];
-  comparePlayerId?: string | null;
-  onChangeCompare?: (id: string | null) => void;
   lens: LensKey;
-  locked?: boolean;
-};
+  locked: boolean;
+}) {
+  const { open, onClose, player, allPlayers, lens, locked } = props;
 
-/* -------------------------------------------------------------------------------------------------
-  Deterministic helpers
--------------------------------------------------------------------------------------------------- */
+  const [compareId, setCompareId] = useState<string>("");
 
-function hashString(s: string) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h << 5) - h + s.charCodeAt(i);
-  return Math.abs(h);
-}
+  useEffect(() => {
+    if (open) setCompareId("");
+  }, [open]);
 
-function seededRand(seed: number) {
-  let t = seed + 0x6d2b79f5;
-  return () => {
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  const compare = useMemo(() => {
+    if (!compareId) return null;
+    return allPlayers.find((p) => p.id === compareId) ?? null;
+  }, [compareId, allPlayers]);
+
+  const series = useMemo(() => {
+    const pts = player.trend ?? [];
+    return pts.map((p) => p.value);
+  }, [player]);
+
+  const compareSeries = useMemo(() => {
+    const pts = compare?.trend ?? [];
+    return pts.map((p) => p.value);
+  }, [compare]);
+
+  const q10 = useMemo(() => quantile([...series].sort((a, b) => a - b), 0.1), [series]);
+  const q50 = useMemo(() => quantile([...series].sort((a, b) => a - b), 0.5), [series]);
+  const q90 = useMemo(() => quantile([...series].sort((a, b) => a - b), 0.9), [series]);
+
+  const W = 900;
+  const H = 320;
+  const PAD = 28;
+
+  const valsAll = useMemo(() => {
+    const a = [...series, ...compareSeries].filter((n) => Number.isFinite(n));
+    return a.length ? a : [0];
+  }, [series, compareSeries]);
+
+  const vMin = Math.min(...valsAll);
+  const vMax = Math.max(...valsAll);
+  const x = (i: number, n: number) =>
+    PAD + (i / Math.max(1, n - 1)) * (W - PAD * 2);
+  const y = (v: number) =>
+    PAD + (1 - (v - vMin) / Math.max(1e-6, vMax - vMin)) * (H - PAD * 2);
+
+  const pathFor = (vals: number[]) => {
+    if (!vals.length) return "";
+    return vals
+      .map((v, i) => `${i === 0 ? "M" : "L"} ${x(i, vals.length)} ${y(v)}`)
+      .join(" ");
   };
-}
 
-/* -------------------------------------------------------------------------------------------------
-  Mock weekly series + projection
--------------------------------------------------------------------------------------------------- */
+  const mainPath = useMemo(() => pathFor(series), [series]);
+  const cmpPath = useMemo(() => pathFor(compareSeries), [compareSeries]);
 
-function buildWeeklySeries(playerId: string, lens: LensKey) {
-  const r = seededRand(hashString(`${playerId}:${lens}`));
-  const rounds = Array.from({ length: 23 }, (_, i) => `R${i + 1}`);
+  const aiLine = useMemo(() => {
+    const m = mean(series);
+    const vol = Math.abs(q90 - q10);
+    if (vol < 12) return "Role and output remain stable week-to-week.";
+    if (m > q50 && vol > 18) return "Upside is strong, but week-to-week range is wide.";
+    if (m < q50 && vol > 18) return "Volatility is high—consider role signals before locking.";
+    return "Trend is balanced—matchup context matters.";
+  }, [series, q10, q50, q90]);
 
-  const base =
-    lens === "goals" ? 1.6 :
-    lens === "disposals" ? 23 :
-    90;
-
-  const vol =
-    lens === "goals" ? 0.5 :
-    lens === "disposals" ? 0.3 :
-    0.2;
-
-  const values = rounds.map(() =>
-    Math.max(0, Math.round(base * (1 + (r() - 0.5) * 2 * vol)))
-  );
-
-  const last = values.slice(-5);
-  const avg = last.reduce((a, b) => a + b, 0) / last.length;
-
-  return {
-    rounds,
-    values,
-    projection: {
-      expected: Math.round(avg),
-      low: Math.round(avg * 0.85),
-      high: Math.round(avg * 1.15),
-    },
-  };
-}
-
-/* -------------------------------------------------------------------------------------------------
-  AI-style insight (safe)
--------------------------------------------------------------------------------------------------- */
-
-function buildInsight(values: number[]) {
-  const recent = values.slice(-5);
-  const prior = values.slice(-10, -5);
-
-  const rAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
-  const pAvg = prior.reduce((a, b) => a + b, 0) / prior.length;
-
-  const delta = rAvg - pAvg;
-
-  if (delta > pAvg * 0.12)
-    return "Momentum is accelerating with upside still intact.";
-
-  if (delta < -pAvg * 0.12)
-    return "Output has cooled compared to earlier rounds.";
-
-  const spread = Math.max(...recent) - Math.min(...recent);
-  if (spread > rAvg * 0.4)
-    return "Production has been volatile — ceiling games mixed with risk.";
-
-  return "Role and output remain stable week-to-week.";
-}
-
-/* -------------------------------------------------------------------------------------------------
-  Component
--------------------------------------------------------------------------------------------------- */
-
-export default function PlayerTrendModal({
-  open,
-  onClose,
-  player,
-  allPlayers,
-  comparePlayerId,
-  onChangeCompare,
-  lens,
-  locked = false,
-}: Props) {
   if (!open) return null;
 
-  const main = useMemo(() => buildWeeklySeries(player.id, lens), [player.id, lens]);
-
-  const comparePlayer = useMemo(
-    () => allPlayers.find((p) => p.id === comparePlayerId) ?? null,
-    [allPlayers, comparePlayerId]
-  );
-
-  const compare = useMemo(
-    () => (comparePlayer ? buildWeeklySeries(comparePlayer.id, lens) : null),
-    [comparePlayer, lens]
-  );
-
-  const insight = useMemo(() => buildInsight(main.values), [main.values]);
-
-  /* ---------------- SVG layout ---------------- */
-
-  const W = 720;
-  const H = 360;
-  const PAD_X = 44;
-  const PAD_Y = 30;
-
-  const allVals = [
-    ...main.values,
-    ...(compare ? compare.values : []),
-    main.projection.low,
-    main.projection.high,
-  ];
-
-  const min = Math.min(...allVals);
-  const max = Math.max(...allVals);
-  const pad = Math.max(2, (max - min) * 0.18);
-
-  const yMin = Math.max(0, min - pad);
-  const yMax = max + pad;
-
-  const x = (i: number) =>
-    PAD_X + (i / (main.values.length - 1)) * (W - PAD_X * 2);
-
-  const y = (v: number) =>
-    PAD_Y + (1 - (v - yMin) / (yMax - yMin)) * (H - PAD_Y * 2);
-
-  const path = (vals: number[]) =>
-    vals.map((v, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(v)}`).join(" ");
-
-  const upcoming = main.values.length - 1;
-
-  /* ---------------- Animation ---------------- */
-
-  const [animate, setAnimate] = useState(false);
-  useEffect(() => {
-    setAnimate(true);
-  }, []);
-
   return (
-    <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center">
-      <button className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-[80] flex items-center justify-center">
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
 
-      <div className="relative w-full max-w-3xl rounded-t-3xl sm:rounded-3xl border border-white/10 bg-[#0b0b0c] shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+      <div className="relative mx-4 w-full max-w-3xl rounded-3xl border border-white/10 bg-[#0c0c0c] shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-white/10 p-5">
           <div>
-            <div className="text-xs tracking-[0.3em] text-white/50">PLAYER TREND</div>
-            <div className="mt-1 text-lg font-semibold text-white">{player.name}</div>
-            <div className="text-sm text-white/60">Weekly {lens} output</div>
+            <div className="text-[11px] tracking-[0.18em] text-white/40">
+              PLAYER TREND
+            </div>
+            <div className="mt-1 text-xl font-semibold">{player.name}</div>
+            <div className="text-sm text-white/55">
+              Weekly {lens === "fantasy" ? "fantasy output" : lens}
+            </div>
           </div>
 
-          <button onClick={onClose} className="rounded-full border border-white/10 bg-white/[0.03] p-2">
-            <X className="h-4 w-4 text-white/70" />
+          <button
+            onClick={onClose}
+            className="rounded-full border border-white/10 bg-white/[0.02] p-2 text-white/70 hover:bg-white/[0.05]"
+          >
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Compare selector */}
-        <div className="px-5 pt-4">
-          <div className="relative">
-            <select
-              value={comparePlayerId ?? ""}
-              onChange={(e) => onChangeCompare?.(e.target.value || null)}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white"
-              disabled={locked}
-            >
-              <option value="">Compare to another player…</option>
-              {allPlayers
-                .filter((p) => p.id !== player.id)
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-            </select>
+        <div className="p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="w-full">
+              <select
+                value={compareId}
+                onChange={(e) => setCompareId(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/80 outline-none focus:ring-2 focus:ring-amber-400/40"
+              >
+                <option value="">Compare to another player…</option>
+                {allPlayers
+                  .filter((p) => p.id !== player.id)
+                  .slice(0, 70)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
 
             {locked && (
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-2 text-xs text-white/55">
+              <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-white/50">
                 <Lock className="h-3.5 w-3.5" />
                 Neeko+
-              </div>
+              </span>
             )}
           </div>
-        </div>
 
-        {/* Chart */}
-        <div className="px-5 py-4">
-          <div className="relative rounded-2xl border border-white/10 bg-black/30 overflow-hidden">
-            {/* soft locked veil (still shows movement underneath) */}
-            {locked && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
-                <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/70 px-4 py-2 text-sm text-white/80">
-                  <Lock className="h-4 w-4" />
-                  Neeko+ Projection (locked)
+          <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+            <div className="relative overflow-hidden rounded-xl border border-white/10 bg-black/40">
+              <svg viewBox={`0 0 ${W} ${H}`} className="block w-full">
+                <path d={mainPath} fill="none" stroke="#ffcc33" strokeWidth={4} />
+                {compare && (
+                  <path
+                    d={cmpPath}
+                    fill="none"
+                    stroke="rgba(255,255,255,0.45)"
+                    strokeWidth={3}
+                    strokeDasharray="6 6"
+                  />
+                )}
+
+                {/* Locked projection band */}
+                {locked && (
+                  <>
+                    <rect
+                      x={W - 90}
+                      y={PAD}
+                      width={70}
+                      height={H - PAD * 2}
+                      fill="rgba(255,204,51,0.15)"
+                    />
+                    <circle
+                      cx={W - 55}
+                      cy={y(series[series.length - 1] ?? q50)}
+                      r={6}
+                      fill="#ffcc33"
+                      opacity={0.9}
+                    />
+                  </>
+                )}
+              </svg>
+
+              {locked && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-2 text-sm text-white/70">
+                    <Lock className="h-4 w-4" />
+                    Neeko+ Projection (locked)
+                  </div>
                 </div>
+              )}
+            </div>
+
+            <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <div className="text-xs text-white/70">
+                <span className="text-amber-200">AI Insight:</span> {aiLine}
               </div>
-            )}
+            </div>
 
-            <svg viewBox={`0 0 ${W} ${H}`} className="block w-full">
-              {/* Projection band */}
-              {!locked && (
-                <rect
-                  x={x(upcoming) - 14}
-                  y={animate ? y(main.projection.high) : y(main.projection.expected)}
-                  width={28}
-                  height={animate ? y(main.projection.low) - y(main.projection.high) : 0}
-                  fill="rgba(251,191,36,0.22)"
-                  style={{ transition: "all 600ms ease-out" }}
-                />
-              )}
-
-              {/* Expected */}
-              {!locked && (
-                <circle cx={x(upcoming)} cy={y(main.projection.expected)} r={4.5} fill="#fbbf24" />
-              )}
-
-              {/* Compare */}
-              {compare && (
-                <path
-                  d={path(compare.values)}
-                  fill="none"
-                  stroke="rgba(255,255,255,0.45)"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                />
-              )}
-
-              {/* Main */}
-              <path
-                d={path(main.values)}
-                fill="none"
-                stroke={locked ? "rgba(251,191,36,0.35)" : "#fbbf24"}
-                strokeWidth={3}
-              />
-            </svg>
-          </div>
-
-          {/* Insight + scaffolding */}
-          <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/70">
             {locked ? (
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 text-xs text-white/65">
+              <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                <div className="flex items-center gap-2 text-xs text-white/55">
                   <Lock className="h-4 w-4" />
                   Premium includes:
                 </div>
-                <ul className="list-disc pl-5 text-sm text-white/65 space-y-1">
+                <ul className="mt-2 list-disc space-y-1 pl-6 text-sm text-white/60">
                   <li>Projection range (low / expected / high)</li>
                   <li>Role stability note + matchup context</li>
                   <li>Trend acceleration / cooling flag</li>
                 </ul>
-                <div className="mt-2 text-xs text-white/50">
+                <div className="mt-2 text-[11px] text-white/40">
                   You’re seeing deterministic preview output only (safe for free users).
                 </div>
               </div>
             ) : (
-              <div>
-                <span className="text-amber-300">AI Insight:</span> {insight}
+              <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm text-white/80">
+                Projection bands:{" "}
+                <span className="text-white">low {Math.round(q10)}</span> ·{" "}
+                <span className="text-white">expected {Math.round(q50)}</span> ·{" "}
+                <span className="text-white">high {Math.round(q90)}</span>
               </div>
             )}
           </div>
