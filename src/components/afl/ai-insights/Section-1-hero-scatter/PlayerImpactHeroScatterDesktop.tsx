@@ -60,6 +60,12 @@ export default function PlayerImpactHeroScatterDesktop(props: {
   const [modalOpen, setModalOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
 
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const tooltipPt = useMemo(() => {
+    const h = hoverId ? playersVisible.find((p) => p.id === hoverId) : null;
+    return h || selected;
+  }, [hoverId, playersVisible, selected]);
+
   const dominantLabel = useMemo(() => {
     if (dominantQuadrant === "finale") return "Finale";
     if (dominantQuadrant === "volatile") return "Volatile";
@@ -226,7 +232,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
       <div className="mt-4">{controls}</div>
 
       {/* Lean meter */}
-      <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+      <div className="mt-4 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
         <div className="flex items-center justify-between text-xs text-white/60">
           <span>{homeTeam}</span>
           <span className="text-white/40">Lean meter</span>
@@ -342,58 +348,65 @@ export default function PlayerImpactHeroScatterDesktop(props: {
 
                 {/* points */}
                 {playersVisible.map((p) => {
-  const cx = xToPx(p.momentum);
-  const cy = yToPx(p.ceiling);
-  const active = openId === p.id;
-  const color = p.team === "home" ? HOME_COLOR : AWAY_COLOR;
+                  const cx = x(p.momentum);
+                  const cy = y(p.ceiling);
+                  const isSel = p.id === openId;
 
-  return (
-    <g key={p.id}>
-      {/* hit target (so clicks always register) */}
-      <circle
-        cx={cx}
-        cy={cy}
-        r={16}
-        fill="transparent"
-        style={{ cursor: "pointer" }}
-        onPointerDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          handleDotClick(p.id);
-        }}
-        onMouseEnter={() => setHoverId(p.id)}
-        onMouseLeave={() =>
-          setHoverId((prev) => (prev === p.id ? null : prev))
-        }
-      />
+                  const showLabel =
+                    labelMode === "all"
+                      ? true
+                      : labelMode === "none"
+                      ? false
+                      : isSel || isLabelSmart(p);
 
-      {/* selection ring */}
-      {active && (
-        <circle
-          cx={cx}
-          cy={cy}
-          r={10}
-          fill="none"
-          stroke="rgba(245, 197, 66, 0.95)"
-          strokeWidth={2.25}
-          pointerEvents="none"
-        />
-      )}
-
-      {/* dot */}
-      <circle
-        cx={cx}
-        cy={cy}
-        r={6}
-        fill={color}
-        opacity={active ? 1 : 0.9}
-        stroke="rgba(0,0,0,0.55)"
-        strokeWidth={1}
-        pointerEvents="none"
-      />
-    </g>
-  );
-})}
+                  return (
+                    <g key={p.id} style={{ cursor: "pointer" }}>
+                      {/* Invisible hit target to ensure clicks always register */}
+                      <circle
+                        cx={x(p.momentum)}
+                        cy={y(p.ceiling)}
+                        r={11}
+                        fill="transparent"
+                        pointerEvents="all"
+                        onMouseEnter={() => setHoverId(p.id)}
+                        onMouseLeave={() => setHoverId((hid) => (hid === p.id ? null : hid))}
+                        onClick={() => handleDotClick(p.id)}
+                      />
+                      <circle
+                        cx={x(p.momentum)}
+                        cy={y(p.ceiling)}
+                        r={6.5}
+                        fill={p.teamSide === "home" ? "#3B82F6" : "#10B981"}
+                        opacity={openId && openId !== p.id ? 0.45 : 0.98}
+                        stroke={openId === p.id ? "rgba(245, 158, 11, 0.95)" : "rgba(255,255,255,0.12)"}
+                        strokeWidth={openId === p.id ? 3 : 1}
+                        pointerEvents="none"
+                      />
+                      {/* Gold ring glow for selection */}
+                      {openId === p.id && (
+                        <circle
+                          cx={x(p.momentum)}
+                          cy={y(p.ceiling)}
+                          r={11}
+                          fill="transparent"
+                          stroke="rgba(245, 158, 11, 0.32)"
+                          strokeWidth={8}
+                          style={{ filter: "blur(0.5px)" }}
+                          pointerEvents="none"
+                        />
+                      )}
+                      {(showLabel || hoverId === p.id || openId === p.id) && (
+                        <text
+                          x={x(p.momentum) + 10}
+                          y={y(p.ceiling) + 4}
+                          className="fill-white/80 text-[11px]"
+                        >
+                          {p.name}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
               </svg>
           </div>
         </div>
@@ -410,7 +423,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
             />
 
             {!isPremium ? (
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
                 <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">Neeko+ note</div>
                 <div className="mt-2 text-sm text-white/70">
                   <span className="inline-flex items-center gap-1 text-white/60">
@@ -572,7 +585,7 @@ function SelectedCard(props: {
             </>
           ) : (
             <div className="mt-2 text-sm text-white/55 leading-relaxed">
-              Click a dot (or a name in the lists) to focus a player. Click again to open the trend/projection.
+              Select a player to view details.
             </div>
           )}
         </div>

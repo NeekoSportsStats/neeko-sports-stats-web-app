@@ -51,6 +51,8 @@ export default function PlayerImpactHeroScatterMobile(props: {
   const [modalOpen, setModalOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
 
+  const [hoverId, setHoverId] = useState<string | null>(null);
+
   const handleDotClick = (id: string) => {
     if (openId !== id) {
       setOpenId(id);
@@ -185,18 +187,51 @@ export default function PlayerImpactHeroScatterMobile(props: {
             const isSel = p.id === openId;
 
             return (
-              <g key={p.id}>
-                <circle cx={cx} cy={cy} r={16} fill="transparent" style={{ cursor: "pointer" }} onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); handleDotClick(p.id); }} />
-                <circle cx={cx} cy={cy} r={isSel ? 9 : 7} fill={dotFill(p.teamSide)} opacity={0.95} pointerEvents="none" />
+              <g key={p.id} style={{ cursor: "pointer" }}>
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={12}
+                  fill="transparent"
+                  pointerEvents="all"
+                  onMouseEnter={() => setHoverId(p.id)}
+                  onMouseLeave={() => setHoverId((hid) => (hid === p.id ? null : hid))}
+                  onClick={() => handleDotClick(p.id)}
+                />
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={isSel ? 8 : 6.5}
+                  fill={dotFill(p.teamSide)}
+                  opacity={openId && openId !== p.id ? 0.45 : 0.98}
+                  pointerEvents="none"
+                />
                 {isSel && (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={14}
-                    fill="rgba(251,191,36,0.12)"
-                    stroke="rgba(251,191,36,0.55)"
-                    strokeWidth={2}
-                  />
+                  <>
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={13}
+                      fill="transparent"
+                      stroke="rgba(251,191,36,0.80)"
+                      strokeWidth={3}
+                      pointerEvents="none"
+                    />
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={13}
+                      fill="transparent"
+                      stroke="rgba(251,191,36,0.25)"
+                      strokeWidth={9}
+                      pointerEvents="none"
+                    />
+                  </>
+                )}
+                {(hoverId === p.id || isSel) && (
+                  <text x={cx + 10} y={cy + 4} className="fill-white/80 text-[11px]">
+                    {p.name}
+                  </text>
                 )}
               </g>
             );
