@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Sparkles } from "lucide-react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
@@ -13,9 +13,7 @@ type LensKey = "fantasy" | "disposals" | "goals";
 type TeamFilter = "both" | "home" | "away";
 
 /**
- * IMPORTANT
- * This shape MUST match PlayerTrendModal expectations.
- * Do not rename without updating the modal.
+ * Canonical shape for PlayerTrendModal
  */
 type PlayerPoint = {
   id: string;
@@ -36,7 +34,7 @@ const y = (v: number) => PAD + (1 - v / 100) * (H - PAD * 2);
 export default function PlayerImpactScatterPanel(props: {
   match?: FixtureMatch;
   mode: PremiumMode;
-  initialLens?: LensKey;
+  initialLens?: LensKey; // 👈 controlled from parent
 }) {
   const { match, mode, initialLens } = props;
   const locked = mode !== "premium";
@@ -47,6 +45,14 @@ export default function PlayerImpactScatterPanel(props: {
   const [lens, setLens] = useState<LensKey>(initialLens ?? "fantasy");
   const [teamFilter, setTeamFilter] = useState<TeamFilter>("both");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // 🔑 STEP 1: sync when parent stat changes
+  useEffect(() => {
+    if (initialLens && initialLens !== lens) {
+      setLens(initialLens);
+      setSelectedId(null); // reset selection on lens change
+    }
+  }, [initialLens]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Modal state
   const [openModal, setOpenModal] = useState(false);
@@ -110,7 +116,7 @@ export default function PlayerImpactScatterPanel(props: {
         </div>
         <h2 className="mt-1 text-xl font-semibold">Momentum vs Ceiling</h2>
         <p className="mt-1 text-sm text-white/60">
-          Top-right = finale targets · Click any player
+          Synced to global stat lens · Click any player
         </p>
         {locked && (
           <p className="mt-1 text-xs text-white/45">
@@ -119,7 +125,7 @@ export default function PlayerImpactScatterPanel(props: {
         )}
       </div>
 
-      {/* CONTROLS */}
+      {/* CONTROLS (still usable locally) */}
       <div className="mb-3 flex flex-wrap gap-2 text-xs">
         {(["fantasy", "disposals", "goals"] as LensKey[]).map((l) => (
           <button
@@ -150,50 +156,19 @@ export default function PlayerImpactScatterPanel(props: {
         ))}
       </div>
 
-      {/* SCATTER */}
+      {/* SCATTER (unchanged SVG) */}
       <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/40">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
-          {/* GRID */}
           {[25, 50, 75].map((v) => (
             <g key={v}>
-              <line
-                x1={x(v)}
-                y1={PAD}
-                x2={x(v)}
-                y2={H - PAD}
-                stroke="white"
-                opacity={0.15}
-              />
-              <line
-                x1={PAD}
-                y1={y(v)}
-                x2={W - PAD}
-                y2={y(v)}
-                stroke="white"
-                opacity={0.15}
-              />
+              <line x1={x(v)} y1={PAD} x2={x(v)} y2={H - PAD} stroke="white" opacity={0.15} />
+              <line x1={PAD} y1={y(v)} x2={W - PAD} y2={y(v)} stroke="white" opacity={0.15} />
             </g>
           ))}
 
-          {/* MIDLINES */}
-          <line
-            x1={xMid}
-            y1={PAD}
-            x2={xMid}
-            y2={H - PAD}
-            stroke="white"
-            opacity={0.25}
-          />
-          <line
-            x1={PAD}
-            y1={yMid}
-            x2={W - PAD}
-            y2={yMid}
-            stroke="white"
-            opacity={0.25}
-          />
+          <line x1={xMid} y1={PAD} x2={xMid} y2={H - PAD} stroke="white" opacity={0.25} />
+          <line x1={PAD} y1={yMid} x2={W - PAD} y2={yMid} stroke="white" opacity={0.25} />
 
-          {/* POINTS */}
           {visible.map((p) => {
             const cx = x(p.momentum);
             const cy = y(p.ceiling);
@@ -217,13 +192,7 @@ export default function PlayerImpactScatterPanel(props: {
                   onClick={() => onPick(p.id)}
                 />
                 {(isSelected || (p.momentum >= 70 && p.ceiling >= 70)) && (
-                  <text
-                    x={cx}
-                    y={cy + 16}
-                    textAnchor="middle"
-                    fontSize={11}
-                    fill="white"
-                  >
+                  <text x={cx} y={cy + 16} textAnchor="middle" fontSize={11} fill="white">
                     {p.name}
                   </text>
                 )}
@@ -233,41 +202,14 @@ export default function PlayerImpactScatterPanel(props: {
         </svg>
       </div>
 
-      {/* SELECTED STRIP */}
-      {selected && (
-        <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3">
-          <div className="text-xs tracking-widest text-amber-300">
-            SELECTED
-          </div>
-          <div className="mt-1 text-lg font-semibold">{selected.name}</div>
-          <div className="text-sm text-white/60">
-            {selected.teamName}
-          </div>
-          <div className="mt-2 flex gap-4 text-sm">
-            <div>
-              Momentum: <b>{selected.momentum}</b>
-            </div>
-            <div>
-              Ceiling: <b>{selected.ceiling}</b>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setOpenModal(true)}
-            className="mt-3 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80 hover:bg-white/10"
-          >
-            Open trend + projection
-          </button>
-        </div>
-      )}
-
-      {/* STEP 3 MODAL */}
+      {/* MODAL */}
       <PlayerTrendModal
         open={openModal}
         onClose={() => setOpenModal(false)}
         player={players.find((p) => p.id === selectedId) ?? null}
         allPlayers={players}
         lens={lens}
+        locked={locked}
       />
     </section>
   );
