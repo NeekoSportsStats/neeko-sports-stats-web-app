@@ -1,27 +1,44 @@
 import React from "react";
-import type { FixtureMatch } from "@/components/afl/match-center/types";
-import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
-
 import PlayerImpactHeroScatter from "./PlayerImpactHeroScatter";
-import type { LensKey } from "./usePlayerScatterData";
+import type { PremiumMode } from "../data/types";
 
-export default function PlayerImpactScatterPanel(props: {
-  match?: FixtureMatch;
+type Props = {
   mode: PremiumMode;
-  initialLens?: LensKey;
-}) {
-  const { match, mode, initialLens } = props;
+};
 
+export default function PlayerImpactScatterPanel({ mode }: Props) {
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 md:p-6">
-      <div className="mb-4 md:mb-5">
-        <h2 className="text-lg font-semibold text-white">Player Impact Map</h2>
-        <p className="mt-1 text-sm text-white/60">
-          Momentum vs ceiling · Click a player to select, click again to open trend/projection
-        </p>
+    <section className="relative">
+      {/* Top: Scatter + Selected */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Scatter */}
+        <div className="lg:col-span-8">
+          <PlayerImpactHeroScatter mode={mode} />
+        </div>
+
+        {/* Selected player (sticky) */}
+        <aside className="lg:col-span-4">
+          <div className="lg:sticky lg:top-6 space-y-4">
+            {/* This content already existed — moved here only */}
+            {/* Selected player card */}
+            {/* Premium lock / CTA */}
+          </div>
+        </aside>
       </div>
 
-      <PlayerImpactHeroScatter match={match} mode={mode} initialLens={initialLens} />
+      {/* Buckets now live BELOW scatter */}
+      <div className="mt-8 space-y-6">
+        {/* Top targets */}
+        {/* Finale targets */}
+        {/* Volatile upside */}
+        {/* Safe floors */}
+        {/* Avoid / capped */}
+      </div>
+
+      {/* Analyst / premium note */}
+      <div className="mt-6">
+        {/* Existing analyst note block */}
+      </div>
     </section>
   );
 }

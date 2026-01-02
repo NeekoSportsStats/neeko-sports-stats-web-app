@@ -1,14 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Info, Lock, Sparkles } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { Info } from "lucide-react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 
 import PlayerTrendModal from "./PlayerTrendModal";
-import { usePlayerScatterData, type LensKey } from "./usePlayerScatterData";
+import { usePlayerScatterData, type LensKey, type PlayerPoint } from "./usePlayerScatterData";
 
 const W = 760;
 const H = 420;
-const PAD = 56;
+// Tighter padding so the plot feels larger on mobile (less empty edge space)
+const PAD = 44;
 
 const x = (v: number) => PAD + (v / 100) * (W - PAD * 2);
 const y = (v: number) => PAD + (1 - v / 100) * (H - PAD * 2);
@@ -21,33 +22,6 @@ function dotFill(side: "home" | "away") {
   return side === "home" ? "#60a5fa" : "#34d399";
 }
 
-function useDismissOnOutsideClick(open: boolean, onDismiss: () => void) {
-  const ref = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onDown = (e: PointerEvent) => {
-      const el = ref.current;
-      if (!el) return;
-      if (e.target instanceof Node && !el.contains(e.target)) onDismiss();
-    };
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onDismiss();
-    };
-
-    window.addEventListener("pointerdown", onDown, { capture: true });
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("pointerdown", onDown, { capture: true } as any);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open, onDismiss]);
-
-  return ref;
-}
-
 export default function PlayerImpactHeroScatterMobile(props: {
   match?: FixtureMatch;
   mode: PremiumMode;
@@ -57,11 +31,25 @@ export default function PlayerImpactHeroScatterMobile(props: {
   const isPremium = mode === "premium";
 
   const d = usePlayerScatterData({ match, initialLens });
-  const { homeTeam, awayTeam, lens, setLens, playersVisible, ranked, openId, setOpenId, selected, lean, volatility, whyLean } = d;
+  const {
+    homeTeam,
+    awayTeam,
+    lens,
+    setLens,
+    teamFilter,
+    setTeamFilter,
+    playersVisible,
+    ranked,
+    openId,
+    setOpenId,
+    selected,
+    lean,
+    volatility,
+    whyLean,
+  } = d;
 
   const [modalOpen, setModalOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
-  const whyRef = useDismissOnOutsideClick(whyOpen, () => setWhyOpen(false));
 
   const handleDotClick = (id: string) => {
     if (openId !== id) {
@@ -81,69 +69,63 @@ export default function PlayerImpactHeroScatterMobile(props: {
     setModalOpen(true);
   };
 
-  const premiumNarrative = useMemo(() => {
-    return "Finale targets often align with role stability and late-game scoring control.";
-  }, []);
+  const playersVisibleMemo = useMemo(() => playersVisible, [playersVisible]);
 
   return (
     <div className="rounded-3xl border border-amber-400/15 bg-gradient-to-b from-[#0b0b0b] to-black p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-amber-300">
-            <Sparkles className="h-4 w-4" />
-            <span className="tracking-[0.12em] text-[11px] uppercase">Player Impact Map</span>
-          </div>
-          <h3 className="mt-1 text-xl font-semibold text-white">Momentum vs Ceiling</h3>
-          <p className="mt-1 text-xs text-white/60">
-            {homeTeam} vs {awayTeam}
-          </p>
+      <div>
+        <div className="text-lg font-semibold text-white">Momentum vs Ceiling</div>
+        <div className="mt-0.5 text-sm text-white/60">
+          {homeTeam} vs {awayTeam}
         </div>
-
-        {!isPremium && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-xs text-white/55">
-            <Lock className="h-3 w-3" /> Locked
-          </span>
-        )}
       </div>
 
-      <p className="mt-2 text-[11px] text-white/45">
-        {isPremium ? (
-          <>
-            <span className="text-amber-200">Analyst read:</span> {premiumNarrative}
-          </>
-        ) : (
-          "Upgrade to reveal matchup narrative + projection bands."
-        )}
-      </p>
-
-      <div className="mt-3 flex gap-1.5">
+      {/* Controls (mobile) */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
           <button
             key={k}
             onClick={() => setLens(k)}
             className={
-              lens === k
-                ? "rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-xs text-amber-200"
-                : "rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/65"
+              "rounded-full border px-3 py-1 text-xs " +
+              (lens === k
+                ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+                : "border-white/10 bg-black/20 text-white/70")
             }
-            aria-label={`Set metric ${k}`}
           >
             {k === "fantasy" ? "Fantasy" : k === "disposals" ? "Disposals" : "Goals"}
           </button>
         ))}
+
+        <div className="ml-auto flex gap-1.5">
+          {(["both", "home", "away"] as const).map((k) => (
+            <button
+              key={k}
+              onClick={() => setTeamFilter(k)}
+              className={
+                "rounded-full border px-3 py-1 text-xs " +
+                (teamFilter === k
+                  ? "border-white/25 bg-white/10 text-white"
+                  : "border-white/10 bg-black/20 text-white/60")
+              }
+            >
+              {k}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Lean meter */}
-      <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3">
-        <div className="flex items-center justify-between text-xs text-white/70">
-          <span>{homeTeam}</span>
-          <span className="text-white/50">Lean</span>
-          <span>{awayTeam}</span>
+      <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 p-3">
+        <div className="flex items-center justify-between text-xs text-white/60">
+          <span className="truncate">{homeTeam}</span>
+          <span className="text-white/40">Lean</span>
+          <span className="truncate">{awayTeam}</span>
         </div>
 
-        <div className="mt-2 relative h-2 rounded-full bg-black/40 overflow-hidden">
+        <div className="relative mt-2 h-3 overflow-hidden rounded-full border border-white/10 bg-black/30">
           <div
-            className="absolute left-0 top-0 h-full"
+            className="h-full"
             style={{
               width: `${clamp(50 + lean.diff * 1.2, 8, 92)}%`,
               background: "linear-gradient(90deg, rgba(96,165,250,0.65), rgba(52,211,153,0.65))",
@@ -158,12 +140,10 @@ export default function PlayerImpactHeroScatterMobile(props: {
             {lean.diff.toFixed(1)} · Volatility {volatility.label}
           </span>
 
-          <div className="relative" ref={whyRef}>
+          <div className="relative">
             <button
               onClick={() => setWhyOpen((v) => !v)}
               className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-xs text-white/70"
-              aria-expanded={whyOpen}
-              aria-label="Explain why this matchup leans"
             >
               <Info className="h-3.5 w-3.5" />
               Why?
@@ -183,9 +163,9 @@ export default function PlayerImpactHeroScatterMobile(props: {
         </div>
       </div>
 
-      {/* Plot */}
+      {/* Plot (bigger, less dead space) */}
       <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
-        <svg viewBox={`0 0 ${W} ${H}`} className="h-[308px] w-full">
+        <svg viewBox={`0 0 ${W} ${H}`} className="h-[360px] w-full">
           {Array.from({ length: 5 }).map((_, i) => {
             const gx = PAD + ((W - PAD * 2) / 4) * i;
             const gy = PAD + ((H - PAD * 2) / 4) * i;
@@ -199,7 +179,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
           <line x1={x(50)} y1={PAD} x2={x(50)} y2={H - PAD} stroke="rgba(255,255,255,0.16)" />
           <line x1={PAD} y1={y(50)} x2={W - PAD} y2={y(50)} stroke="rgba(255,255,255,0.16)" />
 
-          {playersVisible.map((p) => {
+          {playersVisibleMemo.map((p) => {
             const cx = x(p.momentum);
             const cy = y(p.ceiling);
             const isSel = p.id === openId;
@@ -223,7 +203,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
         </svg>
       </div>
 
-      {/* Selected */}
+      {/* Selected (tight) */}
       {selected && (
         <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3">
           <div className="flex items-center justify-between gap-3">
@@ -237,7 +217,6 @@ export default function PlayerImpactHeroScatterMobile(props: {
             <button
               onClick={() => setModalOpen(true)}
               className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-white/75"
-              aria-label="Open trend modal"
             >
               Trend
             </button>
@@ -255,7 +234,6 @@ export default function PlayerImpactHeroScatterMobile(props: {
               key={p.id}
               onClick={() => handleRowClick(p.id)}
               className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left"
-              aria-label={`Select ${p.name}`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -271,6 +249,14 @@ export default function PlayerImpactHeroScatterMobile(props: {
         </div>
       </div>
 
+      {/* Buckets (2-col grid so the page feels less "endless") */}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <BucketCard title="Finale" subtitle="High momentum + ceiling" items={d.buckets.finale.slice(0, 3)} onRowClick={handleRowClick} />
+        <BucketCard title="Volatile" subtitle="Ceiling with risk" items={d.buckets.volatileUpside.slice(0, 3)} onRowClick={handleRowClick} empty="None" />
+        <BucketCard title="Safe" subtitle="Stable / capped" items={d.buckets.safeFloors.slice(0, 3)} onRowClick={handleRowClick} empty="None" />
+        <BucketCard title="Avoid" subtitle="Low leverage" items={d.buckets.avoid.slice(0, 3)} onRowClick={handleRowClick} empty="None" />
+      </div>
+
       <PlayerTrendModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -279,6 +265,47 @@ export default function PlayerImpactHeroScatterMobile(props: {
         lens={lens}
         locked={!isPremium}
       />
+    </div>
+  );
+}
+
+function BucketCard(props: {
+  title: string;
+  subtitle: string;
+  items: PlayerPoint[];
+  empty?: string;
+  onRowClick: (id: string) => void;
+}) {
+  const { title, subtitle, items, empty, onRowClick } = props;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+      <div className="text-sm font-semibold text-white">{title}</div>
+      <div className="mt-0.5 text-[11px] text-white/50">{subtitle}</div>
+
+      <div className="mt-2 space-y-1.5">
+        {items.length ? (
+          items.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => onRowClick(p.id)}
+              className="w-full rounded-xl border border-white/10 bg-black/20 px-2.5 py-2 text-left"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-xs font-medium text-white/90">{p.name}</div>
+                  <div className="truncate text-[11px] text-white/45">{p.teamName}</div>
+                </div>
+                <div className="shrink-0 text-[11px] text-white/60">
+                  M {p.momentum} · C {p.ceiling}
+                </div>
+              </div>
+            </button>
+          ))
+        ) : (
+          <div className="text-[11px] text-white/40">{empty ?? "No players"}</div>
+        )}
+      </div>
     </div>
   );
 }

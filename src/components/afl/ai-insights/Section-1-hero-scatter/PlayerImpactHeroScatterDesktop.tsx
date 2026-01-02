@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Info, Lock, Sparkles } from "lucide-react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
@@ -8,7 +8,8 @@ import { usePlayerScatterData, type LabelMode, type LensKey, type PlayerPoint } 
 
 const W = 760;
 const H = 420;
-const PAD = 56;
+// Slightly tighter padding = bigger usable plot area (less "dead" edge space)
+const PAD = 44;
 
 const x = (v: number) => PAD + (v / 100) * (W - PAD * 2);
 const y = (v: number) => PAD + (1 - v / 100) * (H - PAD * 2);
@@ -24,33 +25,6 @@ function dotFill(side: "home" | "away") {
 function isLabelSmart(p: PlayerPoint) {
   // “smart” labels: only high combined + any ceiling spike
   return p.momentum + p.ceiling >= 150 || p.ceiling >= 86;
-}
-
-function useDismissOnOutsideClick(open: boolean, onDismiss: () => void) {
-  const ref = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onDown = (e: PointerEvent) => {
-      const el = ref.current;
-      if (!el) return;
-      if (e.target instanceof Node && !el.contains(e.target)) onDismiss();
-    };
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onDismiss();
-    };
-
-    window.addEventListener("pointerdown", onDown, { capture: true });
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("pointerdown", onDown, { capture: true } as any);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open, onDismiss]);
-
-  return ref;
 }
 
 export default function PlayerImpactHeroScatterDesktop(props: {
@@ -86,8 +60,6 @@ export default function PlayerImpactHeroScatterDesktop(props: {
   const [modalOpen, setModalOpen] = useState(false);
   const [whyOpen, setWhyOpen] = useState(false);
 
-  const whyRef = useDismissOnOutsideClick(whyOpen, () => setWhyOpen(false));
-
   const dominantLabel = useMemo(() => {
     if (dominantQuadrant === "finale") return "Finale";
     if (dominantQuadrant === "volatile") return "Volatile";
@@ -105,11 +77,11 @@ export default function PlayerImpactHeroScatterDesktop(props: {
 
   const handleDotClick = (id: string) => {
     if (openId !== id) {
-      setOpenId(id); // A1: first click selects + updates sidebar + selected card
+      setOpenId(id);          // A1: select + update sidebar + selected card
       setModalOpen(false);
       return;
     }
-    setModalOpen(true); // A2: second click opens modal
+    setModalOpen(true);       // A2: second click opens modal
   };
 
   const handleRowClick = (id: string) => {
@@ -133,12 +105,10 @@ export default function PlayerImpactHeroScatterDesktop(props: {
               onClick={() => setLens(k)}
               className={cls(
                 "rounded-full border px-3 py-1 text-xs transition",
-                "hover:bg-white/5 active:scale-[0.99]",
                 lens === k
                   ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
-                  : "border-white/10 bg-black/20 text-white/70"
+                  : "border-white/10 bg-black/20 text-white/70 hover:bg-white/5"
               )}
-              aria-label={`Set metric ${k}`}
             >
               {k === "fantasy" ? "Fantasy" : k === "disposals" ? "Disposals" : "Goals"}
             </button>
@@ -158,12 +128,10 @@ export default function PlayerImpactHeroScatterDesktop(props: {
               onClick={() => setTeamFilter(k)}
               className={cls(
                 "rounded-full border px-3 py-1 text-xs transition",
-                "hover:bg-white/5 active:scale-[0.99]",
                 teamFilter === k
                   ? "border-white/25 bg-white/10 text-white"
-                  : "border-white/10 bg-black/20 text-white/60"
+                  : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
               )}
-              aria-label={`Set team filter ${k}`}
             >
               {k}
             </button>
@@ -183,12 +151,10 @@ export default function PlayerImpactHeroScatterDesktop(props: {
               onClick={() => setLabelMode(k)}
               className={cls(
                 "rounded-full border px-3 py-1 text-xs transition",
-                "hover:bg-white/5 active:scale-[0.99]",
                 labelMode === k
                   ? "border-amber-400/35 bg-amber-400/10 text-amber-200"
-                  : "border-white/10 bg-black/20 text-white/60"
+                  : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
               )}
-              aria-label={`Set label mode ${k}`}
             >
               {k}
             </button>
@@ -199,9 +165,9 @@ export default function PlayerImpactHeroScatterDesktop(props: {
   );
 
   return (
-    <div className="rounded-3xl border border-amber-400/15 bg-gradient-to-b from-[#0b0b0b] to-black p-4 md:p-5">
+    <div className="rounded-3xl border border-amber-400/15 bg-gradient-to-b from-[#0b0b0b] to-black p-5 md:p-6">
       {/* Top meta row */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm text-amber-300">
             <Sparkles className="h-4 w-4" />
@@ -230,7 +196,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
           </p>
         </div>
 
-        {/* Pills */}
+        {/* Pills (tight) */}
         <div className="flex flex-wrap items-center gap-2 md:gap-2.5">
           <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/75">
             Lean:{" "}
@@ -257,41 +223,39 @@ export default function PlayerImpactHeroScatterDesktop(props: {
       </div>
 
       {/* Controls */}
-      <div className="mt-3">{controls}</div>
+      <div className="mt-4">{controls}</div>
 
       {/* Lean meter */}
-      <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
-        <div className="flex items-center justify-between text-xs text-white/70">
+      <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div className="flex items-center justify-between text-xs text-white/60">
           <span>{homeTeam}</span>
-          <span className="text-white/50">Lean meter</span>
+          <span className="text-white/40">Lean meter</span>
           <span>{awayTeam}</span>
         </div>
 
-        <div className="mt-2 relative h-2 rounded-full bg-black/40 overflow-hidden">
+        <div className="relative mt-2 h-3 overflow-hidden rounded-full border border-white/10 bg-black/30">
           <div
-            className="absolute left-0 top-0 h-full"
+            className="h-full"
             style={{
-              width: `${Math.max(2, Math.min(98, lean.pct))}%`,
+              width: `${lean.pct}%`,
               background: "linear-gradient(90deg, rgba(96,165,250,0.65), rgba(52,211,153,0.65))",
             }}
           />
           <div className="absolute left-1/2 top-0 h-full w-px bg-white/15" />
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="text-xs text-white/65">
-            <span className="rounded-full border border-white/10 bg-black/20 px-2 py-0.5">
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <div className="text-xs text-white/60">
+            <span className="inline-flex items-center gap-2">
               Lean: Δ {lean.diff > 0 ? "+" : ""}
               {lean.diff.toFixed(1)} <span className="text-white/50">(avg momentum+ceiling)</span>
             </span>
           </div>
 
-          <div className="relative" ref={whyRef}>
+          <div className="relative">
             <button
               onClick={() => setWhyOpen((v) => !v)}
               className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-xs text-white/70 hover:bg-white/5"
-              aria-expanded={whyOpen}
-              aria-label="Explain why this matchup leans"
             >
               <Info className="h-3.5 w-3.5" />
               Why is it lean?
@@ -308,7 +272,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
                   ))}
                 </ul>
                 <div className="mt-2 text-[11px] text-white/40">
-                  (Derived from the current filter state — metric/team/labels.)
+                  (This is derived from the current filter state — metric/team/labels.)
                 </div>
               </div>
             )}
@@ -317,12 +281,21 @@ export default function PlayerImpactHeroScatterDesktop(props: {
       </div>
 
       {/* Main grid */}
+      {/*
+        Desktop intent:
+        - Left: big scatter (primary)
+        - Right: Selected player (sticky)
+        - Buckets move BELOW the scatter in a multi-column grid to reduce overall page height
+          (removes the “giant empty void” you were seeing)
+      */}
       <div className="mt-3 grid grid-cols-12 gap-4">
         {/* Plot */}
         <div className="col-span-12 lg:col-span-8">
-          <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-2 md:p-3">
             <div className="flex items-center justify-between gap-2 px-1">
-              <div className="text-xs text-white/60">X: Momentum · Y: Ceiling</div>
+              <div className="text-xs text-white/60">
+                X: Momentum · Y: Ceiling
+              </div>
 
               <div className="flex items-center gap-3 text-xs text-white/60">
                 <span className="inline-flex items-center gap-1">
@@ -337,7 +310,8 @@ export default function PlayerImpactHeroScatterDesktop(props: {
             </div>
 
             <div className="mt-2 overflow-hidden rounded-xl border border-white/10 bg-black/30">
-              <svg viewBox={`0 0 ${W} ${H}`} className="h-[372px] w-full">
+              {/* Larger rendered height + tighter PAD above = clearer dots/labels */}
+              <svg viewBox={`0 0 ${W} ${H}`} className="h-[440px] w-full">
                 {/* grid */}
                 {Array.from({ length: 5 }).map((_, i) => {
                   const gx = PAD + ((W - PAD * 2) / 4) * i;
@@ -379,21 +353,12 @@ export default function PlayerImpactHeroScatterDesktop(props: {
                       ? false
                       : isSel || isLabelSmart(p);
 
-                  // label edge handling (avoid running off right side)
-                  const nearRight = cx > W - PAD - 120;
-                  const labelX = nearRight ? cx - 10 : cx + 10;
-
                   return (
-                    <g
-                      key={p.id}
-                      style={{ cursor: "pointer" }}
-                      onClick={() => handleDotClick(p.id)}
-                    >
-                      {/* hover/selection ring */}
+                    <g key={p.id} style={{ cursor: "pointer" }} onClick={() => handleDotClick(p.id)}>
                       <circle
                         cx={cx}
                         cy={cy}
-                        r={isSel ? 10 : 7.5}
+                        r={isSel ? 9 : 7}
                         fill={dotFill(p.teamSide)}
                         opacity={isSel ? 1 : 0.92}
                       />
@@ -401,19 +366,16 @@ export default function PlayerImpactHeroScatterDesktop(props: {
                         <circle
                           cx={cx}
                           cy={cy}
-                          r={15}
+                          r={14}
                           fill="rgba(251,191,36,0.12)"
                           stroke="rgba(251,191,36,0.55)"
                           strokeWidth={2}
                         />
                       )}
-
-                      {/* label */}
                       {showLabel && (
                         <text
-                          x={labelX}
+                          x={cx + 10}
                           y={cy + 4}
-                          textAnchor={nearRight ? "end" : "start"}
                           fill={isSel ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.65)"}
                           fontSize="13"
                         >
@@ -425,104 +387,83 @@ export default function PlayerImpactHeroScatterDesktop(props: {
                 })}
               </svg>
             </div>
+          </div>
+        </div>
 
-            {/* Selected */}
-            {selected && (
-              <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] uppercase tracking-[0.18em] text-amber-300/80">
-                      Selected
-                    </div>
-                    <div className="mt-0.5 text-lg font-semibold text-white">{selected.name}</div>
-                    <div className="text-sm text-white/60">{selected.teamName}</div>
+        {/* Selected (right) */}
+        <div className="col-span-12 lg:col-span-4">
+          <div className="space-y-3 lg:sticky lg:top-24">
+            <SelectedCard
+              homeTeam={homeTeam}
+              awayTeam={awayTeam}
+              selected={selected}
+              isPremium={isPremium}
+              onOpenTrend={() => setModalOpen(true)}
+            />
 
-                    <div className="mt-2 text-sm text-white/70">
-                      Momentum: <span className="text-white">{selected.momentum}</span>{" "}
-                      <span className="text-white/40">·</span>{" "}
-                      Ceiling: <span className="text-white">{selected.ceiling}</span>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setModalOpen(true)}
-                    className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-white/75 hover:bg-white/5"
-                    aria-label="Open player trend modal"
-                  >
-                    Open trend
-                  </button>
+            {!isPremium ? (
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">Neeko+ note</div>
+                <div className="mt-2 text-sm text-white/70">
+                  <span className="inline-flex items-center gap-1 text-white/60">
+                    <Lock className="h-3.5 w-3.5" />
+                    Upgrade to reveal matchup narrative + projection bands
+                  </span>
                 </div>
+                <div className="mt-2 text-xs text-white/45">
+                  Premium adds: stronger “why”, projection ranges, and role-stability context.
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-amber-400/15 bg-amber-400/[0.05] p-4">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">Analyst note</div>
+                <div className="mt-2 text-sm text-amber-100/90">{premiumNarrative}</div>
               </div>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Sidebar */}
-        <div className="col-span-12 lg:col-span-4 space-y-3">
-          <SidebarCard
-            title="Top targets"
-            subtitle="Best combined momentum + ceiling"
-            items={ranked.slice(0, 5)}
-            onRowClick={handleRowClick}
-            selectedId={openId}
-          />
+      {/* Buckets below the scatter: multi-column to reduce overall scroll */}
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <SidebarCard
+          title="Top targets"
+          subtitle="Best combined momentum + ceiling"
+          items={ranked.slice(0, 4)}
+          onRowClick={handleRowClick}
+        />
 
-          <SidebarCard
-            title="Finale targets"
-            subtitle="High momentum, high ceiling"
-            badge="Hot"
-            items={buckets.finale.slice(0, 4)}
-            onRowClick={handleRowClick}
-            selectedId={openId}
-          />
+        <SidebarCard
+          title="Finale targets"
+          subtitle="High momentum, high ceiling"
+          badge="Hot"
+          items={buckets.finale.slice(0, 4)}
+          onRowClick={handleRowClick}
+        />
 
-          <SidebarCard
-            title="Volatile upside"
-            subtitle="Ceiling spikes with risk"
-            items={buckets.volatileUpside.slice(0, 4)}
-            onRowClick={handleRowClick}
-            empty="No players in this filter."
-            selectedId={openId}
-          />
+        <SidebarCard
+          title="Volatile upside"
+          subtitle="Ceiling spikes with risk"
+          items={buckets.volatileUpside.slice(0, 4)}
+          onRowClick={handleRowClick}
+          empty="No players in this filter."
+        />
 
-          <SidebarCard
-            title="Safe floors"
-            subtitle="Stable momentum, capped ceiling"
-            items={buckets.safeFloors.slice(0, 4)}
-            onRowClick={handleRowClick}
-            empty="No players in this filter."
-            selectedId={openId}
-          />
+        <SidebarCard
+          title="Safe floors"
+          subtitle="Stable momentum, capped ceiling"
+          items={buckets.safeFloors.slice(0, 4)}
+          onRowClick={handleRowClick}
+          empty="No players in this filter."
+        />
 
-          <SidebarCard
-            title="Avoid / capped"
-            subtitle="Low leverage unless role changes"
-            items={buckets.avoid.slice(0, 3)}
-            onRowClick={handleRowClick}
-            empty="No players in this filter."
-            selectedId={openId}
-          />
-
-          {!isPremium ? (
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">Neeko+ note</div>
-              <div className="mt-2 text-sm text-white/70">
-                <span className="inline-flex items-center gap-1 text-white/60">
-                  <Lock className="h-3.5 w-3.5" />
-                  Upgrade to reveal matchup narrative + projection bands
-                </span>
-              </div>
-              <div className="mt-2 text-xs text-white/45">
-                Premium adds: stronger “why”, projection ranges, and role-stability context.
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-amber-400/15 bg-amber-400/[0.05] p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">Analyst note</div>
-              <div className="mt-2 text-sm text-amber-100/90">{premiumNarrative}</div>
-            </div>
-          )}
-        </div>
+        <SidebarCard
+          title="Avoid / capped"
+          subtitle="Low leverage unless role changes"
+          items={buckets.avoid.slice(0, 4)}
+          onRowClick={handleRowClick}
+          empty="No players in this filter."
+        />
       </div>
 
       {/* Modal */}
@@ -545,12 +486,11 @@ function SidebarCard(props: {
   badge?: string;
   empty?: string;
   onRowClick: (id: string) => void;
-  selectedId?: string | null;
 }) {
-  const { title, subtitle, items, badge, empty, onRowClick, selectedId } = props;
+  const { title, subtitle, items, badge, empty, onRowClick } = props;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="text-sm font-semibold text-white">{title}</div>
@@ -565,35 +505,92 @@ function SidebarCard(props: {
 
       <div className="mt-3 space-y-2">
         {items.length ? (
-          items.map((p) => {
-            const isSel = selectedId === p.id;
-            return (
-              <button
-                key={p.id}
-                onClick={() => onRowClick(p.id)}
-                className={cls(
-                  "w-full rounded-xl border px-3 py-2 text-left transition",
-                  "hover:bg-white/5 active:scale-[0.99]",
-                  isSel ? "border-amber-400/25 bg-amber-400/[0.06]" : "border-white/10 bg-black/20"
-                )}
-                aria-label={`Select ${p.name}`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-medium text-white/90">{p.name}</div>
-                    <div className="text-xs text-white/45">{p.teamName}</div>
-                  </div>
-                  <div className="text-xs text-white/60">
-                    M {p.momentum} · C {p.ceiling}
-                  </div>
+          items.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => onRowClick(p.id)}
+              className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left hover:bg-white/5"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-medium text-white/90">{p.name}</div>
+                  <div className="text-xs text-white/45">{p.teamName}</div>
                 </div>
-              </button>
-            );
-          })
+                <div className="text-xs text-white/60">
+                  M {p.momentum} · C {p.ceiling}
+                </div>
+              </div>
+            </button>
+          ))
         ) : (
           <div className="text-xs text-white/40">{empty ?? "No players in this filter."}</div>
         )}
       </div>
+    </div>
+  );
+}
+
+function SelectedCard(props: {
+  homeTeam: string;
+  awayTeam: string;
+  selected: PlayerPoint | null;
+  isPremium: boolean;
+  onOpenTrend: () => void;
+}) {
+  const { selected, isPremium, onOpenTrend } = props;
+
+  return (
+    <div className={cls(
+      "rounded-2xl border bg-black/20 p-4",
+      selected ? "border-amber-400/20" : "border-white/10"
+    )}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className={cls(
+            "text-[11px] uppercase tracking-[0.18em]",
+            selected ? "text-amber-300/80" : "text-white/35"
+          )}>
+            Selected
+          </div>
+          {selected ? (
+            <>
+              <div className="mt-0.5 text-lg font-semibold text-white">{selected.name}</div>
+              <div className="text-sm text-white/60">{selected.teamName}</div>
+              <div className="mt-2 text-sm text-white/70">
+                Momentum: <span className="text-white">{selected.momentum}</span>{" "}
+                <span className="text-white/40">·</span>{" "}
+                Ceiling: <span className="text-white">{selected.ceiling}</span>
+              </div>
+            </>
+          ) : (
+            <div className="mt-2 text-sm text-white/55 leading-relaxed">
+              Click a dot (or a name in the lists) to focus a player. Click again to open the trend/projection.
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={onOpenTrend}
+          disabled={!selected}
+          className={cls(
+            "rounded-full border px-3 py-1.5 text-xs transition",
+            selected
+              ? "border-white/10 bg-black/20 text-white/75 hover:bg-white/5"
+              : "border-white/10 bg-black/10 text-white/35 cursor-not-allowed"
+          )}
+        >
+          Open trend
+        </button>
+      </div>
+
+      {!isPremium && selected && (
+        <div className="mt-3 text-xs text-white/45">
+          <span className="inline-flex items-center gap-1 text-white/55">
+            <Lock className="h-3.5 w-3.5" />
+            Neeko+ Projection (locked)
+          </span>
+        </div>
+      )}
     </div>
   );
 }
