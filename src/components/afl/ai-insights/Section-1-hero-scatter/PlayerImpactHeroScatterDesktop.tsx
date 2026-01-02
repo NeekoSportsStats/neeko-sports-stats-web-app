@@ -41,6 +41,7 @@ export default function PlayerImpactHeroScatterDesktop({
   } = d;
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [hoverId, setHoverId] = useState<string | null>(null);
 
   const quadrantCounts = useMemo(
     () => ({
@@ -54,68 +55,69 @@ export default function PlayerImpactHeroScatterDesktop({
 
   return (
     <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-[#0b0b0b] to-black px-6 py-5">
-      {/* HEADER + CONTROLS (aligned to chart edge) */}
+      {/* HEADER */}
       <div>
         <h3 className="text-xl font-semibold text-white">
           Momentum vs Ceiling
         </h3>
-
         <p className="mt-1 text-sm text-white/60">
           {homeTeam} vs {awayTeam} · Analyst view
         </p>
-
         <p className="mt-1 text-sm text-white/80">
           {lean.direction} lean ({lean.diff > 0 ? "+" : ""}
           {lean.diff.toFixed(1)}) · {lean.strength}
         </p>
+      </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
+      {/* CONTROLS */}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
+          <button
+            key={k}
+            onClick={() => setLens(k)}
+            className={
+              "rounded-full border px-3 py-1.5 text-sm " +
+              (lens === k
+                ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+                : "border-white/10 bg-black/20 text-white/70")
+            }
+          >
+            {k === "fantasy"
+              ? "Fantasy"
+              : k === "disposals"
+              ? "Disposals"
+              : "Goals"}
+          </button>
+        ))}
+
+        <div className="ml-auto flex gap-1.5">
+          {(["both", "home", "away"] as const).map((k) => (
             <button
               key={k}
-              onClick={() => setLens(k)}
+              onClick={() => setTeamFilter(k)}
               className={
                 "rounded-full border px-3 py-1.5 text-sm " +
-                (lens === k
-                  ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
-                  : "border-white/10 bg-black/20 text-white/70")
+                (teamFilter === k
+                  ? "border-white/25 bg-white/10 text-white"
+                  : "border-white/10 bg-black/20 text-white/60")
               }
             >
-              {k === "fantasy"
-                ? "Fantasy"
-                : k === "disposals"
-                ? "Disposals"
-                : "Goals"}
+              {k}
             </button>
           ))}
-
-          <div className="ml-auto flex gap-1.5">
-            {(["both", "home", "away"] as const).map((k) => (
-              <button
-                key={k}
-                onClick={() => setTeamFilter(k)}
-                className={
-                  "rounded-full border px-3 py-1.5 text-sm " +
-                  (teamFilter === k
-                    ? "border-white/25 bg-white/10 text-white"
-                    : "border-white/10 bg-black/20 text-white/60")
-                }
-              >
-                {k}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
       {/* SCATTER + SIDEBAR */}
       <div className="mt-4 grid grid-cols-12 gap-4 items-start">
+        {/* SCATTER */}
         <div className="col-span-12 lg:col-span-9">
           <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/20">
             <svg
               viewBox={`0 0 ${W} ${H}`}
               className="w-full h-auto aspect-[760/420]"
             >
+              {/* GRID */}
               {Array.from({ length: 5 }).map((_, i) => {
                 const gx = PAD + ((W - PAD * 2) / 4) * i;
                 const gy = PAD + ((H - PAD * 2) / 4) * i;
@@ -139,6 +141,7 @@ export default function PlayerImpactHeroScatterDesktop({
                 );
               })}
 
+              {/* AXES */}
               <line
                 x1={x(50)}
                 y1={PAD}
@@ -154,26 +157,59 @@ export default function PlayerImpactHeroScatterDesktop({
                 stroke="rgba(255,255,255,0.18)"
               />
 
+              {/* POINTS */}
               {playersVisible.map((p) => {
                 const cx = x(p.momentum);
                 const cy = y(p.ceiling);
+                const isSelected = p.id === openId;
+                const isHover = p.id === hoverId;
+
                 return (
                   <g
                     key={p.id}
+                    onMouseEnter={() => setHoverId(p.id)}
+                    onMouseLeave={() => setHoverId(null)}
                     onClick={() => setOpenId(p.id)}
                     style={{ cursor: "pointer" }}
                   >
+                    {/* Gold selection ring */}
+                    {isSelected && (
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={14}
+                        fill="rgba(251,191,36,0.12)"
+                        stroke="rgba(251,191,36,0.75)"
+                        strokeWidth={2}
+                      />
+                    )}
+
+                    {/* Dot */}
                     <circle
                       cx={cx}
                       cy={cy}
-                      r={p.id === openId ? 9 : 7}
+                      r={isHover || isSelected ? 9 : 7}
                       fill={p.teamSide === "home" ? "#60a5fa" : "#34d399"}
                     />
+
+                    {/* Name label */}
+                    {(isHover || isSelected) && (
+                      <text
+                        x={cx + 10}
+                        y={cy - 10}
+                        fontSize="11"
+                        fill="white"
+                        opacity={0.9}
+                      >
+                        {p.name}
+                      </text>
+                    )}
                   </g>
                 );
               })}
             </svg>
 
+            {/* QUADRANT SUMMARY */}
             <div className="pointer-events-none absolute inset-0 text-[11px] text-white/45">
               <div className="absolute left-3 top-1/2 -translate-y-1/2">
                 Finale · {quadrantCounts.finale}
