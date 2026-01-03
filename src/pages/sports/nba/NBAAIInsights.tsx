@@ -3,6 +3,7 @@ import { Crown, ChevronDown } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/nba/match-center/types";
 import { MOCK_FIXTURES } from "@/components/nba/match-center/mockData";
+import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
 
 import type { PremiumMode } from "@/components/nba/ai-insights/data/types";
 
@@ -36,6 +37,11 @@ function currentRound(fixtures: FixtureMatch[]) {
 /* -------------------------------------------------------------------------- */
 
 export default function NBAAIInsights() {
+  if (!NBA_STAT_CONFIG?.availableStats?.length) {
+    console.error("NBA_STAT_CONFIG missing or invalid");
+    return null;
+  }
+
   const fixtures = MOCK_FIXTURES as unknown as FixtureMatch[];
 
   /* ---------------- GLOBAL STATE ---------------- */
