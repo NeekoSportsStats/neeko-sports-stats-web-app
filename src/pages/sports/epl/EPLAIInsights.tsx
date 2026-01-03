@@ -3,6 +3,7 @@ import { Crown, ChevronDown } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/epl/match-center/types";
 import { MOCK_FIXTURES } from "@/components/epl/match-center/mockData";
+import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
 
 import type { PremiumMode } from "@/components/epl/ai-insights/data/types";
 
@@ -36,6 +37,11 @@ function currentRound(fixtures: FixtureMatch[]) {
 /* -------------------------------------------------------------------------- */
 
 export default function EPLAIInsights() {
+  if (!EPL_STAT_CONFIG?.availableStats?.length) {
+    console.error("EPL_STAT_CONFIG missing or invalid");
+    return null;
+  }
+
   const fixtures = MOCK_FIXTURES as unknown as FixtureMatch[];
 
   /* ---------------- GLOBAL STATE ---------------- */

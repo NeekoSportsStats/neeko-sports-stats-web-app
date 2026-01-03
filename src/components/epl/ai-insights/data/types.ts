@@ -75,7 +75,7 @@ export type FixtureMatch = {
 };
 
 /* -------------------------------------------------------------------------- */
-/* AFL AI INSIGHTS — SHARED TYPES                                              */
+/* EPL AI INSIGHTS — SHARED TYPES                                              */
 /* -------------------------------------------------------------------------- */
 
 export type PremiumMode = "free" | "premium";
