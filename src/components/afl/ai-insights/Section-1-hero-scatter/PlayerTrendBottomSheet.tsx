@@ -127,7 +127,13 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
 
   if (!open || !player) return null;
 
-  const trendData = generateTrendData(player, lens);
+  const trendData = player.trend?.length
+    ? player.trend.map((pt) => ({
+        round: pt.label,
+        value: pt.value,
+        predicted: pt.kind === "projected",
+      }))
+    : generateTrendData(player, lens);
   const insight = generateInsight(player, lens, locked);
 
   return (
@@ -210,28 +216,31 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
 function TrendChart(props: { data: any[]; player: PlayerPoint; lens: LensKey; isSheetDragging: boolean }) {
   const { data, player, lens, isSheetDragging } = props;
   const [activePoint, setActivePoint] = useState<number | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
   const W = 320;
   const H = 200;
   const PAD = 24;
 
-  const maxVal = Math.max(...data.map((d) => d.value), 100);
-  const x = (i: number) => PAD + (i / (data.length - 1)) * (W - PAD * 2);
-  const y = (v: number) => H - PAD - ((v / maxVal) * (H - PAD * 2));
+  const trendValues = data.map((d) => d.value);
+  const yMin = Math.min(...trendValues);
+  const yMax = Math.max(...trendValues);
+  const yPadding = (yMax - yMin) * 0.05 || 5;
+  const yDomainMin = Math.max(0, yMin - yPadding);
+  const yDomainMax = yMax + yPadding;
+
+  const xDomain = [0, data.length - 1];
+
+  const x = (i: number) => PAD + (i / xDomain[1]) * (W - PAD * 2);
+  const y = (v: number) => {
+    const range = yDomainMax - yDomainMin;
+    return H - PAD - ((v - yDomainMin) / Math.max(1, range)) * (H - PAD * 2);
+  };
 
   const pathD = data.map((d, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(d.value)}`).join(" ");
 
-  const handlePointTouch = (e: React.TouchEvent, index: number) => {
+  const handlePointTap = (index: number) => {
     if (isSheetDragging) return;
-
-    e.stopPropagation();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const touchX = e.touches[0].clientX - rect.left;
-    const touchY = e.touches[0].clientY - rect.top;
-
-    setActivePoint(index);
-    setTooltipPos({ x: touchX, y: touchY });
+    setActivePoint(activePoint === index ? null : index);
   };
 
   return (
@@ -258,40 +267,44 @@ function TrendChart(props: { data: any[]; player: PlayerPoint; lens: LensKey; is
 
         <path d={pathD} fill="none" stroke="rgba(251,191,36,0.8)" strokeWidth={2.5} />
 
-        {data.map((d, i) => (
-          <g key={i}>
-            <circle
-              cx={x(i)}
-              cy={y(d.value)}
-              r={16}
-              fill="transparent"
-              onTouchStart={(e) => handlePointTouch(e, i)}
-              onTouchEnd={() => {
-                if (!isSheetDragging) {
-                  setActivePoint(null);
-                  setTooltipPos(null);
-                }
-              }}
-            />
-            <circle
-              cx={x(i)}
-              cy={y(d.value)}
-              r={activePoint === i ? 5 : 3.5}
-              fill={d.predicted ? "rgba(251,191,36,0.6)" : "rgba(251,191,36,0.95)"}
-              stroke={activePoint === i ? "rgba(255,255,255,0.5)" : "none"}
-              strokeWidth={2}
-              pointerEvents="none"
-            />
-          </g>
-        ))}
+        {data.map((d, i) => {
+          const cx = x(i);
+          const cy = y(d.value);
+
+          return (
+            <g key={i}>
+              <circle
+                cx={cx}
+                cy={cy}
+                r={16}
+                fill="transparent"
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handlePointTap(i);
+                }}
+                style={{ cursor: "pointer" }}
+              />
+              <circle
+                cx={cx}
+                cy={cy}
+                r={activePoint === i ? 5 : 3.5}
+                fill={d.predicted ? "rgba(251,191,36,0.6)" : "rgba(251,191,36,0.95)"}
+                stroke={activePoint === i ? "rgba(255,255,255,0.5)" : "none"}
+                strokeWidth={2}
+                pointerEvents="none"
+              />
+            </g>
+          );
+        })}
       </svg>
 
-      {activePoint !== null && tooltipPos && !isSheetDragging && (
+      {activePoint !== null && !isSheetDragging && (
         <div
           className="absolute z-20 rounded-lg border border-white/20 bg-[#0b0b0b] px-3 py-2 shadow-xl pointer-events-none"
           style={{
-            left: Math.min(tooltipPos.x, W - 100),
-            top: Math.max(tooltipPos.y - 60, 10),
+            left: Math.min(x(activePoint), W - 100),
+            top: Math.max(y(data[activePoint].value) - 60, 10),
           }}
         >
           <div className="text-xs text-white/60">{data[activePoint].round}</div>
