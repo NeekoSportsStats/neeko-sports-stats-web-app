@@ -142,7 +142,8 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
       >
         <div
           ref={handleRef}
-          className="sticky top-0 z-10 flex flex-col border-b border-white/10 bg-[#0b0b0b] px-4 pb-3 pt-2 cursor-grab active:cursor-grabbing touch-pan-y"
+          className="sticky top-0 z-10 flex flex-col border-b border-white/10 bg-[#0b0b0b] px-4 pb-3 pt-2 cursor-grab active:cursor-grabbing"
+          style={{ touchAction: "pan-y" }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -167,6 +168,7 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
         <div
           ref={contentRef}
           className="flex-1 overflow-y-auto px-4 py-4"
+          style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
         >
           <div className="mb-4">
             <div className="text-xs uppercase tracking-wider text-white/50 mb-2">Trend Chart</div>

@@ -161,8 +161,8 @@ export default function PlayerImpactHeroScatterMobile(props: {
       </div>
 
       {/* Plot (bigger, less dead space) */}
-      <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
-        <svg viewBox={`0 0 ${W} ${H}`} className="h-[360px] w-full touch-none">
+      <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20" style={{ touchAction: "manipulation" }}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="h-[360px] w-full">
           {Array.from({ length: 5 }).map((_, i) => {
             const gx = PAD + ((W - PAD * 2) / 4) * i;
             const gy = PAD + ((H - PAD * 2) / 4) * i;
