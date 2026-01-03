@@ -181,16 +181,11 @@ export default function AFLAIInsights() {
         {/* 1. HERO — PLAYER IMPACT MAP                                         */}
         {/* ------------------------------------------------------------------ */}
         {selectedMatch && (
-          <SectionShell
-            title="Player Impact Map"
-            subtitle="Momentum vs ceiling · Click any player to explore trend, projection, and risk"
-          >
-            <PlayerImpactScatterPanel
-              match={selectedMatch}
-              mode={mode}
-              initialLens={stat}
-            />
-          </SectionShell>
+          <PlayerImpactScatterPanel
+            match={selectedMatch}
+            mode={mode}
+            initialLens={stat}
+          />
         )}
 
         {/* ------------------------------------------------------------------ */}
