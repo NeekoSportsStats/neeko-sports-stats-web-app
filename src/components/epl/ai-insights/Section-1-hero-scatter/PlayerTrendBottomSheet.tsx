@@ -11,13 +11,22 @@ interface PlayerTrendBottomSheetProps {
   locked: boolean;
 }
 
+const DRAG_THRESHOLD = 12;
+const DISMISS_DISTANCE_RATIO = 0.3;
+const DISMISS_VELOCITY = 0.5;
+
 export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProps) {
   const { open, onClose, player, allPlayers, lens, locked } = props;
   const [isDragging, setIsDragging] = useState(false);
+  const [dragStarted, setDragStarted] = useState(false);
   const [dragY, setDragY] = useState(0);
   const [startY, setStartY] = useState(0);
+  const [startTime, setStartTime] = useState(0);
+  const [lastY, setLastY] = useState(0);
+  const [velocity, setVelocity] = useState(0);
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const handleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -25,6 +34,8 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
     } else {
       document.body.style.overflow = "";
       setDragY(0);
+      setDragStarted(false);
+      setIsDragging(false);
     }
     return () => {
       document.body.style.overflow = "";
@@ -45,21 +56,46 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
     if (contentRef.current && contentRef.current.scrollTop > 0) {
       return;
     }
+
+    const touch = e.touches[0];
     setIsDragging(true);
-    setStartY(e.touches[0].clientY);
+    setDragStarted(false);
+    setStartY(touch.clientY);
+    setLastY(touch.clientY);
+    setStartTime(Date.now());
+    setVelocity(0);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging) return;
+
     if (contentRef.current && contentRef.current.scrollTop > 0) {
       setIsDragging(false);
+      setDragStarted(false);
       return;
     }
 
     const currentY = e.touches[0].clientY;
     const diff = currentY - startY;
 
+    if (!dragStarted && Math.abs(diff) < DRAG_THRESHOLD) {
+      return;
+    }
+
+    if (!dragStarted) {
+      setDragStarted(true);
+    }
+
     if (diff > 0) {
+      const now = Date.now();
+      const timeDelta = now - startTime;
+      const yDelta = currentY - lastY;
+
+      if (timeDelta > 0) {
+        setVelocity(yDelta / timeDelta);
+      }
+
+      setLastY(currentY);
       setDragY(diff);
     }
   };
@@ -67,13 +103,19 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
   const handleTouchEnd = () => {
     if (!isDragging) return;
     setIsDragging(false);
+    setDragStarted(false);
 
-    const threshold = window.innerHeight * 0.25;
-    if (dragY > threshold) {
+    const sheetHeight = sheetRef.current?.offsetHeight || window.innerHeight * 0.8;
+    const dismissDistance = sheetHeight * DISMISS_DISTANCE_RATIO;
+    const shouldDismiss = dragY > dismissDistance || velocity > DISMISS_VELOCITY;
+
+    if (shouldDismiss) {
       onClose();
     } else {
       setDragY(0);
     }
+
+    setVelocity(0);
   };
 
   if (!open || !player) return null;
@@ -95,14 +137,17 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
         style={{
           height: "80vh",
           transform: `translateY(${dragY}px)`,
-          transition: isDragging ? "none" : "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+          transition: isDragging ? "none" : "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
         }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
       >
-        <div className="sticky top-0 z-10 flex flex-col border-b border-white/10 bg-[#0b0b0b] px-4 pb-3 pt-2">
-          <div className="mx-auto mb-2 h-1 w-12 rounded-full bg-white/20" />
+        <div
+          ref={handleRef}
+          className="sticky top-0 z-10 flex flex-col border-b border-white/10 bg-[#0b0b0b] px-4 pb-3 pt-2 cursor-grab active:cursor-grabbing touch-pan-y"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className="mx-auto mb-2 h-1 w-12 rounded-full bg-white/30 transition-colors" />
 
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
