@@ -351,19 +351,40 @@ export default function PlayerTrendModal(props: {
                   const minY = Math.min(...series.ys);
                   const maxY = Math.max(...series.ys);
                   const scaleX = (i: number) => PAD + (i / Math.max(1, series.ys.length - 1)) * (CH_W - PAD * 2);
+                  const scaleY = (v: number) => PAD + (1 - (v - minY) / Math.max(1, maxY - minY)) * (CH_H - PAD * 2);
                   const xPos = scaleX(hoverIdx);
+                  const yPos = scaleY(value);
                   const xPercent = (xPos / CH_W) * 100;
+                  const yPercent = (yPos / CH_H) * 100;
 
-                  const flipHorizontal = xPercent > 75;
-                  const tooltipStyles: React.CSSProperties = flipHorizontal
-                    ? { right: `${100 - xPercent}%`, transform: 'translateX(50%)', top: '12px' }
-                    : { left: `${xPercent}%`, transform: 'translateX(-50%)', top: '12px' };
+                  const flipHorizontal = xPercent > 70;
+                  const flipVertical = yPercent < 25;
+
+                  const tooltipStyles: React.CSSProperties = {
+                    position: 'absolute',
+                    pointerEvents: 'none',
+                    zIndex: 50,
+                  };
+
+                  if (flipHorizontal) {
+                    tooltipStyles.right = `${100 - xPercent + 2}%`;
+                    tooltipStyles.transform = 'translateX(50%)';
+                  } else {
+                    tooltipStyles.left = `${xPercent}%`;
+                    tooltipStyles.transform = 'translateX(-50%)';
+                  }
+
+                  if (flipVertical) {
+                    tooltipStyles.top = `${yPercent}%`;
+                    tooltipStyles.marginTop = '12px';
+                  } else {
+                    tooltipStyles.top = `${yPercent}%`;
+                    tooltipStyles.marginTop = '-12px';
+                    tooltipStyles.transform = (tooltipStyles.transform || '') + ' translateY(-100%)';
+                  }
 
                   return (
-                    <div
-                      className="absolute pointer-events-none z-50"
-                      style={tooltipStyles}
-                    >
+                    <div style={tooltipStyles}>
                       <div className="rounded-xl border border-amber-400/30 bg-black/95 backdrop-blur-sm px-3 py-2 shadow-2xl whitespace-nowrap">
                         <div className="text-xs font-semibold text-amber-200">{point.week}</div>
                         <div className="mt-0.5 text-sm text-white">

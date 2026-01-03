@@ -291,9 +291,9 @@ export default function PlayerImpactHeroScatterDesktop(props: {
                       <circle
                         cx={x(p.momentum)}
                         cy={y(p.ceiling)}
-                        r={isHovered ? 7.5 : 6.5}
+                        r={isSel ? 7.5 : isHovered ? 7.5 : 6.5}
                         fill={p.teamSide === "home" ? "#3B82F6" : "#10B981"}
-                        opacity={openId && !isSel ? 0.35 : isHovered ? 1 : 0.95}
+                        opacity={openId && !isSel ? 0.30 : isHovered ? 1 : 0.95}
                         stroke={isSel ? "rgba(245, 158, 11, 0.95)" : isHovered ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.12)"}
                         strokeWidth={isSel ? 3 : isHovered ? 2 : 1}
                         pointerEvents="none"
@@ -303,11 +303,11 @@ export default function PlayerImpactHeroScatterDesktop(props: {
                         <circle
                           cx={x(p.momentum)}
                           cy={y(p.ceiling)}
-                          r={12}
+                          r={13}
                           fill="transparent"
-                          stroke="rgba(245, 158, 11, 0.35)"
-                          strokeWidth={9}
-                          style={{ filter: "blur(0.5px)" }}
+                          stroke="rgba(245, 158, 11, 0.40)"
+                          strokeWidth={10}
+                          style={{ filter: "blur(0.8px)" }}
                           pointerEvents="none"
                         />
                       )}
@@ -393,6 +393,14 @@ export default function PlayerImpactHeroScatterDesktop(props: {
         <div className="col-span-12 lg:col-span-3">
           <div className="space-y-3 lg:sticky lg:top-24">
             <Top3ImpactPanel
+              playersVisible={playersVisible}
+              onSelectPlayer={handleRowClick}
+              onHoverPlayer={setHoverId}
+              openId={openId}
+              hoverId={hoverId}
+            />
+
+            <Bottom3ImpactPanel
               playersVisible={playersVisible}
               onSelectPlayer={handleRowClick}
               onHoverPlayer={setHoverId}
@@ -507,6 +515,80 @@ function Top3ImpactPanel(props: {
   );
 }
 
+function Bottom3ImpactPanel(props: {
+  playersVisible: PlayerPoint[];
+  onSelectPlayer: (id: string) => void;
+  onHoverPlayer: (id: string | null) => void;
+  openId: string | null;
+  hoverId: string | null;
+}) {
+  const { playersVisible, onSelectPlayer, onHoverPlayer, openId, hoverId } = props;
+
+  const bottom3 = useMemo(() => {
+    const sorted = [...playersVisible].sort((a, b) => {
+      const scoreA = a.momentum + a.ceiling;
+      const scoreB = b.momentum + b.ceiling;
+      return scoreA - scoreB;
+    });
+    return sorted.slice(0, 3);
+  }, [playersVisible]);
+
+  if (bottom3.length < 3) return null;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+      <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">Bottom 3 — Low Impact</div>
+      <div className="mt-0.5 text-xs text-white/40">Lowest combined momentum + ceiling</div>
+
+      <div className="mt-2 space-y-1">
+        {bottom3.map((player) => {
+          const isSelected = player.id === openId;
+          const isHovered = player.id === hoverId;
+
+          return (
+            <button
+              key={player.id}
+              onClick={() => onSelectPlayer(player.id)}
+              onMouseEnter={() => onHoverPlayer(player.id)}
+              onMouseLeave={() => onHoverPlayer(null)}
+              className={cls(
+                "w-full rounded-lg border p-2 text-left transition",
+                isSelected
+                  ? "border-amber-400/40 bg-amber-400/10"
+                  : isHovered
+                  ? "border-white/20 bg-white/5"
+                  : "border-white/10 bg-black/20 hover:bg-white/5"
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <div
+                    className="h-2 w-2 rounded-full shrink-0 opacity-70"
+                    style={{
+                      background: player.teamSide === "home" ? "#3B82F6" : "#10B981",
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium text-white/80 truncate">
+                      {player.name}
+                    </div>
+                    <div className="text-[10px] text-white/40">{player.teamName}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-white/50 shrink-0">
+                  <span>M {player.momentum}</span>
+                  <span className="text-white/25">·</span>
+                  <span>C {player.ceiling}</span>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function SelectedCard(props: {
   homeTeam: string;
   awayTeam: string;
@@ -515,10 +597,19 @@ function SelectedCard(props: {
   onOpenTrend: () => void;
 }) {
   const { selected, onOpenTrend } = props;
+  const [hasSeenFirstSelection, setHasSeenFirstSelection] = React.useState(false);
+
+  React.useEffect(() => {
+    if (selected && !hasSeenFirstSelection) {
+      setHasSeenFirstSelection(true);
+    }
+  }, [selected, hasSeenFirstSelection]);
+
+  const showPulse = selected && !hasSeenFirstSelection;
 
   return (
     <div className={cls(
-      "rounded-2xl border bg-black/20 p-3",
+      "rounded-2xl border bg-black/20 p-3 transition-all duration-300",
       selected ? "border-amber-400/20" : "border-white/10"
     )}>
       {selected ? (
@@ -531,9 +622,14 @@ function SelectedCard(props: {
 
             <button
               onClick={onOpenTrend}
-              className="shrink-0 rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-[11px] text-white/70 hover:bg-white/5 transition"
+              className={cls(
+                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                "border-amber-400/40 bg-amber-400/90 text-black hover:bg-amber-400",
+                "shadow-[0_0_12px_rgba(251,191,36,0.3)]",
+                showPulse && "animate-pulse"
+              )}
             >
-              Trend
+              View Trend
             </button>
           </div>
 
@@ -547,12 +643,12 @@ function SelectedCard(props: {
           </div>
         </>
       ) : (
-        <div className="flex flex-col items-center justify-center py-6 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5 mb-3">
-            <Sparkles className="h-5 w-5 text-white/40" />
+        <div className="flex flex-col items-center justify-center py-6 text-center group cursor-default">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/5 mb-3 transition-all duration-300 group-hover:border-amber-400/30 group-hover:bg-amber-400/5 group-hover:shadow-[0_0_20px_rgba(251,191,36,0.15)] group-hover:-translate-y-1">
+            <Sparkles className="h-6 w-6 text-white/40 transition-colors group-hover:text-amber-400/70" />
           </div>
-          <div className="text-xs text-white/50 max-w-[180px]">
-            Select a player to view details
+          <div className="text-xs text-white/50 max-w-[180px] font-medium">
+            Select a player to view trend & projection
           </div>
         </div>
       )}
