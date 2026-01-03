@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { X, ChevronDown, ChevronRight } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { PredictRow, PremiumMode } from "../data/types";
-import { confLabel, volLabel } from "../data/utils";
+import type { FixtureMatch } from "@/components/nba/match-center/types";
+import { confLabel, volLabel, mean } from "../data/utils";
+import { buildPlayerPredictabilityFromFixtures } from "../data/engine";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES & HELPERS                                                             */
@@ -102,23 +104,48 @@ function fakeLockedRow(r: PredictRow): PredictRow {
 /* COMPONENT                                                                   */
 /* -------------------------------------------------------------------------- */
 
+type StatLens = "fantasy" | "disposals" | "goals";
+
 export default function PredictabilityTable({
-  rows,
+  fixtures,
+  match,
   mode,
-  statLabel,
-  matchContext,
-  insight,
   showHeader = true,
 }: {
-  rows: PredictRow[];
+  fixtures: FixtureMatch[];
+  match?: FixtureMatch;
   mode: PremiumMode;
-  statLabel: string;
-  matchContext?: string;
-  insight?: string;
   showHeader?: boolean;
 }) {
   const locked = mode !== "premium";
+
+  const [statLens, setStatLens] = useState<StatLens>("fantasy");
+  const statLabel = statLens === "fantasy" ? "Fantasy" : statLens === "disposals" ? "Disposals" : "Goals";
   const statKey = useMemo(() => inferStatKey(statLabel), [statLabel]);
+
+  const rawPlayerPredict = useMemo(
+    () => buildPlayerPredictabilityFromFixtures(fixtures, statLens),
+    [fixtures, statLens]
+  );
+
+  const rows = useMemo(() => {
+    if (!match) return [];
+    const home = (match as any).homeTeam;
+    const away = (match as any).awayTeam;
+    return rawPlayerPredict.filter(
+      (p) => p.team === home || p.team === away
+    );
+  }, [rawPlayerPredict, match]);
+
+  const matchContext = match ? `${(match as any).homeTeam} vs ${(match as any).awayTeam}` : undefined;
+
+  const playerInsight = useMemo(() => {
+    if (!rows.length) return "";
+    const avgConf = mean(rows.map((r) => r.confidence01));
+    return avgConf >= 0.7
+      ? `${statLabel} production shows strong role reliability across the matchup.`
+      : `${statLabel} output varies by role dependency and matchup conditions.`;
+  }, [rows, statLabel]);
 
   const [chip, setChip] = useState<Chip>("safe");
   const [open, setOpen] = useState(false);
@@ -162,7 +189,7 @@ export default function PredictabilityTable({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statLabel]);
+  }, [statLens]);
 
   /* One-time mobile "tap to expand" affordance memory */
   useEffect(() => {
@@ -194,21 +221,37 @@ export default function PredictabilityTable({
       <section className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden">
         {showHeader && (
           <header className="px-6 pt-5 pb-4 border-b border-white/10">
-            <h2 className="text-lg font-semibold text-white">
-              1. Player Score Predictability
-            </h2>
-            <p className="mt-1 text-sm text-white/60">
-              Expected scoring ranges, confidence and volatility.
-            </p>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold text-white">
+                  Player Score Predictability
+                </h2>
+                <p className="mt-1 text-sm text-white/60">
+                  Expected scoring ranges, confidence and volatility.
+                </p>
+              </div>
 
-            {insight && (
+              <div className="flex gap-1.5">
+                {(["fantasy", "disposals", "goals"] as StatLens[]).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setStatLens(s)}
+                    className={cx(
+                      "rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                      statLens === s
+                        ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+                        : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
+                    )}
+                  >
+                    {s === "fantasy" ? "Fantasy" : s === "disposals" ? "Disposals" : "Goals"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {matchContext && (
               <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-                {insight}
-                {matchContext && (
-                  <div className="mt-1 text-xs text-amber-200/70">
-                    Adjusted for {matchContext}
-                  </div>
-                )}
+                {statLabel} predictions adjusted for {matchContext}
               </div>
             )}
           </header>

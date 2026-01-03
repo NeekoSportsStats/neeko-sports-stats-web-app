@@ -5,9 +5,7 @@ import type { FixtureMatch } from "@/components/afl/match-center/types";
 import { MOCK_FIXTURES } from "@/components/afl/match-center/mockData";
 
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
-import { STAT_LABEL, StatLens, mean } from "@/components/afl/ai-insights/data/utils";
 
-import SectionShell from "@/components/afl/ai-insights/shared/SectionShell";
 import PredictabilityTable from "@/components/afl/ai-insights/Section-2-player-predictability/PredictabilityTable";
 import TeamPredictabilityPanel from "@/components/afl/ai-insights/Section-3-team-prediction/TeamPredictabilityPanel";
 import GameFlowMomentumPanel from "@/components/afl/ai-insights/Section-4-game-flow/GameFlowMomentumPanel";
@@ -17,7 +15,6 @@ import {
   filterPastFixtures,
   filterUpcomingFixtures,
   roundOrder,
-  buildPlayerPredictabilityFromFixtures,
 } from "@/components/afl/ai-insights/data/engine";
 
 /* -------------------------------------------------------------------------- */
@@ -81,35 +78,6 @@ export default function AFLAIInsights() {
     [roundMatches, matchId]
   );
 
-  /* -------------------------------------------------------------------------- */
-  /* PLAYER SCORE PREDICTABILITY DATA                                           */
-  /* -------------------------------------------------------------------------- */
-
-  const rawPlayerPredict = useMemo(
-    () => buildPlayerPredictabilityFromFixtures(pastFixtures, "fantasy"),
-    [pastFixtures]
-  );
-
-  const playerPredict = useMemo(() => {
-    if (!selectedMatch) return [];
-
-    const home = (selectedMatch as any).homeTeam;
-    const away = (selectedMatch as any).awayTeam;
-
-    return rawPlayerPredict.filter(
-      (p) => p.team === home || p.team === away
-    );
-  }, [rawPlayerPredict, selectedMatch]);
-
-  const playerInsight = useMemo(() => {
-    if (!playerPredict.length) return "";
-
-    const avgConf = mean(playerPredict.map((r) => r.confidence01));
-
-    return avgConf >= 0.7
-      ? "Fantasy production shows strong role reliability across the matchup."
-      : "Fantasy output varies by role dependency and matchup conditions.";
-  }, [playerPredict]);
 
   /* -------------------------------------------------------------------------- */
   /* RENDER                                                                    */
@@ -174,16 +142,11 @@ export default function AFLAIInsights() {
         {/* 2. PLAYER SCORE PREDICTABILITY                                      */}
         {/* ------------------------------------------------------------------ */}
         {selectedMatch && (
-          <SectionShell title="Player Score Predictability">
-            <PredictabilityTable
-              rows={playerPredict}
-              mode={mode}
-              statLabel="Fantasy"
-              matchContext={`${(selectedMatch as any).homeTeam} vs ${(selectedMatch as any).awayTeam}`}
-              insight={playerInsight}
-              showHeader={false}
-            />
-          </SectionShell>
+          <PredictabilityTable
+            fixtures={pastFixtures}
+            match={selectedMatch}
+            mode={mode}
+          />
         )}
 
         {/* ------------------------------------------------------------------ */}
@@ -194,7 +157,6 @@ export default function AFLAIInsights() {
             mode={mode}
             match={selectedMatch as any}
             fixtures={pastFixtures}
-            stat="fantasy"
           />
         )}
 

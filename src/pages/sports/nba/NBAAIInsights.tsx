@@ -5,10 +5,7 @@ import type { FixtureMatch } from "@/components/nba/match-center/types";
 import { MOCK_FIXTURES } from "@/components/nba/match-center/mockData";
 
 import type { PremiumMode } from "@/components/nba/ai-insights/data/types";
-import { STAT_LABEL, StatLens, mean } from "@/components/nba/ai-insights/data/utils";
 
-import SectionShell from "@/components/nba/ai-insights/shared/SectionShell";
-import ControlsBar from "@/components/nba/ai-insights/shared/ControlsBar";
 import PredictabilityTable from "@/components/nba/ai-insights/Section-2-player-predictability/PredictabilityTable";
 import TeamPredictabilityPanel from "@/components/nba/ai-insights/Section-3-team-prediction/TeamPredictabilityPanel";
 import GameFlowMomentumPanel from "@/components/nba/ai-insights/Section-4-game-flow/GameFlowMomentumPanel";
@@ -18,7 +15,6 @@ import {
   filterPastFixtures,
   filterUpcomingFixtures,
   roundOrder,
-  buildPlayerPredictabilityFromFixtures,
 } from "@/components/nba/ai-insights/data/engine";
 
 /* -------------------------------------------------------------------------- */
@@ -45,7 +41,6 @@ export default function NBAAIInsights() {
   /* ---------------- GLOBAL STATE ---------------- */
 
   const [mode, setMode] = useState<PremiumMode>("free");
-  const [stat, setStat] = useState<StatLens>("fantasy");
 
   /* ---------------- ROUND + MATCH ---------------- */
 
@@ -83,48 +78,6 @@ export default function NBAAIInsights() {
     [roundMatches, matchId]
   );
 
-  /* -------------------------------------------------------------------------- */
-  /* PLAYER SCORE PREDICTABILITY DATA                                           */
-  /* -------------------------------------------------------------------------- */
-
-  const rawPlayerPredict = useMemo(
-    () => buildPlayerPredictabilityFromFixtures(pastFixtures, stat),
-    [pastFixtures, stat]
-  );
-
-  const playerPredict = useMemo(() => {
-    if (!selectedMatch) return [];
-
-    const home = (selectedMatch as any).homeTeam;
-    const away = (selectedMatch as any).awayTeam;
-
-    return rawPlayerPredict.filter(
-      (p) => p.team === home || p.team === away
-    );
-  }, [rawPlayerPredict, selectedMatch]);
-
-  const playerInsight = useMemo(() => {
-    if (!playerPredict.length) return "";
-
-    const avgConf = mean(playerPredict.map((r) => r.confidence01));
-    const avgVol = mean(playerPredict.map((r) => r.volatility01));
-
-    if (stat === "goals") {
-      return avgVol >= 0.6
-        ? "Goal profiles suggest surge-prone phases and late separation risk."
-        : "Goal output is tightly clustered, limiting swing phases.";
-    }
-
-    if (stat === "disposals") {
-      return avgConf >= 0.7
-        ? "Disposal roles appear highly repeatable across both sides."
-        : "Rotations introduce moderate possession volatility.";
-    }
-
-    return avgConf >= 0.7
-      ? "Fantasy production shows strong role reliability across the matchup."
-      : "Fantasy output varies by role dependency and matchup conditions.";
-  }, [playerPredict, stat]);
 
   /* -------------------------------------------------------------------------- */
   /* RENDER                                                                    */
@@ -136,9 +89,9 @@ export default function NBAAIInsights() {
         {/* HEADER */}
         <header className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">AFL AI Insights</h1>
+            <h1 className="text-3xl font-bold">NBA AI Insights</h1>
             <p className="mt-1 text-sm text-white/60">
-              Match-scoped intelligence · {STAT_LABEL[stat]} lens
+              Match-scoped intelligence
             </p>
           </div>
 
@@ -174,39 +127,26 @@ export default function NBAAIInsights() {
           </div>
         </div>
 
-        {/* STAT FILTER */}
-        <ControlsBar stat={stat} onChange={setStat} />
-
         {/* ------------------------------------------------------------------ */}
         {/* 1. HERO — PLAYER IMPACT MAP                                         */}
         {/* ------------------------------------------------------------------ */}
         {selectedMatch && (
-          <SectionShell
-            title="Player Impact Map"
-            subtitle="Momentum vs ceiling · Click any player to explore trend, projection, and risk"
-          >
-            <PlayerImpactScatterPanel
-              match={selectedMatch}
-              mode={mode}
-              initialLens={stat}
-            />
-          </SectionShell>
+          <PlayerImpactScatterPanel
+            match={selectedMatch}
+            mode={mode}
+            initialLens="fantasy"
+          />
         )}
 
         {/* ------------------------------------------------------------------ */}
         {/* 2. PLAYER SCORE PREDICTABILITY                                      */}
         {/* ------------------------------------------------------------------ */}
         {selectedMatch && (
-          <SectionShell title="Player Score Predictability">
-            <PredictabilityTable
-              rows={playerPredict}
-              mode={mode}
-              statLabel={STAT_LABEL[stat]}
-              matchContext={`${(selectedMatch as any).homeTeam} vs ${(selectedMatch as any).awayTeam}`}
-              insight={playerInsight}
-              showHeader={false}
-            />
-          </SectionShell>
+          <PredictabilityTable
+            fixtures={pastFixtures}
+            match={selectedMatch}
+            mode={mode}
+          />
         )}
 
         {/* ------------------------------------------------------------------ */}
@@ -217,7 +157,6 @@ export default function NBAAIInsights() {
             mode={mode}
             match={selectedMatch as any}
             fixtures={pastFixtures}
-            stat={stat}
           />
         )}
 
