@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { ArrowRight, Flame, Info, Sparkles } from "lucide-react";
-import type { FixtureMatch } from "@/components/afl/match-center/types";
-import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
+import type { FixtureMatch } from "@/components/nba/match-center/types";
+import type { PremiumMode } from "@/components/nba/ai-insights/data/types";
 
 import PlayerTrendBottomSheet from "./PlayerTrendBottomSheet";
 import { usePlayerScatterData, type LensKey, type PlayerPoint } from "./usePlayerScatterData";
