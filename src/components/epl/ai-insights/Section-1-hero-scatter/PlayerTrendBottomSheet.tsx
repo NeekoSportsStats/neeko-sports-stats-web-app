@@ -19,6 +19,7 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
   const { open, onClose, player, allPlayers, lens, locked } = props;
   const [isDragging, setIsDragging] = useState(false);
   const [dragStarted, setDragStarted] = useState(false);
+  const [isSheetDragging, setIsSheetDragging] = useState(false);
   const [dragY, setDragY] = useState(0);
   const [startY, setStartY] = useState(0);
   const [startTime, setStartTime] = useState(0);
@@ -36,6 +37,7 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
       setDragY(0);
       setDragStarted(false);
       setIsDragging(false);
+      setIsSheetDragging(false);
     }
     return () => {
       document.body.style.overflow = "";
@@ -72,6 +74,7 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
     if (contentRef.current && contentRef.current.scrollTop > 0) {
       setIsDragging(false);
       setDragStarted(false);
+      setIsSheetDragging(false);
       return;
     }
 
@@ -84,6 +87,7 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
 
     if (!dragStarted) {
       setDragStarted(true);
+      setIsSheetDragging(true);
     }
 
     if (diff > 0) {
@@ -104,6 +108,7 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
     if (!isDragging) return;
     setIsDragging(false);
     setDragStarted(false);
+    setIsSheetDragging(false);
 
     const sheetHeight = sheetRef.current?.offsetHeight || window.innerHeight * 0.8;
     const dismissDistance = sheetHeight * DISMISS_DISTANCE_RATIO;
