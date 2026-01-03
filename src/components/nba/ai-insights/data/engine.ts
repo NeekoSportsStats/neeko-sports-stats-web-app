@@ -1,4 +1,4 @@
-// src/components/afl/ai-insights/engine.ts
+// src/components/nba/ai-insights/engine.ts
 // NOTE: Full replacement file. Keeps existing exports and adds Player Impact Visual builders.
 // Designed to be deterministic (no per-render Math.random flicker).
 
@@ -28,7 +28,7 @@ import type {
   FixtureMatch,
   TeamStatLine,
 } from "@/components/nba/match-center/types";
-import type { AFLTeam } from "@/components/nba/teams/mockTeams";
+import type { AFLTeam } from "@/components/nba/teams/data/mockTeams";
 
 const WINDOW = 8;
 
