@@ -46,8 +46,6 @@ export default function PlayerImpactHeroScatterDesktop(props: {
     labelMode,
     setLabelMode,
     playersVisible,
-    ranked,
-    buckets,
     openId,
     setOpenId,
     selected,
@@ -152,26 +150,6 @@ export default function PlayerImpactHeroScatterDesktop(props: {
                     "rounded-full border px-2.5 py-1 text-[11px] transition",
                     teamFilter === k
                       ? "border-white/25 bg-white/10 text-white"
-                      : "border-white/10 bg-black/20 text-white/50 hover:bg-white/5"
-                  )}
-                >
-                  {k}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-white/40">Labels</span>
-            <div className="flex gap-1">
-              {(["smart", "all", "none"] as LabelMode[]).map((k) => (
-                <button
-                  key={k}
-                  onClick={() => setLabelMode(k)}
-                  className={cls(
-                    "rounded-full border px-2.5 py-1 text-[11px] transition",
-                    labelMode === k
-                      ? "border-amber-400/35 bg-amber-400/10 text-amber-200"
                       : "border-white/10 bg-black/20 text-white/50 hover:bg-white/5"
                   )}
                 >
@@ -425,48 +403,6 @@ export default function PlayerImpactHeroScatterDesktop(props: {
         </div>
       </div>
 
-      {/* Buckets below the scatter: multi-column to reduce overall scroll */}
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <SidebarCard
-          title="Top targets"
-          subtitle="Best combined momentum + ceiling"
-          items={ranked.slice(0, 4)}
-          onRowClick={handleRowClick}
-        />
-
-        <SidebarCard
-          title="Finale targets"
-          subtitle="High momentum, high ceiling"
-          badge="Hot"
-          items={buckets.finale.slice(0, 4)}
-          onRowClick={handleRowClick}
-        />
-
-        <SidebarCard
-          title="Volatile upside"
-          subtitle="Ceiling spikes with risk"
-          items={buckets.volatileUpside.slice(0, 4)}
-          onRowClick={handleRowClick}
-          empty="No players match the current filters. Try switching metric or team."
-        />
-
-        <SidebarCard
-          title="Safe floors"
-          subtitle="Stable momentum, capped ceiling"
-          items={buckets.safeFloors.slice(0, 4)}
-          onRowClick={handleRowClick}
-          empty="No players match the current filters. Try switching metric or team."
-        />
-
-        <SidebarCard
-          title="Avoid / capped"
-          subtitle="Low leverage unless role changes"
-          items={buckets.avoid.slice(0, 4)}
-          onRowClick={handleRowClick}
-          empty="No players match the current filters. Try switching metric or team."
-        />
-      </div>
-
       {/* Modal */}
       <PlayerTrendModal
         open={modalOpen}
@@ -476,57 +412,6 @@ export default function PlayerImpactHeroScatterDesktop(props: {
         lens={lens}
         locked={!isPremium}
       />
-    </div>
-  );
-}
-
-function SidebarCard(props: {
-  title: string;
-  subtitle: string;
-  items: PlayerPoint[];
-  badge?: string;
-  empty?: string;
-  onRowClick: (id: string) => void;
-}) {
-  const { title, subtitle, items, badge, empty, onRowClick } = props;
-
-  return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="text-sm font-semibold text-white">{title}</div>
-          <div className="mt-0.5 text-xs text-white/50">{subtitle}</div>
-        </div>
-        {badge && (
-          <span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[11px] text-amber-200">
-            {badge}
-          </span>
-        )}
-      </div>
-
-      <div className="mt-3 space-y-2">
-        {items.length ? (
-          items.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => onRowClick(p.id)}
-              className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left hover:bg-white/5"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <div className="text-sm font-medium text-white/90">{p.name}</div>
-                  <div className="text-xs text-white/45">{p.teamName}</div>
-                </div>
-                <div className="text-xs text-white/60">
-                  M {p.momentum} · C {p.ceiling}
-                </div>
-              </div>
-            </button>
-          ))
-        ) : (
-          <div className="text-xs text-white/40 leading-relaxed">{empty ?? "No players match the current filters. Try switching metric or team."}</div>
-        )}
-      </div>
     </div>
   );
 }

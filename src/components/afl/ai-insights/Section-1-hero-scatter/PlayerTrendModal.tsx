@@ -111,13 +111,13 @@ export default function PlayerTrendModal(props: {
   return (
     <div className="fixed inset-0 z-[80]">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-3xl -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto">
-        <div className="rounded-3xl border border-white/10 bg-[#0b0b0b] shadow-2xl">
-          <div className="flex items-start justify-between gap-3 px-6 pt-5">
+      <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-3xl -translate-x-1/2 -translate-y-1/2">
+        <div className="max-h-[90vh] overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0b0b] shadow-2xl">
+          <div className="flex items-start justify-between gap-3 px-6 pt-4 pb-3">
             <div>
               <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Player Trend</div>
               <div className="mt-1 text-2xl font-semibold text-white">{player.name}</div>
-              <div className="mt-1 text-sm text-white/55">Weekly {statLabel} output</div>
+              <div className="mt-0.5 text-sm text-white/55">Weekly {statLabel} output</div>
             </div>
 
             <button
@@ -128,7 +128,7 @@ export default function PlayerTrendModal(props: {
             </button>
           </div>
 
-          <div className="px-6 pb-6 pt-4">
+          <div className="px-6 pb-4">
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1">
                 <select
@@ -164,7 +164,7 @@ export default function PlayerTrendModal(props: {
               </div>
             )}
 
-            <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
+            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
               <div className="relative">
                 <svg viewBox={`0 0 ${CH_W} ${CH_H}`} className="h-[320px] w-full">
                   {/* Horizontal grid lines */}
@@ -288,12 +288,12 @@ export default function PlayerTrendModal(props: {
               </div>
             </div>
 
-            <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/75">
+            <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-2.5 text-sm text-white/75">
               <span className="text-amber-200">AI Insight:</span> {aiLine}
             </div>
 
             {locked ? (
-              <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+              <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-2.5">
                 <div className="inline-flex items-center gap-2 text-sm text-white/70">
                   <Lock className="h-4 w-4" />
                   <span className="font-medium">Premium includes:</span>
@@ -308,7 +308,7 @@ export default function PlayerTrendModal(props: {
                 </div>
               </div>
             ) : (
-              <div className="mt-3 rounded-2xl border border-amber-400/15 bg-amber-400/[0.06] px-4 py-3 text-sm text-amber-100/90">
+              <div className="mt-3 rounded-2xl border border-amber-400/15 bg-amber-400/[0.06] px-4 py-2.5 text-sm text-amber-100/90">
                 Projection bands: low <span className="font-semibold">{projection.low}</span> · expected{" "}
                 <span className="font-semibold">{projection.mid}</span> · high{" "}
                 <span className="font-semibold">{projection.high}</span>
