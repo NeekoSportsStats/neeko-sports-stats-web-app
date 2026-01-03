@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Flame, Info, Lock, Sparkles } from "lucide-react";
+import { ArrowRight, Flame, Info, Lock, Sparkles } from "lucide-react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 
@@ -49,22 +49,8 @@ export default function PlayerImpactHeroScatterDesktop(props: {
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
 
-  const topExtremes = useMemo(() => {
-    const sorted = [...playersVisible].sort((a, b) => {
-      const scoreA = a.momentum + a.ceiling;
-      const scoreB = b.momentum + b.ceiling;
-      return scoreB - scoreA;
-    });
-    const topCombined = sorted.slice(0, 3).map((p) => p.id);
-
-    const sortedCeiling = [...playersVisible].sort((a, b) => b.ceiling - a.ceiling);
-    const topCeiling = sortedCeiling.slice(0, 3).map((p) => p.id);
-
-    return new Set([...topCombined, ...topCeiling]);
-  }, [playersVisible]);
-
   const shouldShowLabel = (p: PlayerPoint) => {
-    return p.id === hoverId || p.id === openId || topExtremes.has(p.id);
+    return p.id === hoverId || p.id === openId;
   };
 
   const premiumNarrative = useMemo(() => {
@@ -235,16 +221,16 @@ export default function PlayerImpactHeroScatterDesktop(props: {
                 </text>
 
                 {/* quadrant labels */}
-                <text x={PAD + 8} y={PAD + 18} fill="rgba(255,255,255,0.48)" fontSize="13">
+                <text x={PAD + 8} y={PAD + 18} fill="rgba(255,255,255,0.55)" fontSize="13">
                   Volatile
                 </text>
-                <text x={W - PAD - 120} y={PAD + 18} fill="rgba(251,191,36,0.90)" fontSize="13" fontWeight="500">
+                <text x={W - PAD - 120} y={PAD + 18} fill="rgba(251,191,36,0.95)" fontSize="13" fontWeight="500">
                   Finale
                 </text>
-                <text x={PAD + 8} y={H - PAD - 10} fill="rgba(255,255,255,0.38)" fontSize="13">
+                <text x={PAD + 8} y={H - PAD - 10} fill="rgba(255,255,255,0.45)" fontSize="13">
                   Low impact
                 </text>
-                <text x={W - PAD - 120} y={H - PAD - 10} fill="rgba(255,255,255,0.38)" fontSize="13">
+                <text x={W - PAD - 120} y={H - PAD - 10} fill="rgba(255,255,255,0.45)" fontSize="13">
                   Safe
                 </text>
 
@@ -320,6 +306,31 @@ export default function PlayerImpactHeroScatterDesktop(props: {
                         >
                           {p.name}
                         </text>
+                      )}
+                      {/* Subtle crosshair on hover */}
+                      {isHovered && (
+                        <>
+                          <line
+                            x1={PAD}
+                            y1={y(p.ceiling)}
+                            x2={W - PAD}
+                            y2={y(p.ceiling)}
+                            stroke="rgba(255,255,255,0.15)"
+                            strokeWidth={1}
+                            strokeDasharray="4 4"
+                            pointerEvents="none"
+                          />
+                          <line
+                            x1={x(p.momentum)}
+                            y1={PAD}
+                            x2={x(p.momentum)}
+                            y2={H - PAD}
+                            stroke="rgba(255,255,255,0.15)"
+                            strokeWidth={1}
+                            strokeDasharray="4 4"
+                            pointerEvents="none"
+                          />
+                        </>
                       )}
                     </g>
                   );
@@ -614,26 +625,30 @@ function SelectedCard(props: {
     )}>
       {selected ? (
         <>
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-3 mb-3">
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold text-white truncate">{selected.name}</div>
               <div className="text-xs text-white/55">{selected.teamName}</div>
+              <div className="text-[11px] text-white/40 mt-0.5">View trend & projection (Neeko+)</div>
             </div>
-
-            <button
-              onClick={onOpenTrend}
-              className={cls(
-                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
-                "border-amber-400/40 bg-amber-400/90 text-black hover:bg-amber-400",
-                "shadow-[0_0_12px_rgba(251,191,36,0.3)]",
-                showPulse && "animate-pulse"
-              )}
-            >
-              View Trend
-            </button>
           </div>
 
-          <div className="mt-2 flex items-center gap-3 text-xs">
+          <button
+            onClick={onOpenTrend}
+            className={cls(
+              "w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all duration-300",
+              "border-amber-400/40 bg-gradient-to-r from-amber-400 to-amber-500 text-black",
+              "hover:from-amber-300 hover:to-amber-400",
+              "shadow-[0_0_16px_rgba(251,191,36,0.4)] hover:shadow-[0_0_24px_rgba(251,191,36,0.6)]",
+              "flex items-center justify-center gap-2",
+              !hasSeenFirstSelection && "animate-[breathing_3s_ease-in-out_infinite]"
+            )}
+          >
+            View Trend
+            <ArrowRight className="h-4 w-4" />
+          </button>
+
+          <div className="mt-3 flex items-center gap-3 text-xs">
             <span className="rounded-full bg-white/5 px-2 py-1">
               <span className="text-white/60">M:</span> <span className="text-white font-medium">{selected.momentum}</span>
             </span>
