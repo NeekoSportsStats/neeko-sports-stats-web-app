@@ -10,6 +10,7 @@ import SeasonRoundSelector from "@/components/nba/match-center/SeasonRoundSelect
 
 import { MOCK_FIXTURES, MOCK_LADDER_TOP16 } from "@/components/nba/match-center/mockData";
 import type { FixtureMatch } from "@/components/nba/match-center/types";
+import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
 
 type Season = 2025 | 2026;
 
@@ -73,7 +74,12 @@ function getDefaultSeasonRound(fixtures: FixtureMatch[]) {
 /* PAGE                                                                        */
 /* -------------------------------------------------------------------------- */
 
-export default function AFLMatchCentre() {
+export default function NBAMatchCentre() {
+  if (!NBA_STAT_CONFIG) {
+    console.error("NBA_STAT_CONFIG missing");
+    return null;
+  }
+
   const [activeMatch, setActiveMatch] = useState<FixtureMatch | null>(null);
 
   const initial = useMemo(() => getDefaultSeasonRound(MOCK_FIXTURES), []);
@@ -115,7 +121,7 @@ export default function AFLMatchCentre() {
 
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
         <div className="space-y-6">
-          <MatchList matches={filtered} onSelectMatch={setActiveMatch} />
+          <MatchList matches={filtered} onSelectMatch={setActiveMatch} statConfig={NBA_STAT_CONFIG} />
           <MatchCenterCTA />
         </div>
 
@@ -133,6 +139,7 @@ export default function AFLMatchCentre() {
         <MatchDetailOverlay
           match={activeMatch}
           onClose={() => setActiveMatch(null)}
+          statConfig={NBA_STAT_CONFIG}
         />
       )}
     </div>
