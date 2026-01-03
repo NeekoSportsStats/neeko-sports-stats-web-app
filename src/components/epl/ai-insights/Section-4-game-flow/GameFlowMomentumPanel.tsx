@@ -658,12 +658,12 @@ export default function GameFlowMomentumPanel({
     return (
       <section className="rounded-2xl border border-white/10 bg-black/40">
         <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
-          <h2 className="text-base sm:text-lg font-semibold">
-            3. Game Flow & Momentum
-          </h2>
-          <p className="text-xs sm:text-sm text-white/60">
-            Tempo shifts, turning points, and when control tends to move
-          </p>
+          <SectionHeader
+            eyebrow="Match Dynamics"
+            title="Game Flow & Momentum"
+            subtitle="Tempo shifts, turning points, and when control tends to move"
+            icon={Activity}
+          />
         </header>
         <div className="px-4 sm:px-6 py-6 sm:py-8 text-sm text-white/40">
           Select a match to view game flow and momentum insights.
@@ -687,13 +687,13 @@ export default function GameFlowMomentumPanel({
       {/* Header */}
       <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base sm:text-lg font-semibold">
-              3. Game Flow & Momentum
-            </h2>
-            <p className="mt-1 text-xs sm:text-sm text-white/60">
-              Tempo shifts, turning points, and when control tends to move
-            </p>
+          <div className="flex-1">
+            <SectionHeader
+              eyebrow="Match Dynamics"
+              title="Game Flow & Momentum"
+              subtitle="Tempo shifts, turning points, and when control tends to move"
+              icon={Activity}
+            />
           </div>
 
           <div className="hidden sm:inline-flex items-center rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[11px] text-amber-200/90">
