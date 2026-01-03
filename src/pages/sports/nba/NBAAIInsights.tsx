@@ -127,9 +127,7 @@ export default function NBAAIInsights() {
           </div>
         </div>
 
-        {/* ------------------------------------------------------------------ */}
-        {/* 1. HERO — PLAYER IMPACT MAP                                         */}
-        {/* ------------------------------------------------------------------ */}
+        {/* PLAYER IMPACT MAP */}
         {selectedMatch && (
           <PlayerImpactScatterPanel
             match={selectedMatch}
@@ -138,9 +136,7 @@ export default function NBAAIInsights() {
           />
         )}
 
-        {/* ------------------------------------------------------------------ */}
-        {/* 2. PLAYER SCORE PREDICTABILITY                                      */}
-        {/* ------------------------------------------------------------------ */}
+        {/* PLAYER SCORE PREDICTABILITY */}
         {selectedMatch && (
           <PredictabilityTable
             fixtures={pastFixtures}
@@ -149,9 +145,7 @@ export default function NBAAIInsights() {
           />
         )}
 
-        {/* ------------------------------------------------------------------ */}
-        {/* 3. TEAM SCORE PREDICTABILITY                                        */}
-        {/* ------------------------------------------------------------------ */}
+        {/* TEAM SCORE PREDICTABILITY */}
         {selectedMatch && (
           <TeamPredictabilityPanel
             mode={mode}
@@ -160,9 +154,7 @@ export default function NBAAIInsights() {
           />
         )}
 
-        {/* ------------------------------------------------------------------ */}
-        {/* 4. GAME FLOW & MOMENTUM                                             */}
-        {/* ------------------------------------------------------------------ */}
+        {/* GAME FLOW & MOMENTUM */}
         {selectedMatch && (
           <GameFlowMomentumPanel
             mode={mode}
