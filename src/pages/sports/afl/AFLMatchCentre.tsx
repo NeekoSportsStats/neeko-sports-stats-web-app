@@ -10,6 +10,7 @@ import SeasonRoundSelector from "@/components/afl/match-center/SeasonRoundSelect
 
 import { MOCK_FIXTURES, MOCK_LADDER_TOP16 } from "@/components/afl/match-center/mockData";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
+import { AFL_STAT_CONFIG } from "@/lib/stats/afl/statConfig";
 
 type Season = 2025 | 2026;
 
@@ -115,7 +116,7 @@ export default function AFLMatchCentre() {
 
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
         <div className="space-y-6">
-          <MatchList matches={filtered} onSelectMatch={setActiveMatch} />
+          <MatchList matches={filtered} onSelectMatch={setActiveMatch} statConfig={AFL_STAT_CONFIG} />
           <MatchCenterCTA />
         </div>
 
@@ -133,6 +134,7 @@ export default function AFLMatchCentre() {
         <MatchDetailOverlay
           match={activeMatch}
           onClose={() => setActiveMatch(null)}
+          statConfig={AFL_STAT_CONFIG}
         />
       )}
     </div>

@@ -1,6 +1,7 @@
 // src/components/afl/match-center/MatchDetailOverlay.tsx
 import React, { useMemo, useState } from "react";
 import type { FixtureMatch, TeamStatLine } from "../data/types";
+import type { StatConfig } from "@/lib/stats/types";
 import { X, ChevronDown } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -39,13 +40,14 @@ function safeNum(n: any) {
 type Props = {
   match: FixtureMatch;
   onClose: () => void;
+  statConfig: StatConfig;
 };
 
 /* -------------------------------------------------------------------------- */
 /* COMPONENT                                                                  */
 /* -------------------------------------------------------------------------- */
 
-export default function MatchDetailOverlay({ match, onClose }: Props) {
+export default function MatchDetailOverlay({ match, onClose, statConfig }: Props) {
   const isFinal = match.status === "final";
 
   const margin =
@@ -273,7 +275,7 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
             {/* TOP FANTASY (small) */}
             {match.topFantasy?.length ? (
               <section>
-                <div className="text-sm font-semibold mb-2">Top Fantasy</div>
+                <div className="text-sm font-semibold mb-2">Top {statConfig.labels.fantasy}</div>
                 <div className="space-y-3 text-sm">
                   {match.topFantasy.map((team) => (
                     <div key={team.team}>

@@ -1,10 +1,12 @@
 import React, { useMemo } from "react";
 import MatchCard from "./MatchCard";
 import type { FixtureMatch } from "../data/types";
+import type { StatConfig } from "@/lib/stats/types";
 
 type Props = {
   matches: FixtureMatch[];
   onSelectMatch: (m: FixtureMatch) => void;
+  statConfig: StatConfig;
 };
 
 function dayLabel(dateISO: string) {
@@ -13,7 +15,7 @@ function dayLabel(dateISO: string) {
   });
 }
 
-export default function MatchList({ matches, onSelectMatch }: Props) {
+export default function MatchList({ matches, onSelectMatch, statConfig }: Props) {
   const grouped = useMemo(() => {
     const map: Record<string, FixtureMatch[]> = {};
     matches.forEach((m) => {
@@ -50,6 +52,7 @@ export default function MatchList({ matches, onSelectMatch }: Props) {
                 key={match.id}
                 match={match}
                 onClick={() => onSelectMatch(match)}
+                statConfig={statConfig}
               />
             ))}
           </div>

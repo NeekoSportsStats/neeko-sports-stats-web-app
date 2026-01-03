@@ -1,6 +1,7 @@
 // src/components/afl/match-center/MatchCard.tsx
 import React, { useMemo } from "react";
 import type { FixtureMatch } from "../data/types";
+import type { StatConfig } from "@/lib/stats/types";
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
@@ -40,9 +41,10 @@ function formPill(v: "W" | "L", i: number) {
 type Props = {
   match: FixtureMatch;
   onClick: () => void;
+  statConfig: StatConfig;
 };
 
-export default function MatchCard({ match, onClick }: Props) {
+export default function MatchCard({ match, onClick, statConfig }: Props) {
   const isFinal = match.status === "final";
   const isUpcoming = match.status === "upcoming";
 
@@ -174,7 +176,7 @@ export default function MatchCard({ match, onClick }: Props) {
           {/* TOP FANTASY (card-only teaser) */}
           {match.topFantasy?.length ? (
             <div className="mt-3 border-t border-white/10 pt-3">
-              <div className="text-[11px] text-white/45 uppercase tracking-wide">Top Fantasy</div>
+              <div className="text-[11px] text-white/45 uppercase tracking-wide">Top {statConfig.labels.fantasy}</div>
               <div className="mt-1 space-y-1 text-[11px] text-white/70">
                 {match.topFantasy.map((t) => (
                   <div key={t.team}>
