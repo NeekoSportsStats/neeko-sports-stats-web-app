@@ -1,4 +1,3 @@
-// src/components/afl/match-center/mockData.ts
 import type {
   FixtureMatch,
   MatchTeamStats,
@@ -6,10 +5,7 @@ import type {
   TopFantasyTeam,
   MatchPreview,
 } from "./types";
-
-/* -------------------------------------------------------------------------- */
-/* HELPERS                                                                    */
-/* -------------------------------------------------------------------------- */
+import { EPL_MATCH_STATS, availableTeamStats } from "./statConfig";
 
 const q = (label: "Q1" | "Q2" | "Q3" | "Q4", home: number, away: number) => ({
   label,
@@ -33,7 +29,6 @@ function addDays(dateISO: string, days: number) {
   return `${y}-${m}-${day}`;
 }
 
-// deterministic RNG (mulberry32)
 function mulberry32(seed: number) {
   return function () {
     seed |= 0;
@@ -53,29 +48,27 @@ function hashStringToSeed(s: string) {
   return h >>> 0;
 }
 
-/* -------------------------------------------------------------------------- */
-/* TEAMS + ROSTERS                                                             */
-/* -------------------------------------------------------------------------- */
-
-export const AFL_TEAMS = [
-  "Adelaide",
-  "Brisbane",
-  "Carlton",
-  "Collingwood",
-  "Essendon",
-  "Fremantle",
-  "Geelong",
-  "Gold Coast",
-  "GWS",
-  "Hawthorn",
-  "Melbourne",
-  "North Melbourne",
-  "Port Adelaide",
-  "Richmond",
-  "St Kilda",
-  "Sydney",
-  "West Coast",
-  "Western Bulldogs",
+export const EPL_TEAMS = [
+  "Arsenal",
+  "Aston Villa",
+  "Bournemouth",
+  "Brentford",
+  "Brighton",
+  "Chelsea",
+  "Crystal Palace",
+  "Everton",
+  "Fulham",
+  "Liverpool",
+  "Manchester City",
+  "Manchester United",
+  "Newcastle",
+  "Nottingham Forest",
+  "Southampton",
+  "Tottenham",
+  "West Ham",
+  "Wolverhampton",
+  "Leicester",
+  "Leeds",
 ] as const;
 
 const FIRST = [
@@ -123,7 +116,7 @@ const LAST = [
   "Clark",
 ];
 
-function buildRoster(team: string, size = 30) {
+function buildRoster(team: string, size = 25) {
   const r = mulberry32(hashStringToSeed(team));
   const out: string[] = [];
   const used = new Set<string>();
@@ -140,12 +133,8 @@ function buildRoster(team: string, size = 30) {
 }
 
 export const TEAM_ROSTERS: Record<string, string[]> = Object.fromEntries(
-  AFL_TEAMS.map((t) => [t, buildRoster(t, 30)])
+  EPL_TEAMS.map((t) => [t, buildRoster(t, 25)])
 );
-
-/* -------------------------------------------------------------------------- */
-/* MOCK PREVIEW + LISTS                                                        */
-/* -------------------------------------------------------------------------- */
 
 function mockLast5(r: () => number): ("W" | "L")[] {
   const arr: ("W" | "L")[] = [];
@@ -160,21 +149,18 @@ function clamp(n: number, a: number, b: number) {
 function buildPreview(homeTeam: string, awayTeam: string, roundLabel: string): MatchPreview {
   const r = mulberry32(hashStringToSeed(`${homeTeam}-${awayTeam}-${roundLabel}`));
 
-  // mock ladder pos: stable-ish per team
-  const homePos = 1 + Math.floor(mulberry32(hashStringToSeed(homeTeam))() * 18);
-  const awayPos = 1 + Math.floor(mulberry32(hashStringToSeed(awayTeam))() * 18);
+  const homePos = 1 + Math.floor(mulberry32(hashStringToSeed(homeTeam))() * 20);
+  const awayPos = 1 + Math.floor(mulberry32(hashStringToSeed(awayTeam))() * 20);
 
-  // ladder edge → probability
-  const ladderEdge = clamp((awayPos - homePos) * 2.2, -12, 12); // + favors home
+  const ladderEdge = clamp((awayPos - homePos) * 2.2, -12, 12);
 
-  // small home advantage + noise
   const noise = (r() - 0.5) * 8;
   const homeProb = clamp(50 + ladderEdge + 2 + noise, 35, 65);
   const awayProb = 100 - homeProb;
 
   const reasons: [string, string] = [
-    `${awayTeam} have the edge on ladder position and recent efficiency indicators.`,
-    `Expect the contest to be decided by clearance/inside-50 conversion rather than a blowout.`,
+    `${awayTeam} have the edge on table position and recent form indicators.`,
+    `Expect the match to be decided by possession and conversion efficiency.`,
   ];
 
   return {
@@ -196,13 +182,12 @@ function buildTeamLists(home: string, away: string, announced: boolean): TeamLis
   if (!announced) {
     return {
       announced: false,
-      caption: "Not yet announced — projected club list",
+      caption: "Not yet announced — projected squad",
       home: homeAll,
       away: awayAll,
     };
   }
 
-  // announced: pick 22 + bench subset
   const r = mulberry32(hashStringToSeed(`${home}-${away}-squad`));
   const pick = (arr: string[], n: number) => {
     const copy = arr.slice();
@@ -214,61 +199,89 @@ function buildTeamLists(home: string, away: string, announced: boolean): TeamLis
     return out;
   };
 
-  const home22 = pick(homeAll, 22);
-  const away22 = pick(awayAll, 22);
+  const home18 = pick(homeAll, 18);
+  const away18 = pick(awayAll, 18);
 
-  const homeBench = home22.slice(-4);
-  const awayBench = away22.slice(-4);
+  const homeBench = home18.slice(-7);
+  const awayBench = away18.slice(-7);
 
   return {
     announced: true,
-    caption: "Final teams",
-    home: home22,
-    away: away22,
+    caption: "Confirmed lineup",
+    home: home18,
+    away: away18,
     homeBench,
     awayBench,
     lateChanges:
       r() > 0.7
-        ? [{ team: home, in: homeBench[0], out: home22[0], note: "Late change" }]
+        ? [{ team: home, in: homeBench[0], out: home18[0], note: "Late change" }]
         : [],
   };
 }
 
-/* -------------------------------------------------------------------------- */
-/* MOCK TEAM STATS + TOP FANTASY                                                */
-/* -------------------------------------------------------------------------- */
-
 function buildTeamStats(
   homeTeam: string,
   awayTeam: string,
-  homePts: number,
-  awayPts: number
+  homeGoals: number,
+  awayGoals: number
 ): MatchTeamStats[] {
-  const r = mulberry32(hashStringToSeed(`${homeTeam}-${awayTeam}-${homePts}-${awayPts}`));
-  const totalPts = homePts + awayPts;
+  const r = mulberry32(hashStringToSeed(`${homeTeam}-${awayTeam}-${homeGoals}-${awayGoals}`));
+  const totalGoals = homeGoals + awayGoals;
 
   const make = (team: string, isHome: boolean) => {
-    const pts = isHome ? homePts : awayPts;
-    const share = pts / Math.max(1, totalPts);
+    const goals = isHome ? homeGoals : awayGoals;
+    const share = totalGoals > 0 ? goals / totalGoals : 0.5;
 
-    // realistic-ish ranges
-    const disposals = Math.round(340 + share * 90 + (r() - 0.5) * 18);
-    const inside50 = Math.round(42 + share * 28 + (r() - 0.5) * 6);
-    const clearances = Math.round(32 + share * 18 + (r() - 0.5) * 4);
-    const contested = Math.round(120 + share * 55 + (r() - 0.5) * 10);
-    const turnovers = Math.round(58 + (1 - share) * 16 + (r() - 0.5) * 8); // lower better
-    const tackles = Math.round(52 + (1 - share) * 18 + (r() - 0.5) * 6);
+    const stats = availableTeamStats.map((statKey) => {
+      const config = EPL_MATCH_STATS[statKey];
+      if (!config) {
+        return {
+          label: statKey,
+          value: 0,
+          leagueAvg: 0,
+          higherIsBetter: true,
+        };
+      }
+
+      let value: number;
+
+      switch (statKey) {
+        case "shots":
+          value = Math.round(10 + share * 12 + (r() - 0.5) * 4);
+          break;
+        case "goals":
+          value = goals;
+          break;
+        case "possession":
+          value = Math.round(45 + share * 15 + (r() - 0.5) * 8);
+          break;
+        case "passes":
+          value = Math.round(350 + share * 200 + (r() - 0.5) * 50);
+          break;
+        case "passAccuracy":
+          value = Math.round(78 + share * 8 + (r() - 0.5) * 4);
+          break;
+        case "tackles":
+          value = Math.round(15 + (1 - share) * 10 + (r() - 0.5) * 4);
+          break;
+        case "fouls":
+          value = Math.round(10 + (1 - share) * 6 + (r() - 0.5) * 3);
+          break;
+        default:
+          value = Math.round(config.leagueAvg * (0.8 + r() * 0.4));
+      }
+
+      return {
+        label: config.label,
+        value,
+        leagueAvg: config.leagueAvg,
+        higherIsBetter: config.higherIsBetter,
+      };
+    });
 
     return {
       team,
-      stats: [
-        { label: "Disposals", value: disposals, leagueAvg: 380, higherIsBetter: true },
-        { label: "Inside 50s", value: inside50, leagueAvg: 52, higherIsBetter: true },
-        { label: "Clearances", value: clearances, leagueAvg: 38, higherIsBetter: true },
-        { label: "Contested Possessions", value: contested, leagueAvg: 145, higherIsBetter: true },
-        { label: "Turnovers", value: turnovers, leagueAvg: 63, higherIsBetter: false },
-        { label: "Tackles", value: tackles, leagueAvg: 60, higherIsBetter: true },
-      ],
+      stats,
     } satisfies MatchTeamStats;
   };
 
@@ -285,7 +298,7 @@ function buildTopFantasy(homeTeam: string, awayTeam: string): TopFantasyTeam[] {
     for (let i = 0; i < 3; i++) {
       const idx = Math.floor(r() * roster.length);
       const name = roster.splice(idx, 1)[0] ?? `${team} Player ${i + 1}`;
-      const fantasy = Math.round(78 + r() * 42); // 78–120
+      const fantasy = Math.round(60 + r() * 40);
       out.push({ name, fantasy });
     }
     out.sort((a, b) => b.fantasy - a.fantasy);
@@ -298,108 +311,82 @@ function buildTopFantasy(homeTeam: string, awayTeam: string): TopFantasyTeam[] {
   ];
 }
 
-/* -------------------------------------------------------------------------- */
-/* 2025 FINALS (EXISTING)                                                       */
-/* -------------------------------------------------------------------------- */
-
 const FIXTURES_2025_BASE: FixtureMatch[] = [
   {
-    id: "2025-r21-rich-carl",
+    id: "2025-r35-ars-che",
     season: 2025,
-    roundNumber: 21,
-    roundLabel: "R21",
+    roundNumber: 35,
+    roundLabel: "GW35",
     status: "final",
-    dateISO: "2025-08-08",
-    timeLocal: "19:40",
-    venue: "MCG",
-    homeTeam: "Richmond",
-    awayTeam: "Carlton",
-    quarters: [q("Q1", 24, 18), q("Q2", 22, 25), q("Q3", 19, 21), q("Q4", 26, 20)],
+    dateISO: "2025-05-03",
+    timeLocal: "15:00",
+    venue: "Emirates Stadium",
+    homeTeam: "Arsenal",
+    awayTeam: "Chelsea",
+    quarters: [q("Q1", 1, 0), q("Q2", 1, 1), q("Q3", 0, 0), q("Q4", 0, 1)],
     ...(() => {
-      const qs = [
-        { home: 24, away: 18 },
-        { home: 22, away: 25 },
-        { home: 19, away: 21 },
-        { home: 26, away: 20 },
-      ];
-      const t = total(qs);
-      return { homeScore: t.home, awayScore: t.away, crowd: 78124 };
+      const homeGoals = 2;
+      const awayGoals = 2;
+      return { homeScore: homeGoals, awayScore: awayGoals, crowd: 60284 };
     })(),
   },
   {
-    id: "2025-r22-coll-bris",
+    id: "2025-r36-liv-mci",
     season: 2025,
-    roundNumber: 22,
-    roundLabel: "R22",
+    roundNumber: 36,
+    roundLabel: "GW36",
     status: "final",
-    dateISO: "2025-08-16",
-    timeLocal: "15:20",
-    venue: "MCG",
-    homeTeam: "Collingwood",
-    awayTeam: "Brisbane",
-    quarters: [q("Q1", 20, 14), q("Q2", 27, 19), q("Q3", 21, 28), q("Q4", 25, 22)],
+    dateISO: "2025-05-10",
+    timeLocal: "16:30",
+    venue: "Anfield",
+    homeTeam: "Liverpool",
+    awayTeam: "Manchester City",
+    quarters: [q("Q1", 1, 0), q("Q2", 2, 0), q("Q3", 0, 1), q("Q4", 0, 1)],
     ...(() => {
-      const qs = [
-        { home: 20, away: 14 },
-        { home: 27, away: 19 },
-        { home: 21, away: 28 },
-        { home: 25, away: 22 },
-      ];
-      const t = total(qs);
-      return { homeScore: t.home, awayScore: t.away, crowd: 86402 };
+      const homeGoals = 3;
+      const awayGoals = 2;
+      return { homeScore: homeGoals, awayScore: awayGoals, crowd: 53394 };
     })(),
   },
   {
-    id: "2025-r23-port-adel",
+    id: "2025-r37-tot-mun",
     season: 2025,
-    roundNumber: 23,
-    roundLabel: "R23",
+    roundNumber: 37,
+    roundLabel: "GW37",
     status: "final",
-    dateISO: "2025-08-24",
-    timeLocal: "16:10",
-    venue: "Adelaide Oval",
-    homeTeam: "Port Adelaide",
-    awayTeam: "Adelaide",
-    quarters: [q("Q1", 26, 20), q("Q2", 24, 17), q("Q3", 18, 22), q("Q4", 29, 21)],
+    dateISO: "2025-05-17",
+    timeLocal: "14:00",
+    venue: "Tottenham Hotspur Stadium",
+    homeTeam: "Tottenham",
+    awayTeam: "Manchester United",
+    quarters: [q("Q1", 0, 1), q("Q2", 1, 1), q("Q3", 1, 0), q("Q4", 1, 0)],
     ...(() => {
-      const qs = [
-        { home: 26, away: 20 },
-        { home: 24, away: 17 },
-        { home: 18, away: 22 },
-        { home: 29, away: 21 },
-      ];
-      const t = total(qs);
-      return { homeScore: t.home, awayScore: t.away, crowd: 52318 };
+      const homeGoals = 3;
+      const awayGoals = 2;
+      return { homeScore: homeGoals, awayScore: awayGoals, crowd: 61559 };
     })(),
   },
 ];
 
 const FIXTURES_2025: FixtureMatch[] = FIXTURES_2025_BASE.map((m) => {
-  // enrich finals with stats + top fantasy + announced lists
-  const homePts = m.homeScore ?? 0;
-  const awayPts = m.awayScore ?? 0;
+  const homeGoals = m.homeScore ?? 0;
+  const awayGoals = m.awayScore ?? 0;
 
   return {
     ...m,
-    teamStats: buildTeamStats(m.homeTeam, m.awayTeam, homePts, awayPts),
+    teamStats: buildTeamStats(m.homeTeam, m.awayTeam, homeGoals, awayGoals),
     topFantasy: buildTopFantasy(m.homeTeam, m.awayTeam),
     teamLists: buildTeamLists(m.homeTeam, m.awayTeam, true),
   };
 });
 
-/* -------------------------------------------------------------------------- */
-/* 2026 GENERATOR (ALL ROUNDS)                                                  */
-/* -------------------------------------------------------------------------- */
-
 function circlePairings(teams: string[]) {
-  // standard “circle method” for even team count
   const list = teams.slice();
   const fixed = list[0];
   let rot = list.slice(1);
 
   return (roundIndex: number) => {
     if (roundIndex > 0) {
-      // rotate
       rot = [rot[rot.length - 1], ...rot.slice(0, -1)];
     }
     const left = [fixed, ...rot.slice(0, rot.length / 2)];
@@ -414,83 +401,77 @@ function circlePairings(teams: string[]) {
 }
 
 const TIME_SLOTS = [
-  { dayOffset: 0, time: "19:50", label: "Thursday" },
-  { dayOffset: 1, time: "19:40", label: "Friday" },
-  { dayOffset: 2, time: "13:45", label: "Saturday" },
-  { dayOffset: 2, time: "16:35", label: "Saturday" },
-  { dayOffset: 2, time: "19:20", label: "Saturday" },
-  { dayOffset: 3, time: "12:35", label: "Sunday" },
-  { dayOffset: 3, time: "15:20", label: "Sunday" },
-  { dayOffset: 3, time: "16:10", label: "Sunday" },
-  { dayOffset: 3, time: "19:10", label: "Sunday" },
+  { dayOffset: 0, time: "12:30", label: "Saturday" },
+  { dayOffset: 0, time: "15:00", label: "Saturday" },
+  { dayOffset: 0, time: "17:30", label: "Saturday" },
+  { dayOffset: 1, time: "14:00", label: "Sunday" },
+  { dayOffset: 1, time: "16:30", label: "Sunday" },
 ];
 
-// light venue mapping (you can replace with real)
 const TEAM_VENUE: Record<string, string> = {
-  Adelaide: "Adelaide Oval",
-  Brisbane: "Gabba",
-  Carlton: "MCG",
-  Collingwood: "MCG",
-  Essendon: "Marvel Stadium",
-  Fremantle: "Optus Stadium",
-  Geelong: "GMHBA Stadium",
-  "Gold Coast": "People First Stadium",
-  GWS: "GIANTS Stadium",
-  Hawthorn: "MCG",
-  Melbourne: "MCG",
-  "North Melbourne": "Marvel Stadium",
-  "Port Adelaide": "Adelaide Oval",
-  Richmond: "MCG",
-  "St Kilda": "Marvel Stadium",
-  Sydney: "SCG",
-  "West Coast": "Optus Stadium",
-  "Western Bulldogs": "Marvel Stadium",
+  Arsenal: "Emirates Stadium",
+  "Aston Villa": "Villa Park",
+  Bournemouth: "Vitality Stadium",
+  Brentford: "Gtech Community Stadium",
+  Brighton: "Amex Stadium",
+  Chelsea: "Stamford Bridge",
+  "Crystal Palace": "Selhurst Park",
+  Everton: "Goodison Park",
+  Fulham: "Craven Cottage",
+  Liverpool: "Anfield",
+  "Manchester City": "Etihad Stadium",
+  "Manchester United": "Old Trafford",
+  Newcastle: "St James' Park",
+  "Nottingham Forest": "City Ground",
+  Southampton: "St Mary's Stadium",
+  Tottenham: "Tottenham Hotspur Stadium",
+  "West Ham": "London Stadium",
+  Wolverhampton: "Molineux Stadium",
+  Leicester: "King Power Stadium",
+  Leeds: "Elland Road",
 };
 
 function buildRoundLabel(roundNumber: number) {
-  return roundNumber === 0 ? "OR" : `R${roundNumber}`;
+  return `GW${roundNumber}`;
 }
 
 function build2026(): FixtureMatch[] {
   const out: FixtureMatch[] = [];
 
-  // Opening Round (keep your existing)
   out.push(
     {
-      id: "2026-or-rich-carl",
+      id: "2026-gw1-ars-liv",
       season: 2026,
-      roundNumber: 0,
-      roundLabel: "OR",
+      roundNumber: 1,
+      roundLabel: "GW1",
       status: "upcoming",
-      dateISO: "2026-03-06",
-      timeLocal: "19:20",
-      venue: TEAM_VENUE["Richmond"] ?? "MCG",
-      homeTeam: "Richmond",
-      awayTeam: "Carlton",
+      dateISO: "2026-08-15",
+      timeLocal: "12:30",
+      venue: TEAM_VENUE["Arsenal"] ?? "Emirates Stadium",
+      homeTeam: "Arsenal",
+      awayTeam: "Liverpool",
     },
     {
-      id: "2026-or-adel-port",
+      id: "2026-gw1-che-mci",
       season: 2026,
-      roundNumber: 0,
-      roundLabel: "OR",
+      roundNumber: 1,
+      roundLabel: "GW1",
       status: "upcoming",
-      dateISO: "2026-03-07",
-      timeLocal: "16:35",
-      venue: TEAM_VENUE["Adelaide"] ?? "Adelaide Oval",
-      homeTeam: "Adelaide",
-      awayTeam: "Port Adelaide",
+      dateISO: "2026-08-15",
+      timeLocal: "15:00",
+      venue: TEAM_VENUE["Chelsea"] ?? "Stamford Bridge",
+      homeTeam: "Chelsea",
+      awayTeam: "Manchester City",
     }
   );
 
-  // R1 starts next week
-  const baseR1 = "2026-03-13";
+  const baseGW2 = "2026-08-22";
 
-  const pairsForRound = circlePairings(AFL_TEAMS.slice() as unknown as string[]);
-  for (let round = 1; round <= 23; round++) {
-    const pairs = pairsForRound(round - 1); // deterministic rotation
+  const pairsForRound = circlePairings(EPL_TEAMS.slice() as unknown as string[]);
+  for (let round = 2; round <= 38; round++) {
+    const pairs = pairsForRound(round - 2);
 
-    // spread across week
-    const roundStart = addDays(baseR1, (round - 1) * 7);
+    const roundStart = addDays(baseGW2, (round - 2) * 7);
 
     pairs.forEach(([home, away], i) => {
       const slot = TIME_SLOTS[i % TIME_SLOTS.length];
@@ -519,7 +500,6 @@ function build2026(): FixtureMatch[] {
     });
   }
 
-  // enrich OR preview+lists too
   return out.map((m) => {
     if (m.status === "upcoming") {
       return {
@@ -534,23 +514,15 @@ function build2026(): FixtureMatch[] {
 
 const FIXTURES_2026 = build2026();
 
-/* -------------------------------------------------------------------------- */
-/* EXPORTS                                                                    */
-/* -------------------------------------------------------------------------- */
-
 export const MOCK_FIXTURES: FixtureMatch[] = [...FIXTURES_2025, ...FIXTURES_2026];
 
-/**
- * Keep legacy ladder shape — AFLMatchCentre normalises it.
- * You can replace this later with a true LadderRow[].
- */
 export const MOCK_LADDER_TOP16 = [
-  { rank: 1, team: "Sydney", record: "17-6" },
-  { rank: 2, team: "Geelong", record: "16-7" },
-  { rank: 3, team: "Brisbane", record: "15-8" },
-  { rank: 4, team: "Carlton", record: "14-9" },
-  { rank: 5, team: "Fremantle", record: "14-9" },
-  { rank: 6, team: "Collingwood", record: "13-10" },
-  { rank: 7, team: "Port Adelaide", record: "13-10" },
-  { rank: 8, team: "Melbourne", record: "12-11" },
+  { rank: 1, team: "Arsenal", record: "26-8-4" },
+  { rank: 2, team: "Manchester City", record: "25-7-6" },
+  { rank: 3, team: "Liverpool", record: "24-9-5" },
+  { rank: 4, team: "Chelsea", record: "21-10-7" },
+  { rank: 5, team: "Tottenham", record: "20-8-10" },
+  { rank: 6, team: "Newcastle", record: "19-10-9" },
+  { rank: 7, team: "Aston Villa", record: "18-11-9" },
+  { rank: 8, team: "Brighton", record: "17-12-9" },
 ];
