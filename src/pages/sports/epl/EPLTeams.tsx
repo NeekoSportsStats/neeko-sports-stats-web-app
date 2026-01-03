@@ -9,6 +9,7 @@ import TeamFormGrid from "@/components/epl/teams/TeamFormGrid";
 import TeamTrends from "@/components/epl/teams/TeamTrends";
 import TeamAIInsights from "@/components/epl/teams/TeamAIInsights";
 import TeamMasterTable from "@/components/epl/teams/TeamMasterTable";
+import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
 
 export default function EPLTeams() {
   const [activeSection, setActiveSection] = useState("momentum");
@@ -126,7 +127,7 @@ export default function EPLTeams() {
       {/* -------------------------------- PAGE HEADER ----------------------------- */}
       <header className="mb-10">
         <h1 className="text-3xl font-semibold text-neutral-100 md:text-4xl">
-          AFL Team Analytics
+          EPL Team Analytics
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-neutral-400">
           League-wide team trends, momentum pulses, attack/defence shifts and
@@ -191,27 +192,27 @@ export default function EPLTeams() {
       {/* -------------------------- PAGE SECTIONS -------------------------- */}
 
       <section id="momentum" className="mb-14 scroll-mt-28">
-        <TeamMomentumPulse />
+        <TeamMomentumPulse statConfig={EPL_STAT_CONFIG} />
       </section>
 
       <section id="dashboard" className="mb-14 scroll-mt-28">
-        <TeamDashboardTiles />
+        <TeamDashboardTiles statConfig={EPL_STAT_CONFIG} />
       </section>
 
       <section id="form-grid" className="mb-14 scroll-mt-28">
-        <TeamFormGrid />
+        <TeamFormGrid statConfig={EPL_STAT_CONFIG} />
       </section>
 
       <section id="trends" className="mb-14 scroll-mt-28">
-        <TeamTrends />
+        <TeamTrends statConfig={EPL_STAT_CONFIG} />
       </section>
 
       <section id="ai" className="mb-14 scroll-mt-28">
-        <TeamAIInsights />
+        <TeamAIInsights statConfig={EPL_STAT_CONFIG} />
       </section>
 
       <section id="master-table" className="scroll-mt-28">
-        <TeamMasterTable />
+        <TeamMasterTable statConfig={EPL_STAT_CONFIG} />
       </section>
 
       {/* ------------------------------- BACK TO TOP ------------------------------ */}
