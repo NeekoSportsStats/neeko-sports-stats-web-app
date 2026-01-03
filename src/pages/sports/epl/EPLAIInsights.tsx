@@ -17,6 +17,8 @@ import {
   roundOrder,
 } from "@/components/epl/ai-insights/data/engine";
 
+import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
+
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -132,7 +134,8 @@ export default function EPLAIInsights() {
           <PlayerImpactScatterPanel
             match={selectedMatch}
             mode={mode}
-            initialLens="fantasy"
+            initialLens={EPL_STAT_CONFIG.defaultStat}
+            statConfig={EPL_STAT_CONFIG}
           />
         )}
 
@@ -142,6 +145,7 @@ export default function EPLAIInsights() {
             fixtures={pastFixtures}
             match={selectedMatch}
             mode={mode}
+            statConfig={EPL_STAT_CONFIG}
           />
         )}
 
@@ -151,6 +155,7 @@ export default function EPLAIInsights() {
             mode={mode}
             match={selectedMatch as any}
             fixtures={pastFixtures}
+            statConfig={EPL_STAT_CONFIG}
           />
         )}
 
@@ -160,6 +165,7 @@ export default function EPLAIInsights() {
             mode={mode}
             match={selectedMatch as any}
             fixtures={pastFixtures}
+            statConfig={EPL_STAT_CONFIG}
           />
         )}
       </div>

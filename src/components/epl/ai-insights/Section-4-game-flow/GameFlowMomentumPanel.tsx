@@ -3,6 +3,7 @@ import { Lock, TrendingUp, Activity, Waves } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/epl/match-center/types";
 import type { PremiumMode } from "@/components/epl/ai-insights/data/types";
+import type { StatConfig } from "@/lib/stats/types";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 /* -------------------------------------------------------------------------- */
@@ -645,10 +646,12 @@ export default function GameFlowMomentumPanel({
   mode,
   match,
   fixtures,
+  statConfig,
 }: {
   mode: PremiumMode;
   match?: FixtureMatch;
   fixtures: FixtureMatch[];
+  statConfig: StatConfig;
 }) {
   // ZERO-CRASH GUARD
   const teams = useMemo(() => getMatchTeams(match as any), [match]);

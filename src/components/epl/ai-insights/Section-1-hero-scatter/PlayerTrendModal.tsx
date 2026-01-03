@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Lock, X } from "lucide-react";
-import type { LensKey, PlayerPoint, PlayerTrendPoint } from "./usePlayerScatterData";
+import type { PlayerPoint, PlayerTrendPoint } from "./usePlayerScatterData";
 
 function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
@@ -42,7 +42,7 @@ export default function PlayerTrendModal(props: {
   onClose: () => void;
   player: PlayerPoint | null;
   allPlayers: PlayerPoint[];
-  lens: LensKey;
+  lens: string;
   locked: boolean;
 }) {
   const { open, onClose, player, allPlayers, locked, lens } = props;

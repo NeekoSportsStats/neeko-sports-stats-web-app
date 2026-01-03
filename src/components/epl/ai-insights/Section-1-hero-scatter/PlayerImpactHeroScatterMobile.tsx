@@ -2,9 +2,10 @@ import React, { useMemo, useState } from "react";
 import { ArrowRight, Flame, Info, Sparkles } from "lucide-react";
 import type { FixtureMatch } from "@/components/epl/match-center/types";
 import type { PremiumMode } from "@/components/epl/ai-insights/data/types";
+import type { StatConfig } from "@/lib/stats/types";
 
 import PlayerTrendBottomSheet from "./PlayerTrendBottomSheet";
-import { usePlayerScatterData, type LensKey, type PlayerPoint } from "./usePlayerScatterData";
+import { usePlayerScatterData, type PlayerPoint } from "./usePlayerScatterData";
 
 const W = 760;
 const H = 420;
@@ -25,12 +26,13 @@ function dotFill(side: "home" | "away") {
 export default function PlayerImpactHeroScatterMobile(props: {
   match?: FixtureMatch;
   mode: PremiumMode;
-  initialLens?: LensKey;
+  initialLens?: string;
+  statConfig: StatConfig;
 }) {
-  const { match, mode, initialLens } = props;
+  const { match, mode, initialLens, statConfig } = props;
   const isPremium = mode === "premium";
 
-  const d = usePlayerScatterData({ match, initialLens });
+  const d = usePlayerScatterData({ match, initialLens, statConfig });
   const {
     homeTeam,
     awayTeam,
@@ -75,7 +77,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
 
       {/* Controls (mobile) */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
+        {statConfig.availableStats.map((k) => (
           <button
             key={k}
             onClick={() => setLens(k)}
@@ -86,7 +88,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
                 : "border-white/10 bg-black/20 text-white/70")
             }
           >
-            {k === "fantasy" ? "Fantasy" : k === "disposals" ? "Disposals" : "Goals"}
+            {statConfig.labels[k] || k}
           </button>
         ))}
 

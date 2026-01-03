@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { FixtureMatch } from "@/components/epl/match-center/types";
 import type { PremiumMode } from "@/components/epl/ai-insights/data/types";
+import type { StatConfig } from "@/lib/stats/types";
 
 import PlayerImpactHeroScatterDesktop from "./PlayerImpactHeroScatterDesktop";
 import PlayerImpactHeroScatterMobile from "./PlayerImpactHeroScatterMobile";
-import type { LensKey } from "./usePlayerScatterData";
 
 function useIsMobile(breakpointPx = 860) {
   const [isMobile, setIsMobile] = useState(false);
@@ -23,9 +23,10 @@ function useIsMobile(breakpointPx = 860) {
 export default function PlayerImpactHeroScatter(props: {
   match?: FixtureMatch;
   mode: PremiumMode;
-  initialLens?: LensKey;
+  initialLens?: string;
+  statConfig: StatConfig;
 }) {
-  const { match, mode, initialLens } = props;
+  const { match, mode, initialLens, statConfig } = props;
   const isMobile = useIsMobile();
 
   const Component = useMemo(
@@ -33,5 +34,5 @@ export default function PlayerImpactHeroScatter(props: {
     [isMobile]
   );
 
-  return <Component match={match} mode={mode} initialLens={initialLens} />;
+  return <Component match={match} mode={mode} initialLens={initialLens} statConfig={statConfig} />;
 }
