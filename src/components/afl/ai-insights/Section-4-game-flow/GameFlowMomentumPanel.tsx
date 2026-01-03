@@ -3,6 +3,7 @@ import { Lock, TrendingUp, Activity, Waves } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
+import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 /* -------------------------------------------------------------------------- */
 /* SECTION 3 — GAME FLOW & MOMENTUM                                           */
@@ -661,12 +662,12 @@ export default function GameFlowMomentumPanel({
       <section className="rounded-2xl border border-white/10 bg-black/40">
         {showHeader && (
           <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
-            <h2 className="text-base sm:text-lg font-semibold">
-              3. Game Flow & Momentum
-            </h2>
-            <p className="text-xs sm:text-sm text-white/60">
-              Tempo shifts, turning points, and when control tends to move
-            </p>
+            <SectionHeader
+              eyebrow="Match Dynamics"
+              title="Game Flow & Momentum"
+              subtitle="Tempo shifts, turning points, and when control tends to move"
+              icon={Activity}
+            />
           </header>
         )}
         <div className="px-4 sm:px-6 py-6 sm:py-8 text-sm text-white/40">
@@ -690,22 +691,14 @@ export default function GameFlowMomentumPanel({
     <section className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
       {showHeader && (
         <>
-          {/* Header */}
           <header className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-white/10">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-base sm:text-lg font-semibold">
-                  3. Game Flow & Momentum
-                </h2>
-                <p className="mt-1 text-xs sm:text-sm text-white/60">
-                  Tempo shifts, turning points, and when control tends to move
-                </p>
-              </div>
-
-              <div className="hidden sm:inline-flex items-center rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[11px] text-amber-200/90">
-                Neeko+
-              </div>
-            </div>
+            <SectionHeader
+              eyebrow="Match Dynamics"
+              title="Game Flow & Momentum"
+              subtitle="Tempo shifts, turning points, and when control tends to move"
+              icon={Activity}
+              badge="neeko+"
+            />
           </header>
         </>
       )}

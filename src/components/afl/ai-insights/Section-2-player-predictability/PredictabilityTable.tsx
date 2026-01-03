@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { X, ChevronDown, ChevronRight } from "lucide-react";
+import { X, ChevronDown, ChevronRight, Target } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { PredictRow, PremiumMode } from "../data/types";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import { confLabel, volLabel, mean } from "../data/utils";
 import { buildPlayerPredictabilityFromFixtures } from "../data/engine";
+import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES & HELPERS                                                             */
@@ -221,17 +222,13 @@ export default function PredictabilityTable({
       <section className="rounded-2xl border border-white/10 bg-black/40 overflow-hidden">
         {showHeader && (
           <header className="px-6 pt-5 pb-4 border-b border-white/10">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <h2 className="text-lg font-semibold text-white">
-                  Player Score Predictability
-                </h2>
-                <p className="mt-1 text-sm text-white/60">
-                  Expected scoring ranges, confidence and volatility.
-                </p>
-              </div>
-
-              <div className="flex gap-1.5">
+            <SectionHeader
+              eyebrow="AI Prediction Engine"
+              title="Player Score Predictability"
+              subtitle="Expected scoring ranges, confidence and volatility"
+              icon={Target}
+              rightSlot={
+                <div className="flex gap-1.5">
                 {(["fantasy", "disposals", "goals"] as StatLens[]).map((s) => (
                   <button
                     key={s}
@@ -246,8 +243,9 @@ export default function PredictabilityTable({
                     {s === "fantasy" ? "Fantasy" : s === "disposals" ? "Disposals" : "Goals"}
                   </button>
                 ))}
-              </div>
-            </div>
+                </div>
+              }
+            />
 
             {matchContext && (
               <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">

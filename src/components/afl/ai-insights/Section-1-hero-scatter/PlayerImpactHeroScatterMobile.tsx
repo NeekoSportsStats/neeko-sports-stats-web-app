@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { ArrowRight, Flame, Info, Sparkles } from "lucide-react";
+import { ArrowRight, Flame, Info, Sparkles, TrendingUp } from "lucide-react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
+import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 import PlayerTrendBottomSheet from "./PlayerTrendBottomSheet";
 import { usePlayerScatterData, type LensKey, type PlayerPoint } from "./usePlayerScatterData";
@@ -66,15 +67,14 @@ export default function PlayerImpactHeroScatterMobile(props: {
 
   return (
     <div className="rounded-3xl border border-amber-400/15 bg-gradient-to-b from-[#0b0b0b] to-black p-4">
-      <div>
-        <div className="text-lg font-semibold text-white">Momentum vs Ceiling</div>
-        <div className="mt-0.5 text-sm text-white/60">
-          {homeTeam} vs {awayTeam}
-        </div>
-      </div>
+      <SectionHeader
+        eyebrow="Player Impact Map"
+        title="Momentum vs Ceiling"
+        subtitle={`${homeTeam} vs ${awayTeam}`}
+        icon={TrendingUp}
+      />
 
-      {/* Controls (mobile) */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
           <button
             key={k}

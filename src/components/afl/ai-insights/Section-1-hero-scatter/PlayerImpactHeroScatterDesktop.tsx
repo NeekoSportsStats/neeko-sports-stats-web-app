@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { ArrowRight, Flame, Info, Lock, Sparkles } from "lucide-react";
+import { ArrowRight, Flame, Info, Lock, Sparkles, TrendingUp } from "lucide-react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
+import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 import PlayerTrendModal from "./PlayerTrendModal";
 import { usePlayerScatterData, type LabelMode, type LensKey, type PlayerPoint } from "./usePlayerScatterData";
@@ -75,54 +76,51 @@ export default function PlayerImpactHeroScatterDesktop(props: {
 
   return (
     <div className="rounded-3xl border border-amber-400/15 bg-gradient-to-b from-[#0b0b0b] to-black p-5 md:p-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div>
-          <h3 className="text-2xl font-semibold text-white">Momentum vs Ceiling</h3>
-          <p className="mt-1 text-sm text-white/60">
-            {homeTeam} vs {awayTeam} · {lens === "fantasy" ? "Fantasy" : lens === "disposals" ? "Disposals" : "Goals"} lens
-          </p>
-        </div>
+      <SectionHeader
+        eyebrow="Player Impact Map"
+        title="Momentum vs Ceiling"
+        subtitle={`${homeTeam} vs ${awayTeam} · ${lens === "fantasy" ? "Fantasy" : lens === "disposals" ? "Disposals" : "Goals"} lens`}
+        icon={TrendingUp}
+        rightSlot={
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex gap-1.5">
+              {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => setLens(k)}
+                  className={cls(
+                    "rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                    lens === k
+                      ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+                      : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
+                  )}
+                >
+                  {k === "fantasy" ? "Fantasy" : k === "disposals" ? "Disposals" : "Goals"}
+                </button>
+              ))}
+            </div>
 
-        {/* Metric + Team Filter */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-1.5">
-            {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
-              <button
-                key={k}
-                onClick={() => setLens(k)}
-                className={cls(
-                  "rounded-full border px-3 py-1.5 text-xs font-medium transition",
-                  lens === k
-                    ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
-                    : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
-                )}
-              >
-                {k === "fantasy" ? "Fantasy" : k === "disposals" ? "Disposals" : "Goals"}
-              </button>
-            ))}
+            <div className="h-5 w-px bg-white/10" />
+
+            <div className="flex gap-1">
+              {(["both", "home", "away"] as const).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => setTeamFilter(k)}
+                  className={cls(
+                    "rounded-full border px-2.5 py-1 text-[11px] transition",
+                    teamFilter === k
+                      ? "border-white/25 bg-white/10 text-white"
+                      : "border-white/10 bg-black/20 text-white/50 hover:bg-white/5"
+                  )}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
           </div>
-
-          <div className="h-5 w-px bg-white/10" />
-
-          <div className="flex gap-1">
-            {(["both", "home", "away"] as const).map((k) => (
-              <button
-                key={k}
-                onClick={() => setTeamFilter(k)}
-                className={cls(
-                  "rounded-full border px-2.5 py-1 text-[11px] transition",
-                  teamFilter === k
-                    ? "border-white/25 bg-white/10 text-white"
-                    : "border-white/10 bg-black/20 text-white/50 hover:bg-white/5"
-                )}
-              >
-                {k}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Lean meter */}
       <div className="mt-4 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
