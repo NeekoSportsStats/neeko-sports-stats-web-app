@@ -9,6 +9,7 @@ import {
   Zap,
 } from "lucide-react";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
+import type { StatConfig } from "@/lib/stats/types";
 
 import {
   useAFLMockPlayers,
@@ -43,8 +44,6 @@ type PositionPlayerMetrics = {
 function clamp01(v: number) {
   return Math.max(0, Math.min(1, v));
 }
-
-const FANTASY_STAT: StatKey = "fantasy";
 
 /* ---------------------------------------------------------
    POSITION CONFIG — fully typed to PositionKey (TS FIX)
@@ -295,7 +294,7 @@ function PositionPlayerCard({
    MAIN SECTION
 --------------------------------------------------------- */
 
-export default function PositionTrends() {
+export default function PositionTrends({ statConfig }: { statConfig: StatConfig }) {
   const players = useAFLMockPlayers();
   const [selectedPos, setSelectedPos] = useState<PositionKey>("MID");
 
@@ -309,7 +308,7 @@ export default function PositionTrends() {
     };
 
     players.forEach((p) => {
-      const series = getSeriesForStat(p, FANTASY_STAT);
+      const series = getSeriesForStat(p, statConfig.defaultStat as StatKey);
       if (!series?.length) return;
 
       const l5 = lastN(series, 5);

@@ -5,6 +5,7 @@ import FormStabilityGrid from "@/components/afl/players/FormStabilityGrid";
 import PositionTrends from "@/components/afl/players/PositionTrends";
 import AIInsights from "@/components/afl/players/AIInsights";
 import MasterTable from "@/components/afl/players/MasterTable";
+import { AFL_STAT_CONFIG } from "@/lib/stats/afl/statConfig";
 
 export default function AFLPlayersPage() {
   const [activeSection, setActiveSection] = useState("round-momentum");
@@ -189,23 +190,23 @@ export default function AFLPlayersPage() {
 
       <div className="space-y-20 md:space-y-24">
         <section id="round-momentum" className="scroll-mt-28 animate-premium-section">
-          <RoundSummary />
+          <RoundSummary statConfig={AFL_STAT_CONFIG} />
         </section>
 
         <section id="form-stability" className="scroll-mt-28 animate-premium-section delay-1">
-          <FormStabilityGrid />
+          <FormStabilityGrid statConfig={AFL_STAT_CONFIG} />
         </section>
 
         <section id="position-trends" className="scroll-mt-28 animate-premium-section delay-2">
-          <PositionTrends />
+          <PositionTrends statConfig={AFL_STAT_CONFIG} />
         </section>
 
         <section id="ai-insights" className="scroll-mt-28 animate-premium-section delay-3">
-          <AIInsights />
+          <AIInsights statConfig={AFL_STAT_CONFIG} />
         </section>
 
         <section id="master-table" className="scroll-mt-28 animate-premium-section delay-4">
-          <MasterTable />
+          <MasterTable statConfig={AFL_STAT_CONFIG} />
         </section>
       </div>
 

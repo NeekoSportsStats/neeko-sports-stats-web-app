@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/lib/auth";
+import type { StatConfig, StatKey } from "@/lib/stats/types";
 import PlayerInsightsOverlay from "../Section-2-player-insights/PlayerInsightsOverlay";
 import MasterTableDesktop from "./MasterTableDesktop";
 import MasterTableMobile from "./MasterTableMobile";
@@ -9,7 +10,7 @@ import MasterTableMobile from "./MasterTableMobile";
 /* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export type StatLens = "Fantasy" | "Disposals" | "Goals";
+export type StatLens = StatKey;
 
 export type PlayerRow = {
   id: number;
@@ -71,10 +72,10 @@ const MOCK_PLAYERS = buildMockPlayers();
 /* MASTER TABLE ORCHESTRATOR                                                   */
 /* -------------------------------------------------------------------------- */
 
-export default function MasterTable() {
+export default function MasterTable({ statConfig }: { statConfig: StatConfig }) {
   const { isPremium } = useAuth();
 
-  const [selectedStat, setSelectedStat] = useState<StatLens>("Fantasy");
+  const [selectedStat, setSelectedStat] = useState<StatLens>(statConfig.defaultStat);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null);
   const [query, setQuery] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -95,6 +96,7 @@ export default function MasterTable() {
           query={query}
           setQuery={setQuery}
           onSelectPlayer={setSelectedPlayer}
+          statConfig={statConfig}
         />
       </div>
 
@@ -108,6 +110,7 @@ export default function MasterTable() {
           query={query}
           setQuery={setQuery}
           onSelectPlayer={setSelectedPlayer}
+          statConfig={statConfig}
         />
       </div>
 

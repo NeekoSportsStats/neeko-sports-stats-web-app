@@ -3,12 +3,14 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { BrainCircuit, Lock, X, ArrowRight } from "lucide-react";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
+import type { StatConfig, StatKey } from "@/lib/stats/types";
 import {
   useAFLMockPlayers,
   lastN,
   average,
   stdDev,
   getSeriesForStat,
+  StatKey as MockStatKey,
 } from "@/components/afl/players/useAFLMockData";
 
 /**
@@ -320,12 +322,12 @@ function BlurredLockedCard() {
    MAIN COMPONENT
 --------------------------------------------------------- */
 
-export default function AIInsights() {
+export default function AIInsights({ statConfig }: { statConfig: StatConfig }) {
   const players = useAFLMockPlayers();
 
   // Build real free rows (top 3)
   const freeRows: AIInsightRowModel[] = players.slice(0, 3).map((p, idx) => {
-    const series = getSeriesForStat(p, "fantasy");
+    const series = getSeriesForStat(p, statConfig.defaultStat as MockStatKey);
     const pred = computePrediction(series);
 
     const low = pred.predicted - pred.range;

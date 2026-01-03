@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Search, Lock, X, ArrowRight, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { StatConfig } from "@/lib/stats/types";
 import type { PlayerRow, StatLens } from "./MasterTable";
 
 /* -------------------------------------------------------------------------- */
@@ -36,6 +37,7 @@ export default function MasterTableMobile({
   query,
   setQuery,
   onSelectPlayer,
+  statConfig,
 }: {
   players: PlayerRow[];
   selectedStat: StatLens;
@@ -44,6 +46,7 @@ export default function MasterTableMobile({
   query: string;
   setQuery: (v: string) => void;
   onSelectPlayer: (p: PlayerRow) => void;
+  statConfig: StatConfig;
 }) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [showUpgrade, setShowUpgrade] = useState(false);
@@ -151,7 +154,7 @@ export default function MasterTableMobile({
           </p>
 
           <div className="mt-4 flex gap-2 rounded-full border border-neutral-700 bg-black/80 px-2 py-1 text-[11px]">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
+            {statConfig.availableStats.map((s) => (
               <button
                 key={s}
                 onClick={() => setSelectedStat(s)}
@@ -162,7 +165,7 @@ export default function MasterTableMobile({
                     : "bg-neutral-900 text-neutral-300"
                 )}
               >
-                {s}
+                {statConfig.labels[s]}
               </button>
             ))}
           </div>

@@ -9,12 +9,13 @@ import {
   Activity,
 } from "lucide-react";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
+import type { StatConfig, StatKey } from "@/lib/stats/types";
 
 import {
   useAFLMockPlayers,
   getSeriesForStat,
   average,
-  StatKey,
+  StatKey as MockStatKey,
 } from "@/components/afl/players/useAFLMockData";
 
 /* ---------------------------------------------------------
@@ -23,27 +24,7 @@ import {
 
 const CURRENT_ROUND = 6;
 
-const STATS: StatKey[] = [
-  "fantasy",
-  "disposals",
-  "kicks",
-  "marks",
-  "tackles",
-  "hitouts",
-  "goals",
-];
-
-const STAT_LABELS: Record<StatKey, string> = {
-  fantasy: "Fantasy",
-  disposals: "Disposals",
-  kicks: "Kicks",
-  marks: "Marks",
-  tackles: "Tackles",
-  hitouts: "Hitouts",
-  goals: "Goals",
-};
-
-const STAT_UNITS: Record<StatKey, string> = {
+const STAT_UNITS: Record<StatKey | string, string> = {
   fantasy: "pts",
   disposals: "disposals",
   kicks: "kicks",
@@ -53,7 +34,7 @@ const STAT_UNITS: Record<StatKey, string> = {
   goals: "goals",
 };
 
-const PULSE_COPY: Record<StatKey, string> = {
+const PULSE_COPY: Record<StatKey | string, string> = {
   fantasy:
     "League-wide Fantasy trends reflect shifts driven by usage rates, matchup edges and evolving roles.",
   disposals:
@@ -166,12 +147,12 @@ function MiniCard({ icon: Icon, label, value, player, delay }: MiniCardProps) {
    MAIN SECTION — (Header pill only)
 --------------------------------------------------------- */
 
-export default function RoundSummary() {
-  const [selected, setSelected] = useState<StatKey>("fantasy");
+export default function RoundSummary({ statConfig }: { statConfig: StatConfig }) {
+  const [selected, setSelected] = useState<StatKey>(statConfig.defaultStat);
   const players = useAFLMockPlayers();
 
-  const selectedLabel = STAT_LABELS[selected];
-  const unit = STAT_UNITS[selected];
+  const selectedLabel = statConfig.labels[selected] || selected;
+  const unit = STAT_UNITS[selected] || selected;
   const labelLower = selectedLabel.toLowerCase();
 
   /* sparkline data */
@@ -246,7 +227,7 @@ export default function RoundSummary() {
         {/* FILTER PILLS — (unchanged) */}
         <div className="-mx-2 mb-4 mt-1 overflow-x-auto scrollbar-thin scrollbar-thumb-yellow-500/30">
           <div className="flex min-w-max gap-2 px-2 pb-1">
-            {STATS.map((s) => (
+            {statConfig.availableStats.map((s) => (
               <button
                 key={s}
                 onClick={() => setSelected(s)}
@@ -258,7 +239,7 @@ export default function RoundSummary() {
                     : "bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white"
                 )}
               >
-                {STAT_LABELS[s]}
+                {statConfig.labels[s]}
               </button>
             ))}
           </div>

@@ -8,6 +8,7 @@ import {
   X,
   Table,
 } from "lucide-react";
+import type { StatConfig } from "@/lib/stats/types";
 import type { PlayerRow, StatLens } from "./MasterTable";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
@@ -50,8 +51,8 @@ function getRowValues(key: string, stat: StatLens): number[] {
   let seed = 0;
   for (let i = 0; i < key.length; i++) seed += key.charCodeAt(i);
 
-  const base = stat === "Fantasy" ? 70 : stat === "Disposals" ? 18 : 1;
-  const range = stat === "Fantasy" ? 40 : stat === "Disposals" ? 20 : 4;
+  const base = stat === "fantasy" ? 70 : stat === "disposals" ? 18 : 1;
+  const range = stat === "fantasy" ? 40 : stat === "disposals" ? 20 : 4;
 
   return ROUND_LABELS.map((_, i) => base + ((seed + i * 13) % range));
 }
@@ -68,8 +69,8 @@ function calcStats(values: number[]) {
 }
 
 function getHitThresholds(stat: StatLens): number[] {
-  if (stat === "Fantasy") return [80, 90, 100, 110];
-  if (stat === "Disposals") return [15, 20, 25, 30];
+  if (stat === "fantasy") return [80, 90, 100, 110];
+  if (stat === "disposals") return [15, 20, 25, 30];
   return [1, 2, 3, 4];
 }
 
@@ -91,6 +92,7 @@ export default function MasterTableDesktop({
   setQuery,
   onSelectPlayer,
   showHeader = true,
+  statConfig,
 }: {
   players: PlayerRow[];
   selectedStat: StatLens;
@@ -100,6 +102,7 @@ export default function MasterTableDesktop({
   setQuery: (v: string) => void;
   onSelectPlayer: (p: PlayerRow) => void;
   showHeader?: boolean;
+  statConfig: StatConfig;
 }) {
 
   const [team, setTeam] = useState("All");
@@ -197,7 +200,7 @@ export default function MasterTableDesktop({
           </div>
 
           <div className="flex gap-2 rounded-full border border-neutral-700 bg-black/80 p-1">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
+            {statConfig.availableStats.map((s) => (
               <button
                 key={s}
                 onClick={() => setSelectedStat(s)}
@@ -208,7 +211,7 @@ export default function MasterTableDesktop({
                     : "text-neutral-300 hover:bg-neutral-800"
                 )}
               >
-                {s}
+                {statConfig.labels[s]}
               </button>
             ))}
           </div>
