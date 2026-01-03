@@ -24,7 +24,6 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
   const [startTime, setStartTime] = useState(0);
   const [lastY, setLastY] = useState(0);
   const [velocity, setVelocity] = useState(0);
-  const [dragEnabled, setDragEnabled] = useState(true);
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<HTMLDivElement>(null);
@@ -54,7 +53,6 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
   }, [open, onClose]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (!dragEnabled) return;
     if (contentRef.current && contentRef.current.scrollTop > 0) {
       return;
     }
@@ -171,9 +169,6 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
           ref={contentRef}
           className="flex-1 overflow-y-auto px-4 py-4"
           style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
-          onPointerDown={() => setDragEnabled(false)}
-          onPointerUp={() => setDragEnabled(true)}
-          onPointerCancel={() => setDragEnabled(true)}
         >
           <div className="mb-4">
             <div className="text-xs uppercase tracking-wider text-white/50 mb-2">Trend Chart</div>
