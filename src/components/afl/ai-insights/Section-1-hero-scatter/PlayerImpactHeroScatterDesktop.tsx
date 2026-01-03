@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Info, Lock, Sparkles } from "lucide-react";
+import { Flame, Info, Lock, Sparkles } from "lucide-react";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 
@@ -392,6 +392,14 @@ export default function PlayerImpactHeroScatterDesktop(props: {
         {/* Selected (right) */}
         <div className="col-span-12 lg:col-span-3">
           <div className="space-y-3 lg:sticky lg:top-24">
+            <Top3ImpactPanel
+              playersVisible={playersVisible}
+              onSelectPlayer={handleRowClick}
+              onHoverPlayer={setHoverId}
+              openId={openId}
+              hoverId={hoverId}
+            />
+
             <SelectedCard
               homeTeam={homeTeam}
               awayTeam={awayTeam}
@@ -419,6 +427,82 @@ export default function PlayerImpactHeroScatterDesktop(props: {
         lens={lens}
         locked={!isPremium}
       />
+    </div>
+  );
+}
+
+function Top3ImpactPanel(props: {
+  playersVisible: PlayerPoint[];
+  onSelectPlayer: (id: string) => void;
+  onHoverPlayer: (id: string | null) => void;
+  openId: string | null;
+  hoverId: string | null;
+}) {
+  const { playersVisible, onSelectPlayer, onHoverPlayer, openId, hoverId } = props;
+
+  const top3 = useMemo(() => {
+    const sorted = [...playersVisible].sort((a, b) => {
+      const scoreA = a.momentum + a.ceiling;
+      const scoreB = b.momentum + b.ceiling;
+      return scoreB - scoreA;
+    });
+    return sorted.slice(0, 3);
+  }, [playersVisible]);
+
+  if (top3.length < 3) return null;
+
+  return (
+    <div className="rounded-2xl border border-amber-400/20 bg-black/20 p-3">
+      <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Top 3 Impact</div>
+      <div className="mt-0.5 text-xs text-white/50">Highest combined momentum + ceiling</div>
+
+      <div className="mt-2 space-y-1">
+        {top3.map((player, idx) => {
+          const isSelected = player.id === openId;
+          const isHovered = player.id === hoverId;
+          const isFirst = idx === 0;
+
+          return (
+            <button
+              key={player.id}
+              onClick={() => onSelectPlayer(player.id)}
+              onMouseEnter={() => onHoverPlayer(player.id)}
+              onMouseLeave={() => onHoverPlayer(null)}
+              className={cls(
+                "w-full rounded-lg border p-2 text-left transition",
+                isSelected
+                  ? "border-amber-400/40 bg-amber-400/10"
+                  : isHovered
+                  ? "border-white/20 bg-white/5"
+                  : "border-white/10 bg-black/20 hover:bg-white/5"
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <div
+                    className="h-2 w-2 rounded-full shrink-0"
+                    style={{
+                      background: player.teamSide === "home" ? "#3B82F6" : "#10B981",
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium text-white truncate flex items-center gap-1.5">
+                      {player.name}
+                      {isFirst && <Flame className="h-3 w-3 text-amber-400 shrink-0" />}
+                    </div>
+                    <div className="text-[10px] text-white/50">{player.teamName}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-white/60 shrink-0">
+                  <span>M {player.momentum}</span>
+                  <span className="text-white/30">·</span>
+                  <span>C {player.ceiling}</span>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
