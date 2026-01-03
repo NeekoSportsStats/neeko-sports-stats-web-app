@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { FixtureMatch } from "@/components/epl/match-center/types";
-import type { StatConfig } from "@/lib/stats/types";
 
+export type LensKey = "fantasy" | "disposals" | "goals";
 export type TeamFilter = "both" | "home" | "away";
 export type LabelMode = "smart" | "all" | "none";
 
@@ -53,16 +53,11 @@ function genTrend(seed: number) {
   });
 }
 
-export function usePlayerScatterData(args: {
-  match?: FixtureMatch;
-  initialLens?: string;
-  statConfig: StatConfig;
-}) {
-  const { statConfig } = args;
+export function usePlayerScatterData(args: { match?: FixtureMatch; initialLens?: LensKey }) {
   const homeTeam = (args.match as any)?.homeTeam?.name ?? (args.match as any)?.homeTeam ?? "Richmond";
   const awayTeam = (args.match as any)?.awayTeam?.name ?? (args.match as any)?.awayTeam ?? "Carlton";
 
-  const [lens, setLens] = useState<string>(args.initialLens ?? statConfig.defaultStat);
+  const [lens, setLens] = useState<LensKey>(args.initialLens ?? "fantasy");
   const [teamFilter, setTeamFilter] = useState<TeamFilter>("both");
   const [labelMode, setLabelMode] = useState<LabelMode>("smart");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -133,14 +128,13 @@ export function usePlayerScatterData(args: {
     }
 
     // Lens just nudges the distribution (still mock)
-    const lensIndex = statConfig.availableStats.indexOf(lens);
-    if (lensIndex === 1) {
+    if (lens === "disposals") {
       arr = arr.map((p) => ({
         ...p,
         momentum: clamp(p.momentum + rnd(-6, 10), 20, 95),
         ceiling: clamp(p.ceiling + rnd(-10, 8), 20, 95),
       }));
-    } else if (lensIndex >= 2) {
+    } else if (lens === "goals") {
       arr = arr.map((p) => ({
         ...p,
         momentum: clamp(p.momentum + rnd(-10, 6), 20, 95),
@@ -149,7 +143,7 @@ export function usePlayerScatterData(args: {
     }
 
     return arr;
-  }, [playersAll, lens, teamFilter, statConfig.availableStats]);
+  }, [playersAll, lens, teamFilter]);
 
   const selected = useMemo(
     () => playersAll.find((p) => p.id === openId) ?? null,

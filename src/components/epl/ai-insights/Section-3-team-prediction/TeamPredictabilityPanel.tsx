@@ -3,7 +3,7 @@ import { Lock } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/epl/match-center/types";
 import type { PremiumMode } from "@/components/epl/ai-insights/data/types";
-import type { StatConfig } from "@/lib/stats/types";
+import type { StatLens } from "@/components/epl/ai-insights/data/utils";
 import { mean } from "@/components/epl/ai-insights/data/utils";
 import { roundOrder } from "@/components/epl/ai-insights/data/engine";
 
@@ -89,10 +89,9 @@ function meterLabel(pct01: number) {
   return "Chaos";
 }
 
-function statContext(stat: string) {
+function statContext(stat: StatLens) {
   if (stat === "disposals") return "possession volume";
   if (stat === "goals") return "goal scoring";
-  if (stat === "shots") return "shot volume";
   return "fantasy output";
 }
 
@@ -102,7 +101,7 @@ function statContext(stat: string) {
  * To make the lens meaningfully change the AI block, we apply a deterministic
  * lens mapping (proxy). This makes the numbers move when stat changes.
  */
-function lensValueFromTeamScore(teamPoints: number, stat: string) {
+function lensValueFromTeamScore(teamPoints: number, stat: StatLens) {
   if (stat === "goals") {
     // goals proxy: ~6 pts per goal, plus some baseline to avoid tiny ranges
     return teamPoints / 6;
@@ -111,24 +110,18 @@ function lensValueFromTeamScore(teamPoints: number, stat: string) {
     // disposals proxy: scale higher (possession volume tends to be "bigger number")
     return teamPoints * 1.35;
   }
-  if (stat === "shots") {
-    // shots proxy: scale to typical shot counts
-    return teamPoints * 0.18;
-  }
   return teamPoints; // fantasy proxy (keep as-is)
 }
 
-function clampForLens(n: number, stat: string) {
+function clampForLens(n: number, stat: StatLens) {
   if (stat === "goals") return clamp(n, 3, 30);
   if (stat === "disposals") return clamp(n, 220, 520);
-  if (stat === "shots") return clamp(n, 8, 25);
   return clamp(n, 40, 160);
 }
 
-function minSpreadForLens(stat: string) {
+function minSpreadForLens(stat: StatLens) {
   if (stat === "goals") return 3;
   if (stat === "disposals") return 28;
-  if (stat === "shots") return 4;
   return 8;
 }
 
@@ -302,7 +295,7 @@ function lastNH2H(fixtures: FixtureMatch[], a: string, b: string, n = 5) {
     .slice(-n);
 }
 
-function computeExpectedRange(vals: number[], stat: string) {
+function computeExpectedRange(vals: number[], stat: StatLens) {
   const s = [...vals].filter(Number.isFinite).sort((a, b) => a - b);
   if (!s.length) {
     // fallback
@@ -336,7 +329,7 @@ function buildTeamOutlook(
   team: string,
   opponent: string,
   fixtures: FixtureMatch[],
-  stat: string
+  stat: StatLens
 ): TeamOutlook {
   const games = gamesForTeam(fixtures, team);
   const last10 = games.slice(-10);
@@ -551,7 +544,7 @@ function buildTeamOutlook(
   };
 }
 
-function buildMatchMeta(home: TeamOutlook, away: TeamOutlook, stat: string): MatchMeta {
+function buildMatchMeta(home: TeamOutlook, away: TeamOutlook, stat: StatLens): MatchMeta {
   // volatility meter combines both vol + defensive risk
   const volScore = (o: TeamOutlook) => {
     const v =
@@ -635,15 +628,13 @@ export default function TeamPredictabilityPanel({
   match,
   fixtures,
   showHeader = true,
-  statConfig,
 }: {
   mode: PremiumMode;
   match?: FixtureMatch;
   fixtures: FixtureMatch[];
   showHeader?: boolean;
-  statConfig: StatConfig;
 }) {
-  const [stat, setStat] = React.useState<string>(statConfig.defaultStat);
+  const [stat, setStat] = React.useState<StatLens>("fantasy");
   // ✅ ZERO-CRASH GUARD
   if (!match || !(match as any)?.homeTeam || !(match as any)?.awayTeam) {
     return (
@@ -926,7 +917,7 @@ export default function TeamPredictabilityPanel({
 
             <div className="flex items-center gap-3">
               <div className="flex gap-1.5">
-                {statConfig.availableStats.map((s) => (
+                {(["fantasy", "disposals", "goals"] as StatLens[]).map((s) => (
                   <button
                     key={s}
                     onClick={() => setStat(s)}
@@ -937,7 +928,7 @@ export default function TeamPredictabilityPanel({
                         : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
                     ].join(" ")}
                   >
-                    {statConfig.labels[s] || s}
+                    {s === "fantasy" ? "Fantasy" : s === "disposals" ? "Disposals" : "Goals"}
                   </button>
                 ))}
               </div>

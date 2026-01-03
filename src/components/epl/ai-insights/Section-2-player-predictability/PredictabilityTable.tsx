@@ -3,7 +3,6 @@ import { X, ChevronDown, ChevronRight } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { PredictRow, PremiumMode } from "../data/types";
 import type { FixtureMatch } from "@/components/epl/match-center/types";
-import type { StatConfig } from "@/lib/stats/types";
 import { confLabel, volLabel, mean } from "../data/utils";
 import { buildPlayerPredictabilityFromFixtures } from "../data/engine";
 
@@ -105,23 +104,23 @@ function fakeLockedRow(r: PredictRow): PredictRow {
 /* COMPONENT                                                                   */
 /* -------------------------------------------------------------------------- */
 
+type StatLens = "fantasy" | "disposals" | "goals";
+
 export default function PredictabilityTable({
   fixtures,
   match,
   mode,
   showHeader = true,
-  statConfig,
 }: {
   fixtures: FixtureMatch[];
   match?: FixtureMatch;
   mode: PremiumMode;
   showHeader?: boolean;
-  statConfig: StatConfig;
 }) {
   const locked = mode !== "premium";
 
-  const [statLens, setStatLens] = useState<string>(statConfig.defaultStat);
-  const statLabel = statConfig.labels[statLens] || statLens;
+  const [statLens, setStatLens] = useState<StatLens>("fantasy");
+  const statLabel = statLens === "fantasy" ? "Fantasy" : statLens === "disposals" ? "Disposals" : "Goals";
   const statKey = useMemo(() => inferStatKey(statLabel), [statLabel]);
 
   const rawPlayerPredict = useMemo(
@@ -233,7 +232,7 @@ export default function PredictabilityTable({
               </div>
 
               <div className="flex gap-1.5">
-                {statConfig.availableStats.map((s) => (
+                {(["fantasy", "disposals", "goals"] as StatLens[]).map((s) => (
                   <button
                     key={s}
                     onClick={() => setStatLens(s)}
@@ -244,7 +243,7 @@ export default function PredictabilityTable({
                         : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
                     )}
                   >
-                    {statConfig.labels[s] || s}
+                    {s === "fantasy" ? "Fantasy" : s === "disposals" ? "Disposals" : "Goals"}
                   </button>
                 ))}
               </div>

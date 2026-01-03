@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { X, Lock, Crown } from "lucide-react";
-import { usePlayerScatterData, type PlayerPoint } from "./usePlayerScatterData";
+import { usePlayerScatterData, type LensKey, type PlayerPoint } from "./usePlayerScatterData";
 
 interface PlayerTrendBottomSheetProps {
   open: boolean;
   onClose: () => void;
   player: PlayerPoint | null;
   allPlayers: PlayerPoint[];
-  lens: string;
+  lens: LensKey;
   locked: boolean;
 }
 
@@ -213,7 +213,7 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
   );
 }
 
-function TrendChart(props: { data: any[]; player: PlayerPoint; lens: string; isSheetDragging: boolean; locked: boolean }) {
+function TrendChart(props: { data: any[]; player: PlayerPoint; lens: LensKey; isSheetDragging: boolean; locked: boolean }) {
   const { data, player, lens, isSheetDragging, locked } = props;
   const [activePoint, setActivePoint] = useState<number | null>(null);
   const [showLockedPreview, setShowLockedPreview] = useState(false);
@@ -407,7 +407,7 @@ function TrendChart(props: { data: any[]; player: PlayerPoint; lens: string; isS
   );
 }
 
-function generateTrendData(player: PlayerPoint, lens: string) {
+function generateTrendData(player: PlayerPoint, lens: LensKey) {
   const rounds = 5;
   const base = lens === "fantasy" ? player.momentum * 8 : lens === "disposals" ? 22 : 1.5;
 
@@ -418,7 +418,7 @@ function generateTrendData(player: PlayerPoint, lens: string) {
   }));
 }
 
-function generateInsight(player: PlayerPoint, lens: string, locked: boolean) {
+function generateInsight(player: PlayerPoint, lens: LensKey, locked: boolean) {
   if (player.momentum > 70 && player.ceiling > 70) {
     return `${player.name} shows elite momentum and ceiling. Strong slate correlation likely with consistent scoring across multiple categories.`;
   }
