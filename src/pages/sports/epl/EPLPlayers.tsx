@@ -5,6 +5,7 @@ import FormStabilityGrid from "@/components/epl/players/FormStabilityGrid";
 import PositionTrends from "@/components/epl/players/PositionTrends";
 import AIInsights from "@/components/epl/players/AIInsights";
 import MasterTable from "@/components/epl/players/MasterTable";
+import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
 
 export default function EPLPlayersPage() {
   const [activeSection, setActiveSection] = useState("round-momentum");
@@ -125,12 +126,12 @@ export default function EPLPlayersPage() {
       {/* Page Header */}
       <header className="mb-8 md:mb-10 animate-premium-section">
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-          AFL Player Performance Dashboard
+          EPL Player Performance Dashboard
         </h1>
         <p className="mt-2 max-w-2xl text-white/70 text-sm leading-relaxed">
           League-wide momentum, fantasy analytics, player trends, stability
           metrics, role intelligence, predictive insights and full-season
-          ledgers — all in one AFL dashboard.
+          ledgers — all in one EPL dashboard.
         </p>
       </header>
 
@@ -189,23 +190,23 @@ export default function EPLPlayersPage() {
 
       <div className="space-y-20 md:space-y-24">
         <section id="round-momentum" className="scroll-mt-28 animate-premium-section">
-          <RoundSummary />
+          <RoundSummary statConfig={EPL_STAT_CONFIG} />
         </section>
 
         <section id="form-stability" className="scroll-mt-28 animate-premium-section delay-1">
-          <FormStabilityGrid />
+          <FormStabilityGrid statConfig={EPL_STAT_CONFIG} />
         </section>
 
         <section id="position-trends" className="scroll-mt-28 animate-premium-section delay-2">
-          <PositionTrends />
+          <PositionTrends statConfig={EPL_STAT_CONFIG} />
         </section>
 
         <section id="ai-insights" className="scroll-mt-28 animate-premium-section delay-3">
-          <AIInsights />
+          <AIInsights statConfig={EPL_STAT_CONFIG} />
         </section>
 
         <section id="master-table" className="scroll-mt-28 animate-premium-section delay-4">
-          <MasterTable />
+          <MasterTable statConfig={EPL_STAT_CONFIG} />
         </section>
       </div>
 
