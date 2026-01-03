@@ -224,27 +224,27 @@ export default function PlayerImpactHeroScatterDesktop(props: {
                 <line x1={PAD} y1={y(50)} x2={W - PAD} y2={y(50)} stroke="rgba(255,255,255,0.16)" />
 
                 {/* Axis direction hints */}
-                <text x={PAD - 4} y={H - PAD + 14} fill="rgba(255,255,255,0.25)" fontSize="9" textAnchor="start">
+                <text x={PAD - 4} y={H - PAD + 14} fill="rgba(255,255,255,0.32)" fontSize="9" textAnchor="start">
                   Low
                 </text>
-                <text x={W - PAD + 4} y={H - PAD + 14} fill="rgba(255,255,255,0.25)" fontSize="9" textAnchor="end">
+                <text x={W - PAD + 4} y={H - PAD + 14} fill="rgba(255,255,255,0.32)" fontSize="9" textAnchor="end">
                   High
                 </text>
-                <text x={PAD - 4} y={PAD - 4} fill="rgba(255,255,255,0.25)" fontSize="9" textAnchor="start">
+                <text x={PAD - 4} y={PAD - 4} fill="rgba(255,255,255,0.32)" fontSize="9" textAnchor="start">
                   High
                 </text>
 
                 {/* quadrant labels */}
-                <text x={PAD + 8} y={PAD + 18} fill="rgba(255,255,255,0.40)" fontSize="13">
+                <text x={PAD + 8} y={PAD + 18} fill="rgba(255,255,255,0.48)" fontSize="13">
                   Volatile
                 </text>
                 <text x={W - PAD - 120} y={PAD + 18} fill="rgba(251,191,36,0.90)" fontSize="13" fontWeight="500">
                   Finale
                 </text>
-                <text x={PAD + 8} y={H - PAD - 10} fill="rgba(255,255,255,0.30)" fontSize="13">
+                <text x={PAD + 8} y={H - PAD - 10} fill="rgba(255,255,255,0.38)" fontSize="13">
                   Low impact
                 </text>
-                <text x={W - PAD - 120} y={H - PAD - 10} fill="rgba(255,255,255,0.30)" fontSize="13">
+                <text x={W - PAD - 120} y={H - PAD - 10} fill="rgba(255,255,255,0.38)" fontSize="13">
                   Safe
                 </text>
 
@@ -331,13 +331,43 @@ export default function PlayerImpactHeroScatterDesktop(props: {
                 const hoveredPlayer = playersVisible.find((p) => p.id === hoverId);
                 if (!hoveredPlayer) return null;
 
+                const tooltipOffset = 12;
+                const tooltipWidth = 200;
+                const tooltipHeight = 80;
+
+                const containerRect = { width: 0, height: 0 };
+                if (typeof document !== 'undefined') {
+                  const container = document.querySelector('.h-\\[560px\\]');
+                  if (container) {
+                    const rect = container.getBoundingClientRect();
+                    containerRect.width = rect.width;
+                    containerRect.height = rect.height;
+                  }
+                }
+
+                let left = hoverPos.x + tooltipOffset;
+                let top = hoverPos.y;
+                let transformX = '0';
+                let transformY = '-50%';
+
+                if (left + tooltipWidth > containerRect.width) {
+                  left = hoverPos.x - tooltipOffset;
+                  transformX = '-100%';
+                }
+
+                if (top - tooltipHeight / 2 < 0) {
+                  transformY = '0';
+                } else if (top + tooltipHeight / 2 > containerRect.height) {
+                  transformY = '-100%';
+                }
+
                 return (
                   <div
-                    className="absolute z-20 pointer-events-none"
+                    className="absolute z-50 pointer-events-none"
                     style={{
-                      left: `${hoverPos.x}px`,
-                      top: `${hoverPos.y}px`,
-                      transform: "translate(12px, -50%)",
+                      left: `${left}px`,
+                      top: `${top}px`,
+                      transform: `translate(${transformX}, ${transformY})`,
                     }}
                   >
                     <div className="rounded-xl border border-amber-400/30 bg-black/95 backdrop-blur-sm px-3 py-2 shadow-xl whitespace-nowrap">

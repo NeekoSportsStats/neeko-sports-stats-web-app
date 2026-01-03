@@ -8,7 +8,6 @@ import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 import { STAT_LABEL, StatLens, mean } from "@/components/afl/ai-insights/data/utils";
 
 import SectionShell from "@/components/afl/ai-insights/shared/SectionShell";
-import ControlsBar from "@/components/afl/ai-insights/shared/ControlsBar";
 import PredictabilityTable from "@/components/afl/ai-insights/Section-2-player-predictability/PredictabilityTable";
 import TeamPredictabilityPanel from "@/components/afl/ai-insights/Section-3-team-prediction/TeamPredictabilityPanel";
 import GameFlowMomentumPanel from "@/components/afl/ai-insights/Section-4-game-flow/GameFlowMomentumPanel";
@@ -45,7 +44,6 @@ export default function AFLAIInsights() {
   /* ---------------- GLOBAL STATE ---------------- */
 
   const [mode, setMode] = useState<PremiumMode>("free");
-  const [stat, setStat] = useState<StatLens>("fantasy");
 
   /* ---------------- ROUND + MATCH ---------------- */
 
@@ -88,8 +86,8 @@ export default function AFLAIInsights() {
   /* -------------------------------------------------------------------------- */
 
   const rawPlayerPredict = useMemo(
-    () => buildPlayerPredictabilityFromFixtures(pastFixtures, stat),
-    [pastFixtures, stat]
+    () => buildPlayerPredictabilityFromFixtures(pastFixtures, "fantasy"),
+    [pastFixtures]
   );
 
   const playerPredict = useMemo(() => {
@@ -107,24 +105,11 @@ export default function AFLAIInsights() {
     if (!playerPredict.length) return "";
 
     const avgConf = mean(playerPredict.map((r) => r.confidence01));
-    const avgVol = mean(playerPredict.map((r) => r.volatility01));
-
-    if (stat === "goals") {
-      return avgVol >= 0.6
-        ? "Goal profiles suggest surge-prone phases and late separation risk."
-        : "Goal output is tightly clustered, limiting swing phases.";
-    }
-
-    if (stat === "disposals") {
-      return avgConf >= 0.7
-        ? "Disposal roles appear highly repeatable across both sides."
-        : "Rotations introduce moderate possession volatility.";
-    }
 
     return avgConf >= 0.7
       ? "Fantasy production shows strong role reliability across the matchup."
       : "Fantasy output varies by role dependency and matchup conditions.";
-  }, [playerPredict, stat]);
+  }, [playerPredict]);
 
   /* -------------------------------------------------------------------------- */
   /* RENDER                                                                    */
@@ -138,7 +123,7 @@ export default function AFLAIInsights() {
           <div>
             <h1 className="text-3xl font-bold">AFL AI Insights</h1>
             <p className="mt-1 text-sm text-white/60">
-              Match-scoped intelligence · {STAT_LABEL[stat]} lens
+              Match-scoped intelligence
             </p>
           </div>
 
@@ -174,9 +159,6 @@ export default function AFLAIInsights() {
           </div>
         </div>
 
-        {/* STAT FILTER */}
-        <ControlsBar stat={stat} onChange={setStat} />
-
         {/* ------------------------------------------------------------------ */}
         {/* 1. HERO — PLAYER IMPACT MAP                                         */}
         {/* ------------------------------------------------------------------ */}
@@ -184,7 +166,7 @@ export default function AFLAIInsights() {
           <PlayerImpactScatterPanel
             match={selectedMatch}
             mode={mode}
-            initialLens={stat}
+            initialLens="fantasy"
           />
         )}
 
@@ -196,7 +178,7 @@ export default function AFLAIInsights() {
             <PredictabilityTable
               rows={playerPredict}
               mode={mode}
-              statLabel={STAT_LABEL[stat]}
+              statLabel="Fantasy"
               matchContext={`${(selectedMatch as any).homeTeam} vs ${(selectedMatch as any).awayTeam}`}
               insight={playerInsight}
               showHeader={false}
@@ -212,7 +194,7 @@ export default function AFLAIInsights() {
             mode={mode}
             match={selectedMatch as any}
             fixtures={pastFixtures}
-            stat={stat}
+            stat="fantasy"
           />
         )}
 

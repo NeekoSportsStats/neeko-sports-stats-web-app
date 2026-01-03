@@ -150,10 +150,10 @@ export default function PlayerTrendModal(props: {
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-3xl -translate-x-1/2 -translate-y-1/2">
         <div className="max-h-[90vh] overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0b0b] shadow-2xl">
-          <div className="flex items-start justify-between gap-3 px-6 pt-4 pb-3">
+          <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-2">
             <div>
               <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Player Trend</div>
-              <div className="mt-1 text-2xl font-semibold text-white">{player.name}</div>
+              <div className="mt-0.5 text-2xl font-semibold text-white">{player.name}</div>
               <div className="mt-0.5 text-sm text-white/55">Weekly {statLabel} output</div>
             </div>
 
@@ -165,7 +165,7 @@ export default function PlayerTrendModal(props: {
             </button>
           </div>
 
-          <div className="px-6 pb-4">
+          <div className="px-5 pb-4">
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1">
                 <select
@@ -196,12 +196,12 @@ export default function PlayerTrendModal(props: {
               </div>
             </div>
             {locked && (
-              <div className="mt-2 text-xs text-white/45">
+              <div className="mt-1.5 text-xs text-white/45">
                 Neeko+ required to compare players
               </div>
             )}
 
-            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
+            <div className="mt-2.5 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
               <div className="relative">
                 <svg viewBox={`0 0 ${CH_W} ${CH_H}`} className="h-[320px] w-full">
                   {/* Horizontal grid lines */}
@@ -228,13 +228,13 @@ export default function PlayerTrendModal(props: {
                     const mid = Math.round((min + max) / 2);
                     return (
                       <>
-                        <text x={PAD - 8} y={PAD + 5} fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="end">
+                        <text x={PAD - 8} y={PAD + 5} fill="rgba(255,255,255,0.48)" fontSize="10" textAnchor="end">
                           {Math.round(max)}
                         </text>
-                        <text x={PAD - 8} y={PAD + (CH_H - PAD * 2) / 2 + 4} fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="end">
+                        <text x={PAD - 8} y={PAD + (CH_H - PAD * 2) / 2 + 4} fill="rgba(255,255,255,0.48)" fontSize="10" textAnchor="end">
                           {mid}
                         </text>
-                        <text x={PAD - 8} y={CH_H - PAD + 4} fill="rgba(255,255,255,0.4)" fontSize="10" textAnchor="end">
+                        <text x={PAD - 8} y={CH_H - PAD + 4} fill="rgba(255,255,255,0.48)" fontSize="10" textAnchor="end">
                           {Math.round(min)}
                         </text>
                       </>
@@ -250,7 +250,7 @@ export default function PlayerTrendModal(props: {
                         key={i}
                         x={xPos}
                         y={CH_H - PAD + 16}
-                        fill="rgba(255,255,255,0.4)"
+                        fill="rgba(255,255,255,0.48)"
                         fontSize="10"
                         textAnchor="middle"
                       >
@@ -354,21 +354,17 @@ export default function PlayerTrendModal(props: {
                   const xPos = scaleX(hoverIdx);
                   const xPercent = (xPos / CH_W) * 100;
 
-                  const tooltipLeft = xPercent > 70 ? 'auto' : `${xPercent}%`;
-                  const tooltipRight = xPercent > 70 ? `${100 - xPercent}%` : 'auto';
-                  const tooltipTransform = xPercent > 70 ? 'translateX(50%)' : 'translateX(-50%)';
+                  const flipHorizontal = xPercent > 75;
+                  const tooltipStyles: React.CSSProperties = flipHorizontal
+                    ? { right: `${100 - xPercent}%`, transform: 'translateX(50%)', top: '12px' }
+                    : { left: `${xPercent}%`, transform: 'translateX(-50%)', top: '12px' };
 
                   return (
                     <div
-                      className="absolute pointer-events-none"
-                      style={{
-                        left: tooltipLeft,
-                        right: tooltipRight,
-                        top: '12px',
-                        transform: tooltipTransform,
-                      }}
+                      className="absolute pointer-events-none z-50"
+                      style={tooltipStyles}
                     >
-                      <div className="rounded-xl border border-amber-400/30 bg-black/90 backdrop-blur-sm px-3 py-2 shadow-xl">
+                      <div className="rounded-xl border border-amber-400/30 bg-black/95 backdrop-blur-sm px-3 py-2 shadow-2xl whitespace-nowrap">
                         <div className="text-xs font-semibold text-amber-200">{point.week}</div>
                         <div className="mt-0.5 text-sm text-white">
                           {statLabel}: <span className="font-semibold">{value}</span>
@@ -385,27 +381,27 @@ export default function PlayerTrendModal(props: {
               </div>
             </div>
 
-            <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-2.5 text-sm text-white/75">
+            <div className="mt-2.5 rounded-2xl border border-white/10 bg-black/20 px-3.5 py-2 text-sm text-white/75">
               <span className="text-amber-200">AI Insight:</span> {aiLine}
             </div>
 
             {locked ? (
-              <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-2.5">
+              <div className="mt-2.5 rounded-2xl border border-white/10 bg-black/20 px-3.5 py-2">
                 <div className="inline-flex items-center gap-2 text-sm text-white/70">
                   <Lock className="h-4 w-4" />
                   <span className="font-medium">Premium includes:</span>
                 </div>
-                <ul className="mt-2 space-y-1 text-sm text-white/55">
+                <ul className="mt-1.5 space-y-0.5 text-sm text-white/55">
                   <li>• Projection range (low / expected / high)</li>
                   <li>• Role stability note + matchup context</li>
                   <li>• Trend acceleration / cooling flag</li>
                 </ul>
-                <div className="mt-2 text-xs text-white/40">
-                  You’re seeing deterministic preview output only (safe for free users).
+                <div className="mt-1.5 text-xs text-white/40">
+                  You're seeing deterministic preview output only (safe for free users).
                 </div>
               </div>
             ) : (
-              <div className="mt-3 rounded-2xl border border-amber-400/15 bg-amber-400/[0.06] px-4 py-2.5 text-sm text-amber-100/90">
+              <div className="mt-2.5 rounded-2xl border border-amber-400/15 bg-amber-400/[0.06] px-3.5 py-2 text-sm text-amber-100/90">
                 Projection bands: low <span className="font-semibold">{projection.low}</span> · expected{" "}
                 <span className="font-semibold">{projection.mid}</span> · high{" "}
                 <span className="font-semibold">{projection.high}</span>
