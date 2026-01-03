@@ -19,6 +19,7 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
   const { open, onClose, player, allPlayers, lens, locked } = props;
   const [isDragging, setIsDragging] = useState(false);
   const [dragStarted, setDragStarted] = useState(false);
+  const [isSheetDragging, setIsSheetDragging] = useState(false);
   const [dragY, setDragY] = useState(0);
   const [startY, setStartY] = useState(0);
   const [startTime, setStartTime] = useState(0);
@@ -37,6 +38,7 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
       setDragY(0);
       setDragStarted(false);
       setIsDragging(false);
+      setIsSheetDragging(false);
     }
     return () => {
       document.body.style.overflow = "";
@@ -74,6 +76,7 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
     if (contentRef.current && contentRef.current.scrollTop > 0) {
       setIsDragging(false);
       setDragStarted(false);
+      setIsSheetDragging(false);
       return;
     }
 
@@ -86,6 +89,7 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
 
     if (!dragStarted) {
       setDragStarted(true);
+      setIsSheetDragging(true);
     }
 
     if (diff > 0) {
@@ -106,6 +110,7 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
     if (!isDragging) return;
     setIsDragging(false);
     setDragStarted(false);
+    setIsSheetDragging(false);
 
     const sheetHeight = sheetRef.current?.offsetHeight || window.innerHeight * 0.8;
     const dismissDistance = sheetHeight * DISMISS_DISTANCE_RATIO;
@@ -177,7 +182,7 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
         >
           <div className="mb-4">
             <div className="text-xs uppercase tracking-wider text-white/50 mb-2">Trend Chart</div>
-            <TrendChart data={trendData} player={player} lens={lens} />
+            <TrendChart data={trendData} player={player} lens={lens} isSheetDragging={isSheetDragging} />
           </div>
 
           {locked && (
@@ -202,8 +207,8 @@ export default function PlayerTrendBottomSheet(props: PlayerTrendBottomSheetProp
   );
 }
 
-function TrendChart(props: { data: any[]; player: PlayerPoint; lens: LensKey }) {
-  const { data, player, lens } = props;
+function TrendChart(props: { data: any[]; player: PlayerPoint; lens: LensKey; isSheetDragging: boolean }) {
+  const { data, player, lens, isSheetDragging } = props;
   const [activePoint, setActivePoint] = useState<number | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
@@ -218,6 +223,8 @@ function TrendChart(props: { data: any[]; player: PlayerPoint; lens: LensKey }) 
   const pathD = data.map((d, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(d.value)}`).join(" ");
 
   const handlePointTouch = (e: React.TouchEvent, index: number) => {
+    if (isSheetDragging) return;
+
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const touchX = e.touches[0].clientX - rect.left;
@@ -228,8 +235,15 @@ function TrendChart(props: { data: any[]; player: PlayerPoint; lens: LensKey }) 
   };
 
   return (
-    <div className="relative rounded-xl border border-white/10 bg-black/20 p-3">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[200px]">
+    <div
+      className="relative rounded-xl border border-white/10 bg-black/20 p-3"
+      style={{ pointerEvents: isSheetDragging ? "none" : "auto" }}
+    >
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full h-[200px]"
+        style={{ touchAction: "none" }}
+      >
         <defs>
           <linearGradient id="trendGradient" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="rgba(251,191,36,0.3)" />
@@ -253,8 +267,10 @@ function TrendChart(props: { data: any[]; player: PlayerPoint; lens: LensKey }) 
               fill="transparent"
               onTouchStart={(e) => handlePointTouch(e, i)}
               onTouchEnd={() => {
-                setActivePoint(null);
-                setTooltipPos(null);
+                if (!isSheetDragging) {
+                  setActivePoint(null);
+                  setTooltipPos(null);
+                }
               }}
             />
             <circle
@@ -270,7 +286,7 @@ function TrendChart(props: { data: any[]; player: PlayerPoint; lens: LensKey }) 
         ))}
       </svg>
 
-      {activePoint !== null && tooltipPos && (
+      {activePoint !== null && tooltipPos && !isSheetDragging && (
         <div
           className="absolute z-20 rounded-lg border border-white/20 bg-[#0b0b0b] px-3 py-2 shadow-xl pointer-events-none"
           style={{
