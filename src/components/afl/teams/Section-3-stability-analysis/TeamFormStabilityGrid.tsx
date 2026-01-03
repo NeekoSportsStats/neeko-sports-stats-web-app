@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { Flame, Snowflake, Activity } from "lucide-react";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
+import type { StatConfig, StatKey } from "@/lib/stats/types";
 
 type TeamTrend = {
   team: string;
@@ -26,15 +27,15 @@ const MOCK_COOLING: TeamTrend[] = [
   { team: "West Coast Eagles", value: -4.4 },
 ];
 
-type StatType = "Fantasy" | "Disposals" | "Goals";
+type StatType = StatKey;
 
-const TeamFormStabilityGrid: React.FC = () => {
-  const [lens, setLens] = useState<StatType>("Fantasy");
+const TeamFormStabilityGrid: React.FC<{ statConfig: StatConfig }> = ({ statConfig }) => {
+  const [lens, setLens] = useState<StatType>(statConfig.defaultStat);
 
   const lensDescription =
-    lens === "Fantasy"
+    lens === "fantasy"
       ? "Fantasy scoring over the last 5 rounds"
-      : lens === "Disposals"
+      : lens === "disposals"
       ? "Ball-winning strength & possession profile"
       : "Goal-scoring momentum & forward impact";
 
@@ -64,7 +65,7 @@ const TeamFormStabilityGrid: React.FC = () => {
             </p>
 
             <div className="inline-flex flex-wrap gap-1.5 rounded-full bg-white/5 p-1">
-              {(["Fantasy", "Disposals", "Goals"] as StatType[]).map((type) => {
+              {statConfig.availableStats.map((type) => {
                 const active = lens === type;
                 return (
                   <button
@@ -76,7 +77,7 @@ const TeamFormStabilityGrid: React.FC = () => {
                         : "bg-transparent text-neutral-300 hover:bg-white/10"
                     }`}
                   >
-                    {type}
+                    {statConfig.labels[type]}
                   </button>
                 );
               })}

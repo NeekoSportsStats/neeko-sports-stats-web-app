@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/lib/auth";
+import type { StatConfig, StatKey } from "@/lib/stats/types";
 
 import TeamInsightsOverlay from "../Section-2-team-insights/TeamInsightsOverlay";
 import TeamMasterTableDesktop from "./TeamMasterTableDesktop";
@@ -14,16 +15,16 @@ import { MOCK_TEAMS, TeamRow } from "../data/mockTeams";
 /* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export type StatLens = "Fantasy" | "Disposals" | "Goals";
+export type StatLens = StatKey;
 
 /* -------------------------------------------------------------------------- */
 /* MASTER TABLE ORCHESTRATOR                                                   */
 /* -------------------------------------------------------------------------- */
 
-export default function TeamMasterTable() {
+export default function TeamMasterTable({ statConfig }: { statConfig: StatConfig }) {
   const { isPremium } = useAuth();
 
-  const [selectedStat, setSelectedStat] = useState<StatLens>("Fantasy");
+  const [selectedStat, setSelectedStat] = useState<StatLens>(statConfig.defaultStat);
   const [selectedTeam, setSelectedTeam] = useState<TeamRow | null>(null);
   const [query, setQuery] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -44,6 +45,7 @@ export default function TeamMasterTable() {
           query={query}
           setQuery={setQuery}
           onSelectTeam={setSelectedTeam}
+          statConfig={statConfig}
         />
       </div>
 
@@ -57,6 +59,7 @@ export default function TeamMasterTable() {
           query={query}
           setQuery={setQuery}
           onSelectTeam={setSelectedTeam}
+          statConfig={statConfig}
         />
       </div>
 

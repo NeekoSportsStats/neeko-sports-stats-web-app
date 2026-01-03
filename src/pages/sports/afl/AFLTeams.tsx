@@ -9,6 +9,7 @@ import TeamFormGrid from "@/components/afl/teams/TeamFormGrid";
 import TeamTrends from "@/components/afl/teams/TeamTrends";
 import TeamAIInsights from "@/components/afl/teams/TeamAIInsights";
 import TeamMasterTable from "@/components/afl/teams/TeamMasterTable";
+import { AFL_STAT_CONFIG } from "@/lib/stats/afl/statConfig";
 
 export default function AFLTeams() {
   const [activeSection, setActiveSection] = useState("momentum");
@@ -191,27 +192,27 @@ export default function AFLTeams() {
       {/* -------------------------- PAGE SECTIONS -------------------------- */}
 
       <section id="momentum" className="mb-14 scroll-mt-28">
-        <TeamMomentumPulse />
+        <TeamMomentumPulse statConfig={AFL_STAT_CONFIG} />
       </section>
 
       <section id="dashboard" className="mb-14 scroll-mt-28">
-        <TeamDashboardTiles />
+        <TeamDashboardTiles statConfig={AFL_STAT_CONFIG} />
       </section>
 
       <section id="form-grid" className="mb-14 scroll-mt-28">
-        <TeamFormGrid />
+        <TeamFormGrid statConfig={AFL_STAT_CONFIG} />
       </section>
 
       <section id="trends" className="mb-14 scroll-mt-28">
-        <TeamTrends />
+        <TeamTrends statConfig={AFL_STAT_CONFIG} />
       </section>
 
       <section id="ai" className="mb-14 scroll-mt-28">
-        <TeamAIInsights />
+        <TeamAIInsights statConfig={AFL_STAT_CONFIG} />
       </section>
 
       <section id="master-table" className="scroll-mt-28">
-        <TeamMasterTable />
+        <TeamMasterTable statConfig={AFL_STAT_CONFIG} />
       </section>
 
       {/* ------------------------------- BACK TO TOP ------------------------------ */}

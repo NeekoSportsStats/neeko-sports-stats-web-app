@@ -6,6 +6,7 @@ import {
   Search,
   X,
 } from "lucide-react";
+import type { StatConfig } from "@/lib/stats/types";
 import type { TeamRow } from "../data/mockTeams";
 import type { StatLens } from "./TeamMasterTable";
 
@@ -31,8 +32,8 @@ const cx = (...c: Array<string | false | undefined>) =>
   c.filter(Boolean).join(" ");
 
 function getValues(team: TeamRow, stat: StatLens): number[] {
-  if (stat === "Fantasy") return team.fantasy;
-  if (stat === "Disposals") return team.disposals;
+  if (stat === "fantasy") return team.fantasy;
+  if (stat === "disposals") return team.disposals;
   return team.goals;
 }
 
@@ -47,8 +48,8 @@ function calcStats(values: number[]) {
 }
 
 function getHitThresholds(stat: StatLens): number[] {
-  if (stat === "Fantasy") return [1800, 1900, 2000, 2100];
-  if (stat === "Disposals") return [320, 350, 380, 400];
+  if (stat === "fantasy") return [1800, 1900, 2000, 2100];
+  if (stat === "disposals") return [320, 350, 380, 400];
   return [8, 10, 12, 14];
 }
 
@@ -69,6 +70,7 @@ export default function TeamMasterTableDesktop({
   query,
   setQuery,
   onSelectTeam,
+  statConfig,
 }: {
   teams: TeamRow[];
   selectedStat: StatLens;
@@ -77,6 +79,7 @@ export default function TeamMasterTableDesktop({
   query: string;
   setQuery: (v: string) => void;
   onSelectTeam: (t: TeamRow) => void;
+  statConfig: StatConfig;
 }) {
   const [search, setSearch] = useState("");
   const [compact, setCompact] = useState(false);
@@ -138,7 +141,7 @@ export default function TeamMasterTableDesktop({
 
             <div className="flex flex-col items-end gap-2">
               <div className="flex gap-2 rounded-full border border-neutral-700 bg-black p-1">
-                {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
+                {statConfig.availableStats.map((s) => (
                   <button
                     key={s}
                     onClick={() => setSelectedStat(s)}
@@ -149,7 +152,7 @@ export default function TeamMasterTableDesktop({
                         : "text-neutral-300 hover:bg-neutral-800"
                     )}
                   >
-                    {s}
+                    {statConfig.labels[s]}
                   </button>
                 ))}
               </div>
