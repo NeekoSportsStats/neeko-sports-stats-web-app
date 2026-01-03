@@ -3,6 +3,7 @@ import { Lock, TrendingUp, Activity, Waves } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/nba/match-center/types";
 import type { PremiumMode } from "@/components/nba/ai-insights/data/types";
+import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 /* -------------------------------------------------------------------------- */
 /* SECTION 3 — GAME FLOW & MOMENTUM                                           */

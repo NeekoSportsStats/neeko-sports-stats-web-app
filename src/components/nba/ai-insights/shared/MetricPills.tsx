@@ -1,5 +1,5 @@
 import React from "react";
-import { cx, labelConfidence, labelVolatility, labelConsistency, labelExplosiveness } from "./utils";
+import { cx, labelConfidence, labelVolatility, labelConsistency, labelExplosiveness } from "../data/utils";
 
 function meterClass(value01: number, kind: "good" | "bad") {
   // only Tailwind classes; no fixed colors beyond gold + neutrals

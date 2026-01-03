@@ -1,6 +1,6 @@
 import React from "react";
 import { Sparkles, AlertTriangle } from "lucide-react";
-import { clamp } from "./data/utils";
+import { clamp } from "../data/utils";
 
 export default function RoundOverview(props: {
   roundLabel: string;

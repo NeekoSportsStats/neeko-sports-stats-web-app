@@ -659,19 +659,28 @@ export function buildPlayerImpactPoints(params: {
   const expMin = Math.min(...expecteds, 0);
   const expMax = Math.max(...expecteds, 1);
 
-  const out: PlayerImpactPoint[] = pre.map((p) => ({
-    id: p.id,
-    name: p.name,
-    team: p.team,
-    confidence01: normalize01(p.within, confMin, confMax),
-    volatility01: normalize01(p.vol, volMin, volMax),
-    expected01: normalize01(p.expected, expMin, expMax),
-    expected: p.expected,
-    rangeLow: p.rangeLow,
-    rangeHigh: p.rangeHigh,
-    trend: p.trend,
-    ai: p.ai,
-  }));
+  const out: PlayerImpactPoint[] = pre.map((p) => {
+    const confidence01 = normalize01(p.within, confMin, confMax);
+    const volatility01 = normalize01(p.vol, volMin, volMax);
+    const expected01 = normalize01(p.expected, expMin, expMax);
+
+    return {
+      id: p.id,
+      name: p.name,
+      team: p.team,
+      safety01: confidence01,
+      impact01: confidence01,
+      size01: expected01,
+      confidence01,
+      volatility01,
+      expected01,
+      expected: p.expected,
+      rangeLow: p.rangeLow,
+      rangeHigh: p.rangeHigh,
+      trend: p.trend,
+      ai: p.ai,
+    };
+  });
 
   // Order: higher expected then safer
   out.sort((a, b) => b.expected - a.expected || b.confidence01 - a.confidence01);
