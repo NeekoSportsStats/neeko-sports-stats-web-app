@@ -48,6 +48,7 @@ export default function PlayerTrendModal(props: {
   const { open, onClose, player, allPlayers, locked, lens } = props;
 
   const [compareId, setCompareId] = useState<string>("");
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open) setCompareId("");
@@ -107,6 +108,42 @@ export default function PlayerTrendModal(props: {
 
   const mainPath = pathFrom(series.ys, CH_W, CH_H, PAD);
   const comparePath = compare ? pathFrom(series2.ys, CH_W, CH_H, PAD) : "";
+
+  const handleChartInteraction = (e: React.MouseEvent<SVGRectElement> | React.TouchEvent<SVGRectElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0]?.clientX ?? 0 : e.clientX;
+    const mouseX = clientX - rect.left;
+    const chartWidth = rect.width;
+    const plotWidth = chartWidth - (PAD * 2 * chartWidth / CH_W);
+    const plotStartX = PAD * chartWidth / CH_W;
+    const relativeX = mouseX - plotStartX;
+    const normalized = clamp(relativeX / plotWidth, 0, 1);
+    const idx = Math.round(normalized * Math.max(0, series.ys.length - 1));
+    const clampedIdx = clamp(idx, 0, series.ys.length - 1);
+
+    if (hoverIdx === clampedIdx) {
+      setHoverIdx(null);
+    } else {
+      setHoverIdx(clampedIdx);
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<SVGRectElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const chartWidth = rect.width;
+    const plotWidth = chartWidth - (PAD * 2 * chartWidth / CH_W);
+    const plotStartX = PAD * chartWidth / CH_W;
+    const relativeX = mouseX - plotStartX;
+    const normalized = clamp(relativeX / plotWidth, 0, 1);
+    const idx = Math.round(normalized * Math.max(0, series.ys.length - 1));
+    const clampedIdx = clamp(idx, 0, series.ys.length - 1);
+    setHoverIdx(clampedIdx);
+  };
+
+  const handleMouseLeave = () => {
+    setHoverIdx(null);
+  };
 
   return (
     <div className="fixed inset-0 z-[80]">
@@ -251,6 +288,50 @@ export default function PlayerTrendModal(props: {
                       />
                     </>
                   )}
+
+                  {hoverIdx !== null && series.ys[hoverIdx] !== undefined && (() => {
+                    const minY = Math.min(...series.ys);
+                    const maxY = Math.max(...series.ys);
+                    const scaleX = (i: number) => PAD + (i / Math.max(1, series.ys.length - 1)) * (CH_W - PAD * 2);
+                    const scaleY = (v: number) => PAD + (1 - (v - minY) / Math.max(1, maxY - minY)) * (CH_H - PAD * 2);
+                    const xPos = scaleX(hoverIdx);
+                    const yPos = scaleY(series.ys[hoverIdx]);
+
+                    return (
+                      <>
+                        <line
+                          x1={xPos}
+                          y1={PAD}
+                          x2={xPos}
+                          y2={CH_H - PAD}
+                          stroke="rgba(250,204,21,0.3)"
+                          strokeWidth={1.5}
+                          strokeDasharray="4 4"
+                        />
+                        <circle
+                          cx={xPos}
+                          cy={yPos}
+                          r={5}
+                          fill="#facc15"
+                          stroke="#000"
+                          strokeWidth={2}
+                        />
+                      </>
+                    );
+                  })()}
+
+                  <rect
+                    x={PAD}
+                    y={PAD}
+                    width={CH_W - PAD * 2}
+                    height={CH_H - PAD * 2}
+                    fill="transparent"
+                    onMouseMove={handleMouseMove}
+                    onMouseLeave={handleMouseLeave}
+                    onClick={handleChartInteraction}
+                    onTouchStart={handleChartInteraction}
+                    style={{ cursor: 'crosshair' }}
+                  />
                 </svg>
 
                 {locked && (
@@ -261,30 +342,46 @@ export default function PlayerTrendModal(props: {
                     </span>
                   </div>
                 )}
-              </div>
-            </div>
 
-            <div className="mt-3 rounded-2xl border border-white/10 bg-black/20 overflow-hidden">
-              <div className="px-4 py-2 border-b border-white/10">
-                <div className="text-xs uppercase tracking-[0.15em] text-white/50">Round-by-Round</div>
-              </div>
-              <div className="max-h-[240px] overflow-y-auto">
-                <table className="w-full">
-                  <thead className="sticky top-0 bg-black/80 backdrop-blur-sm">
-                    <tr className="border-b border-white/10">
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-white/70">Round</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-white/70">{statLabel}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {player.trend.map((row) => (
-                      <tr key={row.week} className="border-b border-white/[0.06] hover:bg-white/[0.02]">
-                        <td className="px-4 py-2 text-sm text-white/80">{row.week}</td>
-                        <td className="px-4 py-2 text-right text-sm text-white/90 font-medium">{row.value}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                {hoverIdx !== null && series.t[hoverIdx] && (() => {
+                  const point = series.t[hoverIdx];
+                  const value = series.ys[hoverIdx];
+                  const delta = hoverIdx > 0 ? value - series.ys[hoverIdx - 1] : null;
+
+                  const minY = Math.min(...series.ys);
+                  const maxY = Math.max(...series.ys);
+                  const scaleX = (i: number) => PAD + (i / Math.max(1, series.ys.length - 1)) * (CH_W - PAD * 2);
+                  const xPos = scaleX(hoverIdx);
+                  const xPercent = (xPos / CH_W) * 100;
+
+                  const tooltipLeft = xPercent > 70 ? 'auto' : `${xPercent}%`;
+                  const tooltipRight = xPercent > 70 ? `${100 - xPercent}%` : 'auto';
+                  const tooltipTransform = xPercent > 70 ? 'translateX(50%)' : 'translateX(-50%)';
+
+                  return (
+                    <div
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: tooltipLeft,
+                        right: tooltipRight,
+                        top: '12px',
+                        transform: tooltipTransform,
+                      }}
+                    >
+                      <div className="rounded-xl border border-amber-400/30 bg-black/90 backdrop-blur-sm px-3 py-2 shadow-xl">
+                        <div className="text-xs font-semibold text-amber-200">{point.week}</div>
+                        <div className="mt-0.5 text-sm text-white">
+                          {statLabel}: <span className="font-semibold">{value}</span>
+                        </div>
+                        {delta !== null && (
+                          <div className="mt-0.5 text-xs text-white/60">
+                            Δ {delta > 0 ? '+' : ''}{delta.toFixed(0)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
