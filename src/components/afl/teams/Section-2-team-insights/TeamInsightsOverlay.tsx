@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { TeamRow } from "../data/mockTeams";
 import type { StatLens } from "../Section-1-master-table/TeamMasterTable";
+import type { StatConfig } from "@/lib/stats/types";
 import TeamInsightsContent from "./TeamInsightsContent";
 
 /* -------------------------------------------------------------------------- */
@@ -16,11 +17,13 @@ export default function TeamInsightsOverlay({
   selectedStat,
   onClose,
   onLensChange,
+  statConfig,
 }: {
   team: TeamRow;
   selectedStat: StatLens;
   onClose: () => void;
   onLensChange: (lens: StatLens) => void;
+  statConfig: StatConfig;
 }) {
   const [mounted, setMounted] = useState(false);
 
@@ -143,7 +146,7 @@ export default function TeamInsightsOverlay({
 
           {/* Lens Pills */}
           <div className="px-5 py-3 flex gap-2 border-b border-neutral-800">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((lens) => (
+            {(["fantasy", "disposals", "goals"] as StatLens[]).map((lens) => (
               <button
                 key={lens}
                 onClick={() => onLensChange(lens)}
@@ -153,7 +156,7 @@ export default function TeamInsightsOverlay({
                     : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300"
                 }
               >
-                {lens}
+                {statConfig.labels[lens]}
               </button>
             ))}
           </div>
@@ -164,6 +167,7 @@ export default function TeamInsightsOverlay({
               team={team}
               selectedStat={selectedStat}
               isPremium={true}
+              statConfig={statConfig}
             />
           </div>
         </div>
@@ -221,7 +225,7 @@ export default function TeamInsightsOverlay({
 
           {/* Pills */}
           <div className="px-4 pb-3 flex gap-2">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((lens) => (
+            {(["fantasy", "disposals", "goals"] as StatLens[]).map((lens) => (
               <button
                 key={lens}
                 onClick={() => onLensChange(lens)}
@@ -231,7 +235,7 @@ export default function TeamInsightsOverlay({
                     : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300"
                 }
               >
-                {lens}
+                {statConfig.labels[lens]}
               </button>
             ))}
           </div>
@@ -246,6 +250,7 @@ export default function TeamInsightsOverlay({
               team={team}
               selectedStat={selectedStat}
               isPremium={true}
+              statConfig={statConfig}
             />
           </div>
         </div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { PlayerRow, StatLens } from "../Section-1-master-table/MasterTable";
+import type { StatConfig } from "@/lib/stats/types";
 import InsightsContent from "./PlayerInsightsContent";
 
 /* -------------------------------------------------------------------------- */
@@ -15,11 +16,15 @@ export default function PlayerInsightsOverlay({
   selectedStat,
   onClose,
   onLensChange,
+  isPremium,
+  statConfig,
 }: {
   player: PlayerRow;
   selectedStat: StatLens;
   onClose: () => void;
   onLensChange: (lens: StatLens) => void;
+  isPremium: boolean;
+  statConfig: StatConfig;
 }) {
   const [mounted, setMounted] = useState(false);
 
@@ -141,7 +146,7 @@ export default function PlayerInsightsOverlay({
 
           {/* Lens Pills */}
           <div className="px-5 py-3 flex gap-2 border-b border-neutral-800">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((lens) => (
+            {statConfig.availableStats.map((lens) => (
               <button
                 key={lens}
                 onClick={() => onLensChange(lens)}
@@ -151,14 +156,19 @@ export default function PlayerInsightsOverlay({
                     : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300"
                 }
               >
-                {lens}
+                {statConfig.labels[lens]}
               </button>
             ))}
           </div>
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto px-5 py-4 pb-12">
-            <InsightsContent player={player} selectedStat={selectedStat} />
+            <InsightsContent
+              player={player}
+              selectedStat={selectedStat}
+              isPremium={isPremium}
+              statConfig={statConfig}
+            />
           </div>
         </div>
       </div>
@@ -215,7 +225,7 @@ export default function PlayerInsightsOverlay({
 
           {/* Pills */}
           <div className="px-4 pb-3 flex gap-2">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((lens) => (
+            {statConfig.availableStats.map((lens) => (
               <button
                 key={lens}
                 onClick={() => onLensChange(lens)}
@@ -225,7 +235,7 @@ export default function PlayerInsightsOverlay({
                     : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300"
                 }
               >
-                {lens}
+                {statConfig.labels[lens]}
               </button>
             ))}
           </div>
@@ -236,7 +246,12 @@ export default function PlayerInsightsOverlay({
             className="flex-1 overflow-y-auto px-4 pb-[max(5rem,env(safe-area-inset-bottom))]"
             style={{ WebkitOverflowScrolling: "touch" }}
           >
-            <InsightsContent player={player} selectedStat={selectedStat} />
+            <InsightsContent
+              player={player}
+              selectedStat={selectedStat}
+              isPremium={isPremium}
+              statConfig={statConfig}
+            />
           </div>
         </div>
       </div>

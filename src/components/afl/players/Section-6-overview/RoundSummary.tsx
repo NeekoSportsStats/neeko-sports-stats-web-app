@@ -19,39 +19,6 @@ import {
 } from "@/components/afl/players/useAFLMockData";
 
 /* ---------------------------------------------------------
-   Constants / Stat Metadata
---------------------------------------------------------- */
-
-const CURRENT_ROUND = 6;
-
-const STAT_UNITS: Record<StatKey | string, string> = {
-  fantasy: "pts",
-  disposals: "disposals",
-  kicks: "kicks",
-  marks: "marks",
-  tackles: "tackles",
-  hitouts: "hitouts",
-  goals: "goals",
-};
-
-const PULSE_COPY: Record<StatKey | string, string> = {
-  fantasy:
-    "League-wide Fantasy trends reflect shifts driven by usage rates, matchup edges and evolving roles.",
-  disposals:
-    "High-volume ball winners dominated disposals, with multiple midfielders posting 30+ touches.",
-  kicks:
-    "Teams pushed territory with more aggressive kicking, lifting inside-50 and switch-kick volume.",
-  marks:
-    "Intercept and link-up marks surged, highlighting defenders and wings controlling transition chains.",
-  tackles:
-    "Pressure acts ramped up, with key midfielders and small forwards driving tackle counts.",
-  hitouts:
-    "Ruck contests shaped territory as top rucks separated in hitouts to advantage.",
-  goals:
-    "Forward efficiency spiked with multiple players kicking bags and capitalising on inside-50 dominance.",
-};
-
-/* ---------------------------------------------------------
    Sparkline
 --------------------------------------------------------- */
 
@@ -152,8 +119,10 @@ export default function RoundSummary({ statConfig }: { statConfig: StatConfig })
   const players = useAFLMockPlayers();
 
   const selectedLabel = statConfig.labels[selected] || selected;
-  const unit = STAT_UNITS[selected] || selected;
+  const unit = statConfig.units?.[selected] || selected;
   const labelLower = selectedLabel.toLowerCase();
+  const currentRound = statConfig.sportMeta?.currentRound || 6;
+  const description = statConfig.descriptions?.[selected] || "";
 
   /* sparkline data */
   const avgRounds = useMemo(() => {
@@ -219,7 +188,7 @@ export default function RoundSummary({ statConfig }: { statConfig: StatConfig })
         <SectionHeader
           pillLabel="Round Momentum"
           title="Round Momentum Summary"
-          subtitle={`Round ${CURRENT_ROUND} • ${selectedLabel} Snapshot`}
+          subtitle={`Round ${currentRound} • ${selectedLabel} Snapshot`}
           description={`Live round snapshot — track ${labelLower} trends, standout players and role/stability shifts as this stat moves week to week.`}
           icon={Sparkles}
         />
@@ -257,7 +226,7 @@ export default function RoundSummary({ statConfig }: { statConfig: StatConfig })
             </h3>
 
             <p className="mb-4 text-sm text-white/70 leading-relaxed">
-              {PULSE_COPY[selected]}
+              {description}
             </p>
 
             <Sparkline data={avgRounds} />

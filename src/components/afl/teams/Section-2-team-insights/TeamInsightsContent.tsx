@@ -1,14 +1,15 @@
 import React, { useMemo } from "react";
 import type { TeamRow } from "../data/mockTeams";
 import type { StatLens } from "../Section-1-master-table/TeamMasterTable";
+import type { StatConfig } from "@/lib/stats/types";
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
 function getValues(team: TeamRow, stat: StatLens): number[] {
-  if (stat === "Fantasy") return team.fantasy;
-  if (stat === "Disposals") return team.disposals;
+  if (stat === "fantasy") return team.fantasy;
+  if (stat === "disposals") return team.disposals;
   return team.goals;
 }
 
@@ -35,12 +36,6 @@ function volatilityLabel(v: number) {
   return { label: "Low", color: "text-emerald-400" };
 }
 
-function hitThresholds(stat: StatLens): number[] {
-  if (stat === "Fantasy") return [1800, 1900, 2000, 2100];
-  if (stat === "Disposals") return [320, 350, 380, 400];
-  return [8, 10, 12, 14];
-}
-
 function hitRate(values: number[], threshold: number) {
   const hits = values.filter((v) => v >= threshold).length;
   return Math.round((hits / values.length) * 100);
@@ -54,10 +49,12 @@ export default function TeamInsightsContent({
   team,
   selectedStat,
   isPremium,
+  statConfig,
 }: {
   team: TeamRow;
   selectedStat: StatLens;
   isPremium: boolean;
+  statConfig: StatConfig;
 }) {
   const values = useMemo(
     () => getValues(team, selectedStat),
@@ -66,7 +63,7 @@ export default function TeamInsightsContent({
 
   const stats = useMemo(() => calcStats(values), [values]);
   const volatility = volatilityLabel(stats.volatility);
-  const thresholds = hitThresholds(selectedStat);
+  const thresholds = statConfig.teamThresholds?.[selectedStat] || [];
   const recent = values.slice(-5);
 
   const aiSummary = useMemo(() => {

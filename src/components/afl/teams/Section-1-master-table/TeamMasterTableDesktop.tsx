@@ -47,12 +47,6 @@ function calcStats(values: number[]) {
   };
 }
 
-function getHitThresholds(stat: StatLens): number[] {
-  if (stat === "fantasy") return [1800, 1900, 2000, 2100];
-  if (stat === "disposals") return [320, 350, 380, 400];
-  return [8, 10, 12, 14];
-}
-
 function calcHitRate(values: number[], threshold: number) {
   const hits = values.filter((v) => v >= threshold).length;
   return Math.round((hits / values.length) * 100);
@@ -117,7 +111,7 @@ export default function TeamMasterTableDesktop({
         )
       : [];
 
-  const hitThresholds = getHitThresholds(selectedStat);
+  const hitThresholds = statConfig.teamThresholds?.[selectedStat] || [];
 
   /* -------------------------------------------------------------------------- */
 

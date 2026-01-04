@@ -1,6 +1,7 @@
 import React from "react";
 import { ROUND_LABELS } from "../Section-1-master-table/MasterTable";
 import type { PlayerRow, StatLens } from "../Section-1-master-table/MasterTable";
+import type { StatConfig } from "@/lib/stats/types";
 
 import {
   computeSummary,
@@ -8,19 +9,19 @@ import {
   getRoundsForLens,
 } from "../data/playerInsightsUtils";
 
-import { STAT_CONFIG } from "../data/playerStatConfig";
-
 /**
  * Full insights content for players — MOBILE SAFE / NO SPARKLINE
  */
 export default function PlayerInsightsContent({
   player,
   selectedStat,
-  isPremium, // ✅ ADDED (NO OTHER PROP CHANGES)
+  isPremium,
+  statConfig,
 }: {
   player: PlayerRow;
   selectedStat: StatLens;
-  isPremium: boolean; // ✅ ADDED
+  isPremium: boolean;
+  statConfig: StatConfig;
 }) {
   /* ------------------------------------------------------------------ */
   /* HARD SAFETY GUARDS                                                  */
@@ -34,14 +35,9 @@ export default function PlayerInsightsContent({
     );
   }
 
-  const config = STAT_CONFIG[selectedStat];
-  if (!config) {
-    return (
-      <div className="p-4 text-sm text-neutral-400">
-        Stat configuration unavailable.
-      </div>
-    );
-  }
+  const thresholds = statConfig.playerInsightThresholds?.[selectedStat] || [];
+  const unit = statConfig.units?.[selectedStat] || "";
+  const label = statConfig.labels[selectedStat] || "";
 
   let summary;
   let hitRates: number[] = [];
@@ -49,7 +45,7 @@ export default function PlayerInsightsContent({
 
   try {
     summary = computeSummary(player, selectedStat);
-    hitRates = computeHitRates(player, selectedStat) ?? [];
+    hitRates = computeHitRates(player, selectedStat, thresholds) ?? [];
     rounds = getRoundsForLens(player, selectedStat) ?? [];
   } catch {
     return (
@@ -71,8 +67,8 @@ export default function PlayerInsightsContent({
     : rounds.slice(0, FREE_ROUND_LIMIT);
 
   const visibleThresholds = isPremium
-    ? config.thresholds
-    : config.thresholds.slice(0, FREE_HITRATE_LIMIT);
+    ? thresholds
+    : thresholds.slice(0, FREE_HITRATE_LIMIT);
 
   /* ------------------------------------------------------------------ */
   /* DERIVED SAFE VALUES                                                 */
@@ -82,9 +78,7 @@ export default function PlayerInsightsContent({
   const min = Number.isFinite(summary.min) ? summary.min : 0;
   const max = Number.isFinite(summary.max) ? summary.max : 0;
   const total = Number.isFinite(summary.total) ? summary.total : 0;
-  const games = Number.isFinite(summary.games)
-    ? summary.games
-    : rounds.length;
+  const games = summary.games || rounds.length;
 
   const volatilityRange = Number.isFinite(summary.volatilityRange)
     ? summary.volatilityRange
@@ -104,18 +98,18 @@ export default function PlayerInsightsContent({
       ? "text-amber-300"
       : "text-red-400";
 
-  const BADGE_CLASS: Record<StatLens, string> = {
-    Fantasy: "border-yellow-500/40 text-yellow-300",
-    Disposals: "border-teal-500/40 text-teal-300",
-    Goals: "border-amber-500/40 text-amber-300",
+  const BADGE_CLASS: Record<string, string> = {
+    fantasy: "border-yellow-500/40 text-yellow-300",
+    disposals: "border-teal-500/40 text-teal-300",
+    goals: "border-amber-500/40 text-amber-300",
   };
 
-  const AI_LENS_INSIGHT: Record<StatLens, string> = {
-    Fantasy:
+  const AI_LENS_INSIGHT: Record<string, string> = {
+    fantasy:
       "Fantasy scoring shows ceiling-driven production with matchup-sensitive spikes.",
-    Disposals:
+    disposals:
       "Disposal output is driven by consistency and involvement across game tempo.",
-    Goals:
+    goals:
       "Goal scoring is volatile, with defined ceiling games but a lower floor.",
   };
 
@@ -128,7 +122,7 @@ export default function PlayerInsightsContent({
       {/* ================= ROUND BY ROUND ================= */}
       <div>
         <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-          Round-by-round {config.label.toLowerCase()}
+          Round-by-round {label.toLowerCase()}
         </div>
 
         <div className="overflow-x-auto overscroll-contain">
@@ -158,7 +152,7 @@ export default function PlayerInsightsContent({
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-              Season summary — {config.label}
+              Season summary — {label}
             </div>
           </div>
 
@@ -167,7 +161,7 @@ export default function PlayerInsightsContent({
               Average
             </div>
             <div className="mt-1 text-sm font-semibold text-yellow-200">
-              {avg.toFixed(1)} {config.valueUnitShort}
+              {avg.toFixed(1)} {unit}
             </div>
 
             <div
