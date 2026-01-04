@@ -27,6 +27,9 @@ export type StatConfig = {
   /** Units (optional) */
   units?: Partial<Record<StatKey, string>>;
 
+  /** Stat descriptions (optional) */
+  descriptions?: Partial<Record<StatKey, string>>;
+
   /** Player insight panel thresholds (optional) */
   playerInsightThresholds?: Partial<Record<StatKey, readonly number[]>>;
 
@@ -35,6 +38,15 @@ export type StatConfig = {
 
   /** Team table thresholds (optional) */
   teamThresholds?: Partial<Record<StatKey, readonly number[]>>;
+
+  /** Sport-specific metadata (optional) */
+  sportMeta?: {
+    totalRounds?: number;
+    currentRound?: number;
+    roundLabels?: string[];
+    periods?: string[];
+    scoringRules?: string;
+  };
 
   /** Momentum definition */
   momentum: {
