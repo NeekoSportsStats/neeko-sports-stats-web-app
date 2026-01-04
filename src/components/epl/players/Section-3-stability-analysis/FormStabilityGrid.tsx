@@ -13,10 +13,6 @@ import {
   StatKey,
 } from "@/components/epl/players/data/useEPLMockData";
 
-/* ---------------------------------------------------------
-   Types / helpers
---------------------------------------------------------- */
-
 type Tone = "hot" | "stable" | "cold";
 
 type PlayerMetrics = {
@@ -34,12 +30,12 @@ type PlayerMetrics = {
 };
 
 function formatMainValue(value: number, stat: StatKey): string {
-  const unit = EPL_STAT_CONFIG.unitsShort[stat] ?? "";
+  const unit = EPL_STAT_CONFIG.units[stat] ?? "";
   return `${value.toFixed(2)} ${unit}`.trim();
 }
 
 function formatDelta(delta: number, stat: StatKey): string {
-  const unit = EPL_STAT_CONFIG.unitsShort[stat] ?? "";
+  const unit = EPL_STAT_CONFIG.units[stat] ?? "";
   if (Math.abs(delta) < 0.01) return `±0.00 ${unit} vs avg`;
 
   const sign = delta > 0 ? "+" : "−";
@@ -55,10 +51,6 @@ function deltaTone(delta: number): string {
 function clamp01(v: number) {
   return Math.max(0, Math.min(1, v));
 }
-
-/* ---------------------------------------------------------
-   Sparkline
---------------------------------------------------------- */
 
 function TrendSparkline({ data, tone }: { data: number[]; tone: Tone }) {
   if (!data.length) return null;
@@ -109,10 +101,6 @@ function TrendSparkline({ data, tone }: { data: number[]; tone: Tone }) {
   );
 }
 
-/* ---------------------------------------------------------
-   Row summary builders (EPL semantics)
---------------------------------------------------------- */
-
 const buildHotSummary = (m: PlayerMetrics, stat: StatKey) => {
   const label = EPL_STAT_CONFIG.labels[stat].toLowerCase();
   return `${m.name} is trending up, with recent ${label} output sitting ${m.deltaVsSeason.toFixed(
@@ -133,10 +121,6 @@ const buildCoolingSummary = (m: PlayerMetrics, stat: StatKey) => {
     m.deltaVsSeason
   ).toFixed(2)} below their usual baseline.`;
 };
-
-/* ---------------------------------------------------------
-   Card + column shells (UNCHANGED)
---------------------------------------------------------- */
 
 function PlayerRowCard({
   tone,
@@ -290,10 +274,6 @@ function ColumnShell({
   );
 }
 
-/* ---------------------------------------------------------
-   MAIN COMPONENT
---------------------------------------------------------- */
-
 export default function FormStabilityGrid({
   statConfig = EPL_STAT_CONFIG,
 }: {
@@ -348,13 +328,12 @@ export default function FormStabilityGrid({
       <div className="pointer-events-none absolute -top-32 left-1/2 h-48 w-[420px] -translate-x-1/2 rounded-full bg-yellow-500/18 blur-3xl" />
 
       <SectionHeader
-        pillLabel="Form Stability Grid"
+        eyebrow="Form Stability Grid"
         title="Hot risers, rock-solid anchors & form slumps"
-        description={`Last 5 matchweeks of ${statConfig.labels[selectedStat].toLowerCase()} output.`}
+        subtitle={`Last 5 matchweeks of ${statConfig.labels[selectedStat].toLowerCase()} output.`}
         icon={Sparkles}
       />
 
-      {/* Stat lens */}
       <div className="mt-4 flex flex-wrap gap-2">
         {statConfig.availableStats.map((s) => (
           <button
