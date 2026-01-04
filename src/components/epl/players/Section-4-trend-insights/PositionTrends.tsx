@@ -19,10 +19,6 @@ import {
   StatKey,
 } from "@/components/epl/players/data/useEPLMockData";
 
-/* ---------------------------------------------------------
-   Types & helpers
---------------------------------------------------------- */
-
 type PositionKey = "GK" | "DEF" | "MID" | "FWD";
 
 type PositionPlayerMetrics = {
@@ -43,10 +39,6 @@ type PositionPlayerMetrics = {
 function clamp01(v: number) {
   return Math.max(0, Math.min(1, v));
 }
-
-/* ---------------------------------------------------------
-   POSITION CONFIG (EPL)
---------------------------------------------------------- */
 
 const POSITION_CONFIG: {
   key: PositionKey;
@@ -105,10 +97,6 @@ const POSITION_CONFIG: {
   },
 ];
 
-/* ---------------------------------------------------------
-   MINI SPARKLINE
---------------------------------------------------------- */
-
 function MiniSparkline({ data }: { data: number[] }) {
   if (!data.length) return null;
 
@@ -152,10 +140,6 @@ function MiniSparkline({ data }: { data: number[] }) {
   );
 }
 
-/* ---------------------------------------------------------
-   ROLE LABEL HELPERS
---------------------------------------------------------- */
-
 function roleDirectionLabel(delta: number) {
   if (delta > 0.15) return { label: "Role trending up", tone: "text-emerald-300" };
   if (delta > 0.05) return { label: "Subtle uptick", tone: "text-emerald-200" };
@@ -163,10 +147,6 @@ function roleDirectionLabel(delta: number) {
   if (delta < -0.05) return { label: "Softening role", tone: "text-red-200" };
   return { label: "Role holding steady", tone: "text-zinc-300" };
 }
-
-/* ---------------------------------------------------------
-   PLAYER CARD
---------------------------------------------------------- */
 
 function PositionPlayerCard({
   metric,
@@ -227,10 +207,6 @@ function PositionPlayerCard({
   );
 }
 
-/* ---------------------------------------------------------
-   MAIN COMPONENT
---------------------------------------------------------- */
-
 export default function PositionTrends({
   statConfig = EPL_STAT_CONFIG,
 }: {
@@ -238,8 +214,9 @@ export default function PositionTrends({
 }) {
   const players = useEPLMockPlayers();
   const [selectedPos, setSelectedPos] = useState<PositionKey>("MID");
-
-  const stat: StatKey = statConfig.defaultStat;
+  const [selectedStat, setSelectedStat] = useState<StatKey>(
+    statConfig.defaultStat
+  );
 
   const metricsByPosition = useMemo(() => {
     const base: Record<PositionKey, PositionPlayerMetrics[]> = {
@@ -250,7 +227,7 @@ export default function PositionTrends({
     };
 
     players.forEach((p) => {
-      const series = getSeriesForStat(p, stat);
+      const series = getSeriesForStat(p, selectedStat);
       if (!series.length) return;
 
       const l5 = lastN(series, 5);
@@ -283,7 +260,7 @@ export default function PositionTrends({
     });
 
     return base;
-  }, [players, stat]);
+  }, [players, selectedStat]);
 
   const config = POSITION_CONFIG.find((p) => p.key === selectedPos)!;
   const metrics = metricsByPosition[selectedPos] ?? [];
@@ -299,11 +276,28 @@ export default function PositionTrends({
   return (
     <section className="relative rounded-3xl border border-white/10 bg-gradient-to-br from-black to-[#111010] px-4 py-6 md:px-6 md:py-8">
       <SectionHeader
-        pillLabel="Position Trends"
+        eyebrow="Position Trends"
         title="Role-driven trends by line"
-        description="Combines recent output and stability to surface meaningful role shifts by position."
+        subtitle="Combines recent output and stability to surface meaningful role shifts by position."
         icon={Sparkles}
       />
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {statConfig.availableStats.map((s) => (
+          <button
+            key={s}
+            onClick={() => setSelectedStat(s as StatKey)}
+            className={cn(
+              "rounded-full border px-3.5 py-1.5 text-xs transition-all backdrop-blur-sm",
+              selectedStat === s
+                ? "bg-yellow-400 text-black border-yellow-300 shadow-[0_0_15px_rgba(250,204,21,0.6)]"
+                : "bg-white/5 text-white/70 border-white/12 hover:bg-white/10"
+            )}
+          >
+            {statConfig.labels[s]}
+          </button>
+        ))}
+      </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
         {POSITION_CONFIG.map((p) => (
