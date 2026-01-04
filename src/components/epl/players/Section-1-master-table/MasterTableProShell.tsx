@@ -1,6 +1,7 @@
 import React from "react";
 import SectionDividerGlow from "@/components/ui/SectionDividerGlow";
 import FilterBarPro from "../Section-7-filtration/FilterBarPro";
+import type { StatConfig } from "@/lib/stats/types";
 
 interface FilterValues {
   team: string;
@@ -14,10 +15,15 @@ interface Props {
   roundList: string[];
   values: FilterValues;
   onFilterChange: (v: Partial<FilterValues>) => void;
+
+  /** 🔥 CONFIG-DRIVEN */
+  statConfig: StatConfig;
   selectedStat: string;
   onStatChange: (v: string) => void;
+
   selectedYear: number;
   onYearChange: (y: number) => void;
+
   totalPlayers: number;
   showingPlayers: number;
   isPremium: boolean;
@@ -29,6 +35,7 @@ export default function MasterTableProShell({
   roundList,
   values,
   onFilterChange,
+  statConfig,
   selectedStat,
   onStatChange,
   selectedYear,
@@ -69,15 +76,18 @@ export default function MasterTableProShell({
         isPremium={isPremium}
       />
 
+      {/* 🔥 STAT + YEAR CONTROLS (CONFIG-DRIVEN) */}
       <div className="flex gap-2">
         <select
           className="px-3 py-1.5 rounded-full bg-neutral-900 border border-neutral-700 text-xs"
           value={selectedStat}
           onChange={(e) => onStatChange(e.target.value)}
         >
-          <option value="fantasy">Fantasy</option>
-          <option value="disposals">Disposals</option>
-          <option value="goals">Goals</option>
+          {statConfig.availableStats.map((stat) => (
+            <option key={stat} value={stat}>
+              {statConfig.labels[stat]}
+            </option>
+          ))}
         </select>
 
         <select
@@ -85,8 +95,10 @@ export default function MasterTableProShell({
           value={selectedYear}
           onChange={(e) => onYearChange(Number(e.target.value))}
         >
-          {[2025, 2024, 2023, 2022].map((y) => (
-            <option key={y}>{y}</option>
+          {Object.values(statConfig.seasons).map((season) => (
+            <option key={season} value={season}>
+              {season}
+            </option>
           ))}
         </select>
       </div>
