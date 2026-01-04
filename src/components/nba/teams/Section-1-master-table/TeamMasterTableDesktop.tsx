@@ -8,18 +8,19 @@ import {
 } from "lucide-react";
 import type { TeamRow } from "../data/mockTeams";
 import type { StatLens } from "./TeamMasterTable";
+import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
 
 /* -------------------------------------------------------------------------- */
 /* CONSTANTS                                                                  */
 /* -------------------------------------------------------------------------- */
 
-const ROUND_LABELS = ["OR", ...Array.from({ length: 23 }, (_, i) => `R${i + 1}`)];
+const GAME_LABELS = Array.from({ length: 82 }, (_, i) => `G${i + 1}`);
 
 const FREE_ROW_LIMIT = 8;
 const LOCKED_PREVIEW_ROWS = 2;
 
 const LEFT_COL_W = 220;
-const ROUND_COL_W = 48;
+const GAME_COL_W = 48;
 const RIGHT_COL_W = 260;
 const ROW_H = 84;
 
@@ -31,12 +32,15 @@ const cx = (...c: Array<string | false | undefined>) =>
   c.filter(Boolean).join(" ");
 
 function getValues(team: TeamRow, stat: StatLens): number[] {
-  if (stat === "Fantasy") return team.fantasy;
-  if (stat === "Disposals") return team.disposals;
-  return team.goals;
+  const statKey = stat as keyof TeamRow;
+  const values = team[statKey];
+  return Array.isArray(values) ? values : [];
 }
 
 function calcStats(values: number[]) {
+  if (!values || values.length === 0) {
+    return { avg: 0, min: 0, max: 0, gms: 0 };
+  }
   const total = values.reduce((a, b) => a + b, 0);
   return {
     avg: Math.round(total / values.length),
@@ -47,9 +51,8 @@ function calcStats(values: number[]) {
 }
 
 function getHitThresholds(stat: StatLens): number[] {
-  if (stat === "Fantasy") return [1800, 1900, 2000, 2100];
-  if (stat === "Disposals") return [320, 350, 380, 400];
-  return [8, 10, 12, 14];
+  const thresholds = NBA_STAT_CONFIG.teamThresholds?.[stat] || [];
+  return thresholds.slice(0, 4);
 }
 
 function calcHitRate(values: number[], threshold: number) {
@@ -138,10 +141,10 @@ export default function TeamMasterTableDesktop({
 
             <div className="flex flex-col items-end gap-2">
               <div className="flex gap-2 rounded-full border border-neutral-700 bg-black p-1">
-                {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
+                {NBA_STAT_CONFIG.availableStats.map((s) => (
                   <button
                     key={s}
-                    onClick={() => setSelectedStat(s)}
+                    onClick={() => setSelectedStat(s as StatLens)}
                     className={cx(
                       "px-4 py-1.5 text-xs rounded-full transition",
                       selectedStat === s
@@ -149,7 +152,7 @@ export default function TeamMasterTableDesktop({
                         : "text-neutral-300 hover:bg-neutral-800"
                     )}
                   >
-                    {s}
+                    {NBA_STAT_CONFIG.labels[s]}
                   </button>
                 ))}
               </div>
@@ -198,7 +201,7 @@ export default function TeamMasterTableDesktop({
               minWidth: compact
                 ? LEFT_COL_W + RIGHT_COL_W * 2
                 : LEFT_COL_W +
-                  ROUND_LABELS.length * ROUND_COL_W +
+                  GAME_LABELS.length * GAME_COL_W +
                   RIGHT_COL_W,
             }}
           >
@@ -262,13 +265,13 @@ export default function TeamMasterTableDesktop({
             {!compact && (
               <div>
                 <div className="sticky top-0 z-10 flex border-b border-neutral-800 bg-black">
-                  {ROUND_LABELS.map((r) => (
+                  {GAME_LABELS.map((g) => (
                     <div
-                      key={r}
+                      key={g}
                       className="py-3 text-center text-[10px] uppercase tracking-[0.18em] text-neutral-500"
-                      style={{ width: ROUND_COL_W }}
+                      style={{ width: GAME_COL_W }}
                     >
-                      {r}
+                      {g}
                     </div>
                   ))}
                 </div>
@@ -283,7 +286,7 @@ export default function TeamMasterTableDesktop({
                       <div
                         key={i}
                         className="flex items-center justify-center text-sm text-neutral-100"
-                        style={{ width: ROUND_COL_W }}
+                        style={{ width: GAME_COL_W }}
                       >
                         {v}
                       </div>
