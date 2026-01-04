@@ -27,6 +27,15 @@ export type StatConfig = {
   /** Units (optional) */
   units?: Partial<Record<StatKey, string>>;
 
+  /** Player insight panel thresholds (optional) */
+  playerInsightThresholds?: Partial<Record<StatKey, readonly number[]>>;
+
+  /** Player master table thresholds (optional) */
+  playerTableThresholds?: Partial<Record<StatKey, readonly number[]>>;
+
+  /** Team table thresholds (optional) */
+  teamThresholds?: Partial<Record<StatKey, readonly number[]>>;
+
   /** Momentum definition */
   momentum: {
     description: string;

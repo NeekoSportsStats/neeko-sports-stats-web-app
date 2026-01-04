@@ -68,12 +68,6 @@ function calcStats(values: number[]) {
   };
 }
 
-function getHitThresholds(stat: StatLens): number[] {
-  if (stat === "fantasy") return [80, 90, 100, 110];
-  if (stat === "disposals") return [15, 20, 25, 30];
-  return [1, 2, 3, 4];
-}
-
 function calcHitRate(values: number[], threshold: number) {
   const hits = values.filter((v) => v >= threshold).length;
   return Math.round((hits / values.length) * 100);
@@ -156,7 +150,7 @@ export default function MasterTableDesktop({
     [players]
   );
 
-  const hitThresholds = getHitThresholds(selectedStat);
+  const hitThresholds = statConfig.playerTableThresholds?.[selectedStat] || [];
 
   const nonCompactMinWidth =
     LEFT_COL_W + ROUND_LABELS.length * ROUND_COL_W + RIGHT_COL_W;

@@ -9,18 +9,6 @@ import {
   getRoundsForLens,
 } from "../data/playerInsightsUtils";
 
-const STAT_THRESHOLDS: Record<string, readonly number[]> = {
-  fantasy: [60, 70, 80, 90, 100],
-  disposals: [15, 20, 25, 30],
-  goals: [1, 2, 3, 4],
-};
-
-const STAT_UNITS: Record<string, string> = {
-  fantasy: "pts",
-  disposals: "disp",
-  goals: "g",
-};
-
 /**
  * Full insights content for players — MOBILE SAFE / NO SPARKLINE
  */
@@ -47,8 +35,8 @@ export default function PlayerInsightsContent({
     );
   }
 
-  const thresholds = STAT_THRESHOLDS[selectedStat] || [];
-  const unit = STAT_UNITS[selectedStat] || "";
+  const thresholds = statConfig.playerInsightThresholds?.[selectedStat] || [];
+  const unit = statConfig.units?.[selectedStat] || "";
   const label = statConfig.labels[selectedStat] || "";
 
   let summary;

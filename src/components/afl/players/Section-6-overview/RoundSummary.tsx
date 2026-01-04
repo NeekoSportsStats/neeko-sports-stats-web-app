@@ -24,16 +24,6 @@ import {
 
 const CURRENT_ROUND = 6;
 
-const STAT_UNITS: Record<StatKey | string, string> = {
-  fantasy: "pts",
-  disposals: "disposals",
-  kicks: "kicks",
-  marks: "marks",
-  tackles: "tackles",
-  hitouts: "hitouts",
-  goals: "goals",
-};
-
 const PULSE_COPY: Record<StatKey | string, string> = {
   fantasy:
     "League-wide Fantasy trends reflect shifts driven by usage rates, matchup edges and evolving roles.",
@@ -152,7 +142,7 @@ export default function RoundSummary({ statConfig }: { statConfig: StatConfig })
   const players = useAFLMockPlayers();
 
   const selectedLabel = statConfig.labels[selected] || selected;
-  const unit = STAT_UNITS[selected] || selected;
+  const unit = statConfig.units?.[selected] || selected;
   const labelLower = selectedLabel.toLowerCase();
 
   /* sparkline data */
