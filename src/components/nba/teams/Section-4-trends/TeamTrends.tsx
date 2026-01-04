@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { MOCK_TEAMS } from "../data/mockTeams";
-import { TrendingUp, Shield, Activity, MoveVertical } from "lucide-react";
+import { TrendingUp, Shield, Target, Zap, Users } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
 /*                               Tooltip helpers                              */
@@ -12,12 +12,12 @@ function inferUnit(label: string): string {
   if (lower.includes("%") || lower.includes("efficiency")) return "%";
   if (lower.includes("points") || lower.includes("score") || lower.includes("conceded"))
     return "pts";
-  if (lower.includes("clearance")) return "clearances";
-  if (lower.includes("wins")) return "wins";
-  if (lower.includes("intercept")) return "marks";
-  if (lower.includes("hit") || lower.includes("hit outs")) return "hitouts";
-  if (lower.includes("influence")) return "rating";
-  if (lower.includes("pressure")) return "index";
+  if (lower.includes("assists")) return "ast";
+  if (lower.includes("rebounds")) return "reb";
+  if (lower.includes("steals")) return "stl";
+  if (lower.includes("blocks")) return "blk";
+  if (lower.includes("threes") || lower.includes("3pt")) return "3PM";
+  if (lower.includes("turnovers")) return "TO";
   if (lower.includes("trend")) return "index";
   return "";
 }
@@ -59,7 +59,7 @@ function TrendTooltipPortal({ tooltip }: { tooltip: TooltipPayload | null }) {
     <div
       className="
         pointer-events-none fixed z-[9999]
-        rounded-md border border-white/10 
+        rounded-md border border-white/10
         bg-black/90 backdrop-blur-md
         px-2 py-1 text-[10px] text-neutral-200
         whitespace-nowrap
@@ -71,7 +71,7 @@ function TrendTooltipPortal({ tooltip }: { tooltip: TooltipPayload | null }) {
       }}
     >
       <div className="text-[8px] uppercase tracking-wider text-neutral-400">
-        Round {tooltip.round}
+        Game {tooltip.round}
       </div>
       <div className="font-semibold">
         {formatTooltipValue(tooltip.value, tooltip.unit)}
@@ -130,7 +130,7 @@ function SparklineLarge({
   ) {
     try {
       const rect = el.getBoundingClientRect();
-      const offset = isTouchDevice ? 4 : 6; // slightly closer on mobile
+      const offset = isTouchDevice ? 4 : 6;
       onShowTooltip?.({
         x: rect.left + rect.width / 2,
         y: rect.top - offset,
@@ -140,26 +140,24 @@ function SparklineLarge({
         unit,
       });
     } catch {
-      // fail-safe; never crash on mobile
+      // fail-safe
     }
   }
 
   return (
     <div
       className="
-        relative 
-        h-[44px] sm:h-[54px] 
-        w-full rounded-xl overflow-hidden 
+        relative
+        h-[44px] sm:h-[54px]
+        w-full rounded-xl overflow-hidden
         bg-gradient-to-b from-neutral-800/40 via-neutral-900/90 to-black
         border border-slate-400/20 shadow-[0_6px_14px_rgba(0,0,0,0.55)]
         px-[4px] sm:px-[6px]
       "
     >
-      {/* highlights */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[40%] bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.12),transparent_65%)]" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[30%] bg-gradient-to-t from-black/80 via-black/0" />
 
-      {/* SINGLE ROW, adaptive compression on all breakpoints */}
       <div className="relative z-10 flex h-full w-full items-end gap-[3px] sm:gap-[2px]">
         {recent.map((v, i) => {
           const norm = (v - min) / range;
@@ -174,7 +172,7 @@ function SparklineLarge({
               data-sparkline-bar="true"
               className="flex-1 flex items-end justify-center h-full"
               onMouseEnter={(e) => {
-                if (isTouchDevice) return; // mobile uses tap
+                if (isTouchDevice) return;
                 showFromElement(e.currentTarget as HTMLElement, v, delta, index);
               }}
               onMouseLeave={() => {
@@ -247,7 +245,7 @@ function computeMetricSummary(
   }
 
   let deltaPct = ((lastAvg - prevAvg) / prevAvg) * 100;
-  deltaPct = Math.max(-15, Math.min(15, deltaPct)); // clamp volatility
+  deltaPct = Math.max(-15, Math.min(15, deltaPct));
 
   let direction: TrendDirection = "flat";
   if (deltaPct > 0.1) direction = "up";
@@ -294,15 +292,15 @@ function TrendBlock({
   return (
     <div
       className="
-        group relative rounded-3xl border border-neutral-800/70 
-        bg-gradient-to-b from-neutral-900/85 via-black to-black/95 
+        group relative rounded-3xl border border-neutral-800/70
+        bg-gradient-to-b from-neutral-900/85 via-black to-black/95
         p-3 sm:p-4 md:p-5 shadow-[0_18px_48px_rgba(0,0,0,0.85)]
       "
     >
       <div
         className="
-          pointer-events-none absolute -inset-px 
-          rounded-[26px] blur-xl opacity-0 
+          pointer-events-none absolute -inset-px
+          rounded-[26px] blur-xl opacity-0
           transition-opacity duration-300 group-hover:opacity-100
         "
         style={{
@@ -438,17 +436,16 @@ function buildPercentSeries(length: number, base: number, swing: number): number
 /* -------------------------------------------------------------------------- */
 
 export default function TeamTrends() {
-  const rounds = 23;
+  const games = 82;
   const [tooltip, setTooltip] = useState<TooltipPayload | null>(null);
 
-  // Option 1 behaviour: tap/click anywhere outside sparkline → hide tooltip
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     function handlePointerDown(e: PointerEvent) {
       const target = e.target as HTMLElement | null;
       if (!target) return;
-      if (target.closest("[data-sparkline-bar='true']")) return; // inside bar
+      if (target.closest("[data-sparkline-bar='true']")) return;
       setTooltip(null);
     }
 
@@ -456,88 +453,126 @@ export default function TeamTrends() {
     return () => window.removeEventListener("pointerdown", handlePointerDown);
   }, []);
 
-  /* ------------------------------- ATTACK -------------------------------- */
+  /* ------------------------------- POINT GUARD -------------------------------- */
 
-  const attackPoints = useMemo(() => {
+  const pgPoints = useMemo(() => {
     const arr: number[] = [];
-    for (let r = 0; r < rounds; r++) {
-      const scores = MOCK_TEAMS.map((t) => t.scores[r]);
+    for (let g = 0; g < games; g++) {
+      const scores = MOCK_TEAMS.map((t) => t.scores[g]);
       arr.push(Math.round(scores.reduce((a, b) => a + b, 0) / scores.length));
     }
     return arr;
-  }, [rounds]);
+  }, [games]);
 
-  const attackExpected = useMemo(
-    () => attackPoints.map((v, i) => (v + (attackPoints[i - 1] ?? v)) / 2),
-    [attackPoints]
+  const pgAssists = useMemo(
+    () => Array.from({ length: games }, (_, i) =>
+      Math.round(22 + Math.sin(i / 3) * 3 + (Math.random() * 4 - 2))
+    ),
+    [games]
   );
 
-  const attackF50 = useMemo(() => buildPercentSeries(rounds, 56, 12), [rounds]);
-  const attackTrend = useMemo(() => buildPercentSeries(rounds, 68, 10), [rounds]);
+  const pgTurnovers = useMemo(() => buildPercentSeries(games, 12, 6), [games]);
+  const pgTrend = useMemo(() => buildPercentSeries(games, 68, 10), [games]);
 
-  /* ------------------------------ DEFENCE -------------------------------- */
+  /* ------------------------------ SHOOTING GUARD -------------------------------- */
 
-  const defenceConceded = useMemo(() => {
+  const sgPoints = useMemo(() => {
     const arr: number[] = [];
-    for (let r = 0; r < rounds; r++) {
-      const conceded = MOCK_TEAMS.map((t) => t.scores[r] - t.margins[r]);
+    for (let g = 0; g < games; g++) {
+      const conceded = MOCK_TEAMS.map((t) => t.scores[g] - t.margins[g]);
       arr.push(Math.round(conceded.reduce((a, b) => a + b, 0) / conceded.length));
     }
     return arr;
-  }, [rounds]);
+  }, [games]);
 
-  const pressureIndex = useMemo(() => buildPressureSeries(rounds), [rounds]);
-  const interceptMarks = useMemo(() => buildPercentSeries(rounds, 60, 14), [rounds]);
-  const defenceTrend = useMemo(() => buildPercentSeries(rounds, 65, 11), [rounds]);
+  const sgThrees = useMemo(
+    () => Array.from({ length: games }, (_, i) =>
+      Math.round(10 + Math.sin(i / 4) * 2 + (Math.random() * 3 - 1.5))
+    ),
+    [games]
+  );
 
-  /* ------------------------------ MIDFIELD ------------------------------- */
+  const sgFgPct = useMemo(() => buildPercentSeries(games, 45, 8), [games]);
+  const sgTrend = useMemo(() => buildPercentSeries(games, 65, 11), [games]);
 
-  const contestedInfluence = useMemo(() => {
+  /* ------------------------------ SMALL FORWARD ------------------------------- */
+
+  const sfPoints = useMemo(() => {
     const arr: number[] = [];
-    for (let r = 0; r < rounds; r++) {
+    for (let g = 0; g < games; g++) {
       const contested = MOCK_TEAMS.map(
-        (t) => t.clearanceDom[r] + t.margins[r] / 3
+        (t) => t.clearanceDom[g] + t.margins[g] / 3
       );
       arr.push(Math.round(contested.reduce((a, b) => a + b, 0) / contested.length));
     }
     return arr;
-  }, [rounds]);
+  }, [games]);
 
-  const stoppageWins = useMemo(
-    () => contestedInfluence.map((v) => v - (5 - Math.random() * 6)),
-    [contestedInfluence]
+  const sfRebounds = useMemo(
+    () => Array.from({ length: games }, (_, i) =>
+      Math.round(6 + Math.sin(i / 3.5) * 2 + (Math.random() * 2 - 1))
+    ),
+    [games]
   );
 
-  const midfieldClearances = useMemo(() => buildPercentSeries(rounds, 52, 10), [rounds]);
-  const midfieldTrend = useMemo(() => buildPercentSeries(rounds, 66, 9), [rounds]);
+  const sfSteals = useMemo(() => buildPercentSeries(games, 52, 10), [games]);
+  const sfTrend = useMemo(() => buildPercentSeries(games, 66, 9), [games]);
 
-  /* -------------------------------- RUCK --------------------------------- */
+  /* -------------------------------- POWER FORWARD --------------------------------- */
 
-  const ruckHitOuts = useMemo(
+  const pfPoints = useMemo(
     () =>
-      Array.from({ length: rounds }, (_, i) =>
-        Math.round(40 + Math.sin(i / 3) * 4 + (Math.random() * 4 - 2))
+      Array.from({ length: games }, (_, i) =>
+        Math.round(18 + Math.sin(i / 3) * 3 + (Math.random() * 4 - 2))
       ),
-    [rounds]
+    [games]
   );
 
-  const ruckHitOutsAdv = useMemo(
+  const pfRebounds = useMemo(
     () =>
-      Array.from({ length: rounds }, (_, i) =>
-        Math.round(12 + Math.sin(i / 4) * 3 + (Math.random() * 3 - 1.5))
+      Array.from({ length: games }, (_, i) =>
+        Math.round(9 + Math.sin(i / 4) * 2 + (Math.random() * 3 - 1.5))
       ),
-    [rounds]
+    [games]
   );
 
-  const ruckClearances = useMemo(
+  const pfBlocks = useMemo(
     () =>
-      Array.from({ length: rounds }, (_, i) =>
-        Math.round(22 + Math.sin(i / 3.5) * 3 + (Math.random() * 3 - 1.5))
+      Array.from({ length: games }, (_, i) =>
+        Math.round(1.5 + Math.sin(i / 3.5) * 0.5 + (Math.random() * 1 - 0.5))
       ),
-    [rounds]
+    [games]
   );
 
-  const ruckTrend = useMemo(() => buildPercentSeries(rounds, 60, 10), [rounds]);
+  const pfTrend = useMemo(() => buildPercentSeries(games, 60, 10), [games]);
+
+  /* -------------------------------- CENTER --------------------------------- */
+
+  const cPoints = useMemo(
+    () =>
+      Array.from({ length: games }, (_, i) =>
+        Math.round(15 + Math.sin(i / 3.2) * 2 + (Math.random() * 3 - 1.5))
+      ),
+    [games]
+  );
+
+  const cRebounds = useMemo(
+    () =>
+      Array.from({ length: games }, (_, i) =>
+        Math.round(11 + Math.sin(i / 4) * 2.5 + (Math.random() * 3 - 1.5))
+      ),
+    [games]
+  );
+
+  const cBlocks = useMemo(
+    () =>
+      Array.from({ length: games }, (_, i) =>
+        Math.round(2 + Math.sin(i / 3.5) * 0.6 + (Math.random() * 1 - 0.5))
+      ),
+    [games]
+  );
+
+  const cTrend = useMemo(() => buildPercentSeries(games, 62, 10), [games]);
 
   /* ---------------------------------------------------------------------- */
 
@@ -545,93 +580,106 @@ export default function TeamTrends() {
     <section className="mt-10">
       <div
         className="
-          relative overflow-hidden 
-          rounded-[32px] border border-yellow-500/30 
+          relative overflow-hidden
+          rounded-[32px] border border-yellow-500/30
           bg-[radial-gradient(circle_at_top,_rgba(12,12,13,0.85),_rgba(3,3,4,0.95)_60%,_black_90%)]
-          px-3 py-4 sm:px-4 sm:py-5 md:px-7 md:py-7 
+          px-3 py-4 sm:px-4 sm:py-5 md:px-7 md:py-7
           shadow-[0_24px_72px_rgba(0,0,0,0.9)] backdrop-blur-2xl
         "
       >
         <div className="pointer-events-none absolute -inset-px rounded-[34px] bg-[radial-gradient(circle_at_top,_rgba(250,204,21,0.16),transparent_55%)] opacity-60" />
 
         <div className="relative">
-          {/* header pill */}
           <div className="inline-flex items-center gap-2 rounded-full border border-yellow-500/25 bg-[radial-gradient(circle_at_top,_rgba(250,204,21,0.18),transparent_55%)] px-3 py-1 shadow-[0_0_10px_rgba(250,204,21,0.3)]">
             <span className="h-1.5 w-1.5 rounded-full bg-yellow-300 shadow-[0_0_8px_rgba(250,204,21,0.85)]" />
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-yellow-100/90">
-              Team Trends
+              Position Trends
             </span>
           </div>
 
           <h2 className="mt-4 text-2xl md:text-3xl font-semibold text-neutral-50">
-            League-wide evolution across all four key positions
+            League-wide evolution across all five positions
           </h2>
 
           <p className="mt-2 max-w-2xl text-xs text-neutral-400">
-            Rolling trends highlighting attacking quality, defensive solidity, midfield control and
-            ruck dominance.
+            Rolling trends highlighting scoring, playmaking, defense and rebounding across NBA positions.
           </p>
 
           <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-            League averages • Last 23 rounds • Synthetic positional trend lenses
+            League averages • Last 82 games • Positional trend lenses
           </p>
 
           <div className="mt-8 grid gap-8 md:grid-cols-2 lg:gap-10">
             <TrendBlock
-              title="Attack Trend"
+              title="Point Guard"
               icon={<TrendingUp className="h-4 w-4 text-yellow-300" />}
               accent="#FACC15"
-              description="Scoring output, expected conversion and forward-50 strength."
+              description="Scoring output, playmaking and ball control from the point."
               series={[
-                { label: "Points Scored", values: attackPoints, goodDirection: "up" },
-                { label: "Expected Score", values: attackExpected, goodDirection: "up" },
-                { label: "Forward-50 Efficiency (%)", values: attackF50, goodDirection: "up" },
-                { label: "Trend", values: attackTrend, goodDirection: "up" },
+                { label: "Points Scored", values: pgPoints, goodDirection: "up" },
+                { label: "Assists", values: pgAssists, goodDirection: "up" },
+                { label: "Turnovers", values: pgTurnovers, goodDirection: "down" },
+                { label: "Trend", values: pgTrend, goodDirection: "up" },
               ]}
               onShowTooltip={setTooltip}
               onHideTooltip={() => setTooltip(null)}
             />
 
             <TrendBlock
-              title="Defence Trend"
-              icon={<Shield className="h-4 w-4 text-cyan-200" />}
+              title="Shooting Guard"
+              icon={<Target className="h-4 w-4 text-cyan-200" />}
               accent="#22D3EE"
-              description="Conceded scoring, pressure indicators and intercept capability."
+              description="Perimeter scoring, three-point shooting and field goal efficiency."
               series={[
-                { label: "Points Conceded", values: defenceConceded, goodDirection: "down" },
-                { label: "Pressure Index", values: pressureIndex, goodDirection: "up" },
-                { label: "Intercept Marks", values: interceptMarks, goodDirection: "up" },
-                { label: "Trend", values: defenceTrend, goodDirection: "down" },
+                { label: "Points Scored", values: sgPoints, goodDirection: "up" },
+                { label: "Three-Pointers", values: sgThrees, goodDirection: "up" },
+                { label: "FG% Efficiency", values: sgFgPct, goodDirection: "up" },
+                { label: "Trend", values: sgTrend, goodDirection: "up" },
               ]}
               onShowTooltip={setTooltip}
               onHideTooltip={() => setTooltip(null)}
             />
 
             <TrendBlock
-              title="Midfield Trend"
-              icon={<Activity className="h-4 w-4 text-orange-300" />}
+              title="Small Forward"
+              icon={<Zap className="h-4 w-4 text-orange-300" />}
               accent="#FB923C"
-              description="Contested strength, stoppage craft and clearance control."
+              description="Versatile scoring, rebounding and defensive pressure."
               series={[
-                { label: "Contested Influence", values: contestedInfluence, goodDirection: "up" },
-                { label: "Stoppage Wins", values: stoppageWins, goodDirection: "up" },
-                { label: "Clearance", values: midfieldClearances, goodDirection: "up" },
-                { label: "Trend", values: midfieldTrend, goodDirection: "up" },
+                { label: "Points Scored", values: sfPoints, goodDirection: "up" },
+                { label: "Rebounds", values: sfRebounds, goodDirection: "up" },
+                { label: "Steals", values: sfSteals, goodDirection: "up" },
+                { label: "Trend", values: sfTrend, goodDirection: "up" },
               ]}
               onShowTooltip={setTooltip}
               onHideTooltip={() => setTooltip(null)}
             />
 
             <TrendBlock
-              title="Ruck Trend"
-              icon={<MoveVertical className="h-4 w-4 text-violet-200" />}
+              title="Power Forward"
+              icon={<Shield className="h-4 w-4 text-violet-200" />}
               accent="#A78BFA"
-              description="Hit-out strength, advantage taps and ruck-led clearances."
+              description="Interior scoring, rebounding dominance and rim protection."
               series={[
-                { label: "Hit Outs", values: ruckHitOuts, goodDirection: "up" },
-                { label: "Hit Outs to Advantage", values: ruckHitOutsAdv, goodDirection: "up" },
-                { label: "Clearances", values: ruckClearances, goodDirection: "up" },
-                { label: "Trend", values: ruckTrend, goodDirection: "up" },
+                { label: "Points Scored", values: pfPoints, goodDirection: "up" },
+                { label: "Rebounds", values: pfRebounds, goodDirection: "up" },
+                { label: "Blocks", values: pfBlocks, goodDirection: "up" },
+                { label: "Trend", values: pfTrend, goodDirection: "up" },
+              ]}
+              onShowTooltip={setTooltip}
+              onHideTooltip={() => setTooltip(null)}
+            />
+
+            <TrendBlock
+              title="Center"
+              icon={<Users className="h-4 w-4 text-emerald-200" />}
+              accent="#10B981"
+              description="Paint presence, rebounding control and shot blocking."
+              series={[
+                { label: "Points Scored", values: cPoints, goodDirection: "up" },
+                { label: "Rebounds", values: cRebounds, goodDirection: "up" },
+                { label: "Blocks", values: cBlocks, goodDirection: "up" },
+                { label: "Trend", values: cTrend, goodDirection: "up" },
               ]}
               onShowTooltip={setTooltip}
               onHideTooltip={() => setTooltip(null)}
@@ -640,7 +688,6 @@ export default function TeamTrends() {
         </div>
       </div>
 
-      {/* global tooltip portal */}
       <TrendTooltipPortal tooltip={tooltip} />
     </section>
   );

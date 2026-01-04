@@ -1,4 +1,4 @@
-// TEAM FORM GRID — FINAL PATCHED VERSION
+// TEAM FORM GRID — NBA EDITION
 // A) Real midfieldTrend sparkline
 // B) Enhanced Soft Glow
 // C) True Center Sparkline
@@ -6,51 +6,51 @@
 // E) Fully patched BACK CARD with balanced JSX
 
 import React, { useMemo, useState } from "react";
-import { MOCK_TEAMS, AFLTeam } from "../data/mockTeams";
+import { MOCK_TEAMS } from "../data/mockTeams";
 import { Flame, CircleDot, Snowflake } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
 /* -------------------------------------------------------------------------- */
 
-const METRICS = ["momentum", "fantasy", "disposals", "goals"] as const;
+const METRICS = ["momentum", "points", "rebounds", "assists"] as const;
 type Metric = (typeof METRICS)[number];
 type Variant = "hot" | "stable" | "cold";
 
 interface ClassifiedTeams {
-  hot: AFLTeam[];
-  stable: AFLTeam[];
-  cold: AFLTeam[];
+  hot: typeof MOCK_TEAMS;
+  stable: typeof MOCK_TEAMS;
+  cold: typeof MOCK_TEAMS;
 }
 
 /* -------------------------------------------------------------------------- */
 /*                         Metric Calculation Logic                           */
 /* -------------------------------------------------------------------------- */
 
-function getBaseMomentum(team: AFLTeam): number {
+function getBaseMomentum(team: typeof MOCK_TEAMS[number]): number {
   const last5 = team.margins.slice(-5);
   return last5.reduce((a, b) => a + b, 0) / last5.length;
 }
 
-function metricJitter(team: AFLTeam, metric: Metric): number {
+function metricJitter(team: typeof MOCK_TEAMS[number], metric: Metric): number {
   const seed =
     team.id *
-    (metric === "fantasy"
+    (metric === "points"
       ? 1.7
-      : metric === "disposals"
+      : metric === "rebounds"
       ? 2.3
-      : metric === "goals"
+      : metric === "assists"
       ? 3.1
       : 0.9);
   return Math.sin(seed) * 6;
 }
 
-function getMetricScore(team: AFLTeam, metric: Metric): number {
+function getMetricScore(team: typeof MOCK_TEAMS[number], metric: Metric): number {
   const base = getBaseMomentum(team);
 
   if (metric === "momentum") return base;
-  if (metric === "fantasy") return base * 0.7 + metricJitter(team, metric);
-  if (metric === "disposals") return base * 0.5 + metricJitter(team, metric);
+  if (metric === "points") return base * 0.7 + metricJitter(team, metric);
+  if (metric === "rebounds") return base * 0.5 + metricJitter(team, metric);
   return base * 0.35 + metricJitter(team, metric);
 }
 
@@ -61,7 +61,7 @@ function classifyTeams(metric: Metric): ClassifiedTeams {
 
   return {
     hot: sorted.slice(0, 3),
-    stable: sorted.slice(8, 11),
+    stable: sorted.slice(12, 15),
     cold: sorted.slice(-3),
   };
 }
@@ -72,16 +72,16 @@ function classifyTeams(metric: Metric): ClassifiedTeams {
 
 const metricLabels: Record<Metric, string> = {
   momentum: "Momentum · Last 5",
-  fantasy: "Fantasy edge",
-  disposals: "Disposals edge",
-  goals: "Goals edge",
+  points: "Points edge",
+  rebounds: "Rebounds edge",
+  assists: "Assists edge",
 };
 
 const metricPrefix: Record<Metric, string> = {
   momentum: "Momentum",
-  fantasy: "Fantasy",
-  disposals: "Disposals",
-  goals: "Goals",
+  points: "Points",
+  rebounds: "Rebounds",
+  assists: "Assists",
 };
 
 const badgeStyles: Record<Variant, string> = {
@@ -173,7 +173,7 @@ export default function TeamFormGrid() {
         </div>
 
         <h2 className="mt-5 text-2xl font-semibold text-neutral-50 sm:text-3xl md:text-[32px] leading-tight">
-          Hot, stable and cold clubs by performance lens
+          Hot, stable and cold teams by performance lens
         </h2>
 
         <p className="mt-3 max-w-3xl text-xs text-neutral-400 sm:text-sm">
@@ -246,7 +246,7 @@ function FormColumn({
   variant: Variant;
   title: string;
   icon: React.ReactNode;
-  teams: AFLTeam[];
+  teams: typeof MOCK_TEAMS;
   metric: Metric;
 }) {
   const color =
@@ -296,7 +296,7 @@ function TeamFormCard({
   metric,
 }: {
   variant: Variant;
-  team: AFLTeam;
+  team: typeof MOCK_TEAMS[number];
   metric: Metric;
 }) {
   const [flipped, setFlipped] = useState(false);
