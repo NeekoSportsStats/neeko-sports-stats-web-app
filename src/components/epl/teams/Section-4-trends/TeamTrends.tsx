@@ -1,7 +1,9 @@
+// src/components/epl/teams/TeamTrends.tsx
+
 import React, { useMemo, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { MOCK_TEAMS } from "../data/mockTeams";
-import { TrendingUp, Shield, Activity, MoveVertical } from "lucide-react";
+import { TrendingUp, Shield, Activity, Target } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
 /*                               Tooltip helpers                              */
@@ -10,12 +12,12 @@ import { TrendingUp, Shield, Activity, MoveVertical } from "lucide-react";
 function inferUnit(label: string): string {
   const lower = label.toLowerCase();
   if (lower.includes("%") || lower.includes("efficiency")) return "%";
-  if (lower.includes("points") || lower.includes("score") || lower.includes("conceded"))
-    return "pts";
-  if (lower.includes("clearance")) return "clearances";
-  if (lower.includes("wins")) return "wins";
-  if (lower.includes("intercept")) return "marks";
-  if (lower.includes("hit") || lower.includes("hit outs")) return "hitouts";
+  if (lower.includes("goals") || lower.includes("scored") || lower.includes("conceded"))
+    return "goals";
+  if (lower.includes("possession")) return "%";
+  if (lower.includes("passes")) return "passes";
+  if (lower.includes("saves")) return "saves";
+  if (lower.includes("tackles")) return "tackles";
   if (lower.includes("influence")) return "rating";
   if (lower.includes("pressure")) return "index";
   if (lower.includes("trend")) return "index";
@@ -59,7 +61,7 @@ function TrendTooltipPortal({ tooltip }: { tooltip: TooltipPayload | null }) {
     <div
       className="
         pointer-events-none fixed z-[9999]
-        rounded-md border border-white/10 
+        rounded-md border border-white/10
         bg-black/90 backdrop-blur-md
         px-2 py-1 text-[10px] text-neutral-200
         whitespace-nowrap
@@ -71,7 +73,7 @@ function TrendTooltipPortal({ tooltip }: { tooltip: TooltipPayload | null }) {
       }}
     >
       <div className="text-[8px] uppercase tracking-wider text-neutral-400">
-        Round {tooltip.round}
+        Matchweek {tooltip.round}
       </div>
       <div className="font-semibold">
         {formatTooltipValue(tooltip.value, tooltip.unit)}
@@ -88,7 +90,6 @@ function TrendTooltipPortal({ tooltip }: { tooltip: TooltipPayload | null }) {
 
 /* -------------------------------------------------------------------------- */
 /*                    SparklineLarge — desktop hover + mobile tap             */
-/*                SINGLE ROW on mobile with adaptive compression              */
 /* -------------------------------------------------------------------------- */
 
 type SparklineProps = {
@@ -130,7 +131,7 @@ function SparklineLarge({
   ) {
     try {
       const rect = el.getBoundingClientRect();
-      const offset = isTouchDevice ? 4 : 6; // slightly closer on mobile
+      const offset = isTouchDevice ? 4 : 6;
       onShowTooltip?.({
         x: rect.left + rect.width / 2,
         y: rect.top - offset,
@@ -140,16 +141,16 @@ function SparklineLarge({
         unit,
       });
     } catch {
-      // fail-safe; never crash on mobile
+      // fail-safe
     }
   }
 
   return (
     <div
       className="
-        relative 
-        h-[44px] sm:h-[54px] 
-        w-full rounded-xl overflow-hidden 
+        relative
+        h-[44px] sm:h-[54px]
+        w-full rounded-xl overflow-hidden
         bg-gradient-to-b from-neutral-800/40 via-neutral-900/90 to-black
         border border-slate-400/20 shadow-[0_6px_14px_rgba(0,0,0,0.55)]
         px-[4px] sm:px-[6px]
@@ -159,7 +160,6 @@ function SparklineLarge({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[40%] bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.12),transparent_65%)]" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[30%] bg-gradient-to-t from-black/80 via-black/0" />
 
-      {/* SINGLE ROW, adaptive compression on all breakpoints */}
       <div className="relative z-10 flex h-full w-full items-end gap-[3px] sm:gap-[2px]">
         {recent.map((v, i) => {
           const norm = (v - min) / range;
@@ -174,7 +174,7 @@ function SparklineLarge({
               data-sparkline-bar="true"
               className="flex-1 flex items-end justify-center h-full"
               onMouseEnter={(e) => {
-                if (isTouchDevice) return; // mobile uses tap
+                if (isTouchDevice) return;
                 showFromElement(e.currentTarget as HTMLElement, v, delta, index);
               }}
               onMouseLeave={() => {
@@ -247,7 +247,7 @@ function computeMetricSummary(
   }
 
   let deltaPct = ((lastAvg - prevAvg) / prevAvg) * 100;
-  deltaPct = Math.max(-15, Math.min(15, deltaPct)); // clamp volatility
+  deltaPct = Math.max(-15, Math.min(15, deltaPct));
 
   let direction: TrendDirection = "flat";
   if (deltaPct > 0.1) direction = "up";
@@ -294,15 +294,15 @@ function TrendBlock({
   return (
     <div
       className="
-        group relative rounded-3xl border border-neutral-800/70 
-        bg-gradient-to-b from-neutral-900/85 via-black to-black/95 
+        group relative rounded-3xl border border-neutral-800/70
+        bg-gradient-to-b from-neutral-900/85 via-black to-black/95
         p-3 sm:p-4 md:p-5 shadow-[0_18px_48px_rgba(0,0,0,0.85)]
       "
     >
       <div
         className="
-          pointer-events-none absolute -inset-px 
-          rounded-[26px] blur-xl opacity-0 
+          pointer-events-none absolute -inset-px
+          rounded-[26px] blur-xl opacity-0
           transition-opacity duration-300 group-hover:opacity-100
         "
         style={{
@@ -438,17 +438,16 @@ function buildPercentSeries(length: number, base: number, swing: number): number
 /* -------------------------------------------------------------------------- */
 
 export default function TeamTrends() {
-  const rounds = 23;
+  const rounds = 38;
   const [tooltip, setTooltip] = useState<TooltipPayload | null>(null);
 
-  // Option 1 behaviour: tap/click anywhere outside sparkline → hide tooltip
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     function handlePointerDown(e: PointerEvent) {
       const target = e.target as HTMLElement | null;
       if (!target) return;
-      if (target.closest("[data-sparkline-bar='true']")) return; // inside bar
+      if (target.closest("[data-sparkline-bar='true']")) return;
       setTooltip(null);
     }
 
@@ -456,9 +455,9 @@ export default function TeamTrends() {
     return () => window.removeEventListener("pointerdown", handlePointerDown);
   }, []);
 
-  /* ------------------------------- ATTACK -------------------------------- */
+  /* ------------------------------- FORWARD -------------------------------- */
 
-  const attackPoints = useMemo(() => {
+  const forwardGoals = useMemo(() => {
     const arr: number[] = [];
     for (let r = 0; r < rounds; r++) {
       const scores = MOCK_TEAMS.map((t) => t.scores[r]);
@@ -467,13 +466,13 @@ export default function TeamTrends() {
     return arr;
   }, [rounds]);
 
-  const attackExpected = useMemo(
-    () => attackPoints.map((v, i) => (v + (attackPoints[i - 1] ?? v)) / 2),
-    [attackPoints]
+  const forwardExpected = useMemo(
+    () => forwardGoals.map((v, i) => (v + (forwardGoals[i - 1] ?? v)) / 2),
+    [forwardGoals]
   );
 
-  const attackF50 = useMemo(() => buildPercentSeries(rounds, 56, 12), [rounds]);
-  const attackTrend = useMemo(() => buildPercentSeries(rounds, 68, 10), [rounds]);
+  const forwardEfficiency = useMemo(() => buildPercentSeries(rounds, 56, 12), [rounds]);
+  const forwardTrend = useMemo(() => buildPercentSeries(rounds, 68, 10), [rounds]);
 
   /* ------------------------------ DEFENCE -------------------------------- */
 
@@ -487,57 +486,51 @@ export default function TeamTrends() {
   }, [rounds]);
 
   const pressureIndex = useMemo(() => buildPressureSeries(rounds), [rounds]);
-  const interceptMarks = useMemo(() => buildPercentSeries(rounds, 60, 14), [rounds]);
+  const tacklesWon = useMemo(() => buildPercentSeries(rounds, 60, 14), [rounds]);
   const defenceTrend = useMemo(() => buildPercentSeries(rounds, 65, 11), [rounds]);
 
   /* ------------------------------ MIDFIELD ------------------------------- */
 
-  const contestedInfluence = useMemo(() => {
+  const midfieldPossession = useMemo(() => {
     const arr: number[] = [];
     for (let r = 0; r < rounds; r++) {
-      const contested = MOCK_TEAMS.map(
-        (t) => t.clearanceDom[r] + t.margins[r] / 3
+      const poss = MOCK_TEAMS.map(
+        (t) => t.possessionDom[r] + t.margins[r] / 5
       );
-      arr.push(Math.round(contested.reduce((a, b) => a + b, 0) / contested.length));
+      arr.push(Math.round(poss.reduce((a, b) => a + b, 0) / poss.length));
     }
     return arr;
   }, [rounds]);
 
-  const stoppageWins = useMemo(
-    () => contestedInfluence.map((v) => v - (5 - Math.random() * 6)),
-    [contestedInfluence]
+  const passCompletion = useMemo(
+    () => midfieldPossession.map((v) => v - (5 - Math.random() * 6)),
+    [midfieldPossession]
   );
 
-  const midfieldClearances = useMemo(() => buildPercentSeries(rounds, 52, 10), [rounds]);
+  const keyPasses = useMemo(() => buildPercentSeries(rounds, 52, 10), [rounds]);
   const midfieldTrend = useMemo(() => buildPercentSeries(rounds, 66, 9), [rounds]);
 
-  /* -------------------------------- RUCK --------------------------------- */
+  /* ------------------------------- GK ------------------------------------ */
 
-  const ruckHitOuts = useMemo(
+  const gkSaves = useMemo(
     () =>
       Array.from({ length: rounds }, (_, i) =>
-        Math.round(40 + Math.sin(i / 3) * 4 + (Math.random() * 4 - 2))
+        Math.round(4 + Math.sin(i / 3) * 1.5 + (Math.random() * 2 - 1))
       ),
     [rounds]
   );
 
-  const ruckHitOutsAdv = useMemo(
+  const gkSavePercentage = useMemo(() => buildPercentSeries(rounds, 68, 12), [rounds]);
+
+  const gkCleanSheets = useMemo(
     () =>
       Array.from({ length: rounds }, (_, i) =>
-        Math.round(12 + Math.sin(i / 4) * 3 + (Math.random() * 3 - 1.5))
+        Math.round(0.3 + Math.sin(i / 4) * 0.2 + (Math.random() * 0.3))
       ),
     [rounds]
   );
 
-  const ruckClearances = useMemo(
-    () =>
-      Array.from({ length: rounds }, (_, i) =>
-        Math.round(22 + Math.sin(i / 3.5) * 3 + (Math.random() * 3 - 1.5))
-      ),
-    [rounds]
-  );
-
-  const ruckTrend = useMemo(() => buildPercentSeries(rounds, 60, 10), [rounds]);
+  const gkTrend = useMemo(() => buildPercentSeries(rounds, 60, 10), [rounds]);
 
   /* ---------------------------------------------------------------------- */
 
@@ -545,10 +538,10 @@ export default function TeamTrends() {
     <section className="mt-10">
       <div
         className="
-          relative overflow-hidden 
-          rounded-[32px] border border-yellow-500/30 
+          relative overflow-hidden
+          rounded-[32px] border border-yellow-500/30
           bg-[radial-gradient(circle_at_top,_rgba(12,12,13,0.85),_rgba(3,3,4,0.95)_60%,_black_90%)]
-          px-3 py-4 sm:px-4 sm:py-5 md:px-7 md:py-7 
+          px-3 py-4 sm:px-4 sm:py-5 md:px-7 md:py-7
           shadow-[0_24px_72px_rgba(0,0,0,0.9)] backdrop-blur-2xl
         "
       >
@@ -569,24 +562,24 @@ export default function TeamTrends() {
 
           <p className="mt-2 max-w-2xl text-xs text-neutral-400">
             Rolling trends highlighting attacking quality, defensive solidity, midfield control and
-            ruck dominance.
+            goalkeeper performance.
           </p>
 
           <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-            League averages • Last 23 rounds • Synthetic positional trend lenses
+            League averages • Last 38 matchweeks • Synthetic positional trend lenses
           </p>
 
           <div className="mt-8 grid gap-8 md:grid-cols-2 lg:gap-10">
             <TrendBlock
-              title="Attack Trend"
+              title="Forward Trend"
               icon={<TrendingUp className="h-4 w-4 text-yellow-300" />}
               accent="#FACC15"
-              description="Scoring output, expected conversion and forward-50 strength."
+              description="Goal output, expected conversion and attacking efficiency."
               series={[
-                { label: "Points Scored", values: attackPoints, goodDirection: "up" },
-                { label: "Expected Score", values: attackExpected, goodDirection: "up" },
-                { label: "Forward-50 Efficiency (%)", values: attackF50, goodDirection: "up" },
-                { label: "Trend", values: attackTrend, goodDirection: "up" },
+                { label: "Goals Scored", values: forwardGoals, goodDirection: "up" },
+                { label: "Expected Goals", values: forwardExpected, goodDirection: "up" },
+                { label: "Efficiency (%)", values: forwardEfficiency, goodDirection: "up" },
+                { label: "Trend", values: forwardTrend, goodDirection: "up" },
               ]}
               onShowTooltip={setTooltip}
               onHideTooltip={() => setTooltip(null)}
@@ -596,11 +589,11 @@ export default function TeamTrends() {
               title="Defence Trend"
               icon={<Shield className="h-4 w-4 text-cyan-200" />}
               accent="#22D3EE"
-              description="Conceded scoring, pressure indicators and intercept capability."
+              description="Conceded goals, pressure indicators and tackles won."
               series={[
-                { label: "Points Conceded", values: defenceConceded, goodDirection: "down" },
+                { label: "Goals Conceded", values: defenceConceded, goodDirection: "down" },
                 { label: "Pressure Index", values: pressureIndex, goodDirection: "up" },
-                { label: "Intercept Marks", values: interceptMarks, goodDirection: "up" },
+                { label: "Tackles Won", values: tacklesWon, goodDirection: "up" },
                 { label: "Trend", values: defenceTrend, goodDirection: "down" },
               ]}
               onShowTooltip={setTooltip}
@@ -611,11 +604,11 @@ export default function TeamTrends() {
               title="Midfield Trend"
               icon={<Activity className="h-4 w-4 text-orange-300" />}
               accent="#FB923C"
-              description="Contested strength, stoppage craft and clearance control."
+              description="Possession control, pass completion and creative output."
               series={[
-                { label: "Contested Influence", values: contestedInfluence, goodDirection: "up" },
-                { label: "Stoppage Wins", values: stoppageWins, goodDirection: "up" },
-                { label: "Clearance", values: midfieldClearances, goodDirection: "up" },
+                { label: "Possession (%)", values: midfieldPossession, goodDirection: "up" },
+                { label: "Pass Completion", values: passCompletion, goodDirection: "up" },
+                { label: "Key Passes", values: keyPasses, goodDirection: "up" },
                 { label: "Trend", values: midfieldTrend, goodDirection: "up" },
               ]}
               onShowTooltip={setTooltip}
@@ -623,15 +616,15 @@ export default function TeamTrends() {
             />
 
             <TrendBlock
-              title="Ruck Trend"
-              icon={<MoveVertical className="h-4 w-4 text-violet-200" />}
+              title="Goalkeeper Trend"
+              icon={<Target className="h-4 w-4 text-violet-200" />}
               accent="#A78BFA"
-              description="Hit-out strength, advantage taps and ruck-led clearances."
+              description="Save quality, clean sheets and overall goalkeeper performance."
               series={[
-                { label: "Hit Outs", values: ruckHitOuts, goodDirection: "up" },
-                { label: "Hit Outs to Advantage", values: ruckHitOutsAdv, goodDirection: "up" },
-                { label: "Clearances", values: ruckClearances, goodDirection: "up" },
-                { label: "Trend", values: ruckTrend, goodDirection: "up" },
+                { label: "Saves", values: gkSaves, goodDirection: "up" },
+                { label: "Save Percentage (%)", values: gkSavePercentage, goodDirection: "up" },
+                { label: "Clean Sheets", values: gkCleanSheets, goodDirection: "up" },
+                { label: "Trend", values: gkTrend, goodDirection: "up" },
               ]}
               onShowTooltip={setTooltip}
               onHideTooltip={() => setTooltip(null)}

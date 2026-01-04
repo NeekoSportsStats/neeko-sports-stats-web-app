@@ -1,43 +1,38 @@
-// TEAM FORM GRID — FINAL PATCHED VERSION
-// A) Real midfieldTrend sparkline
-// B) Enhanced Soft Glow
-// C) True Center Sparkline
-// D) Bottom-locked Progress Bar + Footer
-// E) Fully patched BACK CARD with balanced JSX
+// src/components/epl/teams/TeamFormGrid.tsx
 
 import React, { useMemo, useState } from "react";
-import { MOCK_TEAMS, AFLTeam } from "../data/mockTeams";
+import { MOCK_TEAMS, EPLTeam } from "../data/mockTeams";
 import { Flame, CircleDot, Snowflake } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
 /* -------------------------------------------------------------------------- */
 
-const METRICS = ["momentum", "fantasy", "disposals", "goals"] as const;
+const METRICS = ["momentum", "fantasy", "passes", "goals"] as const;
 type Metric = (typeof METRICS)[number];
 type Variant = "hot" | "stable" | "cold";
 
 interface ClassifiedTeams {
-  hot: AFLTeam[];
-  stable: AFLTeam[];
-  cold: AFLTeam[];
+  hot: EPLTeam[];
+  stable: EPLTeam[];
+  cold: EPLTeam[];
 }
 
 /* -------------------------------------------------------------------------- */
 /*                         Metric Calculation Logic                           */
 /* -------------------------------------------------------------------------- */
 
-function getBaseMomentum(team: AFLTeam): number {
+function getBaseMomentum(team: EPLTeam): number {
   const last5 = team.margins.slice(-5);
   return last5.reduce((a, b) => a + b, 0) / last5.length;
 }
 
-function metricJitter(team: AFLTeam, metric: Metric): number {
+function metricJitter(team: EPLTeam, metric: Metric): number {
   const seed =
     team.id *
     (metric === "fantasy"
       ? 1.7
-      : metric === "disposals"
+      : metric === "passes"
       ? 2.3
       : metric === "goals"
       ? 3.1
@@ -45,12 +40,12 @@ function metricJitter(team: AFLTeam, metric: Metric): number {
   return Math.sin(seed) * 6;
 }
 
-function getMetricScore(team: AFLTeam, metric: Metric): number {
+function getMetricScore(team: EPLTeam, metric: Metric): number {
   const base = getBaseMomentum(team);
 
   if (metric === "momentum") return base;
   if (metric === "fantasy") return base * 0.7 + metricJitter(team, metric);
-  if (metric === "disposals") return base * 0.5 + metricJitter(team, metric);
+  if (metric === "passes") return base * 0.5 + metricJitter(team, metric);
   return base * 0.35 + metricJitter(team, metric);
 }
 
@@ -73,14 +68,14 @@ function classifyTeams(metric: Metric): ClassifiedTeams {
 const metricLabels: Record<Metric, string> = {
   momentum: "Momentum · Last 5",
   fantasy: "Fantasy edge",
-  disposals: "Disposals edge",
+  passes: "Passes edge",
   goals: "Goals edge",
 };
 
 const metricPrefix: Record<Metric, string> = {
   momentum: "Momentum",
   fantasy: "Fantasy",
-  disposals: "Disposals",
+  passes: "Passes",
   goals: "Goals",
 };
 
@@ -246,7 +241,7 @@ function FormColumn({
   variant: Variant;
   title: string;
   icon: React.ReactNode;
-  teams: AFLTeam[];
+  teams: EPLTeam[];
   metric: Metric;
 }) {
   const color =
@@ -296,7 +291,7 @@ function TeamFormCard({
   metric,
 }: {
   variant: Variant;
-  team: AFLTeam;
+  team: EPLTeam;
   metric: Metric;
 }) {
   const [flipped, setFlipped] = useState(false);
@@ -367,7 +362,7 @@ function TeamFormCard({
           </div>
         </div>
 
-        {/* BACK — FULLY PATCHED, BALANCED JSX */}
+        {/* BACK */}
         <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] rounded-xl border border-white/5 bg-black/65 p-4">
 
           {/* HEADER */}
@@ -419,13 +414,13 @@ function TeamFormCard({
               </div>
             </div>
 
-            {/* Clear % */}
+            {/* Possess % */}
             <div>
               <div className="text-[9px] uppercase text-neutral-500 tracking-[0.14em]">
-                Clear %
+                Possess %
               </div>
               <div className="font-semibold">
-                {team.clearanceDom.at(-1)!}%
+                {team.possessionDom.at(-1)!}%
               </div>
             </div>
 
