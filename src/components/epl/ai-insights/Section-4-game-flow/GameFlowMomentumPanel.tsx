@@ -60,10 +60,10 @@ function capTeamName(s: string) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* QUARTER + EVENT ACCESSORS (robust to mock/real shapes)                     */
+/* HALF + EVENT ACCESSORS (robust to mock/real shapes)                        */
 /* -------------------------------------------------------------------------- */
 
-type QuarterScore = { home: number; away: number };
+type HalfScore = { home: number; away: number };
 
 function getMatchTeams(m: any): { home: string | null; away: string | null } {
   const home = m?.homeTeam ?? m?.teams?.home?.name ?? m?.home?.name ?? null;
@@ -86,33 +86,33 @@ function getFinalScores(m: any): { home: number | null; away: number | null } {
 }
 
 /**
- * Attempts to read quarters from a variety of shapes:
- * - m.quarters: [{ home: 21, away: 14 }, ...]
- * - m.quarters: [{ homeScore: 21, awayScore: 14 }, ...]
- * - m.scores.quarters: same idea
+ * Attempts to read halves from a variety of shapes:
+ * - m.halves: [{ home: 1, away: 0 }, { home: 2, away: 1 }]
+ * - m.halves: [{ homeScore: 1, awayScore: 0 }, ...]
+ * - m.scores.halves: same idea
  * - m.periods: same idea
  */
-function getQuarterScores(m: any): QuarterScore[] {
-  const raw = m?.quarters ?? m?.scores?.quarters ?? m?.periods ?? m?.stats?.quarters ?? null;
+function getHalfScores(m: any): HalfScore[] {
+  const raw = m?.halves ?? m?.scores?.halves ?? m?.periods ?? m?.stats?.halves ?? null;
 
   if (!Array.isArray(raw) || !raw.length) return [];
 
-  const out: QuarterScore[] = [];
-  for (const q of raw) {
-    const h =
-      safeNum(q?.home) ??
-      safeNum(q?.homeScore) ??
-      safeNum(q?.home_points) ??
-      safeNum(q?.points_home) ??
+  const out: HalfScore[] = [];
+  for (const h of raw) {
+    const homeScore =
+      safeNum(h?.home) ??
+      safeNum(h?.homeScore) ??
+      safeNum(h?.home_goals) ??
+      safeNum(h?.goals_home) ??
       null;
-    const a =
-      safeNum(q?.away) ??
-      safeNum(q?.awayScore) ??
-      safeNum(q?.away_points) ??
-      safeNum(q?.points_away) ??
+    const awayScore =
+      safeNum(h?.away) ??
+      safeNum(h?.awayScore) ??
+      safeNum(h?.away_goals) ??
+      safeNum(h?.goals_away) ??
       null;
-    if (h == null || a == null) continue;
-    out.push({ home: h, away: a });
+    if (homeScore == null || awayScore == null) continue;
+    out.push({ home: homeScore, away: awayScore });
   }
   return out;
 }
@@ -198,40 +198,40 @@ function gamesForTeam(fixtures: FixtureMatch[], team: string) {
     });
 }
 
-function quarterPointsForTeam(m: any, team: string): number[] {
+function halfGoalsForTeam(m: any, team: string): number[] {
   const { home, away } = getMatchTeams(m);
-  const qs = getQuarterScores(m);
-  if (!qs.length) return [];
-  if (home === team) return qs.map((q) => q.home);
-  if (away === team) return qs.map((q) => q.away);
+  const hs = getHalfScores(m);
+  if (!hs.length) return [];
+  if (home === team) return hs.map((h) => h.home);
+  if (away === team) return hs.map((h) => h.away);
   return [];
 }
 
-function quarterMarginsForTeam(m: any, team: string): number[] {
+function halfMarginsForTeam(m: any, team: string): number[] {
   const { home, away } = getMatchTeams(m);
-  const qs = getQuarterScores(m);
-  if (!qs.length) return [];
-  if (home === team) return qs.map((q) => q.home - q.away);
-  if (away === team) return qs.map((q) => q.away - q.home);
+  const hs = getHalfScores(m);
+  if (!hs.length) return [];
+  if (home === team) return hs.map((h) => h.home - h.away);
+  if (away === team) return hs.map((h) => h.away - h.home);
   return [];
 }
 
-function phaseSlice(quarterVals: number[], phase: Phase) {
-  if (!quarterVals.length) return [];
+function phaseSlice(halfVals: number[], phase: Phase) {
+  if (!halfVals.length) return [];
 
   if (phase === "early") {
-    // Q1 only
-    return quarterVals.slice(0, 1);
+    // First half (H1)
+    return halfVals.slice(0, 1);
   }
 
   if (phase === "mid") {
-    // Q2 + Q3
-    return quarterVals.slice(1, 3);
+    // Mid-match control phase (aggregate of both halves, dampened)
+    return halfVals.length >= 2 ? halfVals.map((v) => v * 0.85) : halfVals;
   }
 
-  // Late game: Q4 gets a natural volatility lift
-  const q4 = quarterVals.slice(3, 4);
-  return q4.length ? q4.map((v) => v * 1.15) : [];
+  // Late game: Second half (H2) gets a natural volatility lift
+  const h2 = halfVals.slice(1, 2);
+  return h2.length ? h2.map((v) => v * 1.2) : [];
 }
 
 function chaosRiskFrom(vol01: number) {
@@ -275,7 +275,7 @@ function computePhaseSignal(
   const chaosRisk = chaosRiskFrom(vol01);
 
   const phaseName =
-    phase === "early" ? "Early game" : phase === "mid" ? "Mid game" : "Late game";
+    phase === "early" ? "First Half (H1)" : phase === "mid" ? "Mid-match control" : "Second Half (H2)";
 
   const biasText =
     controlBias === "neutral"
@@ -298,46 +298,44 @@ function computePhaseSignal(
 
 function teamProfileFrom(fixtures: FixtureMatch[], team: string): TeamProfile {
   const games = gamesForTeam(fixtures, team).slice(-12); // last ~12
-  const q1: number[] = [];
-  const q3: number[] = [];
-  const q4: number[] = [];
+  const h1: number[] = [];
+  const h2: number[] = [];
   const swingCounts: number[] = [];
 
   for (const m of games as any[]) {
-    const pts = quarterPointsForTeam(m, team);
-    const margins = quarterMarginsForTeam(m, team);
+    const goals = halfGoalsForTeam(m, team);
+    const margins = halfMarginsForTeam(m, team);
 
-    if (pts.length >= 1) q1.push(pts[0]);
-    if (pts.length >= 3) q3.push(pts[2]);
-    if (pts.length >= 4) q4.push(pts[3]);
+    if (goals.length >= 1) h1.push(goals[0]);
+    if (goals.length >= 2) h2.push(goals[1]);
 
-    // sensitivity proxy: count quarters with big swing (abs margin > 18)
+    // sensitivity proxy: count halves with big swing (abs margin >= 2 goals in EPL)
     if (margins.length) {
-      const swings = margins.filter((x) => Math.abs(x) >= 18).length;
+      const swings = margins.filter((x) => Math.abs(x) >= 2).length;
       swingCounts.push(swings);
     }
   }
 
-  // Early tempo: based on Q1 points distribution
-  const q1Avg = mean(q1);
+  // Early tempo: based on H1 goal output
+  const h1Avg = mean(h1);
   const earlyTempo: TeamProfile["earlyTempo"] =
-    q1Avg >= 26 ? "Fast" : q1Avg >= 20 ? "Measured" : "Slow";
+    h1Avg >= 1.5 ? "Fast" : h1Avg >= 0.8 ? "Measured" : "Slow";
 
-  // Post-half lift: compare Q3 vs Q1
-  const q3Avg = mean(q3);
-  const lift = q3Avg - q1Avg;
+  // Post-half lift: compare H2 vs H1
+  const h2Avg = mean(h2);
+  const lift = h2Avg - h1Avg;
   const postHalfLift: TeamProfile["postHalfLift"] =
-    lift >= 4 ? "Strong" : lift >= 1 ? "Moderate" : "Flat";
+    lift >= 0.5 ? "Strong" : lift >= 0.2 ? "Moderate" : "Flat";
 
-  // Late stability: std dev of Q4
-  const q4Std = stdev(q4);
+  // Late stability: std dev of H2
+  const h2Std = stdev(h2);
   const lateStability: TeamProfile["lateStability"] =
-    q4Std <= 5.5 ? "High" : q4Std <= 8.5 ? "Medium" : "Low";
+    h2Std <= 0.6 ? "High" : h2Std <= 1.0 ? "Medium" : "Low";
 
   // Sensitivity: how often big swings occur
   const swingAvg = mean(swingCounts);
   const sensitivity: TeamProfile["sensitivity"] =
-    swingAvg <= 0.6 ? "Low" : swingAvg <= 1.2 ? "Medium" : "High";
+    swingAvg <= 0.4 ? "Low" : swingAvg <= 0.8 ? "Medium" : "High";
 
   const editorial = (() => {
     const a =
@@ -377,74 +375,64 @@ function buildMomentumWindows(
   awayTeam: string
 ): MomentumWindow[] {
   // Windows are pattern-based and conservative.
-  // We weight them using observed quarter swing magnitudes across BOTH teams’ recent games.
+  // We weight them using observed half swing magnitudes across BOTH teams' recent games.
   const homeGames = gamesForTeam(fixtures, homeTeam).slice(-10) as any[];
   const awayGames = gamesForTeam(fixtures, awayTeam).slice(-10) as any[];
 
-  const collectQuarterSwing = (games: any[], whichQuarterIdx: number) => {
+  const collectHalfSwing = (games: any[], whichHalfIdx: number) => {
     const swings: number[] = [];
     for (const m of games) {
-      const qs = getQuarterScores(m);
-      if (qs.length < 4) continue;
-      // total points in quarter = home+away; momentum proxy = abs quarter margin
-      const q = qs[whichQuarterIdx];
-      swings.push(Math.abs(q.home - q.away));
+      const hs = getHalfScores(m);
+      if (hs.length < 2) continue;
+      // momentum proxy = abs half margin
+      const h = hs[whichHalfIdx];
+      swings.push(Math.abs(h.home - h.away));
     }
     return swings;
   };
 
-  const q1Sw = [
-    ...collectQuarterSwing(homeGames, 0),
-    ...collectQuarterSwing(awayGames, 0),
+  const h1Sw = [
+    ...collectHalfSwing(homeGames, 0),
+    ...collectHalfSwing(awayGames, 0),
   ];
-  const q2Sw = [
-    ...collectQuarterSwing(homeGames, 1),
-    ...collectQuarterSwing(awayGames, 1),
-  ];
-  const q3Sw = [
-    ...collectQuarterSwing(homeGames, 2),
-    ...collectQuarterSwing(awayGames, 2),
-  ];
-  const q4Sw = [
-    ...collectQuarterSwing(homeGames, 3),
-    ...collectQuarterSwing(awayGames, 3),
+  const h2Sw = [
+    ...collectHalfSwing(homeGames, 1),
+    ...collectHalfSwing(awayGames, 1),
   ];
 
-  const wQ1 = clamp(mean(q1Sw) / 22, 0, 1);
-  const wQ2 = clamp(mean(q2Sw) / 22, 0, 1);
-  const wQ3 = clamp(mean(q3Sw) / 22, 0, 1);
-  const wQ4 = clamp(mean(q4Sw) / 22, 0, 1);
+  const wH1 = clamp(mean(h1Sw) / 2.5, 0, 1);
+  const wH2 = clamp(mean(h2Sw) / 2.5, 0, 1);
 
   const windows: MomentumWindow[] = [
     {
-      id: "q1_start",
-      title: "First 10 minutes (Q1)",
-      why: "The opening shape sets quickly — early territory and clearance control often dictate tempo.",
-      weight01: wQ1 * 0.9,
+      id: "h1_opening",
+      title: "Opening 15 minutes (H1)",
+      why: "The opening shape sets quickly — early possession and territorial control often dictate first-half tempo.",
+      weight01: wH1 * 0.95,
     },
     {
-      id: "q2_late",
-      title: "Final 5 minutes (Q2)",
-      why: "Surges before half-time can compress or stretch margins and reshape the second-half script.",
-      weight01: wQ2 * 0.75,
+      id: "h1_final",
+      title: "Final 10 minutes before HT",
+      why: "Surges before half-time can shift momentum and reshape the second-half tactical approach.",
+      weight01: wH1 * 0.85,
     },
     {
-      id: "q3_open",
-      title: "Opening 10 minutes (Q3)",
-      why: "Post-adjustment phases are a common swing zone — matchup changes and pressure spikes show here.",
-      weight01: wQ3 * 1.0,
+      id: "h2_opening",
+      title: "Opening 15 minutes (H2)",
+      why: "Post-adjustment phases are a common swing zone — tactical changes and fresh energy show here.",
+      weight01: wH2 * 1.0,
     },
     {
-      id: "q4_mid",
-      title: "Mid Q4 (8–14 minutes)",
-      why: "If the game is live, fatigue and risk-taking widen volatility windows — repeats snowball faster.",
-      weight01: wQ4 * 0.9,
+      id: "h2_final",
+      title: "Final 15 minutes (H2)",
+      why: "Late-game pressure intensifies — fatigue and desperation create wider volatility windows as teams push for results.",
+      weight01: wH2 * 0.95,
     },
     {
-      id: "q4_last6",
-      title: "Final 6 minutes (Q4)",
-      why: "Close-game conditions amplify sensitivity — one clean chain can flip control quickly.",
-      weight01: wQ4 * 0.85,
+      id: "h2_stoppage",
+      title: "Stoppage time (90+)",
+      why: "Close-game conditions amplify sensitivity — one chance or defensive lapse can flip the result quickly.",
+      weight01: wH2 * 0.75,
     },
   ];
 
@@ -456,28 +444,28 @@ function buildDeepTriggers(homeTeam: string, awayTeam: string): DeepTrigger[] {
   return [
     {
       id: "trigger_1",
-      if: "Two goals land within ~3 minutes",
-      then: "A swing window typically opens for the next 8–12 minutes (tempo lifts, risk increases).",
+      if: "A goal is scored within the first 10 minutes",
+      then: "The leading team typically gains territorial control, forcing the opponent to adjust their shape early.",
     },
     {
       id: "trigger_2",
-      if: "The first 5 minutes of Q3 are one-way territory",
-      then: "The mid-game lean often hardens (teams commit to structure and matchups).",
+      if: "The first 10 minutes of the second half see sustained pressure",
+      then: "The half-time tactical adjustments become clear — momentum often shifts decisively.",
     },
     {
       id: "trigger_3",
-      if: "The margin is under ~12 points entering Q4",
-      then: "Late-game sensitivity increases (small runs can swing control quickly).",
+      if: "The match is level or within one goal entering the final 15 minutes",
+      then: "Late-game sensitivity increases dramatically (one chance or error can decide the result).",
     },
     {
       id: "trigger_4",
-      if: `${homeTeam} concede a late Q2 run`,
-      then: "Their first 6 minutes after half-time becomes a key response window.",
+      if: `${homeTeam} concede just before half-time`,
+      then: "Their opening 10 minutes of the second half becomes a critical response window.",
     },
     {
       id: "trigger_5",
-      if: `${awayTeam} are forced into repeat defensive entries`,
-      then: "Chain breaks and rebound bursts become more likely (momentum flips faster).",
+      if: `${awayTeam} face sustained pressure in their defensive third`,
+      then: "Counter-attacking opportunities increase, but defensive errors become more likely under fatigue.",
     },
   ];
 }
@@ -488,16 +476,16 @@ function buildFlowModel(
   homeTeam: string,
   awayTeam: string
 ): FlowModel {
-  // Prefer current match quarters if available, else fall back to recent history patterns.
-  const qs = getQuarterScores(match as any);
+  // Prefer current match halves if available, else fall back to recent history patterns.
+  const hs = getHalfScores(match as any);
 
   const homeMargins: number[] = [];
   const awayMargins: number[] = [];
 
-  if (qs.length >= 4) {
-    // Use THIS match’s quarter pattern (best for live/finished games).
-    for (const q of qs) {
-      const m = q.home - q.away;
+  if (hs.length >= 2) {
+    // Use THIS match's half pattern (best for live/finished games).
+    for (const h of hs) {
+      const m = h.home - h.away;
       homeMargins.push(m);
       awayMargins.push(-m);
     }
@@ -507,14 +495,14 @@ function buildFlowModel(
     const ag = (gamesForTeam(fixtures, awayTeam).slice(-8) as any[]) ?? [];
 
     const takeAvgMargins = (games: any[], team: string) => {
-      const qM: number[][] = [];
+      const hM: number[][] = [];
       for (const m of games) {
-        const margins = quarterMarginsForTeam(m, team);
-        if (margins.length >= 4) qM.push(margins.slice(0, 4));
+        const margins = halfMarginsForTeam(m, team);
+        if (margins.length >= 2) hM.push(margins.slice(0, 2));
       }
-      if (!qM.length) return [0, 0, 0, 0];
-      const out = [0, 0, 0, 0];
-      for (let i = 0; i < 4; i++) out[i] = mean(qM.map((row) => row[i] ?? 0));
+      if (!hM.length) return [0, 0];
+      const out = [0, 0];
+      for (let i = 0; i < 2; i++) out[i] = mean(hM.map((row) => row[i] ?? 0));
       return out;
     };
 
@@ -537,14 +525,14 @@ function buildFlowModel(
 
     // Calm + readable summary
     if (e === "Stable" && m !== "Stable" && l === "Volatile")
-      return "Overall flow: controlled early → swing zone mid-game → volatile finish.";
+      return "Overall flow: controlled first half → swing zone mid-match → volatile finish.";
     if (e === "Volatile" && l === "Stable")
       return "Overall flow: fast early swings → steadies late if control holds.";
     if (m === "Swing" && l === "Swing")
-      return "Overall flow: mid-to-late swing profile — control can move in short runs.";
+      return "Overall flow: mid-to-late swing profile — control can shift in quick bursts.";
     if (e === "Stable" && m === "Stable" && l === "Stable")
-      return "Overall flow: stable phases — momentum shifts tend to be slower and more earned.";
-    return "Overall flow: mixed phases — expect tempo to change across quarters.";
+      return "Overall flow: stable throughout — momentum shifts tend to be slower and more earned.";
+    return "Overall flow: mixed phases — expect tempo to change across halves.";
   })();
 
   const homeProfile = teamProfileFrom(fixtures, homeTeam);
@@ -735,10 +723,10 @@ export default function GameFlowMomentumPanel({
               const tone = labelTone(p.label);
               const phaseTitle =
                 p.phase === "early"
-                  ? "Early game (Q1)"
+                  ? "First Half (H1)"
                   : p.phase === "mid"
-                  ? "Mid game (Q2–Q3)"
-                  : "Late game (Q4)";
+                  ? "Mid-match control"
+                  : "Second Half (H2)";
               return (
                 <div
                   key={p.phase}
@@ -946,7 +934,7 @@ export default function GameFlowMomentumPanel({
 
         {/* Footer micro-note */}
         <div className="text-[11px] text-white/40">
-          Note: Game flow signals are pattern-based from available quarter structure. They describe tendencies — not guarantees.
+          Note: Game flow signals are pattern-based from historical half structures. They describe tendencies — not guarantees.
         </div>
       </div>
     </section>

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { FixtureMatch } from "@/components/epl/match-center/types";
 
-export type LensKey = "fantasy" | "disposals" | "goals";
+export type LensKey = "fantasy" | "goals" | "assists" | "shots" | "shotsOnTarget" | "xg";
 export type TeamFilter = "both" | "home" | "away";
 export type LabelMode = "smart" | "all" | "none";
 
@@ -45,17 +45,17 @@ function quadrantOf(p: PlayerPoint): Quadrant {
 }
 
 function genTrend(seed: number) {
-  const weeks = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12"];
+  const weeks = ["GW1", "GW2", "GW3", "GW4", "GW5", "GW6", "GW7", "GW8", "GW9", "GW10", "GW11", "GW12"];
   let v = seed;
   return weeks.map((w, i) => {
-    v = v + (i % 3 === 0 ? rnd(-12, 14) : rnd(-8, 10));
-    return { week: w, value: Math.max(20, Math.min(130, v)) };
+    v = v + (i % 3 === 0 ? rnd(-15, 18) : rnd(-10, 12));
+    return { week: w, value: Math.max(15, Math.min(140, v)) };
   });
 }
 
 export function usePlayerScatterData(args: { match?: FixtureMatch; initialLens?: LensKey }) {
-  const homeTeam = (args.match as any)?.homeTeam?.name ?? (args.match as any)?.homeTeam ?? "Richmond";
-  const awayTeam = (args.match as any)?.awayTeam?.name ?? (args.match as any)?.awayTeam ?? "Carlton";
+  const homeTeam = (args.match as any)?.homeTeam?.name ?? (args.match as any)?.homeTeam ?? "Manchester City";
+  const awayTeam = (args.match as any)?.awayTeam?.name ?? (args.match as any)?.awayTeam ?? "Arsenal";
 
   const [lens, setLens] = useState<LensKey>(args.initialLens ?? "fantasy");
   const [teamFilter, setTeamFilter] = useState<TeamFilter>("both");
@@ -63,26 +63,26 @@ export function usePlayerScatterData(args: { match?: FixtureMatch; initialLens?:
   const [openId, setOpenId] = useState<string | null>(null);
 
   const playersAll = useMemo<PlayerPoint[]>(() => {
-    // Deterministic-ish “mock” pool (safe / non-scrapable). Replace later with real ingestion.
+    // EPL mock player pool
     const home = [
-      "Dustin Martin",
-      "Tom Lynch",
-      "Noah Balta",
-      "Shai Bolton",
-      "Toby Nankervis",
-      "Jack Graham",
-      "Jayden Short",
-      "Nick Vlastuin",
+      "Erling Haaland",
+      "Kevin De Bruyne",
+      "Phil Foden",
+      "Bernardo Silva",
+      "Jack Grealish",
+      "Rodri",
+      "Ruben Dias",
+      "Kyle Walker",
     ];
     const away = [
-      "Sam Walsh",
-      "Patrick Cripps",
-      "Charlie Curnow",
-      "Jacob Weitering",
-      "Christian Petracca",
-      "George Hewett",
-      "Zac Williams",
-      "Adam Cerra",
+      "Bukayo Saka",
+      "Martin Odegaard",
+      "Gabriel Jesus",
+      "Declan Rice",
+      "Gabriel Martinelli",
+      "William Saliba",
+      "Ben White",
+      "Aaron Ramsdale",
     ];
 
     const mk = (name: string, side: "home" | "away", idx: number): PlayerPoint => {
@@ -104,16 +104,16 @@ export function usePlayerScatterData(args: { match?: FixtureMatch; initialLens?:
     home.forEach((n, i) => out.push(mk(n, "home", i)));
     away.forEach((n, i) => out.push(mk(n, "away", i)));
 
-    // Keep a familiar “hero” name for your screenshots vibe
-    if (!out.some((p) => p.name === "Max Gawn")) {
+    // Add a recognizable name for visual consistency
+    if (!out.some((p) => p.name === "Mohamed Salah")) {
       out.push({
-        id: "away-max-gawn",
-        name: "Max Gawn",
+        id: "away-mohamed-salah",
+        name: "Mohamed Salah",
         teamSide: "away",
         teamName: awayTeam,
-        momentum: 62,
-        ceiling: 81,
-        trend: genTrend(78),
+        momentum: 68,
+        ceiling: 85,
+        trend: genTrend(82),
       });
     }
 
@@ -127,18 +127,36 @@ export function usePlayerScatterData(args: { match?: FixtureMatch; initialLens?:
       arr = arr.filter((p) => p.teamSide === teamFilter);
     }
 
-    // Lens just nudges the distribution (still mock)
-    if (lens === "disposals") {
+    // Lens adjusts distribution based on stat type
+    if (lens === "goals") {
+      arr = arr.map((p) => ({
+        ...p,
+        momentum: clamp(p.momentum + rnd(-10, 8), 20, 95),
+        ceiling: clamp(p.ceiling + rnd(-8, 16), 20, 95),
+      }));
+    } else if (lens === "assists") {
+      arr = arr.map((p) => ({
+        ...p,
+        momentum: clamp(p.momentum + rnd(-8, 12), 20, 95),
+        ceiling: clamp(p.ceiling + rnd(-6, 10), 20, 95),
+      }));
+    } else if (lens === "shots") {
+      arr = arr.map((p) => ({
+        ...p,
+        momentum: clamp(p.momentum + rnd(-7, 9), 20, 95),
+        ceiling: clamp(p.ceiling + rnd(-9, 11), 20, 95),
+      }));
+    } else if (lens === "shotsOnTarget") {
       arr = arr.map((p) => ({
         ...p,
         momentum: clamp(p.momentum + rnd(-6, 10), 20, 95),
-        ceiling: clamp(p.ceiling + rnd(-10, 8), 20, 95),
+        ceiling: clamp(p.ceiling + rnd(-8, 12), 20, 95),
       }));
-    } else if (lens === "goals") {
+    } else if (lens === "xg") {
       arr = arr.map((p) => ({
         ...p,
-        momentum: clamp(p.momentum + rnd(-10, 6), 20, 95),
-        ceiling: clamp(p.ceiling + rnd(-6, 14), 20, 95),
+        momentum: clamp(p.momentum + rnd(-9, 11), 20, 95),
+        ceiling: clamp(p.ceiling + rnd(-7, 13), 20, 95),
       }));
     }
 
@@ -219,7 +237,7 @@ export function usePlayerScatterData(args: { match?: FixtureMatch; initialLens?:
     const practical =
       lean.direction === "even"
         ? "Use quadrant buckets to separate ceiling plays vs stable floors."
-        : `If stacking, bias your top exposures toward ${dir} “finale” + one volatile ceiling play.`;
+        : `If stacking, bias your top exposures toward ${dir} "finale" + one volatile ceiling play.`;
 
     return {
       title: `Why is it lean?`,
