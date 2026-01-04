@@ -1,12 +1,14 @@
 export const cx = (...c: Array<string | false | null | undefined>) =>
   c.filter(Boolean).join(" ");
 
-export type StatLens = "fantasy" | "disposals" | "goals";
+export type StatLens = "fantasy" | "points" | "rebounds" | "assists" | "threes";
 
 export const STAT_LABEL: Record<StatLens, string> = {
   fantasy: "Fantasy",
-  disposals: "Disposals",
-  goals: "Goals",
+  points: "Points",
+  rebounds: "Rebounds",
+  assists: "Assists",
+  threes: "3-Pointers",
 };
 
 export function clamp(n: number, min: number, max: number) {

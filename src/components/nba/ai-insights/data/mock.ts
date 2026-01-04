@@ -7,16 +7,16 @@ export interface WeeklyPlayerStat {
   playerName: string;
   teamId: string;
   teamName: string;
-  role: "MID" | "FWD" | "DEF" | "RUC";
+  role: "PG" | "SG" | "SF" | "PF" | "C";
   round: string;
   venue: string;
   opponentTeamId: string;
   opponentTeamName: string;
   fantasy: number;
-  disposals: number;
-  goals: number;
-  tog: number;
-  cbas: number;
+  points: number;
+  rebounds: number;
+  assists: number;
+  threes: number;
 }
 
 export interface WeeklyTeamStat {
@@ -27,8 +27,10 @@ export interface WeeklyTeamStat {
   opponentTeamId: string;
   opponentTeamName: string;
   fantasyTotal: number;
-  disposalsTotal: number;
-  goalsTotal: number;
+  pointsTotal: number;
+  reboundsTotal: number;
+  assistsTotal: number;
+  threesTotal: number;
   pointsFor: number;
   pointsAgainst: number;
   qPointsFor: [number, number, number, number];
@@ -47,26 +49,31 @@ export interface HeadToHeadContext {
 /* -------------------------------------------------------------------------- */
 
 const TEAMS = [
-  { id: "COLL", name: "Collingwood" },
-  { id: "CARL", name: "Carlton" },
+  { id: "LAL", name: "Lakers" },
+  { id: "GSW", name: "Warriors" },
 ];
 
-const VENUES = ["MCG", "Marvel", "SCG", "GMHBA"];
+const VENUES = [
+  "Crypto.com Arena",
+  "Chase Center",
+  "TD Garden",
+  "Madison Square Garden",
+];
 
 const rnd = (min: number, max: number) =>
   Math.round(min + Math.random() * (max - min));
 
-function rounds(n = 14) {
+function games(n = 14) {
   const out: string[] = [];
-  for (let i = 1; i <= n; i++) out.push(`R${i}`);
+  for (let i = 1; i <= n; i++) out.push(`G${i}`);
   return out;
 }
 
 export const MOCK_CONTEXT: HeadToHeadContext = {
-  homeTeamId: "COLL",
-  awayTeamId: "CARL",
-  venue: "MCG",
-  roundLabel: "R12",
+  homeTeamId: "LAL",
+  awayTeamId: "GSW",
+  venue: "Crypto.com Arena",
+  roundLabel: "G10",
 };
 
 /* -------------------------------------------------------------------------- */
@@ -74,39 +81,39 @@ export const MOCK_CONTEXT: HeadToHeadContext = {
 /* -------------------------------------------------------------------------- */
 
 const PLAYERS = [
-  // Collingwood (15)
-  { id: "c1", name: "Nick Daicos", teamId: "COLL", teamName: "Collingwood", role: "MID" as const },
-  { id: "c2", name: "Jordan De Goey", teamId: "COLL", teamName: "Collingwood", role: "MID" as const },
-  { id: "c3", name: "Jack Crisp", teamId: "COLL", teamName: "Collingwood", role: "MID" as const },
-  { id: "c4", name: "Tom Mitchell", teamId: "COLL", teamName: "Collingwood", role: "MID" as const },
-  { id: "c5", name: "Scott Pendlebury", teamId: "COLL", teamName: "Collingwood", role: "MID" as const },
-  { id: "c6", name: "Brody Mihocek", teamId: "COLL", teamName: "Collingwood", role: "FWD" as const },
-  { id: "c7", name: "Jamie Elliott", teamId: "COLL", teamName: "Collingwood", role: "FWD" as const },
-  { id: "c8", name: "Darcy Moore", teamId: "COLL", teamName: "Collingwood", role: "DEF" as const },
-  { id: "c9", name: "Isaac Quaynor", teamId: "COLL", teamName: "Collingwood", role: "DEF" as const },
-  { id: "c10", name: "Brayden Maynard", teamId: "COLL", teamName: "Collingwood", role: "DEF" as const },
-  { id: "c11", name: "Jeremy Howe", teamId: "COLL", teamName: "Collingwood", role: "DEF" as const },
-  { id: "c12", name: "Billy Frampton", teamId: "COLL", teamName: "Collingwood", role: "DEF" as const },
-  { id: "c13", name: "Bobby Hill", teamId: "COLL", teamName: "Collingwood", role: "FWD" as const },
-  { id: "c14", name: "Lachie Schultz", teamId: "COLL", teamName: "Collingwood", role: "FWD" as const },
-  { id: "c15", name: "Will Hoskin-Elliott", teamId: "COLL", teamName: "Collingwood", role: "FWD" as const },
+  // Lakers (15)
+  { id: "l1", name: "LeBron James", teamId: "LAL", teamName: "Lakers", role: "SF" as const },
+  { id: "l2", name: "Anthony Davis", teamId: "LAL", teamName: "Lakers", role: "PF" as const },
+  { id: "l3", name: "D'Angelo Russell", teamId: "LAL", teamName: "Lakers", role: "PG" as const },
+  { id: "l4", name: "Austin Reaves", teamId: "LAL", teamName: "Lakers", role: "SG" as const },
+  { id: "l5", name: "Rui Hachimura", teamId: "LAL", teamName: "Lakers", role: "PF" as const },
+  { id: "l6", name: "Jarred Vanderbilt", teamId: "LAL", teamName: "Lakers", role: "PF" as const },
+  { id: "l7", name: "Taurean Prince", teamId: "LAL", teamName: "Lakers", role: "SF" as const },
+  { id: "l8", name: "Gabe Vincent", teamId: "LAL", teamName: "Lakers", role: "PG" as const },
+  { id: "l9", name: "Cam Reddish", teamId: "LAL", teamName: "Lakers", role: "SF" as const },
+  { id: "l10", name: "Jaxson Hayes", teamId: "LAL", teamName: "Lakers", role: "C" as const },
+  { id: "l11", name: "Max Christie", teamId: "LAL", teamName: "Lakers", role: "SG" as const },
+  { id: "l12", name: "Jalen Hood-Schifino", teamId: "LAL", teamName: "Lakers", role: "PG" as const },
+  { id: "l13", name: "Christian Wood", teamId: "LAL", teamName: "Lakers", role: "C" as const },
+  { id: "l14", name: "Maxwell Lewis", teamId: "LAL", teamName: "Lakers", role: "SF" as const },
+  { id: "l15", name: "Colin Castleton", teamId: "LAL", teamName: "Lakers", role: "C" as const },
 
-  // Carlton (15)
-  { id: "b1", name: "Patrick Cripps", teamId: "CARL", teamName: "Carlton", role: "MID" as const },
-  { id: "b2", name: "Sam Walsh", teamId: "CARL", teamName: "Carlton", role: "MID" as const },
-  { id: "b3", name: "Adam Cerra", teamId: "CARL", teamName: "Carlton", role: "MID" as const },
-  { id: "b4", name: "George Hewett", teamId: "CARL", teamName: "Carlton", role: "MID" as const },
-  { id: "b5", name: "Matt Kennedy", teamId: "CARL", teamName: "Carlton", role: "MID" as const },
-  { id: "b6", name: "Charlie Curnow", teamId: "CARL", teamName: "Carlton", role: "FWD" as const },
-  { id: "b7", name: "Harry McKay", teamId: "CARL", teamName: "Carlton", role: "FWD" as const },
-  { id: "b8", name: "Zac Williams", teamId: "CARL", teamName: "Carlton", role: "DEF" as const },
-  { id: "b9", name: "Jacob Weitering", teamId: "CARL", teamName: "Carlton", role: "DEF" as const },
-  { id: "b10", name: "Mitch McGovern", teamId: "CARL", teamName: "Carlton", role: "DEF" as const },
-  { id: "b11", name: "Adam Saad", teamId: "CARL", teamName: "Carlton", role: "DEF" as const },
-  { id: "b12", name: "Nick Newman", teamId: "CARL", teamName: "Carlton", role: "DEF" as const },
-  { id: "b13", name: "Blake Acres", teamId: "CARL", teamName: "Carlton", role: "MID" as const },
-  { id: "b14", name: "Matthew Owies", teamId: "CARL", teamName: "Carlton", role: "FWD" as const },
-  { id: "b15", name: "Jack Martin", teamId: "CARL", teamName: "Carlton", role: "FWD" as const },
+  // Warriors (15)
+  { id: "w1", name: "Stephen Curry", teamId: "GSW", teamName: "Warriors", role: "PG" as const },
+  { id: "w2", name: "Klay Thompson", teamId: "GSW", teamName: "Warriors", role: "SG" as const },
+  { id: "w3", name: "Andrew Wiggins", teamId: "GSW", teamName: "Warriors", role: "SF" as const },
+  { id: "w4", name: "Draymond Green", teamId: "GSW", teamName: "Warriors", role: "PF" as const },
+  { id: "w5", name: "Kevon Looney", teamId: "GSW", teamName: "Warriors", role: "C" as const },
+  { id: "w6", name: "Chris Paul", teamId: "GSW", teamName: "Warriors", role: "PG" as const },
+  { id: "w7", name: "Jonathan Kuminga", teamId: "GSW", teamName: "Warriors", role: "PF" as const },
+  { id: "w8", name: "Moses Moody", teamId: "GSW", teamName: "Warriors", role: "SG" as const },
+  { id: "w9", name: "Gary Payton II", teamId: "GSW", teamName: "Warriors", role: "SG" as const },
+  { id: "w10", name: "Brandin Podziemski", teamId: "GSW", teamName: "Warriors", role: "SG" as const },
+  { id: "w11", name: "Trayce Jackson-Davis", teamId: "GSW", teamName: "Warriors", role: "C" as const },
+  { id: "w12", name: "Cory Joseph", teamId: "GSW", teamName: "Warriors", role: "PG" as const },
+  { id: "w13", name: "Lester Quinones", teamId: "GSW", teamName: "Warriors", role: "SG" as const },
+  { id: "w14", name: "Usman Garuba", teamId: "GSW", teamName: "Warriors", role: "PF" as const },
+  { id: "w15", name: "Jerome Robinson", teamId: "GSW", teamName: "Warriors", role: "SG" as const },
 ];
 
 /* -------------------------------------------------------------------------- */
@@ -115,32 +122,50 @@ const PLAYERS = [
 
 export const MOCK_WEEKLY_PLAYERS: WeeklyPlayerStat[] = (() => {
   const out: WeeklyPlayerStat[] = [];
-  const rs = rounds();
+  const gs = games();
 
-  for (const r of rs) {
+  for (const g of gs) {
     const venue = VENUES[rnd(0, VENUES.length - 1)];
 
     for (const p of PLAYERS) {
-      const oppTeamId = p.teamId === "COLL" ? "CARL" : "COLL";
-      const oppTeamName = p.teamId === "COLL" ? "Carlton" : "Collingwood";
+      const oppTeamId = p.teamId === "LAL" ? "GSW" : "LAL";
+      const oppTeamName = p.teamId === "LAL" ? "Warriors" : "Lakers";
 
-      const baseFantasy =
-        p.role === "MID" ? rnd(85, 125) :
-        p.role === "FWD" ? rnd(55, 95) :
-        rnd(60, 95);
+      const basePoints =
+        p.role === "PG" || p.role === "SG" ? rnd(12, 28) :
+        p.role === "SF" ? rnd(14, 30) :
+        p.role === "PF" ? rnd(10, 25) :
+        rnd(8, 18);
 
-      const baseDisp =
-        p.role === "MID" ? rnd(22, 36) :
-        p.role === "FWD" ? rnd(10, 20) :
-        rnd(14, 26);
+      const baseRebounds =
+        p.role === "C" || p.role === "PF" ? rnd(6, 14) :
+        p.role === "SF" ? rnd(4, 8) :
+        rnd(2, 5);
 
-      const baseGoals =
-        p.role === "FWD" ? rnd(1, 5) :
-        p.role === "MID" ? rnd(0, 2) :
-        rnd(0, 1);
+      const baseAssists =
+        p.role === "PG" ? rnd(5, 12) :
+        p.role === "SG" || p.role === "SF" ? rnd(2, 6) :
+        rnd(1, 3);
+
+      const baseThrees =
+        p.role === "PG" || p.role === "SG" ? rnd(1, 5) :
+        p.role === "SF" ? rnd(0, 4) :
+        rnd(0, 2);
 
       const jitter = (n: number, j: number) =>
         Math.max(0, n + rnd(-j, j));
+
+      const points = jitter(basePoints, 6);
+      const rebounds = jitter(baseRebounds, 3);
+      const assists = jitter(baseAssists, 2);
+      const threes = jitter(baseThrees, 2);
+
+      const fantasy = Math.round(
+        points * 1.0 +
+        rebounds * 1.2 +
+        assists * 1.5 +
+        threes * 0.5
+      );
 
       out.push({
         playerId: p.id,
@@ -148,15 +173,15 @@ export const MOCK_WEEKLY_PLAYERS: WeeklyPlayerStat[] = (() => {
         teamId: p.teamId,
         teamName: p.teamName,
         role: p.role,
-        round: r,
+        round: g,
         venue,
         opponentTeamId: oppTeamId,
         opponentTeamName: oppTeamName,
-        fantasy: jitter(baseFantasy, 18),
-        disposals: jitter(baseDisp, 7),
-        goals: jitter(baseGoals, 2),
-        tog: rnd(70, 92),
-        cbas: p.role === "MID" ? rnd(8, 24) : rnd(0, 6),
+        fantasy,
+        points,
+        rebounds,
+        assists,
+        threes,
       });
     }
   }
@@ -170,48 +195,49 @@ export const MOCK_WEEKLY_PLAYERS: WeeklyPlayerStat[] = (() => {
 
 export const MOCK_WEEKLY_TEAMS: WeeklyTeamStat[] = (() => {
   const out: WeeklyTeamStat[] = [];
-  const rs = rounds();
+  const gs = games();
 
-  for (const r of rs) {
-    const venue = VENUES[rnd(0, VENUES.length - 1)];
+  for (const g of gs) {
+    for (const team of TEAMS) {
+      const oppTeam = team.id === "LAL" ? TEAMS[1] : TEAMS[0];
+      const venue = VENUES[rnd(0, VENUES.length - 1)];
 
-    const mk = (teamId: string, oppId: string) => {
-      const tName = TEAMS.find((t) => t.id === teamId)?.name ?? teamId;
-      const oName = TEAMS.find((t) => t.id === oppId)?.name ?? oppId;
+      const q1For = rnd(24, 32);
+      const q2For = rnd(22, 30);
+      const q3For = rnd(24, 32);
+      const q4For = rnd(26, 34);
+      const pointsFor = q1For + q2For + q3For + q4For;
 
-      const q = [
-        rnd(18, 32),
-        rnd(18, 32),
-        rnd(18, 34),
-        rnd(18, 34),
-      ] as [number, number, number, number];
+      const q1Ag = rnd(24, 32);
+      const q2Ag = rnd(22, 30);
+      const q3Ag = rnd(24, 32);
+      const q4Ag = rnd(26, 34);
+      const pointsAgainst = q1Ag + q2Ag + q3Ag + q4Ag;
 
-      const qa = [
-        rnd(18, 32),
-        rnd(18, 32),
-        rnd(18, 34),
-        rnd(18, 34),
-      ] as [number, number, number, number];
+      const fantasyTotal = rnd(300, 450);
+      const pointsTotal = pointsFor;
+      const reboundsTotal = rnd(38, 52);
+      const assistsTotal = rnd(18, 30);
+      const threesTotal = rnd(8, 18);
 
-      return {
-        teamId,
-        teamName: tName,
-        round: r,
+      out.push({
+        teamId: team.id,
+        teamName: team.name,
+        round: g,
         venue,
-        opponentTeamId: oppId,
-        opponentTeamName: oName,
-        fantasyTotal: rnd(1450, 1650),
-        disposalsTotal: rnd(350, 420),
-        goalsTotal: rnd(9, 16),
-        pointsFor: q.reduce((a, b) => a + b, 0),
-        pointsAgainst: qa.reduce((a, b) => a + b, 0),
-        qPointsFor: q,
-        qPointsAgainst: qa,
-      };
-    };
-
-    out.push(mk("COLL", "CARL"));
-    out.push(mk("CARL", "COLL"));
+        opponentTeamId: oppTeam.id,
+        opponentTeamName: oppTeam.name,
+        fantasyTotal,
+        pointsTotal,
+        reboundsTotal,
+        assistsTotal,
+        threesTotal,
+        pointsFor,
+        pointsAgainst,
+        qPointsFor: [q1For, q2For, q3For, q4For],
+        qPointsAgainst: [q1Ag, q2Ag, q3Ag, q4Ag],
+      });
+    }
   }
 
   return out;

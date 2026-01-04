@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Lock, X } from "lucide-react";
 import type { LensKey, PlayerPoint, PlayerTrendPoint } from "./usePlayerScatterData";
+import { STAT_LABEL } from "../data/utils";
 
 function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
@@ -100,7 +101,7 @@ export default function PlayerTrendModal(props: {
 
   if (!open || !player || !player.trend || player.trend.length === 0) return null;
 
-  const statLabel = lens === "fantasy" ? "Fantasy" : lens === "disposals" ? "Disposals" : "Goals";
+  const statLabel = STAT_LABEL[lens];
 
   const CH_W = 760;
   const CH_H = 340;

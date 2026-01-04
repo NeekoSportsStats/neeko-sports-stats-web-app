@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { FixtureMatch } from "@/components/nba/match-center/types";
 
-export type LensKey = "fantasy" | "disposals" | "goals";
+export type LensKey = "fantasy" | "points" | "rebounds" | "assists" | "threes";
 export type TeamFilter = "both" | "home" | "away";
 export type LabelMode = "smart" | "all" | "none";
 
@@ -45,17 +45,17 @@ function quadrantOf(p: PlayerPoint): Quadrant {
 }
 
 function genTrend(seed: number) {
-  const weeks = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12"];
+  const games = ["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10", "G11", "G12"];
   let v = seed;
-  return weeks.map((w, i) => {
-    v = v + (i % 3 === 0 ? rnd(-12, 14) : rnd(-8, 10));
-    return { week: w, value: Math.max(20, Math.min(130, v)) };
+  return games.map((w, i) => {
+    v = v + (i % 3 === 0 ? rnd(-8, 10) : rnd(-5, 7));
+    return { week: w, value: Math.max(15, Math.min(60, v)) };
   });
 }
 
 export function usePlayerScatterData(args: { match?: FixtureMatch; initialLens?: LensKey }) {
-  const homeTeam = (args.match as any)?.homeTeam?.name ?? (args.match as any)?.homeTeam ?? "Richmond";
-  const awayTeam = (args.match as any)?.awayTeam?.name ?? (args.match as any)?.awayTeam ?? "Carlton";
+  const homeTeam = (args.match as any)?.homeTeam?.name ?? (args.match as any)?.homeTeam ?? "Lakers";
+  const awayTeam = (args.match as any)?.awayTeam?.name ?? (args.match as any)?.awayTeam ?? "Warriors";
 
   const [lens, setLens] = useState<LensKey>(args.initialLens ?? "fantasy");
   const [teamFilter, setTeamFilter] = useState<TeamFilter>("both");
@@ -63,26 +63,25 @@ export function usePlayerScatterData(args: { match?: FixtureMatch; initialLens?:
   const [openId, setOpenId] = useState<string | null>(null);
 
   const playersAll = useMemo<PlayerPoint[]>(() => {
-    // Deterministic-ish “mock” pool (safe / non-scrapable). Replace later with real ingestion.
     const home = [
-      "Dustin Martin",
-      "Tom Lynch",
-      "Noah Balta",
-      "Shai Bolton",
-      "Toby Nankervis",
-      "Jack Graham",
-      "Jayden Short",
-      "Nick Vlastuin",
+      "LeBron James",
+      "Anthony Davis",
+      "D'Angelo Russell",
+      "Austin Reaves",
+      "Rui Hachimura",
+      "Jarred Vanderbilt",
+      "Taurean Prince",
+      "Gabe Vincent",
     ];
     const away = [
-      "Sam Walsh",
-      "Patrick Cripps",
-      "Charlie Curnow",
-      "Jacob Weitering",
-      "Christian Petracca",
-      "George Hewett",
-      "Zac Williams",
-      "Adam Cerra",
+      "Stephen Curry",
+      "Klay Thompson",
+      "Andrew Wiggins",
+      "Draymond Green",
+      "Kevon Looney",
+      "Chris Paul",
+      "Jonathan Kuminga",
+      "Moses Moody",
     ];
 
     const mk = (name: string, side: "home" | "away", idx: number): PlayerPoint => {
@@ -104,16 +103,16 @@ export function usePlayerScatterData(args: { match?: FixtureMatch; initialLens?:
     home.forEach((n, i) => out.push(mk(n, "home", i)));
     away.forEach((n, i) => out.push(mk(n, "away", i)));
 
-    // Keep a familiar “hero” name for your screenshots vibe
-    if (!out.some((p) => p.name === "Max Gawn")) {
+    // Additional star player
+    if (!out.some((p) => p.name === "Luka Doncic")) {
       out.push({
-        id: "away-max-gawn",
-        name: "Max Gawn",
+        id: "guest-luka",
+        name: "Luka Doncic",
         teamSide: "away",
         teamName: awayTeam,
-        momentum: 62,
-        ceiling: 81,
-        trend: genTrend(78),
+        momentum: 68,
+        ceiling: 85,
+        trend: genTrend(42),
       });
     }
 
@@ -127,18 +126,30 @@ export function usePlayerScatterData(args: { match?: FixtureMatch; initialLens?:
       arr = arr.filter((p) => p.teamSide === teamFilter);
     }
 
-    // Lens just nudges the distribution (still mock)
-    if (lens === "disposals") {
+    // Lens nudges the distribution for different stat types
+    if (lens === "points") {
       arr = arr.map((p) => ({
         ...p,
         momentum: clamp(p.momentum + rnd(-6, 10), 20, 95),
-        ceiling: clamp(p.ceiling + rnd(-10, 8), 20, 95),
+        ceiling: clamp(p.ceiling + rnd(-8, 12), 20, 95),
       }));
-    } else if (lens === "goals") {
+    } else if (lens === "rebounds") {
       arr = arr.map((p) => ({
         ...p,
-        momentum: clamp(p.momentum + rnd(-10, 6), 20, 95),
-        ceiling: clamp(p.ceiling + rnd(-6, 14), 20, 95),
+        momentum: clamp(p.momentum + rnd(-8, 6), 20, 95),
+        ceiling: clamp(p.ceiling + rnd(-6, 10), 20, 95),
+      }));
+    } else if (lens === "assists") {
+      arr = arr.map((p) => ({
+        ...p,
+        momentum: clamp(p.momentum + rnd(-7, 8), 20, 95),
+        ceiling: clamp(p.ceiling + rnd(-10, 8), 20, 95),
+      }));
+    } else if (lens === "threes") {
+      arr = arr.map((p) => ({
+        ...p,
+        momentum: clamp(p.momentum + rnd(-10, 12), 20, 95),
+        ceiling: clamp(p.ceiling + rnd(-8, 14), 20, 95),
       }));
     }
 

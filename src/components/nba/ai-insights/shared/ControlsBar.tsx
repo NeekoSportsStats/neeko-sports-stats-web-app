@@ -27,12 +27,12 @@ export default function ControlsBar(props: {
     );
   };
 
+  const stats: StatLens[] = ["fantasy", "points", "rebounds", "assists", "threes"];
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        {btn("fantasy")}
-        {btn("disposals")}
-        {btn("goals")}
+        {stats.map((s) => btn(s))}
       </div>
       {right ? <div className="flex items-center gap-2">{right}</div> : null}
     </div>

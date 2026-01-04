@@ -28,7 +28,15 @@ import type {
   FixtureMatch,
   TeamStatLine,
 } from "@/components/nba/match-center/types";
-import type { AFLTeam } from "@/components/nba/teams/data/mockTeams";
+
+interface NBATeam {
+  name: string;
+  fantasy?: number[];
+  points?: number[];
+  rebounds?: number[];
+  assists?: number[];
+  threes?: number[];
+}
 
 const WINDOW = 8;
 
@@ -44,7 +52,7 @@ function lower(s: string) {
   return (s ?? "").toString().trim().toLowerCase();
 }
 
-function findTeamByName(teams: AFLTeam[], name: string) {
+function findTeamByName(teams: NBATeam[], name: string) {
   const n = lower(name);
   if (!n) return null;
   return (
@@ -56,11 +64,14 @@ function findTeamByName(teams: AFLTeam[], name: string) {
   );
 }
 
-function seriesForTeam(t: AFLTeam | null, stat: StatLens): number[] {
+function seriesForTeam(t: NBATeam | null, stat: StatLens): number[] {
   if (!t) return [];
   if (stat === "fantasy") return ((t as any).fantasy ?? []).map(Number);
-  if (stat === "disposals") return ((t as any).disposals ?? []).map(Number);
-  return ((t as any).goals ?? []).map(Number);
+  if (stat === "points") return ((t as any).points ?? []).map(Number);
+  if (stat === "rebounds") return ((t as any).rebounds ?? []).map(Number);
+  if (stat === "assists") return ((t as any).assists ?? []).map(Number);
+  if (stat === "threes") return ((t as any).threes ?? []).map(Number);
+  return [];
 }
 
 function findStat(lines: TeamStatLine[] | undefined, key: StatLens) {
@@ -69,8 +80,9 @@ function findStat(lines: TeamStatLine[] | undefined, key: StatLens) {
   const candidates = [
     key,
     key === "fantasy" ? "fantasy points" : key,
-    key === "disposals" ? "disp" : key,
     key === "fantasy" ? "total fantasy" : key,
+    key === "threes" ? "3-pointers" : key,
+    key === "threes" ? "three pointers" : key,
   ].map(lower);
 
   const direct = lines.find((l) => candidates.includes(lower(l.label)));
@@ -191,20 +203,28 @@ export function buildPlayerPredictabilityFromFixtures(
   for (const [id, p] of byPlayer) {
     const base =
       stat === "fantasy"
-        ? 75 + seededBetween(hash32(id + stat), 0, 35)
-        : stat === "disposals"
-        ? 14 + seededBetween(hash32(id + stat), 0, 18)
-        : 1 + seededBetween(hash32(id + stat), 0, 2.2);
+        ? 30 + seededBetween(hash32(id + stat), 0, 25)
+        : stat === "points"
+        ? 12 + seededBetween(hash32(id + stat), 0, 18)
+        : stat === "rebounds"
+        ? 3 + seededBetween(hash32(id + stat), 0, 8)
+        : stat === "assists"
+        ? 2 + seededBetween(hash32(id + stat), 0, 8)
+        : 1 + seededBetween(hash32(id + stat), 0, 4);
 
     const games = WINDOW + Math.floor(seededBetween(hash32(id + "games"), 0, 4));
 
     for (let i = 0; i < games; i++) {
       const noise =
         stat === "fantasy"
-          ? seededBetween(hash32(id + "n" + i), 0, 18)
-          : stat === "disposals"
-          ? seededBetween(hash32(id + "n" + i), 0, 6)
-          : seededBetween(hash32(id + "n" + i), 0, 1.2);
+          ? seededBetween(hash32(id + "n" + i), 0, 12)
+          : stat === "points"
+          ? seededBetween(hash32(id + "n" + i), 0, 8)
+          : stat === "rebounds"
+          ? seededBetween(hash32(id + "n" + i), 0, 4)
+          : stat === "assists"
+          ? seededBetween(hash32(id + "n" + i), 0, 4)
+          : seededBetween(hash32(id + "n" + i), 0, 2);
 
       p.values.push(Math.max(0, Math.round(base + noise)));
     }
@@ -271,7 +291,7 @@ export function buildPlayerPredictabilityFromFixtures(
 /* -------------------------------------------------------------------------- */
 
 export function buildTeamPredictabilityFromTeams(
-  teams: AFLTeam[],
+  teams: NBATeam[],
   stat: StatLens
 ): PredictRow[] {
   const vols: number[] = [];
@@ -338,7 +358,7 @@ export function buildTeamPredictabilityFromTeams(
 export function buildH2HPlayerMatchups(
   match: FixtureMatch | undefined,
   stat: StatLens,
-  teams: AFLTeam[]
+  teams: NBATeam[]
 ): MatchupRow[] {
   if (!match) return [];
 
@@ -384,7 +404,7 @@ export function buildH2HPlayerMatchups(
 export function buildH2HTeamMatchups(
   match: FixtureMatch | undefined,
   stat: StatLens,
-  teams: AFLTeam[]
+  teams: NBATeam[]
 ): MatchupRow[] {
   if (!match) return [];
 
@@ -456,7 +476,7 @@ export function buildQuarterFlow(
 /* -------------------------------------------------------------------------- */
 
 export function buildConsistencyExplosivenessTeams(
-  teams: AFLTeam[],
+  teams: NBATeam[],
   stat: StatLens
 ): ConsistencyRow[] {
   const rows: ConsistencyRow[] = [];
@@ -551,17 +571,25 @@ function makeDeterministicSeries(params: {
 
   const base =
     stat === "fantasy"
-      ? 70 + seededBetween(hash32(id + stat + "b"), 0, 45)
-      : stat === "disposals"
-      ? 12 + seededBetween(hash32(id + stat + "b"), 0, 22)
-      : 0.5 + seededBetween(hash32(id + stat + "b"), 0, 3.0);
+      ? 35 + seededBetween(hash32(id + stat + "b"), 0, 30)
+      : stat === "points"
+      ? 14 + seededBetween(hash32(id + stat + "b"), 0, 16)
+      : stat === "rebounds"
+      ? 4 + seededBetween(hash32(id + stat + "b"), 0, 10)
+      : stat === "assists"
+      ? 3 + seededBetween(hash32(id + stat + "b"), 0, 9)
+      : 1 + seededBetween(hash32(id + stat + "b"), 0, 4);
 
   const volatility =
     stat === "fantasy"
-      ? seededBetween(hash32(id + stat + "v"), 6, 22)
-      : stat === "disposals"
-      ? seededBetween(hash32(id + stat + "v"), 3, 9)
-      : seededBetween(hash32(id + stat + "v"), 0.4, 1.8);
+      ? seededBetween(hash32(id + stat + "v"), 4, 15)
+      : stat === "points"
+      ? seededBetween(hash32(id + stat + "v"), 3, 8)
+      : stat === "rebounds"
+      ? seededBetween(hash32(id + stat + "v"), 1, 4)
+      : stat === "assists"
+      ? seededBetween(hash32(id + stat + "v"), 1, 4)
+      : seededBetween(hash32(id + stat + "v"), 0.5, 2);
 
   const out: number[] = [];
   for (let i = 0; i < length; i++) {

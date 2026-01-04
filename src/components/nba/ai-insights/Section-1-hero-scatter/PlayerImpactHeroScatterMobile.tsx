@@ -5,6 +5,7 @@ import type { PremiumMode } from "@/components/nba/ai-insights/data/types";
 
 import PlayerTrendBottomSheet from "./PlayerTrendBottomSheet";
 import { usePlayerScatterData, type LensKey, type PlayerPoint } from "./usePlayerScatterData";
+import { STAT_LABEL } from "../data/utils";
 
 const W = 760;
 const H = 420;
@@ -75,7 +76,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
 
       {/* Controls (mobile) */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
+        {(["fantasy", "points", "rebounds", "assists", "threes"] as LensKey[]).map((k) => (
           <button
             key={k}
             onClick={() => setLens(k)}
@@ -86,7 +87,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
                 : "border-white/10 bg-black/20 text-white/70")
             }
           >
-            {k === "fantasy" ? "Fantasy" : k === "disposals" ? "Disposals" : "Goals"}
+            {STAT_LABEL[k]}
           </button>
         ))}
 
