@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-
 import type { EPLStatKey } from "@/lib/stats/types";
 
 export type StatKey = EPLStatKey;
@@ -19,9 +18,6 @@ export interface Player {
   xg: number[];
 }
 
-/* -------------------------------------------------------
-   FILTER / UI OPTIONS
-------------------------------------------------------- */
 export const TEAM_OPTIONS = [
   "All",
   "ARS",
@@ -45,52 +41,40 @@ export const ROUND_OPTIONS = [
 
 export const YEARS = ["2025–2026", "2024–2025"];
 
-/* -------------------------------------------------------
-   RANDOM HELPERS
-------------------------------------------------------- */
-const rand = (min: number, max: number) =>
-  Math.round(min + Math.random() * (max - min));
-
-const randFloat = (min: number, max: number, dp = 2) =>
-  Number((min + Math.random() * (max - min)).toFixed(dp));
-
-/* -------------------------------------------------------
-   EPL-REALISTIC STAT GENERATORS
-------------------------------------------------------- */
-function genGoals(pos: Position) {
+function genGoals(pos: Position, seed: number): number {
   if (pos === "GK") return 0;
-  if (pos === "DEF") return Math.random() < 0.04 ? 1 : 0;
-  if (pos === "MID") return Math.random() < 0.12 ? 1 : 0;
-  return Math.random() < 0.35 ? rand(1, 2) : 0;
+  if (pos === "DEF") return seed % 25 === 0 ? 1 : 0;
+  if (pos === "MID") return seed % 8 < 1 ? 1 : 0;
+  return seed % 3 === 0 ? Math.min(2, Math.floor(seed % 3)) : 0;
 }
 
-function genAssists(pos: Position) {
+function genAssists(pos: Position, seed: number): number {
   if (pos === "GK") return 0;
-  if (pos === "DEF") return Math.random() < 0.08 ? 1 : 0;
-  if (pos === "MID") return Math.random() < 0.18 ? 1 : 0;
-  return Math.random() < 0.22 ? 1 : 0;
+  if (pos === "DEF") return seed % 12 === 0 ? 1 : 0;
+  if (pos === "MID") return seed % 5 < 1 ? 1 : 0;
+  return seed % 4 < 1 ? 1 : 0;
 }
 
-function genShots(pos: Position) {
+function genShots(pos: Position, seed: number): number {
   if (pos === "GK") return 0;
-  if (pos === "DEF") return rand(0, 1);
-  if (pos === "MID") return rand(1, 3);
-  return rand(2, 6);
+  if (pos === "DEF") return seed % 2;
+  if (pos === "MID") return 1 + (seed % 3);
+  return 2 + (seed % 5);
 }
 
-function genShotsOnTarget(shots: number) {
+function genShotsOnTarget(shots: number, seed: number): number {
   if (shots === 0) return 0;
-  return Math.min(shots, rand(0, Math.ceil(shots / 2)));
+  return Math.min(shots, Math.floor(shots / 2) + (seed % 2));
 }
 
-function genXG(shots: number, goals: number) {
+function genXG(shots: number, goals: number, seed: number): number {
   if (shots === 0) return 0;
-  return Math.max(goals * 0.35, randFloat(0.05, shots * 0.18));
+  return Math.max(
+    goals * 0.35,
+    Number((0.05 + (shots * 0.15 * (seed % 100)) / 100).toFixed(2))
+  );
 }
 
-/* -------------------------------------------------------
-   MULTI-MATCHWEEK PLAYER GENERATOR (38 GW)
-------------------------------------------------------- */
 function generatePlayers(): Player[] {
   return Array.from({ length: 100 }).map((_, i) => {
     const pos = ["GK", "DEF", "MID", "FWD"][i % 4] as Position;
@@ -115,11 +99,12 @@ function generatePlayers(): Player[] {
     const xg: number[] = [];
 
     for (let gw = 0; gw < 38; gw++) {
-      const g = genGoals(pos);
-      const a = genAssists(pos);
-      const s = genShots(pos);
-      const sot = genShotsOnTarget(s);
-      const expected = genXG(s, g);
+      const seed = i * 38 + gw;
+      const g = genGoals(pos, seed);
+      const a = genAssists(pos, seed + 1);
+      const s = genShots(pos, seed + 2);
+      const sot = genShotsOnTarget(s, seed + 3);
+      const expected = genXG(s, g, seed + 4);
 
       goals.push(g);
       assists.push(a);
@@ -133,7 +118,6 @@ function generatePlayers(): Player[] {
       name: `Player ${i + 1}`,
       pos,
       team,
-
       goals,
       assists,
       shots,
@@ -143,9 +127,6 @@ function generatePlayers(): Player[] {
   });
 }
 
-/* -------------------------------------------------------
-   UTILITY HELPERS (UNCHANGED PATTERN)
-------------------------------------------------------- */
 export const lastN = (s: number[], n: number) => s.slice(-n);
 
 export const average = (s: number[]) =>
@@ -160,9 +141,6 @@ export function stdDev(values: number[]) {
   return Math.sqrt(variance);
 }
 
-/* -------------------------------------------------------
-   UNIVERSAL SERIES ACCESSOR (CONFIG SAFE)
-------------------------------------------------------- */
 export function getSeriesForStat(
   player: Player,
   stat: StatKey
@@ -170,9 +148,6 @@ export function getSeriesForStat(
   return player[stat];
 }
 
-/* -------------------------------------------------------
-   STABILITY META (UNCHANGED)
-------------------------------------------------------- */
 export function stabilityMeta(vol: number) {
   if (vol < 0.4)
     return {
@@ -199,9 +174,6 @@ export function stabilityMeta(vol: number) {
   };
 }
 
-/* -------------------------------------------------------
-   MAIN HOOK
-------------------------------------------------------- */
 export function useEPLMockPlayers(): Player[] {
   return useMemo(() => generatePlayers(), []);
 }
