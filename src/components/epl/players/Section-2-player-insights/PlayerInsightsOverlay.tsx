@@ -1,10 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 
 import type { PlayerRow, StatLens } from "../Section-1-master-table/MasterTable";
 import PlayerInsightsContent from "./PlayerInsightsContent";
-
-// ✅ EPL config drives pills + labels
 import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
 
 /* -------------------------------------------------------------------------- */
@@ -14,8 +12,8 @@ import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
 type Props = {
   player: PlayerRow;
   selectedStat: StatLens;
-  onClose: () => void;
-  onLensChange: (lens: StatLens) => void;
+  onClose?: () => void;
+  onLensChange?: (lens: StatLens) => void;
   isPremium?: boolean;
 };
 
@@ -44,15 +42,12 @@ export default function PlayerInsightsOverlay({
   const draggingRef = useRef(false);
   const startYRef = useRef(0);
 
-  // ✅ Lenses are config-driven (EPL)
-  const lenses = useMemo(() => {
-    const stats = (EPL_STAT_CONFIG.availableStats ?? []) as unknown as StatLens[];
-    // Safety: ensure selectedStat always exists in the list (avoid stuck UI)
-    if (stats.length && stats.includes(selectedStat)) return stats;
-    if (stats.length && !stats.includes(selectedStat)) return stats;
-    // ultimate fallback (shouldn't happen)
-    return [selectedStat];
-  }, [selectedStat]);
+  const safeClose = onClose ?? (() => {});
+  const safeLensChange = onLensChange ?? (() => {});
+
+  const cfg: any = EPL_STAT_CONFIG as any;
+  const lenses = (cfg?.availableStats ?? []) as StatLens[];
+  const lensLabel = (lens: StatLens) => cfg?.labels?.[lens] ?? String(lens);
 
   /* ---------------------------------------------------------------------- */
   /* LOCK BACKGROUND SCROLL                                                  */
@@ -105,15 +100,15 @@ export default function PlayerInsightsOverlay({
 
     const dy = e.changedTouches[0].clientY - startYRef.current;
 
-    // Close if dragged far enough
+    // ✅ Close if dragged far enough
     if (dy >= CLOSE_THRESHOLD) {
       sheet.style.transition = "transform 0.2s ease-out";
       sheet.style.transform = "translateY(100%)";
-      setTimeout(onClose, 180);
+      setTimeout(safeClose, 180);
       return;
     }
 
-    // Otherwise snap back
+    // ❌ Otherwise snap back
     sheet.style.transition =
       "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)";
     sheet.style.transform = "translateY(0px)";
@@ -129,7 +124,7 @@ export default function PlayerInsightsOverlay({
     <div
       className="fixed inset-0 z-[999] isolate bg-black/80 backdrop-blur-md"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) safeClose();
       }}
     >
       {/* ============================== */}
@@ -140,6 +135,7 @@ export default function PlayerInsightsOverlay({
           hidden md:block fixed right-0 top-0 h-full w-[480px]
           bg-black border-l border-yellow-500/30
           shadow-[0_0_80px_rgba(250,204,21,0.45)]
+          pointer-events-auto
         "
         onClick={(e) => e.stopPropagation()}
       >
@@ -160,35 +156,29 @@ export default function PlayerInsightsOverlay({
 
             <button
               type="button"
-              onClick={onClose}
+              onClick={safeClose}
               className="rounded-full bg-neutral-900 p-1.5 text-neutral-300 hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Lens Pills (CONFIG-DRIVEN) */}
-          <div className="px-5 py-3 flex gap-2 border-b border-neutral-800 flex-wrap">
-            {lenses.map((lens) => {
-              const label =
-                (EPL_STAT_CONFIG.labels as any)?.[lens] ??
-                String(lens).toUpperCase();
-
-              return (
-                <button
-                  type="button"
-                  key={String(lens)}
-                  onClick={() => onLensChange(lens)}
-                  className={
-                    selectedStat === lens
-                      ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black shadow-lg"
-                      : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300 hover:text-white"
-                  }
-                >
-                  {label}
-                </button>
-              );
-            })}
+          {/* Lens Pills */}
+          <div className="px-5 py-3 flex flex-wrap gap-2 border-b border-neutral-800">
+            {lenses.map((lens) => (
+              <button
+                key={String(lens)}
+                type="button"
+                onClick={() => safeLensChange(lens)}
+                className={
+                  selectedStat === lens
+                    ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black shadow-lg"
+                    : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300 hover:text-white"
+                }
+              >
+                {lensLabel(lens)}
+              </button>
+            ))}
           </div>
 
           {/* Content */}
@@ -217,6 +207,7 @@ export default function PlayerInsightsOverlay({
             border-t border-yellow-500/30
             shadow-[0_0_80px_rgba(250,204,21,0.45)]
             flex flex-col
+            pointer-events-auto
           "
         >
           {/* Drag Handle */}
@@ -225,7 +216,6 @@ export default function PlayerInsightsOverlay({
             onTouchMove={handleMove}
             onTouchEnd={handleEnd}
             className="py-4 flex justify-center"
-            // IMPORTANT: only the handle blocks touch scrolling; rest remains interactive
             style={{ touchAction: "none" }}
           >
             <div className="h-1.5 w-10 rounded-full bg-yellow-200/80" />
@@ -247,35 +237,29 @@ export default function PlayerInsightsOverlay({
 
             <button
               type="button"
-              onClick={onClose}
+              onClick={safeClose}
               className="rounded-full bg-neutral-900 p-1.5 text-neutral-300 hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Pills (CONFIG-DRIVEN) */}
-          <div className="px-4 pb-3 flex gap-2 flex-wrap">
-            {lenses.map((lens) => {
-              const label =
-                (EPL_STAT_CONFIG.labels as any)?.[lens] ??
-                String(lens).toUpperCase();
-
-              return (
-                <button
-                  type="button"
-                  key={String(lens)}
-                  onClick={() => onLensChange(lens)}
-                  className={
-                    selectedStat === lens
-                      ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black"
-                      : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300 hover:text-white"
-                  }
-                >
-                  {label}
-                </button>
-              );
-            })}
+          {/* Pills */}
+          <div className="px-4 pb-3 flex flex-wrap gap-2">
+            {lenses.map((lens) => (
+              <button
+                key={String(lens)}
+                type="button"
+                onClick={() => safeLensChange(lens)}
+                className={
+                  selectedStat === lens
+                    ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black"
+                    : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300 hover:text-white"
+                }
+              >
+                {lensLabel(lens)}
+              </button>
+            ))}
           </div>
 
           {/* Scrollable Content */}

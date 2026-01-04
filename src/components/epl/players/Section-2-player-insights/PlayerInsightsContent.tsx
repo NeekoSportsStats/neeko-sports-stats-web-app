@@ -2,22 +2,82 @@ import React, { useMemo } from "react";
 import type { PlayerRow, StatLens } from "../Section-1-master-table/MasterTable";
 import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
 
-/**
- * EPL Player Insights Content
- * - Config-driven labels/units
- * - Works with either:
- *   A) player.stats[lens] arrays (preferred)
- *   B) legacy player.roundsX arrays (fallback)
- *
- * PATCH NOTES (SAFE):
- * - Keeps your existing Summary + Recent History blocks
- * - Restores AFL-like sections:
- *   - Round-by-round grid (with free preview gating)
- *   - Season summary: avg/min/max/games/total/volatility
- *   - AI performance summary (from config descriptions)
- *   - Hit-rate ladder (from config playerThresholds)
- * - No AFL hardcoding; everything derives from EPL_STAT_CONFIG + selectedStat + series
- */
+/* -------------------------------------------------------------------------- */
+/* HELPERS                                                                    */
+/* -------------------------------------------------------------------------- */
+
+function safeNum(n: any): number | null {
+  const v = Number(n);
+  return Number.isFinite(v) ? v : null;
+}
+
+function mean(vals: number[]) {
+  if (!vals.length) return 0;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+function stdev(vals: number[]) {
+  if (vals.length < 2) return 0;
+  const m = mean(vals);
+  const v =
+    vals.reduce((acc, x) => acc + (x - m) * (x - m), 0) /
+    Math.max(1, vals.length - 1);
+  return Math.sqrt(v);
+}
+
+function clamp01(x: number) {
+  if (!Number.isFinite(x)) return 0;
+  return Math.max(0, Math.min(1, x));
+}
+
+function roundLabels(total: number, prefix: string) {
+  const out: string[] = [];
+  for (let i = 1; i <= total; i++) out.push(`${prefix}${i}`);
+  return out;
+}
+
+function volLabel(v: number) {
+  // Tuned for low-scoring EPL outputs.
+  if (v >= 1.25) return { label: "High", tone: "text-red-300" };
+  if (v >= 0.65) return { label: "Medium", tone: "text-yellow-300" };
+  return { label: "Low", tone: "text-emerald-300" };
+}
+
+function aiSummary(statKey: string, avg: number, v: number) {
+  const stat = String(statKey).toLowerCase();
+  const vol = volLabel(v).label.toLowerCase();
+
+  if (stat.includes("xg")) {
+    return `Chance quality is ${vol}; xG stability tends to improve with consistent shot volume and central touches.`;
+  }
+  if (stat.includes("shotsontarget")) {
+    return `Finishing accuracy looks ${vol}; watch for matchup-driven swings in on-target volume.`;
+  }
+  if (stat.includes("shots")) {
+    return `Shot volume is ${vol}; sustained pressure usually shows up as repeatable shooting opportunities.`;
+  }
+  if (stat.includes("assists")) {
+    return `Chance creation is ${vol}; role and set-piece involvement can drive spike weeks.`;
+  }
+  if (stat.includes("goals")) {
+    if (avg >= 0.6)
+      return `Goal output is strong with ${vol} volatility — ceiling games appear when service quality holds.`;
+    return `Goal output is ${vol}; expect swings tied to shot quality, role, and opponent defensive strength.`;
+  }
+
+  return `Performance profile is ${vol}; premium unlock will later add matchup flags and role notes.`;
+}
+
+function hitRate(series: number[], threshold: number) {
+  if (!series.length) return 0;
+  const hits = series.filter((v) => v >= threshold).length;
+  return hits / series.length;
+}
+
+/* -------------------------------------------------------------------------- */
+/* EPL Player Insights Content                                                */
+/* -------------------------------------------------------------------------- */
+
 export default function PlayerInsightsContent({
   player,
   selectedStat,
@@ -27,128 +87,68 @@ export default function PlayerInsightsContent({
   selectedStat: StatLens;
   isPremium?: boolean;
 }) {
-  /* -------------------------------------------------------------------------- */
-  /* HELPERS                                                                    */
-  /* -------------------------------------------------------------------------- */
-
-  const safeNum = (n: any) => {
-    const v = Number(n);
-    return Number.isFinite(v) ? v : null;
-  };
-
-  const mean = (vals: number[]) => {
-    if (!vals.length) return 0;
-    return vals.reduce((a, b) => a + b, 0) / vals.length;
-  };
-
-  const stdev = (vals: number[]) => {
-    if (vals.length <= 1) return 0;
-    const m = mean(vals);
-    const v =
-      vals.reduce((acc, x) => acc + (x - m) * (x - m), 0) / (vals.length - 1);
-    return Math.sqrt(v);
-  };
-
-  const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
-
-  /* -------------------------------------------------------------------------- */
-  /* SERIES                                                                     */
-  /* -------------------------------------------------------------------------- */
-
   const series: number[] = useMemo(() => {
     const anyPlayer: any = player;
 
     // Preferred shape: player.stats[lens] = number[]
     const byStats = anyPlayer?.stats?.[selectedStat];
-    if (Array.isArray(byStats)) return byStats.map((v: any) => safeNum(v)).filter((v: any) => typeof v === "number");
+    if (Array.isArray(byStats)) return byStats.map((x: any) => safeNum(x) ?? 0);
 
     // Fallback legacy shapes (only if they exist)
     if (
       selectedStat === ("fantasy" as any) &&
       Array.isArray(anyPlayer.roundsFantasy)
     )
-      return anyPlayer.roundsFantasy.map((v: any) => safeNum(v)).filter((v: any) => typeof v === "number");
-
+      return anyPlayer.roundsFantasy;
     if (
       selectedStat === ("disposals" as any) &&
       Array.isArray(anyPlayer.roundsDisposals)
     )
-      return anyPlayer.roundsDisposals.map((v: any) => safeNum(v)).filter((v: any) => typeof v === "number");
-
+      return anyPlayer.roundsDisposals;
     if (
       selectedStat === ("goals" as any) &&
       Array.isArray(anyPlayer.roundsGoals)
     )
-      return anyPlayer.roundsGoals.map((v: any) => safeNum(v)).filter((v: any) => typeof v === "number");
+      return anyPlayer.roundsGoals;
 
     return [];
   }, [player, selectedStat]);
 
-  /* -------------------------------------------------------------------------- */
-  /* CONFIG-DRIVEN COPY                                                         */
-  /* -------------------------------------------------------------------------- */
+  const cfg: any = EPL_STAT_CONFIG as any;
 
-  const label =
-    (EPL_STAT_CONFIG.labels as any)?.[selectedStat] ?? String(selectedStat);
-
+  const label = cfg?.labels?.[selectedStat] ?? String(selectedStat);
   const unitShort =
-    (EPL_STAT_CONFIG as any)?.unitsShort?.[selectedStat] ??
-    (EPL_STAT_CONFIG.units as any)?.[selectedStat] ??
-    "";
+    cfg?.unitsShort?.[selectedStat] ?? cfg?.units?.[selectedStat] ?? "";
 
-  const description =
-    (EPL_STAT_CONFIG.descriptions as any)?.[selectedStat] ??
-    "Performance trends based on recent matchweeks.";
+  const totalRounds: number = cfg?.sportMeta?.rounds ?? 38;
+  const roundPrefix: string = cfg?.sportMeta?.roundLabel ?? "GW";
+  const labels = useMemo(
+    () => roundLabels(totalRounds, roundPrefix),
+    [totalRounds, roundPrefix]
+  );
 
-  // Sport meta (safe fallbacks)
-  const totalRounds =
-    (EPL_STAT_CONFIG.sportMeta as any)?.totalRounds ??
-    (EPL_STAT_CONFIG.sportMeta as any)?.rounds ??
-    series.length;
+  const cleaned = useMemo(
+    () => series.map((v) => safeNum(v) ?? 0),
+    [series]
+  );
 
-  const roundLabel =
-    (EPL_STAT_CONFIG.sportMeta as any)?.roundLabel ??
-    (EPL_STAT_CONFIG.sportMeta as any)?.roundPrefix ??
-    "GW";
+  const last = cleaned.at(-1);
+  const avg = mean(cleaned);
+  const total = cleaned.reduce((a, b) => a + b, 0);
+  const min = cleaned.length ? Math.min(...cleaned) : 0;
+  const max = cleaned.length ? Math.max(...cleaned) : 0;
+  const v = stdev(cleaned);
+  const vol = volLabel(v);
 
-  // Thresholds for hit-rate ladder
-  const playerThresholds: number[] =
-    ((EPL_STAT_CONFIG as any)?.playerThresholds?.[selectedStat] as
-      | number[]
-      | undefined) ?? [];
+  const l5 = cleaned.slice(-5);
+  const avgL5 = mean(l5);
 
-  /* -------------------------------------------------------------------------- */
-  /* DERIVED METRICS                                                            */
-  /* -------------------------------------------------------------------------- */
+  const thresholds: number[] = (cfg?.playerThresholds?.[selectedStat] ??
+    cfg?.thresholds?.player?.[selectedStat] ??
+    []) as number[];
 
-  const last = series.length ? series[series.length - 1] : undefined;
-
-  const avg = series.length > 0 ? mean(series) : 0;
-
-  const l5 = series.slice(-5);
-  const avgL5 = l5.length > 0 ? mean(l5) : 0;
-
-  const min = series.length ? Math.min(...series) : 0;
-  const max = series.length ? Math.max(...series) : 0;
-  const games = series.length;
-  const total = series.reduce((a, b) => a + b, 0);
-  const volatility = stdev(series);
-
-  // Free preview gating for the round grid (matches your “upgrade to view all rounds” pattern)
-  const FREE_PREVIEW_COUNT = 10;
-
-  const hitRates = useMemo(() => {
-    if (!games || !playerThresholds.length) return [];
-    return playerThresholds.map((t) => {
-      const hits = series.filter((v) => v >= t).length;
-      const pct = clamp01(hits / games);
-      return { threshold: t, hits, pct };
-    });
-  }, [games, playerThresholds, series]);
-
-  /* -------------------------------------------------------------------------- */
-  /* GUARDS                                                                     */
-  /* -------------------------------------------------------------------------- */
+  const PREVIEW_ROUNDS = 10;
+  const showRounds = isPremium ? totalRounds : Math.min(totalRounds, PREVIEW_ROUNDS);
 
   if (!player) {
     return (
@@ -156,7 +156,7 @@ export default function PlayerInsightsContent({
     );
   }
 
-  if (!series.length) {
+  if (!cleaned.length) {
     return (
       <div className="p-4 text-sm text-neutral-400">
         No {label} history available for this player yet.
@@ -164,15 +164,9 @@ export default function PlayerInsightsContent({
     );
   }
 
-  /* -------------------------------------------------------------------------- */
-  /* UI                                                                         */
-  /* -------------------------------------------------------------------------- */
-
   return (
     <div className="space-y-4">
-      {/* ------------------------------------------------------------------ */}
-      {/* TOP SUMMARY (YOUR EXISTING BLOCK — KEPT)                            */}
-      {/* ------------------------------------------------------------------ */}
+      {/* Top summary */}
       <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-4">
         <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-500">
           {label} • Summary
@@ -214,61 +208,49 @@ export default function PlayerInsightsContent({
 
         {!isPremium && (
           <div className="mt-3 text-xs text-neutral-400">
-            Premium unlock adds matchup flags, volatility modelling, and role
-            notes.
+            Upgrade to Neeko+ to unlock matchup flags, volatility modelling, and role notes.
           </div>
         )}
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* ROUND-BY-ROUND GRID (RESTORED)                                      */}
-      {/* ------------------------------------------------------------------ */}
+      {/* Round-by-round grid */}
       <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-4">
-        <div className="flex items-end justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-            Round by round — {label}
+            {roundPrefix} by {roundPrefix} — {label}
           </div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-600">
-            {roundLabel}1 → {roundLabel}
-            {Math.max(totalRounds || games, games)}
+            {labels[0]} → {labels[labels.length - 1]}
           </div>
         </div>
 
         <div className="mt-3 grid grid-cols-5 gap-2">
-          {series.map((v, idx) => {
-            const locked = !isPremium && idx >= FREE_PREVIEW_COUNT;
-            const roundName = `${roundLabel}${idx + 1}`;
+          {labels.slice(0, showRounds).map((r, i) => {
+            const v = cleaned[i] ?? 0;
             return (
               <div
-                key={`${String(selectedStat)}-rr-${idx}`}
-                className={[
-                  "relative rounded-xl border px-3 py-2 text-center",
-                  "bg-black/40 border-neutral-800",
-                  locked ? "opacity-50 blur-[1px]" : "opacity-100",
-                ].join(" ")}
-                title={roundName}
+                key={r}
+                className="rounded-xl border border-neutral-800 bg-black/40 p-2 text-center"
               >
-                <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
-                  {roundName}
+                <div className="text-[10px] uppercase tracking-[0.14em] text-neutral-500">
+                  {r}
                 </div>
                 <div className="mt-1 text-sm font-semibold text-white">
-                  {Number(v).toFixed(0)}
+                  {Number.isFinite(v) ? Number(v).toFixed(0) : "—"}
                 </div>
               </div>
             );
           })}
         </div>
 
-        {!isPremium && series.length > FREE_PREVIEW_COUNT && (
+        {!isPremium && totalRounds > PREVIEW_ROUNDS ? (
           <div className="mt-3 text-xs text-neutral-400">
-            Upgrade to Neeko+ to view all rounds
+            Upgrade to Neeko+ to view all rounds.
           </div>
-        )}
+        ) : null}
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* SEASON SUMMARY (RESTORED: MIN/MAX/GAMES/TOTAL/VOLATILITY)            */}
-      {/* ------------------------------------------------------------------ */}
+      {/* Season summary */}
       <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-4">
         <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-500">
           Season summary — {label}
@@ -279,7 +261,7 @@ export default function PlayerInsightsContent({
             <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
               Min
             </div>
-            <div className="mt-1 text-base font-semibold text-white">
+            <div className="mt-1 text-lg font-semibold text-white">
               {min.toFixed(0)}
             </div>
           </div>
@@ -288,7 +270,7 @@ export default function PlayerInsightsContent({
             <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
               Max
             </div>
-            <div className="mt-1 text-base font-semibold text-white">
+            <div className="mt-1 text-lg font-semibold text-white">
               {max.toFixed(0)}
             </div>
           </div>
@@ -297,8 +279,8 @@ export default function PlayerInsightsContent({
             <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
               Games
             </div>
-            <div className="mt-1 text-base font-semibold text-white">
-              {games}
+            <div className="mt-1 text-lg font-semibold text-white">
+              {cleaned.length}
             </div>
           </div>
 
@@ -306,73 +288,68 @@ export default function PlayerInsightsContent({
             <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
               Total
             </div>
-            <div className="mt-1 text-base font-semibold text-white">
+            <div className="mt-1 text-lg font-semibold text-white">
               {total.toFixed(0)}
             </div>
           </div>
         </div>
 
         <div className="mt-3 text-xs text-neutral-400">
-          Volatility:{" "}
-          <span className="text-white">{volatility.toFixed(2)}</span>
+          Volatility: <span className={vol.tone}>{vol.label}</span>{" "}
+          <span className="text-neutral-600">({v.toFixed(2)})</span>
         </div>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* AI PERFORMANCE SUMMARY (RESTORED)                                   */}
-      {/* ------------------------------------------------------------------ */}
-      <div className="rounded-2xl border border-yellow-500/30 bg-black/50 p-4">
-        <div className="text-[10px] uppercase tracking-[0.18em] text-yellow-300">
-          AI Performance Summary
+      {/* AI performance summary */}
+      <div className="rounded-2xl border border-yellow-500/20 bg-neutral-950/60 p-4 shadow-[0_0_60px_rgba(250,204,21,0.15)]">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-yellow-200/80">
+          AI performance summary
         </div>
-        <div className="mt-2 text-sm text-neutral-300">{description}</div>
+        <div className="mt-2 text-sm text-neutral-200">
+          {aiSummary(String(selectedStat), avg, v)}
+        </div>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* HIT-RATE LADDER (RESTORED, CONFIG-DRIVEN)                            */}
-      {/* ------------------------------------------------------------------ */}
-      {hitRates.length > 0 && (
+      {/* Hit-rate ladder */}
+      {thresholds.length ? (
         <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-4">
           <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-500">
             Hit-rate ladder
           </div>
 
           <div className="mt-3 space-y-2">
-            {hitRates.map((hr) => (
-              <div
-                key={`${String(selectedStat)}-hr-${hr.threshold}`}
-                className="flex items-center gap-3"
-              >
-                <div className="w-12 shrink-0 text-xs text-neutral-300">
-                  {hr.threshold}+
+            {thresholds.map((t) => {
+              const hr = hitRate(cleaned, t);
+              const pct = Math.round(hr * 100);
+              return (
+                <div key={t} className="flex items-center gap-3">
+                  <div className="w-10 shrink-0 text-xs text-neutral-300">
+                    {t}+
+                  </div>
+                  <div className="relative h-2 flex-1 rounded-full bg-black/40 border border-neutral-800 overflow-hidden">
+                    <div
+                      className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-400 to-yellow-300"
+                      style={{ width: `${clamp01(hr) * 100}%` }}
+                    />
+                  </div>
+                  <div className="w-10 shrink-0 text-right text-xs text-neutral-300">
+                    {pct}%
+                  </div>
                 </div>
-
-                <div className="flex-1 rounded-full bg-black/40 border border-neutral-800 h-2 overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-emerald-400 to-amber-400"
-                    style={{ width: `${Math.round(hr.pct * 100)}%` }}
-                  />
-                </div>
-
-                <div className="w-10 shrink-0 text-right text-xs text-neutral-300">
-                  {Math.round(hr.pct * 100)}%
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* ------------------------------------------------------------------ */}
-      {/* RECENT HISTORY (YOUR EXISTING BLOCK — KEPT)                          */}
-      {/* ------------------------------------------------------------------ */}
+      {/* Recent history chips */}
       <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-4">
         <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-500">
           Recent history
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
-          {series.slice(-10).map((v, i) => (
+          {cleaned.slice(-10).map((v, i) => (
             <span
               key={`${String(selectedStat)}-${i}`}
               className="rounded-full bg-black/45 px-3 py-1 text-xs text-neutral-200 border border-neutral-800"
