@@ -1,15 +1,17 @@
-// src/components/afl/players/AIInsights.tsx
+// src/components/nba/players/AIInsights.tsx
 import React from "react";
 import { cn } from "@/lib/utils";
 import { BrainCircuit, Lock, X, ArrowRight } from "lucide-react";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
+import type { StatConfig, StatKey } from "@/lib/stats/types";
 import {
   useNBAMockPlayers,
   lastN,
   average,
   stdDev,
   getSeriesForStat,
-} from "@/components/nba/players/useAFLMockData";
+  StatKey as MockStatKey,
+} from "@/components/nba/players/data/useNBAMockData";
 
 /**
  * TEMP GATING FLAG
@@ -83,29 +85,29 @@ function GoldEdgeWrap() {
 }
 
 /* ---------------------------------------------------------
-   AI Micro-Sentences (rotating)
+   AI Micro-Sentences (rotating) — NBA specific
 --------------------------------------------------------- */
 
 const aiLines = [
-  "Projection supported by consistent centre-square tendencies and stable usage chains.",
+  "Projection supported by consistent shot selection and stable usage patterns.",
   "Volatility curve trending tighter, supporting an elevated scoring floor.",
   "Matchup neutrality offsets minor volatility spikes in recent games.",
-  "Role continuity suggests reliable baseline output moving into next round.",
+  "Role continuity suggests reliable baseline output moving into next game.",
   "Usage patterns holding steady, reinforcing stable projection confidence.",
-  "Short-term scoring window supported by consistent midfield engagement.",
+  "Short-term scoring window supported by consistent offensive involvement.",
 ];
 
 /* ---------------------------------------------------------
-   Tag Variations (rotating)
+   Tag Variations (rotating) — NBA specific
 --------------------------------------------------------- */
 
 const tagSets = [
-  ["CBA lift", "Transition chains", "Volatility normal"],
-  ["Role stable", "Usage steady", "Neutral matchup"],
-  ["Favourable role split", "High involvement", "Floor intact"],
-  ["Inside-mid presence", "Transition impact", "Contest chain"],
+  ["High usage", "Scoring flow", "Volatility normal"],
+  ["Role stable", "Minutes steady", "Neutral matchup"],
+  ["Favorable matchup", "High involvement", "Floor intact"],
+  ["Primary option", "Ball handling", "Shot creation"],
   ["Matchup stable", "Usage consistent", "Low volatility"],
-  ["High time-on-ground", "Chain involvement", "Balanced matchup"],
+  ["High minutes", "Offensive load", "Balanced matchup"],
 ];
 
 /* ---------------------------------------------------------
@@ -150,9 +152,11 @@ function ConfidenceBadge({ value }: { value: number }) {
 
 function AIInsightRow({
   row,
+  statLabel,
   blurred,
 }: {
   row: AIInsightRowModel;
+  statLabel: string;
   blurred?: boolean;
 }) {
   return (
@@ -192,7 +196,7 @@ function AIInsightRow({
             <p className="mt-1 text-xl font-semibold text-neutral-50">
               {row.projection.toFixed(1)}{" "}
               <span className="text-base font-normal text-neutral-300">
-                ± {row.range.toFixed(1)} fantasy
+                ± {row.range.toFixed(1)} {statLabel.toLowerCase()}
               </span>{" "}
               <span className="text-[11px] text-neutral-400">
                 ({row.low.toFixed(0)}–{row.high.toFixed(0)} range)
@@ -320,12 +324,14 @@ function BlurredLockedCard() {
    MAIN COMPONENT
 --------------------------------------------------------- */
 
-export default function AIInsights() {
+export default function AIInsights({ statConfig }: { statConfig: StatConfig }) {
   const players = useNBAMockPlayers();
+
+  const statLabel = statConfig.labels[statConfig.defaultStat] || "Points";
 
   // Build real free rows (top 3)
   const freeRows: AIInsightRowModel[] = players.slice(0, 3).map((p, idx) => {
-    const series = getSeriesForStat(p, "fantasy");
+    const series = getSeriesForStat(p, statConfig.defaultStat as MockStatKey);
     const pred = computePrediction(series);
 
     const low = pred.predicted - pred.range;
@@ -349,49 +355,49 @@ export default function AIInsights() {
     };
   });
 
-  // Fake premium rows (just for locked previews)
+  // Fake premium rows (just for locked previews) - NBA positions
   const premiumRows: AIInsightRowModel[] = [
     {
       id: "premium-1",
       name: "Player 58",
-      team: "RICH",
-      position: "MID",
-      projection: 88.1,
-      range: 7.4,
-      low: 80.7,
-      high: 95.5,
+      team: "LAL",
+      position: "PG",
+      projection: 28.1,
+      range: 4.4,
+      low: 23.7,
+      high: 32.5,
       stability: 78,
       aiText:
-        "Projection built on expanding centre-bounce window and strong link-up chains through midfield.",
-      tags: ["Role expansion", "Usage spike", "Favourable matchup"],
+        "Projection built on expanding usage rate and strong pick-and-roll efficiency.",
+      tags: ["Role expansion", "Usage spike", "Favorable matchup"],
     },
     {
       id: "premium-2",
       name: "Player 42",
-      team: "ESS",
-      position: "FWD",
-      projection: 75.3,
-      range: 9.2,
-      low: 66.1,
-      high: 84.5,
+      team: "BOS",
+      position: "SF",
+      projection: 22.3,
+      range: 5.2,
+      low: 17.1,
+      high: 27.5,
       stability: 65,
       aiText:
-        "Forward-half role with rising inside-50 involvements, supported by stable time-on-ground profile.",
-      tags: ["High TOG", "Inside-50 chains", "Volatility moderate"],
+        "Wing production with rising three-point volume, supported by stable minutes profile.",
+      tags: ["High minutes", "Perimeter volume", "Volatility moderate"],
     },
     {
       id: "premium-3",
       name: "Player 71",
-      team: "ADE",
-      position: "DEF",
-      projection: 81.6,
-      range: 8.0,
-      low: 73.6,
-      high: 89.6,
+      team: "MIA",
+      position: "C",
+      projection: 14.6,
+      range: 3.0,
+      low: 11.6,
+      high: 17.6,
       stability: 82,
       aiText:
-        "Defensive distributor with consistent kick-mark chains and favourable rebound opportunities.",
-      tags: ["Rebound role", "Kick-mark chains", "Floor intact"],
+        "Interior presence with consistent paint touches and favorable rebounding opportunities.",
+      tags: ["Paint dominance", "Board control", "Floor intact"],
     },
   ];
 
@@ -411,26 +417,26 @@ export default function AIInsights() {
         {/* Header */}
         <div className="mb-8">
           <SectionHeader
-            pillLabel="AI Insights"
+            eyebrow="AI Insights"
             title="AI Projection • Usage Forecast • Role Signals"
-            description="Predictions generated by Neeko AI — combining role tendencies, matchup profiles and volatility pathways."
+            subtitle="Predictions generated by Neeko AI — combining role tendencies, matchup profiles and volatility pathways."
             icon={BrainCircuit}
           />
 
           <p className="mt-5 max-w-xl text-[10px] leading-relaxed text-neutral-500">
             <span className="font-medium text-neutral-300">Role stable</span> =
-            consistent position &amp; CBA pattern.{" "}
-            <span className="font-medium text-neutral-300">Usage steady</span> =
-            involvement near baseline.{" "}
+            consistent position &amp; offensive pattern.{" "}
+            <span className="font-medium text-neutral-300">Minutes steady</span> =
+            playing time near baseline.{" "}
             <span className="font-medium text-neutral-300">Neutral matchup</span> =
-            average opponent fantasy concession.
+            average opponent defensive rating.
           </p>
         </div>
 
         {/* Row 1 – free cards (carousel on mobile, 3-col grid on desktop) */}
         <div className="mb-6 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 md:grid md:grid-cols-3 md:gap-5 md:overflow-visible">
           {freeRows.map((row) => (
-            <AIInsightRow key={row.id} row={row} />
+            <AIInsightRow key={row.id} row={row} statLabel={statLabel} />
           ))}
         </div>
 
@@ -438,7 +444,7 @@ export default function AIInsights() {
         <div className="mb-8 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 md:grid md:grid-cols-3 md:gap-5 md:overflow-visible">
           {premiumRows.map((row) =>
             IS_PREMIUM ? (
-              <AIInsightRow key={row.id} row={row} />
+              <AIInsightRow key={row.id} row={row} statLabel={statLabel} />
             ) : (
               <BlurredLockedCard key={row.id} />
             )
@@ -489,7 +495,7 @@ export default function AIInsights() {
             </div>
 
             <h3 className="mt-3 text-xl font-semibold text-neutral-50">
-              Unlock full AFL AI analysis
+              Unlock full NBA AI analysis
             </h3>
 
             <p className="mt-2 text-xs text-neutral-300">
@@ -500,11 +506,11 @@ export default function AIInsights() {
             <ul className="mt-4 space-y-2 text-xs text-neutral-200">
               <li className="flex gap-2">
                 <span className="mt-[5px] h-[4px] w-[4px] rounded-full bg-yellow-400" />
-                <span>Full analysis for all 18 AFL clubs.</span>
+                <span>Full analysis for all 30 NBA teams.</span>
               </li>
               <li className="flex gap-2">
                 <span className="mt-[5px] h-[4px] w-[4px] rounded-full bg-yellow-400" />
-                <span>Deep momentum, attack/defence & clearance trend models.</span>
+                <span>Deep momentum, offensive/defensive efficiency trend models.</span>
               </li>
               <li className="flex gap-2">
                 <span className="mt-[5px] h-[4px] w-[4px] rounded-full bg-yellow-400" />
