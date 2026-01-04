@@ -108,6 +108,7 @@ export default function MasterTable() {
             selectedStat={selectedStat}
             onClose={() => setSelectedPlayer(null)}
             onLensChange={setSelectedStat}
+            isPremium={isPremium}
           />,
           document.body
         )}

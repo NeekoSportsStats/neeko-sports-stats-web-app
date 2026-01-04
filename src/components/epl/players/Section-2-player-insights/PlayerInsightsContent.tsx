@@ -1,172 +1,134 @@
 import React, { useMemo } from "react";
-import { X } from "lucide-react";
+import type { PlayerRow, StatLens } from "../Section-1-master-table/MasterTable";
 import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
-import type { EPLStatKey } from "@/lib/stats/types";
 
-type PlayerRow = {
-  id: number;
-  name: string;
-  team: string;
-  role: string;
-  stats: Record<EPLStatKey, number[]>;
-};
-
-type Props = {
-  player: PlayerRow;
-  selectedStat: EPLStatKey;
-  onClose: () => void;
-  onLensChange: (stat: EPLStatKey) => void;
-};
-
+/**
+ * EPL Player Insights Content
+ * - Config-driven labels/units
+ * - Works with either:
+ *   A) player.stats[lens] arrays (preferred)
+ *   B) legacy player.roundsX arrays (fallback)
+ */
 export default function PlayerInsightsContent({
   player,
   selectedStat,
-  onClose,
-  onLensChange,
-}: Props) {
-  const statKeys = EPL_STAT_CONFIG.availableStats as EPLStatKey[];
+  isPremium = false,
+}: {
+  player: PlayerRow;
+  selectedStat: StatLens;
+  isPremium?: boolean;
+}) {
+  const series: number[] = useMemo(() => {
+    const anyPlayer: any = player;
 
-  const series = player.stats[selectedStat] ?? [];
+    // Preferred shape: player.stats[lens] = number[]
+    const byStats = anyPlayer?.stats?.[selectedStat];
+    if (Array.isArray(byStats)) return byStats;
 
-  const summary = useMemo(() => {
-    if (!series.length) {
-      return {
-        min: 0,
-        max: 0,
-        avg: 0,
-        total: 0,
-        volatility: "N/A",
-      };
-    }
+    // Fallback legacy shapes (only if they exist)
+    if (selectedStat === ("fantasy" as any) && Array.isArray(anyPlayer.roundsFantasy))
+      return anyPlayer.roundsFantasy;
+    if (selectedStat === ("disposals" as any) && Array.isArray(anyPlayer.roundsDisposals))
+      return anyPlayer.roundsDisposals;
+    if (selectedStat === ("goals" as any) && Array.isArray(anyPlayer.roundsGoals))
+      return anyPlayer.roundsGoals;
 
-    const total = series.reduce((a, b) => a + b, 0);
-    const avg = total / series.length;
+    return [];
+  }, [player, selectedStat]);
 
-    return {
-      min: Math.min(...series),
-      max: Math.max(...series),
-      avg,
-      total,
-      volatility:
-        avg > 1.2 ? "High" : avg > 0.6 ? "Medium" : "Low",
-    };
-  }, [series]);
+  const label =
+    (EPL_STAT_CONFIG.labels as any)?.[selectedStat] ?? String(selectedStat);
+  const unitShort =
+    (EPL_STAT_CONFIG as any)?.unitsShort?.[selectedStat] ??
+    (EPL_STAT_CONFIG.units as any)?.[selectedStat] ??
+    "";
+
+  const last = series.at(-1);
+  const avg =
+    series.length > 0
+      ? series.reduce((a, b) => a + b, 0) / Math.max(1, series.length)
+      : 0;
+
+  const l5 = series.slice(-5);
+  const avgL5 =
+    l5.length > 0 ? l5.reduce((a, b) => a + b, 0) / Math.max(1, l5.length) : 0;
+
+  if (!player) {
+    return <div className="p-4 text-sm text-neutral-400">Player not found.</div>;
+  }
+
+  if (!series.length) {
+    return (
+      <div className="p-4 text-sm text-neutral-400">
+        No {label} history available for this player yet.
+      </div>
+    );
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/80 backdrop-blur-md">
-      <div className="w-full max-w-md h-full bg-neutral-950 border-l border-yellow-500/40 p-6 overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.3em] text-yellow-300">
-              Player Insights
+    <div className="space-y-4">
+      {/* Top summary */}
+      <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-4">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-500">
+          {label} • Summary
+        </div>
+
+        <div className="mt-2 grid grid-cols-3 gap-3">
+          <div className="rounded-xl bg-black/40 p-3">
+            <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
+              Latest
             </div>
-            <h2 className="text-lg font-semibold text-white mt-1">
-              {player.name}
-            </h2>
-            <p className="text-xs text-neutral-400">
-              {player.team} • {player.role}
-            </p>
+            <div className="mt-1 text-lg font-semibold text-white">
+              {typeof last === "number" ? last.toFixed(1) : "—"}
+              {unitShort ? (
+                <span className="ml-1 text-xs font-medium text-neutral-400">
+                  {unitShort}
+                </span>
+              ) : null}
+            </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="rounded-full border border-neutral-700 p-1.5 hover:border-yellow-400"
-          >
-            <X className="h-4 w-4 text-neutral-300" />
-          </button>
-        </div>
-
-        {/* STAT PILLS — CONFIG DRIVEN */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {statKeys.map((stat) => (
-            <button
-              key={stat}
-              onClick={() => onLensChange(stat)}
-              className={`
-                rounded-full px-3 py-1.5 text-xs font-medium transition
-                ${
-                  selectedStat === stat
-                    ? "bg-yellow-400 text-black shadow-[0_0_18px_rgba(250,204,21,0.9)]"
-                    : "bg-black/40 text-neutral-300 border border-neutral-700 hover:border-yellow-400/70"
-                }
-              `}
-            >
-              {EPL_STAT_CONFIG.labels[stat]}
-            </button>
-          ))}
-        </div>
-
-        {/* ROUND BY ROUND */}
-        <div className="mb-6">
-          <div className="text-[10px] uppercase tracking-[0.25em] text-neutral-400 mb-2">
-            Round by Round — {EPL_STAT_CONFIG.labels[selectedStat]}
+          <div className="rounded-xl bg-black/40 p-3">
+            <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
+              Season Avg
+            </div>
+            <div className="mt-1 text-lg font-semibold text-white">
+              {avg.toFixed(1)}
+            </div>
           </div>
 
-          <div className="grid grid-cols-5 gap-2">
-            {series.slice(0, 10).map((v, i) => (
-              <div
-                key={i}
-                className="rounded-lg bg-black/40 border border-neutral-800 py-2 text-center text-sm text-white"
-              >
-                <div className="text-[9px] text-neutral-500">
-                  GW{i + 1}
-                </div>
-                {v}
-              </div>
-            ))}
+          <div className="rounded-xl bg-black/40 p-3">
+            <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-500">
+              Last 5 Avg
+            </div>
+            <div className="mt-1 text-lg font-semibold text-white">
+              {avgL5.toFixed(1)}
+            </div>
           </div>
         </div>
 
-        {/* SUMMARY */}
-        <div className="rounded-2xl border border-neutral-800 bg-black/40 p-4 mb-4">
-          <div className="text-[10px] uppercase tracking-[0.25em] text-neutral-400 mb-3">
-            Season Summary — {EPL_STAT_CONFIG.labels[selectedStat]}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <div className="text-neutral-400 text-xs">Average</div>
-              <div className="text-yellow-300 font-semibold">
-                {summary.avg.toFixed(2)}{" "}
-                {EPL_STAT_CONFIG.units[selectedStat]}
-              </div>
-            </div>
-
-            <div>
-              <div className="text-neutral-400 text-xs">Total</div>
-              <div className="text-white font-semibold">
-                {summary.total}
-              </div>
-            </div>
-
-            <div>
-              <div className="text-neutral-400 text-xs">Min</div>
-              <div className="text-white">{summary.min}</div>
-            </div>
-
-            <div>
-              <div className="text-neutral-400 text-xs">Max</div>
-              <div className="text-white">{summary.max}</div>
-            </div>
-          </div>
-
+        {!isPremium && (
           <div className="mt-3 text-xs text-neutral-400">
-            Volatility:{" "}
-            <span className="text-yellow-300">{summary.volatility}</span>
+            Premium unlock adds matchup flags, volatility modelling, and role notes.
           </div>
+        )}
+      </div>
+
+      {/* Raw trend list (simple + safe) */}
+      <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-4">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-500">
+          Recent history
         </div>
 
-        {/* AI SUMMARY */}
-        <div className="rounded-2xl border border-yellow-500/30 bg-black/40 p-4">
-          <div className="text-[10px] uppercase tracking-[0.25em] text-yellow-300 mb-2">
-            AI Performance Summary
-          </div>
-          <p className="text-sm text-neutral-300 leading-relaxed">
-            {EPL_STAT_CONFIG.labels[selectedStat]} output shows role-driven
-            volatility with matchup-dependent ceiling games and a
-            controlled scoring floor.
-          </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {series.slice(-10).map((v, i) => (
+            <span
+              key={`${String(selectedStat)}-${i}`}
+              className="rounded-full bg-black/45 px-3 py-1 text-xs text-neutral-200 border border-neutral-800"
+            >
+              {Number(v).toFixed(0)}
+            </span>
+          ))}
         </div>
       </div>
     </div>

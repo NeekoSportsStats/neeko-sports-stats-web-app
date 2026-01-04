@@ -1,26 +1,42 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
+
 import type { PlayerRow, StatLens } from "../Section-1-master-table/MasterTable";
-import InsightsContent from "./PlayerInsightsContent";
+import PlayerInsightsContent from "./PlayerInsightsContent";
+
+// ✅ EPL config drives pills + labels
+import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
 
 /* -------------------------------------------------------------------------- */
-/*                         PLAYER INSIGHTS OVERLAY (FINAL)                    */
+/* TYPES                                                                      */
+/* -------------------------------------------------------------------------- */
+
+type Props = {
+  player: PlayerRow;
+  selectedStat: StatLens;
+  onClose: () => void;
+  onLensChange: (lens: StatLens) => void;
+  isPremium?: boolean;
+};
+
+/* -------------------------------------------------------------------------- */
+/* CONSTANTS                                                                  */
 /* -------------------------------------------------------------------------- */
 
 const CLOSE_THRESHOLD = 140; // px
 const MAX_DRAG = 320; // px
+
+/* -------------------------------------------------------------------------- */
+/* COMPONENT                                                                  */
+/* -------------------------------------------------------------------------- */
 
 export default function PlayerInsightsOverlay({
   player,
   selectedStat,
   onClose,
   onLensChange,
-}: {
-  player: PlayerRow;
-  selectedStat: StatLens;
-  onClose: () => void;
-  onLensChange: (lens: StatLens) => void;
-}) {
+  isPremium = false,
+}: Props) {
   const [mounted, setMounted] = useState(false);
 
   const sheetRef = useRef<HTMLDivElement | null>(null);
@@ -28,9 +44,20 @@ export default function PlayerInsightsOverlay({
   const draggingRef = useRef(false);
   const startYRef = useRef(0);
 
+  // ✅ Lenses are config-driven (EPL)
+  const lenses = useMemo(() => {
+    const stats = (EPL_STAT_CONFIG.availableStats ?? []) as unknown as StatLens[];
+    // Safety: ensure selectedStat always exists in the list (avoid stuck UI)
+    if (stats.length && stats.includes(selectedStat)) return stats;
+    if (stats.length && !stats.includes(selectedStat)) return stats;
+    // ultimate fallback (shouldn't happen)
+    return [selectedStat];
+  }, [selectedStat]);
+
   /* ---------------------------------------------------------------------- */
   /* LOCK BACKGROUND SCROLL                                                  */
   /* ---------------------------------------------------------------------- */
+
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -78,7 +105,7 @@ export default function PlayerInsightsOverlay({
 
     const dy = e.changedTouches[0].clientY - startYRef.current;
 
-    // ✅ Close if dragged far enough
+    // Close if dragged far enough
     if (dy >= CLOSE_THRESHOLD) {
       sheet.style.transition = "transform 0.2s ease-out";
       sheet.style.transform = "translateY(100%)";
@@ -86,7 +113,7 @@ export default function PlayerInsightsOverlay({
       return;
     }
 
-    // ❌ Otherwise snap back
+    // Otherwise snap back
     sheet.style.transition =
       "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)";
     sheet.style.transform = "translateY(0px)";
@@ -132,33 +159,45 @@ export default function PlayerInsightsOverlay({
             </div>
 
             <button
+              type="button"
               onClick={onClose}
-              className="rounded-full bg-neutral-900 p-1.5 text-neutral-300"
+              className="rounded-full bg-neutral-900 p-1.5 text-neutral-300 hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Lens Pills */}
-          <div className="px-5 py-3 flex gap-2 border-b border-neutral-800">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((lens) => (
-              <button
-                key={lens}
-                onClick={() => onLensChange(lens)}
-                className={
-                  selectedStat === lens
-                    ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black shadow-lg"
-                    : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300"
-                }
-              >
-                {lens}
-              </button>
-            ))}
+          {/* Lens Pills (CONFIG-DRIVEN) */}
+          <div className="px-5 py-3 flex gap-2 border-b border-neutral-800 flex-wrap">
+            {lenses.map((lens) => {
+              const label =
+                (EPL_STAT_CONFIG.labels as any)?.[lens] ??
+                String(lens).toUpperCase();
+
+              return (
+                <button
+                  type="button"
+                  key={String(lens)}
+                  onClick={() => onLensChange(lens)}
+                  className={
+                    selectedStat === lens
+                      ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black shadow-lg"
+                      : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300 hover:text-white"
+                  }
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto px-5 py-4 pb-12">
-            <InsightsContent player={player} selectedStat={selectedStat} />
+            <PlayerInsightsContent
+              player={player}
+              selectedStat={selectedStat}
+              isPremium={isPremium}
+            />
           </div>
         </div>
       </div>
@@ -186,6 +225,7 @@ export default function PlayerInsightsOverlay({
             onTouchMove={handleMove}
             onTouchEnd={handleEnd}
             className="py-4 flex justify-center"
+            // IMPORTANT: only the handle blocks touch scrolling; rest remains interactive
             style={{ touchAction: "none" }}
           >
             <div className="h-1.5 w-10 rounded-full bg-yellow-200/80" />
@@ -206,28 +246,36 @@ export default function PlayerInsightsOverlay({
             </div>
 
             <button
+              type="button"
               onClick={onClose}
-              className="rounded-full bg-neutral-900 p-1.5 text-neutral-300"
+              className="rounded-full bg-neutral-900 p-1.5 text-neutral-300 hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Pills */}
-          <div className="px-4 pb-3 flex gap-2">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((lens) => (
-              <button
-                key={lens}
-                onClick={() => onLensChange(lens)}
-                className={
-                  selectedStat === lens
-                    ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black"
-                    : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300"
-                }
-              >
-                {lens}
-              </button>
-            ))}
+          {/* Pills (CONFIG-DRIVEN) */}
+          <div className="px-4 pb-3 flex gap-2 flex-wrap">
+            {lenses.map((lens) => {
+              const label =
+                (EPL_STAT_CONFIG.labels as any)?.[lens] ??
+                String(lens).toUpperCase();
+
+              return (
+                <button
+                  type="button"
+                  key={String(lens)}
+                  onClick={() => onLensChange(lens)}
+                  className={
+                    selectedStat === lens
+                      ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black"
+                      : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300 hover:text-white"
+                  }
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
 
           {/* Scrollable Content */}
@@ -236,7 +284,11 @@ export default function PlayerInsightsOverlay({
             className="flex-1 overflow-y-auto px-4 pb-[max(5rem,env(safe-area-inset-bottom))]"
             style={{ WebkitOverflowScrolling: "touch" }}
           >
-            <InsightsContent player={player} selectedStat={selectedStat} />
+            <PlayerInsightsContent
+              player={player}
+              selectedStat={selectedStat}
+              isPremium={isPremium}
+            />
           </div>
         </div>
       </div>
