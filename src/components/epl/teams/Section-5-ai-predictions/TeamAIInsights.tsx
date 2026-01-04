@@ -1,7 +1,7 @@
-// src/components/afl/teams/TeamAIInsights.tsx
+// src/components/epl/teams/TeamAIInsights.tsx
 
 import React from "react";
-import { MOCK_TEAMS, AFLTeam } from "../data/mockTeams";
+import { MOCK_TEAMS, EPLTeam } from "../data/mockTeams";
 import { Lock, X, ArrowRight } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -30,8 +30,8 @@ function buildLeagueBaselines() {
       return avg(lastN(against, 5));
     })
   );
-  const leagueClearance = avg(
-    MOCK_TEAMS.map((t) => avg(lastN(t.clearanceDom, 5)))
+  const leaguePossession = avg(
+    MOCK_TEAMS.map((t) => avg(lastN(t.possessionDom, 5)))
   );
   const leagueVolatility = avg(
     MOCK_TEAMS.map((t) => volatility(lastN(t.margins, 5)))
@@ -40,28 +40,28 @@ function buildLeagueBaselines() {
   return {
     leagueAttack,
     leagueDefence,
-    leagueClearance,
+    leaguePossession,
     leagueVolatility,
   };
 }
 
 function buildTeamInsightLines(
-  team: AFLTeam,
+  team: EPLTeam,
   baselines: ReturnType<typeof buildLeagueBaselines>
 ): string[] {
   const last5Scores = lastN(team.scores, 5);
   const last5Margins = lastN(team.margins, 5);
-  const last5Clear = lastN(team.clearanceDom, 5);
+  const last5Poss = lastN(team.possessionDom, 5);
 
   const against = team.scores.map((s, i) => s - team.margins[i]);
   const last5Against = lastN(against, 5);
 
   const attackAvg = avg(last5Scores);
   const defenceAvg = avg(last5Against);
-  const clearAvg = avg(last5Clear);
+  const possAvg = avg(last5Poss);
   const vol = volatility(last5Margins);
 
-  const { leagueAttack, leagueDefence, leagueClearance, leagueVolatility } =
+  const { leagueAttack, leagueDefence, leaguePossession, leagueVolatility } =
     baselines;
 
   const lines: string[] = [];
@@ -73,7 +73,7 @@ function buildTeamInsightLines(
     );
   else if (vol > leagueVolatility * 1.15)
     lines.push(
-      `${team.name} shows elevated round-to-round swing, indicating unstable momentum.`
+      `${team.name} shows elevated match-to-match swing, indicating unstable momentum.`
     );
   else
     lines.push(
@@ -83,7 +83,7 @@ function buildTeamInsightLines(
   // Attack
   if (attackAvg > leagueAttack * 1.05)
     lines.push(
-      `${team.name} is trending above league attack averages over the last 5 rounds.`
+      `${team.name} is trending above league attack averages over the last 5 matches.`
     );
   else if (attackAvg < leagueAttack * 0.95)
     lines.push(
@@ -103,18 +103,18 @@ function buildTeamInsightLines(
     lines.push(`${team.name} defence is conceding above projected levels.`);
   else lines.push(`${team.name} defence is conceding in line with league norms.`);
 
-  // Clearances
-  if (clearAvg > leagueClearance * 1.05)
+  // Possession
+  if (possAvg > leaguePossession * 1.05)
     lines.push(
-      `${team.name} clearance differential is trending above league norms.`
+      `${team.name} possession differential is trending above league norms.`
     );
-  else if (clearAvg < leagueClearance * 0.95)
+  else if (possAvg < leaguePossession * 0.95)
     lines.push(
-      `${team.name} clearance differential is trending below league norms.`
+      `${team.name} possession differential is trending below league norms.`
     );
   else
     lines.push(
-      `${team.name} clearance differential is hovering around league averages.`
+      `${team.name} possession differential is hovering around league averages.`
     );
 
   return lines;
@@ -124,7 +124,7 @@ function buildTeamInsightLines(
 /*                              CARD COMPONENTS                               */
 /* -------------------------------------------------------------------------- */
 
-const RealCard = ({ team, lines }: { team: AFLTeam; lines: string[] }) => (
+const RealCard = ({ team, lines }: { team: EPLTeam; lines: string[] }) => (
   <article className="min-w-[260px] snap-start rounded-3xl border border-neutral-800/90 bg-gradient-to-b from-black/96 via-neutral-950 to-black px-5 py-5 text-xs text-neutral-200 shadow-[0_0_45px_rgba(0,0,0,0.8)] transition hover:brightness-110">
     <div className="mb-3 flex items-center justify-between">
       <div>
@@ -263,7 +263,7 @@ export default function TeamAIInsights() {
 
           <p className="mt-2 max-w-2xl text-xs text-neutral-400">
             Your lightweight AI snapshot for momentum, attack/defence shifts and
-            clearance trends. Unlock full intelligence to view all 18 clubs.
+            possession trends. Unlock full intelligence to view all 20 clubs.
           </p>
         </div>
 
@@ -292,7 +292,7 @@ export default function TeamAIInsights() {
               Neeko+ AI
             </div>
             <div className="mt-1 text-sm font-semibold text-yellow-100">
-              Unlock full AFL AI intelligence across all 18 clubs
+              Unlock full EPL AI intelligence across all 20 clubs
             </div>
             <p className="mt-1 text-xs text-neutral-300">
               Access deeper trend breakdowns, AI-driven matchup flags, volatility
@@ -326,7 +326,7 @@ export default function TeamAIInsights() {
             </div>
 
             <h3 className="mt-3 text-xl font-semibold text-neutral-50">
-              Unlock full AFL AI analysis
+              Unlock full EPL AI analysis
             </h3>
 
             <p className="mt-2 text-xs text-neutral-300">
@@ -337,11 +337,11 @@ export default function TeamAIInsights() {
             <ul className="mt-4 space-y-2 text-xs text-neutral-200">
               <li className="flex gap-2">
                 <span className="h-[4px] w-[4px] rounded-full bg-yellow-400 mt-[5px]" />
-                <span>Full analysis for all 18 AFL clubs.</span>
+                <span>Full analysis for all 20 EPL clubs.</span>
               </li>
               <li className="flex gap-2">
                 <span className="h-[4px] w-[4px] rounded-full bg-yellow-400 mt-[5px]" />
-                <span>Momentum, defence/attack & clearance deep-dive.</span>
+                <span>Momentum, defence/attack & possession deep-dive.</span>
               </li>
               <li className="flex gap-2">
                 <span className="h-[4px] w-[4px] rounded-full bg-yellow-400 mt-[5px]" />

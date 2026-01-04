@@ -109,7 +109,7 @@ export default function EPLTeams() {
   /* -------------------------------------------------------------------------- */
 
   const sections = [
-    { id: "momentum", label: "Round Momentum" },
+    { id: "momentum", label: "Matchweek Momentum" },
     { id: "dashboard", label: "Dashboard" },
     { id: "form-grid", label: "Form Grid" },
     { id: "trends", label: "Team Trends" },
@@ -200,15 +200,15 @@ export default function EPLTeams() {
       </section>
 
       <section id="form-grid" className="mb-14 scroll-mt-28">
-        <TeamFormGrid statConfig={EPL_STAT_CONFIG} />
+        <TeamFormGrid />
       </section>
 
       <section id="trends" className="mb-14 scroll-mt-28">
-        <TeamTrends statConfig={EPL_STAT_CONFIG} />
+        <TeamTrends />
       </section>
 
       <section id="ai" className="mb-14 scroll-mt-28">
-        <TeamAIInsights statConfig={EPL_STAT_CONFIG} />
+        <TeamAIInsights />
       </section>
 
       <section id="master-table" className="scroll-mt-28">
