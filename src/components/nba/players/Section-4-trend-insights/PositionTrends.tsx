@@ -1,4 +1,4 @@
-// src/components/afl/players/PositionTrends.tsx
+// src/components/nba/players/PositionTrends.tsx
 import React, { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
@@ -9,6 +9,7 @@ import {
   Zap,
 } from "lucide-react";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
+import type { StatConfig, StatKey } from "@/lib/stats/types";
 
 import {
   useNBAMockPlayers,
@@ -16,14 +17,14 @@ import {
   lastN,
   average,
   stdDev,
-  StatKey,
-} from "@/components/nba/players/useAFLMockData";
+  StatKey as MockStatKey,
+} from "@/components/nba/players/data/useNBAMockData";
 
 /* ---------------------------------------------------------
    Types & helpers
 --------------------------------------------------------- */
 
-type PositionKey = "MID" | "FWD" | "DEF" | "RUC";
+type PositionKey = "PG" | "SG" | "SF" | "PF" | "C";
 
 type PositionPlayerMetrics = {
   id: number;
@@ -44,10 +45,8 @@ function clamp01(v: number) {
   return Math.max(0, Math.min(1, v));
 }
 
-const FANTASY_STAT: StatKey = "fantasy";
-
 /* ---------------------------------------------------------
-   POSITION CONFIG — fully typed to PositionKey (TS FIX)
+   POSITION CONFIG — NBA positions
 --------------------------------------------------------- */
 
 const POSITION_CONFIG: {
@@ -62,9 +61,9 @@ const POSITION_CONFIG: {
   };
 }[] = [
   {
-    key: "MID",
-    label: "Mids",
-    description: "Inside/wing rotations and centre-square usage trends.",
+    key: "PG",
+    label: "Point Guards",
+    description: "Playmaking, assist generation, and floor management trends.",
     toneClasses: {
       pill: "bg-emerald-500/15 text-emerald-200 border-emerald-400/60",
       glow: "from-emerald-500/22 via-transparent to-emerald-400/12",
@@ -73,9 +72,9 @@ const POSITION_CONFIG: {
     },
   },
   {
-    key: "FWD",
-    label: "Forwards",
-    description: "Forward-half threat, pressure roles and shot volume.",
+    key: "SG",
+    label: "Shooting Guards",
+    description: "Scoring efficiency, three-point volume, and perimeter impact.",
     toneClasses: {
       pill: "bg-red-500/18 text-red-200 border-red-400/65",
       glow: "from-red-500/25 via-transparent to-orange-400/15",
@@ -84,9 +83,9 @@ const POSITION_CONFIG: {
     },
   },
   {
-    key: "DEF",
-    label: "Defenders",
-    description: "Ball movement chains, intercept load and kick-out share.",
+    key: "SF",
+    label: "Small Forwards",
+    description: "All-around contributions, wing versatility, and two-way play.",
     toneClasses: {
       pill: "bg-sky-500/18 text-sky-100 border-sky-400/60",
       glow: "from-sky-500/25 via-transparent to-cyan-400/15",
@@ -95,9 +94,20 @@ const POSITION_CONFIG: {
     },
   },
   {
-    key: "RUC",
-    label: "Rucks",
-    description: "Ruck share, stoppage work and around-the-ground impact.",
+    key: "PF",
+    label: "Power Forwards",
+    description: "Frontcourt production, rebounding, and interior presence.",
+    toneClasses: {
+      pill: "bg-amber-500/18 text-amber-100 border-amber-400/60",
+      glow: "from-amber-500/25 via-transparent to-yellow-400/15",
+      border: "border-amber-400/45",
+      header: "text-amber-100",
+    },
+  },
+  {
+    key: "C",
+    label: "Centers",
+    description: "Paint dominance, rim protection, and offensive boards.",
     toneClasses: {
       pill: "bg-purple-500/18 text-purple-100 border-purple-400/60",
       glow: "from-purple-500/25 via-transparent to-fuchsia-400/15",
@@ -165,19 +175,17 @@ function MiniSparkline({ data }: { data: number[] }) {
 }
 
 /* ---------------------------------------------------------
-   ROLE HELPERS
+   ROLE HELPERS — NBA specific
 --------------------------------------------------------- */
 
 function inferRoleType(pos: string) {
   const p = pos.toUpperCase();
-  if (p.includes("MID") && p.includes("FWD")) return "MID/FWD hybrid";
-  if (p.includes("MID") && p.includes("DEF")) return "MID/DEF hybrid";
-  if (p.includes("MID")) return "Inside/wing mid";
-  if (p.includes("RUC") && p.includes("FWD")) return "Ruck/forward split";
-  if (p.includes("RUC")) return "Primary ruck";
-  if (p.includes("DEF")) return "Rebounding defender";
-  if (p.includes("FWD")) return "Attacking forward";
-  return "Versatile role";
+  if (p.includes("PG")) return "Primary ball handler";
+  if (p.includes("SG")) return "Perimeter scorer";
+  if (p.includes("SF")) return "Wing versatility";
+  if (p.includes("PF")) return "Frontcourt contributor";
+  if (p.includes("C")) return "Interior anchor";
+  return "Multi-position role";
 }
 
 function roleDirectionLabel(delta: number) {
@@ -295,21 +303,22 @@ function PositionPlayerCard({
    MAIN SECTION
 --------------------------------------------------------- */
 
-export default function PositionTrends() {
+export default function PositionTrends({ statConfig }: { statConfig: StatConfig }) {
   const players = useNBAMockPlayers();
-  const [selectedPos, setSelectedPos] = useState<PositionKey>("MID");
+  const [selectedPos, setSelectedPos] = useState<PositionKey>("PG");
 
   /* Build metrics */
   const metricsByPosition = useMemo(() => {
     const base: Record<PositionKey, PositionPlayerMetrics[]> = {
-      MID: [],
-      FWD: [],
-      DEF: [],
-      RUC: [],
+      PG: [],
+      SG: [],
+      SF: [],
+      PF: [],
+      C: [],
     };
 
     players.forEach((p) => {
-      const series = getSeriesForStat(p, FANTASY_STAT);
+      const series = getSeriesForStat(p, statConfig.defaultStat);
       if (!series?.length) return;
 
       const l5 = lastN(series, 5);
@@ -340,14 +349,15 @@ export default function PositionTrends() {
       };
 
       const upper = p.pos.toUpperCase();
-      if (upper.includes("MID")) base.MID.push(metrics);
-      if (upper.includes("FWD")) base.FWD.push(metrics);
-      if (upper.includes("DEF")) base.DEF.push(metrics);
-      if (upper.includes("RUC")) base.RUC.push(metrics);
+      if (upper.includes("PG")) base.PG.push(metrics);
+      if (upper.includes("SG")) base.SG.push(metrics);
+      if (upper.includes("SF")) base.SF.push(metrics);
+      if (upper.includes("PF")) base.PF.push(metrics);
+      if (upper.includes("C")) base.C.push(metrics);
     });
 
     return base;
-  }, [players]);
+  }, [players, statConfig.defaultStat]);
 
   const config = POSITION_CONFIG.find((c) => c.key === selectedPos)!;
   const metrics = metricsByPosition[selectedPos] ?? [];
@@ -380,9 +390,9 @@ export default function PositionTrends() {
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <SectionHeader
-              pillLabel="Position Trends"
-              title="Role-driven trends by line"
-              description="Blends recent fantasy output with stability and volatility to surface the most important movers and softening role signals across each position."
+              eyebrow="Position Trends"
+              title="Role-driven trends by position"
+              subtitle="Blends recent output with stability and volatility to surface the most important movers and softening role signals across each position."
               icon={Sparkles}
             />
           </div>
