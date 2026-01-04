@@ -1,4 +1,4 @@
-// src/components/afl/match-center/types.ts
+// src/components/nba/match-center/types.ts
 
 export type MatchStatus = "upcoming" | "final";
 
@@ -62,11 +62,11 @@ export type FixtureMatch = {
   id: string;
 
   /** Season context */
-  season: 2025 | 2026;
+  season: "2024-25" | "2025-26";
 
-  /** Round context */
-  roundNumber: number; // 0 = Opening Round
-  roundLabel: string; // OR, R1…R23
+  /** Game context */
+  roundNumber: number; // Game number (1-82)
+  roundLabel: string; // G1…G82
 
   /** Match info */
   dateISO: string;

@@ -12,7 +12,7 @@ import { MOCK_FIXTURES, MOCK_LADDER_TOP16 } from "@/components/nba/match-center/
 import type { FixtureMatch } from "@/components/nba/match-center/types";
 import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
 
-type Season = 2025 | 2026;
+type Season = "2024-25" | "2025-26";
 
 /* -------------------------------------------------------------------------- */
 /* NORMALISE LADDER                                                            */
@@ -67,7 +67,7 @@ function getDefaultSeasonRound(fixtures: FixtureMatch[]) {
     return { season: lastFinal.season, roundNumber: lastFinal.roundNumber };
   }
 
-  return { season: 2026 as Season, roundNumber: 1 };
+  return { season: "2025-26" as Season, roundNumber: 1 };
 }
 
 /* -------------------------------------------------------------------------- */
