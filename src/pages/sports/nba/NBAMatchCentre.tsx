@@ -34,7 +34,7 @@ function normaliseLadder(rows: any[]): LadderRow[] {
       wins,
       losses,
       draws: 0,
-      percentage: 100,
+      percentage: wins > 0 ? Math.round((wins / (wins + losses)) * 100) : 0,
     };
   });
 }
@@ -67,7 +67,7 @@ function getDefaultSeasonRound(fixtures: FixtureMatch[]) {
     return { season: lastFinal.season, roundNumber: lastFinal.roundNumber };
   }
 
-  return { season: 2026 as Season, roundNumber: 0 };
+  return { season: 2026 as Season, roundNumber: 1 };
 }
 
 /* -------------------------------------------------------------------------- */

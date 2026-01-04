@@ -10,6 +10,7 @@ import SeasonRoundSelector from "@/components/epl/match-center/SeasonRoundSelect
 
 import { MOCK_FIXTURES, MOCK_LADDER_TOP16 } from "@/components/epl/match-center/mockData";
 import type { FixtureMatch } from "@/components/epl/match-center/types";
+import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
 
 type Season = 2025 | 2026;
 
@@ -23,16 +24,16 @@ function normaliseLadder(rows: any[]): LadderRow[] {
   }
 
   return rows.map((r, idx) => {
-    const [wins = 0, losses = 0] =
+    const [wins = 0, losses = 0, draws = 0] =
       typeof r.record === "string" ? r.record.split("-").map(Number) : [];
 
     return {
       pos: r.rank ?? idx + 1,
       team: r.team,
-      played: wins + losses,
+      played: wins + losses + draws,
       wins,
       losses,
-      draws: 0,
+      draws: draws || 0,
       percentage: 100,
     };
   });
@@ -66,14 +67,14 @@ function getDefaultSeasonRound(fixtures: FixtureMatch[]) {
     return { season: lastFinal.season, roundNumber: lastFinal.roundNumber };
   }
 
-  return { season: 2026 as Season, roundNumber: 0 };
+  return { season: 2026 as Season, roundNumber: 1 };
 }
 
 /* -------------------------------------------------------------------------- */
 /* PAGE                                                                        */
 /* -------------------------------------------------------------------------- */
 
-export default function AFLMatchCentre() {
+export default function EPLMatchCentre() {
   const [activeMatch, setActiveMatch] = useState<FixtureMatch | null>(null);
 
   const initial = useMemo(() => getDefaultSeasonRound(MOCK_FIXTURES), []);
