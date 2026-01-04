@@ -1,18 +1,17 @@
 import React, { useMemo } from "react";
 import type { TeamRow } from "../data/mockTeams";
 import type { StatLens } from "../Section-1-master-table/TeamMasterTable";
-
-/* -------------------------------------------------------------------------- */
-/* HELPERS                                                                    */
-/* -------------------------------------------------------------------------- */
+import type { StatConfig, EPLStatKey } from "@/lib/stats/types";
 
 function getValues(team: TeamRow, stat: StatLens): number[] {
-  if (stat === "Fantasy") return team.fantasy;
-  if (stat === "Disposals") return team.disposals;
-  return team.goals;
+  const values = (team as any)[stat];
+  return Array.isArray(values) ? values : [];
 }
 
 function calcStats(values: number[]) {
+  if (!values.length) {
+    return { avg: 0, min: 0, max: 0, games: 0, volatility: 0, total: 0 };
+  }
   const total = values.reduce((a, b) => a + b, 0);
   const avg = total / values.length;
   const min = Math.min(...values);
@@ -35,29 +34,22 @@ function volatilityLabel(v: number) {
   return { label: "Low", color: "text-emerald-400" };
 }
 
-function hitThresholds(stat: StatLens): number[] {
-  if (stat === "Fantasy") return [1800, 1900, 2000, 2100];
-  if (stat === "Disposals") return [320, 350, 380, 400];
-  return [8, 10, 12, 14];
-}
-
 function hitRate(values: number[], threshold: number) {
+  if (!values.length) return 0;
   const hits = values.filter((v) => v >= threshold).length;
   return Math.round((hits / values.length) * 100);
 }
-
-/* -------------------------------------------------------------------------- */
-/* COMPONENT                                                                  */
-/* -------------------------------------------------------------------------- */
 
 export default function TeamInsightsContent({
   team,
   selectedStat,
   isPremium,
+  statConfig,
 }: {
   team: TeamRow;
   selectedStat: StatLens;
   isPremium: boolean;
+  statConfig: StatConfig<EPLStatKey>;
 }) {
   const values = useMemo(
     () => getValues(team, selectedStat),
@@ -66,7 +58,7 @@ export default function TeamInsightsContent({
 
   const stats = useMemo(() => calcStats(values), [values]);
   const volatility = volatilityLabel(stats.volatility);
-  const thresholds = hitThresholds(selectedStat);
+  const thresholds = statConfig.teamThresholds[selectedStat] ?? [];
   const recent = values.slice(-5);
 
   const aiSummary = useMemo(() => {
@@ -81,7 +73,6 @@ export default function TeamInsightsContent({
 
   return (
     <div className="px-6 pb-8 space-y-6">
-      {/* ================= SEASON AVERAGE ================= */}
       <div>
         <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-400">
           Season Average
@@ -91,7 +82,6 @@ export default function TeamInsightsContent({
         </div>
       </div>
 
-      {/* ================= CORE RATINGS ================= */}
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-xl border border-neutral-800 bg-black/60 p-3">
           <div className="text-[10px] uppercase text-neutral-400">Attack</div>
@@ -115,7 +105,6 @@ export default function TeamInsightsContent({
         </div>
       </div>
 
-      {/* ================= RECENT FORM ================= */}
       <div>
         <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-400 mb-2">
           Recent Form (Last 5)
@@ -132,11 +121,10 @@ export default function TeamInsightsContent({
         </div>
       </div>
 
-      {/* ================= SEASON SUMMARY ================= */}
       <div className="rounded-2xl border border-neutral-800 bg-black/70 p-4 space-y-3">
         <div className="flex justify-between items-center">
           <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-400">
-            Season Summary — {selectedStat}
+            Season Summary — {statConfig.labels[selectedStat]}
           </div>
           <div className="text-sm text-yellow-300 font-semibold">
             {stats.avg}
@@ -163,7 +151,6 @@ export default function TeamInsightsContent({
         </div>
       </div>
 
-      {/* ================= AI SUMMARY ================= */}
       <div className="rounded-2xl border border-neutral-800 bg-black/60 p-4">
         <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-400 mb-2">
           AI Performance Summary
@@ -173,7 +160,6 @@ export default function TeamInsightsContent({
         </p>
       </div>
 
-      {/* ================= HIT RATE LADDER ================= */}
       <div className="rounded-2xl border border-neutral-800 bg-black/70 p-4">
         <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-400 mb-3">
           Hit-Rate Ladder
@@ -202,7 +188,6 @@ export default function TeamInsightsContent({
         </div>
       </div>
 
-      {/* ================= PREMIUM NOTE ================= */}
       {!isPremium && (
         <div className="text-[11px] text-neutral-500 text-center pt-2">
           Upgrade to Neeko+ to unlock deeper matchup-adjusted insights.

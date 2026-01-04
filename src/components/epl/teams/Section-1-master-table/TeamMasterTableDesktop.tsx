@@ -8,12 +8,7 @@ import {
 } from "lucide-react";
 import type { TeamRow } from "../data/mockTeams";
 import type { StatLens } from "./TeamMasterTable";
-
-/* -------------------------------------------------------------------------- */
-/* CONSTANTS                                                                  */
-/* -------------------------------------------------------------------------- */
-
-const ROUND_LABELS = ["OR", ...Array.from({ length: 23 }, (_, i) => `R${i + 1}`)];
+import type { StatConfig, EPLStatKey } from "@/lib/stats/types";
 
 const FREE_ROW_LIMIT = 8;
 const LOCKED_PREVIEW_ROWS = 2;
@@ -23,20 +18,18 @@ const ROUND_COL_W = 48;
 const RIGHT_COL_W = 260;
 const ROW_H = 84;
 
-/* -------------------------------------------------------------------------- */
-/* HELPERS                                                                    */
-/* -------------------------------------------------------------------------- */
-
 const cx = (...c: Array<string | false | undefined>) =>
   c.filter(Boolean).join(" ");
 
 function getValues(team: TeamRow, stat: StatLens): number[] {
-  if (stat === "Fantasy") return team.fantasy;
-  if (stat === "Disposals") return team.disposals;
-  return team.goals;
+  const values = (team as any)[stat];
+  return Array.isArray(values) ? values : [];
 }
 
 function calcStats(values: number[]) {
+  if (!values.length) {
+    return { avg: 0, min: 0, max: 0, gms: 0 };
+  }
   const total = values.reduce((a, b) => a + b, 0);
   return {
     avg: Math.round(total / values.length),
@@ -46,20 +39,11 @@ function calcStats(values: number[]) {
   };
 }
 
-function getHitThresholds(stat: StatLens): number[] {
-  if (stat === "Fantasy") return [1800, 1900, 2000, 2100];
-  if (stat === "Disposals") return [320, 350, 380, 400];
-  return [8, 10, 12, 14];
-}
-
 function calcHitRate(values: number[], threshold: number) {
+  if (!values.length) return 0;
   const hits = values.filter((v) => v >= threshold).length;
   return Math.round((hits / values.length) * 100);
 }
-
-/* -------------------------------------------------------------------------- */
-/* DESKTOP MASTER TABLE — TEAMS                                                */
-/* -------------------------------------------------------------------------- */
 
 export default function TeamMasterTableDesktop({
   teams,
@@ -69,6 +53,7 @@ export default function TeamMasterTableDesktop({
   query,
   setQuery,
   onSelectTeam,
+  statConfig,
 }: {
   teams: TeamRow[];
   selectedStat: StatLens;
@@ -77,13 +62,20 @@ export default function TeamMasterTableDesktop({
   query: string;
   setQuery: (v: string) => void;
   onSelectTeam: (t: TeamRow) => void;
+  statConfig: StatConfig<EPLStatKey>;
 }) {
   const [search, setSearch] = useState("");
   const [compact, setCompact] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
 
-  /* ---------------- DERIVED DATA ---------------- */
+  const ROUND_LABELS = useMemo(() => {
+    return ["OR", ...(statConfig.sportMeta.roundLabels ?? [])];
+  }, [statConfig]);
+
+  const hitThresholds = useMemo(() => {
+    return statConfig.teamThresholds[selectedStat] ?? [];
+  }, [statConfig, selectedStat]);
 
   const rows = useMemo(() => {
     return teams.map((t) => {
@@ -114,14 +106,9 @@ export default function TeamMasterTableDesktop({
         )
       : [];
 
-  const hitThresholds = getHitThresholds(selectedStat);
-
-  /* -------------------------------------------------------------------------- */
-
   return (
     <>
       <div className="mt-10 rounded-3xl border border-neutral-800 bg-black shadow-2xl overflow-hidden">
-        {/* ================= HEADER ================= */}
         <div className="px-6 py-6 border-b border-neutral-800">
           <div className="flex justify-between items-start">
             <div>
@@ -138,7 +125,7 @@ export default function TeamMasterTableDesktop({
 
             <div className="flex flex-col items-end gap-2">
               <div className="flex gap-2 rounded-full border border-neutral-700 bg-black p-1">
-                {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
+                {(statConfig.availableStats as readonly StatLens[]).map((s) => (
                   <button
                     key={s}
                     onClick={() => setSelectedStat(s)}
@@ -149,7 +136,7 @@ export default function TeamMasterTableDesktop({
                         : "text-neutral-300 hover:bg-neutral-800"
                     )}
                   >
-                    {s}
+                    {statConfig.labels[s]}
                   </button>
                 ))}
               </div>
@@ -190,7 +177,6 @@ export default function TeamMasterTableDesktop({
           </div>
         </div>
 
-        {/* ================= TABLE ================= */}
         <div className="relative max-h-[65vh] overflow-x-auto overflow-y-auto">
           <div
             className="flex text-[11px]"
@@ -202,7 +188,6 @@ export default function TeamMasterTableDesktop({
                   RIGHT_COL_W,
             }}
           >
-            {/* ================= TEAM COLUMN ================= */}
             <div
               className="sticky left-0 z-20 border-r border-neutral-800 bg-black"
               style={{ width: LEFT_COL_W }}
@@ -258,7 +243,6 @@ export default function TeamMasterTableDesktop({
                 ))}
             </div>
 
-            {/* ================= ROUNDS ================= */}
             {!compact && (
               <div>
                 <div className="sticky top-0 z-10 flex border-b border-neutral-800 bg-black">
@@ -293,7 +277,6 @@ export default function TeamMasterTableDesktop({
               </div>
             )}
 
-            {/* ================= STATS ================= */}
             <div
               className="sticky right-0 z-10 border-l border-neutral-800 bg-black"
               style={{ width: compact ? RIGHT_COL_W * 2 : RIGHT_COL_W }}
@@ -359,7 +342,6 @@ export default function TeamMasterTableDesktop({
           <div className="h-px bg-neutral-800 w-full" />
         </div>
 
-        {/* ================= CTA / SHOW MORE ================= */}
         <div className="py-10 flex justify-center border-t border-neutral-800">
           {!isPremium ? (
             <button
@@ -390,7 +372,6 @@ export default function TeamMasterTableDesktop({
         </div>
       </div>
 
-      {/* ================= UPGRADE POPUP ================= */}
       {showUpgrade && (
         <div className="fixed inset-0 z-[100]">
           <div
@@ -421,7 +402,7 @@ export default function TeamMasterTableDesktop({
               <div className="px-5 py-5 space-y-4">
                 <p className="text-sm text-neutral-300">
                   Access full-season team trends, advanced hit-rate analysis,
-                  and deeper matchup insights across every AFL club.
+                  and deeper matchup insights across every EPL club.
                 </p>
 
                 <button

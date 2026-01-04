@@ -3,19 +3,17 @@ import { Search, Lock, X, ArrowRight, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { TeamRow } from "../data/mockTeams";
 import type { StatLens } from "./TeamMasterTable";
-
-/* -------------------------------------------------------------------------- */
-/* HELPERS                                                                    */
-/* -------------------------------------------------------------------------- */
+import type { StatConfig, EPLStatKey } from "@/lib/stats/types";
 
 function cx(...parts: Array<string | false | undefined | null>) {
   return parts.filter(Boolean).join(" ");
 }
 
-/* skeleton helper (mirrors Players exactly) */
-const skeletonValue = () => Math.floor(1800 + Math.random() * 400);
+function getValues(team: TeamRow, stat: StatLens): number[] {
+  const values = (team as any)[stat];
+  return Array.isArray(values) ? values : [];
+}
 
-const ROUND_LABELS = ["OR", ...Array.from({ length: 23 }, (_, i) => `R${i + 1}`)];
 const PAGE_SIZE = 8;
 
 const LEFT_COL_W = 124;
@@ -23,10 +21,6 @@ const CELL_W = 52;
 const CELL_GAP = 4;
 
 const STATS_ROW_CLASS = "flex gap-[4px] px-1.5";
-
-/* -------------------------------------------------------------------------- */
-/* TEAM MASTER TABLE MOBILE                                                   */
-/* -------------------------------------------------------------------------- */
 
 export default function TeamMasterTableMobile({
   teams,
@@ -36,6 +30,7 @@ export default function TeamMasterTableMobile({
   query,
   setQuery,
   onSelectTeam,
+  statConfig,
 }: {
   teams: TeamRow[];
   selectedStat: StatLens;
@@ -44,13 +39,14 @@ export default function TeamMasterTableMobile({
   query: string;
   setQuery: (v: string) => void;
   onSelectTeam: (t: TeamRow) => void;
+  statConfig: StatConfig<EPLStatKey>;
 }) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [showUpgrade, setShowUpgrade] = useState(false);
 
-  /* ---------------------------------------------------------------------- */
-  /* FILTERING                                                               */
-  /* ---------------------------------------------------------------------- */
+  const ROUND_LABELS = useMemo(() => {
+    return ["OR", ...(statConfig.sportMeta.roundLabels ?? [])];
+  }, [statConfig]);
 
   const filtered = useMemo(() => {
     let result = teams;
@@ -66,15 +62,10 @@ export default function TeamMasterTableMobile({
 
   const visibleTeams = filtered.slice(0, visibleCount);
 
-  const tableWidth = LEFT_COL_W + 24 * CELL_W + 23 * CELL_GAP + 16;
-
-  /* ---------------------------------------------------------------------- */
-  /* RENDER                                                                  */
-  /* ---------------------------------------------------------------------- */
+  const tableWidth = LEFT_COL_W + ROUND_LABELS.length * CELL_W + (ROUND_LABELS.length - 1) * CELL_GAP + 16;
 
   return (
     <>
-      {/* ================= HEADER CARD ================= */}
       <div className="relative mt-6">
         <div className="absolute inset-0 backdrop-blur-[14px]" />
         <div className="relative rounded-3xl border border-neutral-800 bg-black/80 px-4 py-4 shadow-xl">
@@ -94,7 +85,7 @@ export default function TeamMasterTableMobile({
           </p>
 
           <div className="mt-4 flex gap-2 rounded-full border border-neutral-700 bg-black/80 px-2 py-1 text-[11px]">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
+            {(statConfig.availableStats as readonly StatLens[]).map((s) => (
               <button
                 key={s}
                 onClick={() => setSelectedStat(s)}
@@ -105,7 +96,7 @@ export default function TeamMasterTableMobile({
                     : "bg-neutral-900 text-neutral-300"
                 )}
               >
-                {s}
+                {statConfig.labels[s]}
               </button>
             ))}
           </div>
@@ -133,7 +124,6 @@ export default function TeamMasterTableMobile({
         </div>
       </div>
 
-      {/* ================= TABLE ================= */}
       <div className="mt-4 rounded-3xl border border-neutral-800 bg-black/90 shadow-xl overflow-hidden">
         <div className="relative overflow-x-auto scrollbar-none">
           {!isPremium && (
@@ -201,6 +191,7 @@ export default function TeamMasterTableMobile({
             <div className="divide-y divide-neutral-800/70">
               {visibleTeams.map((t, idx) => {
                 const gated = !isPremium && idx >= 8;
+                const values = getValues(t, selectedStat);
 
                 return (
                   <div key={t.id} className="relative flex" style={{ width: tableWidth }}>
@@ -228,7 +219,7 @@ export default function TeamMasterTableMobile({
                           {gated ? (
                             <span className="inline-block w-6 h-4 rounded-sm bg-neutral-600/40 animate-pulse" />
                           ) : (
-                            skeletonValue()
+                            values[i] ?? "-"
                           )}
                         </div>
                       ))}
@@ -248,7 +239,6 @@ export default function TeamMasterTableMobile({
         </div>
       </div>
 
-      {/* ================= SHOW MORE ================= */}
       {visibleTeams.length < filtered.length && (
         <div className="mt-4 flex justify-center">
           <Button
@@ -262,7 +252,6 @@ export default function TeamMasterTableMobile({
         </div>
       )}
 
-      {/* ================= UPGRADE MODAL ================= */}
       {showUpgrade && (
         <div className="fixed inset-0 z-[100]">
           <div

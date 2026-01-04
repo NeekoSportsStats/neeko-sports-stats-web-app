@@ -2,25 +2,24 @@ import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { TeamRow } from "../data/mockTeams";
 import type { StatLens } from "../Section-1-master-table/TeamMasterTable";
+import type { StatConfig, EPLStatKey } from "@/lib/stats/types";
 import TeamInsightsContent from "./TeamInsightsContent";
 
-/* -------------------------------------------------------------------------- */
-/*                         TEAM INSIGHTS OVERLAY                               */
-/* -------------------------------------------------------------------------- */
-
-const CLOSE_THRESHOLD = 140; // px
-const MAX_DRAG = 320; // px
+const CLOSE_THRESHOLD = 140;
+const MAX_DRAG = 320;
 
 export default function TeamInsightsOverlay({
   team,
   selectedStat,
   onClose,
   onLensChange,
+  statConfig,
 }: {
   team: TeamRow;
   selectedStat: StatLens;
   onClose: () => void;
   onLensChange: (lens: StatLens) => void;
+  statConfig: StatConfig<EPLStatKey>;
 }) {
   const [mounted, setMounted] = useState(false);
 
@@ -28,10 +27,6 @@ export default function TeamInsightsOverlay({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
   const startYRef = useRef(0);
-
-  /* ---------------------------------------------------------------------- */
-  /* LOCK BACKGROUND SCROLL                                                  */
-  /* ---------------------------------------------------------------------- */
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -43,15 +38,10 @@ export default function TeamInsightsOverlay({
     };
   }, []);
 
-  /* ---------------------------------------------------------------------- */
-  /* DRAG HANDLERS (HANDLE ONLY)                                             */
-  /* ---------------------------------------------------------------------- */
-
   const handleStart = (e: React.TouchEvent<HTMLDivElement>) => {
     const scrollEl = scrollRef.current;
     if (!scrollEl) return;
 
-    // Only allow drag if content is at top
     if (scrollEl.scrollTop > 0) return;
 
     draggingRef.current = true;
@@ -80,7 +70,6 @@ export default function TeamInsightsOverlay({
 
     const dy = e.changedTouches[0].clientY - startYRef.current;
 
-    // Close if dragged far enough
     if (dy >= CLOSE_THRESHOLD) {
       sheet.style.transition = "transform 0.2s ease-out";
       sheet.style.transform = "translateY(100%)";
@@ -88,7 +77,6 @@ export default function TeamInsightsOverlay({
       return;
     }
 
-    // Otherwise snap back
     sheet.style.transition =
       "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)";
     sheet.style.transform = "translateY(0px)";
@@ -107,9 +95,6 @@ export default function TeamInsightsOverlay({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      {/* ============================== */}
-      {/* DESKTOP PANEL                  */}
-      {/* ============================== */}
       <div
         className="
           hidden md:block fixed right-0 top-0 h-full w-[480px]
@@ -119,7 +104,6 @@ export default function TeamInsightsOverlay({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex h-full flex-col">
-          {/* Header */}
           <div className="px-5 py-4 flex justify-between border-b border-neutral-800">
             <div>
               <div className="text-[10px] uppercase tracking-[0.18em] text-yellow-200/80">
@@ -141,37 +125,33 @@ export default function TeamInsightsOverlay({
             </button>
           </div>
 
-          {/* Lens Pills */}
           <div className="px-5 py-3 flex gap-2 border-b border-neutral-800">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((lens) => (
+            {(statConfig.availableStats as readonly StatLens[]).map((lens) => (
               <button
                 key={lens}
                 onClick={() => onLensChange(lens)}
                 className={
                   selectedStat === lens
-                    ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black shadow-lg"
-                    : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300"
+                    ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black shadow-lg text-xs"
+                    : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300 text-xs"
                 }
               >
-                {lens}
+                {statConfig.labels[lens]}
               </button>
             ))}
           </div>
 
-          {/* Content */}
           <div className="flex-1 overflow-y-auto px-5 py-4 pb-12">
             <TeamInsightsContent
               team={team}
               selectedStat={selectedStat}
               isPremium={true}
+              statConfig={statConfig}
             />
           </div>
         </div>
       </div>
 
-      {/* ============================== */}
-      {/* MOBILE BOTTOM SHEET            */}
-      {/* ============================== */}
       <div
         className="md:hidden fixed inset-0 flex items-end justify-center"
         onClick={(e) => e.stopPropagation()}
@@ -186,7 +166,6 @@ export default function TeamInsightsOverlay({
             flex flex-col
           "
         >
-          {/* Drag Handle */}
           <div
             onTouchStart={handleStart}
             onTouchMove={handleMove}
@@ -197,7 +176,6 @@ export default function TeamInsightsOverlay({
             <div className="h-1.5 w-10 rounded-full bg-yellow-200/80" />
           </div>
 
-          {/* Header */}
           <div className="px-4 pb-3 flex justify-between">
             <div>
               <div className="text-[10px] uppercase tracking-[0.18em] text-yellow-200">
@@ -219,24 +197,22 @@ export default function TeamInsightsOverlay({
             </button>
           </div>
 
-          {/* Pills */}
           <div className="px-4 pb-3 flex gap-2">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((lens) => (
+            {(statConfig.availableStats as readonly StatLens[]).map((lens) => (
               <button
                 key={lens}
                 onClick={() => onLensChange(lens)}
                 className={
                   selectedStat === lens
-                    ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black"
-                    : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300"
+                    ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black text-xs"
+                    : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300 text-xs"
                 }
               >
-                {lens}
+                {statConfig.labels[lens]}
               </button>
             ))}
           </div>
 
-          {/* Scrollable Content */}
           <div
             ref={scrollRef}
             className="flex-1 overflow-y-auto px-4 pb-[max(5rem,env(safe-area-inset-bottom))]"
@@ -246,6 +222,7 @@ export default function TeamInsightsOverlay({
               team={team}
               selectedStat={selectedStat}
               isPremium={true}
+              statConfig={statConfig}
             />
           </div>
         </div>

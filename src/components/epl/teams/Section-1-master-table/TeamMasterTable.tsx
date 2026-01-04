@@ -1,8 +1,7 @@
-// src/components/afl/teams/TeamMasterTable.tsx
-
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/lib/auth";
+import type { StatConfig, EPLStatKey } from "@/lib/stats/types";
 
 import TeamInsightsOverlay from "../Section-2-team-insights/TeamInsightsOverlay";
 import TeamMasterTableDesktop from "./TeamMasterTableDesktop";
@@ -10,20 +9,12 @@ import TeamMasterTableMobile from "./TeamMasterTableMobile";
 
 import { MOCK_TEAMS, TeamRow } from "../data/mockTeams";
 
-/* -------------------------------------------------------------------------- */
-/* TYPES                                                                      */
-/* -------------------------------------------------------------------------- */
+export type StatLens = EPLStatKey;
 
-export type StatLens = "Fantasy" | "Disposals" | "Goals";
-
-/* -------------------------------------------------------------------------- */
-/* MASTER TABLE ORCHESTRATOR                                                   */
-/* -------------------------------------------------------------------------- */
-
-export default function TeamMasterTable() {
+export default function TeamMasterTable({ statConfig }: { statConfig: StatConfig<EPLStatKey> }) {
   const { isPremium } = useAuth();
 
-  const [selectedStat, setSelectedStat] = useState<StatLens>("Fantasy");
+  const [selectedStat, setSelectedStat] = useState<StatLens>(statConfig.defaultStat);
   const [selectedTeam, setSelectedTeam] = useState<TeamRow | null>(null);
   const [query, setQuery] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -34,7 +25,6 @@ export default function TeamMasterTable() {
 
   return (
     <>
-      {/* ================= DESKTOP ================= */}
       <div className="hidden md:block">
         <TeamMasterTableDesktop
           teams={teams}
@@ -44,10 +34,10 @@ export default function TeamMasterTable() {
           query={query}
           setQuery={setQuery}
           onSelectTeam={setSelectedTeam}
+          statConfig={statConfig}
         />
       </div>
 
-      {/* ================= MOBILE ================= */}
       <div className="md:hidden">
         <TeamMasterTableMobile
           teams={teams}
@@ -57,10 +47,10 @@ export default function TeamMasterTable() {
           query={query}
           setQuery={setQuery}
           onSelectTeam={setSelectedTeam}
+          statConfig={statConfig}
         />
       </div>
 
-      {/* ================= INSIGHTS OVERLAY ================= */}
       {mounted &&
         selectedTeam &&
         createPortal(
@@ -69,6 +59,7 @@ export default function TeamMasterTable() {
             selectedStat={selectedStat}
             onClose={() => setSelectedTeam(null)}
             onLensChange={setSelectedStat}
+            statConfig={statConfig}
           />,
           document.body
         )}
