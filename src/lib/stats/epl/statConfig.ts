@@ -8,11 +8,12 @@ export const EPL_STAT_CONFIG: StatConfig<EPLStatKey> = {
     current: "2025–2026",
   },
 
-  availableStats: ["goals", "assists", "shots", "shotsOnTarget", "xg"],
+  availableStats: ["fantasy", "goals", "assists", "shots", "shotsOnTarget", "xg"],
 
-  defaultStat: "goals",
+  defaultStat: "fantasy",
 
   labels: {
+    fantasy: "Fantasy",
     goals: "Goals",
     assists: "Assists",
     shots: "Shots",
@@ -21,6 +22,7 @@ export const EPL_STAT_CONFIG: StatConfig<EPLStatKey> = {
   },
 
   units: {
+    fantasy: "pts",
     goals: "g",
     assists: "a",
     shots: "sh",
@@ -29,6 +31,8 @@ export const EPL_STAT_CONFIG: StatConfig<EPLStatKey> = {
   },
 
   descriptions: {
+    fantasy:
+      "Fantasy scoring based on goals, assists, shots, xG and involvement.",
     goals:
       "Forward efficiency spiked with multiple players scoring and capitalising on high xG chances.",
     assists:
@@ -55,6 +59,7 @@ export const EPL_STAT_CONFIG: StatConfig<EPLStatKey> = {
   },
 
   playerThresholds: {
+    fantasy: [30, 40, 50, 60],
     goals: [1, 2, 3, 4],
     assists: [1, 2, 3],
     shots: [2, 4, 6, 8],
@@ -63,6 +68,7 @@ export const EPL_STAT_CONFIG: StatConfig<EPLStatKey> = {
   },
 
   teamThresholds: {
+    fantasy: [120, 150, 180],
     goals: [1, 2, 3, 4],
     assists: [1, 2, 3, 4],
     shots: [8, 12, 16, 20],

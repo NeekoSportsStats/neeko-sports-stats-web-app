@@ -12,6 +12,7 @@ export interface Player {
   pos: Position;
   team: string;
 
+  fantasy: number[];
   goals: number[];
   assists: number[];
   shots: number[];
@@ -63,6 +64,7 @@ function generatePlayers(): Player[] {
       "WHU",
     ][i % 10];
 
+    const fantasy: number[] = [];
     const goals: number[] = [];
     const assists: number[] = [];
     const shots: number[] = [];
@@ -111,6 +113,15 @@ function generatePlayers(): Player[] {
         expectedGoals = Math.round(expectedGoals * 100) / 100;
       }
 
+      const fantasyScore = Math.round(
+        g * 8 +
+        a * 5 +
+        s * 1 +
+        sot * 2 +
+        expectedGoals * 6
+      );
+
+      fantasy.push(fantasyScore);
       goals.push(g);
       assists.push(a);
       shots.push(s);
@@ -123,6 +134,7 @@ function generatePlayers(): Player[] {
       name: `Player ${i + 1}`,
       pos,
       team,
+      fantasy,
       goals,
       assists,
       shots,

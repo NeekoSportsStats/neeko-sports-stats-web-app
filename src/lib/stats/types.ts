@@ -2,9 +2,9 @@ export type SportKey = "afl" | "epl" | "nba";
 
 export type AFLStatKey = "fantasy" | "disposals" | "goals";
 
-export type EPLStatKey = "goals" | "assists" | "shots" | "shotsOnTarget" | "xg";
+export type EPLStatKey = "fantasy" | "goals" | "assists" | "shots" | "shotsOnTarget" | "xg";
 
-export type NBAStatKey = "points" | "rebounds" | "assists";
+export type NBAStatKey = "points" | "rebounds" | "assists" | "threes";
 
 export type StatKey = AFLStatKey | EPLStatKey | NBAStatKey;
 

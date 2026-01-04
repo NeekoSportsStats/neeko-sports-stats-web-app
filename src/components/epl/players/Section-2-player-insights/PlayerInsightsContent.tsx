@@ -47,6 +47,13 @@ function aiSummary(statKey: string, avg: number, v: number) {
   const stat = String(statKey).toLowerCase();
   const vol = volLabel(v).label.toLowerCase();
 
+  if (stat.includes("fantasy")) {
+    if (avg >= 45)
+      return `Fantasy scoring is elite with ${vol} volatility — consistent involvement across goals, assists, and shot volume.`;
+    if (avg >= 30)
+      return `Fantasy output is strong with ${vol} volatility; ceiling games driven by multi-stat contributions.`;
+    return `Fantasy scoring is ${vol}; expect matchup-driven swings tied to role, shot quality, and chance creation.`;
+  }
   if (stat.includes("xg")) {
     return `Chance quality is ${vol}; xG stability tends to improve with consistent shot volume and central touches.`;
   }

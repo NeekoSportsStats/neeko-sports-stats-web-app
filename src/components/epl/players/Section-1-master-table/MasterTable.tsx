@@ -28,24 +28,42 @@ function buildMockPlayers(): PlayerRow[] {
   return Array.from({ length: 80 }).map((_, i) => {
     const stats: Record<StatLens, number[]> = {} as any;
 
-    statKeys.forEach((stat) => {
-      stats[stat] = Array.from({ length: totalRounds }).map(() => {
-        switch (stat) {
-          case "goals":
-            return Math.random() < 0.25 ? 1 : 0;
-          case "xg":
-            return +(Math.random() * 0.6).toFixed(2);
-          case "shots":
-            return Math.round(Math.random() * 4);
-          case "assists":
-            return Math.random() < 0.15 ? 1 : 0;
-          case "shotsOnTarget":
-            return Math.round(Math.random() * 2);
-          default:
-            return +(Math.random() * 1.2).toFixed(2);
-        }
-      });
-    });
+    const goals: number[] = [];
+    const assists: number[] = [];
+    const shots: number[] = [];
+    const shotsOnTarget: number[] = [];
+    const xg: number[] = [];
+    const fantasy: number[] = [];
+
+    for (let r = 0; r < totalRounds; r++) {
+      const g = Math.random() < 0.25 ? 1 : 0;
+      const a = Math.random() < 0.15 ? 1 : 0;
+      const s = Math.round(Math.random() * 4);
+      const sot = Math.round(Math.random() * 2);
+      const xgVal = +(Math.random() * 0.6).toFixed(2);
+
+      const fantasyScore = Math.round(
+        g * 8 +
+        a * 5 +
+        s * 1 +
+        sot * 2 +
+        xgVal * 6
+      );
+
+      goals.push(g);
+      assists.push(a);
+      shots.push(s);
+      shotsOnTarget.push(sot);
+      xg.push(xgVal);
+      fantasy.push(fantasyScore);
+    }
+
+    stats.fantasy = fantasy;
+    stats.goals = goals;
+    stats.assists = assists;
+    stats.shots = shots;
+    stats.shotsOnTarget = shotsOnTarget;
+    stats.xg = xg;
 
     return {
       id: i + 1,

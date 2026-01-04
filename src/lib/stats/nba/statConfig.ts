@@ -1,22 +1,22 @@
-import { StatConfig } from "../types";
+import type { StatConfig, NBAStatKey } from "@/lib/stats/types";
 
-export const NBA_STAT_CONFIG: StatConfig = {
-  sport: "nba",
+export const NBA_STAT_CONFIG: StatConfig<NBAStatKey> = {
+  league: "NBA",
 
-  defaultStat: "points",
+  seasons: {
+    past: "2024–2025",
+    current: "2025–2026",
+  },
 
   availableStats: ["points", "rebounds", "assists", "threes"],
+
+  defaultStat: "points",
 
   labels: {
     points: "Points",
     rebounds: "Rebounds",
     assists: "Assists",
     threes: "3-Pointers",
-    fantasy: "",
-    disposals: "",
-    goals: "",
-    xg: "",
-    shots: "",
   },
 
   units: {
@@ -24,13 +24,6 @@ export const NBA_STAT_CONFIG: StatConfig = {
     rebounds: "reb",
     assists: "ast",
     threes: "3PM",
-  },
-
-  unitsShort: {
-    points: "pts",
-    rebounds: "reb",
-    assists: "ast",
-    threes: "3s",
   },
 
   descriptions: {
@@ -48,32 +41,25 @@ export const NBA_STAT_CONFIG: StatConfig = {
     totalRounds: 82,
     currentRound: 1,
     roundLabels: [
-      "Game 1","Game 2","Game 3","Game 4","Game 5","Game 6","Game 7","Game 8","Game 9","Game 10",
-      "Game 11","Game 12","Game 13","Game 14","Game 15","Game 16","Game 17","Game 18","Game 19","Game 20",
-      "Game 21","Game 22","Game 23","Game 24","Game 25","Game 26","Game 27","Game 28","Game 29","Game 30",
-      "Game 31","Game 32","Game 33","Game 34","Game 35","Game 36","Game 37","Game 38","Game 39","Game 40",
-      "Game 41","Game 42","Game 43","Game 44","Game 45","Game 46","Game 47","Game 48","Game 49","Game 50",
-      "Game 51","Game 52","Game 53","Game 54","Game 55","Game 56","Game 57","Game 58","Game 59","Game 60",
-      "Game 61","Game 62","Game 63","Game 64","Game 65","Game 66","Game 67","Game 68","Game 69","Game 70",
-      "Game 71","Game 72","Game 73","Game 74","Game 75","Game 76","Game 77","Game 78","Game 79","Game 80",
-      "Game 81","Game 82",
+      "G1","G2","G3","G4","G5","G6","G7","G8","G9","G10",
+      "G11","G12","G13","G14","G15","G16","G17","G18","G19","G20",
+      "G21","G22","G23","G24","G25","G26","G27","G28","G29","G30",
+      "G31","G32","G33","G34","G35","G36","G37","G38","G39","G40",
+      "G41","G42","G43","G44","G45","G46","G47","G48","G49","G50",
+      "G51","G52","G53","G54","G55","G56","G57","G58","G59","G60",
+      "G61","G62","G63","G64","G65","G66","G67","G68","G69","G70",
+      "G71","G72","G73","G74","G75","G76","G77","G78","G79","G80",
+      "G81","G82",
     ],
     periods: ["Q1", "Q2", "Q3", "Q4"],
     scoringRules: "2 points inside arc, 3 points beyond arc, 1 point per free throw",
   },
 
-  playerInsightThresholds: {
+  playerThresholds: {
     points: [15, 20, 25, 30, 35],
     rebounds: [5, 8, 10, 12],
     assists: [3, 5, 7, 10],
     threes: [1, 2, 3, 4],
-  },
-
-  playerTableThresholds: {
-    points: [20, 25, 30, 35],
-    rebounds: [8, 10, 12, 15],
-    assists: [5, 7, 10, 12],
-    threes: [2, 3, 4, 5],
   },
 
   teamThresholds: {
@@ -82,6 +68,8 @@ export const NBA_STAT_CONFIG: StatConfig = {
     assists: [20, 25, 30, 35],
     threes: [8, 12, 15, 18],
   },
+
+  positions: ["PG", "SG", "SF", "PF", "C"],
 
   momentum: {
     description: "Recent scoring trend over last games",
