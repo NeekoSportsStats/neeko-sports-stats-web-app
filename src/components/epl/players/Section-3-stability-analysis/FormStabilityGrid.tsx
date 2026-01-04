@@ -11,7 +11,7 @@ import {
   average,
   stdDev,
   StatKey,
-} from "@/components/epl/players/data/useAFLMockData";
+} from "@/components/epl/players/data/useEPLMockData";
 
 /* ---------------------------------------------------------
    Types / helpers

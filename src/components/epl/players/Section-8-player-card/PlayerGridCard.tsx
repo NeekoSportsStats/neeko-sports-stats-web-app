@@ -1,5 +1,5 @@
 import React from "react";
-import { Player } from "../data/useAFLMockData";
+import { Player } from "../data/useEPLMockData";
 import TrendSparklineMini from "../Section-3-stability-analysis/TrendSparklineMini";
 import MiniTrendChips from "../Section-4-trend-insights/MiniTrendChips";
 

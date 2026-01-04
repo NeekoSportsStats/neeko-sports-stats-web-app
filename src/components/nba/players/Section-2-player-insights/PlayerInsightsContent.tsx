@@ -1,5 +1,5 @@
 import React from "react";
-import { ROUND_LABELS } from "../Section-1-master-table/MasterTable";
+import { GAME_LABELS } from "../Section-1-master-table/MasterTable";
 import type { PlayerRow, StatLens } from "../Section-1-master-table/MasterTable";
 
 import {
@@ -8,7 +8,7 @@ import {
   getRoundsForLens,
 } from "../data/playerInsightsUtils";
 
-import { STAT_CONFIG } from "../data/playerStatConfig";
+import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
 
 /**
  * Full insights content for players — MOBILE SAFE / NO SPARKLINE

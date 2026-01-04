@@ -1,5 +1,5 @@
 import React from "react";
-import { Player } from "../data/useAFLMockData";
+import { Player } from "../data/useEPLMockData";
 
 interface Item {
   player: Player;

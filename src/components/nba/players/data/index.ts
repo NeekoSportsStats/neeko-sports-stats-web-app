@@ -1,3 +1,2 @@
-export * from "./useAFLMockData";
+export * from "./useNBAMockData";
 export * from "./playerInsightsUtils";
-export * from "./playerStatConfig";

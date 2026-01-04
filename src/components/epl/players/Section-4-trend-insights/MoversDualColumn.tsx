@@ -1,6 +1,6 @@
 import React from "react";
 import PlayerGridCard from "../Section-8-player-card/PlayerGridCard";
-import { Player } from "../data/useAFLMockData";
+import { Player } from "../data/useEPLMockData";
 
 export interface MoversEntry {
   player: Player;

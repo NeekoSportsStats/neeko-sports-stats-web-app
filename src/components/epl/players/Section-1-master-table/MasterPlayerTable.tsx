@@ -6,7 +6,7 @@ import {
   average,
   stdDev,
   stabilityMeta,
-} from "../data/useAFLMockData";
+} from "../data/useEPLMockData";
 import TrendSparklineMini from "../Section-3-stability-analysis/TrendSparklineMini";
 import FormArrowBadge from "../Section-3-stability-analysis/FormArrowBadge";
 

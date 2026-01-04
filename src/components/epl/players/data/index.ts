@@ -1,2 +1,2 @@
-export * from "./useAFLMockData";
+export * from "./useEPLMockData";
 export * from "./playerInsightsUtils";

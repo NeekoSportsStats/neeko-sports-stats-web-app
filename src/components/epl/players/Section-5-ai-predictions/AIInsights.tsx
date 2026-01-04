@@ -11,7 +11,7 @@ import {
   stdDev,
   getSeriesForStat,
   StatKey,
-} from "@/components/epl/players/data/useAFLMockData";
+} from "@/components/epl/players/data/useEPLMockData";
 
 /**
  * TEMP GATING FLAG
