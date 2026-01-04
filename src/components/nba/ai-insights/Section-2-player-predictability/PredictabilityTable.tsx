@@ -30,8 +30,10 @@ function blendedScore(r: PredictRow) {
 function inferStatKey(statLabel: string) {
   const s = (statLabel || "").toLowerCase();
   if (s.includes("fantasy")) return "fantasy";
-  if (s.includes("disposal")) return "disposals";
-  if (s.includes("goal")) return "goals";
+  if (s.includes("point")) return "points";
+  if (s.includes("rebound")) return "rebounds";
+  if (s.includes("assist")) return "assists";
+  if (s.includes("three") || s.includes("3")) return "threes";
   return "generic";
 }
 
@@ -62,17 +64,27 @@ function whyThisMatters(statKey: string, conf01: number, vol01: number) {
   if (statKey === "fantasy") {
     return conf01 >= 0.7
       ? "Strong role reliability supports safer fantasy builds."
-      : "Fantasy output sensitive to role and tempo shifts.";
+      : "Fantasy output sensitive to usage and matchup shifts.";
   }
-  if (statKey === "disposals") {
+  if (statKey === "points") {
     return conf01 >= 0.7
-      ? "Disposal volume is structurally stable."
-      : "Touches fluctuate with rotation and matchup.";
+      ? "Scoring output is structurally stable."
+      : "Points fluctuate with shot quality and defensive pressure.";
   }
-  if (statKey === "goals") {
+  if (statKey === "rebounds") {
+    return conf01 >= 0.7
+      ? "Rebounding volume is consistent and role-stable."
+      : "Glass work varies with matchup and rotation minutes.";
+  }
+  if (statKey === "assists") {
     return vol01 >= 0.65
-      ? "Goal scoring volatile and opportunity driven."
-      : "Scoring chances relatively contained.";
+      ? "Playmaking volatile and pace-dependent."
+      : "Ball movement relatively stable within system.";
+  }
+  if (statKey === "threes") {
+    return vol01 >= 0.65
+      ? "Three-point shooting highly volatile and variance-driven."
+      : "Outside shooting shows contained variance.";
   }
   return "Projection reliability reflects recent role context.";
 }
@@ -104,7 +116,7 @@ function fakeLockedRow(r: PredictRow): PredictRow {
 /* COMPONENT                                                                   */
 /* -------------------------------------------------------------------------- */
 
-type StatLens = "fantasy" | "disposals" | "goals";
+type StatLens = "fantasy" | "points" | "rebounds" | "assists" | "threes";
 
 export default function PredictabilityTable({
   fixtures,
@@ -120,7 +132,12 @@ export default function PredictabilityTable({
   const locked = mode !== "premium";
 
   const [statLens, setStatLens] = useState<StatLens>("fantasy");
-  const statLabel = statLens === "fantasy" ? "Fantasy" : statLens === "disposals" ? "Disposals" : "Goals";
+  const statLabel =
+    statLens === "fantasy" ? "Fantasy" :
+    statLens === "points" ? "Points" :
+    statLens === "rebounds" ? "Rebounds" :
+    statLens === "assists" ? "Assists" :
+    "3-Pointers";
   const statKey = useMemo(() => inferStatKey(statLabel), [statLabel]);
 
   const rawPlayerPredict = useMemo(
@@ -232,7 +249,7 @@ export default function PredictabilityTable({
               </div>
 
               <div className="flex gap-1.5">
-                {(["fantasy", "disposals", "goals"] as StatLens[]).map((s) => (
+                {(["fantasy", "points", "rebounds", "assists", "threes"] as StatLens[]).map((s) => (
                   <button
                     key={s}
                     onClick={() => setStatLens(s)}
@@ -243,7 +260,10 @@ export default function PredictabilityTable({
                         : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
                     )}
                   >
-                    {s === "fantasy" ? "Fantasy" : s === "disposals" ? "Disposals" : "Goals"}
+                    {s === "fantasy" ? "Fantasy" :
+                     s === "points" ? "Points" :
+                     s === "rebounds" ? "Rebounds" :
+                     s === "assists" ? "Assists" : "3-Pointers"}
                   </button>
                 ))}
               </div>

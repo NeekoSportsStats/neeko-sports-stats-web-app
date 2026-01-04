@@ -76,12 +76,12 @@ function getFinalScores(m: any): { home: number | null; away: number | null } {
     safeNum(m?.homeScore) ??
     safeNum(m?.scores?.home) ??
     safeNum(m?.score?.home) ??
-    safeNum(m?.goals?.home); // fallback
+    safeNum(m?.points?.home); // fallback
   const away =
     safeNum(m?.awayScore) ??
     safeNum(m?.scores?.away) ??
     safeNum(m?.score?.away) ??
-    safeNum(m?.goals?.away);
+    safeNum(m?.points?.away);
   return { home, away };
 }
 
@@ -419,7 +419,7 @@ function buildMomentumWindows(
     {
       id: "q1_start",
       title: "First 10 minutes (Q1)",
-      why: "The opening shape sets quickly — early territory and clearance control often dictate tempo.",
+      why: "Opening tempo and early pace control often set the rhythm and defensive intensity.",
       weight01: wQ1 * 0.9,
     },
     {
@@ -431,19 +431,19 @@ function buildMomentumWindows(
     {
       id: "q3_open",
       title: "Opening 10 minutes (Q3)",
-      why: "Post-adjustment phases are a common swing zone — matchup changes and pressure spikes show here.",
+      why: "Post-halftime adjustments are a common swing zone — rotations and defensive changes show impact.",
       weight01: wQ3 * 1.0,
     },
     {
       id: "q4_mid",
-      title: "Mid Q4 (8–14 minutes)",
-      why: "If the game is live, fatigue and risk-taking widen volatility windows — repeats snowball faster.",
+      title: "Mid Q4 (6–10 minutes)",
+      why: "Fatigue and foul trouble widen volatility windows — scoring runs can snowball faster.",
       weight01: wQ4 * 0.9,
     },
     {
       id: "q4_last6",
       title: "Final 6 minutes (Q4)",
-      why: "Close-game conditions amplify sensitivity — one clean chain can flip control quickly.",
+      why: "Close-game conditions amplify sensitivity — one clean run can flip momentum quickly.",
       weight01: wQ4 * 0.85,
     },
   ];
@@ -456,18 +456,18 @@ function buildDeepTriggers(homeTeam: string, awayTeam: string): DeepTrigger[] {
   return [
     {
       id: "trigger_1",
-      if: "Two goals land within ~3 minutes",
-      then: "A swing window typically opens for the next 8–12 minutes (tempo lifts, risk increases).",
+      if: "Two quick buckets land within ~90 seconds",
+      then: "A momentum window typically opens for the next 4–6 minutes (pace lifts, defensive pressure increases).",
     },
     {
       id: "trigger_2",
-      if: "The first 5 minutes of Q3 are one-way territory",
-      then: "The mid-game lean often hardens (teams commit to structure and matchups).",
+      if: "The first 5 minutes of Q3 show one-sided scoring",
+      then: "The mid-game lean often hardens (teams commit to defensive schemes and rotations).",
     },
     {
       id: "trigger_3",
-      if: "The margin is under ~12 points entering Q4",
-      then: "Late-game sensitivity increases (small runs can swing control quickly).",
+      if: "The margin is under 8 points entering Q4",
+      then: "Late-game volatility increases (scoring runs and defensive stops can flip control quickly).",
     },
     {
       id: "trigger_4",
