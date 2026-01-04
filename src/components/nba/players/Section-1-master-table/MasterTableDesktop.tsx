@@ -108,7 +108,7 @@ export default function MasterTableDesktop({
   const rows = useMemo(() => {
     return players
       .map((p) => {
-        const values = getRowValues(String(p.id), selectedStat, gameLabels);
+        const values = p.stats[selectedStat] || [];
         return {
           player: p,
           values,
@@ -117,7 +117,7 @@ export default function MasterTableDesktop({
         };
       })
       .sort((a, b) => b.stats.total - a.stats.total);
-  }, [players, selectedStat, gameLabels]);
+  }, [players, selectedStat]);
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -144,7 +144,7 @@ export default function MasterTableDesktop({
     [players]
   );
 
-  const hitThresholds = statConfig.playerTableThresholds?.[selectedStat] || [];
+  const hitThresholds = statConfig.playerThresholds?.[selectedStat] || [];
 
   const nonCompactMinWidth =
     LEFT_COL_W + gameLabels.length * GAME_COL_W + RIGHT_COL_W;

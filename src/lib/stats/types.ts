@@ -4,7 +4,7 @@ export type AFLStatKey = "fantasy" | "disposals" | "goals";
 
 export type EPLStatKey = "fantasy" | "goals" | "assists" | "shots" | "shotsOnTarget" | "xg";
 
-export type NBAStatKey = "points" | "rebounds" | "assists" | "threes";
+export type NBAStatKey = "fantasy" | "points" | "rebounds" | "assists" | "threes";
 
 export type StatKey = AFLStatKey | EPLStatKey | NBAStatKey;
 

@@ -279,19 +279,22 @@ export default function MasterTableMobile({
                       </button>
 
                       <div className={`${STATS_ROW_CLASS} py-4`}>
-                        {gameLabels.map((_, i) => (
-                          <div
-                            key={i}
-                            className="text-center text-[15px] text-neutral-100"
-                            style={{ width: CELL_W }}
-                          >
-                            {gated ? (
-                              <span className="inline-block w-6 h-4 rounded-sm bg-neutral-600/40 animate-pulse" />
-                            ) : (
-                              skeletonValue()
-                            )}
-                          </div>
-                        ))}
+                        {gameLabels.map((_, i) => {
+                          const value = p.stats[selectedStat]?.[i] ?? 0;
+                          return (
+                            <div
+                              key={i}
+                              className="text-center text-[15px] text-neutral-100"
+                              style={{ width: CELL_W }}
+                            >
+                              {gated ? (
+                                <span className="inline-block w-6 h-4 rounded-sm bg-neutral-600/40 animate-pulse" />
+                              ) : (
+                                value
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
 
                       {gated && (

@@ -1,21 +1,21 @@
 import React, { useMemo } from "react";
 import { X } from "lucide-react";
-import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
-import type { EPLStatKey } from "@/lib/stats/types";
+import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
+import type { NBAStatKey } from "@/lib/stats/types";
 
 type PlayerRow = {
   id: number;
   name: string;
   team: string;
   role: string;
-  stats: Record<EPLStatKey, number[]>;
+  stats: Record<NBAStatKey, number[]>;
 };
 
 type Props = {
   player: PlayerRow;
-  selectedStat: EPLStatKey;
+  selectedStat: NBAStatKey;
   onClose: () => void;
-  onLensChange: (stat: EPLStatKey) => void;
+  onLensChange: (stat: NBAStatKey) => void;
 };
 
 export default function PlayerInsightsContent({
@@ -24,7 +24,7 @@ export default function PlayerInsightsContent({
   onClose,
   onLensChange,
 }: Props) {
-  const statKeys = EPL_STAT_CONFIG.availableStats as EPLStatKey[];
+  const statKeys = NBA_STAT_CONFIG.availableStats as NBAStatKey[];
 
   const series = player.stats[selectedStat] ?? [];
 
@@ -92,7 +92,7 @@ export default function PlayerInsightsContent({
                 }
               `}
             >
-              {EPL_STAT_CONFIG.labels[stat]}
+              {NBA_STAT_CONFIG.labels[stat]}
             </button>
           ))}
         </div>
@@ -100,7 +100,7 @@ export default function PlayerInsightsContent({
         {/* ROUND BY ROUND */}
         <div className="mb-6">
           <div className="text-[10px] uppercase tracking-[0.25em] text-neutral-400 mb-2">
-            Round by Round — {EPL_STAT_CONFIG.labels[selectedStat]}
+            Round by Round — {NBA_STAT_CONFIG.labels[selectedStat]}
           </div>
 
           <div className="grid grid-cols-5 gap-2">
@@ -121,7 +121,7 @@ export default function PlayerInsightsContent({
         {/* SUMMARY */}
         <div className="rounded-2xl border border-neutral-800 bg-black/40 p-4 mb-4">
           <div className="text-[10px] uppercase tracking-[0.25em] text-neutral-400 mb-3">
-            Season Summary — {EPL_STAT_CONFIG.labels[selectedStat]}
+            Season Summary — {NBA_STAT_CONFIG.labels[selectedStat]}
           </div>
 
           <div className="grid grid-cols-2 gap-4 text-sm">
@@ -129,7 +129,7 @@ export default function PlayerInsightsContent({
               <div className="text-neutral-400 text-xs">Average</div>
               <div className="text-yellow-300 font-semibold">
                 {summary.avg.toFixed(2)}{" "}
-                {EPL_STAT_CONFIG.unitsShort[selectedStat]}
+                {NBA_STAT_CONFIG.units[selectedStat]}
               </div>
             </div>
 
@@ -163,7 +163,7 @@ export default function PlayerInsightsContent({
             AI Performance Summary
           </div>
           <p className="text-sm text-neutral-300 leading-relaxed">
-            {EPL_STAT_CONFIG.labels[selectedStat]} output shows role-driven
+            {NBA_STAT_CONFIG.labels[selectedStat]} output shows role-driven
             volatility with matchup-dependent ceiling games and a
             controlled scoring floor.
           </p>

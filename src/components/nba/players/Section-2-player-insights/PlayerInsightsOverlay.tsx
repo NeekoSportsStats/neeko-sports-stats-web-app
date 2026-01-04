@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { PlayerRow, StatLens } from "../Section-1-master-table/MasterTable";
 import InsightsContent from "./PlayerInsightsContent";
+import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
 
 /* -------------------------------------------------------------------------- */
 /*                         PLAYER INSIGHTS OVERLAY (FINAL)                    */
@@ -141,7 +142,7 @@ export default function PlayerInsightsOverlay({
 
           {/* Lens Pills */}
           <div className="px-5 py-3 flex gap-2 border-b border-neutral-800">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((lens) => (
+            {(NBA_STAT_CONFIG.availableStats as StatLens[]).map((lens) => (
               <button
                 key={lens}
                 onClick={() => onLensChange(lens)}
@@ -151,7 +152,7 @@ export default function PlayerInsightsOverlay({
                     : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300"
                 }
               >
-                {lens}
+                {NBA_STAT_CONFIG.labels[lens]}
               </button>
             ))}
           </div>
@@ -215,7 +216,7 @@ export default function PlayerInsightsOverlay({
 
           {/* Pills */}
           <div className="px-4 pb-3 flex gap-2">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((lens) => (
+            {(NBA_STAT_CONFIG.availableStats as StatLens[]).map((lens) => (
               <button
                 key={lens}
                 onClick={() => onLensChange(lens)}
@@ -225,7 +226,7 @@ export default function PlayerInsightsOverlay({
                     : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300"
                 }
               >
-                {lens}
+                {NBA_STAT_CONFIG.labels[lens]}
               </button>
             ))}
           </div>

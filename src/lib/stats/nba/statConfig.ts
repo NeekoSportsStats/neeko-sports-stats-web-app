@@ -8,11 +8,12 @@ export const NBA_STAT_CONFIG: StatConfig<NBAStatKey> = {
     current: "2025–2026",
   },
 
-  availableStats: ["points", "rebounds", "assists", "threes"],
+  availableStats: ["fantasy", "points", "rebounds", "assists", "threes"],
 
-  defaultStat: "points",
+  defaultStat: "fantasy",
 
   labels: {
+    fantasy: "Fantasy",
     points: "Points",
     rebounds: "Rebounds",
     assists: "Assists",
@@ -20,6 +21,7 @@ export const NBA_STAT_CONFIG: StatConfig<NBAStatKey> = {
   },
 
   units: {
+    fantasy: "pts",
     points: "pts",
     rebounds: "reb",
     assists: "ast",
@@ -27,6 +29,8 @@ export const NBA_STAT_CONFIG: StatConfig<NBAStatKey> = {
   },
 
   descriptions: {
+    fantasy:
+      "Fantasy scoring combining points, rebounds, assists, and other statistical categories into a composite score.",
     points:
       "Scoring output per game showing offensive volume and efficiency across all shot types.",
     rebounds:
@@ -56,6 +60,7 @@ export const NBA_STAT_CONFIG: StatConfig<NBAStatKey> = {
   },
 
   playerThresholds: {
+    fantasy: [25, 35, 45, 55, 65],
     points: [15, 20, 25, 30, 35],
     rebounds: [5, 8, 10, 12],
     assists: [3, 5, 7, 10],
@@ -63,6 +68,7 @@ export const NBA_STAT_CONFIG: StatConfig<NBAStatKey> = {
   },
 
   teamThresholds: {
+    fantasy: [200, 225, 250, 275],
     points: [100, 110, 120, 130],
     rebounds: [40, 45, 50, 55],
     assists: [20, 25, 30, 35],

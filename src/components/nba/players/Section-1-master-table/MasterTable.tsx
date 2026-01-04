@@ -19,9 +19,7 @@ export type PlayerRow = {
   name: string;
   team: string;
   role: string;
-  roundsPoints: number[];
-  roundsRebounds: number[];
-  roundsAssists: number[];
+  stats: Record<StatLens, number[]>;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -30,17 +28,30 @@ export type PlayerRow = {
 
 function buildMockPlayers(): PlayerRow[] {
   const list: PlayerRow[] = [];
-  const totalGames = NBA_STAT_CONFIG.sportMeta.totalRounds;
+  const totalGames = NBA_STAT_CONFIG.sportMeta.totalRounds ?? 82;
 
   for (let i = 1; i <= 60; i++) {
+    const role = ["PG","SG","SF","PF","C"][i % 5];
     const pts: number[] = [];
     const reb: number[] = [];
     const ast: number[] = [];
+    const threes: number[] = [];
+    const fantasy: number[] = [];
 
     for (let g = 0; g < totalGames; g++) {
-      pts.push(10 + Math.round(Math.random() * 30));
-      reb.push(2 + Math.round(Math.random() * 14));
-      ast.push(1 + Math.round(Math.random() * 12));
+      const p = 10 + Math.round(Math.random() * 30);
+      const r = 2 + Math.round(Math.random() * 14);
+      const a = 1 + Math.round(Math.random() * 12);
+      const t = Math.round(Math.random() * 5);
+
+      // NBA Fantasy formula: pts + (reb * 1.2) + (ast * 1.5) + (3pm * 3)
+      const f = p + (r * 1.2) + (a * 1.5) + (t * 3);
+
+      pts.push(p);
+      reb.push(r);
+      ast.push(a);
+      threes.push(t);
+      fantasy.push(Math.round(f));
     }
 
     list.push({
@@ -48,10 +59,14 @@ function buildMockPlayers(): PlayerRow[] {
       rank: i,
       name: `Player ${i}`,
       team: ["LAL","GSW","BOS","MIA","DEN","PHX"][i % 6],
-      role: ["PG","SG","SF","PF","C"][i % 5],
-      roundsPoints: pts,
-      roundsRebounds: reb,
-      roundsAssists: ast,
+      role,
+      stats: {
+        fantasy,
+        points: pts,
+        rebounds: reb,
+        assists: ast,
+        threes,
+      } as Record<StatLens, number[]>,
     });
   }
 
