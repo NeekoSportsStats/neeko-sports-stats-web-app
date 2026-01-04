@@ -1,9 +1,8 @@
-import type { PlayerRow, StatLens } from "./MasterTable";
-import { STAT_CONFIG } from "./playerStatConfig";
+import type { PlayerRow, StatLens } from "../Section-1-master-table/MasterTable";
 
 export function getRoundsForLens(player: PlayerRow, lens: StatLens) {
-  if (lens === "Fantasy") return player.roundsFantasy;
-  if (lens === "Disposals") return player.roundsDisposals;
+  if (lens === "fantasy") return player.roundsFantasy;
+  if (lens === "disposals") return player.roundsDisposals;
   return player.roundsGoals;
 }
 
@@ -19,12 +18,12 @@ export function computeSummary(player: PlayerRow, lens: StatLens) {
   const windowMax = Math.max(...lastWindow);
   const volatilityRange = windowMax - windowMin;
 
-  return { min, max, total, avg, windowMin, windowMax, volatilityRange };
+  return { min, max, total, avg, windowMin, windowMax, volatilityRange, games: rounds.length };
 }
 
-export function computeHitRates(player: PlayerRow, lens: StatLens) {
+export function computeHitRates(player: PlayerRow, lens: StatLens, thresholds: readonly number[]) {
   const rounds = getRoundsForLens(player, lens);
-  return STAT_CONFIG[lens].thresholds.map((t) =>
+  return thresholds.map((t) =>
     Math.round((rounds.filter((v) => v >= t).length / rounds.length) * 100)
   );
 }
