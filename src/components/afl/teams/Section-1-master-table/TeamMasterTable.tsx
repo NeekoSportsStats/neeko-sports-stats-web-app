@@ -72,6 +72,7 @@ export default function TeamMasterTable({ statConfig }: { statConfig: StatConfig
             selectedStat={selectedStat}
             onClose={() => setSelectedTeam(null)}
             onLensChange={setSelectedStat}
+            statConfig={statConfig}
           />,
           document.body
         )}
