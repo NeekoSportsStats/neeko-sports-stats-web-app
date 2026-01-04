@@ -1,7 +1,7 @@
-// src/components/afl/teams/TeamDashboardTiles.tsx
+// src/components/epl/teams/TeamDashboardTiles.tsx
 
 import React from "react";
-import { MOCK_TEAMS, AFLTeam } from "../data/mockTeams";
+import { MOCK_TEAMS, EPLTeam } from "../data/mockTeams";
 import {
   Activity,
   ShieldCheck,
@@ -20,7 +20,7 @@ type TileProps = {
   label: string;
   caption: string;
   value: string;
-  team: AFLTeam;
+  team: EPLTeam;
   icon: React.ReactNode;
   leaderLabel?: string;
 };
@@ -36,7 +36,7 @@ function GoldIconPlate({ children }: { children: React.ReactNode }) {
   );
 }
 
-function TeamIdentityBar({ team }: { team: AFLTeam }) {
+function TeamIdentityBar({ team }: { team: EPLTeam }) {
   return (
     <div className="mt-5 flex items-center justify-between rounded-full border border-yellow-500/25 bg-gradient-to-r from-black/70 via-black/45 to-black/65 px-3 py-1.5 shadow-[0_4px_14px_rgba(0,0,0,0.45)]">
       <div className="flex items-center gap-2">
@@ -135,7 +135,7 @@ function Tile({ label, caption, value, team, icon, leaderLabel }: TileProps) {
 export default function TeamDashboardTiles() {
   const bestAttack = [...MOCK_TEAMS].sort((a, b) => b.attackRating - a.attackRating)[0];
   const bestDefence = [...MOCK_TEAMS].sort((a, b) => b.defenceRating - a.defenceRating)[0];
-  const bestClearance = [...MOCK_TEAMS].sort((a, b) => avg(b.clearanceDom) - avg(a.clearanceDom))[0];
+  const bestPossession = [...MOCK_TEAMS].sort((a, b) => avg(b.possessionDom) - avg(a.possessionDom))[0];
   const mostConsistent = [...MOCK_TEAMS].sort((a, b) => b.consistencyIndex - a.consistencyIndex)[0];
   const easiestFixtures = [...MOCK_TEAMS].sort((a, b) => a.fixtureDifficulty.score - b.fixtureDifficulty.score)[0];
   const bestMomentum = [...MOCK_TEAMS].sort(
@@ -169,7 +169,7 @@ export default function TeamDashboardTiles() {
           </h3>
 
           <p className="mt-2 max-w-2xl text-xs text-neutral-400">
-            Rolling form, attack and defence ratings, clearance dominance and upcoming fixture difficulty – distilled into six premium, gold-tinted tiles.
+            Rolling form, attack and defence ratings, possession dominance and upcoming fixture difficulty – distilled into six premium, gold-tinted tiles.
           </p>
 
           <div className="mt-3 h-px w-40 bg-gradient-to-r from-yellow-500/90 via-yellow-300/60 to-transparent" />
@@ -180,7 +180,7 @@ export default function TeamDashboardTiles() {
 
         <Tile
           label="Recent Form"
-          caption="Last 6 rounds scoring margin trend"
+          caption="Last 6 matchweeks goal difference trend"
           value={avg(lastN(bestMomentum.margins, 6)).toFixed(1)}
           team={bestMomentum}
           icon={<TrendingUp className="h-4 w-4" />}
@@ -206,10 +206,10 @@ export default function TeamDashboardTiles() {
         />
 
         <Tile
-          label="Clearance Dominance"
-          caption="Average clearance win % this season"
-          value={`${avg(bestClearance.clearanceDom).toFixed(1)}%`}
-          team={bestClearance}
+          label="Possession Dominance"
+          caption="Average possession % this season"
+          value={`${avg(bestPossession.possessionDom).toFixed(1)}%`}
+          team={bestPossession}
           icon={<ArrowRight className="h-4 w-4" />}
           leaderLabel="League Leader"
         />

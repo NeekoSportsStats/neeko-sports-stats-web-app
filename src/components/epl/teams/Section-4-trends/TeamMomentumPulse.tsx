@@ -1,11 +1,4 @@
-// TEAM MOMENTUM PULSE — T1 PRIME EDITION v4
-// - Updated to match existing data model (no invalid fields)
-// - Section width now perfectly aligned with TeamDashboardTiles & all other sections
-// - Team Dashboard pill applied (Option A)
-// - H1-A Premium Depth Hover
-// - Fade-in animations preserved
-// - Sparkline mobile improved
-// - 6 editorial headlines
+// src/components/epl/teams/TeamMomentumPulse.tsx
 
 import React from "react";
 import { MOCK_TEAMS } from "../data/mockTeams";
@@ -206,7 +199,7 @@ function HeadlinesCard({ items, className }: { items: string[]; className?: stri
 ============================================================================ */
 
 export default function TeamMomentumPulse() {
-  const roundIndex = 22;
+  const roundIndex = 37;
   const prev = roundIndex - 1;
 
   const teams = MOCK_TEAMS;
@@ -223,11 +216,11 @@ export default function TeamMomentumPulse() {
     .sort((a, b) => b.delta - a.delta)[0];
 
   const headlines = [
-    "Midfield usage shifted significantly this round, with several clubs testing wider rotations.",
-    `${fantasyTeam.name} drove a major fantasy surge thanks to increased stoppage exposure.`,
+    "Midfield possession patterns shifted significantly this matchweek, with several clubs testing wider rotations.",
+    `${fantasyTeam.name} drove a major fantasy surge thanks to increased attacking exposure.`,
     `${defenceTeam.name} maintained elite defensive structure for extended phases.`,
-    `${momentum.team.name} produced the strongest round-to-round momentum lift in R22 → R23.`,
-    "Hybrid forward–mid roles delivered spikes in contest generation and volatility.",
+    `${momentum.team.name} produced the strongest matchweek-to-matchweek momentum lift in MW37 → MW38.`,
+    "Hybrid forward roles delivered spikes in goal contributions and volatility.",
     "Late-match defensive tightening reduced scoring flow across multiple games.",
   ];
 
@@ -250,7 +243,7 @@ export default function TeamMomentumPulse() {
           className="relative"
           style={{ animation: "fadeUp 650ms ease-out forwards", opacity: 0 }}
         >
-          {/* TEAM DASHBOARD PILL — Option A */}
+          {/* TEAM DASHBOARD PILL */}
           <div
             className="
               inline-flex items-center gap-[6px]
@@ -263,7 +256,7 @@ export default function TeamMomentumPulse() {
             "
           >
             <span className="h-1.5 w-1.5 rounded-full bg-[rgba(255,220,138,1)]" />
-            Round Momentum Pulse • R23
+            Matchweek Momentum Pulse • MW38
           </div>
 
           <h2 className="mt-5 text-[22px] font-semibold text-white md:text-[24px]">
@@ -271,7 +264,7 @@ export default function TeamMomentumPulse() {
           </h2>
 
           <p className="mt-2 max-w-3xl text-[15px] leading-snug text-neutral-200">
-            Round 23 fantasy trends reveal usage spikes, role changes and matchup
+            Matchweek 38 fantasy trends reveal usage spikes, role changes and matchup
             edges shaping team performance league-wide.
           </p>
 
@@ -284,7 +277,7 @@ export default function TeamMomentumPulse() {
             {/* Metric cards */}
             <div>
               <h3 className="text-[11px] uppercase tracking-[0.24em] text-[rgba(255,211,105,0.95)]">
-                Round 23 Summary Metrics
+                Matchweek 38 Summary Metrics
               </h3>
 
               <div className="mt-4 grid gap-6 sm:grid-cols-2">

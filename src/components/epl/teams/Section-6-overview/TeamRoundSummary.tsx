@@ -1,4 +1,4 @@
-// src/components/afl/teams/TeamMomentumPulse.tsx
+// src/components/epl/teams/TeamRoundSummary.tsx
 
 import React, { useMemo } from "react";
 import { MOCK_TEAMS } from "../data/mockTeams";
@@ -21,13 +21,13 @@ function Sparkline({ values }: { values: number[] }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                          TEAM MOMENTUM PULSE                               */
+/*                          TEAM MATCHWEEK PULSE                              */
 /* -------------------------------------------------------------------------- */
 
-export default function TeamMomentumPulse() {
+export default function TeamRoundSummary() {
   // Compute league-wide average sparkline
   const leagueAvgSpark = useMemo(() => {
-    const rounds = 23;
+    const rounds = 38;
     const arr: number[] = [];
     for (let r = 0; r < rounds; r++) {
       const roundScores = MOCK_TEAMS.map((t) => t.scores[r]);
@@ -43,7 +43,7 @@ export default function TeamMomentumPulse() {
   /* ------------------------------ HEADLINES -------------------------------- */
 
   const highestScoring = useMemo(() => {
-    const lastRound = 22;
+    const lastRound = 37;
     return [...MOCK_TEAMS].sort(
       (a, b) => b.scores[lastRound] - a.scores[lastRound]
     )[0];
@@ -59,7 +59,7 @@ export default function TeamMomentumPulse() {
     return [...MOCK_TEAMS]
       .map((t) => ({
         team: t,
-        delta: t.margins[22] - t.margins[21],
+        delta: t.margins[37] - t.margins[36],
       }))
       .sort((a, b) => b.delta - a.delta)[0];
   }, []);
@@ -85,9 +85,9 @@ export default function TeamMomentumPulse() {
       "
     >
       <SectionHeader
-        pillLabel="Round Momentum Pulse"
+        pillLabel="Matchweek Momentum Pulse"
         title="League-wide momentum trends & team signals"
-        description="Round-by-round scoring flow, defensive stability, movement indicators and team-level momentum signals."
+        description="Matchweek-by-matchweek scoring flow, defensive stability, movement indicators and team-level momentum signals."
         icon={Sparkles}
       />
 
@@ -108,7 +108,7 @@ export default function TeamMomentumPulse() {
           <div className="flex items-center gap-2 text-yellow-300">
             <Flame className="h-4 w-4" />
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em]">
-              Highest Scoring (R23)
+              Highest Scoring (MW38)
             </span>
           </div>
           <div className="mt-2 text-lg font-semibold text-neutral-50">
