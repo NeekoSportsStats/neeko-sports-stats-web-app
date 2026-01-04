@@ -31,8 +31,8 @@ export default function ControlsBar(props: {
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex flex-wrap items-center gap-2">
         {btn("fantasy")}
-        {btn("disposals")}
         {btn("goals")}
+        {btn("assists")}
       </div>
       {right ? <div className="flex items-center gap-2">{right}</div> : null}
     </div>

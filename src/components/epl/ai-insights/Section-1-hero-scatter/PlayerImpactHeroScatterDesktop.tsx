@@ -80,14 +80,14 @@ export default function PlayerImpactHeroScatterDesktop(props: {
         <div>
           <h3 className="text-2xl font-semibold text-white">Momentum vs Ceiling</h3>
           <p className="mt-1 text-sm text-white/60">
-            {homeTeam} vs {awayTeam} · {lens === "fantasy" ? "Fantasy" : lens === "disposals" ? "Disposals" : "Goals"} lens
+            {homeTeam} vs {awayTeam} · {lens === "fantasy" ? "Fantasy" : lens === "goals" ? "Goals" : "Assists"} lens
           </p>
         </div>
 
         {/* Metric + Team Filter */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex gap-1.5">
-            {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
+            {(["fantasy", "goals", "assists"] as LensKey[]).map((k) => (
               <button
                 key={k}
                 onClick={() => setLens(k)}
@@ -98,7 +98,7 @@ export default function PlayerImpactHeroScatterDesktop(props: {
                     : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
                 )}
               >
-                {k === "fantasy" ? "Fantasy" : k === "disposals" ? "Disposals" : "Goals"}
+                {k === "fantasy" ? "Fantasy" : k === "goals" ? "Goals" : "Assists"}
               </button>
             ))}
           </div>

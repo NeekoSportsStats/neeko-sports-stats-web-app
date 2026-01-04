@@ -100,7 +100,7 @@ export default function PlayerTrendModal(props: {
 
   if (!open || !player || !player.trend || player.trend.length === 0) return null;
 
-  const statLabel = lens === "fantasy" ? "Fantasy" : lens === "disposals" ? "Disposals" : "Goals";
+  const statLabel = lens === "fantasy" ? "Fantasy" : lens === "goals" ? "Goals" : lens === "assists" ? "Assists" : lens;
 
   const CH_W = 760;
   const CH_H = 340;

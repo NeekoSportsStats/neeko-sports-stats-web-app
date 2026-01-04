@@ -75,7 +75,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
 
       {/* Controls (mobile) */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {(["fantasy", "disposals", "goals"] as LensKey[]).map((k) => (
+        {(["fantasy", "goals", "assists"] as LensKey[]).map((k) => (
           <button
             key={k}
             onClick={() => setLens(k)}
@@ -86,7 +86,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
                 : "border-white/10 bg-black/20 text-white/70")
             }
           >
-            {k === "fantasy" ? "Fantasy" : k === "disposals" ? "Disposals" : "Goals"}
+            {k === "fantasy" ? "Fantasy" : k === "goals" ? "Goals" : "Assists"}
           </button>
         ))}
 

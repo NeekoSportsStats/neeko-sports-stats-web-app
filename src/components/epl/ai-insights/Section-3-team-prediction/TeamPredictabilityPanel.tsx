@@ -90,7 +90,7 @@ function meterLabel(pct01: number) {
 }
 
 function statContext(stat: StatLens) {
-  if (stat === "disposals") return "possession volume";
+  if (stat === "assists") return "creative output";
   if (stat === "goals") return "goal scoring";
   return "fantasy output";
 }
@@ -106,22 +106,22 @@ function lensValueFromTeamScore(teamPoints: number, stat: StatLens) {
     // goals proxy: ~6 pts per goal, plus some baseline to avoid tiny ranges
     return teamPoints / 6;
   }
-  if (stat === "disposals") {
-    // disposals proxy: scale higher (possession volume tends to be "bigger number")
-    return teamPoints * 1.35;
+  if (stat === "assists") {
+    // assists proxy: scale for creative output (typically 8-15 per team per game)
+    return teamPoints / 8 + 4;
   }
   return teamPoints; // fantasy proxy (keep as-is)
 }
 
 function clampForLens(n: number, stat: StatLens) {
   if (stat === "goals") return clamp(n, 3, 30);
-  if (stat === "disposals") return clamp(n, 220, 520);
+  if (stat === "assists") return clamp(n, 6, 18);
   return clamp(n, 40, 160);
 }
 
 function minSpreadForLens(stat: StatLens) {
   if (stat === "goals") return 3;
-  if (stat === "disposals") return 28;
+  if (stat === "assists") return 2;
   return 8;
 }
 
@@ -299,7 +299,7 @@ function computeExpectedRange(vals: number[], stat: StatLens) {
   const s = [...vals].filter(Number.isFinite).sort((a, b) => a - b);
   if (!s.length) {
     // fallback
-    const base = stat === "goals" ? 12 : stat === "disposals" ? 340 : 90;
+    const base = stat === "goals" ? 12 : stat === "assists" ? 10 : 90;
     return {
       low: base - minSpreadForLens(stat),
       high: base + minSpreadForLens(stat),
@@ -319,7 +319,7 @@ function computeExpectedRange(vals: number[], stat: StatLens) {
   if (stat === "goals") {
     return { low: Math.round(low), high: Math.round(high) };
   }
-  if (stat === "disposals") {
+  if (stat === "assists") {
     return { low: Math.round(low), high: Math.round(high) };
   }
   return { low: Math.round(low), high: Math.round(high) };
@@ -387,7 +387,7 @@ function buildTeamOutlook(
       ? clamp(
           (quantile([...oppH2HScores].sort((a, b) => a - b), 0.75) -
             lensValueFromTeamScore(mean(rawConceded), stat)) /
-            Math.max(1, stat === "goals" ? 10 : stat === "disposals" ? 180 : 60),
+            Math.max(1, stat === "goals" ? 10 : stat === "assists" ? 6 : 60),
           0,
           0.35
         )
@@ -451,8 +451,8 @@ function buildTeamOutlook(
   const lensLine =
     stat === "goals"
       ? "Goal lens emphasizes bursts and conversion variance — bands can compress until a scoring run lands."
-      : stat === "disposals"
-      ? "Disposals lens tracks system/role repeatability — tempo and stoppage control matter more than scoreboard."
+      : stat === "assists"
+      ? "Assists lens tracks creative involvement and key pass volume — fluidity in buildup shapes the range."
       : "Fantasy lens mixes role + matchup — volatility often comes from rotations and scoring chain exposure.";
 
   const read = (() => {
@@ -498,11 +498,11 @@ function buildTeamOutlook(
       ];
     }
 
-    if (stat === "disposals") {
+    if (stat === "assists") {
       return [
-        `IF stoppage wins tilt one way, THEN possession bands widen and the lean strengthens.`,
-        `IF tagging pressure lands on a primary mid, THEN the profile destabilizes (${chaosWord}).`,
-        `IF uncontested marks climb, THEN volatility compresses and floors lift.`,
+        `IF buildup chains flow through midfield, THEN creative output climbs and the lean strengthens.`,
+        `IF pressing intensity disrupts passing lanes, THEN the profile destabilizes (${chaosWord}).`,
+        `IF final third possession increases, THEN assist volume rises and variance compresses.`,
       ];
     }
 
@@ -606,10 +606,10 @@ function buildMatchMeta(home: TeamOutlook, away: TeamOutlook, stat: StatLens): M
           "IF early conversion spikes, THEN volatility accelerates late.",
           "IF set shots drop, THEN floors rise and chaos compresses.",
         ]
-      : stat === "disposals"
+      : stat === "assists"
       ? [
-          "IF stoppages tilt, THEN the lean sharpens quickly.",
-          "IF tagging pressure lands, THEN the band widens.",
+          "IF buildup fluidity increases, THEN the creative lean sharpens quickly.",
+          "IF pressing disrupts passing, THEN the assist band widens.",
         ]
       : [
           "IF rotations hold, THEN reliability improves across both teams.",
@@ -835,9 +835,9 @@ export default function TeamPredictabilityPanel({
             <>
               Goal lens vs <span className="text-white">{opponentName}</span>: expect tighter phases unless conversion swings land.
             </>
-          ) : stat === "disposals" ? (
+          ) : stat === "assists" ? (
             <>
-              Disposals lens vs <span className="text-white">{opponentName}</span>: stoppage + uncontested chains will decide band width.
+              Assists lens vs <span className="text-white">{opponentName}</span>: creative buildup and passing fluidity will decide band width.
             </>
           ) : (
             <>
@@ -917,7 +917,7 @@ export default function TeamPredictabilityPanel({
 
             <div className="flex items-center gap-3">
               <div className="flex gap-1.5">
-                {(["fantasy", "disposals", "goals"] as StatLens[]).map((s) => (
+                {(["fantasy", "goals", "assists"] as StatLens[]).map((s) => (
                   <button
                     key={s}
                     onClick={() => setStat(s)}
@@ -928,7 +928,7 @@ export default function TeamPredictabilityPanel({
                         : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
                     ].join(" ")}
                   >
-                    {s === "fantasy" ? "Fantasy" : s === "disposals" ? "Disposals" : "Goals"}
+                    {s === "fantasy" ? "Fantasy" : s === "goals" ? "Goals" : "Assists"}
                   </button>
                 ))}
               </div>

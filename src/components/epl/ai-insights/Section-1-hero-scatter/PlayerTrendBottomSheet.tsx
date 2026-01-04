@@ -409,7 +409,7 @@ function TrendChart(props: { data: any[]; player: PlayerPoint; lens: LensKey; is
 
 function generateTrendData(player: PlayerPoint, lens: LensKey) {
   const rounds = 5;
-  const base = lens === "fantasy" ? player.momentum * 8 : lens === "disposals" ? 22 : 1.5;
+  const base = lens === "fantasy" ? player.momentum * 8 : lens === "goals" ? 1.8 : lens === "assists" ? 1.2 : 2.5;
 
   return Array.from({ length: rounds + 2 }, (_, i) => ({
     round: `R${i + 1}`,
