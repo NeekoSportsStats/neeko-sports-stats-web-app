@@ -1,8 +1,9 @@
-// src/components/afl/players/FormStabilityGrid.tsx
+// src/components/nba/players/FormStabilityGrid.tsx
 import React, { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Sparkles, ChevronDown } from "lucide-react";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
+import type { StatConfig, StatKey } from "@/lib/stats/types";
 
 import {
   useNBAMockPlayers,
@@ -10,32 +11,8 @@ import {
   lastN,
   average,
   stdDev,
-  StatKey,
-} from "@/components/nba/players/useAFLMockData";
-
-/* ---------------------------------------------------------
-   Stat config
---------------------------------------------------------- */
-
-const STATS: StatKey[] = [
-  "fantasy",
-  "disposals",
-  "kicks",
-  "marks",
-  "tackles",
-  "hitouts",
-  "goals",
-];
-
-const STAT_LABELS: Record<StatKey, string> = {
-  fantasy: "Fantasy",
-  disposals: "Disposals",
-  kicks: "Kicks",
-  marks: "Marks",
-  tackles: "Tackles",
-  hitouts: "Hitouts",
-  goals: "Goals",
-};
+  StatKey as MockStatKey,
+} from "@/components/nba/players/data/useNBAMockData";
 
 /* ---------------------------------------------------------
    Types / helpers
@@ -57,20 +34,20 @@ type PlayerMetrics = {
   consistency: number;
 };
 
-function formatMainValue(value: number, stat: StatKey): string {
-  const label = STAT_LABELS[stat].toLowerCase();
-  if (stat === "goals") return `${value.toFixed(1)} ${label}`;
-  return `${Math.round(value)} ${label}`;
+function formatMainValue(value: number, stat: StatKey | string, label: string): string {
+  const labelLower = label.toLowerCase();
+  if (stat === "goals") return `${value.toFixed(1)} ${labelLower}`;
+  return `${Math.round(value)} ${labelLower}`;
 }
 
-function formatDelta(delta: number, stat: StatKey): string {
-  const label = STAT_LABELS[stat].toLowerCase();
-  if (Math.abs(delta) < 0.05) return `±0.0 ${label} vs avg`;
+function formatDelta(delta: number, stat: StatKey | string, label: string): string {
+  const labelLower = label.toLowerCase();
+  if (Math.abs(delta) < 0.05) return `±0.0 ${labelLower} vs avg`;
 
   const sign = delta > 0 ? "+" : "−";
   const abs = Math.abs(delta).toFixed(1);
 
-  return `${sign}${abs} ${label} vs avg`;
+  return `${sign}${abs} ${labelLower} vs avg`;
 }
 
 function deltaTone(delta: number): string {
@@ -142,25 +119,25 @@ function TrendSparkline({ data, tone }: { data: number[]; tone: Tone }) {
    Row Summaries
 --------------------------------------------------------- */
 
-const buildHotSummary = (m: PlayerMetrics, stat: StatKey) => {
-  const label = STAT_LABELS[stat].toLowerCase();
+const buildHotSummary = (m: PlayerMetrics, stat: StatKey | string, label: string) => {
+  const labelLower = label.toLowerCase();
   const delta = m.deltaVsSeason;
   const direction = delta > 0 ? "above" : "below";
   const abs = Math.abs(delta).toFixed(1);
-  return `${m.name} is running hot with recent ${label} output sitting ${abs} ${label} ${direction} their season baseline.`;
+  return `${m.name} is running hot with recent ${labelLower} output sitting ${abs} ${labelLower} ${direction} their season baseline.`;
 };
 
-const buildStableSummary = (m: PlayerMetrics, stat: StatKey) => {
-  const label = STAT_LABELS[stat].toLowerCase();
-  return `${m.name} is a rock-solid ${label} performer, maintaining ${m.consistency.toFixed(
+const buildStableSummary = (m: PlayerMetrics, stat: StatKey | string, label: string) => {
+  const labelLower = label.toLowerCase();
+  return `${m.name} is a rock-solid ${labelLower} performer, maintaining ${m.consistency.toFixed(
     0
-  )}% consistency with limited week-to-week variation.`;
+  )}% consistency with limited game-to-game variation.`;
 };
 
-const buildCoolingSummary = (m: PlayerMetrics, stat: StatKey) => {
-  const label = STAT_LABELS[stat].toLowerCase();
+const buildCoolingSummary = (m: PlayerMetrics, stat: StatKey | string, label: string) => {
+  const labelLower = label.toLowerCase();
   const abs = Math.abs(m.deltaVsSeason).toFixed(1);
-  return `${m.name} has cooled off, sitting ${abs} ${label} below their usual baseline over the last five rounds.`;
+  return `${m.name} has cooled off, sitting ${abs} ${labelLower} below their usual baseline over the last five games.`;
 };
 
 /* ---------------------------------------------------------
@@ -172,6 +149,7 @@ function PlayerRowCard({
   title,
   metric,
   stat,
+  statLabel,
   isOpen,
   onToggle,
   summaryBuilder,
@@ -180,14 +158,15 @@ function PlayerRowCard({
   tone: Tone;
   title: string;
   metric: PlayerMetrics;
-  stat: StatKey;
+  stat: StatKey | string;
+  statLabel: string;
   isOpen: boolean;
   onToggle: () => void;
-  summaryBuilder: (m: PlayerMetrics, stat: StatKey) => string;
+  summaryBuilder: (m: PlayerMetrics, stat: StatKey | string, label: string) => string;
   showConsistency?: boolean;
 }) {
-  const mainValue = formatMainValue(metric.avgL5, stat);
-  const deltaLabel = formatDelta(metric.deltaVsSeason, stat);
+  const mainValue = formatMainValue(metric.avgL5, stat, statLabel);
+  const deltaLabel = formatDelta(metric.deltaVsSeason, stat, statLabel);
 
   // refined tone glows
   const glow =
@@ -296,7 +275,7 @@ function PlayerRowCard({
           <div className="mt-3 border-t border-white/10 pt-3 animate-in fade-in slide-in-from-top-1">
             <TrendSparkline data={metric.l5} tone={tone} />
             <p className="mt-2 text-[11px] leading-relaxed text-white/70 md:text-xs">
-              {summaryBuilder(metric, stat)}
+              {summaryBuilder(metric, stat, statLabel)}
             </p>
           </div>
         )}
@@ -345,12 +324,12 @@ function ColumnShell({
    Main Component
 --------------------------------------------------------- */
 
-export default function FormStabilityGrid() {
+export default function FormStabilityGrid({ statConfig }: { statConfig: StatConfig }) {
   const players = useNBAMockPlayers();
-  const [selectedStat, setSelectedStat] = useState<StatKey>("fantasy");
+  const [selectedStat, setSelectedStat] = useState<StatKey>(statConfig.defaultStat);
   const [openKey, setOpenKey] = useState<string | null>(null);
 
-  const statLabel = STAT_LABELS[selectedStat];
+  const statLabel = statConfig.unitsShort?.[selectedStat] || statConfig.labels[selectedStat] || selectedStat;
 
   const metrics: PlayerMetrics[] = useMemo(() => {
     return players.map((p) => {
@@ -416,9 +395,9 @@ export default function FormStabilityGrid() {
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <SectionHeader
-              pillLabel="Form Stability Grid"
+              eyebrow="Form Stability Grid"
               title="Hot risers, rock-solid anchors & form slumps"
-              description={`Last 5 rounds of ${statLabel.toLowerCase()} — split into recent surges, stability leaders and cooling risks.`}
+              subtitle={`Last 5 games of ${statLabel.toLowerCase()} — split into recent surges, stability leaders and cooling risks.`}
               icon={Sparkles}
             />
           </div>
@@ -430,7 +409,7 @@ export default function FormStabilityGrid() {
             </span>
 
             <div className="flex flex-wrap gap-1.5">
-              {STATS.map((s) => {
+              {statConfig.availableStats.map((s) => {
                 const active = selectedStat === s;
                 return (
                   <button
@@ -446,7 +425,7 @@ export default function FormStabilityGrid() {
                         : "bg-white/5 text-white/70 border-white/12 hover:bg-white/10"
                     )}
                   >
-                    {STAT_LABELS[s]}
+                    {statConfig.labels[s]}
                   </button>
                 );
               })}
@@ -471,6 +450,7 @@ export default function FormStabilityGrid() {
                   title="Hot Form"
                   metric={m}
                   stat={selectedStat}
+                  statLabel={statLabel}
                   isOpen={openKey === key}
                   onToggle={() => setOpenKey(openKey === key ? null : key)}
                   summaryBuilder={buildHotSummary}
@@ -494,6 +474,7 @@ export default function FormStabilityGrid() {
                   title="Stability"
                   metric={m}
                   stat={selectedStat}
+                  statLabel={statLabel}
                   isOpen={openKey === key}
                   onToggle={() => setOpenKey(openKey === key ? null : key)}
                   summaryBuilder={buildStableSummary}
@@ -518,6 +499,7 @@ export default function FormStabilityGrid() {
                   title="Cooling"
                   metric={m}
                   stat={selectedStat}
+                  statLabel={statLabel}
                   isOpen={openKey === key}
                   onToggle={() => setOpenKey(openKey === key ? null : key)}
                   summaryBuilder={buildCoolingSummary}
