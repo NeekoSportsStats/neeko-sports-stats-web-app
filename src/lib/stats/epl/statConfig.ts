@@ -8,7 +8,7 @@ export const EPL_STAT_CONFIG: StatConfig<EPLStatKey> = {
     current: "2025–2026",
   },
 
-  availableStats: ["goals", "assists", "shots", "shotsOnTarget", "xg"] as const,
+  availableStats: ["goals", "assists", "shots", "shotsOnTarget", "xg"],
 
   defaultStat: "goals",
 
@@ -17,63 +17,73 @@ export const EPL_STAT_CONFIG: StatConfig<EPLStatKey> = {
     assists: "Assists",
     shots: "Shots",
     shotsOnTarget: "Shots on Target",
-    xg: "Expected Goals (xG)",
+    xg: "Expected Goals",
   },
 
   units: {
-    goals: "goals",
-    assists: "assists",
-    shots: "shots",
-    shotsOnTarget: "SOT",
+    goals: "g",
+    assists: "a",
+    shots: "sh",
+    shotsOnTarget: "sot",
     xg: "xG",
   },
 
   descriptions: {
-    goals: "Goal output by matchweek and finishing form trends.",
-    assists: "Chance creation leading directly to goals.",
-    shots: "Shooting volume across recent matchweeks.",
-    shotsOnTarget: "Shots on target indicating finishing accuracy.",
-    xg: "Quality of chances created based on shot context.",
-  },
-
-  playerThresholds: {
-    goals: [1, 2, 3],
-    assists: [1, 2],
-    shots: [2, 4, 6],
-    shotsOnTarget: [1, 2, 3],
-    xg: [0.3, 0.6, 1.0],
-  },
-
-  teamThresholds: {
-    goals: [1, 2, 3, 4],
-    assists: [1, 2, 3],
-    shots: [8, 12, 16],
-    shotsOnTarget: [4, 6, 8],
-    xg: [1.0, 1.8, 2.5],
+    goals:
+      "Forward efficiency spiked with multiple players scoring and capitalising on high xG chances.",
+    assists:
+      "Creative midfielders dominated assists, with key playmakers posting multiple goal contributions.",
+    shots:
+      "Teams pushed volume with aggressive shooting, lifting shot counts in attacking thirds.",
+    shotsOnTarget:
+      "Clinical finishing surged, with top forwards converting shots on target at elite rates.",
+    xg:
+      "Expected goals reflected chance quality, highlighting forwards and attacking mids in prime positions.",
   },
 
   sportMeta: {
     totalRounds: 38,
     currentRound: 1,
-    roundLabels: Array.from({ length: 38 }, (_, i) => `GW${i + 1}`),
+    roundLabels: [
+      "GW1", "GW2", "GW3", "GW4", "GW5", "GW6", "GW7", "GW8", "GW9", "GW10",
+      "GW11", "GW12", "GW13", "GW14", "GW15", "GW16", "GW17", "GW18", "GW19", "GW20",
+      "GW21", "GW22", "GW23", "GW24", "GW25", "GW26", "GW27", "GW28", "GW29", "GW30",
+      "GW31", "GW32", "GW33", "GW34", "GW35", "GW36", "GW37", "GW38",
+    ],
     periods: ["H1", "H2"],
-    scoringRules: "Goal=1, Assist=1, xG model informational",
+    scoringRules: "1 point per goal, assists credited to final pass before goal",
   },
 
-  positions: ["GK", "DEF", "MID", "FWD"] as const,
+  playerThresholds: {
+    goals: [1, 2, 3, 4],
+    assists: [1, 2, 3],
+    shots: [2, 4, 6, 8],
+    shotsOnTarget: [1, 2, 3, 4],
+    xg: [0.3, 0.6, 1.0, 1.5],
+  },
+
+  teamThresholds: {
+    goals: [1, 2, 3, 4],
+    assists: [1, 2, 3, 4],
+    shots: [8, 12, 16, 20],
+    shotsOnTarget: [4, 6, 8, 10],
+    xg: [1.0, 1.8, 2.5, 3.0],
+  },
+
+  positions: ["GK", "DEF", "MID", "FWD"],
 
   momentum: {
-    description: "Form trajectory over last 5 matchweeks",
-    window: 5,
+    description: "Recent scoring trend over last matchweeks",
+    window: 3,
   },
 
   ceiling: {
-    description: "Best performance in recent 8 matchweeks",
+    description: "Upper scoring potential",
     method: "max",
   },
 
   volatility: {
-    description: "Standard deviation of recent 5 matchweeks",
+    description: "Matchweek-to-matchweek variance",
     method: "stdev",
   },
 
