@@ -12,10 +12,6 @@ export default function EPLPlayersPage() {
   const [isStuck, setIsStuck] = useState(false);
   const [showTopButton, setShowTopButton] = useState(false);
 
-  /* -------------------------------------------------------------------------- */
-  /*                         Scroll Spy Section Tracking                        */
-  /* -------------------------------------------------------------------------- */
-
   useEffect(() => {
     const ids = [
       "round-momentum",
@@ -48,10 +44,6 @@ export default function EPLPlayersPage() {
     return () => observer.disconnect();
   }, []);
 
-  /* -------------------------------------------------------------------------- */
-  /*                        Smooth Scroll Nav for Section Pills                 */
-  /* -------------------------------------------------------------------------- */
-
   useEffect(() => {
     const links = document.querySelectorAll("a[href^='#']");
 
@@ -76,10 +68,6 @@ export default function EPLPlayersPage() {
     return () => links.forEach((l) => l.removeEventListener("click", handler));
   }, []);
 
-  /* -------------------------------------------------------------------------- */
-  /*                            Sticky Nav Trigger                              */
-  /* -------------------------------------------------------------------------- */
-
   useEffect(() => {
     const anchor = document.getElementById("selector-bar");
     if (!anchor) return;
@@ -94,19 +82,11 @@ export default function EPLPlayersPage() {
     return () => io.disconnect();
   }, []);
 
-  /* -------------------------------------------------------------------------- */
-  /*                         Back To Top Button Trigger                         */
-  /* -------------------------------------------------------------------------- */
-
   useEffect(() => {
     const onScroll = () => setShowTopButton(window.scrollY > 600);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  /* -------------------------------------------------------------------------- */
-  /*                            Section Definitions                             */
-  /* -------------------------------------------------------------------------- */
 
   const sections = [
     { id: "round-momentum", label: "Round Momentum" },
@@ -116,30 +96,20 @@ export default function EPLPlayersPage() {
     { id: "master-table", label: "Master Table" },
   ];
 
-  /* -------------------------------------------------------------------------- */
-  /*                                 RENDER                                     */
-  /* -------------------------------------------------------------------------- */
-
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 text-white">
 
-      {/* Page Header */}
       <header className="mb-8 md:mb-10 animate-premium-section">
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
           EPL Player Performance Dashboard
         </h1>
         <p className="mt-2 max-w-2xl text-white/70 text-sm leading-relaxed">
-          League-wide momentum, fantasy analytics, player trends, stability
-          metrics, role intelligence, predictive insights and full-season
-          ledgers — all in one EPL dashboard.
+          League-wide momentum, player trends, stability metrics, role intelligence,
+          predictive insights and full-season ledgers — all in one EPL dashboard.
         </p>
       </header>
 
       <div id="selector-bar" className="h-1 w-full"></div>
-
-      {/* ---------------------------------------------------------------------- */}
-      {/*                          PREMIUM GLASS NAV A1                           */}
-      {/* ---------------------------------------------------------------------- */}
 
       <div className={`sticky top-16 z-40 transition-all duration-300 mb-10 ${isStuck ? "scale-[1.012]" : ""}`}>
         <div
@@ -184,10 +154,6 @@ export default function EPLPlayersPage() {
         </div>
       </div>
 
-      {/* ---------------------------------------------------------------------- */}
-      {/*                              PAGE SECTIONS                             */}
-      {/* ---------------------------------------------------------------------- */}
-
       <div className="space-y-20 md:space-y-24">
         <section id="round-momentum" className="scroll-mt-28 animate-premium-section">
           <RoundSummary statConfig={EPL_STAT_CONFIG} />
@@ -209,10 +175,6 @@ export default function EPLPlayersPage() {
           <MasterTable statConfig={EPL_STAT_CONFIG} />
         </section>
       </div>
-
-      {/* ---------------------------------------------------------------------- */}
-      {/*                         FLOATING BACK TO TOP                           */}
-      {/* ---------------------------------------------------------------------- */}
 
       {showTopButton && (
         <button
