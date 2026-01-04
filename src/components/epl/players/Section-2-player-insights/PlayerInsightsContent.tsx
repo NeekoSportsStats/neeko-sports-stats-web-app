@@ -1,5 +1,4 @@
 import React from "react";
-import { MATCHWEEK_LABELS } from "../Section-1-master-table/MasterTable";
 import type { PlayerRow, StatLens } from "../Section-1-master-table/MasterTable";
 
 import {
@@ -104,6 +103,8 @@ export default function PlayerInsightsContent({
       ? "text-amber-300"
       : "text-red-400";
 
+  const ROUND_LABELS = EPL_STAT_CONFIG.sportMeta.roundLabels!;
+
   const BADGE_CLASS: Partial<Record<StatLens, string>> = {
     goals: "border-amber-500/40 text-amber-300",
     assists: "border-emerald-500/40 text-emerald-300",
@@ -142,7 +143,7 @@ export default function PlayerInsightsContent({
             {visibleRounds.map((v, i) => (
               <div key={i} className="flex min-w-[46px] flex-col items-center">
                 <span className="text-[9px] text-neutral-500">
-                  {MATCHWEEK_LABELS[i] ?? ""}
+                  {ROUND_LABELS[i] ?? ""}
                 </span>
                 <div className="mt-1 flex h-8 w-10 items-center justify-center rounded-md bg-neutral-950/80 text-neutral-100">
                   {v}

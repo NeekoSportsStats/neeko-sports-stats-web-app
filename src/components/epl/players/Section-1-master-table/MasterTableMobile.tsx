@@ -2,31 +2,21 @@ import React, { useMemo, useState } from "react";
 import { Search, Lock, X, ArrowRight, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PlayerRow, StatLens } from "./MasterTable";
-
-/* -------------------------------------------------------------------------- */
-/* HELPERS                                                                    */
-/* -------------------------------------------------------------------------- */
+import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
 
 function cx(...parts: Array<string | false | undefined | null>) {
   return parts.filter(Boolean).join(" ");
 }
 
-/* ✅ ADDED — skeleton helper (non-invasive) */
 const skeletonValue = () => Math.floor(70 + Math.random() * 40);
 
-const ROUND_LABELS = ["OR", ...Array.from({ length: 23 }, (_, i) => `R${i + 1}`)];
 const PAGE_SIZE = 10;
 
 const LEFT_COL_W = 124;
 const CELL_W = 52;
 const CELL_GAP = 4;
 
-// Shared stats row layout (header + body must match exactly)
 const STATS_ROW_CLASS = "flex gap-[4px] px-1.5";
-
-/* -------------------------------------------------------------------------- */
-/* MASTER TABLE MOBILE                                                         */
-/* -------------------------------------------------------------------------- */
 
 export default function MasterTableMobile({
   players,
@@ -51,10 +41,6 @@ export default function MasterTableMobile({
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
   const [showTeamDropdown, setShowTeamDropdown] = useState(false);
 
-  /* ---------------------------------------------------------------------- */
-  /* FILTERING                                                               */
-  /* ---------------------------------------------------------------------- */
-
   const filtered = useMemo(() => {
     let result = players;
 
@@ -73,20 +59,19 @@ export default function MasterTableMobile({
 
   const visiblePlayers = filtered.slice(0, visibleCount);
 
-  /* ---------------------------------------------------------------------- */
-  /* RENDER                                                                  */
-  /* ---------------------------------------------------------------------- */
+  const ROUND_LABELS = EPL_STAT_CONFIG.sportMeta.roundLabels!;
 
-  const tableWidth = LEFT_COL_W + 24 * CELL_W + 23 * CELL_GAP + 16;
+  const tableWidth = LEFT_COL_W + ROUND_LABELS.length * CELL_W + (ROUND_LABELS.length - 1) * CELL_GAP + 16;
 
   const TEAMS = useMemo(
     () => Array.from(new Set(players.map((p) => p.team))).sort(),
     [players]
   );
 
+  const statLenses = EPL_STAT_CONFIG.availableStats.slice(0, 3) as StatLens[];
+
   return (
     <>
-      {/* ================= HEADER CARD ================= */}
       <div className="relative mt-6">
         <div className="absolute inset-0 backdrop-blur-[14px]" />
         <div className="relative rounded-3xl border border-neutral-800 bg-black/80 px-4 py-4 shadow-xl">
@@ -147,11 +132,11 @@ export default function MasterTableMobile({
           </h3>
 
           <p className="mt-1 text-xs text-neutral-400">
-            Round-by-round production.
+            Matchweek-by-matchweek production.
           </p>
 
           <div className="mt-4 flex gap-2 rounded-full border border-neutral-700 bg-black/80 px-2 py-1 text-[11px]">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
+            {statLenses.map((s) => (
               <button
                 key={s}
                 onClick={() => setSelectedStat(s)}
@@ -162,7 +147,7 @@ export default function MasterTableMobile({
                     : "bg-neutral-900 text-neutral-300"
                 )}
               >
-                {s}
+                {EPL_STAT_CONFIG.labels[s]}
               </button>
             ))}
           </div>
@@ -190,7 +175,6 @@ export default function MasterTableMobile({
         </div>
       </div>
 
-      {/* ================= TABLE ================= */}
       <div className="mt-4 rounded-3xl border border-neutral-800 bg-black/90 shadow-xl overflow-hidden">
         <div className="relative">
           <div className="overflow-x-auto overflow-y-visible scrollbar-none relative">
@@ -307,7 +291,6 @@ export default function MasterTableMobile({
         </div>
       </div>
 
-      {/* ================= SHOW MORE ================= */}
       {visiblePlayers.length < filtered.length && (
         <div className="mt-4 flex justify-center">
           <Button
@@ -321,7 +304,6 @@ export default function MasterTableMobile({
         </div>
       )}
 
-      {/* ================= SHOW LESS (premium only) ================= */}
       {isPremium && visibleCount > PAGE_SIZE && (
         <div className="mt-2 flex justify-center">
           <button
@@ -333,7 +315,6 @@ export default function MasterTableMobile({
         </div>
       )}
 
-      {/* ================= UPGRADE MODAL ================= */}
       {showUpgrade && (
         <div className="fixed inset-0 z-[100]">
           <div
@@ -363,7 +344,7 @@ export default function MasterTableMobile({
 
               <div className="px-5 py-5 space-y-4">
                 <ul className="space-y-3 text-sm text-neutral-300">
-                  <li>• Full season round-by-round stats</li>
+                  <li>• Full season matchweek-by-matchweek stats</li>
                   <li>• Team filtering & search</li>
                   <li>• Player insights & AI analysis</li>
                   <li>• Premium-only table interactions</li>

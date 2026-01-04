@@ -7,11 +7,9 @@ import PlayerInsightsOverlay from "../Section-2-player-insights/PlayerInsightsOv
 import MasterTableDesktop from "./MasterTableDesktop";
 import MasterTableMobile from "./MasterTableMobile";
 
-/* -------------------------------------------------------------------------- */
-/* TYPES                                                                      */
-/* -------------------------------------------------------------------------- */
+import type { EPLStatKey } from "@/lib/stats/types";
 
-export type StatLens = keyof typeof EPL_STAT_CONFIG.stats;
+export type StatLens = EPLStatKey;
 
 export type PlayerRow = {
   id: number;
@@ -20,31 +18,18 @@ export type PlayerRow = {
   team: string;
   role: string;
 
-  // EPL-style stat series (per matchweek)
   stats: Record<StatLens, number[]>;
 };
 
-/* -------------------------------------------------------------------------- */
-/* MATCHWEEK LABELS                                                           */
-/* -------------------------------------------------------------------------- */
-
-export const MATCHWEEK_LABELS = Array.from(
-  { length: 38 },
-  (_, i) => `MW${i + 1}`
-);
-
-/* -------------------------------------------------------------------------- */
-/* MOCK DATA                                                                  */
-/* -------------------------------------------------------------------------- */
-
 function buildMockPlayers(): PlayerRow[] {
-  const statKeys = Object.keys(EPL_STAT_CONFIG.stats) as StatLens[];
+  const statKeys = EPL_STAT_CONFIG.availableStats as StatLens[];
+  const totalRounds = EPL_STAT_CONFIG.sportMeta.totalRounds!;
 
   return Array.from({ length: 80 }).map((_, i) => {
     const stats: Record<StatLens, number[]> = {} as any;
 
     statKeys.forEach((stat) => {
-      stats[stat] = MATCHWEEK_LABELS.map(() => {
+      stats[stat] = Array.from({ length: totalRounds }).map(() => {
         switch (stat) {
           case "goals":
             return Math.random() < 0.25 ? 1 : 0;
@@ -54,6 +39,8 @@ function buildMockPlayers(): PlayerRow[] {
             return Math.round(Math.random() * 4);
           case "assists":
             return Math.random() < 0.15 ? 1 : 0;
+          case "shotsOnTarget":
+            return Math.round(Math.random() * 2);
           default:
             return +(Math.random() * 1.2).toFixed(2);
         }
@@ -73,19 +60,11 @@ function buildMockPlayers(): PlayerRow[] {
 
 const MOCK_PLAYERS = buildMockPlayers();
 
-/* -------------------------------------------------------------------------- */
-/* MASTER TABLE ORCHESTRATOR                                                   */
-/* -------------------------------------------------------------------------- */
-
-export default function MasterTable({
-  statConfig = EPL_STAT_CONFIG,
-}: {
-  statConfig?: typeof EPL_STAT_CONFIG;
-}) {
+export default function MasterTable() {
   const { isPremium } = useAuth();
 
   const [selectedStat, setSelectedStat] = useState<StatLens>(
-    statConfig.defaultStat
+    EPL_STAT_CONFIG.defaultStat
   );
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null);
   const [query, setQuery] = useState("");
@@ -97,13 +76,11 @@ export default function MasterTable({
 
   return (
     <>
-      {/* ================= DESKTOP ================= */}
       <div className="hidden md:block">
         <MasterTableDesktop
           players={players}
           selectedStat={selectedStat}
           setSelectedStat={setSelectedStat}
-          statConfig={statConfig}
           isPremium={isPremium}
           query={query}
           setQuery={setQuery}
@@ -111,13 +88,11 @@ export default function MasterTable({
         />
       </div>
 
-      {/* ================= MOBILE ================= */}
       <div className="md:hidden">
         <MasterTableMobile
           players={players}
           selectedStat={selectedStat}
           setSelectedStat={setSelectedStat}
-          statConfig={statConfig}
           isPremium={isPremium}
           query={query}
           setQuery={setQuery}
@@ -125,14 +100,12 @@ export default function MasterTable({
         />
       </div>
 
-      {/* ================= INSIGHTS OVERLAY ================= */}
       {mounted &&
         selectedPlayer &&
         createPortal(
           <PlayerInsightsOverlay
             player={selectedPlayer}
             selectedStat={selectedStat}
-            statConfig={statConfig}
             onClose={() => setSelectedPlayer(null)}
             onLensChange={setSelectedStat}
           />,
