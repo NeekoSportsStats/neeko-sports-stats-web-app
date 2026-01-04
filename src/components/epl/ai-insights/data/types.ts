@@ -4,8 +4,8 @@
 
 export type MatchStatus = "upcoming" | "final";
 
-export type FixtureQuarter = {
-  label: "Q1" | "Q2" | "Q3" | "Q4";
+export type FixtureHalf = {
+  label: "H1" | "H2";
   home: number;
   away: number;
 };
@@ -64,7 +64,7 @@ export type FixtureMatch = {
   status: MatchStatus;
   homeScore?: number;
   awayScore?: number;
-  quarters?: FixtureQuarter[];
+  halves?: FixtureHalf[];
   crowd?: number;
   topPlayers?: { home: string[]; away: string[] };
   ladderDelta?: { team: string; delta: number }[];
@@ -104,8 +104,8 @@ export type MatchupRow = {
 
 /* ---------------- GAME FLOW ---------------- */
 
-export type QuarterFlowRow = {
-  q: "Q1" | "Q2" | "Q3" | "Q4";
+export type HalfFlowRow = {
+  half: "H1" | "H2";
   swing01: number;
   decisive01: number;
   ai: string;
@@ -159,7 +159,7 @@ export type TeamMatchupRow = {
   ai: string;
 };
 
-export type QuarterFlow = QuarterFlowRow;
+export type HalfFlow = HalfFlowRow;
 
 export type ConsistencyExplosivenessRow = {
   id: string;

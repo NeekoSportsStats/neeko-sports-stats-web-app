@@ -5,7 +5,7 @@
 import type {
   PredictRow,
   MatchupRow,
-  QuarterFlowRow,
+  HalfFlowRow,
   ConsistencyRow,
   DriverRow,
   // NEW (Section 4)
@@ -28,7 +28,7 @@ import type {
   FixtureMatch,
   TeamStatLine,
 } from "@/components/epl/match-center/types";
-import type { AFLTeam } from "@/components/epl/teams/data/mockTeams";
+import type { EPLTeam } from "@/components/epl/teams/data/mockTeams";
 
 const WINDOW = 8;
 
@@ -44,7 +44,7 @@ function lower(s: string) {
   return (s ?? "").toString().trim().toLowerCase();
 }
 
-function findTeamByName(teams: AFLTeam[], name: string) {
+function findTeamByName(teams: EPLTeam[], name: string) {
   const n = lower(name);
   if (!n) return null;
   return (
@@ -56,7 +56,7 @@ function findTeamByName(teams: AFLTeam[], name: string) {
   );
 }
 
-function seriesForTeam(t: AFLTeam | null, stat: StatLens): number[] {
+function seriesForTeam(t: EPLTeam | null, stat: StatLens): number[] {
   if (!t) return [];
   if (stat === "fantasy") return ((t as any).fantasy ?? []).map(Number);
   if (stat === "disposals") return ((t as any).disposals ?? []).map(Number);
@@ -271,7 +271,7 @@ export function buildPlayerPredictabilityFromFixtures(
 /* -------------------------------------------------------------------------- */
 
 export function buildTeamPredictabilityFromTeams(
-  teams: AFLTeam[],
+  teams: EPLTeam[],
   stat: StatLens
 ): PredictRow[] {
   const vols: number[] = [];
@@ -338,7 +338,7 @@ export function buildTeamPredictabilityFromTeams(
 export function buildH2HPlayerMatchups(
   match: FixtureMatch | undefined,
   stat: StatLens,
-  teams: AFLTeam[]
+  teams: EPLTeam[]
 ): MatchupRow[] {
   if (!match) return [];
 
@@ -384,7 +384,7 @@ export function buildH2HPlayerMatchups(
 export function buildH2HTeamMatchups(
   match: FixtureMatch | undefined,
   stat: StatLens,
-  teams: AFLTeam[]
+  teams: EPLTeam[]
 ): MatchupRow[] {
   if (!match) return [];
 
@@ -419,34 +419,32 @@ export function buildH2HTeamMatchups(
 /* 5) GAME FLOW                                                               */
 /* -------------------------------------------------------------------------- */
 
-export function buildQuarterFlow(
+export function buildHalfFlow(
   match: FixtureMatch | undefined
-): QuarterFlowRow[] {
-  const qs = (match as any)?.quarters;
-  if (!qs?.length)
+): HalfFlowRow[] {
+  const hs = (match as any)?.halves;
+  if (!hs?.length)
     return [
-      { q: "Q1", swing01: 0.4, decisive01: 0.4, ai: "No data." },
-      { q: "Q2", swing01: 0.4, decisive01: 0.4, ai: "No data." },
-      { q: "Q3", swing01: 0.4, decisive01: 0.4, ai: "No data." },
-      { q: "Q4", swing01: 0.4, decisive01: 0.4, ai: "No data." },
+      { half: "H1", swing01: 0.4, decisive01: 0.4, ai: "No data." },
+      { half: "H2", swing01: 0.4, decisive01: 0.4, ai: "No data." },
     ];
 
-  const margins = qs.map((q: any) => q.home - q.away);
+  const margins = hs.map((h: any) => h.home - h.away);
   const abs = margins.map(Math.abs);
 
   const sd = stdev(margins);
-  const sdN = normalize01(sd, 3, 22);
+  const sdN = normalize01(sd, 0.5, 2.5);
 
   const absMin = Math.min(...abs, 0);
   const absMax = Math.max(...abs, 1);
 
-  return qs.map((q: any) => {
-    const m = q.home - q.away;
+  return hs.map((h: any) => {
+    const m = h.home - h.away;
     return {
-      q: q.label,
+      half: h.label,
       decisive01: normalize01(Math.abs(m), absMin, absMax),
       swing01: clamp(sdN * 0.7, 0, 1),
-      ai: `Margin ${m}`,
+      ai: `Margin ${m} goals`,
     };
   });
 }
@@ -456,7 +454,7 @@ export function buildQuarterFlow(
 /* -------------------------------------------------------------------------- */
 
 export function buildConsistencyExplosivenessTeams(
-  teams: AFLTeam[],
+  teams: EPLTeam[],
   stat: StatLens
 ): ConsistencyRow[] {
   const rows: ConsistencyRow[] = [];
