@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import type { NBAStatKey } from "@/lib/stats/types";
+import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
 
-export type StatKey = NBAStatKey;
+export type StatKey = typeof NBA_STAT_CONFIG.availableStats[number];
 
 export type Position = "PG" | "SG" | "SF" | "PF" | "C";
 
@@ -14,6 +14,7 @@ export interface Player {
   points: number[];
   rebounds: number[];
   assists: number[];
+  threes: number[];
 }
 
 export const TEAM_OPTIONS = [
@@ -34,27 +35,14 @@ export const POSITION_OPTIONS = ["All", "PG", "SG", "SF", "PF", "C"];
 
 export const ROUND_OPTIONS = [
   "All",
-  ...Array.from({ length: 82 }, (_, i) => `G${i + 1}`),
+  ...Array.from({ length: NBA_STAT_CONFIG.sportMeta.totalRounds }, (_, i) => `G${i + 1}`),
 ];
 
 export const YEARS = ["2025–2026", "2024–2025"];
 
-function genPoints(pos: Position, seed: number): number {
-  const base = pos === "C" ? 15 : pos === "PF" ? 18 : pos === "SF" ? 20 : pos === "SG" ? 22 : 18;
-  return base + (seed % 15) - 5;
-}
-
-function genRebounds(pos: Position, seed: number): number {
-  const base = pos === "C" ? 10 : pos === "PF" ? 8 : pos === "SF" ? 6 : pos === "SG" ? 4 : 3;
-  return base + (seed % 8) - 3;
-}
-
-function genAssists(pos: Position, seed: number): number {
-  const base = pos === "PG" ? 8 : pos === "SG" ? 5 : pos === "SF" ? 4 : pos === "PF" ? 3 : 2;
-  return base + (seed % 6) - 2;
-}
-
 function generatePlayers(): Player[] {
+  const totalRounds = NBA_STAT_CONFIG.sportMeta.totalRounds;
+
   return Array.from({ length: 100 }).map((_, i) => {
     const pos = ["PG", "SG", "SF", "PF", "C"][i % 5] as Position;
     const team =
@@ -74,12 +62,31 @@ function generatePlayers(): Player[] {
     const points: number[] = [];
     const rebounds: number[] = [];
     const assists: number[] = [];
+    const threes: number[] = [];
 
-    for (let game = 0; game < 82; game++) {
-      const seed = i * 82 + game;
-      points.push(Math.max(0, genPoints(pos, seed)));
-      rebounds.push(Math.max(0, genRebounds(pos, seed + 1)));
-      assists.push(Math.max(0, genAssists(pos, seed + 2)));
+    for (let game = 0; game < totalRounds; game++) {
+      const seed = i * 100 + game;
+
+      const ptsBase = pos === "C" ? 15 : pos === "PF" ? 18 : pos === "SF" ? 20 : pos === "SG" ? 22 : 18;
+      const ptsVariation = (seed % 15) + ((seed * 7) % 16) - 10;
+      const pts = Math.max(8, Math.min(38, ptsBase + ptsVariation));
+
+      const rebBase = pos === "C" ? 12 : pos === "PF" ? 9 : pos === "SF" ? 6 : pos === "SG" ? 4 : 3;
+      const rebVariation = (seed % 8) + ((seed * 3) % 9) - 5;
+      const reb = Math.max(2, Math.min(18, rebBase + rebVariation));
+
+      const astBase = pos === "PG" ? 8 : pos === "SG" ? 5 : pos === "SF" ? 4 : pos === "PF" ? 3 : 2;
+      const astVariation = (seed % 6) + ((seed * 5) % 8) - 4;
+      const ast = Math.max(1, Math.min(14, astBase + astVariation));
+
+      const threesBase = pos === "SG" ? 3 : pos === "SF" ? 2 : pos === "PG" ? 2 : pos === "PF" ? 1 : 0;
+      const threesVariation = (seed % 4) + ((seed * 11) % 3) - 2;
+      const three = Math.max(0, Math.min(6, threesBase + threesVariation));
+
+      points.push(pts);
+      rebounds.push(reb);
+      assists.push(ast);
+      threes.push(three);
     }
 
     return {
@@ -90,6 +97,7 @@ function generatePlayers(): Player[] {
       points,
       rebounds,
       assists,
+      threes,
     };
   });
 }
