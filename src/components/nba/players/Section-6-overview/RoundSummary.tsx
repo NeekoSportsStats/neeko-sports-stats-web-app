@@ -125,15 +125,23 @@ export default function RoundSummary({ statConfig }: { statConfig: StatConfig })
 
   /* sparkline data */
   const avgGames = useMemo(() => {
+    if (!players || players.length === 0) return [];
     const sample = players[0];
     if (!sample) return [];
     const series = getSeriesForStat(sample, selected);
+    if (!Array.isArray(series) || series.length === 0) return [];
+
     const totals = Array.from({ length: series.length }, () => 0);
 
     players.forEach((p) => {
-      getSeriesForStat(p, selected).forEach((v, i) => {
-        totals[i] += v;
-      });
+      const pSeries = getSeriesForStat(p, selected);
+      if (Array.isArray(pSeries)) {
+        pSeries.forEach((v, i) => {
+          if (i < totals.length) {
+            totals[i] += v;
+          }
+        });
+      }
     });
 
     return totals.map((t) => Math.round(t / players.length));
@@ -141,33 +149,47 @@ export default function RoundSummary({ statConfig }: { statConfig: StatConfig })
 
   /* stat calcs */
   const topScorer = useMemo(() => {
-    return players
-      .map((p) => ({ name: p.name, last: getSeriesForStat(p, selected).at(-1) ?? 0 }))
-      .sort((a, b) => b.last - a.last)[0];
+    if (!players || players.length === 0) return { name: "—", last: 0 };
+    const scored = players
+      .map((p) => {
+        const series = getSeriesForStat(p, selected);
+        const last = Array.isArray(series) && series.length > 0 ? series[series.length - 1] : 0;
+        return { name: p.name, last };
+      })
+      .sort((a, b) => b.last - a.last);
+    return scored[0] || { name: "—", last: 0 };
   }, [players, selected]);
 
   const biggestRiser = useMemo(() => {
-    return players
+    if (!players || players.length === 0) return { name: "—", diff: 0 };
+    const risers = players
       .map((p) => {
         const s = getSeriesForStat(p, selected);
-        if (s.length < 2) return null;
-        return { name: p.name, diff: (s.at(-1) ?? 0) - (s.at(-2) ?? 0) };
+        if (!Array.isArray(s) || s.length < 2) return null;
+        const last = s[s.length - 1] || 0;
+        const prev = s[s.length - 2] || 0;
+        return { name: p.name, diff: last - prev };
       })
-      .filter(Boolean)
-      .sort((a, b) => (b as any).diff - (a as any).diff)[0] as any;
+      .filter((item): item is { name: string; diff: number } => item !== null)
+      .sort((a, b) => b.diff - a.diff);
+    return risers[0] || { name: "—", diff: 0 };
   }, [players, selected]);
 
   const mostConsistent = useMemo(() => {
-    return players
+    if (!players || players.length === 0) return { name: "—", consistency: 0 };
+    const consistent = players
       .map((p) => {
         const s = getSeriesForStat(p, selected);
+        if (!Array.isArray(s) || s.length === 0) return { name: p.name, consistency: 0 };
         const base = average(s) || 1;
+        const aboveBase = s.filter((v) => v >= base).length;
         return {
           name: p.name,
-          consistency: (s.filter((v) => v >= base).length / s.length) * 100,
+          consistency: (aboveBase / s.length) * 100,
         };
       })
-      .sort((a, b) => b.consistency - a.consistency)[0];
+      .sort((a, b) => b.consistency - a.consistency);
+    return consistent[0] || { name: "—", consistency: 0 };
   }, [players, selected]);
 
   return (
@@ -241,16 +263,16 @@ export default function RoundSummary({ statConfig }: { statConfig: StatConfig })
 
             <ul className="space-y-2 text-sm text-white/80">
               <li>
-                • <strong>{topScorer?.name}</strong> led this game with{" "}
-                <strong>{topScorer?.last} {unit}</strong>.
+                • <strong>{topScorer.name}</strong> led this game with{" "}
+                <strong>{topScorer.last} {unit}</strong>.
               </li>
               <li>
-                • <strong>{biggestRiser?.name}</strong> climbed{" "}
-                <strong>{biggestRiser?.diff.toFixed(1)} {unit}</strong> from previous game.
+                • <strong>{biggestRiser.name}</strong> climbed{" "}
+                <strong>{biggestRiser.diff.toFixed(1)} {unit}</strong> from previous game.
               </li>
               <li>
-                • <strong>{mostConsistent?.name}</strong> holds{" "}
-                <strong>{mostConsistent?.consistency.toFixed(0)}%</strong> above-average performances.
+                • <strong>{mostConsistent.name}</strong> holds{" "}
+                <strong>{mostConsistent.consistency.toFixed(0)}%</strong> above-average performances.
               </li>
               <li>
                 • League-wide {labelLower} output continues to show meaningful consistency and role changes.
@@ -264,22 +286,22 @@ export default function RoundSummary({ statConfig }: { statConfig: StatConfig })
           <MiniCard
             icon={Flame}
             label="Top Score"
-            value={`${topScorer?.last ?? 0} ${unit}`}
-            player={topScorer?.name ?? "—"}
+            value={`${topScorer.last} ${unit}`}
+            player={topScorer.name}
             delay={160}
           />
           <MiniCard
             icon={TrendingUp}
             label="Biggest Riser"
-            value={`${biggestRiser?.diff.toFixed(1)} ${unit}`}
-            player={biggestRiser?.name ?? "—"}
+            value={`${biggestRiser.diff.toFixed(1)} ${unit}`}
+            player={biggestRiser.name}
             delay={220}
           />
           <MiniCard
             icon={Shield}
             label="Most Consistent"
-            value={`${mostConsistent?.consistency.toFixed(0)}%`}
-            player={mostConsistent?.name ?? "—"}
+            value={`${mostConsistent.consistency.toFixed(0)}%`}
+            player={mostConsistent.name}
             delay={280}
           />
         </div>

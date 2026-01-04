@@ -11,6 +11,7 @@ export interface Player {
   pos: Position;
   team: string;
 
+  fantasy: number[];
   points: number[];
   rebounds: number[];
   assists: number[];
@@ -59,6 +60,7 @@ function generatePlayers(): Player[] {
         "LAC",
       ][i % 10];
 
+    const fantasy: number[] = [];
     const points: number[] = [];
     const rebounds: number[] = [];
     const assists: number[] = [];
@@ -83,6 +85,9 @@ function generatePlayers(): Player[] {
       const threesVariation = (seed % 4) + ((seed * 11) % 3) - 2;
       const three = Math.max(0, Math.min(6, threesBase + threesVariation));
 
+      const fantasyScore = pts + (reb * 1.2) + (ast * 1.5) + (three * 3);
+
+      fantasy.push(Math.round(fantasyScore));
       points.push(pts);
       rebounds.push(reb);
       assists.push(ast);
@@ -94,6 +99,7 @@ function generatePlayers(): Player[] {
       name: `Player ${i + 1}`,
       pos,
       team,
+      fantasy,
       points,
       rebounds,
       assists,
@@ -120,7 +126,11 @@ export function getSeriesForStat(
   player: Player,
   stat: StatKey
 ): number[] {
-  return player[stat];
+  const series = player[stat];
+  if (!Array.isArray(series)) {
+    return [];
+  }
+  return series;
 }
 
 export function stabilityMeta(vol: number) {
