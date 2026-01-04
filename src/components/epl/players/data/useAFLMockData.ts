@@ -1,21 +1,19 @@
 import { useMemo } from "react";
 
 /* -------------------------------------------------------
-   EXPANDED SUPPORTED STAT KEYS
+   SUPPORTED EPL STAT KEYS (CONFIG-ALIGNED)
 ------------------------------------------------------- */
 export type StatKey =
-  | "fantasy"
-  | "disposals"
-  | "kicks"
-  | "marks"
-  | "tackles"
-  | "hitouts"
-  | "goals";
+  | "goals"
+  | "assists"
+  | "shots"
+  | "shotsOnTarget"
+  | "xG";
 
-export type Position = "MID" | "FWD" | "DEF" | "RUC";
+export type Position = "GK" | "DEF" | "MID" | "FWD";
 
 /* -------------------------------------------------------
-   PLAYER MODEL NOW SUPPORTS MULTI-STAT ROUND DATA
+   PLAYER MODEL — EPL STYLE (PER MATCHWEEK)
 ------------------------------------------------------- */
 export interface Player {
   id: number;
@@ -23,14 +21,11 @@ export interface Player {
   pos: Position;
   team: string;
 
-  // 🔥 expanded mock stats per round:
-  fantasy: number[];
-  disposals: number[];
-  kicks: number[];
-  marks: number[];
-  tackles: number[];
-  hitouts: number[];
   goals: number[];
+  assists: number[];
+  shots: number[];
+  shotsOnTarget: number[];
+  xG: number[];
 }
 
 /* -------------------------------------------------------
@@ -38,56 +33,109 @@ export interface Player {
 ------------------------------------------------------- */
 export const TEAM_OPTIONS = [
   "All",
-  "COLL",
-  "ESS",
-  "SYD",
-  "CARL",
-  "GEEL",
-  "MELB",
-  "RICH",
+  "ARS",
+  "MCI",
+  "LIV",
+  "CHE",
+  "TOT",
+  "MUN",
+  "NEW",
+  "AVL",
+  "BHA",
+  "WHU",
 ];
 
-export const POSITION_OPTIONS = ["All", "MID", "FWD", "DEF", "RUC"];
+export const POSITION_OPTIONS = ["All", "GK", "DEF", "MID", "FWD"];
 
-export const ROUND_OPTIONS = ["All", "OR", "R1", "R2", "R3", "R4", "R5"];
+export const ROUND_OPTIONS = [
+  "All",
+  ...Array.from({ length: 38 }, (_, i) => `GW${i + 1}`),
+];
 
-export const YEARS = [2025, 2024, 2023, 2022];
+export const YEARS = ["2025–2026", "2024–2025"];
 
 /* -------------------------------------------------------
-   MULTI-STAT PLAYER MOCK GENERATOR
+   RANDOM HELPERS
+------------------------------------------------------- */
+const rand = (min: number, max: number) =>
+  Math.round(min + Math.random() * (max - min));
+
+const randFloat = (min: number, max: number, dp = 2) =>
+  Number((min + Math.random() * (max - min)).toFixed(dp));
+
+/* -------------------------------------------------------
+   EPL-REALISTIC STAT GENERATORS
+------------------------------------------------------- */
+function genGoals(pos: Position) {
+  if (pos === "GK") return 0;
+  if (pos === "DEF") return Math.random() < 0.04 ? 1 : 0;
+  if (pos === "MID") return Math.random() < 0.12 ? 1 : 0;
+  return Math.random() < 0.35 ? rand(1, 2) : 0;
+}
+
+function genAssists(pos: Position) {
+  if (pos === "GK") return 0;
+  if (pos === "DEF") return Math.random() < 0.08 ? 1 : 0;
+  if (pos === "MID") return Math.random() < 0.18 ? 1 : 0;
+  return Math.random() < 0.22 ? 1 : 0;
+}
+
+function genShots(pos: Position) {
+  if (pos === "GK") return 0;
+  if (pos === "DEF") return rand(0, 1);
+  if (pos === "MID") return rand(1, 3);
+  return rand(2, 6);
+}
+
+function genShotsOnTarget(shots: number) {
+  if (shots === 0) return 0;
+  return Math.min(shots, rand(0, Math.ceil(shots / 2)));
+}
+
+function genXG(shots: number, goals: number) {
+  if (shots === 0) return 0;
+  return Math.max(goals * 0.35, randFloat(0.05, shots * 0.18));
+}
+
+/* -------------------------------------------------------
+   MULTI-MATCHWEEK PLAYER GENERATOR (38 GW)
 ------------------------------------------------------- */
 function generatePlayers(): Player[] {
-  return Array.from({ length: 120 }).map((_, i) => {
-    const pos = ["MID", "FWD", "DEF", "RUC"][i % 4] as Position;
+  return Array.from({ length: 100 }).map((_, i) => {
+    const pos = ["GK", "DEF", "MID", "FWD"][i % 4] as Position;
     const team =
-      ["COLL", "ESS", "SYD", "CARL", "GEEL", "MELB", "RICH"][i % 7];
+      [
+        "ARS",
+        "MCI",
+        "LIV",
+        "CHE",
+        "TOT",
+        "MUN",
+        "NEW",
+        "AVL",
+        "BHA",
+        "WHU",
+      ][i % 10];
 
-    // Base fantasy logic
-    const base = 80 + (i % 15);
+    const goals: number[] = [];
+    const assists: number[] = [];
+    const shots: number[] = [];
+    const shotsOnTarget: number[] = [];
+    const xG: number[] = [];
 
-    // Create variation across rounds
-    const fantasy = [
-      base - 10 + (i % 5),
-      base - 5 + (i % 4),
-      base + 3 - (i % 6),
-      base + 8 - (i % 7),
-      base + 1 + (i % 3),
-      base + 4 - (i % 2),
-    ];
+    for (let gw = 0; gw < 38; gw++) {
+      const g = genGoals(pos);
+      const a = genAssists(pos);
+      const s = genShots(pos);
+      const sot = genShotsOnTarget(s);
+      const expected = genXG(s, g);
 
-    // Derived stats using reasonable AFL-style ratios
-    const disposals = fantasy.map((f) => Math.round(f / 1.4));
-    const kicks = disposals.map((d) => Math.round(d * 0.55));
-    const marks = disposals.map((d) => Math.round((d - kicks[0]) * 0.3));
-    const tackles = fantasy.map((f) => Math.round((f - 50) / 15));
-    const hitouts = pos === "RUC"
-      ? fantasy.map((f) => Math.round((f - 40) / 2.5))
-      : fantasy.map(() => 0);
-
-    // goals: scaled based on role
-    const goals = pos === "FWD"
-      ? fantasy.map((f) => Math.max(0, Math.round((f - 60) / 20)))
-      : fantasy.map(() => 0);
+      goals.push(g);
+      assists.push(a);
+      shots.push(s);
+      shotsOnTarget.push(sot);
+      xG.push(expected);
+    }
 
     return {
       id: i + 1,
@@ -95,19 +143,17 @@ function generatePlayers(): Player[] {
       pos,
       team,
 
-      fantasy,
-      disposals,
-      kicks,
-      marks,
-      tackles,
-      hitouts,
       goals,
+      assists,
+      shots,
+      shotsOnTarget,
+      xG,
     };
   });
 }
 
 /* -------------------------------------------------------
-   UTILITY HELPERS
+   UTILITY HELPERS (UNCHANGED PATTERN)
 ------------------------------------------------------- */
 export const lastN = (s: number[], n: number) => s.slice(-n);
 
@@ -124,36 +170,39 @@ export function stdDev(values: number[]) {
 }
 
 /* -------------------------------------------------------
-   UNIVERSAL GET-SERIES FUNCTION
+   UNIVERSAL SERIES ACCESSOR (CONFIG SAFE)
 ------------------------------------------------------- */
-export function getSeriesForStat(player: Player, stat: StatKey): number[] {
+export function getSeriesForStat(
+  player: Player,
+  stat: StatKey
+): number[] {
   return player[stat];
 }
 
 /* -------------------------------------------------------
-   STABILITY META (unchanged)
+   STABILITY META (UNCHANGED)
 ------------------------------------------------------- */
 export function stabilityMeta(vol: number) {
-  if (vol < 4)
+  if (vol < 0.4)
     return {
       label: "Rock solid",
       colour: "text-emerald-400",
-      reason: "Reliable scoring floor.",
+      reason: "Highly consistent output.",
     };
-  if (vol < 8)
+  if (vol < 0.8)
     return {
       label: "Steady",
       colour: "text-emerald-300",
-      reason: "Low movement week to week.",
+      reason: "Low week-to-week variance.",
     };
-  if (vol < 12)
+  if (vol < 1.3)
     return {
       label: "Swingy",
       colour: "text-amber-300",
-      reason: "Matchup dependent swings.",
+      reason: "Matchup influenced output.",
     };
   return {
-    label: "Rollercoaster",
+    label: "Volatile",
     colour: "text-red-400",
     reason: "High upside, high risk.",
   };
@@ -162,6 +211,6 @@ export function stabilityMeta(vol: number) {
 /* -------------------------------------------------------
    MAIN HOOK
 ------------------------------------------------------- */
-export function useAFLMockPlayers(): Player[] {
+export function useEPLMockPlayers(): Player[] {
   return useMemo(() => generatePlayers(), []);
 }

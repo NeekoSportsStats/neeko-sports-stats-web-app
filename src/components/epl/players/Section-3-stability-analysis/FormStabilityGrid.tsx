@@ -1,41 +1,17 @@
-// src/components/afl/players/FormStabilityGrid.tsx
 import React, { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Sparkles, ChevronDown } from "lucide-react";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
+import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
 import {
-  useAFLMockPlayers,
+  useEPLMockPlayers,
   getSeriesForStat,
   lastN,
   average,
   stdDev,
   StatKey,
-} from "@/components/epl/players/useAFLMockData";
-
-/* ---------------------------------------------------------
-   Stat config
---------------------------------------------------------- */
-
-const STATS: StatKey[] = [
-  "fantasy",
-  "disposals",
-  "kicks",
-  "marks",
-  "tackles",
-  "hitouts",
-  "goals",
-];
-
-const STAT_LABELS: Record<StatKey, string> = {
-  fantasy: "Fantasy",
-  disposals: "Disposals",
-  kicks: "Kicks",
-  marks: "Marks",
-  tackles: "Tackles",
-  hitouts: "Hitouts",
-  goals: "Goals",
-};
+} from "@/components/epl/players/data/useEPLMockData";
 
 /* ---------------------------------------------------------
    Types / helpers
@@ -58,24 +34,21 @@ type PlayerMetrics = {
 };
 
 function formatMainValue(value: number, stat: StatKey): string {
-  const label = STAT_LABELS[stat].toLowerCase();
-  if (stat === "goals") return `${value.toFixed(1)} ${label}`;
-  return `${Math.round(value)} ${label}`;
+  const unit = EPL_STAT_CONFIG.unitsShort[stat] ?? "";
+  return `${value.toFixed(2)} ${unit}`.trim();
 }
 
 function formatDelta(delta: number, stat: StatKey): string {
-  const label = STAT_LABELS[stat].toLowerCase();
-  if (Math.abs(delta) < 0.05) return `±0.0 ${label} vs avg`;
+  const unit = EPL_STAT_CONFIG.unitsShort[stat] ?? "";
+  if (Math.abs(delta) < 0.01) return `±0.00 ${unit} vs avg`;
 
   const sign = delta > 0 ? "+" : "−";
-  const abs = Math.abs(delta).toFixed(1);
-
-  return `${sign}${abs} ${label} vs avg`;
+  return `${sign}${Math.abs(delta).toFixed(2)} ${unit} vs avg`;
 }
 
 function deltaTone(delta: number): string {
-  if (delta > 0.1) return "text-emerald-300";
-  if (delta < -0.1) return "text-red-300";
+  if (delta > 0.05) return "text-emerald-300";
+  if (delta < -0.05) return "text-red-300";
   return "text-zinc-400";
 }
 
@@ -104,7 +77,6 @@ function TrendSparkline({ data, tone }: { data: number[]; tone: Tone }) {
 
   return (
     <div className="relative mt-3 h-16 w-full">
-      {/* Glow */}
       <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 ${width} 100`}>
         <polyline
           points={normalized
@@ -120,7 +92,6 @@ function TrendSparkline({ data, tone }: { data: number[]; tone: Tone }) {
         />
       </svg>
 
-      {/* Main */}
       <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 ${width} 100`}>
         <polyline
           points={normalized
@@ -139,32 +110,32 @@ function TrendSparkline({ data, tone }: { data: number[]; tone: Tone }) {
 }
 
 /* ---------------------------------------------------------
-   Row Summaries
+   Row summary builders (EPL semantics)
 --------------------------------------------------------- */
 
 const buildHotSummary = (m: PlayerMetrics, stat: StatKey) => {
-  const label = STAT_LABELS[stat].toLowerCase();
-  const delta = m.deltaVsSeason;
-  const direction = delta > 0 ? "above" : "below";
-  const abs = Math.abs(delta).toFixed(1);
-  return `${m.name} is running hot with recent ${label} output sitting ${abs} ${label} ${direction} their season baseline.`;
+  const label = EPL_STAT_CONFIG.labels[stat].toLowerCase();
+  return `${m.name} is trending up, with recent ${label} output sitting ${m.deltaVsSeason.toFixed(
+    2
+  )} above their season average.`;
 };
 
 const buildStableSummary = (m: PlayerMetrics, stat: StatKey) => {
-  const label = STAT_LABELS[stat].toLowerCase();
-  return `${m.name} is a rock-solid ${label} performer, maintaining ${m.consistency.toFixed(
+  const label = EPL_STAT_CONFIG.labels[stat].toLowerCase();
+  return `${m.name} has delivered consistent ${label} returns, maintaining ${m.consistency.toFixed(
     0
-  )}% consistency with limited week-to-week variation.`;
+  )}% stability across recent matchweeks.`;
 };
 
 const buildCoolingSummary = (m: PlayerMetrics, stat: StatKey) => {
-  const label = STAT_LABELS[stat].toLowerCase();
-  const abs = Math.abs(m.deltaVsSeason).toFixed(1);
-  return `${m.name} has cooled off, sitting ${abs} ${label} below their usual baseline over the last five rounds.`;
+  const label = EPL_STAT_CONFIG.labels[stat].toLowerCase();
+  return `${m.name} has cooled off, with ${label} output dipping ${Math.abs(
+    m.deltaVsSeason
+  ).toFixed(2)} below their usual baseline.`;
 };
 
 /* ---------------------------------------------------------
-   Card
+   Card + column shells (UNCHANGED)
 --------------------------------------------------------- */
 
 function PlayerRowCard({
@@ -189,7 +160,6 @@ function PlayerRowCard({
   const mainValue = formatMainValue(metric.avgL5, stat);
   const deltaLabel = formatDelta(metric.deltaVsSeason, stat);
 
-  // refined tone glows
   const glow =
     tone === "hot"
       ? "shadow-[0_0_18px_rgba(239,68,68,0.40)]"
@@ -222,21 +192,7 @@ function PlayerRowCard({
         border
       )}
     >
-      {/* Tone internal wash */}
-      <div
-        className={cn(
-          "pointer-events-none absolute inset-0 rounded-xl opacity-55",
-          tone === "hot" &&
-            "bg-gradient-to-b from-red-500/20 via-transparent to-red-500/10",
-          tone === "stable" &&
-            "bg-gradient-to-b from-yellow-500/20 via-transparent to-yellow-500/10",
-          tone === "cold" &&
-            "bg-gradient-to-b from-sky-400/20 via-transparent to-sky-400/8"
-        )}
-      />
-
       <div className="relative space-y-2">
-        {/* top */}
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <span
@@ -272,7 +228,6 @@ function PlayerRowCard({
           </div>
         </div>
 
-        {/* tagline */}
         <div className="flex items-center justify-between">
           <p className="text-[11px] text-white/65 md:text-xs">
             {tone === "hot" && "Trending up in recent output."}
@@ -291,7 +246,6 @@ function PlayerRowCard({
           </div>
         </div>
 
-        {/* expanded */}
         {isOpen && (
           <div className="mt-3 border-t border-white/10 pt-3 animate-in fade-in slide-in-from-top-1">
             <TrendSparkline data={metric.l5} tone={tone} />
@@ -304,10 +258,6 @@ function PlayerRowCard({
     </button>
   );
 }
-
-/* ---------------------------------------------------------
-   Column Shell
---------------------------------------------------------- */
 
 function ColumnShell({
   tone,
@@ -325,7 +275,7 @@ function ColumnShell({
       ? "text-red-200"
       : tone === "stable"
       ? "text-yellow-200"
-      : "text-cyan-100"; // brighter for polish
+      : "text-cyan-100";
 
   return (
     <div className="relative space-y-4">
@@ -335,22 +285,25 @@ function ColumnShell({
         </p>
         <p className="text-[11px] text-white/65 md:text-xs">{subtitle}</p>
       </div>
-      {/* +1px breathing space applied */}
       <div className="space-y-3">{children}</div>
     </div>
   );
 }
 
 /* ---------------------------------------------------------
-   Main Component
+   MAIN COMPONENT
 --------------------------------------------------------- */
 
-export default function FormStabilityGrid() {
-  const players = useAFLMockPlayers();
-  const [selectedStat, setSelectedStat] = useState<StatKey>("fantasy");
+export default function FormStabilityGrid({
+  statConfig = EPL_STAT_CONFIG,
+}: {
+  statConfig?: typeof EPL_STAT_CONFIG;
+}) {
+  const players = useEPLMockPlayers();
+  const [selectedStat, setSelectedStat] = useState<StatKey>(
+    statConfig.defaultStat
+  );
   const [openKey, setOpenKey] = useState<string | null>(null);
-
-  const statLabel = STAT_LABELS[selectedStat];
 
   const metrics: PlayerMetrics[] = useMemo(() => {
     return players.map((p) => {
@@ -361,8 +314,8 @@ export default function FormStabilityGrid() {
       const deltaVsSeason = avgL5 - avgSeason;
 
       const vol = stdDev(l5);
-      const base = avgL5 || avgSeason || 1;
-      const consistency = clamp01(1 - vol / base) * 100;
+      const base = avgSeason || 1;
+      const consistency = clamp01(1 - vol / Math.max(base, 0.15)) * 100;
 
       return {
         id: p.id,
@@ -380,22 +333,9 @@ export default function FormStabilityGrid() {
     });
   }, [players, selectedStat]);
 
-  const hot = useMemo(
-    () => [...metrics].sort((a, b) => b.deltaVsSeason - a.deltaVsSeason).slice(0, 5),
-    [metrics]
-  );
-
-  const stable = useMemo(
-    () => [...metrics].sort((a, b) => b.consistency - a.consistency).slice(0, 5),
-    [metrics]
-  );
-
-  const cooling = useMemo(
-    () => [...metrics].sort((a, b) => a.deltaVsSeason - b.deltaVsSeason).slice(0, 5),
-    [metrics]
-  );
-
-  const makeKey = (tone: Tone, id: number) => `${tone}-${id}`;
+  const hot = [...metrics].sort((a, b) => b.deltaVsSeason - a.deltaVsSeason).slice(0, 5);
+  const stable = [...metrics].sort((a, b) => b.consistency - a.consistency).slice(0, 5);
+  const cooling = [...metrics].sort((a, b) => a.deltaVsSeason - b.deltaVsSeason).slice(0, 5);
 
   return (
     <section
@@ -405,127 +345,88 @@ export default function FormStabilityGrid() {
         "shadow-[0_0_80px_rgba(0,0,0,0.75)] overflow-hidden"
       )}
     >
-      {/* ⬇ refined glow layer (narrower, softer) */}
-      <div className="pointer-events-none absolute inset-x-[-60px] top-28 bottom-[-60px] bg-gradient-to-r from-red-500/18 via-yellow-400/18 to-sky-400/20 blur-2xl opacity-55" />
-
-      {/* top glow */}
       <div className="pointer-events-none absolute -top-32 left-1/2 h-48 w-[420px] -translate-x-1/2 rounded-full bg-yellow-500/18 blur-3xl" />
 
-      <div className="relative space-y-5">
-        {/* Header */}
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <SectionHeader
-              pillLabel="Form Stability Grid"
-              title="Hot risers, rock-solid anchors & form slumps"
-              description={`Last 5 rounds of ${statLabel.toLowerCase()} — split into recent surges, stability leaders and cooling risks.`}
-              icon={Sparkles}
+      <SectionHeader
+        pillLabel="Form Stability Grid"
+        title="Hot risers, rock-solid anchors & form slumps"
+        description={`Last 5 matchweeks of ${statConfig.labels[selectedStat].toLowerCase()} output.`}
+        icon={Sparkles}
+      />
+
+      {/* Stat lens */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {statConfig.availableStats.map((s) => (
+          <button
+            key={s}
+            onClick={() => {
+              setSelectedStat(s as StatKey);
+              setOpenKey(null);
+            }}
+            className={cn(
+              "rounded-full px-3.5 py-1.5 text-xs border transition-all backdrop-blur-sm",
+              selectedStat === s
+                ? "bg-yellow-400 text-black border-yellow-300 shadow-[0_0_15px_rgba(250,204,21,0.6)]"
+                : "bg-white/5 text-white/70 border-white/12 hover:bg-white/10"
+            )}
+          >
+            {statConfig.labels[s]}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-6 grid gap-6 md:grid-cols-3">
+        <ColumnShell tone="hot" title="Hot Form Surge" subtitle="Biggest L5 surges vs season baseline.">
+          {hot.map((m) => (
+            <PlayerRowCard
+              key={`hot-${m.id}`}
+              tone="hot"
+              title="Hot Form"
+              metric={m}
+              stat={selectedStat}
+              isOpen={openKey === `hot-${m.id}`}
+              onToggle={() =>
+                setOpenKey(openKey === `hot-${m.id}` ? null : `hot-${m.id}`)
+              }
+              summaryBuilder={buildHotSummary}
             />
-          </div>
+          ))}
+        </ColumnShell>
 
-          {/* stat lens */}
-          <div className="flex flex-col items-start gap-2 md:items-end">
-            <span className="text-[11px] uppercase tracking-[0.18em] text-white/45">
-              Stat lens
-            </span>
+        <ColumnShell tone="stable" title="Stability Leaders" subtitle="Lowest volatility with dependable output.">
+          {stable.map((m) => (
+            <PlayerRowCard
+              key={`stable-${m.id}`}
+              tone="stable"
+              title="Stability"
+              metric={m}
+              stat={selectedStat}
+              isOpen={openKey === `stable-${m.id}`}
+              onToggle={() =>
+                setOpenKey(openKey === `stable-${m.id}` ? null : `stable-${m.id}`)
+              }
+              summaryBuilder={buildStableSummary}
+              showConsistency
+            />
+          ))}
+        </ColumnShell>
 
-            <div className="flex flex-wrap gap-1.5">
-              {STATS.map((s) => {
-                const active = selectedStat === s;
-                return (
-                  <button
-                    key={s}
-                    onClick={() => {
-                      setSelectedStat(s);
-                      setOpenKey(null);
-                    }}
-                    className={cn(
-                      "rounded-full px-3.5 py-1.5 text-xs md:text-[13px] border transition-all backdrop-blur-sm",
-                      active
-                        ? "bg-yellow-400 text-black border-yellow-300 font-semibold shadow-[0_0_15px_rgba(250,204,21,0.6)] ring-1 ring-yellow-500/40"
-                        : "bg-white/5 text-white/70 border-white/12 hover:bg-white/10"
-                    )}
-                  >
-                    {STAT_LABELS[s]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Columns */}
-        <div className="grid gap-6 md:grid-cols-3">
-          {/* hot */}
-          <ColumnShell
-            tone="hot"
-            title="Hot Form Surge"
-            subtitle="Biggest L5 surges vs season baseline."
-          >
-            {hot.map((m) => {
-              const key = makeKey("hot", m.id);
-              return (
-                <PlayerRowCard
-                  key={key}
-                  tone="hot"
-                  title="Hot Form"
-                  metric={m}
-                  stat={selectedStat}
-                  isOpen={openKey === key}
-                  onToggle={() => setOpenKey(openKey === key ? null : key)}
-                  summaryBuilder={buildHotSummary}
-                />
-              );
-            })}
-          </ColumnShell>
-
-          {/* stable */}
-          <ColumnShell
-            tone="stable"
-            title="Stability Leaders"
-            subtitle="Lowest volatility with dependable L5 output."
-          >
-            {stable.map((m) => {
-              const key = makeKey("stable", m.id);
-              return (
-                <PlayerRowCard
-                  key={key}
-                  tone="stable"
-                  title="Stability"
-                  metric={m}
-                  stat={selectedStat}
-                  isOpen={openKey === key}
-                  onToggle={() => setOpenKey(openKey === key ? null : key)}
-                  summaryBuilder={buildStableSummary}
-                  showConsistency
-                />
-              );
-            })}
-          </ColumnShell>
-
-          {/* cooling */}
-          <ColumnShell
-            tone="cold"
-            title="Cooling Risks"
-            subtitle="Softening L5 output vs usual baseline."
-          >
-            {cooling.map((m) => {
-              const key = makeKey("cold", m.id);
-              return (
-                <PlayerRowCard
-                  key={key}
-                  tone="cold"
-                  title="Cooling"
-                  metric={m}
-                  stat={selectedStat}
-                  isOpen={openKey === key}
-                  onToggle={() => setOpenKey(openKey === key ? null : key)}
-                  summaryBuilder={buildCoolingSummary}
-                />
-              );
-            })}
-          </ColumnShell>
-        </div>
+        <ColumnShell tone="cold" title="Cooling Risks" subtitle="Softening output vs usual baseline.">
+          {cooling.map((m) => (
+            <PlayerRowCard
+              key={`cold-${m.id}`}
+              tone="cold"
+              title="Cooling"
+              metric={m}
+              stat={selectedStat}
+              isOpen={openKey === `cold-${m.id}`}
+              onToggle={() =>
+                setOpenKey(openKey === `cold-${m.id}` ? null : `cold-${m.id}`)
+              }
+              summaryBuilder={buildCoolingSummary}
+            />
+          ))}
+        </ColumnShell>
       </div>
     </section>
   );
