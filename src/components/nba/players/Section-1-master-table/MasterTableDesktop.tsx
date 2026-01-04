@@ -7,26 +7,23 @@ import {
   Search,
   X,
 } from "lucide-react";
+import type { StatConfig } from "@/lib/stats/types";
 import type { PlayerRow, StatLens } from "./MasterTable";
 
 /* -------------------------------------------------------------------------- */
 /* CONSTANTS                                                                  */
 /* -------------------------------------------------------------------------- */
 
-const ROUND_LABELS = ["OR", ...Array.from({ length: 23 }, (_, i) => `R${i + 1}`)];
-
 const FREE_ROW_LIMIT = 8;
 const PREMIUM_PAGE_SIZE = 20;
 
-/** How many "locked" skeleton rows we show under the free limit */
 const GHOST_ROW_COUNT = 2;
 
 const LEFT_COL_W = 220;
-const ROUND_COL_W = 48;
+const GAME_COL_W = 48;
 const RIGHT_COL_W = 260;
 const ROW_H = 84;
 
-/* -------------------- LOCKED SPACING TOKENS -------------------- */
 const SPACING = {
   statsGapY: "space-y-[2px]",
   hitRateGapY: "space-y-1",
@@ -44,14 +41,14 @@ function buildSearchIndex(p: PlayerRow) {
   return `${p.name} ${p.team} ${p.role}`.toLowerCase();
 }
 
-function getRowValues(key: string, stat: StatLens): number[] {
+function getRowValues(key: string, stat: StatLens, gameLabels: string[]): number[] {
   let seed = 0;
   for (let i = 0; i < key.length; i++) seed += key.charCodeAt(i);
 
-  const base = stat === "Fantasy" ? 70 : stat === "Disposals" ? 18 : 1;
-  const range = stat === "Fantasy" ? 40 : stat === "Disposals" ? 20 : 4;
+  const base = stat === "points" ? 18 : stat === "rebounds" ? 7 : stat === "assists" ? 4 : 2;
+  const range = stat === "points" ? 25 : stat === "rebounds" ? 12 : stat === "assists" ? 10 : 5;
 
-  return ROUND_LABELS.map((_, i) => base + ((seed + i * 13) % range));
+  return gameLabels.map((_, i) => base + ((seed + i * 13) % range));
 }
 
 function calcStats(values: number[]) {
@@ -63,12 +60,6 @@ function calcStats(values: number[]) {
     max: Math.max(...values),
     gms: values.length,
   };
-}
-
-function getHitThresholds(stat: StatLens): number[] {
-  if (stat === "Fantasy") return [80, 90, 100, 110];
-  if (stat === "Disposals") return [15, 20, 25, 30];
-  return [1, 2, 3, 4];
 }
 
 function calcHitRate(values: number[], threshold: number) {
@@ -88,6 +79,8 @@ export default function MasterTableDesktop({
   query,
   setQuery,
   onSelectPlayer,
+  showHeader = true,
+  statConfig,
 }: {
   players: PlayerRow[];
   selectedStat: StatLens;
@@ -96,24 +89,26 @@ export default function MasterTableDesktop({
   query: string;
   setQuery: (v: string) => void;
   onSelectPlayer: (p: PlayerRow) => void;
+  showHeader?: boolean;
+  statConfig: StatConfig;
 }) {
 
   const [team, setTeam] = useState("All");
   const [search, setSearch] = useState("");
   const [compact, setCompact] = useState(false);
 
-  // Free users: no "show more" button (per request). Premium: 20-per-click paging.
   const [premiumVisible, setPremiumVisible] = useState(PREMIUM_PAGE_SIZE);
 
-  // CTA modal
   const [ctaOpen, setCtaOpen] = useState(false);
+
+  const gameLabels = statConfig.sportMeta.roundLabels;
 
   /* ---------------- DERIVED DATA ---------------- */
 
   const rows = useMemo(() => {
     return players
       .map((p) => {
-        const values = getRowValues(String(p.id), selectedStat);
+        const values = getRowValues(String(p.id), selectedStat, gameLabels);
         return {
           player: p,
           values,
@@ -122,7 +117,7 @@ export default function MasterTableDesktop({
         };
       })
       .sort((a, b) => b.stats.total - a.stats.total);
-  }, [players, selectedStat]);
+  }, [players, selectedStat, gameLabels]);
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -149,13 +144,12 @@ export default function MasterTableDesktop({
     [players]
   );
 
-  const hitThresholds = getHitThresholds(selectedStat);
+  const hitThresholds = statConfig.playerTableThresholds?.[selectedStat] || [];
 
   const nonCompactMinWidth =
-    LEFT_COL_W + ROUND_LABELS.length * ROUND_COL_W + RIGHT_COL_W;
+    LEFT_COL_W + gameLabels.length * GAME_COL_W + RIGHT_COL_W;
 
   const ghostRows = useMemo(() => {
-    // "always under free rows" — only show when not premium
     if (isPremium) return [];
     return Array.from({ length: GHOST_ROW_COUNT }, (_, i) => i);
   }, [isPremium]);
@@ -188,12 +182,12 @@ export default function MasterTableDesktop({
               <span className="uppercase tracking-[0.18em]">Master Table</span>
             </div>
             <h2 className="mt-3 text-xl font-semibold text-neutral-50">
-              Full-season player trends
+              Full-season player performance
             </h2>
           </div>
 
           <div className="flex gap-2 rounded-full border border-neutral-700 bg-black/80 p-1">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
+            {statConfig.availableStats.map((s) => (
               <button
                 key={s}
                 onClick={() => setSelectedStat(s)}
@@ -204,7 +198,7 @@ export default function MasterTableDesktop({
                     : "text-neutral-300 hover:bg-neutral-800"
                 )}
               >
-                {s}
+                {statConfig.labels[s]}
               </button>
             ))}
           </div>
@@ -213,7 +207,7 @@ export default function MasterTableDesktop({
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
             <p className="text-xs text-neutral-400">
-              Season-long totals, averages and hit-rate performance
+              Game-by-game totals, averages and hit-rate performance
             </p>
 
             <div
@@ -269,7 +263,7 @@ export default function MasterTableDesktop({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 disabled={!isPremium}
-                placeholder="Search player, team or role"
+                placeholder="Search player, team or position"
                 className="bg-transparent text-sm text-neutral-200 placeholder:text-neutral-500 outline-none w-48 disabled:cursor-not-allowed"
               />
               {!isPremium && <Lock className="h-4 w-4 text-neutral-500 ml-2" />}
@@ -280,7 +274,6 @@ export default function MasterTableDesktop({
 
       {/* ================= TABLE (SCROLL CONTAINER) ================= */}
       <div className="relative max-h-[65vh] overflow-y-auto overflow-x-auto scrollbar-none">
-        {/* Left/right scroll fades */}
         <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-black/90 to-transparent z-40" />
         <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-black/90 to-transparent z-40" />
 
@@ -318,7 +311,6 @@ export default function MasterTableDesktop({
                   </div>
                 </div>
 
-                {/* Row-level hover hint (subtle) */}
                 {!isPremium && (
                   <span className="opacity-0 group-hover:opacity-100 transition text-[10px] text-yellow-300/90 flex items-center gap-1">
                     <Lock className="h-3 w-3" />
@@ -328,7 +320,6 @@ export default function MasterTableDesktop({
               </button>
             ))}
 
-            {/* Ghost (locked) skeleton rows under free rows */}
             {ghostRows.map((i) => (
               <div
                 key={`ghost-player-${i}`}
@@ -363,13 +354,13 @@ export default function MasterTableDesktop({
             <>
               <div>
                 <div className="sticky top-0 z-20 flex border-b border-neutral-800 bg-black/95">
-                  {ROUND_LABELS.map((r) => (
+                  {gameLabels.map((g) => (
                     <div
-                      key={r}
+                      key={g}
                       className="py-3 text-center text-[10px] uppercase tracking-[0.18em] text-neutral-500"
-                      style={{ width: ROUND_COL_W }}
+                      style={{ width: GAME_COL_W }}
                     >
-                      {r}
+                      {g.replace("Game ", "G")}
                     </div>
                   ))}
                 </div>
@@ -384,7 +375,7 @@ export default function MasterTableDesktop({
                       <div
                         key={i}
                         className="flex items-center justify-center text-sm text-neutral-100"
-                        style={{ width: ROUND_COL_W }}
+                        style={{ width: GAME_COL_W }}
                       >
                         {v}
                       </div>
@@ -392,18 +383,17 @@ export default function MasterTableDesktop({
                   </div>
                 ))}
 
-                {/* Ghost (locked) skeleton rows under free rows */}
                 {ghostRows.map((i) => (
                   <div
-                    key={`ghost-rounds-${i}`}
+                    key={`ghost-games-${i}`}
                     className="relative flex border-t border-neutral-800"
                     style={{ height: ROW_H }}
                   >
-                    {ROUND_LABELS.map((_, j) => (
+                    {gameLabels.map((_, j) => (
                       <div
                         key={j}
                         className="flex items-center justify-center"
-                        style={{ width: ROUND_COL_W }}
+                        style={{ width: GAME_COL_W }}
                       >
                         <div className="h-4 w-6 rounded bg-neutral-800/70" />
                       </div>
@@ -476,7 +466,6 @@ export default function MasterTableDesktop({
                   </div>
                 ))}
 
-                {/* Ghost (locked) skeleton rows under free rows */}
                 {ghostRows.map((i) => (
                   <div
                     key={`ghost-stats-${i}`}
@@ -568,7 +557,6 @@ export default function MasterTableDesktop({
                 </div>
               ))}
 
-              {/* Ghost (locked) skeleton rows under free rows */}
               {ghostRows.map((i) => (
                 <div
                   key={`ghost-compact-${i}`}
@@ -602,7 +590,6 @@ export default function MasterTableDesktop({
         </div>
       </div>
 
-      {/* CTA (opens modal, CTA always ABOVE the ghost rows which are inside table) */}
       {!isPremium && (
         <div className="flex justify-center py-10 border-t border-neutral-800">
           <button
@@ -625,7 +612,6 @@ export default function MasterTableDesktop({
         </div>
       )}
 
-      {/* SHOW MORE (Premium only, 20-per-click) */}
       {isPremium && premiumVisible < filtered.length && (
         <div className="py-6 text-center">
           <button
@@ -639,7 +625,6 @@ export default function MasterTableDesktop({
         </div>
       )}
 
-      {/* CTA MODAL */}
       {!isPremium && ctaOpen && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center px-6">
           <button

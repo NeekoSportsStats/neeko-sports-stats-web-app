@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/lib/auth";
+import type { StatConfig, StatKey } from "@/lib/stats/types";
+import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
 import PlayerInsightsOverlay from "../Section-2-player-insights/PlayerInsightsOverlay";
 import MasterTableDesktop from "./MasterTableDesktop";
 import MasterTableMobile from "./MasterTableMobile";
@@ -9,7 +11,7 @@ import MasterTableMobile from "./MasterTableMobile";
 /* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export type StatLens = "Fantasy" | "Disposals" | "Goals";
+export type StatLens = StatKey;
 
 export type PlayerRow = {
   id: number;
@@ -17,20 +19,10 @@ export type PlayerRow = {
   name: string;
   team: string;
   role: string;
-  roundsFantasy: number[];
-  roundsDisposals: number[];
-  roundsGoals: number[];
+  roundsPoints: number[];
+  roundsRebounds: number[];
+  roundsAssists: number[];
 };
-
-/* -------------------------------------------------------------------------- */
-/* ROUND LABELS                                                               */
-/* -------------------------------------------------------------------------- */
-
-export const ROUND_LABELS = [
-  "OR","R1","R2","R3","R4","R5","R6","R7","R8","R9",
-  "R10","R11","R12","R13","R14","R15","R16","R17","R18","R19",
-  "R20","R21","R22","R23",
-];
 
 /* -------------------------------------------------------------------------- */
 /* MOCK DATA                                                                  */
@@ -38,27 +30,28 @@ export const ROUND_LABELS = [
 
 function buildMockPlayers(): PlayerRow[] {
   const list: PlayerRow[] = [];
+  const totalGames = NBA_STAT_CONFIG.sportMeta.totalRounds;
 
   for (let i = 1; i <= 60; i++) {
-    const f: number[] = [];
-    const d: number[] = [];
-    const g: number[] = [];
+    const pts: number[] = [];
+    const reb: number[] = [];
+    const ast: number[] = [];
 
-    for (let r = 0; r < ROUND_LABELS.length; r++) {
-      f.push(60 + Math.round(Math.random() * 40));
-      d.push(10 + Math.round(Math.random() * 20));
-      g.push(Math.round(Math.random() * 3));
+    for (let g = 0; g < totalGames; g++) {
+      pts.push(10 + Math.round(Math.random() * 30));
+      reb.push(2 + Math.round(Math.random() * 14));
+      ast.push(1 + Math.round(Math.random() * 12));
     }
 
     list.push({
       id: i,
       rank: i,
       name: `Player ${i}`,
-      team: ["CARL","ESS","COLL","RICH","GEEL","NMFC"][i % 6],
-      role: ["MID","RUC","FWD","DEF"][i % 4],
-      roundsFantasy: f,
-      roundsDisposals: d,
-      roundsGoals: g,
+      team: ["LAL","GSW","BOS","MIA","DEN","PHX"][i % 6],
+      role: ["PG","SG","SF","PF","C"][i % 5],
+      roundsPoints: pts,
+      roundsRebounds: reb,
+      roundsAssists: ast,
     });
   }
 
@@ -71,10 +64,10 @@ const MOCK_PLAYERS = buildMockPlayers();
 /* MASTER TABLE ORCHESTRATOR                                                   */
 /* -------------------------------------------------------------------------- */
 
-export default function MasterTable() {
+export default function MasterTable({ statConfig }: { statConfig: StatConfig }) {
   const { isPremium } = useAuth();
 
-  const [selectedStat, setSelectedStat] = useState<StatLens>("Fantasy");
+  const [selectedStat, setSelectedStat] = useState<StatLens>(statConfig.defaultStat);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null);
   const [query, setQuery] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -95,6 +88,7 @@ export default function MasterTable() {
           query={query}
           setQuery={setQuery}
           onSelectPlayer={setSelectedPlayer}
+          statConfig={statConfig}
         />
       </div>
 
@@ -108,6 +102,7 @@ export default function MasterTable() {
           query={query}
           setQuery={setQuery}
           onSelectPlayer={setSelectedPlayer}
+          statConfig={statConfig}
         />
       </div>
 
@@ -120,6 +115,8 @@ export default function MasterTable() {
             selectedStat={selectedStat}
             onClose={() => setSelectedPlayer(null)}
             onLensChange={setSelectedStat}
+            isPremium={isPremium}
+            statConfig={statConfig}
           />,
           document.body
         )}

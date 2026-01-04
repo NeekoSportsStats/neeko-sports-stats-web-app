@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Search, Lock, X, ArrowRight, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { StatConfig } from "@/lib/stats/types";
 import type { PlayerRow, StatLens } from "./MasterTable";
 
 /* -------------------------------------------------------------------------- */
@@ -11,17 +12,14 @@ function cx(...parts: Array<string | false | undefined | null>) {
   return parts.filter(Boolean).join(" ");
 }
 
-/* ✅ ADDED — skeleton helper (non-invasive) */
-const skeletonValue = () => Math.floor(70 + Math.random() * 40);
+const skeletonValue = () => Math.floor(10 + Math.random() * 30);
 
-const ROUND_LABELS = ["OR", ...Array.from({ length: 23 }, (_, i) => `R${i + 1}`)];
 const PAGE_SIZE = 10;
 
 const LEFT_COL_W = 124;
 const CELL_W = 52;
 const CELL_GAP = 4;
 
-// Shared stats row layout (header + body must match exactly)
 const STATS_ROW_CLASS = "flex gap-[4px] px-1.5";
 
 /* -------------------------------------------------------------------------- */
@@ -36,6 +34,7 @@ export default function MasterTableMobile({
   query,
   setQuery,
   onSelectPlayer,
+  statConfig,
 }: {
   players: PlayerRow[];
   selectedStat: StatLens;
@@ -44,12 +43,15 @@ export default function MasterTableMobile({
   query: string;
   setQuery: (v: string) => void;
   onSelectPlayer: (p: PlayerRow) => void;
+  statConfig: StatConfig;
 }) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [showUpgrade, setShowUpgrade] = useState(false);
 
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
   const [showTeamDropdown, setShowTeamDropdown] = useState(false);
+
+  const gameLabels = statConfig.sportMeta.roundLabels;
 
   /* ---------------------------------------------------------------------- */
   /* FILTERING                                                               */
@@ -77,7 +79,7 @@ export default function MasterTableMobile({
   /* RENDER                                                                  */
   /* ---------------------------------------------------------------------- */
 
-  const tableWidth = LEFT_COL_W + 24 * CELL_W + 23 * CELL_GAP + 16;
+  const tableWidth = LEFT_COL_W + gameLabels.length * CELL_W + (gameLabels.length - 1) * CELL_GAP + 16;
 
   const TEAMS = useMemo(
     () => Array.from(new Set(players.map((p) => p.team))).sort(),
@@ -143,15 +145,15 @@ export default function MasterTableMobile({
           </div>
 
           <h3 className="mt-3 text-lg font-semibold text-neutral-50">
-            Full-season player trends
+            Full-season player performance
           </h3>
 
           <p className="mt-1 text-xs text-neutral-400">
-            Round-by-round production.
+            Game-by-game production stats.
           </p>
 
           <div className="mt-4 flex gap-2 rounded-full border border-neutral-700 bg-black/80 px-2 py-1 text-[11px]">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
+            {statConfig.availableStats.map((s) => (
               <button
                 key={s}
                 onClick={() => setSelectedStat(s)}
@@ -162,7 +164,7 @@ export default function MasterTableMobile({
                     : "bg-neutral-900 text-neutral-300"
                 )}
               >
-                {s}
+                {statConfig.labels[s]}
               </button>
             ))}
           </div>
@@ -221,7 +223,7 @@ export default function MasterTableMobile({
                           Unlock full player table
                         </div>
                         <div className="mt-1 text-xs text-neutral-300">
-                          Full season trends, team filters & AI insights.
+                          Full season stats, team filters & AI insights.
                         </div>
                       </div>
 
@@ -244,13 +246,13 @@ export default function MasterTableMobile({
                 </div>
 
                 <div className={`${STATS_ROW_CLASS} py-4`}>
-                  {ROUND_LABELS.map((r) => (
+                  {gameLabels.map((g) => (
                     <div
-                      key={r}
+                      key={g}
                       className="text-center text-[10px] uppercase tracking-[0.18em] text-neutral-500 translate-y-[1px]"
                       style={{ width: CELL_W }}
                     >
-                      {r}
+                      {g.replace("Game ", "G")}
                     </div>
                   ))}
                 </div>
@@ -277,7 +279,7 @@ export default function MasterTableMobile({
                       </button>
 
                       <div className={`${STATS_ROW_CLASS} py-4`}>
-                        {ROUND_LABELS.map((_, i) => (
+                        {gameLabels.map((_, i) => (
                           <div
                             key={i}
                             className="text-center text-[15px] text-neutral-100"
@@ -363,7 +365,7 @@ export default function MasterTableMobile({
 
               <div className="px-5 py-5 space-y-4">
                 <ul className="space-y-3 text-sm text-neutral-300">
-                  <li>• Full season round-by-round stats</li>
+                  <li>• Full season game-by-game stats</li>
                   <li>• Team filtering & search</li>
                   <li>• Player insights & AI analysis</li>
                   <li>• Premium-only table interactions</li>
