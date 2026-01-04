@@ -109,10 +109,10 @@ export default function NBATeams() {
   /* -------------------------------------------------------------------------- */
 
   const sections = [
-    { id: "momentum", label: "Round Momentum" },
+    { id: "momentum", label: "Game Momentum" },
     { id: "dashboard", label: "Dashboard" },
     { id: "form-grid", label: "Form Grid" },
-    { id: "trends", label: "Team Trends" },
+    { id: "trends", label: "Position Trends" },
     { id: "ai", label: "AI Insights" },
     { id: "master-table", label: "Master Table" },
   ];
@@ -130,8 +130,8 @@ export default function NBATeams() {
           NBA Team Analytics
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-neutral-400">
-          League-wide team trends, momentum pulses, attack/defence shifts and
-          full season scoring tables.
+          League-wide team trends, momentum pulses, scoring/defensive shifts and
+          full season standings tables.
         </p>
       </header>
 
@@ -192,27 +192,27 @@ export default function NBATeams() {
       {/* -------------------------- PAGE SECTIONS -------------------------- */}
 
       <section id="momentum" className="mb-14 scroll-mt-28">
-        <TeamMomentumPulse statConfig={NBA_STAT_CONFIG} />
+        <TeamMomentumPulse />
       </section>
 
       <section id="dashboard" className="mb-14 scroll-mt-28">
-        <TeamDashboardTiles statConfig={NBA_STAT_CONFIG} />
+        <TeamDashboardTiles />
       </section>
 
       <section id="form-grid" className="mb-14 scroll-mt-28">
-        <TeamFormGrid statConfig={NBA_STAT_CONFIG} />
+        <TeamFormGrid />
       </section>
 
       <section id="trends" className="mb-14 scroll-mt-28">
-        <TeamTrends statConfig={NBA_STAT_CONFIG} />
+        <TeamTrends />
       </section>
 
       <section id="ai" className="mb-14 scroll-mt-28">
-        <TeamAIInsights statConfig={NBA_STAT_CONFIG} />
+        <TeamAIInsights />
       </section>
 
       <section id="master-table" className="scroll-mt-28">
-        <TeamMasterTable statConfig={NBA_STAT_CONFIG} />
+        <TeamMasterTable />
       </section>
 
       {/* ------------------------------- BACK TO TOP ------------------------------ */}

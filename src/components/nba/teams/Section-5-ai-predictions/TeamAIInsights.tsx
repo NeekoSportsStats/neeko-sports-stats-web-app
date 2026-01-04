@@ -1,7 +1,7 @@
-// src/components/afl/teams/TeamAIInsights.tsx
+// src/components/nba/teams/TeamAIInsights.tsx
 
 import React from "react";
-import { MOCK_TEAMS, AFLTeam } from "../data/mockTeams";
+import { MOCK_TEAMS } from "../data/mockTeams";
 import { Lock, X, ArrowRight } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -46,7 +46,7 @@ function buildLeagueBaselines() {
 }
 
 function buildTeamInsightLines(
-  team: AFLTeam,
+  team: typeof MOCK_TEAMS[number],
   baselines: ReturnType<typeof buildLeagueBaselines>
 ): string[] {
   const last5Scores = lastN(team.scores, 5);
@@ -73,7 +73,7 @@ function buildTeamInsightLines(
     );
   else if (vol > leagueVolatility * 1.15)
     lines.push(
-      `${team.name} shows elevated round-to-round swing, indicating unstable momentum.`
+      `${team.name} shows elevated game-to-game swing, indicating unstable momentum.`
     );
   else
     lines.push(
@@ -83,7 +83,7 @@ function buildTeamInsightLines(
   // Attack
   if (attackAvg > leagueAttack * 1.05)
     lines.push(
-      `${team.name} is trending above league attack averages over the last 5 rounds.`
+      `${team.name} is trending above league attack averages over the last 5 games.`
     );
   else if (attackAvg < leagueAttack * 0.95)
     lines.push(
@@ -124,7 +124,7 @@ function buildTeamInsightLines(
 /*                              CARD COMPONENTS                               */
 /* -------------------------------------------------------------------------- */
 
-const RealCard = ({ team, lines }: { team: AFLTeam; lines: string[] }) => (
+const RealCard = ({ team, lines }: { team: typeof MOCK_TEAMS[number]; lines: string[] }) => (
   <article className="min-w-[260px] snap-start rounded-3xl border border-neutral-800/90 bg-gradient-to-b from-black/96 via-neutral-950 to-black px-5 py-5 text-xs text-neutral-200 shadow-[0_0_45px_rgba(0,0,0,0.8)] transition hover:brightness-110">
     <div className="mb-3 flex items-center justify-between">
       <div>
@@ -263,7 +263,7 @@ export default function TeamAIInsights() {
 
           <p className="mt-2 max-w-2xl text-xs text-neutral-400">
             Your lightweight AI snapshot for momentum, attack/defence shifts and
-            clearance trends. Unlock full intelligence to view all 18 clubs.
+            clearance trends. Unlock full intelligence to view all 30 teams.
           </p>
         </div>
 
@@ -292,7 +292,7 @@ export default function TeamAIInsights() {
               Neeko+ AI
             </div>
             <div className="mt-1 text-sm font-semibold text-yellow-100">
-              Unlock full AFL AI intelligence across all 18 clubs
+              Unlock full NBA AI intelligence across all 30 teams
             </div>
             <p className="mt-1 text-xs text-neutral-300">
               Access deeper trend breakdowns, AI-driven matchup flags, volatility
@@ -326,7 +326,7 @@ export default function TeamAIInsights() {
             </div>
 
             <h3 className="mt-3 text-xl font-semibold text-neutral-50">
-              Unlock full AFL AI analysis
+              Unlock full NBA AI analysis
             </h3>
 
             <p className="mt-2 text-xs text-neutral-300">
@@ -337,7 +337,7 @@ export default function TeamAIInsights() {
             <ul className="mt-4 space-y-2 text-xs text-neutral-200">
               <li className="flex gap-2">
                 <span className="h-[4px] w-[4px] rounded-full bg-yellow-400 mt-[5px]" />
-                <span>Full analysis for all 18 AFL clubs.</span>
+                <span>Full analysis for all 30 NBA teams.</span>
               </li>
               <li className="flex gap-2">
                 <span className="h-[4px] w-[4px] rounded-full bg-yellow-400 mt-[5px]" />
