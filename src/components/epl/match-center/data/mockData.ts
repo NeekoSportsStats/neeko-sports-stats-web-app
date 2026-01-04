@@ -314,7 +314,7 @@ function buildTopFantasy(homeTeam: string, awayTeam: string): TopFantasyTeam[] {
 const FIXTURES_2025_BASE: FixtureMatch[] = [
   {
     id: "2025-r35-ars-che",
-    season: 2025,
+    season: "2024–2025",
     roundNumber: 35,
     roundLabel: "GW35",
     status: "final",
@@ -332,7 +332,7 @@ const FIXTURES_2025_BASE: FixtureMatch[] = [
   },
   {
     id: "2025-r36-liv-mci",
-    season: 2025,
+    season: "2024–2025",
     roundNumber: 36,
     roundLabel: "GW36",
     status: "final",
@@ -350,7 +350,7 @@ const FIXTURES_2025_BASE: FixtureMatch[] = [
   },
   {
     id: "2025-r37-tot-mun",
-    season: 2025,
+    season: "2024–2025",
     roundNumber: 37,
     roundLabel: "GW37",
     status: "final",
@@ -441,11 +441,11 @@ function build2026(): FixtureMatch[] {
   out.push(
     {
       id: "2026-gw1-ars-liv",
-      season: 2026,
+      season: "2025–2026",
       roundNumber: 1,
       roundLabel: "GW1",
       status: "upcoming",
-      dateISO: "2026-08-15",
+      dateISO: "2025-08-15",
       timeLocal: "12:30",
       venue: TEAM_VENUE["Arsenal"] ?? "Emirates Stadium",
       homeTeam: "Arsenal",
@@ -453,11 +453,11 @@ function build2026(): FixtureMatch[] {
     },
     {
       id: "2026-gw1-che-mci",
-      season: 2026,
+      season: "2025–2026",
       roundNumber: 1,
       roundLabel: "GW1",
       status: "upcoming",
-      dateISO: "2026-08-15",
+      dateISO: "2025-08-15",
       timeLocal: "15:00",
       venue: TEAM_VENUE["Chelsea"] ?? "Stamford Bridge",
       homeTeam: "Chelsea",
@@ -465,7 +465,7 @@ function build2026(): FixtureMatch[] {
     }
   );
 
-  const baseGW2 = "2026-08-22";
+  const baseGW2 = "2025-08-22";
 
   const pairsForRound = circlePairings(EPL_TEAMS.slice() as unknown as string[]);
   for (let round = 2; round <= 38; round++) {
@@ -483,7 +483,7 @@ function build2026(): FixtureMatch[] {
         id: `2026-${roundLabel}-${home.slice(0, 3).toLowerCase()}-${away
           .slice(0, 3)
           .toLowerCase()}-${i}`,
-        season: 2026,
+        season: "2025–2026",
         roundNumber: round,
         roundLabel,
         status: "upcoming",

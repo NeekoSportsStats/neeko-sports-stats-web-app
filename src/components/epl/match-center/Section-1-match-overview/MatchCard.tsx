@@ -1,4 +1,4 @@
-// src/components/afl/match-center/MatchCard.tsx
+// src/components/epl/match-center/MatchCard.tsx
 import React, { useMemo } from "react";
 import type { FixtureMatch } from "../data/types";
 

@@ -11,24 +11,24 @@ export default function MatchCenterHeader() {
         {/* Eyebrow */}
         <div className="mb-3 flex items-center gap-2 text-xs font-medium tracking-widest text-amber-300/80">
           <Activity size={14} />
-          MATCH CENTER
+          MATCH CENTRE
         </div>
 
         {/* Title */}
         <h1 className="text-3xl md:text-4xl font-bold text-white">
-          AFL Match Center
+          EPL Match Centre
         </h1>
 
         {/* Subtitle */}
         <p className="mt-2 max-w-3xl text-sm md:text-base text-white/70">
-          Upcoming fixtures with venue and ladder context. Deeper predictive
-          interpretation is available through AI match analysis.
+          Upcoming fixtures with venue and table context. Deeper match
+          interpretation is available through AI analysis.
         </p>
 
         {/* CTA */}
         <div className="mt-5">
           <a
-            href="/sports/afl/ai-analysis"
+            href="/sports/epl/ai-analysis"
             className="inline-flex items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-xs font-medium text-amber-300 transition hover:bg-amber-400/20"
           >
             Explore AI Match Insights →

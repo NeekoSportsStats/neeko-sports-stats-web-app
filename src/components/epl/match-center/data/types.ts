@@ -1,4 +1,4 @@
-// src/components/afl/match-center/types.ts
+// src/components/epl/match-center/types.ts
 
 export type MatchStatus = "upcoming" | "final";
 
@@ -33,11 +33,11 @@ export type TopFantasyTeam = {
 };
 
 export type TeamLists = {
-  /** If false, we show the full club list as “Not yet announced (projected)” */
+  /** If false, we show the full club list as "Not yet announced (projected)" */
   announced: boolean;
   caption?: string;
 
-  /** Usually 22 when announced; can be full list when not announced */
+  /** Usually squad size when announced; can be full list when not announced */
   home: string[];
   away: string[];
 
@@ -61,12 +61,12 @@ export type MatchPreview = {
 export type FixtureMatch = {
   id: string;
 
-  /** Season context */
-  season: 2025 | 2026;
+  /** Season context (e.g., "2024–2025", "2025–2026") */
+  season: string;
 
-  /** Round context */
-  roundNumber: number; // 0 = Opening Round
-  roundLabel: string; // OR, R1…R23
+  /** Gameweek context */
+  roundNumber: number; // 1-38
+  roundLabel: string; // GW1, GW2…GW38
 
   /** Match info */
   dateISO: string;

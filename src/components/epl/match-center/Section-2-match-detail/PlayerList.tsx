@@ -44,7 +44,7 @@ export default function MatchList({ matches, onSelectMatch }: Props) {
           No fixtures available
         </div>
         <div className="mt-1 text-xs text-white/50">
-          Check back later for upcoming AFL matches.
+          Check back later for upcoming EPL fixtures.
         </div>
       </div>
     );

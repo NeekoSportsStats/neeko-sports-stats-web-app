@@ -12,7 +12,7 @@ import { MOCK_FIXTURES, MOCK_LADDER_TOP16 } from "@/components/epl/match-center/
 import type { FixtureMatch } from "@/components/epl/match-center/types";
 import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
 
-type Season = 2025 | 2026;
+type Season = string;
 
 /* -------------------------------------------------------------------------- */
 /* NORMALISE LADDER                                                            */
@@ -67,7 +67,7 @@ function getDefaultSeasonRound(fixtures: FixtureMatch[]) {
     return { season: lastFinal.season, roundNumber: lastFinal.roundNumber };
   }
 
-  return { season: 2026 as Season, roundNumber: 1 };
+  return { season: EPL_STAT_CONFIG.seasons.current, roundNumber: 1 };
 }
 
 /* -------------------------------------------------------------------------- */

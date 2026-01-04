@@ -1,4 +1,4 @@
-// src/components/afl/match-center/MatchDetailOverlay.tsx
+// src/components/epl/match-center/MatchDetailOverlay.tsx
 import React, { useMemo, useState } from "react";
 import type { FixtureMatch, TeamStatLine } from "../data/types";
 import { X, ChevronDown } from "lucide-react";
@@ -482,7 +482,7 @@ export default function MatchDetailOverlay({ match, onClose }: Props) {
         {/* CTA */}
         <div className="mt-8">
           <a
-            href="https://www.neekostats.com.au/sports/afl/ai-analysis"
+            href="/sports/epl/ai-analysis"
             className="block w-full rounded-lg bg-amber-400 text-black text-sm font-semibold py-3 text-center hover:bg-amber-300 transition-colors"
           >
             Open AI Match Analysis →
