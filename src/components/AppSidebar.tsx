@@ -54,6 +54,8 @@ export function AppSidebar() {
   const handleLinkClick = () => {
     if (isMobile) {
       setOpenMobile(false);
+    } else {
+      setOpen(false);
     }
   };
 
@@ -69,20 +71,6 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="z-50">
-      {!isMobile && (
-        <SidebarHeader className="flex flex-row items-center justify-between">
-          <span className="text-lg font-semibold">Menu</span>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setOpen(false)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </SidebarHeader>
-      )}
-
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>

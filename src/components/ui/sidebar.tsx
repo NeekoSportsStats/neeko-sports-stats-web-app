@@ -136,7 +136,7 @@ const Sidebar = React.forwardRef<
     collapsible?: "offcanvas" | "icon" | "none";
   }
 >(({ side = "left", variant = "sidebar", collapsible = "offcanvas", className, children, ...props }, ref) => {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+  const { isMobile, state, openMobile, setOpenMobile, setOpen } = useSidebar();
 
   if (collapsible === "none") {
     return (
@@ -184,6 +184,15 @@ const Sidebar = React.forwardRef<
         <div
           className="fixed inset-0 z-40 bg-black/50 transition-opacity duration-200"
           onClick={() => setOpen(false)}
+          aria-label="Close sidebar"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setOpen(false);
+            }
+          }}
         />
       )}
       <div
