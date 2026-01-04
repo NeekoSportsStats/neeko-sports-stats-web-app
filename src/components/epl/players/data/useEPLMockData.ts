@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { EPLStatKey } from "@/lib/stats/types";
+import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
 
 export type StatKey = EPLStatKey;
 
@@ -36,61 +37,31 @@ export const POSITION_OPTIONS = ["All", "GK", "DEF", "MID", "FWD"];
 
 export const ROUND_OPTIONS = [
   "All",
-  ...Array.from({ length: 38 }, (_, i) => `GW${i + 1}`),
+  ...EPL_STAT_CONFIG.sportMeta.roundLabels!,
 ];
 
-export const YEARS = ["2025–2026", "2024–2025"];
-
-function genGoals(pos: Position, seed: number): number {
-  if (pos === "GK") return 0;
-  if (pos === "DEF") return seed % 25 === 0 ? 1 : 0;
-  if (pos === "MID") return seed % 8 < 1 ? 1 : 0;
-  return seed % 3 === 0 ? Math.min(2, Math.floor(seed % 3)) : 0;
-}
-
-function genAssists(pos: Position, seed: number): number {
-  if (pos === "GK") return 0;
-  if (pos === "DEF") return seed % 12 === 0 ? 1 : 0;
-  if (pos === "MID") return seed % 5 < 1 ? 1 : 0;
-  return seed % 4 < 1 ? 1 : 0;
-}
-
-function genShots(pos: Position, seed: number): number {
-  if (pos === "GK") return 0;
-  if (pos === "DEF") return seed % 2;
-  if (pos === "MID") return 1 + (seed % 3);
-  return 2 + (seed % 5);
-}
-
-function genShotsOnTarget(shots: number, seed: number): number {
-  if (shots === 0) return 0;
-  return Math.min(shots, Math.floor(shots / 2) + (seed % 2));
-}
-
-function genXG(shots: number, goals: number, seed: number): number {
-  if (shots === 0) return 0;
-  return Math.max(
-    goals * 0.35,
-    Number((0.05 + (shots * 0.15 * (seed % 100)) / 100).toFixed(2))
-  );
-}
+export const YEARS = [
+  EPL_STAT_CONFIG.seasons.current,
+  EPL_STAT_CONFIG.seasons.past,
+];
 
 function generatePlayers(): Player[] {
+  const totalRounds = EPL_STAT_CONFIG.sportMeta.totalRounds!;
+
   return Array.from({ length: 100 }).map((_, i) => {
     const pos = ["GK", "DEF", "MID", "FWD"][i % 4] as Position;
-    const team =
-      [
-        "ARS",
-        "MCI",
-        "LIV",
-        "CHE",
-        "TOT",
-        "MUN",
-        "NEW",
-        "AVL",
-        "BHA",
-        "WHU",
-      ][i % 10];
+    const team = [
+      "ARS",
+      "MCI",
+      "LIV",
+      "CHE",
+      "TOT",
+      "MUN",
+      "NEW",
+      "AVL",
+      "BHA",
+      "WHU",
+    ][i % 10];
 
     const goals: number[] = [];
     const assists: number[] = [];
@@ -98,19 +69,53 @@ function generatePlayers(): Player[] {
     const shotsOnTarget: number[] = [];
     const xg: number[] = [];
 
-    for (let gw = 0; gw < 38; gw++) {
-      const seed = i * 38 + gw;
-      const g = genGoals(pos, seed);
-      const a = genAssists(pos, seed + 1);
-      const s = genShots(pos, seed + 2);
-      const sot = genShotsOnTarget(s, seed + 3);
-      const expected = genXG(s, g, seed + 4);
+    for (let gw = 0; gw < totalRounds; gw++) {
+      const seed = i * totalRounds + gw;
+
+      let g = 0;
+      if (pos === "FWD") {
+        g = seed % 3 === 0 ? (seed % 7 < 2 ? 2 : 1) : 0;
+      } else if (pos === "MID") {
+        g = seed % 5 === 0 ? 1 : 0;
+      } else if (pos === "DEF") {
+        g = seed % 30 === 0 ? 1 : 0;
+      }
+
+      let a = 0;
+      if (pos !== "GK") {
+        if (pos === "MID") {
+          a = seed % 4 === 0 ? 1 : 0;
+        } else if (pos === "FWD") {
+          a = seed % 5 === 0 ? 1 : 0;
+        } else if (pos === "DEF") {
+          a = seed % 15 === 0 ? 1 : 0;
+        }
+      }
+
+      let s = 0;
+      if (pos === "FWD") {
+        s = 1 + (seed % 5);
+      } else if (pos === "MID") {
+        s = 1 + (seed % 4);
+      } else if (pos === "DEF") {
+        s = seed % 3 < 2 ? 1 : 2;
+      }
+
+      const sot = s > 0 ? Math.min(3, Math.floor(s / 2) + (seed % 2)) : 0;
+
+      let expectedGoals = 0.0;
+      if (s > 0) {
+        const base = s * 0.2;
+        const variance = (seed % 10) * 0.05;
+        expectedGoals = Math.min(1.2, Math.max(0.0, base + variance));
+        expectedGoals = Math.round(expectedGoals * 100) / 100;
+      }
 
       goals.push(g);
       assists.push(a);
       shots.push(s);
       shotsOnTarget.push(sot);
-      xg.push(expected);
+      xg.push(expectedGoals);
     }
 
     return {
@@ -136,15 +141,11 @@ export function stdDev(values: number[]) {
   if (values.length <= 1) return 0;
   const avg = average(values);
   const variance =
-    values.reduce((s, v) => s + (v - avg) ** 2, 0) /
-    (values.length - 1);
+    values.reduce((s, v) => s + (v - avg) ** 2, 0) / (values.length - 1);
   return Math.sqrt(variance);
 }
 
-export function getSeriesForStat(
-  player: Player,
-  stat: StatKey
-): number[] {
+export function getSeriesForStat(player: Player, stat: StatKey): number[] {
   return player[stat];
 }
 
