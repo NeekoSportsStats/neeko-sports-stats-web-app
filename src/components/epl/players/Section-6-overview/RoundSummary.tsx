@@ -17,17 +17,7 @@ import {
   StatKey,
 } from "@/components/epl/players/data/useEPLMockData";
 
-/* ---------------------------------------------------------
-   Constants (Config-driven)
---------------------------------------------------------- */
-
-const CURRENT_GW = 38;
-
 const STATS = EPL_STAT_CONFIG.availableStats;
-
-/* ---------------------------------------------------------
-   Sparkline
---------------------------------------------------------- */
 
 function Sparkline({ data }: { data: number[] }) {
   if (!data.length) return null;
@@ -74,10 +64,6 @@ function Sparkline({ data }: { data: number[] }) {
   );
 }
 
-/* ---------------------------------------------------------
-   Mini Card
---------------------------------------------------------- */
-
 interface MiniCardProps {
   icon: React.ElementType;
   label: string;
@@ -117,10 +103,6 @@ function MiniCard({ icon: Icon, label, value, player, delay }: MiniCardProps) {
   );
 }
 
-/* ---------------------------------------------------------
-   MAIN SECTION
---------------------------------------------------------- */
-
 export default function RoundSummary() {
   const players = useEPLMockPlayers();
   const [selected, setSelected] = useState<StatKey>(
@@ -131,12 +113,15 @@ export default function RoundSummary() {
   const unit = EPL_STAT_CONFIG.units[selected];
   const desc = EPL_STAT_CONFIG.descriptions[selected];
 
-  /* sparkline data */
+  const currentRound = EPL_STAT_CONFIG.sportMeta.currentRound!;
+  const totalRounds = EPL_STAT_CONFIG.sportMeta.totalRounds!;
+  const roundLabels = EPL_STAT_CONFIG.sportMeta.roundLabels!;
+
   const avgRounds = useMemo(() => {
     if (!players.length) return [];
 
     const totals = Array.from(
-      { length: EPL_STAT_CONFIG.sportMeta.rounds },
+      { length: totalRounds },
       () => 0
     );
 
@@ -147,9 +132,8 @@ export default function RoundSummary() {
     });
 
     return totals.map((t) => Number((t / players.length).toFixed(2)));
-  }, [players, selected]);
+  }, [players, selected, totalRounds]);
 
-  /* stat calcs */
   const topScorer = useMemo(() => {
     return players
       .map((p) => ({
@@ -186,6 +170,8 @@ export default function RoundSummary() {
       .sort((a, b) => b.consistency - a.consistency)[0];
   }, [players, selected]);
 
+  const currentRoundLabel = roundLabels[currentRound - 1] || `${currentRound}`;
+
   return (
     <section
       className={cn(
@@ -199,14 +185,12 @@ export default function RoundSummary() {
       <div className="pointer-events-none absolute -top-40 left-1/2 h-72 w-[480px] -translate-x-1/2 bg-yellow-500/20 blur-3xl" />
 
       <SectionHeader
-        pillLabel="Matchweek Momentum"
+        eyebrow="Matchweek Momentum"
         title="Matchweek Momentum Summary"
-        subtitle={`GW ${CURRENT_GW} • ${label}`}
-        description={desc}
+        subtitle={`${currentRoundLabel} • ${label} • ${desc}`}
         icon={Sparkles}
       />
 
-      {/* FILTER PILLS */}
       <div className="-mx-2 mb-4 mt-1 overflow-x-auto scrollbar-thin scrollbar-thumb-yellow-500/30">
         <div className="flex min-w-max gap-2 px-2 pb-1">
           {STATS.map((s) => (
@@ -227,7 +211,6 @@ export default function RoundSummary() {
         </div>
       </div>
 
-      {/* GRID */}
       <div className="grid gap-4 md:grid-cols-2 md:gap-6">
         <div className="rounded-2xl border border-yellow-500/20 bg-black/70 px-4 py-4 md:px-6 md:py-5 backdrop-blur-sm">
           <h3 className="mb-2 flex items-center gap-2 text-base md:text-lg font-semibold">
@@ -261,7 +244,6 @@ export default function RoundSummary() {
         </div>
       </div>
 
-      {/* MINI CARDS */}
       <div className="mt-6 grid gap-4 md:mt-7 md:grid-cols-3">
         <MiniCard
           icon={Flame}
