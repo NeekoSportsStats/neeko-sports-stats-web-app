@@ -1,5 +1,5 @@
 import React from "react";
-import { ROUND_LABELS } from "../Section-1-master-table/MasterTable";
+import { MATCHWEEK_LABELS } from "../Section-1-master-table/MasterTable";
 import type { PlayerRow, StatLens } from "../Section-1-master-table/MasterTable";
 
 import {
@@ -8,7 +8,7 @@ import {
   getRoundsForLens,
 } from "../data/playerInsightsUtils";
 
-import { STAT_CONFIG } from "../data/playerStatConfig";
+import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
 
 /**
  * Full insights content for players — MOBILE SAFE / NO SPARKLINE
@@ -34,8 +34,7 @@ export default function PlayerInsightsContent({
     );
   }
 
-  const config = STAT_CONFIG[selectedStat];
-  if (!config) {
+  if (!EPL_STAT_CONFIG.availableStats.includes(selectedStat)) {
     return (
       <div className="p-4 text-sm text-neutral-400">
         Stat configuration unavailable.
@@ -70,9 +69,10 @@ export default function PlayerInsightsContent({
     ? rounds
     : rounds.slice(0, FREE_ROUND_LIMIT);
 
+  const allThresholds = EPL_STAT_CONFIG.playerThresholds[selectedStat] ?? [];
   const visibleThresholds = isPremium
-    ? config.thresholds
-    : config.thresholds.slice(0, FREE_HITRATE_LIMIT);
+    ? allThresholds
+    : allThresholds.slice(0, FREE_HITRATE_LIMIT);
 
   /* ------------------------------------------------------------------ */
   /* DERIVED SAFE VALUES                                                 */
@@ -104,19 +104,25 @@ export default function PlayerInsightsContent({
       ? "text-amber-300"
       : "text-red-400";
 
-  const BADGE_CLASS: Record<StatLens, string> = {
-    Fantasy: "border-yellow-500/40 text-yellow-300",
-    Disposals: "border-teal-500/40 text-teal-300",
-    Goals: "border-amber-500/40 text-amber-300",
+  const BADGE_CLASS: Partial<Record<StatLens, string>> = {
+    goals: "border-amber-500/40 text-amber-300",
+    assists: "border-emerald-500/40 text-emerald-300",
+    shots: "border-sky-500/40 text-sky-300",
+    shotsOnTarget: "border-blue-500/40 text-blue-300",
+    xg: "border-purple-500/40 text-purple-300",
   };
 
-  const AI_LENS_INSIGHT: Record<StatLens, string> = {
-    Fantasy:
-      "Fantasy scoring shows ceiling-driven production with matchup-sensitive spikes.",
-    Disposals:
-      "Disposal output is driven by consistency and involvement across game tempo.",
-    Goals:
+  const AI_LENS_INSIGHT: Partial<Record<StatLens, string>> = {
+    goals:
       "Goal scoring is volatile, with defined ceiling games but a lower floor.",
+    assists:
+      "Assist output shows creative involvement and matchup-sensitive spikes.",
+    shots:
+      "Shot volume indicates offensive threat level and attacking intent.",
+    shotsOnTarget:
+      "Shots on target show finishing accuracy and threat conversion.",
+    xg:
+      "Expected goals capture underlying chance quality and finishing efficiency.",
   };
 
   /* ------------------------------------------------------------------ */
@@ -128,7 +134,7 @@ export default function PlayerInsightsContent({
       {/* ================= ROUND BY ROUND ================= */}
       <div>
         <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-          Round-by-round {config.label.toLowerCase()}
+          Round-by-round {EPL_STAT_CONFIG.labels[selectedStat].toLowerCase()}
         </div>
 
         <div className="overflow-x-auto overscroll-contain">
@@ -136,7 +142,7 @@ export default function PlayerInsightsContent({
             {visibleRounds.map((v, i) => (
               <div key={i} className="flex min-w-[46px] flex-col items-center">
                 <span className="text-[9px] text-neutral-500">
-                  {ROUND_LABELS[i] ?? ""}
+                  {MATCHWEEK_LABELS[i] ?? ""}
                 </span>
                 <div className="mt-1 flex h-8 w-10 items-center justify-center rounded-md bg-neutral-950/80 text-neutral-100">
                   {v}
@@ -158,7 +164,7 @@ export default function PlayerInsightsContent({
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-              Season summary — {config.label}
+              Season summary — {EPL_STAT_CONFIG.labels[selectedStat]}
             </div>
           </div>
 
@@ -167,12 +173,12 @@ export default function PlayerInsightsContent({
               Average
             </div>
             <div className="mt-1 text-sm font-semibold text-yellow-200">
-              {avg.toFixed(1)} {config.valueUnitShort}
+              {avg.toFixed(1)} {EPL_STAT_CONFIG.units[selectedStat] ?? ""}
             </div>
 
             <div
               className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[9px] uppercase ${
-                BADGE_CLASS[selectedStat]
+                BADGE_CLASS[selectedStat] ?? "border-white/40 text-white"
               }`}
             >
               {player.role ?? ""}
@@ -225,7 +231,7 @@ export default function PlayerInsightsContent({
         <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-yellow-200">
           AI performance summary
         </div>
-        <p>{AI_LENS_INSIGHT[selectedStat]}</p>
+        <p>{AI_LENS_INSIGHT[selectedStat] ?? "Performance data shows player contribution across match situations."}</p>
       </div>
 
       {/* ================= HIT RATE LADDER ================= */}

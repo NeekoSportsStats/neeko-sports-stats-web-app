@@ -15,7 +15,7 @@ import {
   getSeriesForStat,
   average,
   StatKey,
-} from "@/components/epl/players/data/useEPLMockData";
+} from "@/components/epl/players/data/useAFLMockData";
 
 /* ---------------------------------------------------------
    Constants (Config-driven)

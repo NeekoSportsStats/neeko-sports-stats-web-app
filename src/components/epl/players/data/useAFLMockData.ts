@@ -1,20 +1,11 @@
 import { useMemo } from "react";
 
-/* -------------------------------------------------------
-   SUPPORTED EPL STAT KEYS (CONFIG-ALIGNED)
-------------------------------------------------------- */
-export type StatKey =
-  | "goals"
-  | "assists"
-  | "shots"
-  | "shotsOnTarget"
-  | "xG";
+import type { EPLStatKey } from "@/lib/stats/types";
+
+export type StatKey = EPLStatKey;
 
 export type Position = "GK" | "DEF" | "MID" | "FWD";
 
-/* -------------------------------------------------------
-   PLAYER MODEL — EPL STYLE (PER MATCHWEEK)
-------------------------------------------------------- */
 export interface Player {
   id: number;
   name: string;
@@ -25,7 +16,7 @@ export interface Player {
   assists: number[];
   shots: number[];
   shotsOnTarget: number[];
-  xG: number[];
+  xg: number[];
 }
 
 /* -------------------------------------------------------
@@ -121,7 +112,7 @@ function generatePlayers(): Player[] {
     const assists: number[] = [];
     const shots: number[] = [];
     const shotsOnTarget: number[] = [];
-    const xG: number[] = [];
+    const xg: number[] = [];
 
     for (let gw = 0; gw < 38; gw++) {
       const g = genGoals(pos);
@@ -134,7 +125,7 @@ function generatePlayers(): Player[] {
       assists.push(a);
       shots.push(s);
       shotsOnTarget.push(sot);
-      xG.push(expected);
+      xg.push(expected);
     }
 
     return {
@@ -147,7 +138,7 @@ function generatePlayers(): Player[] {
       assists,
       shots,
       shotsOnTarget,
-      xG,
+      xg,
     };
   });
 }

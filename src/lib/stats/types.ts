@@ -1,46 +1,36 @@
-// src/lib/stats/types.ts
-
 export type SportKey = "afl" | "epl" | "nba";
 
-export type StatKey =
-  | "fantasy"
-  | "disposals"
-  | "goals"
-  | "xg"
-  | "shots"
-  | "points"
-  | "rebounds"
-  | "assists";
+export type AFLStatKey = "fantasy" | "disposals" | "goals";
 
-export type StatConfig = {
-  sport: SportKey;
+export type EPLStatKey = "goals" | "assists" | "shots" | "shotsOnTarget" | "xg";
 
-  /** Default stat when section loads */
-  defaultStat: StatKey;
+export type NBAStatKey = "points" | "rebounds" | "assists";
 
-  /** Stats user can toggle between */
-  availableStats: StatKey[];
+export type StatKey = AFLStatKey | EPLStatKey | NBAStatKey;
 
-  /** Display labels */
-  labels: Record<StatKey, string>;
+export type StatConfig<TStat extends string = StatKey> = {
+  league: string;
 
-  /** Units (optional) */
-  units?: Partial<Record<StatKey, string>>;
+  seasons: {
+    past: string;
+    current: string;
+  };
 
-  /** Stat descriptions (optional) */
-  descriptions?: Partial<Record<StatKey, string>>;
+  availableStats: readonly TStat[];
 
-  /** Player insight panel thresholds (optional) */
-  playerInsightThresholds?: Partial<Record<StatKey, readonly number[]>>;
+  defaultStat: TStat;
 
-  /** Player master table thresholds (optional) */
-  playerTableThresholds?: Partial<Record<StatKey, readonly number[]>>;
+  labels: Record<TStat, string>;
 
-  /** Team table thresholds (optional) */
-  teamThresholds?: Partial<Record<StatKey, readonly number[]>>;
+  units: Record<TStat, string>;
 
-  /** Sport-specific metadata (optional) */
-  sportMeta?: {
+  descriptions: Record<TStat, string>;
+
+  playerThresholds: Record<TStat, readonly number[]>;
+
+  teamThresholds: Record<TStat, readonly number[]>;
+
+  sportMeta: {
     totalRounds?: number;
     currentRound?: number;
     roundLabels?: string[];
@@ -48,27 +38,25 @@ export type StatConfig = {
     scoringRules?: string;
   };
 
-  /** Momentum definition */
+  positions: readonly string[];
+
   momentum: {
     description: string;
     window: number;
   };
 
-  /** Ceiling definition */
   ceiling: {
     description: string;
     method: "max" | "p90";
   };
 
-  /** Volatility definition */
   volatility: {
     description: string;
     method: "stdev";
   };
 
-  /** Prediction support */
   prediction?: {
     enabled: boolean;
-    horizon: number; // games/rounds ahead
+    horizon: number;
   };
 };
