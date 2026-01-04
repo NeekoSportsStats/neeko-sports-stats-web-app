@@ -30,7 +30,7 @@ function blendedScore(r: PredictRow) {
 function inferStatKey(statLabel: string) {
   const s = (statLabel || "").toLowerCase();
   if (s.includes("fantasy")) return "fantasy";
-  if (s.includes("disposal")) return "disposals";
+  if (s.includes("assist")) return "assists";
   if (s.includes("goal")) return "goals";
   return "generic";
 }
@@ -64,10 +64,10 @@ function whyThisMatters(statKey: string, conf01: number, vol01: number) {
       ? "Strong role reliability supports safer fantasy builds."
       : "Fantasy output sensitive to role and tempo shifts.";
   }
-  if (statKey === "disposals") {
+  if (statKey === "assists") {
     return conf01 >= 0.7
-      ? "Disposal volume is structurally stable."
-      : "Touches fluctuate with rotation and matchup.";
+      ? "Assist output shows consistent creative involvement."
+      : "Assist production varies with team shape and matchup.";
   }
   if (statKey === "goals") {
     return vol01 >= 0.65
@@ -104,7 +104,7 @@ function fakeLockedRow(r: PredictRow): PredictRow {
 /* COMPONENT                                                                   */
 /* -------------------------------------------------------------------------- */
 
-type StatLens = "fantasy" | "disposals" | "goals";
+type StatLens = "fantasy" | "goals" | "assists";
 
 export default function PredictabilityTable({
   fixtures,
@@ -120,7 +120,7 @@ export default function PredictabilityTable({
   const locked = mode !== "premium";
 
   const [statLens, setStatLens] = useState<StatLens>("fantasy");
-  const statLabel = statLens === "fantasy" ? "Fantasy" : statLens === "disposals" ? "Disposals" : "Goals";
+  const statLabel = statLens === "fantasy" ? "Fantasy" : statLens === "goals" ? "Goals" : "Assists";
   const statKey = useMemo(() => inferStatKey(statLabel), [statLabel]);
 
   const rawPlayerPredict = useMemo(
@@ -232,7 +232,7 @@ export default function PredictabilityTable({
               </div>
 
               <div className="flex gap-1.5">
-                {(["fantasy", "disposals", "goals"] as StatLens[]).map((s) => (
+                {(["fantasy", "goals", "assists"] as StatLens[]).map((s) => (
                   <button
                     key={s}
                     onClick={() => setStatLens(s)}
@@ -243,7 +243,7 @@ export default function PredictabilityTable({
                         : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
                     )}
                   >
-                    {s === "fantasy" ? "Fantasy" : s === "disposals" ? "Disposals" : "Goals"}
+                    {s === "fantasy" ? "Fantasy" : s === "goals" ? "Goals" : "Assists"}
                   </button>
                 ))}
               </div>

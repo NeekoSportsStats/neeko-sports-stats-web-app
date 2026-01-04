@@ -59,7 +59,7 @@ function findTeamByName(teams: EPLTeam[], name: string) {
 function seriesForTeam(t: EPLTeam | null, stat: StatLens): number[] {
   if (!t) return [];
   if (stat === "fantasy") return ((t as any).fantasy ?? []).map(Number);
-  if (stat === "disposals") return ((t as any).disposals ?? []).map(Number);
+  if (stat === "assists") return ((t as any).assists ?? []).map(Number);
   return ((t as any).goals ?? []).map(Number);
 }
 
@@ -69,7 +69,7 @@ function findStat(lines: TeamStatLine[] | undefined, key: StatLens) {
   const candidates = [
     key,
     key === "fantasy" ? "fantasy points" : key,
-    key === "disposals" ? "disp" : key,
+    key === "assists" ? "assist" : key,
     key === "fantasy" ? "total fantasy" : key,
   ].map(lower);
 
@@ -192,9 +192,9 @@ export function buildPlayerPredictabilityFromFixtures(
     const base =
       stat === "fantasy"
         ? 75 + seededBetween(hash32(id + stat), 0, 35)
-        : stat === "disposals"
-        ? 14 + seededBetween(hash32(id + stat), 0, 18)
-        : 1 + seededBetween(hash32(id + stat), 0, 2.2);
+        : stat === "assists"
+        ? 0.5 + seededBetween(hash32(id + stat), 0, 2.5)
+        : 0.8 + seededBetween(hash32(id + stat), 0, 2.2);
 
     const games = WINDOW + Math.floor(seededBetween(hash32(id + "games"), 0, 4));
 
@@ -202,8 +202,8 @@ export function buildPlayerPredictabilityFromFixtures(
       const noise =
         stat === "fantasy"
           ? seededBetween(hash32(id + "n" + i), 0, 18)
-          : stat === "disposals"
-          ? seededBetween(hash32(id + "n" + i), 0, 6)
+          : stat === "assists"
+          ? seededBetween(hash32(id + "n" + i), 0, 1.5)
           : seededBetween(hash32(id + "n" + i), 0, 1.2);
 
       p.values.push(Math.max(0, Math.round(base + noise)));
@@ -550,15 +550,15 @@ function makeDeterministicSeries(params: {
   const base =
     stat === "fantasy"
       ? 70 + seededBetween(hash32(id + stat + "b"), 0, 45)
-      : stat === "disposals"
-      ? 12 + seededBetween(hash32(id + stat + "b"), 0, 22)
-      : 0.5 + seededBetween(hash32(id + stat + "b"), 0, 3.0);
+      : stat === "assists"
+      ? 0.5 + seededBetween(hash32(id + stat + "b"), 0, 2.5)
+      : 0.8 + seededBetween(hash32(id + stat + "b"), 0, 3.0);
 
   const volatility =
     stat === "fantasy"
       ? seededBetween(hash32(id + stat + "v"), 6, 22)
-      : stat === "disposals"
-      ? seededBetween(hash32(id + stat + "v"), 3, 9)
+      : stat === "assists"
+      ? seededBetween(hash32(id + stat + "v"), 0.4, 1.5)
       : seededBetween(hash32(id + stat + "v"), 0.4, 1.8);
 
   const out: number[] = [];
