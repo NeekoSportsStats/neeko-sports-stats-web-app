@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { BrainCircuit, Lock, X, ArrowRight } from "lucide-react";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 import {
-  useAFLMockPlayers,
+  useNBAMockPlayers,
   lastN,
   average,
   stdDev,
@@ -321,7 +321,7 @@ function BlurredLockedCard() {
 --------------------------------------------------------- */
 
 export default function AIInsights() {
-  const players = useAFLMockPlayers();
+  const players = useNBAMockPlayers();
 
   // Build real free rows (top 3)
   const freeRows: AIInsightRowModel[] = players.slice(0, 3).map((p, idx) => {

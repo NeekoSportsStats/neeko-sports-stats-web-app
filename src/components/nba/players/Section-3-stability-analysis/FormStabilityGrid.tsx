@@ -5,7 +5,7 @@ import { Sparkles, ChevronDown } from "lucide-react";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 import {
-  useAFLMockPlayers,
+  useNBAMockPlayers,
   getSeriesForStat,
   lastN,
   average,
@@ -346,7 +346,7 @@ function ColumnShell({
 --------------------------------------------------------- */
 
 export default function FormStabilityGrid() {
-  const players = useAFLMockPlayers();
+  const players = useNBAMockPlayers();
   const [selectedStat, setSelectedStat] = useState<StatKey>("fantasy");
   const [openKey, setOpenKey] = useState<string | null>(null);
 

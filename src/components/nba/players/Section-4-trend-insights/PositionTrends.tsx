@@ -11,7 +11,7 @@ import {
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 import {
-  useAFLMockPlayers,
+  useNBAMockPlayers,
   getSeriesForStat,
   lastN,
   average,
@@ -296,7 +296,7 @@ function PositionPlayerCard({
 --------------------------------------------------------- */
 
 export default function PositionTrends() {
-  const players = useAFLMockPlayers();
+  const players = useNBAMockPlayers();
   const [selectedPos, setSelectedPos] = useState<PositionKey>("MID");
 
   /* Build metrics */

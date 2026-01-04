@@ -11,7 +11,7 @@ import {
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 
 import {
-  useAFLMockPlayers,
+  useNBAMockPlayers,
   getSeriesForStat,
   average,
   StatKey,
@@ -168,7 +168,7 @@ function MiniCard({ icon: Icon, label, value, player, delay }: MiniCardProps) {
 
 export default function RoundSummary() {
   const [selected, setSelected] = useState<StatKey>("fantasy");
-  const players = useAFLMockPlayers();
+  const players = useNBAMockPlayers();
 
   const selectedLabel = STAT_LABELS[selected];
   const unit = STAT_UNITS[selected];
