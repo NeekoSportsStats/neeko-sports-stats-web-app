@@ -1,4 +1,3 @@
-// src/components/afl/players/RoundSummary.tsx
 import React, { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
@@ -9,66 +8,14 @@ import {
   Activity,
 } from "lucide-react";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
+import type { StatConfig, StatKey } from "@/lib/stats/types";
 
 import {
   useNBAMockPlayers,
   getSeriesForStat,
   average,
-  StatKey,
-} from "@/components/nba/players/useAFLMockData";
-
-/* ---------------------------------------------------------
-   Constants / Stat Metadata
---------------------------------------------------------- */
-
-const CURRENT_ROUND = 6;
-
-const STATS: StatKey[] = [
-  "fantasy",
-  "disposals",
-  "kicks",
-  "marks",
-  "tackles",
-  "hitouts",
-  "goals",
-];
-
-const STAT_LABELS: Record<StatKey, string> = {
-  fantasy: "Fantasy",
-  disposals: "Disposals",
-  kicks: "Kicks",
-  marks: "Marks",
-  tackles: "Tackles",
-  hitouts: "Hitouts",
-  goals: "Goals",
-};
-
-const STAT_UNITS: Record<StatKey, string> = {
-  fantasy: "pts",
-  disposals: "disposals",
-  kicks: "kicks",
-  marks: "marks",
-  tackles: "tackles",
-  hitouts: "hitouts",
-  goals: "goals",
-};
-
-const PULSE_COPY: Record<StatKey, string> = {
-  fantasy:
-    "League-wide Fantasy trends reflect shifts driven by usage rates, matchup edges and evolving roles.",
-  disposals:
-    "High-volume ball winners dominated disposals, with multiple midfielders posting 30+ touches.",
-  kicks:
-    "Teams pushed territory with more aggressive kicking, lifting inside-50 and switch-kick volume.",
-  marks:
-    "Intercept and link-up marks surged, highlighting defenders and wings controlling transition chains.",
-  tackles:
-    "Pressure acts ramped up, with key midfielders and small forwards driving tackle counts.",
-  hitouts:
-    "Ruck contests shaped territory as top rucks separated in hitouts to advantage.",
-  goals:
-    "Forward efficiency spiked with multiple players kicking bags and capitalising on inside-50 dominance.",
-};
+  StatKey as MockStatKey,
+} from "@/components/nba/players/data/useNBAMockData";
 
 /* ---------------------------------------------------------
    Sparkline
@@ -163,19 +110,21 @@ function MiniCard({ icon: Icon, label, value, player, delay }: MiniCardProps) {
 }
 
 /* ---------------------------------------------------------
-   MAIN SECTION — (Header pill only)
+   MAIN SECTION
 --------------------------------------------------------- */
 
-export default function RoundSummary() {
-  const [selected, setSelected] = useState<StatKey>("fantasy");
+export default function RoundSummary({ statConfig }: { statConfig: StatConfig }) {
+  const [selected, setSelected] = useState<StatKey>(statConfig.defaultStat);
   const players = useNBAMockPlayers();
 
-  const selectedLabel = STAT_LABELS[selected];
-  const unit = STAT_UNITS[selected];
+  const selectedLabel = statConfig.labels[selected] || selected;
+  const unit = statConfig.units?.[selected] || selected;
   const labelLower = selectedLabel.toLowerCase();
+  const currentGame = statConfig.sportMeta?.currentRound || 6;
+  const description = statConfig.descriptions?.[selected] || "";
 
   /* sparkline data */
-  const avgRounds = useMemo(() => {
+  const avgGames = useMemo(() => {
     const sample = players[0];
     if (!sample) return [];
     const series = getSeriesForStat(sample, selected);
@@ -236,17 +185,16 @@ export default function RoundSummary() {
 
       <div className="relative">
         <SectionHeader
-          pillLabel="Round Momentum"
-          title="Round Momentum Summary"
-          subtitle={`Round ${CURRENT_ROUND} • ${selectedLabel} Snapshot`}
-          description={`Live round snapshot — track ${labelLower} trends, standout players and role/stability shifts as this stat moves week to week.`}
+          eyebrow="Game Momentum"
+          title="Game Momentum Summary"
+          subtitle={`Game ${currentGame} • ${selectedLabel} Snapshot — track ${labelLower} trends, standout players and role shifts as this stat moves game to game.`}
           icon={Sparkles}
         />
 
-        {/* FILTER PILLS — (unchanged) */}
+        {/* FILTER PILLS */}
         <div className="-mx-2 mb-4 mt-1 overflow-x-auto scrollbar-thin scrollbar-thumb-yellow-500/30">
           <div className="flex min-w-max gap-2 px-2 pb-1">
-            {STATS.map((s) => (
+            {statConfig.availableStats.map((s) => (
               <button
                 key={s}
                 onClick={() => setSelected(s)}
@@ -258,13 +206,13 @@ export default function RoundSummary() {
                     : "bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white"
                 )}
               >
-                {STAT_LABELS[s]}
+                {statConfig.labels[s]}
               </button>
             ))}
           </div>
         </div>
 
-        {/* GRID (unchanged) */}
+        {/* GRID */}
         <div className="grid gap-4 md:grid-cols-2 md:gap-6">
           {/* PULSE */}
           <div
@@ -272,14 +220,14 @@ export default function RoundSummary() {
           >
             <h3 className="mb-2 flex items-center gap-2 text-base md:text-lg font-semibold">
               <Activity className="h-5 w-5 text-yellow-300" />
-              <span>Round Momentum Pulse</span>
+              <span>Game Momentum Pulse</span>
             </h3>
 
             <p className="mb-4 text-sm text-white/70 leading-relaxed">
-              {PULSE_COPY[selected]}
+              {description}
             </p>
 
-            <Sparkline data={avgRounds} />
+            <Sparkline data={avgGames} />
           </div>
 
           {/* HEADLINES */}
@@ -293,25 +241,25 @@ export default function RoundSummary() {
 
             <ul className="space-y-2 text-sm text-white/80">
               <li>
-                • <strong>{topScorer?.name}</strong> led this round with{" "}
+                • <strong>{topScorer?.name}</strong> led this game with{" "}
                 <strong>{topScorer?.last} {unit}</strong>.
               </li>
               <li>
                 • <strong>{biggestRiser?.name}</strong> climbed{" "}
-                <strong>{biggestRiser?.diff.toFixed(1)} {unit}</strong> on last week.
+                <strong>{biggestRiser?.diff.toFixed(1)} {unit}</strong> from previous game.
               </li>
               <li>
                 • <strong>{mostConsistent?.name}</strong> holds{" "}
-                <strong>{mostConsistent?.consistency.toFixed(0)}%</strong> above-average games.
+                <strong>{mostConsistent?.consistency.toFixed(0)}%</strong> above-average performances.
               </li>
               <li>
-                • League-wide {labelLower} output continues to show meaningful stability and role changes.
+                • League-wide {labelLower} output continues to show meaningful consistency and role changes.
               </li>
             </ul>
           </div>
         </div>
 
-        {/* MINI CARDS (unchanged) */}
+        {/* MINI CARDS */}
         <div className="mt-6 grid gap-4 md:mt-7 md:grid-cols-3">
           <MiniCard
             icon={Flame}
