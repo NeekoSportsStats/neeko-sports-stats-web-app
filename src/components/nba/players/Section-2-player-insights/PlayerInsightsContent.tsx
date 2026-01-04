@@ -1,5 +1,4 @@
 import React from "react";
-import { GAME_LABELS } from "../Section-1-master-table/MasterTable";
 import type { PlayerRow, StatLens } from "../Section-1-master-table/MasterTable";
 
 import {
@@ -10,17 +9,14 @@ import {
 
 import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
 
-/**
- * Full insights content for players — MOBILE SAFE / NO SPARKLINE
- */
 export default function PlayerInsightsContent({
   player,
   selectedStat,
-  isPremium, // ✅ ADDED (NO OTHER PROP CHANGES)
+  isPremium,
 }: {
   player: PlayerRow;
   selectedStat: StatLens;
-  isPremium: boolean; // ✅ ADDED
+  isPremium: boolean;
 }) {
   /* ------------------------------------------------------------------ */
   /* HARD SAFETY GUARDS                                                  */
@@ -34,8 +30,7 @@ export default function PlayerInsightsContent({
     );
   }
 
-  const config = STAT_CONFIG[selectedStat];
-  if (!config) {
+  if (!NBA_STAT_CONFIG.availableStats.includes(selectedStat)) {
     return (
       <div className="p-4 text-sm text-neutral-400">
         Stat configuration unavailable.
@@ -70,9 +65,10 @@ export default function PlayerInsightsContent({
     ? rounds
     : rounds.slice(0, FREE_ROUND_LIMIT);
 
+  const allThresholds = NBA_STAT_CONFIG.playerInsightThresholds[selectedStat] ?? [];
   const visibleThresholds = isPremium
-    ? config.thresholds
-    : config.thresholds.slice(0, FREE_HITRATE_LIMIT);
+    ? allThresholds
+    : allThresholds.slice(0, FREE_HITRATE_LIMIT);
 
   /* ------------------------------------------------------------------ */
   /* DERIVED SAFE VALUES                                                 */
@@ -104,19 +100,24 @@ export default function PlayerInsightsContent({
       ? "text-amber-300"
       : "text-red-400";
 
-  const BADGE_CLASS: Record<StatLens, string> = {
-    Fantasy: "border-yellow-500/40 text-yellow-300",
-    Disposals: "border-teal-500/40 text-teal-300",
-    Goals: "border-amber-500/40 text-amber-300",
+  const ROUND_LABELS = NBA_STAT_CONFIG.sportMeta.roundLabels!;
+
+  const BADGE_CLASS: Partial<Record<StatLens, string>> = {
+    points: "border-amber-500/40 text-amber-300",
+    rebounds: "border-emerald-500/40 text-emerald-300",
+    assists: "border-sky-500/40 text-sky-300",
+    threes: "border-purple-500/40 text-purple-300",
   };
 
-  const AI_LENS_INSIGHT: Record<StatLens, string> = {
-    Fantasy:
-      "Fantasy scoring shows ceiling-driven production with matchup-sensitive spikes.",
-    Disposals:
-      "Disposal output is driven by consistency and involvement across game tempo.",
-    Goals:
-      "Goal scoring is volatile, with defined ceiling games but a lower floor.",
+  const AI_LENS_INSIGHT: Partial<Record<StatLens, string>> = {
+    points:
+      "Scoring output shows offensive volume and efficiency across all shot types.",
+    rebounds:
+      "Rebounding production indicates board control and positioning on both ends.",
+    assists:
+      "Playmaking reflects ball movement and offensive flow creation.",
+    threes:
+      "Three-point volume showcases range and spacing impact.",
   };
 
   /* ------------------------------------------------------------------ */
@@ -125,10 +126,10 @@ export default function PlayerInsightsContent({
 
   return (
     <div className="flex flex-col gap-4 text-[11px] text-neutral-200">
-      {/* ================= ROUND BY ROUND ================= */}
+      {/* ================= GAME BY GAME ================= */}
       <div>
         <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-          Round-by-round {config.label.toLowerCase()}
+          Game-by-game {NBA_STAT_CONFIG.labels[selectedStat].toLowerCase()}
         </div>
 
         <div className="overflow-x-auto overscroll-contain">
@@ -148,7 +149,7 @@ export default function PlayerInsightsContent({
 
         {!isPremium && (
           <div className="mt-2 text-[10px] text-neutral-400">
-            Upgrade to Neeko+ to view all rounds
+            Upgrade to Neeko+ to view all games
           </div>
         )}
       </div>
@@ -158,7 +159,7 @@ export default function PlayerInsightsContent({
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-500">
-              Season summary — {config.label}
+              Season summary — {NBA_STAT_CONFIG.labels[selectedStat]}
             </div>
           </div>
 
@@ -167,12 +168,12 @@ export default function PlayerInsightsContent({
               Average
             </div>
             <div className="mt-1 text-sm font-semibold text-yellow-200">
-              {avg.toFixed(1)} {config.valueUnitShort}
+              {avg.toFixed(1)} {NBA_STAT_CONFIG.units[selectedStat] ?? ""}
             </div>
 
             <div
               className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[9px] uppercase ${
-                BADGE_CLASS[selectedStat]
+                BADGE_CLASS[selectedStat] ?? "border-white/40 text-white"
               }`}
             >
               {player.role ?? ""}
@@ -225,7 +226,7 @@ export default function PlayerInsightsContent({
         <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-yellow-200">
           AI performance summary
         </div>
-        <p>{AI_LENS_INSIGHT[selectedStat]}</p>
+        <p>{AI_LENS_INSIGHT[selectedStat] ?? "Performance data shows player contribution across game situations."}</p>
       </div>
 
       {/* ================= HIT RATE LADDER ================= */}

@@ -1,5 +1,6 @@
 import React from "react";
 import TrendSparklineMini from "../Section-3-stability-analysis/TrendSparklineMini";
+import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
 
 interface Props {
   value: string;
@@ -21,21 +22,17 @@ export default function PlayerStatLensHeader({
       </h3>
 
       <div className="flex flex-wrap gap-2">
-        {[
-          { key: "fantasy", label: "Fantasy" },
-          { key: "disposals", label: "Disposals" },
-          { key: "goals", label: "Goals" },
-        ].map((s) => (
+        {NBA_STAT_CONFIG.availableStats.map((statKey) => (
           <button
-            key={s.key}
+            key={statKey}
             className={`px-3 py-1.5 rounded-full text-xs border ${
-              value === s.key
+              value === statKey
                 ? "bg-yellow-400 text-black border-yellow-300"
                 : "bg-neutral-900 text-neutral-300 border-neutral-700"
             }`}
-            onClick={() => onChange(s.key)}
+            onClick={() => onChange(statKey)}
           >
-            {s.label}
+            {NBA_STAT_CONFIG.labels[statKey]}
           </button>
         ))}
       </div>
@@ -43,14 +40,14 @@ export default function PlayerStatLensHeader({
       <div className="rounded-lg border border-neutral-800 bg-neutral-950/80 px-3 py-2">
         <TrendSparklineMini values={avgSeries} />
         <p className="mt-1 text-[11px] text-neutral-400">
-          Mock league-wide average for each round — swap this to real stats when
+          Mock league-wide average for each game — swap this to real stats when
           your pipeline is live.
         </p>
       </div>
 
       {!isPremium && (
         <p className="text-[11px] text-yellow-300">
-          Neeko+ will add extra lenses (CBA load, role, ceiling scores, etc.).
+          Neeko+ will add extra lenses (blocks, steals, turnovers, etc.).
         </p>
       )}
     </div>
