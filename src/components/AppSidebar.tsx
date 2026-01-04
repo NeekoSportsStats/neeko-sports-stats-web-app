@@ -52,8 +52,9 @@ export function AppSidebar() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   const handleLinkClick = () => {
-    if (isMobile) setOpenMobile(false);
-    else setOpen(false);
+    if (isMobile) {
+      setOpenMobile(false);
+    }
   };
 
   // disable admin for now
@@ -68,18 +69,19 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="z-50">
-      <SidebarHeader className="flex flex-row items-center justify-between">
-        <span className="text-lg font-semibold">Menu</span>
+      {!isMobile && (
+        <SidebarHeader className="flex flex-row items-center justify-between">
+          <span className="text-lg font-semibold">Menu</span>
 
-        {/* PATCHED ICON BUTTON */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => (isMobile ? setOpenMobile(false) : setOpen(false))}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </SidebarHeader>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setOpen(false)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </SidebarHeader>
+      )}
 
       <SidebarContent>
         <SidebarGroup>
