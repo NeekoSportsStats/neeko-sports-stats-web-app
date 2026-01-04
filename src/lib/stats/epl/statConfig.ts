@@ -68,7 +68,7 @@ export const EPL_STAT_CONFIG: StatConfig<EPLStatKey> = {
   },
 
   teamThresholds: {
-    fantasy: [120, 150, 180],
+    fantasy: [1300, 1400, 1500, 1600],
     goals: [1, 2, 3, 4],
     assists: [1, 2, 3, 4],
     shots: [8, 12, 16, 20],
