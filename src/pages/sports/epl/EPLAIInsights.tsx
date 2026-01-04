@@ -44,6 +44,11 @@ export default function EPLAIInsights() {
 
   const fixtures = MOCK_FIXTURES as unknown as FixtureMatch[];
 
+  /* ---------------- EPL STAT LENSES (AUTHORITATIVE) ---------------- */
+
+  const availableLenses = EPL_STAT_CONFIG.availableStats;
+  const defaultLens = EPL_STAT_CONFIG.defaultStat;
+
   /* ---------------- GLOBAL STATE ---------------- */
 
   const [mode, setMode] = useState<PremiumMode>("free");
@@ -138,7 +143,9 @@ export default function EPLAIInsights() {
           <PlayerImpactScatterPanel
             match={selectedMatch}
             mode={mode}
-            initialLens="fantasy"
+            initialLens={defaultLens as any}
+            availableLenses={availableLenses as any}
+            statLabels={EPL_STAT_CONFIG.labels as any}
           />
         )}
 

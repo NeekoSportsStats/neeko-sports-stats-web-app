@@ -24,8 +24,10 @@ export default function PlayerImpactHeroScatter(props: {
   match?: FixtureMatch;
   mode: PremiumMode;
   initialLens?: LensKey;
+  availableLenses?: LensKey[];
+  statLabels?: Record<string, string>;
 }) {
-  const { match, mode, initialLens } = props;
+  const { match, mode, initialLens, availableLenses, statLabels } = props;
   const isMobile = useIsMobile();
 
   const Component = useMemo(
@@ -33,5 +35,13 @@ export default function PlayerImpactHeroScatter(props: {
     [isMobile]
   );
 
-  return <Component match={match} mode={mode} initialLens={initialLens} />;
+  return (
+    <Component
+      match={match}
+      mode={mode}
+      initialLens={initialLens}
+      availableLenses={availableLenses}
+      statLabels={statLabels}
+    />
+  );
 }

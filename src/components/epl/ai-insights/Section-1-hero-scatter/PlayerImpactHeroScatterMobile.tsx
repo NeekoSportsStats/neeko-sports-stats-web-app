@@ -26,9 +26,13 @@ export default function PlayerImpactHeroScatterMobile(props: {
   match?: FixtureMatch;
   mode: PremiumMode;
   initialLens?: LensKey;
+  availableLenses?: LensKey[];
+  statLabels?: Record<string, string>;
 }) {
-  const { match, mode, initialLens } = props;
+  const { match, mode, initialLens, availableLenses, statLabels } = props;
   const isPremium = mode === "premium";
+
+  const lensesToShow = availableLenses || (["fantasy", "goals", "assists"] as LensKey[]);
 
   const d = usePlayerScatterData({ match, initialLens });
   const {
@@ -75,7 +79,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
 
       {/* Controls (mobile) */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        {(["fantasy", "goals", "assists"] as LensKey[]).map((k) => (
+        {lensesToShow.map((k) => (
           <button
             key={k}
             onClick={() => setLens(k)}
@@ -86,7 +90,7 @@ export default function PlayerImpactHeroScatterMobile(props: {
                 : "border-white/10 bg-black/20 text-white/70")
             }
           >
-            {k === "fantasy" ? "Fantasy" : k === "goals" ? "Goals" : "Assists"}
+            {statLabels?.[k] || k}
           </button>
         ))}
 
