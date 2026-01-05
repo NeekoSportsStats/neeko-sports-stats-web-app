@@ -3,6 +3,7 @@ import { Search, Lock, X, ArrowRight, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { TeamRow } from "../data/mockTeams";
 import type { StatLens } from "./TeamMasterTable";
+import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
@@ -32,6 +33,8 @@ export default function TeamMasterTableMobile({
   teams,
   selectedStat,
   setSelectedStat,
+  conference,
+  setConference,
   isPremium,
   query,
   setQuery,
@@ -40,6 +43,8 @@ export default function TeamMasterTableMobile({
   teams: TeamRow[];
   selectedStat: StatLens;
   setSelectedStat: (s: StatLens) => void;
+  conference: "East" | "West";
+  setConference: (c: "East" | "West") => void;
   isPremium: boolean;
   query: string;
   setQuery: (v: string) => void;
@@ -52,8 +57,12 @@ export default function TeamMasterTableMobile({
   /* FILTERING                                                               */
   /* ---------------------------------------------------------------------- */
 
+  const conferenceTeams = useMemo(() => {
+    return teams.filter((t) => t.conference === conference);
+  }, [teams, conference]);
+
   const filtered = useMemo(() => {
-    let result = teams;
+    let result = conferenceTeams;
 
     if (isPremium && query.trim()) {
       result = result.filter((t) =>
@@ -62,7 +71,7 @@ export default function TeamMasterTableMobile({
     }
 
     return result;
-  }, [teams, query, isPremium]);
+  }, [conferenceTeams, query, isPremium]);
 
   const visibleTeams = filtered.slice(0, visibleCount);
 
@@ -86,18 +95,35 @@ export default function TeamMasterTableMobile({
           </div>
 
           <h3 className="mt-3 text-lg font-semibold text-neutral-50">
-            Full-season team trends
+            {conference}ern Conference
           </h3>
 
           <p className="mt-1 text-xs text-neutral-400">
             Round-by-round team production.
           </p>
 
+          <div className="mt-3 flex gap-2">
+            {(["East", "West"] as const).map((conf) => (
+              <button
+                key={conf}
+                onClick={() => setConference(conf)}
+                className={cx(
+                  "px-3 py-1.5 text-xs rounded-full border transition-all",
+                  conference === conf
+                    ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-200"
+                    : "border-neutral-700 bg-neutral-900/50 text-neutral-400"
+                )}
+              >
+                {conf}
+              </button>
+            ))}
+          </div>
+
           <div className="mt-4 flex gap-2 rounded-full border border-neutral-700 bg-black/80 px-2 py-1 text-[11px]">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((s) => (
+            {NBA_STAT_CONFIG.availableStats.map((s) => (
               <button
                 key={s}
-                onClick={() => setSelectedStat(s)}
+                onClick={() => setSelectedStat(s as StatLens)}
                 className={cx(
                   "rounded-full px-3 py-1.5 transition",
                   selectedStat === s
@@ -105,7 +131,7 @@ export default function TeamMasterTableMobile({
                     : "bg-neutral-900 text-neutral-300"
                 )}
               >
-                {s}
+                {NBA_STAT_CONFIG.labels[s]}
               </button>
             ))}
           </div>

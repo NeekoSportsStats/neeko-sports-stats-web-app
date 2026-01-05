@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 export type LadderRow = {
   pos: number;
@@ -9,6 +9,7 @@ export type LadderRow = {
   draws: number;
   percentage: number;
   delta?: number; // optional movement
+  conference?: "East" | "West";
 };
 
 type Props = {
@@ -23,14 +24,40 @@ function LadderSnapshot({ rows, highlightTeams = [] }: Props) {
   const homeTeam = highlightTeams[0];
   const awayTeam = highlightTeams[1];
 
+  const [conference, setConference] = useState<"East" | "West">("East");
+
+  const filteredRows = rows.filter((r) => r.conference === conference || !r.conference);
+
+  const rankedRows = filteredRows.map((r, idx) => ({
+    ...r,
+    pos: idx + 1,
+  }));
+
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
       {/* Header */}
       <div className="mb-2 flex items-center justify-between">
         <div className="text-sm font-semibold text-white">
-          Ladder Snapshot
+          {conference}ern Conference
         </div>
-        <div className="text-xs text-white/45">Top 16</div>
+        <div className="text-xs text-white/45">Standings</div>
+      </div>
+
+      <div className="mb-3 flex gap-2">
+        {(["East", "West"] as const).map((conf) => (
+          <button
+            key={conf}
+            onClick={() => setConference(conf)}
+            className={cx(
+              "px-2.5 py-1 text-xs rounded-full border transition-all",
+              conference === conf
+                ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+                : "border-white/10 bg-black/20 text-white/60 hover:bg-white/5"
+            )}
+          >
+            {conf}
+          </button>
+        ))}
       </div>
 
       {/* Column labels */}
@@ -47,16 +74,16 @@ function LadderSnapshot({ rows, highlightTeams = [] }: Props) {
       </div>
 
       <div className="space-y-1.5 mt-1">
-        {rows.map((r, i) => {
+        {rankedRows.map((r, i) => {
           const isHome = r.team === homeTeam;
           const isAway = r.team === awayTeam;
 
           return (
             <React.Fragment key={r.team}>
-              {/* Finals cutoff */}
-              {i === 8 && (
+              {/* Top 6 cutoff */}
+              {i === 6 && (
                 <div className="my-1 border-t border-white/10 px-2 text-[10px] text-white/30">
-                  Finals Cutoff
+                  Play-In Range (7-10)
                 </div>
               )}
 

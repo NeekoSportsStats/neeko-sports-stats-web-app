@@ -27,6 +27,7 @@ export default function TeamMasterTable() {
   const [selectedStat, setSelectedStat] = useState<StatLens>("fantasy");
   const [selectedTeam, setSelectedTeam] = useState<TeamRow | null>(null);
   const [query, setQuery] = useState("");
+  const [conference, setConference] = useState<"East" | "West">("East");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -41,6 +42,8 @@ export default function TeamMasterTable() {
           teams={teams}
           selectedStat={selectedStat}
           setSelectedStat={setSelectedStat}
+          conference={conference}
+          setConference={setConference}
           isPremium={isPremium}
           query={query}
           setQuery={setQuery}
@@ -54,6 +57,8 @@ export default function TeamMasterTable() {
           teams={teams}
           selectedStat={selectedStat}
           setSelectedStat={setSelectedStat}
+          conference={conference}
+          setConference={setConference}
           isPremium={isPremium}
           query={query}
           setQuery={setQuery}

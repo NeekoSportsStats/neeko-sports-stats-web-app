@@ -5,6 +5,7 @@ export type NBATeam = {
   id: number;
   name: string;
   code: string;
+  conference: "East" | "West";
   colours: {
     primary: string;
     secondary: string;
@@ -87,6 +88,14 @@ const TEAM_CODES = [
   "MIN", "OKC", "NOP", "SAS", "HOU", "MEM"
 ];
 
+// Conference assignments (East = 0, West = 1)
+const TEAM_CONFERENCES: Array<"East" | "West"> = [
+  "West", "West", "East", "East", "West", "West", "West", "East", // LAL, GSW, BOS, MIA, DEN, PHX, DAL, MIL
+  "East", "East", "East", "East", "East", "East", "East", "East", // PHI, BKN, NYK, TOR, CHI, CLE, IND, DET
+  "East", "East", "East", "East", "West", "West", "West", "West", // ATL, CHA, ORL, WAS, LAC, SAC, POR, UTA
+  "West", "West", "West", "West", "West", "West"                   // MIN, OKC, NOP, SAS, HOU, MEM
+];
+
 // Team colours
 const TEAM_COLOURS = [
   { primary: "#552583", secondary: "#FDB927" }, // Lakers
@@ -157,6 +166,7 @@ export const MOCK_TEAMS: NBATeam[] = TEAM_LIST.map((name, idx) => {
     id: idx + 1,
     name,
     code: TEAM_CODES[idx],
+    conference: TEAM_CONFERENCES[idx],
     colours: TEAM_COLOURS[idx],
 
     scores,

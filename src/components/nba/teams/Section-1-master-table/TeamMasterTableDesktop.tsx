@@ -68,6 +68,8 @@ export default function TeamMasterTableDesktop({
   teams,
   selectedStat,
   setSelectedStat,
+  conference,
+  setConference,
   isPremium,
   query,
   setQuery,
@@ -76,6 +78,8 @@ export default function TeamMasterTableDesktop({
   teams: TeamRow[];
   selectedStat: StatLens;
   setSelectedStat: (s: StatLens) => void;
+  conference: "East" | "West";
+  setConference: (c: "East" | "West") => void;
   isPremium: boolean;
   query: string;
   setQuery: (v: string) => void;
@@ -88,8 +92,12 @@ export default function TeamMasterTableDesktop({
 
   /* ---------------- DERIVED DATA ---------------- */
 
+  const conferenceTeams = useMemo(() => {
+    return teams.filter((t) => t.conference === conference);
+  }, [teams, conference]);
+
   const rows = useMemo(() => {
-    return teams.map((t) => {
+    return conferenceTeams.map((t) => {
       const values = getValues(t, selectedStat);
       return {
         team: t,
@@ -98,7 +106,7 @@ export default function TeamMasterTableDesktop({
         searchIndex: `${t.name} ${t.code}`.toLowerCase(),
       };
     });
-  }, [teams, selectedStat]);
+  }, [conferenceTeams, selectedStat]);
 
   const filtered = useMemo(() => {
     if (!isPremium || !search.trim()) return rows;
@@ -132,11 +140,28 @@ export default function TeamMasterTableDesktop({
                 Teams Master Table
               </div>
               <h2 className="mt-3 text-xl font-semibold text-neutral-50">
-                Full-season team trends
+                {conference}ern Conference
               </h2>
               <p className="text-xs text-neutral-400">
                 Season-long totals, averages and hit-rate performance
               </p>
+
+              <div className="mt-3 flex gap-2">
+                {(["East", "West"] as const).map((conf) => (
+                  <button
+                    key={conf}
+                    onClick={() => setConference(conf)}
+                    className={cx(
+                      "px-3 py-1.5 text-xs rounded-full border transition-all",
+                      conference === conf
+                        ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-200"
+                        : "border-neutral-700 bg-neutral-900/50 text-neutral-400 hover:bg-neutral-800"
+                    )}
+                  >
+                    {conf}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="flex flex-col items-end gap-2">
