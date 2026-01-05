@@ -305,7 +305,9 @@ function TeamFormCard({
   const formattedScore = formatMetric(score);
   const barWidth = intensityWidth(score);
 
-  const trend = team.midfieldTrend;
+  const trend = Array.isArray(team.paceTrend) && team.paceTrend.length > 0
+    ? team.paceTrend
+    : team.margins.slice(-12);
 
   return (
     <div
@@ -419,13 +421,15 @@ function TeamFormCard({
               </div>
             </div>
 
-            {/* Clear % */}
+            {/* Pace */}
             <div>
               <div className="text-[9px] uppercase text-neutral-500 tracking-[0.14em]">
-                Clear %
+                Pace
               </div>
               <div className="font-semibold">
-                {team.clearanceDom.at(-1)!}%
+                {Array.isArray(team.paceRating) && team.paceRating.length > 0
+                  ? team.paceRating.at(-1)!
+                  : 100}
               </div>
             </div>
 

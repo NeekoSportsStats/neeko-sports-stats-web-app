@@ -30,8 +30,13 @@ function buildLeagueBaselines() {
       return avg(lastN(against, 5));
     })
   );
-  const leagueClearance = avg(
-    MOCK_TEAMS.map((t) => avg(lastN(t.clearanceDom, 5)))
+  const leaguePace = avg(
+    MOCK_TEAMS.map((t) => {
+      const paceData = Array.isArray(t.paceRating) && t.paceRating.length > 0
+        ? lastN(t.paceRating, 5)
+        : [100, 100, 100, 100, 100];
+      return avg(paceData);
+    })
   );
   const leagueVolatility = avg(
     MOCK_TEAMS.map((t) => volatility(lastN(t.margins, 5)))
@@ -40,7 +45,7 @@ function buildLeagueBaselines() {
   return {
     leagueAttack,
     leagueDefence,
-    leagueClearance,
+    leaguePace,
     leagueVolatility,
   };
 }
@@ -51,17 +56,19 @@ function buildTeamInsightLines(
 ): string[] {
   const last5Scores = lastN(team.scores, 5);
   const last5Margins = lastN(team.margins, 5);
-  const last5Clear = lastN(team.clearanceDom, 5);
+  const last5Pace = Array.isArray(team.paceRating) && team.paceRating.length > 0
+    ? lastN(team.paceRating, 5)
+    : [100, 100, 100, 100, 100];
 
   const against = team.scores.map((s, i) => s - team.margins[i]);
   const last5Against = lastN(against, 5);
 
   const attackAvg = avg(last5Scores);
   const defenceAvg = avg(last5Against);
-  const clearAvg = avg(last5Clear);
+  const paceAvg = avg(last5Pace);
   const vol = volatility(last5Margins);
 
-  const { leagueAttack, leagueDefence, leagueClearance, leagueVolatility } =
+  const { leagueAttack, leagueDefence, leaguePace, leagueVolatility } =
     baselines;
 
   const lines: string[] = [];
@@ -103,18 +110,18 @@ function buildTeamInsightLines(
     lines.push(`${team.name} defence is conceding above projected levels.`);
   else lines.push(`${team.name} defence is conceding in line with league norms.`);
 
-  // Clearances
-  if (clearAvg > leagueClearance * 1.05)
+  // Pace
+  if (paceAvg > leaguePace * 1.05)
     lines.push(
-      `${team.name} clearance differential is trending above league norms.`
+      `${team.name} pace of play is trending above league norms.`
     );
-  else if (clearAvg < leagueClearance * 0.95)
+  else if (paceAvg < leaguePace * 0.95)
     lines.push(
-      `${team.name} clearance differential is trending below league norms.`
+      `${team.name} pace of play is trending below league norms.`
     );
   else
     lines.push(
-      `${team.name} clearance differential is hovering around league averages.`
+      `${team.name} pace of play is hovering around league averages.`
     );
 
   return lines;

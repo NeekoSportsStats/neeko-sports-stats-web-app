@@ -500,10 +500,13 @@ export default function TeamTrends() {
   const sfPoints = useMemo(() => {
     const arr: number[] = [];
     for (let g = 0; g < games; g++) {
-      const contested = MOCK_TEAMS.map(
-        (t) => t.clearanceDom[g] + t.margins[g] / 3
-      );
-      arr.push(Math.round(contested.reduce((a, b) => a + b, 0) / contested.length));
+      const rebounds = MOCK_TEAMS.map((t) => {
+        if (Array.isArray(t.rebounds) && t.rebounds[g] != null) {
+          return t.rebounds[g] + (t.margins[g] || 0) / 3;
+        }
+        return 0;
+      });
+      arr.push(Math.round(rebounds.reduce((a, b) => a + b, 0) / rebounds.length));
     }
     return arr;
   }, [games]);
