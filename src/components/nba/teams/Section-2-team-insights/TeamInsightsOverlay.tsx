@@ -143,14 +143,14 @@ export default function TeamInsightsOverlay({
 
           {/* Lens Pills */}
           <div className="px-5 py-3 flex gap-2 border-b border-neutral-800">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((lens) => (
+            {(["fantasy", "points", "rebounds", "assists", "threes"] as StatLens[]).map((lens) => (
               <button
                 key={lens}
                 onClick={() => onLensChange(lens)}
                 className={
                   selectedStat === lens
-                    ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black shadow-lg"
-                    : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300"
+                    ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black shadow-lg capitalize"
+                    : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300 capitalize"
                 }
               >
                 {lens}
@@ -220,15 +220,15 @@ export default function TeamInsightsOverlay({
           </div>
 
           {/* Pills */}
-          <div className="px-4 pb-3 flex gap-2">
-            {(["Fantasy", "Disposals", "Goals"] as StatLens[]).map((lens) => (
+          <div className="px-4 pb-3 flex gap-2 overflow-x-auto">
+            {(["fantasy", "points", "rebounds", "assists", "threes"] as StatLens[]).map((lens) => (
               <button
                 key={lens}
                 onClick={() => onLensChange(lens)}
                 className={
                   selectedStat === lens
-                    ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black"
-                    : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300"
+                    ? "rounded-full px-3 py-1.5 bg-yellow-400 text-black capitalize whitespace-nowrap"
+                    : "rounded-full px-3 py-1.5 bg-neutral-900 text-neutral-300 capitalize whitespace-nowrap"
                 }
               >
                 {lens}

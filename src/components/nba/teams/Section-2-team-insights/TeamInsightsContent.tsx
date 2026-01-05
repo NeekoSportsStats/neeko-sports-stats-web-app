@@ -7,12 +7,22 @@ import type { StatLens } from "../Section-1-master-table/TeamMasterTable";
 /* -------------------------------------------------------------------------- */
 
 function getValues(team: TeamRow, stat: StatLens): number[] {
-  if (stat === "Fantasy") return team.fantasy;
-  if (stat === "Disposals") return team.disposals;
-  return team.goals;
+  const statKey = stat as keyof TeamRow;
+  const values = team[statKey];
+  return Array.isArray(values) ? values : [];
 }
 
 function calcStats(values: number[]) {
+  if (!values || values.length === 0) {
+    return {
+      avg: 0,
+      min: 0,
+      max: 0,
+      games: 0,
+      volatility: 0,
+      total: 0,
+    };
+  }
   const total = values.reduce((a, b) => a + b, 0);
   const avg = total / values.length;
   const min = Math.min(...values);
@@ -36,9 +46,12 @@ function volatilityLabel(v: number) {
 }
 
 function hitThresholds(stat: StatLens): number[] {
-  if (stat === "Fantasy") return [1800, 1900, 2000, 2100];
-  if (stat === "Disposals") return [320, 350, 380, 400];
-  return [8, 10, 12, 14];
+  if (stat === "fantasy") return [200, 225, 250, 275];
+  if (stat === "points") return [100, 110, 120, 130];
+  if (stat === "rebounds") return [40, 45, 50, 55];
+  if (stat === "assists") return [20, 25, 30, 35];
+  if (stat === "threes") return [8, 12, 15, 18];
+  return [100, 110, 120, 130];
 }
 
 function hitRate(values: number[], threshold: number) {

@@ -14,7 +14,7 @@ export default function PageHeaderHero({
 }: Props) {
   return (
     <div className="space-y-4">
-      <h1 className="text-3xl font-bold">🏉 AFL Player Stats</h1>
+      <h1 className="text-3xl font-bold">🏀 NBA Player Stats</h1>
       <p className="text-neutral-400 text-sm">
         Live player form, volatility and AI-ready signals for your next move.
       </p>
@@ -24,8 +24,10 @@ export default function PageHeaderHero({
       <div className="flex flex-wrap gap-2">
         {[
           { key: "fantasy", label: "Fantasy", emoji: "📊" },
-          { key: "disposals", label: "Disposals", emoji: "📥" },
-          { key: "goals", label: "Goals", emoji: "🥅" },
+          { key: "points", label: "Points", emoji: "🏀" },
+          { key: "rebounds", label: "Rebounds", emoji: "🎯" },
+          { key: "assists", label: "Assists", emoji: "🤝" },
+          { key: "threes", label: "3-Pointers", emoji: "🎯" },
         ].map((s) => (
           <button
             key={s.key}

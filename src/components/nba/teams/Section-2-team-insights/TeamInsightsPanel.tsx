@@ -15,14 +15,17 @@ type Props = {
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const avg = (arr: number[]) =>
-  Math.round(arr.reduce((a, b) => a + b, 0) / arr.length);
+const avg = (arr: number[]) => {
+  if (!arr || arr.length === 0) return 0;
+  return Math.round(arr.reduce((a, b) => a + b, 0) / arr.length);
+};
 
 const lastN = (arr: number[], n: number) => arr.slice(-n);
 
 const deltaPct = (recent: number[], full: number[]) => {
   const r = avg(recent);
   const f = avg(full);
+  if (f === 0) return 0;
   return Math.round(((r - f) / f) * 100);
 };
 
@@ -40,12 +43,9 @@ export default function TeamInsightsPanel({
   onClose,
   onUpgrade,
 }: Props) {
-  const values =
-    stat === "Fantasy"
-      ? team.fantasy
-      : stat === "Disposals"
-      ? team.disposals
-      : team.goals;
+  const statKey = stat as keyof TeamRow;
+  const rawValues = team[statKey];
+  const values = Array.isArray(rawValues) ? rawValues : [];
 
   /* ---------------- DERIVED METRICS ---------------- */
 
