@@ -14,7 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Crown, Sparkles, Loader2, ArrowLeft } from "lucide-react";
+import { Check, Crown, Sparkles, Loader2, ArrowLeft, TrendingUp, Target, Zap, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const NeekoPlusPurchase = () => {
@@ -34,21 +34,30 @@ const NeekoPlusPurchase = () => {
     "Early access to new features",
   ];
 
-  const testimonials = [
+  const trustFeatures = [
     {
-      quote:
-        "The AI trends make it so much easier to spot form swings. It feels like cheating.",
-      name: "— Daniel Matthews",
+      icon: TrendingUp,
+      title: "Data-driven edge",
+      description:
+        "Advanced trend modelling across AFL, EPL, and NBA — designed to surface momentum shifts before they show up in box scores.",
     },
     {
-      quote:
-        "Exactly the kind of dashboard I wish existed years ago. Perfect for multi-sport fans.",
-      name: "— Alicia Porter",
+      icon: Target,
+      title: "Fantasy-first analysis",
+      description:
+        "Every metric is tuned for fantasy relevance, including hit-rate thresholds, volatility bands, and ceiling projections.",
     },
     {
-      quote:
-        "I use Neeko+ every week to sanity-check my bets. The stats view is insanely helpful.",
-      name: "— Marcus Liu",
+      icon: Zap,
+      title: "Built weekly, not retrospectively",
+      description:
+        "Neeko+ is designed around upcoming matchups — not post-game summaries.",
+    },
+    {
+      icon: Users,
+      title: "Trusted by growing community",
+      description:
+        "Used weekly by a growing base of fantasy-focused users preparing lineups, trades, and match decisions.",
     },
   ];
 
@@ -226,20 +235,40 @@ const NeekoPlusPurchase = () => {
         </Card>
       </div>
 
-      {/* TESTIMONIALS */}
+      {/* TRUST FEATURES */}
       <div className="mt-20">
-        <h2 className="text-2xl font-bold mb-6">What early users are saying</h2>
+        <h2 className="text-3xl font-bold mb-2 text-center">
+          Why serious fantasy players use Neeko+
+        </h2>
+        <p className="text-muted-foreground text-center mb-10">
+          Built for decision-makers who want clarity, not noise.
+        </p>
 
-        <div className="grid md:grid-cols-3 gap-6">
-          {testimonials.map((t, idx) => (
-            <Card key={idx} className="p-6 bg-black/40 border-primary/20">
-              <p className="mb-4 text-white/90 italic leading-relaxed">
-                “{t.quote}”
-              </p>
-              <p className="text-muted-foreground">{t.name}</p>
-            </Card>
-          ))}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {trustFeatures.map((feature, idx) => {
+            const Icon = feature.icon;
+            return (
+              <Card
+                key={idx}
+                className="p-6 bg-black/40 border-primary/20 hover:border-primary/40 transition-all"
+              >
+                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4">
+                  <Icon className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2 text-white">
+                  {feature.title}
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {feature.description}
+                </p>
+              </Card>
+            );
+          })}
         </div>
+
+        <p className="text-center mt-8 text-xs text-muted-foreground">
+          No hype. No betting tips. Just structured insight.
+        </p>
       </div>
     </div>
   );
