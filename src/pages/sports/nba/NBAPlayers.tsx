@@ -6,8 +6,11 @@ import PositionTrends from "@/components/nba/players/PositionTrends";
 import AIInsights from "@/components/nba/players/AIInsights";
 import MasterTable from "@/components/nba/players/MasterTable";
 import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
+import { LEAGUE_AVAILABILITY } from "@/config/leagueAvailability";
+import ComingSoonOverlay from "@/components/ComingSoonOverlay";
 
 export default function NBAPlayersPage() {
+  const isComingSoon = LEAGUE_AVAILABILITY.nba === "coming-soon";
   const [activeSection, setActiveSection] = useState("round-momentum");
   const [isStuck, setIsStuck] = useState(false);
   const [showTopButton, setShowTopButton] = useState(false);
@@ -121,7 +124,11 @@ export default function NBAPlayersPage() {
   /* -------------------------------------------------------------------------- */
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 text-white">
+    <div className="relative min-h-screen">
+      {isComingSoon && <ComingSoonOverlay league="NBA" />}
+
+      <div className={isComingSoon ? "pointer-events-none blur-sm" : ""}>
+        <div className="mx-auto max-w-6xl px-4 py-8 text-white">
 
       {/* Page Header */}
       <header className="mb-8 md:mb-10 animate-premium-section">
@@ -227,6 +234,8 @@ export default function NBAPlayersPage() {
           Back to Top
         </button>
       )}
+        </div>
+      </div>
     </div>
   );
 }

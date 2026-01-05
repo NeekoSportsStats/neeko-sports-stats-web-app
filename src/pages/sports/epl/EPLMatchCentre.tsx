@@ -11,6 +11,8 @@ import SeasonRoundSelector from "@/components/epl/match-center/SeasonRoundSelect
 import { MOCK_FIXTURES, MOCK_LADDER_TOP16 } from "@/components/epl/match-center/mockData";
 import type { FixtureMatch } from "@/components/epl/match-center/types";
 import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
+import { LEAGUE_AVAILABILITY } from "@/config/leagueAvailability";
+import ComingSoonOverlay from "@/components/ComingSoonOverlay";
 
 type Season = string;
 
@@ -75,6 +77,7 @@ function getDefaultSeasonRound(fixtures: FixtureMatch[]) {
 /* -------------------------------------------------------------------------- */
 
 export default function EPLMatchCentre() {
+  const isComingSoon = LEAGUE_AVAILABILITY.epl === "coming-soon";
   const [activeMatch, setActiveMatch] = useState<FixtureMatch | null>(null);
 
   const initial = useMemo(() => getDefaultSeasonRound(MOCK_FIXTURES), []);
@@ -101,7 +104,11 @@ export default function EPLMatchCentre() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl px-4 md:px-6 py-8">
+    <div className="relative min-h-screen">
+      {isComingSoon && <ComingSoonOverlay league="EPL" />}
+
+      <div className={isComingSoon ? "pointer-events-none blur-sm" : ""}>
+        <div className="mx-auto max-w-6xl px-4 md:px-6 py-8">
       <MatchCenterHeader />
 
       <div className="mt-6">
@@ -136,6 +143,8 @@ export default function EPLMatchCentre() {
           onClose={() => setActiveMatch(null)}
         />
       )}
+        </div>
+      </div>
     </div>
   );
 }

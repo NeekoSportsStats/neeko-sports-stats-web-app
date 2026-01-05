@@ -4,6 +4,8 @@ import { Crown, ChevronDown } from "lucide-react";
 import type { FixtureMatch } from "@/components/epl/match-center/types";
 import { MOCK_FIXTURES } from "@/components/epl/match-center/mockData";
 import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
+import { LEAGUE_AVAILABILITY } from "@/config/leagueAvailability";
+import ComingSoonOverlay from "@/components/ComingSoonOverlay";
 
 import type { PremiumMode } from "@/components/epl/ai-insights/data/types";
 
@@ -37,6 +39,8 @@ function currentRound(fixtures: FixtureMatch[]) {
 /* -------------------------------------------------------------------------- */
 
 export default function EPLAIInsights() {
+  const isComingSoon = LEAGUE_AVAILABILITY.epl === "coming-soon";
+
   if (!EPL_STAT_CONFIG?.availableStats?.length) {
     console.error("EPL_STAT_CONFIG missing or invalid");
     return null;
@@ -95,7 +99,11 @@ export default function EPLAIInsights() {
   /* -------------------------------------------------------------------------- */
 
   return (
-    <div className="min-h-screen bg-[#070707] text-white">
+    <div className="relative min-h-screen">
+      {isComingSoon && <ComingSoonOverlay league="EPL" />}
+
+      <div className={isComingSoon ? "pointer-events-none blur-sm" : ""}>
+        <div className="min-h-screen bg-[#070707] text-white">
       <div className="mx-auto max-w-6xl px-4 py-8 space-y-12">
         {/* HEADER */}
         <header className="flex items-center justify-between">
@@ -175,6 +183,8 @@ export default function EPLAIInsights() {
             fixtures={pastFixtures}
           />
         )}
+        </div>
+      </div>
       </div>
     </div>
   );

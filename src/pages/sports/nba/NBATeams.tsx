@@ -10,8 +10,11 @@ import TeamTrends from "@/components/nba/teams/TeamTrends";
 import TeamAIInsights from "@/components/nba/teams/TeamAIInsights";
 import TeamMasterTable from "@/components/nba/teams/TeamMasterTable";
 import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
+import { LEAGUE_AVAILABILITY } from "@/config/leagueAvailability";
+import ComingSoonOverlay from "@/components/ComingSoonOverlay";
 
 export default function NBATeams() {
+  const isComingSoon = LEAGUE_AVAILABILITY.nba === "coming-soon";
   const [activeSection, setActiveSection] = useState("momentum");
   const [isStuck, setIsStuck] = useState(false);
   const [showTopButton, setShowTopButton] = useState(false);
@@ -122,7 +125,11 @@ export default function NBATeams() {
   /* -------------------------------------------------------------------------- */
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-20 pt-6">
+    <div className="relative min-h-screen">
+      {isComingSoon && <ComingSoonOverlay league="NBA" />}
+
+      <div className={isComingSoon ? "pointer-events-none blur-sm" : ""}>
+        <div className="mx-auto max-w-6xl px-4 pb-20 pt-6">
 
       {/* -------------------------------- PAGE HEADER ----------------------------- */}
       <header className="mb-10">
@@ -230,6 +237,8 @@ export default function NBATeams() {
           Back to Top
         </button>
       )}
+        </div>
+      </div>
     </div>
   );
 }

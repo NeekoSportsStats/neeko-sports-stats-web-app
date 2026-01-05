@@ -11,6 +11,8 @@ import SeasonRoundSelector from "@/components/nba/match-center/SeasonRoundSelect
 import { MOCK_FIXTURES, MOCK_LADDER_TOP16 } from "@/components/nba/match-center/mockData";
 import type { FixtureMatch } from "@/components/nba/match-center/types";
 import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
+import { LEAGUE_AVAILABILITY } from "@/config/leagueAvailability";
+import ComingSoonOverlay from "@/components/ComingSoonOverlay";
 
 type Season = "2024-25" | "2025-26";
 
@@ -75,6 +77,8 @@ function getDefaultSeasonRound(fixtures: FixtureMatch[]) {
 /* -------------------------------------------------------------------------- */
 
 export default function NBAMatchCentre() {
+  const isComingSoon = LEAGUE_AVAILABILITY.nba === "coming-soon";
+
   if (!NBA_STAT_CONFIG) {
     console.error("NBA_STAT_CONFIG missing");
     return null;
@@ -106,7 +110,11 @@ export default function NBAMatchCentre() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl px-4 md:px-6 py-8">
+    <div className="relative min-h-screen">
+      {isComingSoon && <ComingSoonOverlay league="NBA" />}
+
+      <div className={isComingSoon ? "pointer-events-none blur-sm" : ""}>
+        <div className="mx-auto max-w-6xl px-4 md:px-6 py-8">
       <MatchCenterHeader />
 
       <div className="mt-6">
@@ -142,6 +150,8 @@ export default function NBAMatchCentre() {
           statConfig={NBA_STAT_CONFIG}
         />
       )}
+        </div>
+      </div>
     </div>
   );
 }

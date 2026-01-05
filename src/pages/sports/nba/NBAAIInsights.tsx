@@ -4,6 +4,8 @@ import { Crown, ChevronDown } from "lucide-react";
 import type { FixtureMatch } from "@/components/nba/match-center/types";
 import { MOCK_FIXTURES } from "@/components/nba/match-center/mockData";
 import { NBA_STAT_CONFIG } from "@/lib/stats/nba/statConfig";
+import { LEAGUE_AVAILABILITY } from "@/config/leagueAvailability";
+import ComingSoonOverlay from "@/components/ComingSoonOverlay";
 
 import type { PremiumMode } from "@/components/nba/ai-insights/data/types";
 
@@ -37,6 +39,8 @@ function currentRound(fixtures: FixtureMatch[]) {
 /* -------------------------------------------------------------------------- */
 
 export default function NBAAIInsights() {
+  const isComingSoon = LEAGUE_AVAILABILITY.nba === "coming-soon";
+
   if (!NBA_STAT_CONFIG?.availableStats?.length) {
     console.error("NBA_STAT_CONFIG missing or invalid");
     return null;
@@ -90,7 +94,11 @@ export default function NBAAIInsights() {
   /* -------------------------------------------------------------------------- */
 
   return (
-    <div className="min-h-screen bg-[#070707] text-white">
+    <div className="relative min-h-screen">
+      {isComingSoon && <ComingSoonOverlay league="NBA" />}
+
+      <div className={isComingSoon ? "pointer-events-none blur-sm" : ""}>
+        <div className="min-h-screen bg-[#070707] text-white">
       <div className="mx-auto max-w-6xl px-4 py-8 space-y-12">
         {/* HEADER */}
         <header className="flex items-center justify-between">
@@ -168,6 +176,8 @@ export default function NBAAIInsights() {
             fixtures={pastFixtures}
           />
         )}
+        </div>
+      </div>
       </div>
     </div>
   );

@@ -10,8 +10,11 @@ import TeamTrends from "@/components/epl/teams/TeamTrends";
 import TeamAIInsights from "@/components/epl/teams/TeamAIInsights";
 import TeamMasterTable from "@/components/epl/teams/TeamMasterTable";
 import { EPL_STAT_CONFIG } from "@/lib/stats/epl/statConfig";
+import { LEAGUE_AVAILABILITY } from "@/config/leagueAvailability";
+import ComingSoonOverlay from "@/components/ComingSoonOverlay";
 
 export default function EPLTeams() {
+  const isComingSoon = LEAGUE_AVAILABILITY.epl === "coming-soon";
   const [activeSection, setActiveSection] = useState("momentum");
   const [isStuck, setIsStuck] = useState(false);
   const [showTopButton, setShowTopButton] = useState(false);
@@ -122,7 +125,11 @@ export default function EPLTeams() {
   /* -------------------------------------------------------------------------- */
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-20 pt-6">
+    <div className="relative min-h-screen">
+      {isComingSoon && <ComingSoonOverlay league="EPL" />}
+
+      <div className={isComingSoon ? "pointer-events-none blur-sm" : ""}>
+        <div className="mx-auto max-w-6xl px-4 pb-20 pt-6">
 
       {/* -------------------------------- PAGE HEADER ----------------------------- */}
       <header className="mb-10">
@@ -230,6 +237,8 @@ export default function EPLTeams() {
           Back to Top
         </button>
       )}
+        </div>
+      </div>
     </div>
   );
 }
