@@ -6,10 +6,10 @@ import { MOCK_FIXTURES } from "@/components/afl/match-center/mockData";
 
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 
-import PredictabilityTable from "@/components/afl/ai-insights/Section-2-player-predictability/PredictabilityTable";
-import TeamPredictabilityPanel from "@/components/afl/ai-insights/Section-3-team-prediction/TeamPredictabilityPanel";
-import GameFlowMomentumPanel from "@/components/afl/ai-insights/Section-4-game-flow/GameFlowMomentumPanel";
-import PlayerImpactScatterPanel from "@/components/afl/ai-insights/Section-1-hero-scatter/PlayerImpactScatterPanel";
+import PredictabilityTable from "@/features/afl/ai-insights/sections/PlayerPredictability";
+import TeamPredictabilityPanel from "@/features/afl/ai-insights/sections/TeamPredictability";
+import GameFlowMomentumPanel from "@/features/afl/ai-insights/sections/GameFlow";
+import PlayerImpactScatterPanel from "@/features/afl/ai-insights/sections/HeroScatter";
 
 import {
   filterPastFixtures,

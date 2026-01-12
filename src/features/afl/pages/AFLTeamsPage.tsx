@@ -3,12 +3,12 @@
 
 import React, { useEffect, useState } from "react";
 
-import TeamMomentumPulse from "@/components/afl/teams/TeamMomentumPulse";
-import TeamDashboardTiles from "@/components/afl/teams/TeamDashboardTiles";
-import TeamFormGrid from "@/components/afl/teams/TeamFormGrid";
-import TeamTrends from "@/components/afl/teams/TeamTrends";
-import TeamAIInsights from "@/components/afl/teams/TeamAIInsights";
-import TeamMasterTable from "@/components/afl/teams/TeamMasterTable";
+import TeamMomentumPulse from "@/features/afl/teams/sections/TeamMomentumPulse";
+import TeamDashboardTiles from "@/features/afl/teams/sections/TeamDashboardTiles";
+import TeamFormGrid from "@/features/afl/teams/sections/TeamFormGrid";
+import TeamTrends from "@/features/afl/teams/sections/TeamTrends";
+import TeamAIInsights from "@/features/afl/teams/sections/TeamAIInsights";
+import TeamMasterTable from "@/features/afl/teams/sections/TeamMasterTable";
 import { AFL_STAT_CONFIG } from "@/lib/stats/afl/statConfig";
 
 export default function AFLTeams() {
