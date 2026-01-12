@@ -37,10 +37,7 @@ import UserConductPolicy from "@/pages/policies/UserConductPolicy";
 /* =========================
    AFL Pages
 ========================= */
-import AFLPlayers from "@/pages/sports/afl/AFLPlayers";
-import AFLTeams from "@/pages/sports/afl/AFLTeams";
-import AFLAIInsights from "@/pages/sports/afl/AFLAIInsights";
-import AFLMatchCentre from "@/pages/sports/afl/AFLMatchCentre";
+import { AFLPlayersPage, AFLTeamsPage, AFLAIInsightsPage, AFLMatchCentrePage } from "@/features/afl";
 
 /* =========================
    EPL Pages (CORRECT)
@@ -169,10 +166,10 @@ function App() {
          AFL
       ========================= */}
       <Route path="/sports/afl" element={<Navigate to="/sports/afl/players" replace />} />
-      <Route path="/sports/afl/players" element={<Layout><AFLPlayers /></Layout>} />
-      <Route path="/sports/afl/teams" element={<Layout><AFLTeams /></Layout>} />
-      <Route path="/sports/afl/ai-analysis" element={<Layout><AFLAIInsights /></Layout>} />
-      <Route path="/sports/afl/match-centre" element={<Layout><AFLMatchCentre /></Layout>} />
+      <Route path="/sports/afl/players" element={<Layout><AFLPlayersPage /></Layout>} />
+      <Route path="/sports/afl/teams" element={<Layout><AFLTeamsPage /></Layout>} />
+      <Route path="/sports/afl/ai-analysis" element={<Layout><AFLAIInsightsPage /></Layout>} />
+      <Route path="/sports/afl/match-centre" element={<Layout><AFLMatchCentrePage /></Layout>} />
 
       {/* =========================
          EPL
