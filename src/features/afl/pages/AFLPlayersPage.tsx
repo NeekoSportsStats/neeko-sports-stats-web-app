@@ -6,12 +6,17 @@ import PositionTrends from "@/features/afl/players/sections/PositionTrends";
 import AIInsights from "@/features/afl/players/sections/AIInsights";
 import MasterTable from "@/features/afl/players/sections/MasterTable";
 import { AFL_STAT_CONFIG } from "@/lib/stats/afl/statConfig";
+import { getRoundSummaryData } from "@/features/afl/players/data/getRoundSummaryData";
+import type { StatKey } from "@/lib/stats/types";
 
 export default function AFLPlayersPage() {
   const [activeSection, setActiveSection] = useState("round-momentum");
   const [isStuck, setIsStuck] = useState(false);
   const [showTopButton, setShowTopButton] = useState(false);
   const [roundSummaryData, setRoundSummaryData] = useState<RoundSummaryData | null>(null);
+  const [roundSummaryLoading, setRoundSummaryLoading] = useState(true);
+  const [roundSummaryError, setRoundSummaryError] = useState<string | null>(null);
+  const [selectedStat, setSelectedStat] = useState<StatKey>(AFL_STAT_CONFIG.defaultStat);
 
   /* -------------------------------------------------------------------------- */
   /*                         Scroll Spy Section Tracking                        */
@@ -106,6 +111,34 @@ export default function AFLPlayersPage() {
   }, []);
 
   /* -------------------------------------------------------------------------- */
+  /*                         Load Round Summary Data                            */
+  /* -------------------------------------------------------------------------- */
+
+  useEffect(() => {
+    const loadRoundSummaryData = async () => {
+      setRoundSummaryLoading(true);
+      setRoundSummaryError(null);
+
+      try {
+        const data = await getRoundSummaryData({
+          season: 2025,
+          round: AFL_STAT_CONFIG.sportMeta.currentRound,
+          stat: selectedStat,
+        });
+        setRoundSummaryData(data);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        console.error("Failed to load Round Summary data:", errorMessage);
+        setRoundSummaryError(errorMessage);
+      } finally {
+        setRoundSummaryLoading(false);
+      }
+    };
+
+    loadRoundSummaryData();
+  }, [selectedStat]);
+
+  /* -------------------------------------------------------------------------- */
   /*                            Section Definitions                             */
   /* -------------------------------------------------------------------------- */
 
@@ -191,13 +224,28 @@ export default function AFLPlayersPage() {
 
       <div className="space-y-20 md:space-y-24">
         <section id="round-momentum" className="scroll-mt-28 animate-premium-section">
-          {roundSummaryData && (
+          {roundSummaryLoading && (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center space-y-3">
+                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-yellow-400 border-r-transparent"></div>
+                <p className="text-sm text-white/60">Loading Round Momentum...</p>
+              </div>
+            </div>
+          )}
+
+          {roundSummaryError && !roundSummaryLoading && (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-6">
+              <p className="text-sm text-red-400">
+                Failed to load Round Summary. Check console for details.
+              </p>
+            </div>
+          )}
+
+          {roundSummaryData && !roundSummaryLoading && !roundSummaryError && (
             <RoundSummary
               data={roundSummaryData}
               onStatChange={(stat) => {
-                setRoundSummaryData((prev) =>
-                  prev ? { ...prev, selectedStat: stat } : prev
-                );
+                setSelectedStat(stat);
               }}
             />
           )}
