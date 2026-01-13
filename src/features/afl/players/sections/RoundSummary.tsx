@@ -10,6 +10,10 @@ import {
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 import type { StatKey } from "@/lib/stats/types";
 
+/* -------------------------------------------------------------------------- */
+/* TYPES                                                                      */
+/* -------------------------------------------------------------------------- */
+
 export type RoundSummaryData = {
   currentRound: number;
 
@@ -38,6 +42,10 @@ export type RoundSummaryData = {
   };
 };
 
+/* -------------------------------------------------------------------------- */
+/* SPARKLINE                                                                  */
+/* -------------------------------------------------------------------------- */
+
 function Sparkline({ data }: { data: number[] }) {
   if (!data.length) return null;
 
@@ -48,6 +56,7 @@ function Sparkline({ data }: { data: number[] }) {
 
   return (
     <div className="relative h-16 md:h-24 w-full">
+      {/* Glow */}
       <svg
         className="absolute inset-0 h-full w-full"
         viewBox={`0 0 ${width} 100`}
@@ -64,6 +73,7 @@ function Sparkline({ data }: { data: number[] }) {
         />
       </svg>
 
+      {/* Main */}
       <svg
         className="absolute inset-0 h-full w-full"
         viewBox={`0 0 ${width} 100`}
@@ -82,6 +92,10 @@ function Sparkline({ data }: { data: number[] }) {
     </div>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* MINI CARD                                                                  */
+/* -------------------------------------------------------------------------- */
 
 interface MiniCardProps {
   icon: React.ElementType;
@@ -104,6 +118,7 @@ function MiniCard({ icon: Icon, label, value, player, delay }: MiniCardProps) {
       style={{ animationDelay: `${delay}ms` }}
     >
       <div className="pointer-events-none absolute inset-x-0 -bottom-12 h-24 bg-gradient-to-t from-yellow-500/15 to-transparent" />
+
       <div className="relative flex flex-col gap-2 text-left">
         <div className="flex items-center justify-between">
           <Icon className="h-5 w-5 text-yellow-400" />
@@ -111,6 +126,7 @@ function MiniCard({ icon: Icon, label, value, player, delay }: MiniCardProps) {
             {label}
           </span>
         </div>
+
         <div>
           <p className="text-xl md:text-2xl font-semibold text-yellow-300">
             {value}
@@ -122,6 +138,10 @@ function MiniCard({ icon: Icon, label, value, player, delay }: MiniCardProps) {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/* MAIN COMPONENT                                                             */
+/* -------------------------------------------------------------------------- */
+
 export default function RoundSummary({
   data,
   onStatChange,
@@ -132,7 +152,9 @@ export default function RoundSummary({
   const selectedLabel = data.labels[data.selectedStat] || data.selectedStat;
   const unit = data.units?.[data.selectedStat] || data.selectedStat;
   const labelLower = selectedLabel.toLowerCase();
-  const description = data.description || "";
+  const description =
+    data.description ||
+    `Live round snapshot — track ${labelLower} trends, standout players and role/stability shifts as this stat moves week to week.`;
 
   return (
     <section
@@ -144,17 +166,19 @@ export default function RoundSummary({
         "animate-in fade-in slide-in-from-bottom-6"
       )}
     >
+      {/* Ambient glow */}
       <div className="pointer-events-none absolute -top-40 left-1/2 h-72 w-[480px] -translate-x-1/2 bg-yellow-500/20 blur-3xl" />
 
       <div className="relative">
+        {/* Header */}
         <SectionHeader
-          pillLabel="Round Momentum"
+          eyebrow="Round Momentum"
           title="Round Momentum Summary"
           subtitle={`Round ${data.currentRound} • ${selectedLabel} Snapshot`}
-          description={`Live round snapshot — track ${labelLower} trends, standout players and role/stability shifts as this stat moves week to week.`}
           icon={Sparkles}
         />
 
+        {/* Stat Pills */}
         <div className="-mx-2 mb-4 mt-1 overflow-x-auto scrollbar-thin scrollbar-thumb-yellow-500/30">
           <div className="flex min-w-max gap-2 px-2 pb-1">
             {data.availableStats.map((s) => (
@@ -175,10 +199,10 @@ export default function RoundSummary({
           </div>
         </div>
 
+        {/* Main panels */}
         <div className="grid gap-4 md:grid-cols-2 md:gap-6">
-          <div
-            className="rounded-2xl border border-yellow-500/20 bg-black/70 px-4 py-4 md:px-6 md:py-5 backdrop-blur-sm transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(250,204,21,0.45)] animate-in fade-in slide-in-from-bottom-4"
-          >
+          {/* Pulse */}
+          <div className="rounded-2xl border border-yellow-500/20 bg-black/70 px-4 py-4 md:px-6 md:py-5 backdrop-blur-sm transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(250,204,21,0.45)] animate-in fade-in slide-in-from-bottom-4">
             <h3 className="mb-2 flex items-center gap-2 text-base md:text-lg font-semibold">
               <Activity className="h-5 w-5 text-yellow-300" />
               <span>Round Momentum Pulse</span>
@@ -191,9 +215,8 @@ export default function RoundSummary({
             <Sparkline data={data.sparkline} />
           </div>
 
-          <div
-            className="rounded-2xl border border-yellow-500/20 bg-black/70 px-4 py-4 md:px-6 md:py-5 backdrop-blur-sm transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(250,204,21,0.45)] animate-in fade-in slide-in-from-bottom-4"
-          >
+          {/* Headlines */}
+          <div className="rounded-2xl border border-yellow-500/20 bg-black/70 px-4 py-4 md:px-6 md:py-5 backdrop-blur-sm transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(250,204,21,0.45)] animate-in fade-in slide-in-from-bottom-4">
             <h3 className="mb-2 flex items-center gap-2 text-base md:text-lg font-semibold">
               <Flame className="h-5 w-5 text-orange-400" />
               <span>Key Headlines</span>
@@ -219,6 +242,7 @@ export default function RoundSummary({
           </div>
         </div>
 
+        {/* Mini cards */}
         <div className="mt-6 grid gap-4 md:mt-7 md:grid-cols-3">
           <MiniCard
             icon={Flame}
@@ -242,7 +266,6 @@ export default function RoundSummary({
             delay={280}
           />
         </div>
-
       </div>
     </section>
   );
