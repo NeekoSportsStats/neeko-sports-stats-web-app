@@ -7,12 +7,14 @@ import AIInsights from "@/features/afl/players/sections/AIInsights";
 import MasterTable from "@/features/afl/players/sections/MasterTable";
 import { AFL_STAT_CONFIG } from "@/lib/stats/afl/statConfig";
 import { getRoundSummaryData } from "@/features/afl/players/data/getRoundSummaryData";
+import { getLatestCompletedRound } from "@/features/afl/shared/data/getLatestCompletedRound";
 import type { StatKey } from "@/lib/stats/types";
 
 export default function AFLPlayersPage() {
   const [activeSection, setActiveSection] = useState("round-momentum");
   const [isStuck, setIsStuck] = useState(false);
   const [showTopButton, setShowTopButton] = useState(false);
+  const [latestRound, setLatestRound] = useState<number | null>(null);
   const [roundSummaryData, setRoundSummaryData] = useState<RoundSummaryData | null>(null);
   const [roundSummaryLoading, setRoundSummaryLoading] = useState(true);
   const [roundSummaryError, setRoundSummaryError] = useState<string | null>(null);
@@ -111,10 +113,34 @@ export default function AFLPlayersPage() {
   }, []);
 
   /* -------------------------------------------------------------------------- */
+  /*                      Fetch Latest Completed Round                          */
+  /* -------------------------------------------------------------------------- */
+
+  useEffect(() => {
+    const fetchLatestRound = async () => {
+      try {
+        const round = await getLatestCompletedRound(2025);
+        setLatestRound(round);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        console.error("Failed to fetch latest completed round:", errorMessage);
+        setRoundSummaryError(errorMessage);
+        setRoundSummaryLoading(false);
+      }
+    };
+
+    fetchLatestRound();
+  }, []);
+
+  /* -------------------------------------------------------------------------- */
   /*                         Load Round Summary Data                            */
   /* -------------------------------------------------------------------------- */
 
   useEffect(() => {
+    if (latestRound === null) {
+      return;
+    }
+
     const loadRoundSummaryData = async () => {
       setRoundSummaryLoading(true);
       setRoundSummaryError(null);
@@ -122,7 +148,7 @@ export default function AFLPlayersPage() {
       try {
         const data = await getRoundSummaryData({
           season: 2025,
-          round: AFL_STAT_CONFIG.sportMeta.currentRound,
+          round: latestRound,
           stat: selectedStat,
         });
         setRoundSummaryData(data);
@@ -136,7 +162,7 @@ export default function AFLPlayersPage() {
     };
 
     loadRoundSummaryData();
-  }, [selectedStat]);
+  }, [selectedStat, latestRound]);
 
   /* -------------------------------------------------------------------------- */
   /*                            Section Definitions                             */
