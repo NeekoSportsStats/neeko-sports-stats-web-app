@@ -51,22 +51,20 @@ export async function getRoundSummaryData(params: {
   const latestRound = roundRow.round_number;
 
   /* ------------------ CURRENT ROUND (snapshot) ---------------------------- */
-  /* This is the ONLY source of truth for:
-     - Top scorer
-     - Current round players
-     - Finals / GF / bye-safe logic
-  */
+  // Source of truth for who actually played this round (GF/byes safe)
 
   const { data: snapshot, error: snapErr } = await supabase
     .schema("afl")
     .from("latest_round_snapshot")
-    .select(`
+    .select(
+      `
       player_id,
       player_name,
       disposals,
       goals,
       fantasy_score
-    `)
+    `
+    )
     .eq("season", season)
     .eq("round_number", latestRound);
 
@@ -85,6 +83,7 @@ export async function getRoundSummaryData(params: {
     .from("rolling_player_stats_last_10")
     .select("*")
     .eq("season", season)
+    .gte("round_number", Math.max(1, latestRound - 9))
     .lte("round_number", latestRound);
 
   if (rollErr || !rolling || rolling.length === 0) {
@@ -95,7 +94,7 @@ export async function getRoundSummaryData(params: {
 
   /* ----------------------------- calculations ----------------------------- */
 
-  const sparkline = buildMomentumSparkline(rollingStats, stat);
+  const sparkline = buildMomentumSparkline(rollingStats, stat, latestRound);
   const topScorer = calculateTopScorer(currentRoundStats, stat);
   const biggestRiser = calculateBiggestRiser(
     rollingStats,
@@ -106,7 +105,8 @@ export async function getRoundSummaryData(params: {
   const mostConsistent = calculateMostConsistent(
     rollingStats,
     currentRoundStats,
-    stat
+    stat,
+    latestRound
   );
 
   /* ------------------------------- return -------------------------------- */
@@ -130,27 +130,45 @@ export async function getRoundSummaryData(params: {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Sparkline = league-wide average per round (last 10 rounds only)
+ * Sparkline = league-wide average per round (exactly last 10 rounds).
+ * - Ignores 0/null to avoid flattening to 0
+ * - If a round has no data, carries forward last value (bye/finals safe)
  */
 function buildMomentumSparkline(
   stats: RollingRow[],
-  stat: StatKey
+  stat: StatKey,
+  latestRound: number
 ): number[] {
-  const roundMap = new Map<number, { sum: number; count: number }>();
+  const start = Math.max(1, latestRound - 9);
+  const rounds = Array.from({ length: latestRound - start + 1 }, (_, i) => start + i);
 
-  stats.forEach((s) => {
-    const v = getStatValue(s, stat);
-    const prev = roundMap.get(s.round_number) ?? { sum: 0, count: 0 };
-    roundMap.set(s.round_number, {
-      sum: prev.sum + v,
-      count: prev.count + 1,
-    });
-  });
+  const out: number[] = [];
+  let lastValue = 0;
 
-  return Array.from(roundMap.entries())
-    .sort((a, b) => a[0] - b[0])
-    .slice(-10)
-    .map(([, v]) => Math.round(v.sum / Math.max(v.count, 1)));
+  for (const r of rounds) {
+    const rows = stats.filter((s) => s.round_number === r);
+
+    const values = rows
+      .map((s) => getStatValue(s, stat))
+      .filter((v) => Number.isFinite(v) && v > 0);
+
+    if (values.length === 0) {
+      // carry forward (prevents disposals sparkline collapsing)
+      out.push(lastValue);
+      continue;
+    }
+
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    const rounded = Math.round(avg);
+    out.push(rounded);
+    lastValue = rounded;
+  }
+
+  // Ensure exactly 10 points if early season (round < 10)
+  while (out.length < 10) out.unshift(out[0] ?? 0);
+
+  // Cap to last 10
+  return out.slice(-10);
 }
 
 /**
@@ -170,7 +188,7 @@ function calculateTopScorer(
 }
 
 /**
- * Biggest riser = current round vs OWN 10-round average
+ * Biggest riser = current round vs OWN average across prior rounds in the 10-round window
  */
 function calculateBiggestRiser(
   history: RollingRow[],
@@ -182,17 +200,18 @@ function calculateBiggestRiser(
   let bestDiff = 0;
 
   current.forEach((player) => {
-    const past = history.filter(
-      (h) =>
-        h.player_id === player.player_id &&
-        h.round_number < latestRound
-    );
+    const past = history
+      .filter(
+        (h) =>
+          h.player_id === player.player_id &&
+          h.round_number < latestRound
+      )
+      .map((h) => getStatValue(h, stat))
+      .filter((v) => Number.isFinite(v) && v > 0);
 
     if (past.length < 3) return;
 
-    const avg =
-      past.reduce((s, r) => s + getStatValue(r, stat), 0) / past.length;
-
+    const avg = past.reduce((s, v) => s + v, 0) / past.length;
     const diff = getStatValue(player, stat) - avg;
 
     if (diff > bestDiff) {
@@ -208,43 +227,53 @@ function calculateBiggestRiser(
 }
 
 /**
- * Most consistent = lowest variance around OWN average
- * Returned as % consistency (0–100)
+ * Most consistent = player closest to their OWN average across last 10 rounds.
+ * Uses MAD (mean absolute deviation) and returns a real 0–100 score:
+ * score = 100 * (1 - MAD/mean)
  */
 function calculateMostConsistent(
   history: RollingRow[],
   current: SnapshotRow[],
-  stat: StatKey
+  stat: StatKey,
+  latestRound: number
 ): { name: string; percentage: number } {
+  const start = Math.max(1, latestRound - 9);
+
   let bestName = "—";
-  let bestVariance = Infinity;
+  let bestScore = -1;
 
   current.forEach((player) => {
     const values = history
-      .filter((h) => h.player_id === player.player_id)
+      .filter(
+        (h) =>
+          h.player_id === player.player_id &&
+          h.round_number >= start &&
+          h.round_number <= latestRound
+      )
       .map((h) => getStatValue(h, stat))
-      .filter((v) => v > 0);
+      .filter((v) => Number.isFinite(v) && v > 0);
 
     if (values.length < 5) return;
 
     const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    if (mean <= 0) return;
 
-    const variance =
-      values.reduce((s, v) => s + Math.pow(v - mean, 2), 0) /
-      values.length;
+    const mad =
+      values.reduce((s, v) => s + Math.abs(v - mean), 0) / values.length;
 
-    if (variance < bestVariance) {
-      bestVariance = variance;
+    const scoreRaw = 100 * (1 - mad / mean);
+    const score = clamp(Math.round(scoreRaw), 0, 100);
+
+    if (score > bestScore) {
+      bestScore = score;
       bestName = player.player_name;
     }
   });
 
-  if (bestVariance === Infinity) {
-    return { name: "—", percentage: 0 };
-  }
-
-  const score = Math.max(0, Math.min(100, Math.round(100 - bestVariance)));
-  return { name: bestName, percentage: score };
+  return {
+    name: bestName,
+    percentage: bestScore < 0 ? 0 : bestScore,
+  };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -265,4 +294,8 @@ function getStatValue(
     default:
       return 0;
   }
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
 }
