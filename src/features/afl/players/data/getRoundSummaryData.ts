@@ -60,7 +60,7 @@ export async function getRoundSummaryData(params: {
   const stats = data as RollingPlayerStatsRow[];
 
   /* ---------------------- isolate CURRENT ROUND players ------------------- */
-  // This ensures:
+  // Ensures:
   // - Grand Final only shows GF players
   // - No byes included
   // - No teams leaking in
@@ -122,6 +122,8 @@ function buildMomentumSparkline(
 
   stats.forEach((s) => {
     const value = getStatValue(s, stat);
+    if (value <= 0) return;
+
     const existing = roundMap.get(s.round_number) ?? { sum: 0, count: 0 };
     roundMap.set(s.round_number, {
       sum: existing.sum + value,
@@ -136,7 +138,7 @@ function buildMomentumSparkline(
 }
 
 /**
- * Top scorer = highest stat in the current round
+ * Top scorer = highest stat in the CURRENT round only
  */
 function calculateTopScorer(
   rows: RollingPlayerStatsRow[],
@@ -164,11 +166,14 @@ function calculateBiggestRiser(
   let bestDiff = 0;
 
   currentRoundStats.forEach((current) => {
-    const history = allStats.filter(
-      (s) =>
-        s.player_id === current.player_id &&
-        s.round_number < latestRound
-    );
+    const history = allStats
+      .filter(
+        (s) =>
+          s.player_id === current.player_id &&
+          s.round_number < latestRound &&
+          getStatValue(s, stat) > 0
+      )
+      .slice(-10);
 
     if (history.length < 3) return;
 
@@ -184,11 +189,14 @@ function calculateBiggestRiser(
     }
   });
 
-  return { name: bestName, diff: Math.round(bestDiff * 10) / 10 };
+  return {
+    name: bestName,
+    diff: Math.round(bestDiff * 10) / 10,
+  };
 }
 
 /**
- * Most consistent = lowest variance around OWN 10-round average
+ * Most consistent = closest to OWN 10-round average (bounded 0–100%)
  */
 function calculateMostConsistent(
   allStats: RollingPlayerStatsRow[],
@@ -196,35 +204,43 @@ function calculateMostConsistent(
   stat: StatKey
 ): { name: string; percentage: number } {
   let bestName = "—";
-  let bestScore = Number.POSITIVE_INFINITY;
+  let bestConsistency = 0;
 
   currentRoundStats.forEach((player) => {
-    const history = allStats.filter(
-      (s) => s.player_id === player.player_id
-    );
+    const history = allStats
+      .filter(
+        (s) =>
+          s.player_id === player.player_id &&
+          getStatValue(s, stat) > 0
+      )
+      .slice(-10);
 
     if (history.length < 5) return;
 
     const values = history.map((s) => getStatValue(s, stat));
-    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    if (avg === 0) return;
 
-    if (mean === 0) return;
-
-    const variance =
-      values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) /
+    const meanDeviation =
+      values.reduce((sum, v) => sum + Math.abs(v - avg), 0) /
       values.length;
 
-    const consistencyScore = variance / mean;
+    const consistency = Math.max(
+      0,
+      Math.min(1, 1 - meanDeviation / avg)
+    );
 
-    if (consistencyScore < bestScore) {
-      bestScore = consistencyScore;
+    const pct = Math.round(consistency * 100);
+
+    if (pct > bestConsistency) {
+      bestConsistency = pct;
       bestName = player.player_name;
     }
   });
 
   return {
     name: bestName,
-    percentage: bestScore === Infinity ? 0 : Math.round((1 / bestScore) * 100),
+    percentage: bestConsistency,
   };
 }
 
