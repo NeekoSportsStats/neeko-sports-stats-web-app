@@ -10,6 +10,7 @@ import {
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 import type { StatKey } from "@/lib/stats/types";
 import { ConsistencyInfo } from "./ConsistencyInfo";
+import { BiggestRiserInfo } from "./BiggestRiserInfo";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
@@ -35,6 +36,7 @@ export type RoundSummaryData = {
   biggestRiser: {
     name: string;
     diff: number;
+    currentValue: number;
   };
 
   mostConsistent: {
@@ -159,6 +161,24 @@ export default function RoundSummary({
     data.description ||
     `Live round snapshot — track ${labelLower} trends, standout players and role/stability shifts as this stat moves week to week.`;
 
+  const biggestRiserHeadline = React.useMemo(() => {
+    const { name, diff, currentValue } = data.biggestRiser;
+
+    if (name === "—" || diff <= 0) {
+      return "No clear week-to-week riser this round.";
+    }
+
+    if (data.selectedStat === "goals") {
+      return `${name} kicked ${currentValue} g (+${diff.toFixed(1)} vs last game).`;
+    }
+
+    if (data.selectedStat === "fantasy") {
+      return `${name} jumped ${diff.toFixed(1)} pts vs their last game.`;
+    }
+
+    return `${name} jumped ${diff.toFixed(1)} disp vs their last game.`;
+  }, [data.biggestRiser, data.selectedStat]);
+
   return (
     <section
       className={cn(
@@ -231,8 +251,7 @@ export default function RoundSummary({
                 <strong>{data.topScorer.value} {unit}</strong>.
               </li>
               <li>
-                • <strong>{data.biggestRiser.name}</strong> climbed{" "}
-                <strong>{data.biggestRiser.diff.toFixed(1)} {unit}</strong> on last week.
+                • {biggestRiserHeadline}
               </li>
               <li>
                 • <strong>{data.mostConsistent.name}</strong> holds{" "}
@@ -260,6 +279,7 @@ export default function RoundSummary({
             value={`${data.biggestRiser.diff.toFixed(1)} ${unit}`}
             player={data.biggestRiser.name}
             delay={220}
+            info={<BiggestRiserInfo />}
           />
           <MiniCard
             icon={Shield}

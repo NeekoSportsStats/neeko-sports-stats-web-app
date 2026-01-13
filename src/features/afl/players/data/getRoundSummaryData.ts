@@ -188,41 +188,51 @@ function calculateTopScorer(
 }
 
 /**
- * Biggest riser = current round vs OWN average across prior rounds in the 10-round window
+ * Biggest riser = largest increase vs player's most recent previous game
+ * (not vs average - true last-game delta)
  */
 function calculateBiggestRiser(
   history: RollingRow[],
   current: SnapshotRow[],
   stat: StatKey,
   latestRound: number
-): { name: string; diff: number } {
+): { name: string; diff: number; currentValue: number } {
   let bestName = "—";
   let bestDiff = 0;
+  let bestCurrentValue = 0;
 
   current.forEach((player) => {
-    const past = history
+    const currentValue = getStatValue(player, stat);
+
+    // Find all prior games for this player in the same season
+    const priorGames = history
       .filter(
         (h) =>
           h.player_id === player.player_id &&
           h.round_number < latestRound
       )
-      .map((h) => getStatValue(h, stat))
-      .filter((v) => Number.isFinite(v) && v > 0);
+      .sort((a, b) => b.round_number - a.round_number); // most recent first
 
-    if (past.length < 3) return;
+    // Get the most recent prior game
+    if (priorGames.length === 0) return;
 
-    const avg = past.reduce((s, v) => s + v, 0) / past.length;
-    const diff = getStatValue(player, stat) - avg;
+    const previousGame = priorGames[0];
+    const previousValue = getStatValue(previousGame, stat);
+
+    // Calculate true last-game delta
+    const diff = currentValue - previousValue;
 
     if (diff > bestDiff) {
       bestDiff = diff;
       bestName = player.player_name;
+      bestCurrentValue = currentValue;
     }
   });
 
   return {
     name: bestName,
     diff: Math.round(bestDiff * 10) / 10,
+    currentValue: Math.round(bestCurrentValue * 10) / 10,
   };
 }
 
