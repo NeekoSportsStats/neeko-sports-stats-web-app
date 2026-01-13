@@ -1,5 +1,6 @@
 // src/components/afl/match-center/SeasonRoundSelector.tsx
 import React, { useMemo } from "react";
+import { getAflRoundLabel } from "@/features/afl/shared/data/getAflRoundLabel";
 
 type Season = 2025 | 2026;
 
@@ -70,7 +71,7 @@ export default function SeasonRoundSelector({
           <div className="flex items-center justify-between">
             <div className="text-sm font-semibold text-white">Round</div>
             <div className="text-xs text-white/45">
-              {roundNumber === 0 ? "Opening Round" : `Round ${roundNumber}`}
+              {roundNumber === 0 ? "Opening Round" : getAflRoundLabel(roundNumber)}
             </div>
           </div>
 

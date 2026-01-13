@@ -11,6 +11,7 @@ import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 import type { StatKey } from "@/lib/stats/types";
 import { ConsistencyInfo } from "./ConsistencyInfo";
 import { BiggestRiserInfo } from "./BiggestRiserInfo";
+import { getAflRoundLabel } from "../../shared/data/getAflRoundLabel";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
@@ -197,7 +198,7 @@ export default function RoundSummary({
         <SectionHeader
           eyebrow="Round Momentum"
           title="Round Momentum Summary"
-          subtitle={`Round ${data.currentRound} • ${selectedLabel} Snapshot`}
+          subtitle={`${getAflRoundLabel(data.currentRound)} • ${selectedLabel} Snapshot`}
           icon={Sparkles}
         />
 

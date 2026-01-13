@@ -17,6 +17,7 @@ import {
   average,
   StatKey as MockStatKey,
 } from "@/components/afl/players/useAFLMockData";
+import { getAflRoundLabel } from "@/features/afl/shared/data/getAflRoundLabel";
 
 /* ---------------------------------------------------------
    Sparkline
@@ -188,7 +189,7 @@ export default function RoundSummary({ statConfig }: { statConfig: StatConfig })
         <SectionHeader
           pillLabel="Round Momentum"
           title="Round Momentum Summary"
-          subtitle={`Round ${currentRound} • ${selectedLabel} Snapshot`}
+          subtitle={`${getAflRoundLabel(currentRound)} • ${selectedLabel} Snapshot`}
           description={`Live round snapshot — track ${labelLower} trends, standout players and role/stability shifts as this stat moves week to week.`}
           icon={Sparkles}
         />

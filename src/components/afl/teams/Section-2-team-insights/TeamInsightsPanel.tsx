@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { X, Lock, TrendingUp, TrendingDown } from "lucide-react";
 import type { TeamRow } from "../data/mockTeams";
 import type { StatLens } from "../Section-1-master-table/TeamMasterTable";
+import { getAflRoundLabel } from "@/features/afl/shared/data/getAflRoundLabel";
 
 type Props = {
   team: TeamRow;
@@ -149,7 +150,7 @@ export default function TeamInsightsPanel({
                       ? "bg-neutral-700"
                       : "bg-neutral-600"
                   }`}
-                  title={`Round ${i + 1}: ${v}`}
+                  title={`${getAflRoundLabel(i + 1)}: ${v}`}
                 />
               ))}
             </div>
