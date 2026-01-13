@@ -38,54 +38,32 @@ export async function getRoundSummaryData(params: {
   const { data, error } = await supabase
     .schema("afl")
     .from("latest_round_snapshot")
-    .select(`
-      season,
-      round_number,
-      player_id,
-      player_name,
-      team_id,
-      team_name,
-      disposals,
-      goals,
-      tackles,
-      marks,
-      fantasy_score
-    `)
+    .select("*")
     .eq("season", season)
     .eq("round_number", round);
 
   if (error) {
-    throw new Error(
-      `Failed to fetch Round Summary snapshot: ${error.message}`
-    );
+    throw new Error(`Failed to fetch Round Summary snapshot: ${error.message}`);
   }
 
   if (!data || data.length === 0) {
-    throw new Error(
-      `No snapshot data found for season ${season}, round ${round}`
-    );
+    throw new Error(`No snapshot data found for season ${season}, round ${round}`);
   }
 
   const rows = data as LatestRoundSnapshotRow[];
 
   const sparkline = calculateSparkline(rows, stat);
   const topScorer = calculateTopScorer(rows, stat);
-
-  // Snapshot-only for now
   const biggestRiser = { name: "—", diff: 0 };
   const mostConsistent = calculateMostConsistent(rows, stat);
 
   return {
     currentRound: round,
     selectedStat: stat,
-
-    // readonly-safe
-    availableStats: AFL_STAT_CONFIG.availableStats,
-
+    availableStats: [...AFL_STAT_CONFIG.availableStats], // ✅ FIX readonly error
     labels: AFL_STAT_CONFIG.labels,
     units: AFL_STAT_CONFIG.units,
     description: AFL_STAT_CONFIG.descriptions?.[stat],
-
     sparkline,
     topScorer,
     biggestRiser,
@@ -127,27 +105,19 @@ function calculateMostConsistent(
   stat: StatKey
 ): { name: string; percentage: number } {
   const values = rows.map((r) => getStatValue(r, stat));
-  const leagueAvg =
-    values.reduce((sum, v) => sum + v, 0) / Math.max(values.length, 1);
+  const avg = values.reduce((a, b) => a + b, 0) / Math.max(values.length, 1);
 
-  const best =
-    rows
-      .map((r) => ({
-        name: r.player_name,
-        percentage: getStatValue(r, stat) >= leagueAvg ? 100 : 0,
-      }))
-      .sort((a, b) => b.percentage - a.percentage)[0] ?? {
-      name: "—",
-      percentage: 0,
-    };
+  const best = rows
+    .map((r) => ({
+      name: r.player_name,
+      percentage: getStatValue(r, stat) >= avg ? 100 : 0,
+    }))
+    .sort((a, b) => b.percentage - a.percentage)[0];
 
-  return best;
+  return best ?? { name: "—", percentage: 0 };
 }
 
-function getStatValue(
-  row: LatestRoundSnapshotRow,
-  stat: StatKey
-): number {
+function getStatValue(row: LatestRoundSnapshotRow, stat: StatKey): number {
   switch (stat) {
     case "fantasy":
       return row.fantasy_score ?? 0;
@@ -155,10 +125,6 @@ function getStatValue(
       return row.disposals ?? 0;
     case "goals":
       return row.goals ?? 0;
-    case "marks":
-      return row.marks ?? 0;
-    case "tackles":
-      return row.tackles ?? 0;
     default:
       return 0;
   }
