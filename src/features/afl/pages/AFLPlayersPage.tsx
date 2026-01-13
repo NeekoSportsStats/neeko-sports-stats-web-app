@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-import RoundSummary from "@/features/afl/players/sections/RoundSummary";
+import RoundSummary, { type RoundSummaryData } from "@/features/afl/players/sections/RoundSummary";
 import FormStabilityGrid from "@/features/afl/players/sections/FormStabilityGrid";
 import PositionTrends from "@/features/afl/players/sections/PositionTrends";
 import AIInsights from "@/features/afl/players/sections/AIInsights";
@@ -11,6 +11,7 @@ export default function AFLPlayersPage() {
   const [activeSection, setActiveSection] = useState("round-momentum");
   const [isStuck, setIsStuck] = useState(false);
   const [showTopButton, setShowTopButton] = useState(false);
+  const [roundSummaryData, setRoundSummaryData] = useState<RoundSummaryData | null>(null);
 
   /* -------------------------------------------------------------------------- */
   /*                         Scroll Spy Section Tracking                        */
@@ -190,7 +191,16 @@ export default function AFLPlayersPage() {
 
       <div className="space-y-20 md:space-y-24">
         <section id="round-momentum" className="scroll-mt-28 animate-premium-section">
-          <RoundSummary statConfig={AFL_STAT_CONFIG} />
+          {roundSummaryData && (
+            <RoundSummary
+              data={roundSummaryData}
+              onStatChange={(stat) => {
+                setRoundSummaryData((prev) =>
+                  prev ? { ...prev, selectedStat: stat } : prev
+                );
+              }}
+            />
+          )}
         </section>
 
         <section id="form-stability" className="scroll-mt-28 animate-premium-section delay-1">
