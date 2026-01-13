@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 import type { StatKey } from "@/lib/stats/types";
+import { ConsistencyInfo } from "./ConsistencyInfo";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
@@ -103,9 +104,10 @@ interface MiniCardProps {
   value: string;
   player: string;
   delay: number;
+  info?: React.ReactNode;
 }
 
-function MiniCard({ icon: Icon, label, value, player, delay }: MiniCardProps) {
+function MiniCard({ icon: Icon, label, value, player, delay, info }: MiniCardProps) {
   return (
     <div
       className={cn(
@@ -122,8 +124,9 @@ function MiniCard({ icon: Icon, label, value, player, delay }: MiniCardProps) {
       <div className="relative flex flex-col gap-2 text-left">
         <div className="flex items-center justify-between">
           <Icon className="h-5 w-5 text-yellow-400" />
-          <span className="text-[11px] uppercase tracking-[0.16em] text-white/40">
+          <span className="text-[11px] uppercase tracking-[0.16em] text-white/40 flex items-center">
             {label}
+            {info}
           </span>
         </div>
 
@@ -264,6 +267,7 @@ export default function RoundSummary({
             value={`${data.mostConsistent.percentage.toFixed(0)}%`}
             player={data.mostConsistent.name}
             delay={280}
+            info={<ConsistencyInfo />}
           />
         </div>
       </div>
