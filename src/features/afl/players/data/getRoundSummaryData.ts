@@ -27,6 +27,8 @@ export async function getRoundSummaryData(params: {
 }): Promise<RoundSummaryData> {
   const { season, stat } = params;
 
+  /* ---------------------- resolve latest completed round ------------------ */
+
   const { data: latestRoundRow, error: latestRoundError } = await supabase
     .schema("afl")
     .from("latest_completed_round")
@@ -39,6 +41,8 @@ export async function getRoundSummaryData(params: {
   }
 
   const latestRound = latestRoundRow.round_number;
+
+  /* ---------------------- fetch rolling 10 round data --------------------- */
 
   const { data, error } = await supabase
     .schema("afl")
@@ -55,6 +59,12 @@ export async function getRoundSummaryData(params: {
 
   const stats = data as RollingPlayerStatsRow[];
 
+  /* ---------------------- isolate CURRENT ROUND players ------------------- */
+  // This ensures:
+  // - Grand Final only shows GF players
+  // - No byes included
+  // - No teams leaking in
+
   const currentRoundStats = stats.filter(
     (s) => s.round_number === latestRound
   );
@@ -65,10 +75,23 @@ export async function getRoundSummaryData(params: {
     );
   }
 
+  /* ----------------------------- calculations ----------------------------- */
+
   const sparkline = buildMomentumSparkline(stats, stat);
   const topScorer = calculateTopScorer(currentRoundStats, stat);
-  const biggestRiser = calculateBiggestRiser(stats, stat, latestRound);
-  const mostConsistent = calculateMostConsistent(stats, stat);
+  const biggestRiser = calculateBiggestRiser(
+    stats,
+    currentRoundStats,
+    stat,
+    latestRound
+  );
+  const mostConsistent = calculateMostConsistent(
+    stats,
+    currentRoundStats,
+    stat
+  );
+
+  /* ------------------------------- return -------------------------------- */
 
   return {
     currentRound: latestRound,
@@ -88,32 +111,33 @@ export async function getRoundSummaryData(params: {
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Sparkline = league-wide average per round (last 10 rounds)
+ */
 function buildMomentumSparkline(
   stats: RollingPlayerStatsRow[],
   stat: StatKey
 ): number[] {
-  const roundAverages = new Map<number, { sum: number; count: number }>();
+  const roundMap = new Map<number, { sum: number; count: number }>();
 
-  for (const s of stats) {
+  stats.forEach((s) => {
     const value = getStatValue(s, stat);
-    const existing = roundAverages.get(s.round_number) || { sum: 0, count: 0 };
-    roundAverages.set(s.round_number, {
+    const existing = roundMap.get(s.round_number) ?? { sum: 0, count: 0 };
+    roundMap.set(s.round_number, {
       sum: existing.sum + value,
       count: existing.count + 1,
     });
-  }
+  });
 
-  const sparklineData = Array.from(roundAverages.entries())
-    .map(([round, { sum, count }]) => ({
-      round,
-      avg: sum / Math.max(count, 1),
-    }))
-    .sort((a, b) => a.round - b.round)
-    .map((d) => Math.round(d.avg));
-
-  return sparklineData;
+  return Array.from(roundMap.entries())
+    .sort((a, b) => a[0] - b[0])
+    .slice(-10)
+    .map(([, v]) => Math.round(v.sum / Math.max(v.count, 1)));
 }
 
+/**
+ * Top scorer = highest stat in the current round
+ */
 function calculateTopScorer(
   rows: RollingPlayerStatsRow[],
   stat: StatKey
@@ -122,99 +146,91 @@ function calculateTopScorer(
     (a, b) => getStatValue(b, stat) - getStatValue(a, stat)
   )[0];
 
-  if (!top) {
-    return { name: "—", value: 0 };
-  }
-
-  return {
-    name: top.player_name,
-    value: getStatValue(top, stat),
-  };
+  return top
+    ? { name: top.player_name, value: getStatValue(top, stat) }
+    : { name: "—", value: 0 };
 }
 
+/**
+ * Biggest riser = player who exceeded their OWN 10-round average the most
+ */
 function calculateBiggestRiser(
-  stats: RollingPlayerStatsRow[],
+  allStats: RollingPlayerStatsRow[],
+  currentRoundStats: RollingPlayerStatsRow[],
   stat: StatKey,
   latestRound: number
 ): { name: string; diff: number } {
-  const playerRounds = new Map<string, Map<number, number>>();
-
-  for (const s of stats) {
-    if (!playerRounds.has(s.player_id)) {
-      playerRounds.set(s.player_id, new Map());
-    }
-    playerRounds.get(s.player_id)!.set(s.round_number, getStatValue(s, stat));
-  }
-
-  let bestPlayer = "—";
+  let bestName = "—";
   let bestDiff = 0;
 
-  for (const [playerId, roundData] of playerRounds.entries()) {
-    const currentRoundValue = roundData.get(latestRound);
-    if (currentRoundValue === undefined) continue;
+  currentRoundStats.forEach((current) => {
+    const history = allStats.filter(
+      (s) =>
+        s.player_id === current.player_id &&
+        s.round_number < latestRound
+    );
 
-    const previousRounds = Array.from(roundData.entries())
-      .filter(([round]) => round < latestRound)
-      .map(([, value]) => value);
+    if (history.length < 3) return;
 
-    if (previousRounds.length === 0) continue;
+    const avg =
+      history.reduce((sum, s) => sum + getStatValue(s, stat), 0) /
+      history.length;
 
-    const previousAvg =
-      previousRounds.reduce((sum, val) => sum + val, 0) / previousRounds.length;
-    const diff = currentRoundValue - previousAvg;
+    const diff = getStatValue(current, stat) - avg;
 
     if (diff > bestDiff) {
       bestDiff = diff;
-      const playerRow = stats.find((s) => s.player_id === playerId);
-      if (playerRow) {
-        bestPlayer = playerRow.player_name;
-      }
+      bestName = current.player_name;
     }
-  }
-
-  return {
-    name: bestPlayer,
-    diff: bestDiff,
-  };
-}
-
-function calculateMostConsistent(
-  stats: RollingPlayerStatsRow[],
-  stat: StatKey
-): { name: string; percentage: number } {
-  const values = stats.map((s) => getStatValue(s, stat));
-  const leagueAvg =
-    values.reduce((a, b) => a + b, 0) / Math.max(values.length, 1);
-
-  const playerMap = new Map<string, { name: string; values: number[] }>();
-
-  stats.forEach((s) => {
-    if (!playerMap.has(s.player_id)) {
-      playerMap.set(s.player_id, { name: s.player_name, values: [] });
-    }
-    playerMap.get(s.player_id)!.values.push(getStatValue(s, stat));
   });
 
-  let bestPlayer = "—";
-  let bestPercentage = 0;
+  return { name: bestName, diff: Math.round(bestDiff * 10) / 10 };
+}
 
-  for (const [, player] of playerMap.entries()) {
-    if (player.values.length === 0) continue;
+/**
+ * Most consistent = lowest variance around OWN 10-round average
+ */
+function calculateMostConsistent(
+  allStats: RollingPlayerStatsRow[],
+  currentRoundStats: RollingPlayerStatsRow[],
+  stat: StatKey
+): { name: string; percentage: number } {
+  let bestName = "—";
+  let bestScore = Number.POSITIVE_INFINITY;
 
-    const aboveAvgCount = player.values.filter((v) => v >= leagueAvg).length;
-    const percentage = (aboveAvgCount / player.values.length) * 100;
+  currentRoundStats.forEach((player) => {
+    const history = allStats.filter(
+      (s) => s.player_id === player.player_id
+    );
 
-    if (percentage > bestPercentage) {
-      bestPercentage = percentage;
-      bestPlayer = player.name;
+    if (history.length < 5) return;
+
+    const values = history.map((s) => getStatValue(s, stat));
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+
+    if (mean === 0) return;
+
+    const variance =
+      values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) /
+      values.length;
+
+    const consistencyScore = variance / mean;
+
+    if (consistencyScore < bestScore) {
+      bestScore = consistencyScore;
+      bestName = player.player_name;
     }
-  }
+  });
 
   return {
-    name: bestPlayer,
-    percentage: bestPercentage,
+    name: bestName,
+    percentage: bestScore === Infinity ? 0 : Math.round((1 / bestScore) * 100),
   };
 }
+
+/* -------------------------------------------------------------------------- */
+/* STAT ACCESS                                                                */
+/* -------------------------------------------------------------------------- */
 
 function getStatValue(row: RollingPlayerStatsRow, stat: StatKey): number {
   switch (stat) {
