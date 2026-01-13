@@ -42,7 +42,7 @@ export async function getRoundSummaryData(params: {
 
   const { data, error } = await supabase
     .schema("afl")
-    .from("rolling_player_stats_last_5")
+    .from("rolling_player_stats_last_10")
     .select("*")
     .eq("season", season)
     .lte("round_number", latestRound);
