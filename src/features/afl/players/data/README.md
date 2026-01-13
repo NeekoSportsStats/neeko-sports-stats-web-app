@@ -162,3 +162,88 @@ Returns empty arrays for all positions if:
 - Player has insufficient games (<3) for analysis
 
 This graceful fallback allows the UI to display "Not enough data yet" messaging.
+
+## getFormStabilityGridData
+
+Fetches and calculates form stability analysis for the Form Stability Grid section.
+
+### Usage Example
+
+```typescript
+import { getFormStabilityGridData } from "@/features/afl/players/data/getFormStabilityGridData";
+
+// In a React component
+const fetchData = async () => {
+  try {
+    const data = await getFormStabilityGridData({
+      season: 2025,
+      stat: "fantasy"
+    });
+
+    // data.hot = top 5 players with biggest L5 surge
+    // data.stable = top 5 most consistent players
+    // data.cooling = bottom 5 players with softening output
+    setFormData(data);
+  } catch (error) {
+    console.error("Failed to load Form Stability Grid:", error);
+  }
+};
+```
+
+### Required Database Schema
+
+This function uses the `public.afl_player_stats` table:
+
+```sql
+CREATE TABLE afl_player_stats (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  player TEXT NOT NULL,
+  team TEXT,
+  position TEXT,
+  round_order INTEGER,
+  disposals INTEGER DEFAULT 0,
+  goals INTEGER DEFAULT 0,
+  fantasy_points INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_afl_player_stats_player ON afl_player_stats(player);
+```
+
+### Data Calculations
+
+For each player, the function calculates:
+
+1. **Last 5 Values**: Most recent 5 game statistics (ordered by round)
+2. **L5 Average**: Mean of last 5 games
+3. **Season Average**: Mean across all games in the season
+4. **Delta vs Season**: Difference between L5 avg and season avg
+5. **Volatility**: Standard deviation of last 5 games
+6. **Consistency**: 0-100 score based on stability (100 = perfectly consistent)
+
+### Categories
+
+Players are sorted into three categories:
+
+- **Hot**: Top 5 players sorted by delta_vs_season (descending) - biggest recent surges
+- **Stable**: Top 5 players sorted by consistency (descending) - most dependable output
+- **Cooling**: Top 5 players sorted by delta_vs_season (ascending) - biggest recent drops
+
+### Returns
+
+```typescript
+{
+  hot: PlayerFormMetrics[],      // Top 5 hot form surges
+  stable: PlayerFormMetrics[],   // Top 5 stability leaders
+  cooling: PlayerFormMetrics[]   // Top 5 cooling risks
+}
+```
+
+### Error Handling
+
+Returns empty arrays for all categories if:
+- The database table doesn't exist
+- No data exists for the requested season
+- Player has insufficient games (<5) for analysis
+
+This graceful fallback allows the UI to display "Not enough data yet" messaging.
