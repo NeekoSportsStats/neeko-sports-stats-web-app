@@ -239,9 +239,20 @@ function calculateMostConsistent(
 ): { name: string; percentage: number } {
   const start = Math.max(1, latestRound - 9);
 
-  let bestName = "—";
+  let bestName = "";
   let bestScore = -1;
 
+  function scorePlayer(values: number[]) {
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    if (mean <= 0) return null;
+
+    const mad =
+      values.reduce((s, v) => s + Math.abs(v - mean), 0) / values.length;
+
+    return clamp(Math.round(100 * (1 - mad / mean)), 0, 100);
+  }
+
+  /* ---------------- PRIMARY: GF players ---------------- */
   current.forEach((player) => {
     const values = history
       .filter(
@@ -251,18 +262,12 @@ function calculateMostConsistent(
           h.round_number <= latestRound
       )
       .map((h) => getStatValue(h, stat))
-      .filter((v) => Number.isFinite(v) && v > 0);
+      .filter((v) => v > 0);
 
-    if (values.length < 5) return;
+    if (values.length < 3) return;
 
-    const mean = values.reduce((a, b) => a + b, 0) / values.length;
-    if (mean <= 0) return;
-
-    const mad =
-      values.reduce((s, v) => s + Math.abs(v - mean), 0) / values.length;
-
-    const scoreRaw = 100 * (1 - mad / mean);
-    const score = clamp(Math.round(scoreRaw), 0, 100);
+    const score = scorePlayer(values);
+    if (score === null) return;
 
     if (score > bestScore) {
       bestScore = score;
@@ -270,12 +275,38 @@ function calculateMostConsistent(
     }
   });
 
+  /* ---------------- FALLBACK: league-wide ---------------- */
+  if (!bestName) {
+    const map = new Map<string, { name: string; values: number[] }>();
+
+    history.forEach((h) => {
+      const v = getStatValue(h, stat);
+      if (v <= 0) return;
+
+      if (!map.has(h.player_id)) {
+        map.set(h.player_id, { name: h.player_name, values: [] });
+      }
+      map.get(h.player_id)!.values.push(v);
+    });
+
+    map.forEach((p) => {
+      if (p.values.length < 5) return;
+
+      const score = scorePlayer(p.values);
+      if (score === null) return;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestName = p.name;
+      }
+    });
+  }
+
   return {
-    name: bestName,
-    percentage: bestScore < 0 ? 0 : bestScore,
+    name: bestName || "—",
+    percentage: bestScore > 0 ? bestScore : 0,
   };
 }
-
 /* -------------------------------------------------------------------------- */
 /* STAT ACCESS                                                                */
 /* -------------------------------------------------------------------------- */
