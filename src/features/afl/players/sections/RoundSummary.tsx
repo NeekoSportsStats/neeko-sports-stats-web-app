@@ -60,7 +60,6 @@ function Sparkline({ data }: { data: number[] }) {
 
   return (
     <div className="relative h-16 md:h-24 w-full">
-      {/* Glow */}
       <svg
         className="absolute inset-0 h-full w-full"
         viewBox={`0 0 ${width} 100`}
@@ -73,11 +72,10 @@ function Sparkline({ data }: { data: number[] }) {
           fill="none"
           stroke="rgba(250, 204, 21, 0.4)"
           strokeWidth={4}
-          className="drop-shadow-[0_0_10px_rgba(250,204,21,0.6)] animate-[pulse_1.8s_ease-in-out_infinite]"
+          className="drop-shadow-[0_0_10px_rgba(250,204,21,0.6)]"
         />
       </svg>
 
-      {/* Main */}
       <svg
         className="absolute inset-0 h-full w-full"
         viewBox={`0 0 ${width} 100`}
@@ -90,7 +88,6 @@ function Sparkline({ data }: { data: number[] }) {
           fill="none"
           stroke="rgb(250, 204, 21)"
           strokeWidth={2.5}
-          className="animate-[fade-in_0.8s_ease-out]"
         />
       </svg>
     </div>
@@ -158,6 +155,7 @@ export default function RoundSummary({
   const selectedLabel = data.labels[data.selectedStat] || data.selectedStat;
   const unit = data.units?.[data.selectedStat] || data.selectedStat;
   const labelLower = selectedLabel.toLowerCase();
+
   const description =
     data.description ||
     `Live round snapshot — track ${labelLower} trends, standout players and role/stability shifts as this stat moves week to week.`;
@@ -170,15 +168,20 @@ export default function RoundSummary({
     }
 
     if (data.selectedStat === "goals") {
-      return `${name} kicked ${currentValue} g (+${diff.toFixed(1)} vs last game).`;
+      return `${name} kicked ${currentValue} g (+${diff.toFixed(0)} vs last game).`;
     }
 
     if (data.selectedStat === "fantasy") {
-      return `${name} jumped ${diff.toFixed(1)} pts vs their last game.`;
+      return `${name} improved by +${diff.toFixed(0)} pts vs last game.`;
     }
 
-    return `${name} jumped ${diff.toFixed(1)} disp vs their last game.`;
+    return `${name} improved by +${diff.toFixed(0)} disp vs last game.`;
   }, [data.biggestRiser, data.selectedStat]);
+
+  const mostConsistentDisplay =
+    data.mostConsistent.name === "—"
+      ? "—"
+      : `${data.mostConsistent.percentage.toFixed(0)}%`;
 
   return (
     <section
@@ -190,11 +193,9 @@ export default function RoundSummary({
         "animate-in fade-in slide-in-from-bottom-6"
       )}
     >
-      {/* Ambient glow */}
       <div className="pointer-events-none absolute -top-40 left-1/2 h-72 w-[480px] -translate-x-1/2 bg-yellow-500/20 blur-3xl" />
 
       <div className="relative">
-        {/* Header */}
         <SectionHeader
           eyebrow="Round Momentum"
           title="Round Momentum Summary"
@@ -202,7 +203,6 @@ export default function RoundSummary({
           icon={Sparkles}
         />
 
-        {/* Stat Pills */}
         <div className="-mx-2 mb-4 mt-1 overflow-x-auto scrollbar-thin scrollbar-thumb-yellow-500/30">
           <div className="flex min-w-max gap-2 px-2 pb-1">
             {data.availableStats.map((s) => (
@@ -223,24 +223,19 @@ export default function RoundSummary({
           </div>
         </div>
 
-        {/* Main panels */}
         <div className="grid gap-4 md:grid-cols-2 md:gap-6">
-          {/* Pulse */}
-          <div className="rounded-2xl border border-yellow-500/20 bg-black/70 px-4 py-4 md:px-6 md:py-5 backdrop-blur-sm transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(250,204,21,0.45)] animate-in fade-in slide-in-from-bottom-4">
+          <div className="rounded-2xl border border-yellow-500/20 bg-black/70 px-4 py-4 md:px-6 md:py-5 backdrop-blur-sm">
             <h3 className="mb-2 flex items-center gap-2 text-base md:text-lg font-semibold">
               <Activity className="h-5 w-5 text-yellow-300" />
               <span>Round Momentum Pulse</span>
             </h3>
-
             <p className="mb-4 text-sm text-white/70 leading-relaxed">
               {description}
             </p>
-
             <Sparkline data={data.sparkline} />
           </div>
 
-          {/* Headlines */}
-          <div className="rounded-2xl border border-yellow-500/20 bg-black/70 px-4 py-4 md:px-6 md:py-5 backdrop-blur-sm transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(250,204,21,0.45)] animate-in fade-in slide-in-from-bottom-4">
+          <div className="rounded-2xl border border-yellow-500/20 bg-black/70 px-4 py-4 md:px-6 md:py-5 backdrop-blur-sm">
             <h3 className="mb-2 flex items-center gap-2 text-base md:text-lg font-semibold">
               <Flame className="h-5 w-5 text-orange-400" />
               <span>Key Headlines</span>
@@ -251,12 +246,10 @@ export default function RoundSummary({
                 • <strong>{data.topScorer.name}</strong> led this round with{" "}
                 <strong>{data.topScorer.value} {unit}</strong>.
               </li>
-              <li>
-                • {biggestRiserHeadline}
-              </li>
+              <li>• {biggestRiserHeadline}</li>
               <li>
                 • <strong>{data.mostConsistent.name}</strong> holds{" "}
-                <strong>{data.mostConsistent.percentage.toFixed(0)}%</strong> above-average games.
+                <strong>{mostConsistentDisplay}</strong> above-average games.
               </li>
               <li>
                 • League-wide {labelLower} output continues to show meaningful stability and role changes.
@@ -265,7 +258,6 @@ export default function RoundSummary({
           </div>
         </div>
 
-        {/* Mini cards */}
         <div className="mt-6 grid gap-4 md:mt-7 md:grid-cols-3">
           <MiniCard
             icon={Flame}
@@ -277,7 +269,7 @@ export default function RoundSummary({
           <MiniCard
             icon={TrendingUp}
             label="Biggest Riser"
-            value={`${data.biggestRiser.diff.toFixed(1)} ${unit}`}
+            value={`${data.biggestRiser.diff.toFixed(0)} ${unit}`}
             player={data.biggestRiser.name}
             delay={220}
             info={<BiggestRiserInfo />}
@@ -285,7 +277,7 @@ export default function RoundSummary({
           <MiniCard
             icon={Shield}
             label="Most Consistent"
-            value={`${data.mostConsistent.percentage.toFixed(0)}%`}
+            value={mostConsistentDisplay}
             player={data.mostConsistent.name}
             delay={280}
             info={<ConsistencyInfo />}
