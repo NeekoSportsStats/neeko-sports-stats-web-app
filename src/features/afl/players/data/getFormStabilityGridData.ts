@@ -41,54 +41,105 @@ export async function getFormStabilityGridData(params: {
 }): Promise<FormStabilityGridData> {
   const { season, stat } = params;
 
+  // Map stat → column name in rolling_player_stats_last_10
+  const statColumn =
+    stat === "fantasy"
+      ? "fantasy_score"
+      : stat === "disposals"
+      ? "disposals"
+      : stat === "goals"
+      ? "goals"
+      : null;
+
+  if (!statColumn) {
+    return { hot: [], stable: [], cooling: [] };
+  }
+
   const { data, error } = await supabase
-    .from("player_form_stability")
+    .schema("afl")
+    .from("rolling_player_stats_last_10")
     .select(
       `
       player_id,
       player_name,
-      team,
-      season_avg,
-      l5_avg,
-      l5_volatility
+      round_number,
+      ${statColumn}
     `
     )
     .eq("season", season)
-    .eq("stat_key", stat);
+    .order("round_number", { ascending: true });
 
   if (error || !data || data.length === 0) {
-    return {
-      hot: [],
-      stable: [],
-      cooling: [],
-    };
+    return { hot: [], stable: [], cooling: [] };
   }
 
-  const allMetrics: PlayerFormMetrics[] = data
-    .map((row) => {
-      const season_avg = typeof row.season_avg === "number" ? row.season_avg : 0;
-      const l5_avg = typeof row.l5_avg === "number" ? row.l5_avg : 0;
-      const l5_volatility = typeof row.l5_volatility === "number" ? row.l5_volatility : 0;
+  /* ------------------------------------------------------------------------ */
+  /* GROUP BY PLAYER                                                          */
+  /* ------------------------------------------------------------------------ */
 
-      const delta_vs_season = l5_avg - season_avg;
-      const base = l5_avg || season_avg || 1;
-      const consistency = clamp((1 - l5_volatility / base) * 100, 0, 100);
+  const playerMap = new Map<
+    string,
+    { name: string; values: number[] }
+  >();
 
-      return {
-        player_id: row.player_id || `unknown-${Math.random()}`,
-        player_name: row.player_name || "Unknown Player",
-        team_name: typeof row.team === "string" && row.team.trim() ? row.team : undefined,
-        season_avg,
-        l5_avg,
-        delta_vs_season,
-        volatility: l5_volatility,
-        consistency,
-      };
-    })
-    .filter((m) => {
-      if (!m.player_name || m.player_name === "Unknown Player") return false;
-      return true;
+  data.forEach((row: any) => {
+    const value = Number(row[statColumn]);
+    if (!Number.isFinite(value) || value <= 0) return;
+
+    if (!playerMap.has(row.player_id)) {
+      playerMap.set(row.player_id, {
+        name: row.player_name ?? "Unknown Player",
+        values: [],
+      });
+    }
+
+    playerMap.get(row.player_id)!.values.push(value);
+  });
+
+  /* ------------------------------------------------------------------------ */
+  /* CALCULATE METRICS                                                        */
+  /* ------------------------------------------------------------------------ */
+
+  const allMetrics: PlayerFormMetrics[] = [];
+
+  playerMap.forEach((player, player_id) => {
+    const values = player.values;
+    if (values.length < 3) return;
+
+    const season_avg =
+      values.reduce((a, b) => a + b, 0) / values.length;
+
+    const last5 = values.slice(-5);
+    const l5_avg =
+      last5.reduce((a, b) => a + b, 0) / last5.length;
+
+    const volatility =
+      last5.reduce((s, v) => s + Math.abs(v - l5_avg), 0) /
+      last5.length;
+
+    const delta_vs_season = l5_avg - season_avg;
+    const base = l5_avg || season_avg || 1;
+
+    const consistency = clamp(
+      (1 - volatility / base) * 100,
+      0,
+      100
+    );
+
+    allMetrics.push({
+      player_id,
+      player_name: player.name,
+      season_avg,
+      l5_avg,
+      delta_vs_season,
+      volatility,
+      consistency,
     });
+  });
+
+  /* ------------------------------------------------------------------------ */
+  /* BUCKETING                                                                */
+  /* ------------------------------------------------------------------------ */
 
   const hot = [...allMetrics]
     .filter((m) => m.delta_vs_season > 0)
