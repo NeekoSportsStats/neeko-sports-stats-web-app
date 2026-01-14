@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Sparkles, ChevronDown } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 import type { StatConfig, StatKey } from "@/lib/stats/types";
 import {
@@ -42,8 +42,6 @@ function PlayerRowCard({
   metric,
   stat,
   statLabel,
-  isOpen,
-  onToggle,
   summary,
   showConsistency,
 }: {
@@ -52,8 +50,6 @@ function PlayerRowCard({
   metric: PlayerFormMetrics;
   stat: StatKey | string;
   statLabel: string;
-  isOpen: boolean;
-  onToggle: () => void;
   summary: string;
   showConsistency?: boolean;
 }) {
@@ -79,16 +75,15 @@ function PlayerRowCard({
       : "bg-cyan-500/25 text-cyan-100";
 
   return (
-    <button
-      onClick={onToggle}
+    <div
       className={cn(
         "w-full rounded-xl border px-4 py-3 md:px-5 md:py-4",
-        "bg-black/55 backdrop-blur-xl transition-transform hover:-translate-y-[2px]",
+        "bg-black/55 backdrop-blur-xl",
         glow,
         border
       )}
     >
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <span
@@ -126,31 +121,17 @@ function PlayerRowCard({
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <p className="text-[11px] text-white/65 md:text-xs">
-            {tone === "hot" && "Trending up in recent output."}
-            {tone === "stable" && "Steady output with controlled volatility."}
-            {tone === "cold" && "Softening output vs usual baseline."}
-          </p>
+        <p className="text-[11px] text-white/65 md:text-xs">
+          {tone === "hot" && "Trending up in recent output."}
+          {tone === "stable" && "Steady output with controlled volatility."}
+          {tone === "cold" && "Softening output vs usual baseline."}
+        </p>
 
-          <div className="flex items-center gap-1 text-[11px] text-white/60">
-            <span>{isOpen ? "Hide insight" : "Show insight"}</span>
-            <ChevronDown
-              className={cn(
-                "h-3.5 w-3.5 transition-transform",
-                isOpen && "rotate-180"
-              )}
-            />
-          </div>
+        <div className="border-t border-white/10 pt-2.5 text-[11px] text-white/70">
+          {summary}
         </div>
-
-        {isOpen && (
-          <div className="mt-3 border-t border-white/10 pt-3 text-[11px] text-white/70">
-            {summary}
-          </div>
-        )}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -195,7 +176,6 @@ function ColumnShell({
 
 export default function FormStabilityGrid({ statConfig }: { statConfig: StatConfig }) {
   const [selectedStat, setSelectedStat] = useState<StatKey>(statConfig.defaultStat);
-  const [openKey, setOpenKey] = useState<string | null>(null);
   const [data, setData] = useState<FormStabilityGridData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -220,8 +200,6 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
     })();
   }, [selectedStat]);
 
-  const makeKey = (tone: Tone, id: string) => `${tone}-${id}`;
-
   return (
     <section
       className={cn(
@@ -240,10 +218,7 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
         {statConfig.availableStats.map((s) => (
           <button
             key={s}
-            onClick={() => {
-              setSelectedStat(s);
-              setOpenKey(null);
-            }}
+            onClick={() => setSelectedStat(s)}
             className={cn(
               "rounded-full px-3.5 py-1.5 text-xs border transition-all",
               selectedStat === s
@@ -273,22 +248,17 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
       {!loading && !error && data && (
         <div className="mt-8 grid gap-6 md:grid-cols-3">
           <ColumnShell tone="hot" title="Hot Form Surge" subtitle="Biggest L5 surges vs baseline.">
-            {data.hot.map((m) => {
-              const key = makeKey("hot", m.player_id);
-              return (
-                <PlayerRowCard
-                  key={key}
-                  tone="hot"
-                  title="Hot Form"
-                  metric={m}
-                  stat={selectedStat}
-                  statLabel={statLabel}
-                  isOpen={openKey === key}
-                  onToggle={() => setOpenKey(openKey === key ? null : key)}
-                  summary={`${m.player_name} is outperforming their season average.`}
-                />
-              );
-            })}
+            {data.hot.map((m) => (
+              <PlayerRowCard
+                key={m.player_id}
+                tone="hot"
+                title="Hot Form"
+                metric={m}
+                stat={selectedStat}
+                statLabel={statLabel}
+                summary={`${m.player_name} is outperforming their season average.`}
+              />
+            ))}
           </ColumnShell>
 
           <ColumnShell
@@ -296,23 +266,18 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
             title="Stability Leaders"
             subtitle="Lowest volatility and dependable output."
           >
-            {data.stable.map((m) => {
-              const key = makeKey("stable", m.player_id);
-              return (
-                <PlayerRowCard
-                  key={key}
-                  tone="stable"
-                  title="Stability"
-                  metric={m}
-                  stat={selectedStat}
-                  statLabel={statLabel}
-                  isOpen={openKey === key}
-                  onToggle={() => setOpenKey(openKey === key ? null : key)}
-                  summary={`${m.player_name} delivers consistent output week to week.`}
-                  showConsistency
-                />
-              );
-            })}
+            {data.stable.map((m) => (
+              <PlayerRowCard
+                key={m.player_id}
+                tone="stable"
+                title="Stability"
+                metric={m}
+                stat={selectedStat}
+                statLabel={statLabel}
+                summary={`${m.player_name} delivers consistent output week to week.`}
+                showConsistency
+              />
+            ))}
           </ColumnShell>
 
           <ColumnShell
@@ -320,22 +285,17 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
             title="Cooling Risks"
             subtitle="Recent output below usual baseline."
           >
-            {data.cooling.map((m) => {
-              const key = makeKey("cold", m.player_id);
-              return (
-                <PlayerRowCard
-                  key={key}
-                  tone="cold"
-                  title="Cooling"
-                  metric={m}
-                  stat={selectedStat}
-                  statLabel={statLabel}
-                  isOpen={openKey === key}
-                  onToggle={() => setOpenKey(openKey === key ? null : key)}
-                  summary={`${m.player_name} has cooled off relative to their season norm.`}
-                />
-              );
-            })}
+            {data.cooling.map((m) => (
+              <PlayerRowCard
+                key={m.player_id}
+                tone="cold"
+                title="Cooling"
+                metric={m}
+                stat={selectedStat}
+                statLabel={statLabel}
+                summary={`${m.player_name} has cooled off relative to their season norm.`}
+              />
+            ))}
           </ColumnShell>
         </div>
       )}
