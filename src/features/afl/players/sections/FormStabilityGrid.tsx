@@ -17,76 +17,68 @@ const PLAYERS_PER_COLUMN = 3;
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
-function formatMainValue(value: number, stat: StatKey | string, label: string): string {
-  const l = label.toLowerCase();
-  return stat === "goals" ? `${value.toFixed(1)} ${l}` : `${Math.round(value)} ${l}`;
+function formatMainValue(value: number, stat: StatKey | string): string {
+  if (stat === "goals") return value.toFixed(1);
+  return Math.round(value).toString();
 }
 
-function formatDelta(delta: number, label: string): string {
-  const l = label.toLowerCase();
-  if (Math.abs(delta) < 0.05) return `±0.0 ${l} vs avg`;
-  return `${delta > 0 ? "+" : "−"}${Math.abs(delta).toFixed(1)} ${l} vs avg`;
+function formatDelta(delta: number): string {
+  if (Math.abs(delta) < 0.05) return "±0";
+  const sign = delta > 0 ? "+" : "";
+  return `${sign}${delta.toFixed(1)}`;
 }
 
 function deltaTone(delta: number): string {
-  if (delta > 0.1) return "text-emerald-300";
-  if (delta < -0.1) return "text-red-300";
+  if (delta > 0.1) return "text-emerald-400";
+  if (delta < -0.1) return "text-red-400";
   return "text-zinc-400";
 }
 
-function formatHitRate(metric: PlayerFormMetrics, stat: StatKey): string {
-  if (stat === "goals") {
-    return `Scoring rate: ${metric.hit_rate.toFixed(0)}% (≥ ${metric.threshold} goal)`;
-  }
-  const statLabel = stat === "fantasy" ? "fantasy pts" : "disposals";
-  return `Hit rate: ${metric.hit_rate.toFixed(0)}% (≥ ${metric.threshold} ${statLabel})`;
-}
-
-function generateSummary(
+function generateMicroCopy(
   tone: Tone,
   metric: PlayerFormMetrics,
   stat: StatKey
 ): string {
-  const missRate = 100 - metric.hit_rate;
+  const hitRate = metric.hit_rate || 0;
+  const delta = formatDelta(metric.delta_vs_season);
 
   if (tone === "hot") {
-    return `Surging ${formatMainValue(
-      Math.abs(metric.delta_vs_season),
-      stat,
-      ""
-    )} above season avg. Hit rate: ${metric.hit_rate.toFixed(0)}%.`;
+    return `${delta} vs season avg · ${hitRate.toFixed(0)}% hit rate`;
   }
 
   if (tone === "stable") {
-    const volatilityDesc = metric.volatility < 5 ? "rock-solid" : "reliable";
-    return `${volatilityDesc.charAt(0).toUpperCase() + volatilityDesc.slice(1)} floor with ${metric.hit_rate.toFixed(0)}% hit rate and low variance (${metric.volatility.toFixed(1)} vol).`;
+    const vol = metric.volatility.toFixed(1);
+    return `${hitRate.toFixed(0)}% hit rate · ${vol} volatility`;
   }
 
-  return `Softening ${formatMainValue(
-    Math.abs(metric.delta_vs_season),
-    stat,
-    ""
-  )} below season avg. Missing threshold ${missRate.toFixed(0)}% of time.`;
+  const missRate = (100 - hitRate).toFixed(0);
+  return `${delta} vs season avg · ${missRate}% miss rate`;
 }
 
 function getSubtitle(tone: Tone, stat: StatKey): string {
-  if (tone === "hot") return "Biggest L5 surges vs baseline.";
+  if (tone === "hot") return "Biggest recent surges above season baseline";
 
   if (tone === "stable") {
-    if (stat === "fantasy") return "High hit-rate + low volatility over the last 5.";
-    if (stat === "disposals") return "Consistently clearing possession baseline.";
-    if (stat === "goals") return "Reliable scoring across recent games.";
+    if (stat === "fantasy") return "High frequency floors with low variance";
+    if (stat === "disposals") return "Consistent possession baselines";
+    if (stat === "goals") return "Reliable scoring frequency";
   }
 
-  return "Recent output below usual baseline.";
+  return "Significant drops below season baseline";
 }
 
 /* -------------------------------------------------------------------------- */
 /* SPARKLINE                                                                  */
 /* -------------------------------------------------------------------------- */
 
-function Sparkline({ values, tone }: { values: number[]; tone: Tone }) {
-  if (values.length === 0) return null;
+function Sparkline({ values, tone }: { values?: number[]; tone: Tone }) {
+  if (!values || values.length === 0) {
+    return (
+      <div className="w-full h-8 flex items-center justify-center">
+        <p className="text-[10px] text-white/30">Last 5 game trend unavailable</p>
+      </div>
+    );
+  }
 
   const max = Math.max(...values, 1);
   const min = Math.min(...values, 0);
@@ -94,7 +86,7 @@ function Sparkline({ values, tone }: { values: number[]; tone: Tone }) {
 
   const points = values
     .map((v, i) => {
-      const x = (i / (values.length - 1)) * 100;
+      const x = (i / Math.max(values.length - 1, 1)) * 100;
       const y = 100 - ((v - min) / range) * 100;
       return `${x},${y}`;
     })
@@ -147,43 +139,46 @@ function PlayerRowCard({
 }) {
   const glow =
     tone === "hot"
-      ? "shadow-[0_0_18px_rgba(239,68,68,0.40)]"
+      ? "shadow-[0_0_16px_rgba(239,68,68,0.35)]"
       : tone === "stable"
-      ? "shadow-[0_0_18px_rgba(250,204,21,0.38)]"
-      : "shadow-[0_0_18px_rgba(56,189,248,0.40)]";
+      ? "shadow-[0_0_16px_rgba(250,204,21,0.30)]"
+      : "shadow-[0_0_16px_rgba(56,189,248,0.35)]";
 
   const border =
     tone === "hot"
-      ? "border-red-500/35"
+      ? "border-red-500/30"
       : tone === "stable"
-      ? "border-yellow-400/32"
-      : "border-cyan-400/35";
+      ? "border-yellow-400/28"
+      : "border-cyan-400/30";
 
   const badgeBg =
     tone === "hot"
-      ? "bg-red-500/25 text-red-200"
+      ? "bg-red-500/20 text-red-200"
       : tone === "stable"
-      ? "bg-yellow-500/25 text-yellow-100"
-      : "bg-cyan-500/25 text-cyan-100";
+      ? "bg-yellow-500/20 text-yellow-100"
+      : "bg-cyan-500/20 text-cyan-100";
 
-  const summary = generateSummary(tone, metric, stat as StatKey);
+  const microCopy = generateMicroCopy(tone, metric, stat as StatKey);
+  const teamDisplay = metric.team_name || "—";
 
   return (
     <button
       onClick={onToggle}
       className={cn(
-        "w-full rounded-xl border px-4 py-3 md:px-5 md:py-4 text-left",
-        "bg-black/55 backdrop-blur-xl transition-all hover:-translate-y-[2px]",
+        "w-full rounded-xl border px-4 py-3.5 text-left min-h-[120px]",
+        "bg-black/60 backdrop-blur-sm transition-all duration-200",
+        "hover:-translate-y-1 hover:bg-black/70",
         glow,
         border
       )}
     >
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1 flex-1 min-w-0">
+          <div className="space-y-1.5 flex-1 min-w-0">
             <span
               className={cn(
-                "inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-[0.16em]",
+                "inline-flex items-center rounded-full px-2.5 py-0.5",
+                "text-[10px] font-medium uppercase tracking-[0.12em]",
                 badgeBg
               )}
             >
@@ -191,49 +186,44 @@ function PlayerRowCard({
             </span>
 
             <div>
-              <p className="text-sm font-semibold text-white truncate">
+              <p className="text-sm font-semibold text-white truncate leading-tight">
                 {metric.player_name}
               </p>
-              <p className="text-[11px] text-white/55">{metric.team}</p>
+              <p className="text-[10px] text-white/45 mt-0.5">{teamDisplay}</p>
             </div>
           </div>
 
-          <div className="text-right space-y-1 flex-shrink-0">
-            <p className="text-sm font-semibold text-white">
-              {formatMainValue(metric.l5_avg, stat, statLabel)}
+          <div className="text-right space-y-0.5 flex-shrink-0">
+            <p className="text-base font-bold text-white tabular-nums">
+              {formatMainValue(metric.l5_avg, stat)}
             </p>
-            <p className={cn("text-[11px] font-medium", deltaTone(metric.delta_vs_season))}>
-              {formatDelta(metric.delta_vs_season, statLabel)}
+            <p className={cn("text-[10px] font-medium tabular-nums", deltaTone(metric.delta_vs_season))}>
+              {formatDelta(metric.delta_vs_season)}
             </p>
-            <p className="text-[11px] text-white/60">
+            <p className="text-[10px] text-white/55 mt-1">
               {tone === "stable" ? (
-                <>
-                  Hit rate{" "}
-                  <span className="font-semibold text-yellow-300">
-                    {metric.hit_rate.toFixed(0)}%
-                  </span>
-                </>
+                <span className="font-semibold text-yellow-300">
+                  {(metric.hit_rate || 0).toFixed(0)}%
+                </span>
               ) : (
-                <span className="text-white/50">
-                  {metric.hit_rate.toFixed(0)}% hit
+                <span className="text-white/45">
+                  {(metric.hit_rate || 0).toFixed(0)}%
                 </span>
               )}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] text-white/65">
-            {tone === "hot" && "Trending up in recent output"}
-            {tone === "stable" && "Steady output with controlled volatility"}
-            {tone === "cold" && "Softening output vs baseline"}
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <p className="text-[10px] text-white/60 leading-snug flex-1">
+            {microCopy}
           </p>
 
-          <div className="flex items-center gap-1 text-[11px] text-white/60 flex-shrink-0">
-            <span>{isOpen ? "Hide" : "Show"}</span>
+          <div className="flex items-center gap-1 text-[10px] text-white/50 flex-shrink-0">
+            <span className="font-medium">{isOpen ? "Hide" : "Show"}</span>
             <ChevronDown
               className={cn(
-                "h-3.5 w-3.5 transition-transform",
+                "h-3 w-3 transition-transform duration-200",
                 isOpen && "rotate-180"
               )}
             />
@@ -241,12 +231,14 @@ function PlayerRowCard({
         </div>
 
         {isOpen && (
-          <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
+          <div className="mt-2.5 space-y-2 border-t border-white/8 pt-2.5">
             <Sparkline values={metric.last_5_values} tone={tone} />
-            <p className="text-[11px] text-white/70">{summary}</p>
-            <p className="text-[10px] text-white/50">
-              {formatHitRate(metric, stat as StatKey)}
-            </p>
+            {metric.threshold && (
+              <p className="text-[10px] text-white/40 leading-relaxed">
+                Threshold: {metric.threshold}{" "}
+                {stat === "goals" ? "goal" : stat === "fantasy" ? "fantasy pts" : "disposals"}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -271,18 +263,18 @@ function ColumnShell({
 }) {
   const headingColor =
     tone === "hot"
-      ? "text-red-200"
+      ? "text-red-300"
       : tone === "stable"
-      ? "text-yellow-200"
-      : "text-cyan-100";
+      ? "text-yellow-300"
+      : "text-cyan-300";
 
   return (
-    <div className="flex flex-col">
-      <div className="mb-4 min-h-[44px]">
-        <p className={cn("text-xs font-semibold uppercase tracking-[0.17em]", headingColor)}>
+    <div className="flex flex-col h-full">
+      <div className="mb-4 min-h-[52px]">
+        <p className={cn("text-[11px] font-bold uppercase tracking-[0.14em] leading-tight", headingColor)}>
           {title}
         </p>
-        <p className="text-[11px] text-white/65 md:text-xs mt-1">{subtitle}</p>
+        <p className="text-[10px] text-white/60 mt-1.5 leading-snug">{subtitle}</p>
       </div>
       <div className="space-y-3 flex-1">{children}</div>
     </div>
@@ -326,14 +318,14 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
   return (
     <section
       className={cn(
-        "relative rounded-3xl border border-white/10 px-4 py-6 md:px-6 md:py-8",
-        "bg-gradient-to-br from-[#050507] via-black to-[#111010]",
-        "shadow-[0_0_80px_rgba(0,0,0,0.75)]"
+        "relative rounded-3xl border border-white/8 px-5 py-7 md:px-7 md:py-9",
+        "bg-gradient-to-br from-[#050507] via-black to-[#0d0d0f]",
+        "shadow-2xl"
       )}
     >
       <SectionHeader
         title="Form Stability Grid"
-        subtitle={`Frequency-based stability analysis over last 5 rounds.`}
+        subtitle="Based on each player's own season baseline (last 5 games vs season average)"
         icon={Sparkles}
       />
 
@@ -343,10 +335,10 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
             key={s}
             onClick={() => setSelectedStat(s)}
             className={cn(
-              "rounded-full px-3.5 py-1.5 text-xs border transition-all",
+              "rounded-full px-3.5 py-1.5 text-xs border transition-all duration-200",
               selectedStat === s
-                ? "bg-yellow-400 text-black border-yellow-300 font-semibold"
-                : "bg-white/5 text-white/70 border-white/12 hover:bg-white/10"
+                ? "bg-yellow-400 text-black border-yellow-300 font-semibold shadow-lg"
+                : "bg-white/5 text-white/65 border-white/10 hover:bg-white/10 hover:border-white/20"
             )}
           >
             {statConfig.labels[s]}
@@ -355,41 +347,47 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
       </div>
 
       {loading && (
-        <div className="py-16 text-center text-sm text-white/60">
-          Loading Form Stability Grid…
+        <div className="py-20 text-center text-sm text-white/50">
+          Loading stability analysis…
         </div>
       )}
 
       {error && !loading && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-6 mt-6">
+        <div className="rounded-xl border border-red-500/25 bg-red-500/5 p-6 mt-6">
           <p className="text-sm text-red-400">
-            Failed to load form stability data. Check console for details.
+            Unable to load form stability data.
           </p>
         </div>
       )}
 
       {!loading && !error && data && (
-        <div className="mt-8 grid gap-6 md:grid-cols-3 items-start">
+        <div className="mt-8 grid gap-5 md:grid-cols-3 items-start">
           <ColumnShell
             tone="hot"
             title="Hot Form Surge"
             subtitle={getSubtitle("hot", selectedStat)}
           >
-            {data.hot.slice(0, PLAYERS_PER_COLUMN).map((m) => {
-              const key = makeKey("hot", m.player_id);
-              return (
-                <PlayerRowCard
-                  key={key}
-                  tone="hot"
-                  title="Hot Form"
-                  metric={m}
-                  stat={selectedStat}
-                  statLabel={statLabel}
-                  isOpen={openKey === key}
-                  onToggle={() => setOpenKey(openKey === key ? null : key)}
-                />
-              );
-            })}
+            {data.hot.length === 0 ? (
+              <div className="text-center py-8 text-xs text-white/40">
+                No hot form players found
+              </div>
+            ) : (
+              data.hot.slice(0, PLAYERS_PER_COLUMN).map((m) => {
+                const key = makeKey("hot", m.player_id);
+                return (
+                  <PlayerRowCard
+                    key={key}
+                    tone="hot"
+                    title="Hot"
+                    metric={m}
+                    stat={selectedStat}
+                    statLabel={statLabel}
+                    isOpen={openKey === key}
+                    onToggle={() => setOpenKey(openKey === key ? null : key)}
+                  />
+                );
+              })
+            )}
           </ColumnShell>
 
           <ColumnShell
@@ -397,21 +395,27 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
             title="Stability Leaders"
             subtitle={getSubtitle("stable", selectedStat)}
           >
-            {data.stable.slice(0, PLAYERS_PER_COLUMN).map((m) => {
-              const key = makeKey("stable", m.player_id);
-              return (
-                <PlayerRowCard
-                  key={key}
-                  tone="stable"
-                  title="Stability"
-                  metric={m}
-                  stat={selectedStat}
-                  statLabel={statLabel}
-                  isOpen={openKey === key}
-                  onToggle={() => setOpenKey(openKey === key ? null : key)}
-                />
-              );
-            })}
+            {data.stable.length === 0 ? (
+              <div className="text-center py-8 text-xs text-white/40">
+                No stable players found
+              </div>
+            ) : (
+              data.stable.slice(0, PLAYERS_PER_COLUMN).map((m) => {
+                const key = makeKey("stable", m.player_id);
+                return (
+                  <PlayerRowCard
+                    key={key}
+                    tone="stable"
+                    title="Stable"
+                    metric={m}
+                    stat={selectedStat}
+                    statLabel={statLabel}
+                    isOpen={openKey === key}
+                    onToggle={() => setOpenKey(openKey === key ? null : key)}
+                  />
+                );
+              })
+            )}
           </ColumnShell>
 
           <ColumnShell
@@ -419,21 +423,27 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
             title="Cooling Risks"
             subtitle={getSubtitle("cold", selectedStat)}
           >
-            {data.cooling.slice(0, PLAYERS_PER_COLUMN).map((m) => {
-              const key = makeKey("cold", m.player_id);
-              return (
-                <PlayerRowCard
-                  key={key}
-                  tone="cold"
-                  title="Cooling"
-                  metric={m}
-                  stat={selectedStat}
-                  statLabel={statLabel}
-                  isOpen={openKey === key}
-                  onToggle={() => setOpenKey(openKey === key ? null : key)}
-                />
-              );
-            })}
+            {data.cooling.length === 0 ? (
+              <div className="text-center py-8 text-xs text-white/40">
+                No cooling players found
+              </div>
+            ) : (
+              data.cooling.slice(0, PLAYERS_PER_COLUMN).map((m) => {
+                const key = makeKey("cold", m.player_id);
+                return (
+                  <PlayerRowCard
+                    key={key}
+                    tone="cold"
+                    title="Cooling"
+                    metric={m}
+                    stat={selectedStat}
+                    statLabel={statLabel}
+                    isOpen={openKey === key}
+                    onToggle={() => setOpenKey(openKey === key ? null : key)}
+                  />
+                );
+              })
+            )}
           </ColumnShell>
         </div>
       )}
