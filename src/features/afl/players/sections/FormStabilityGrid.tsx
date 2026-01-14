@@ -18,20 +18,56 @@ const PLAYERS_PER_COLUMN = 3;
 /* -------------------------------------------------------------------------- */
 
 function formatMainValue(value: number, stat: StatKey | string): string {
-  if (stat === "goals") return value.toFixed(1);
+  if (stat === "goals") {
+    return value < 0.1 ? "—" : value.toFixed(1);
+  }
   return Math.round(value).toString();
 }
 
-function formatDelta(delta: number): string {
-  if (Math.abs(delta) < 0.05) return "±0";
-  const sign = delta > 0 ? "+" : "";
-  return `${sign}${delta.toFixed(1)}`;
-}
+function getFrequencyCopy(
+  tone: Tone,
+  metric: PlayerFormMetrics,
+  stat: StatKey
+): string {
+  const values = metric.last_5_values || [];
+  const threshold = metric.threshold || 0;
+  const hitCount = values.filter((v) => v >= threshold).length;
 
-function deltaTone(delta: number): string {
-  if (delta > 0.1) return "text-emerald-400";
-  if (delta < -0.1) return "text-red-400";
-  return "text-zinc-400";
+  if (stat === "fantasy") {
+    if (tone === "hot") {
+      return `${threshold}+ fantasy in ${hitCount} of last 5 games`;
+    }
+    if (tone === "stable") {
+      if (hitCount === 5) return `${threshold}+ fantasy in all 5 games`;
+      return `${threshold}+ fantasy in ${hitCount} of last 5 games`;
+    }
+    return `Below ${threshold} fantasy in ${5 - hitCount} of last 5 games`;
+  }
+
+  if (stat === "disposals") {
+    if (tone === "hot") {
+      return `${threshold}+ disposals in ${hitCount} of last 5 games`;
+    }
+    if (tone === "stable") {
+      if (hitCount === 5) return `${threshold}+ disposals in all 5 games`;
+      return `${threshold}+ disposals in ${hitCount} of last 5 games`;
+    }
+    return `Below season disposal rate recently`;
+  }
+
+  if (stat === "goals") {
+    if (tone === "hot") {
+      if (hitCount === 5) return `Scored in all 5 games`;
+      return `Scored in ${hitCount} of last 5 games`;
+    }
+    if (tone === "stable") {
+      if (hitCount === 5) return `Scored in all 5 games`;
+      return `Scored in ${hitCount} of last 5 games`;
+    }
+    return `Limited scoreboard impact recently`;
+  }
+
+  return "";
 }
 
 function generateMicroCopy(
@@ -39,20 +75,11 @@ function generateMicroCopy(
   metric: PlayerFormMetrics,
   stat: StatKey
 ): string {
-  const hitRate = metric.hit_rate || 0;
-  const delta = formatDelta(metric.delta_vs_season);
-
-  if (tone === "hot") {
-    return `${delta} vs season avg · ${hitRate.toFixed(0)}% hit rate`;
+  if (!metric.last_5_values || metric.last_5_values.length === 0) {
+    return "Recent form data unavailable";
   }
 
-  if (tone === "stable") {
-    const vol = metric.volatility.toFixed(1);
-    return `${hitRate.toFixed(0)}% hit rate · ${vol} volatility`;
-  }
-
-  const missRate = (100 - hitRate).toFixed(0);
-  return `${delta} vs season avg · ${missRate}% miss rate`;
+  return getFrequencyCopy(tone, metric, stat);
 }
 
 function getSubtitle(tone: Tone, stat: StatKey): string {
@@ -125,7 +152,6 @@ function PlayerRowCard({
   title,
   metric,
   stat,
-  statLabel,
   isOpen,
   onToggle,
 }: {
@@ -133,7 +159,6 @@ function PlayerRowCard({
   title: string;
   metric: PlayerFormMetrics;
   stat: StatKey | string;
-  statLabel: string;
   isOpen: boolean;
   onToggle: () => void;
 }) {
@@ -197,20 +222,17 @@ function PlayerRowCard({
             <p className="text-base font-bold text-white tabular-nums">
               {formatMainValue(metric.l5_avg, stat)}
             </p>
-            <p className={cn("text-[10px] font-medium tabular-nums", deltaTone(metric.delta_vs_season))}>
-              {formatDelta(metric.delta_vs_season)}
-            </p>
-            <p className="text-[10px] text-white/55 mt-1">
-              {tone === "stable" ? (
-                <span className="font-semibold text-yellow-300">
+            {tone === "stable" ? (
+              <p className="text-[10px] mt-1">
+                <span className="font-semibold text-yellow-300 tabular-nums">
                   {(metric.hit_rate || 0).toFixed(0)}%
                 </span>
-              ) : (
-                <span className="text-white/45">
-                  {(metric.hit_rate || 0).toFixed(0)}%
-                </span>
-              )}
-            </p>
+              </p>
+            ) : (
+              <p className="text-[10px] text-white/45 mt-1 tabular-nums">
+                {(metric.hit_rate || 0).toFixed(0)}%
+              </p>
+            )}
           </div>
         </div>
 
@@ -291,8 +313,6 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
   const [data, setData] = useState<FormStabilityGridData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const statLabel = statConfig.labels[selectedStat];
 
   useEffect(() => {
     (async () => {
@@ -381,7 +401,6 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
                     title="Hot"
                     metric={m}
                     stat={selectedStat}
-                    statLabel={statLabel}
                     isOpen={openKey === key}
                     onToggle={() => setOpenKey(openKey === key ? null : key)}
                   />
@@ -409,7 +428,6 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
                     title="Stable"
                     metric={m}
                     stat={selectedStat}
-                    statLabel={statLabel}
                     isOpen={openKey === key}
                     onToggle={() => setOpenKey(openKey === key ? null : key)}
                   />
@@ -437,7 +455,6 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
                     title="Cooling"
                     metric={m}
                     stat={selectedStat}
-                    statLabel={statLabel}
                     isOpen={openKey === key}
                     onToggle={() => setOpenKey(openKey === key ? null : key)}
                   />
