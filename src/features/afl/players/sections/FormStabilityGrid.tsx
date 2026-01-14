@@ -232,7 +232,7 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
     >
       <SectionHeader
         title="Form Stability Grid"
-        description={`Last 5 rounds of ${statLabel.toLowerCase()} compared to season baseline.`}
+        subtitle={`Last 5 rounds of ${statLabel.toLowerCase()} compared to season baseline.`}
         icon={Sparkles}
       />
 
