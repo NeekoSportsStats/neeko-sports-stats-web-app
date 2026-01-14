@@ -24,50 +24,13 @@ function formatMainValue(value: number, stat: StatKey | string): string {
   return Math.round(value).toString();
 }
 
-function getFrequencyCopy(
-  tone: Tone,
-  metric: PlayerFormMetrics,
-  stat: StatKey
-): string {
-  const values = metric.last_5_values || [];
-  const threshold = metric.threshold || 0;
-  const hitCount = values.filter((v) => v >= threshold).length;
-
-  if (stat === "fantasy") {
-    if (tone === "hot") {
-      return `${threshold}+ fantasy in ${hitCount} of last 5 games`;
-    }
-    if (tone === "stable") {
-      if (hitCount === 5) return `${threshold}+ fantasy in all 5 games`;
-      return `${threshold}+ fantasy in ${hitCount} of last 5 games`;
-    }
-    return `Below ${threshold} fantasy in ${5 - hitCount} of last 5 games`;
-  }
-
-  if (stat === "disposals") {
-    if (tone === "hot") {
-      return `${threshold}+ disposals in ${hitCount} of last 5 games`;
-    }
-    if (tone === "stable") {
-      if (hitCount === 5) return `${threshold}+ disposals in all 5 games`;
-      return `${threshold}+ disposals in ${hitCount} of last 5 games`;
-    }
-    return `Below season disposal rate recently`;
-  }
-
+function formatDelta(delta: number, stat: StatKey | string): string {
+  if (Math.abs(delta) < 0.05) return "±0";
+  const sign = delta > 0 ? "+" : "";
   if (stat === "goals") {
-    if (tone === "hot") {
-      if (hitCount === 5) return `Scored in all 5 games`;
-      return `Scored in ${hitCount} of last 5 games`;
-    }
-    if (tone === "stable") {
-      if (hitCount === 5) return `Scored in all 5 games`;
-      return `Scored in ${hitCount} of last 5 games`;
-    }
-    return `Limited scoreboard impact recently`;
+    return `${sign}${delta.toFixed(1)}`;
   }
-
-  return "";
+  return `${sign}${Math.round(delta)}`;
 }
 
 function generateMicroCopy(
@@ -75,11 +38,17 @@ function generateMicroCopy(
   metric: PlayerFormMetrics,
   stat: StatKey
 ): string {
-  if (!metric.last_5_values || metric.last_5_values.length === 0) {
-    return "Recent form data unavailable";
+  const delta = formatDelta(metric.delta_vs_season, stat);
+
+  if (tone === "hot") {
+    return `Up ${delta} vs season baseline`;
   }
 
-  return getFrequencyCopy(tone, metric, stat);
+  if (tone === "stable") {
+    return `Low variance with consistent output`;
+  }
+
+  return `Down ${delta} vs season baseline`;
 }
 
 function getSubtitle(tone: Tone, stat: StatKey): string {
@@ -98,48 +67,11 @@ function getSubtitle(tone: Tone, stat: StatKey): string {
 /* SPARKLINE                                                                  */
 /* -------------------------------------------------------------------------- */
 
-function Sparkline({ values, tone }: { values?: number[]; tone: Tone }) {
-  if (!values || values.length === 0) {
-    return (
-      <div className="w-full h-8 flex items-center justify-center">
-        <p className="text-[10px] text-white/30">Last 5 game trend unavailable</p>
-      </div>
-    );
-  }
-
-  const max = Math.max(...values, 1);
-  const min = Math.min(...values, 0);
-  const range = max - min || 1;
-
-  const points = values
-    .map((v, i) => {
-      const x = (i / Math.max(values.length - 1, 1)) * 100;
-      const y = 100 - ((v - min) / range) * 100;
-      return `${x},${y}`;
-    })
-    .join(" ");
-
-  const strokeColor =
-    tone === "hot"
-      ? "rgb(239, 68, 68)"
-      : tone === "stable"
-      ? "rgb(250, 204, 21)"
-      : "rgb(56, 189, 248)";
-
+function SparklinePlaceholder() {
   return (
-    <svg
-      viewBox="0 0 100 30"
-      className="w-full h-8"
-      preserveAspectRatio="none"
-    >
-      <polyline
-        points={points}
-        fill="none"
-        stroke={strokeColor}
-        strokeWidth="2"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
+    <div className="w-full h-8 flex items-center justify-center rounded border border-white/5 bg-white/[0.02]">
+      <p className="text-[10px] text-white/30">Detailed trend data coming soon</p>
+    </div>
   );
 }
 
@@ -222,17 +154,9 @@ function PlayerRowCard({
             <p className="text-base font-bold text-white tabular-nums">
               {formatMainValue(metric.l5_avg, stat)}
             </p>
-            {tone === "stable" ? (
-              <p className="text-[10px] mt-1">
-                <span className="font-semibold text-yellow-300 tabular-nums">
-                  {(metric.hit_rate || 0).toFixed(0)}%
-                </span>
-              </p>
-            ) : (
-              <p className="text-[10px] text-white/45 mt-1 tabular-nums">
-                {(metric.hit_rate || 0).toFixed(0)}%
-              </p>
-            )}
+            <p className="text-[10px] text-white/45 mt-1">
+              <span className="text-[9px] uppercase tracking-wider">L5 AVG</span>
+            </p>
           </div>
         </div>
 
@@ -254,13 +178,10 @@ function PlayerRowCard({
 
         {isOpen && (
           <div className="mt-2.5 space-y-2 border-t border-white/8 pt-2.5">
-            <Sparkline values={metric.last_5_values} tone={tone} />
-            {metric.threshold && (
-              <p className="text-[10px] text-white/40 leading-relaxed">
-                Threshold: {metric.threshold}{" "}
-                {stat === "goals" ? "goal" : stat === "fantasy" ? "fantasy pts" : "disposals"}
-              </p>
-            )}
+            <SparklinePlaceholder />
+            <p className="text-[10px] text-white/40 leading-relaxed">
+              Season avg: {formatMainValue(metric.season_avg, stat)} · Consistency: {metric.consistency.toFixed(0)}%
+            </p>
           </div>
         )}
       </div>
