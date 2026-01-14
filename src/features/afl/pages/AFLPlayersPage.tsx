@@ -148,6 +148,7 @@ export default function AFLPlayersPage() {
       try {
         const data = await getRoundSummaryData({
           season: 2025,
+          round: latestRound,
           stat: selectedStat,
         });
         setRoundSummaryData(data);
