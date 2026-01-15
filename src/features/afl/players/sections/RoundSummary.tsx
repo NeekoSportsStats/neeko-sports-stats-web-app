@@ -1,12 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import {
-  TrendingUp,
-  Flame,
-  Shield,
-  Sparkles,
-  Activity,
-} from "lucide-react";
+import { TrendingUp, Flame, Shield, Sparkles, Activity } from "lucide-react";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
 import type { StatKey } from "@/lib/stats/types";
 import { ConsistencyInfo } from "./ConsistencyInfo";
@@ -53,10 +47,30 @@ export type RoundSummaryData = {
 function Sparkline({ data }: { data: number[] }) {
   if (!data.length) return null;
 
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const normalized = data.map((v) => ((v - min) / (max - min || 1)) * 100);
+  // Guard against tiny ranges making everything look flat.
+  const maxRaw = Math.max(...data);
+  const minRaw = Math.min(...data);
+
+  // If all values equal, draw a subtle midline instead of a flat bottom line.
+  const rangeRaw = maxRaw - minRaw;
+
+  // Add padding so small movement is still visible.
+  const pad = rangeRaw > 0 ? rangeRaw * 0.2 : 1;
+  const max = maxRaw + pad;
+  const min = minRaw - pad;
+
+  const range = Math.max(max - min, 1e-6);
+  const normalized = data.map((v) => ((v - min) / range) * 100);
+
   const width = Math.max(normalized.length * 20, 80);
+
+  // If truly flat, center the line.
+  const points =
+    rangeRaw < 1e-6
+      ? normalized.map((_, i) => `${(i / (normalized.length - 1)) * width},50`).join(" ")
+      : normalized
+          .map((v, i) => `${(i / (normalized.length - 1)) * width},${100 - v}`)
+          .join(" ");
 
   return (
     <div className="relative h-16 md:h-24 w-full">
@@ -66,9 +80,7 @@ function Sparkline({ data }: { data: number[] }) {
         preserveAspectRatio="none"
       >
         <polyline
-          points={normalized
-            .map((v, i) => `${(i / (normalized.length - 1)) * width},${100 - v}`)
-            .join(" ")}
+          points={points}
           fill="none"
           stroke="rgba(250, 204, 21, 0.4)"
           strokeWidth={4}
@@ -82,9 +94,7 @@ function Sparkline({ data }: { data: number[] }) {
         preserveAspectRatio="none"
       >
         <polyline
-          points={normalized
-            .map((v, i) => `${(i / (normalized.length - 1)) * width},${100 - v}`)
-            .join(" ")}
+          points={points}
           fill="none"
           stroke="rgb(250, 204, 21)"
           strokeWidth={2.5}
@@ -107,7 +117,14 @@ interface MiniCardProps {
   info?: React.ReactNode;
 }
 
-function MiniCard({ icon: Icon, label, value, player, delay, info }: MiniCardProps) {
+function MiniCard({
+  icon: Icon,
+  label,
+  value,
+  player,
+  delay,
+  info,
+}: MiniCardProps) {
   return (
     <div
       className={cn(
@@ -163,19 +180,27 @@ export default function RoundSummary({
   const biggestRiserHeadline = React.useMemo(() => {
     const { name, diff, currentValue } = data.biggestRiser;
 
-    if (name === "—" || diff <= 0) {
-      return "No clear week-to-week riser this round.";
+    if (name === "—") return "No clear week-to-week riser this round.";
+    if (!Number.isFinite(diff) || Math.abs(diff) < 0.5) {
+      return `${name} held steady (no meaningful change vs last game).`;
     }
 
+    const sign = diff > 0 ? "+" : "−";
+    const abs = Math.abs(diff);
+
     if (data.selectedStat === "goals") {
-      return `${name} kicked ${currentValue} g (+${diff.toFixed(0)} vs last game).`;
+      return `${name} kicked ${currentValue} g (${sign}${abs.toFixed(0)} vs last game).`;
     }
 
     if (data.selectedStat === "fantasy") {
-      return `${name} improved by +${diff.toFixed(0)} pts vs last game.`;
+      return `${name} ${diff > 0 ? "improved" : "dropped"} by ${sign}${abs.toFixed(
+        0
+      )} pts vs last game.`;
     }
 
-    return `${name} improved by +${diff.toFixed(0)} disp vs last game.`;
+    return `${name} ${diff > 0 ? "improved" : "dropped"} by ${sign}${abs.toFixed(
+      0
+    )} disp vs last game.`;
   }, [data.biggestRiser, data.selectedStat]);
 
   const mostConsistentDisplay =
@@ -244,7 +269,10 @@ export default function RoundSummary({
             <ul className="space-y-2 text-sm text-white/80">
               <li>
                 • <strong>{data.topScorer.name}</strong> led this round with{" "}
-                <strong>{data.topScorer.value} {unit}</strong>.
+                <strong>
+                  {data.topScorer.value} {unit}
+                </strong>
+                .
               </li>
               <li>• {biggestRiserHeadline}</li>
               <li>
@@ -252,7 +280,8 @@ export default function RoundSummary({
                 <strong>{mostConsistentDisplay}</strong> above-average games.
               </li>
               <li>
-                • League-wide {labelLower} output continues to show meaningful stability and role changes.
+                • League-wide {labelLower} output continues to show meaningful
+                stability and role changes.
               </li>
             </ul>
           </div>
