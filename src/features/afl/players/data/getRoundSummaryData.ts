@@ -15,7 +15,7 @@ interface SnapshotRow {
   fantasy_score: number | null;
 }
 
-interface FactRow {
+interface RollingRow {
   season: number;
   round_number: number;
   player_id: string;
@@ -35,69 +35,51 @@ export async function getRoundSummaryData(params: {
 }): Promise<RoundSummaryData> {
   const { season, stat } = params;
 
-  // ✅ Keep this view if it works for you, but it must be readable.
-  // If this ever becomes a problem, we can replace it with an RPC.
-  const { data: roundRow, error: roundErr } = await supabase
-    .schema("afl")
-    .from("latest_completed_round")
-    .select("round_number")
-    .eq("season", season)
-    .single();
+  /* ---------------- latest completed round (RPC) ---------------- */
 
-  if (roundErr || !roundRow) {
+  const { data: roundData, error: roundError } = await supabase
+    .schema("afl")
+    .rpc("get_latest_completed_round", { p_season: season });
+
+  if (roundError || !roundData || !roundData[0]) {
     throw new Error("Failed to resolve latest completed round");
   }
 
-  const latestRound = roundRow.round_number;
+  const latestRound = roundData[0].round_number;
 
-  // ✅ Snapshot comes from a BASE TABLE (RLS + REST friendly)
-  const { data: snapshot, error: snapErr } = await supabase
+  /* ---------------- snapshot (current round only) ---------------- */
+
+  const { data: snapshot, error: snapError } = await supabase
     .schema("afl")
     .from("player_round_snapshot")
     .select("player_id, player_name, disposals, goals, fantasy_score")
     .eq("season", season)
     .eq("round_number", latestRound);
 
-  if (snapErr) {
-    throw new Error(`Snapshot query failed: ${snapErr.message}`);
-  }
-
-  if (!snapshot || snapshot.length === 0) {
+  if (snapError || !snapshot || snapshot.length === 0) {
     throw new Error(`No snapshot data for round ${latestRound}`);
   }
 
   const currentRoundStats = snapshot as SnapshotRow[];
 
-  // ✅ Rolling history comes from FACT TABLE filtered to last 10 rounds
-  const startRound = Math.max(1, latestRound - 9);
+  /* ---------------- rolling history (base table only) ------------- */
 
-  const { data: history, error: histErr } = await supabase
+  const { data: history, error: historyError } = await supabase
     .schema("afl")
     .from("player_game_stats_fact")
-    .select("season, round_number, player_id, player_name, disposals, goals, fantasy_score")
+    .select(
+      "season, round_number, player_id, player_name, disposals, goals, fantasy_score"
+    )
     .eq("season", season)
-    .gte("round_number", startRound)
     .lte("round_number", latestRound);
 
-  if (histErr) {
-    throw new Error(`History query failed: ${histErr.message}`);
-  }
-
-  if (!history || history.length === 0) {
+  if (historyError || !history || history.length === 0) {
     throw new Error("Rolling stats unavailable");
   }
 
-  const rollingStats = history as FactRow[];
+  const rollingStats = history as RollingRow[];
 
-  const sparkline = buildMomentumSparkline(rollingStats, stat, latestRound);
-  const topScorer = calculateTopScorer(currentRoundStats, stat);
-  const biggestRiser = calculateBiggestRiser(
-    rollingStats,
-    currentRoundStats,
-    stat,
-    latestRound
-  );
-  const mostConsistent = calculateMostConsistent(rollingStats, stat);
+  /* ---------------- calculations -------------------------------- */
 
   return {
     currentRound: latestRound,
@@ -106,10 +88,16 @@ export async function getRoundSummaryData(params: {
     labels: AFL_STAT_CONFIG.labels,
     units: AFL_STAT_CONFIG.units,
     description: AFL_STAT_CONFIG.descriptions?.[stat],
-    sparkline,
-    topScorer,
-    biggestRiser,
-    mostConsistent,
+
+    sparkline: buildMomentumSparkline(rollingStats, stat, latestRound),
+    topScorer: calculateTopScorer(currentRoundStats, stat),
+    biggestRiser: calculateBiggestRiser(
+      rollingStats,
+      currentRoundStats,
+      stat,
+      latestRound
+    ),
+    mostConsistent: calculateMostConsistent(rollingStats, stat),
   };
 }
 
@@ -118,15 +106,18 @@ export async function getRoundSummaryData(params: {
 /* -------------------------------------------------------------------------- */
 
 function buildMomentumSparkline(
-  stats: FactRow[],
+  stats: RollingRow[],
   stat: StatKey,
   latestRound: number
 ): number[] {
   const start = Math.max(1, latestRound - 9);
-  const rounds = Array.from({ length: latestRound - start + 1 }, (_, i) => start + i);
+  const rounds = Array.from(
+    { length: latestRound - start + 1 },
+    (_, i) => start + i
+  );
 
   const out: number[] = [];
-  let lastValue = 0;
+  let last = 0;
 
   for (const r of rounds) {
     const values = stats
@@ -135,15 +126,13 @@ function buildMomentumSparkline(
       .filter((v) => v > 0);
 
     if (!values.length) {
-      // if a round has no values (shouldn’t happen after snapshot is correct),
-      // carry forward last value to avoid a flatline at 0.
-      out.push(lastValue);
+      out.push(last);
       continue;
     }
 
     const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
     out.push(avg);
-    lastValue = avg;
+    last = avg;
   }
 
   while (out.length < 10) out.unshift(out[0] ?? 0);
@@ -151,19 +140,17 @@ function buildMomentumSparkline(
 }
 
 function calculateTopScorer(rows: SnapshotRow[], stat: StatKey) {
-  const top = [...rows].sort((a, b) => getStatValue(b, stat) - getStatValue(a, stat))[0];
+  const top = [...rows].sort(
+    (a, b) => getStatValue(b, stat) - getStatValue(a, stat)
+  )[0];
 
   return top
     ? { name: top.player_name, value: getStatValue(top, stat) }
     : { name: "—", value: 0 };
 }
 
-/**
- * Biggest riser = delta vs player's previous game (not vs league average)
- * Uses history (last 10 rounds) but will still work fine across finals gaps.
- */
 function calculateBiggestRiser(
-  history: FactRow[],
+  history: RollingRow[],
   current: SnapshotRow[],
   stat: StatKey,
   latestRound: number
@@ -174,7 +161,10 @@ function calculateBiggestRiser(
     const currentValue = getStatValue(p, stat);
 
     const previous = history
-      .filter((h) => h.player_id === p.player_id && h.round_number < latestRound)
+      .filter(
+        (h) =>
+          h.player_id === p.player_id && h.round_number < latestRound
+      )
       .sort((a, b) => b.round_number - a.round_number)[0];
 
     if (!previous) return;
@@ -184,7 +174,7 @@ function calculateBiggestRiser(
     if (diff > best.diff) {
       best = {
         name: p.player_name,
-        diff: Math.round(diff * 10) / 10,
+        diff: Math.round(diff),
         currentValue,
       };
     }
@@ -193,11 +183,7 @@ function calculateBiggestRiser(
   return best;
 }
 
-/**
- * Most consistent = min 3 games in the sampled window
- * Score = 100 * (1 - MAD/mean), clamped.
- */
-function calculateMostConsistent(history: FactRow[], stat: StatKey) {
+function calculateMostConsistent(history: RollingRow[], stat: StatKey) {
   const map = new Map<string, { name: string; values: number[] }>();
 
   history.forEach((h) => {
@@ -214,30 +200,29 @@ function calculateMostConsistent(history: FactRow[], stat: StatKey) {
   let bestScore = -1;
 
   map.forEach((p) => {
-    const last = p.values.slice(-10);
-    if (last.length < 3) return;
+    const last10 = p.values.slice(-10);
+    if (last10.length < 3) return;
 
-    const mean = last.reduce((a, b) => a + b, 0) / last.length;
-    if (mean <= 0) return;
+    const mean = last10.reduce((a, b) => a + b, 0) / last10.length;
+    const mad =
+      last10.reduce((s, v) => s + Math.abs(v - mean), 0) / last10.length;
 
-    const mad = last.reduce((s, v) => s + Math.abs(v - mean), 0) / last.length;
-    const raw = 100 * (1 - mad / mean);
-    const score = Math.max(0, Math.min(100, Math.round(raw)));
-
+    const score = Math.round(100 * (1 - mad / mean));
     if (score > bestScore) {
       bestScore = score;
       bestName = p.name;
     }
   });
 
-  return {
-    name: bestName,
-    percentage: bestScore > 0 ? bestScore : 0,
-  };
+  return { name: bestName, percentage: Math.max(bestScore, 0) };
 }
 
 function getStatValue(
-  row: { disposals?: number | null; goals?: number | null; fantasy_score?: number | null },
+  row: {
+    disposals?: number | null;
+    goals?: number | null;
+    fantasy_score?: number | null;
+  },
   stat: StatKey
 ): number {
   if (stat === "fantasy") return row.fantasy_score ?? 0;
