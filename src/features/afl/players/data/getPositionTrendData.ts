@@ -35,19 +35,19 @@ export interface PositionTrendData {
 }
 
 interface PlayerGameStats {
-  player: string;
-  team: string;
+  player_name: string;
+  team_abbr: string;
   position: string | null;
-  round_order: number | null;
+  round_number: number | null;
   disposals: number | null;
   goals: number | null;
-  fantasy_points: number | null;
+  fantasy_score: number | null;
 }
 
 function getStatValue(stat: StatKey, row: PlayerGameStats): number {
   switch (stat) {
     case "fantasy":
-      return row.fantasy_points ?? 0;
+      return row.fantasy_score ?? 0;
     case "disposals":
       return row.disposals ?? 0;
     case "goals":
@@ -77,20 +77,22 @@ export async function getPositionTrendData(params: {
   const { season, stat } = params;
 
   const { data: stats, error } = await supabase
-    .from("afl_player_stats")
+    .schema("afl")
+    .from("player_game_stats_canonical")
     .select(
       `
-      player,
-      team,
+      player_name,
+      team_abbr,
       position,
-      round_order,
+      round_number,
       disposals,
       goals,
-      fantasy_points
+      fantasy_score
     `
     )
-    .order("player")
-    .order("round_order");
+    .eq("season", season)
+    .order("player_name")
+    .order("round_number");
 
   if (error || !stats || stats.length === 0) {
     return {
@@ -113,18 +115,18 @@ export async function getPositionTrendData(params: {
 
   (stats as PlayerGameStats[]).forEach((row) => {
     const value = getStatValue(stat, row);
-    const roundOrder = row.round_order ?? 0;
+    const roundOrder = row.round_number ?? 0;
 
-    if (!playerMap.has(row.player)) {
-      playerMap.set(row.player, {
-        name: row.player,
-        team: row.team,
+    if (!playerMap.has(row.player_name)) {
+      playerMap.set(row.player_name, {
+        name: row.player_name,
+        team: row.team_abbr,
         position: row.position ?? "",
         games: [],
       });
     }
 
-    const playerData = playerMap.get(row.player)!;
+    const playerData = playerMap.get(row.player_name)!;
     playerData.games.push({ round: roundOrder, value });
   });
 

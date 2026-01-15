@@ -41,7 +41,7 @@ export async function getFormStabilityGridData(params: {
 }): Promise<FormStabilityGridData> {
   const { season, stat } = params;
 
-  // Map stat → column name in rolling_player_stats_last_10
+  // Map stat → column name in player_game_stats_canonical
   const statColumn =
     stat === "fantasy"
       ? "fantasy_score"
@@ -57,7 +57,7 @@ export async function getFormStabilityGridData(params: {
 
   const { data, error } = await supabase
     .schema("afl")
-    .from("rolling_player_stats_last_10")
+    .from("player_game_stats_canonical")
     .select(
       `
       player_id,
@@ -67,6 +67,7 @@ export async function getFormStabilityGridData(params: {
     `
     )
     .eq("season", season)
+    .order("player_name", { ascending: true })
     .order("round_number", { ascending: true });
 
   if (error || !data || data.length === 0) {
