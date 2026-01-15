@@ -1,11 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { StatKey } from "@/lib/stats/types";
 
+/* -------------------------------------------------------------------------- */
+/* TYPES                                                                      */
+/* -------------------------------------------------------------------------- */
+
 export interface PositionPlayerMetrics {
   player_id: string;
   full_name: string;
-  team_abbr: string;
-  primary_position: string;
   last_5_values: number[];
   season_avg: number;
   l5_avg: number;
@@ -16,59 +18,47 @@ export interface PositionPlayerMetrics {
 }
 
 export interface PositionTrendData {
-  MID: {
-    hot: PositionPlayerMetrics[];
-    cold: PositionPlayerMetrics[];
-  };
-  FWD: {
-    hot: PositionPlayerMetrics[];
-    cold: PositionPlayerMetrics[];
-  };
-  DEF: {
-    hot: PositionPlayerMetrics[];
-    cold: PositionPlayerMetrics[];
-  };
-  RUC: {
+  ALL: {
     hot: PositionPlayerMetrics[];
     cold: PositionPlayerMetrics[];
   };
 }
 
 interface PlayerGameStats {
+  player_id: string;
   player_name: string;
-  team_abbr: string;
-  position: string | null;
-  round_number: number | null;
+  round_number: number;
   disposals: number | null;
   goals: number | null;
   fantasy_score: number | null;
 }
 
+/* -------------------------------------------------------------------------- */
+/* HELPERS                                                                    */
+/* -------------------------------------------------------------------------- */
+
 function getStatValue(stat: StatKey, row: PlayerGameStats): number {
-  switch (stat) {
-    case "fantasy":
-      return row.fantasy_score ?? 0;
-    case "disposals":
-      return row.disposals ?? 0;
-    case "goals":
-      return row.goals ?? 0;
-    default:
-      return 0;
-  }
+  if (stat === "fantasy") return row.fantasy_score ?? 0;
+  if (stat === "disposals") return row.disposals ?? 0;
+  if (stat === "goals") return row.goals ?? 0;
+  return 0;
 }
 
 function calculateStdDev(values: number[]): number {
-  if (values.length === 0) return 0;
+  if (!values.length) return 0;
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  const variance =
-    values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
-    values.length;
-  return Math.sqrt(variance);
+  return Math.sqrt(
+    values.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / values.length
+  );
 }
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
+
+/* -------------------------------------------------------------------------- */
+/* MAIN FETCH                                                                 */
+/* -------------------------------------------------------------------------- */
 
 export async function getPositionTrendData(params: {
   season: number;
@@ -81,129 +71,84 @@ export async function getPositionTrendData(params: {
     .from("player_game_stats_canonical")
     .select(
       `
-      player_name,
-      team_abbr,
-      position,
-      round_number,
-      disposals,
-      goals,
-      fantasy_score
-    `
+        player_id,
+        player_name,
+        round_number,
+        disposals,
+        goals,
+        fantasy_score
+      `
     )
     .eq("season", season)
-    .order("player_name")
+    .order("player_id")
     .order("round_number");
 
   if (error || !stats || stats.length === 0) {
-    return {
-      MID: { hot: [], cold: [] },
-      FWD: { hot: [], cold: [] },
-      DEF: { hot: [], cold: [] },
-      RUC: { hot: [], cold: [] },
-    };
+    return { ALL: { hot: [], cold: [] } };
   }
 
   const playerMap = new Map<
     string,
-    {
-      name: string;
-      team: string;
-      position: string;
-      games: { round: number; value: number }[];
-    }
+    { name: string; games: { round: number; value: number }[] }
   >();
 
   (stats as PlayerGameStats[]).forEach((row) => {
     const value = getStatValue(stat, row);
-    const roundOrder = row.round_number ?? 0;
-
-    if (!playerMap.has(row.player_name)) {
-      playerMap.set(row.player_name, {
+    if (!playerMap.has(row.player_id)) {
+      playerMap.set(row.player_id, {
         name: row.player_name,
-        team: row.team_abbr,
-        position: row.position ?? "",
         games: [],
       });
     }
 
-    const playerData = playerMap.get(row.player_name)!;
-    playerData.games.push({ round: roundOrder, value });
-  });
-
-  const allMetrics: PositionPlayerMetrics[] = [];
-
-  playerMap.forEach((playerData, playerId) => {
-    if (playerData.games.length < 3) return;
-
-    playerData.games.sort((a, b) => a.round - b.round);
-
-    const allValues = playerData.games.map((g) => g.value);
-    const last5Games = playerData.games.slice(-5);
-    const last5Values = last5Games.map((g) => g.value);
-
-    if (last5Values.length < 3) return;
-
-    const seasonAvg =
-      allValues.reduce((a, b) => a + b, 0) / allValues.length;
-    const l5Avg = last5Values.reduce((a, b) => a + b, 0) / last5Values.length;
-    const deltaVsSeason = l5Avg - seasonAvg;
-
-    const volatility = calculateStdDev(last5Values);
-    const baseVal = l5Avg || seasonAvg || 1;
-    const stabilityScore = clamp((1 - volatility / baseVal) * 100, 0, 100);
-
-    const compositeScore = deltaVsSeason * (0.3 + 0.7 * (stabilityScore / 100));
-
-    allMetrics.push({
-      player_id: playerId,
-      full_name: playerData.name,
-      team_abbr: playerData.team,
-      primary_position: playerData.position,
-      last_5_values: last5Values,
-      season_avg: seasonAvg,
-      l5_avg: l5Avg,
-      delta_vs_season: deltaVsSeason,
-      volatility,
-      stability_score: stabilityScore,
-      composite_score: compositeScore,
+    playerMap.get(row.player_id)!.games.push({
+      round: row.round_number,
+      value,
     });
   });
 
-  const metricsByPosition: Record<
-    string,
-    PositionPlayerMetrics[]
-  > = {
-    MID: [],
-    FWD: [],
-    DEF: [],
-    RUC: [],
-  };
+  const metrics: PositionPlayerMetrics[] = [];
 
-  allMetrics.forEach((metric) => {
-    const pos = metric.primary_position.toUpperCase();
-    if (pos.includes("MID")) metricsByPosition.MID.push(metric);
-    if (pos.includes("FWD")) metricsByPosition.FWD.push(metric);
-    if (pos.includes("DEF")) metricsByPosition.DEF.push(metric);
-    if (pos.includes("RUC")) metricsByPosition.RUC.push(metric);
+  playerMap.forEach((player) => {
+    if (player.games.length < 3) return;
+
+    player.games.sort((a, b) => a.round - b.round);
+
+    const allValues = player.games.map((g) => g.value);
+    const last5 = player.games.slice(-5).map((g) => g.value);
+    if (last5.length < 3) return;
+
+    const seasonAvg = allValues.reduce((a, b) => a + b, 0) / allValues.length;
+    const l5Avg = last5.reduce((a, b) => a + b, 0) / last5.length;
+    const delta = l5Avg - seasonAvg;
+
+    const volatility = calculateStdDev(last5);
+    const base = l5Avg || seasonAvg || 1;
+    const stability = clamp((1 - volatility / base) * 100, 0, 100);
+
+    const composite = delta * (0.3 + 0.7 * (stability / 100));
+
+    metrics.push({
+      player_id: crypto.randomUUID(),
+      full_name: player.name,
+      last_5_values: last5,
+      season_avg: seasonAvg,
+      l5_avg: l5Avg,
+      delta_vs_season: delta,
+      volatility,
+      stability_score: stability,
+      composite_score: composite,
+    });
   });
 
-  const result: PositionTrendData = {
-    MID: { hot: [], cold: [] },
-    FWD: { hot: [], cold: [] },
-    DEF: { hot: [], cold: [] },
-    RUC: { hot: [], cold: [] },
+  const sorted = [...metrics].sort(
+    (a, b) => b.composite_score - a.composite_score
+  );
+
+  return {
+    ALL: {
+      hot: sorted.slice(0, 10),
+      cold: sorted.slice(-10).reverse(),
+    },
   };
-
-  (["MID", "FWD", "DEF", "RUC"] as const).forEach((position) => {
-    const metrics = metricsByPosition[position] || [];
-
-    const sortedByComposite = [...metrics].sort(
-      (a, b) => b.composite_score - a.composite_score
-    );
-
-    result[position].hot = sortedByComposite.slice(0, 5);
-    result[position].cold = sortedByComposite.slice(-5).reverse();
-  });
-
-  return result;
 }
