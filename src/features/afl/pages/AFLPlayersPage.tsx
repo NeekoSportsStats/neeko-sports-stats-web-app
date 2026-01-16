@@ -6,15 +6,11 @@ import PositionTrends from "@/features/afl/players/sections/PositionTrends";
 import AIInsights from "@/features/afl/players/sections/AIInsights";
 import MasterTable from "@/features/afl/players/sections/MasterTable";
 import { AFL_STAT_CONFIG } from "@/lib/stats/afl/statConfig";
-import { getRoundMomentumData, type RoundMomentumData } from "@/features/afl/players/data/getRoundMomentumData";
 
 export default function AFLPlayersPage() {
   const [activeSection, setActiveSection] = useState("round-momentum");
   const [isStuck, setIsStuck] = useState(false);
   const [showTopButton, setShowTopButton] = useState(false);
-  const [roundMomentumData, setRoundMomentumData] = useState<RoundMomentumData | null>(null);
-  const [roundMomentumLoading, setRoundMomentumLoading] = useState(true);
-  const [roundMomentumError, setRoundMomentumError] = useState<string | null>(null);
 
   /* -------------------------------------------------------------------------- */
   /*                         Scroll Spy Section Tracking                        */
@@ -109,30 +105,6 @@ export default function AFLPlayersPage() {
   }, []);
 
   /* -------------------------------------------------------------------------- */
-  /*                      Fetch Round Momentum Data                             */
-  /* -------------------------------------------------------------------------- */
-
-  useEffect(() => {
-    const loadRoundMomentumData = async () => {
-      setRoundMomentumLoading(true);
-      setRoundMomentumError(null);
-
-      try {
-        const data = await getRoundMomentumData(2025);
-        setRoundMomentumData(data);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        console.error("Failed to load Round Momentum data:", errorMessage);
-        setRoundMomentumError(errorMessage);
-      } finally {
-        setRoundMomentumLoading(false);
-      }
-    };
-
-    loadRoundMomentumData();
-  }, []);
-
-  /* -------------------------------------------------------------------------- */
   /*                            Section Definitions                             */
   /* -------------------------------------------------------------------------- */
 
@@ -218,26 +190,7 @@ export default function AFLPlayersPage() {
 
       <div className="space-y-20 md:space-y-24">
         <section id="round-momentum" className="scroll-mt-28 animate-premium-section">
-          {roundMomentumLoading && (
-            <div className="flex items-center justify-center py-20">
-              <div className="text-center space-y-3">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-yellow-400 border-r-transparent"></div>
-                <p className="text-sm text-white/60">Loading Round Momentum...</p>
-              </div>
-            </div>
-          )}
-
-          {roundMomentumError && !roundMomentumLoading && (
-            <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-6">
-              <p className="text-sm text-red-400">
-                Failed to load Round Momentum. Check console for details.
-              </p>
-            </div>
-          )}
-
-          {roundMomentumData && !roundMomentumLoading && !roundMomentumError && (
-            <RoundMomentum data={roundMomentumData} />
-          )}
+          <RoundMomentum />
         </section>
 
         <section id="form-stability" className="scroll-mt-28 animate-premium-section delay-1">
