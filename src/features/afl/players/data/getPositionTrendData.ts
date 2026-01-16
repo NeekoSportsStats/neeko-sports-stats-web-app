@@ -24,21 +24,24 @@ export interface PositionTrendData {
   };
 }
 
-interface PlayerGameStats {
+interface RoundPlayerRow {
   player_id: string;
-  player_name: string;
   round_number: number;
   disposals: number | null;
   goals: number | null;
-  fantasy_score: number | null;
+}
+
+interface PlayerMeta {
+  id: string;
+  name: string;
 }
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
-function getStatValue(stat: StatKey, row: PlayerGameStats): number {
-  if (stat === "fantasy") return row.fantasy_score ?? 0;
+function getStatValue(stat: StatKey, row: RoundPlayerRow): number {
+  // round_player_summary does NOT contain fantasy_score in your current schema
   if (stat === "disposals") return row.disposals ?? 0;
   if (stat === "goals") return row.goals ?? 0;
   return 0;
@@ -66,37 +69,57 @@ export async function getPositionTrendData(params: {
 }): Promise<PositionTrendData> {
   const { season, stat } = params;
 
+  // If UI passes fantasy here, we can't compute it from round_player_summary
+  if (stat === "fantasy") {
+    return { ALL: { hot: [], cold: [] } };
+  }
+
   const { data: stats, error } = await supabase
     .schema("afl")
     .from("round_player_summary")
     .select(
       `
         player_id,
-        player_name,
         round_number,
         disposals,
-        goals,
-        fantasy_score
+        goals
       `
     )
     .eq("season", season)
-    .order("player_id")
-    .order("round_number");
+    .order("player_id", { ascending: true })
+    .order("round_number", { ascending: true });
 
   if (error || !stats || stats.length === 0) {
     return { ALL: { hot: [], cold: [] } };
   }
+
+  const rows = stats as RoundPlayerRow[];
+
+  // Pull player names (players table exists and has: id, name)
+  const playerIds = Array.from(new Set(rows.map((r) => r.player_id)));
+
+  const { data: players } = await supabase
+    .schema("afl")
+    .from("players")
+    .select("id, name")
+    .in("id", playerIds);
+
+  const playerNameMap = new Map(
+    (players as PlayerMeta[] | null | undefined)?.map((p) => [p.id, p.name]) ??
+      []
+  );
 
   const playerMap = new Map<
     string,
     { name: string; games: { round: number; value: number }[] }
   >();
 
-  (stats as PlayerGameStats[]).forEach((row) => {
+  rows.forEach((row) => {
     const value = getStatValue(stat, row);
+
     if (!playerMap.has(row.player_id)) {
       playerMap.set(row.player_id, {
-        name: row.player_name,
+        name: playerNameMap.get(row.player_id) ?? "Unknown Player",
         games: [],
       });
     }
@@ -109,7 +132,7 @@ export async function getPositionTrendData(params: {
 
   const metrics: PositionPlayerMetrics[] = [];
 
-  playerMap.forEach((player) => {
+  playerMap.forEach((player, playerId) => {
     if (player.games.length < 3) return;
 
     player.games.sort((a, b) => a.round - b.round);
@@ -129,7 +152,7 @@ export async function getPositionTrendData(params: {
     const composite = delta * (0.3 + 0.7 * (stability / 100));
 
     metrics.push({
-      player_id: crypto.randomUUID(),
+      player_id: playerId, // ✅ keep real UUID
       full_name: player.name,
       last_5_values: last5,
       season_avg: seasonAvg,
