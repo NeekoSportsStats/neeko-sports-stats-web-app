@@ -5,20 +5,23 @@ import type { RoundSummaryData } from "../sections/RoundSummary";
 /* MAIN FETCH                                                                 */
 /* -------------------------------------------------------------------------- */
 
-export async function getRoundSummaryData(): Promise<RoundSummaryData | null> {
+export async function getRoundSummaryData(): Promise<RoundSummaryData> {
   /* ------------------------------------------------------------------ */
-  /* 1. Resolve current round                                           */
+  /* 1. Resolve latest available round (safe, no view dependency)       */
   /* ------------------------------------------------------------------ */
 
-  const { data: currentRoundRow, error: crError } = await supabase
+  const { data: roundRows, error: roundErr } = await supabase
     .schema("afl")
-    .from("current_round")
+    .from("round_player_summary")
     .select("season, round_number")
-    .single();
+    .order("round_number", { ascending: false })
+    .limit(1);
 
-  if (crError || !currentRoundRow) return null;
+  if (roundErr || !roundRows?.length) {
+    throw new Error("Unable to resolve latest round");
+  }
 
-  const { season, round_number } = currentRoundRow;
+  const { season, round_number } = roundRows[0];
 
   /* ------------------------------------------------------------------ */
   /* 2. Fetch round player stats                                        */
@@ -31,15 +34,15 @@ export async function getRoundSummaryData(): Promise<RoundSummaryData | null> {
     .eq("season", season)
     .eq("round_number", round_number);
 
-  if (rpError || !roundPlayers || roundPlayers.length === 0) return null;
+  if (rpError || !roundPlayers?.length) {
+    throw new Error("No round player stats available");
+  }
 
   /* ------------------------------------------------------------------ */
   /* 3. Player names                                                    */
   /* ------------------------------------------------------------------ */
 
-  const playerIds = Array.from(
-    new Set(roundPlayers.map((p) => p.player_id))
-  );
+  const playerIds = [...new Set(roundPlayers.map((p) => p.player_id))];
 
   const { data: players } = await supabase
     .schema("afl")
@@ -60,7 +63,7 @@ export async function getRoundSummaryData(): Promise<RoundSummaryData | null> {
   );
 
   /* ------------------------------------------------------------------ */
-  /* 5. Season averages (for overperformer)                             */
+  /* 5. Season averages (overperformer)                                 */
   /* ------------------------------------------------------------------ */
 
   const { data: seasonAvgs } = await supabase
@@ -88,7 +91,7 @@ export async function getRoundSummaryData(): Promise<RoundSummaryData | null> {
   const biggestOver = overperformers[0];
 
   /* ------------------------------------------------------------------ */
-  /* 6. League round averages                                           */
+  /* 6. League averages                                                 */
   /* ------------------------------------------------------------------ */
 
   const totalDisposals = roundPlayers.reduce(
@@ -116,7 +119,7 @@ export async function getRoundSummaryData(): Promise<RoundSummaryData | null> {
     biggestOverperformer: biggestOver
       ? {
           name: playerMap.get(biggestOver.player_id) ?? "—",
-          diff: biggestOver.diff,
+          diff: Number(biggestOver.diff.toFixed(1)),
           currentValue: biggestOver.disposals ?? 0,
         }
       : {

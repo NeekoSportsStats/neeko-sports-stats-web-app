@@ -72,11 +72,7 @@ function MiniCard({
 /* MAIN COMPONENT                                                             */
 /* -------------------------------------------------------------------------- */
 
-export default function RoundSummary({
-  data,
-}: {
-  data: RoundSummaryData;
-}) {
+export default function RoundSummary({ data }: { data: RoundSummaryData }) {
   return (
     <section
       className={cn(
@@ -105,7 +101,7 @@ export default function RoundSummary({
         <MiniCard
           icon={TrendingUp}
           label="Biggest Overperformer"
-          value={`+${data.biggestOverperformer.diff.toFixed(1)} disp`}
+          value={`+${data.biggestOverperformer.diff}`}
           subtitle={data.biggestOverperformer.name}
           delay={180}
         />
