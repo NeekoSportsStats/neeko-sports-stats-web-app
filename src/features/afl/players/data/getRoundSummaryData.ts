@@ -36,15 +36,15 @@ export async function getRoundSummaryData(params: {
   const { data: cr, error: crError } = await supabase
     .schema("afl")
     .from("current_round")
-    .select("round_number")
+    .select("current_round")
     .eq("season", season)
     .single();
 
-  if (crError || !cr?.round_number) {
+  if (crError || !cr?.current_round) {
     throw new Error("Failed to resolve current round");
   }
 
-  const currentRound = cr.round_number;
+  const currentRound = cr.current_round;
 
   /* ---------- round player stats ---------- */
 
