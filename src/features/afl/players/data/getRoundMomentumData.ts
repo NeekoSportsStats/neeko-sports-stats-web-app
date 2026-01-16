@@ -6,12 +6,12 @@ export interface RoundMomentumData {
   topScore: {
     playerName: string;
     value: number;
-  } | null;
+  };
   biggestOverperformer: {
     playerName: string;
     diff: number;
     roundValue: number;
-  } | null;
+  };
   roundAverage: number;
 }
 
@@ -35,8 +35,8 @@ export async function getRoundMomentumData(
 
   if (!roundData || roundData.length === 0) {
     return {
-      topScore: null,
-      biggestOverperformer: null,
+      topScore: { playerName: "—", value: 0 },
+      biggestOverperformer: { playerName: "—", diff: 0, roundValue: 0 },
       roundAverage: 0,
     };
   }
@@ -69,13 +69,23 @@ export async function getRoundMomentumData(
     (players || []).map((p) => [p.id, p.name])
   );
 
-  const avgMap = new Map(
+  let avgMapFiltered = new Map(
     (seasonAvgs || [])
       .filter((a) => a.games_played >= 5)
       .map((a) => [a.player_id, stat === "goals" ? a.avg_goals : a.avg_disposals])
   );
 
-  let topScorePlayer: { playerName: string; value: number } | null = null;
+  if (avgMapFiltered.size === 0) {
+    avgMapFiltered = new Map(
+      (seasonAvgs || [])
+        .filter((a) => a.games_played >= 1)
+        .map((a) => [a.player_id, stat === "goals" ? a.avg_goals : a.avg_disposals])
+    );
+  }
+
+  const avgMap = avgMapFiltered;
+
+  let topScorePlayer: { playerName: string; value: number } = { playerName: "—", value: 0 };
   let maxValue = -1;
 
   for (const row of roundData) {
@@ -93,7 +103,7 @@ export async function getRoundMomentumData(
     playerName: string;
     diff: number;
     roundValue: number;
-  } | null = null;
+  } = { playerName: "—", diff: 0, roundValue: 0 };
   let maxDiff = -Infinity;
 
   for (const row of roundData) {
@@ -122,8 +132,7 @@ export async function getRoundMomentumData(
 
   return {
     topScore: topScorePlayer,
-    biggestOverperformer:
-      maxDiff > -Infinity ? biggestOverperformer : null,
+    biggestOverperformer,
     roundAverage,
   };
 }
