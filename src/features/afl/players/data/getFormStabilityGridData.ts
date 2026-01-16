@@ -57,7 +57,7 @@ export async function getFormStabilityGridData(params: {
 
   const { data, error } = await supabase
     .schema("afl")
-    .from("player_game_stats_canonical")
+    .from("round_player_summary")
     .select(
       `
       player_id,
