@@ -171,15 +171,14 @@ export async function getRoundMomentumData(
     }
   }
 
-  let roundAverage = 0;
-  if (!isGrandFinal) {
-    const totalValue = latestRoundData.reduce(
-      (sum, r) => sum + getStatValue(r, stat),
-      0
-    );
-    roundAverage =
-      latestRoundData.length > 0 ? totalValue / latestRoundData.length : 0;
-  }
+  const values = latestRoundData
+    .map(row => Number(getStatValue(row, stat)))
+    .filter(v => Number.isFinite(v));
+
+  const roundAverage =
+    values.length > 0
+      ? Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(1))
+      : 0;
 
   const statLabel = getStatLabel(stat);
   const keyPoints: string[] = [];
@@ -208,10 +207,6 @@ export async function getRoundMomentumData(
     } else {
       keyPoints.push("📈 Grand Final intensity kept most players within their season norms.");
     }
-
-    keyPoints.push(
-      "🧠 League-wide averages are not computed for Grand Finals, as only two teams compete in the season decider."
-    );
   } else {
     if (topScorePlayer.value > 0) {
       keyPoints.push(
@@ -232,37 +227,37 @@ export async function getRoundMomentumData(
     } else {
       keyPoints.push("📈 No major overperformers emerged this round.");
     }
+  }
 
-    if (stat === "goals") {
-      if (roundAverage >= 2.5) {
-        keyPoints.push("🧠 League-wide goal output was strong this round.");
-      } else if (roundAverage >= 1.5) {
-        keyPoints.push("🧠 Goal numbers sat around typical league levels.");
-      } else if (roundAverage > 0) {
-        keyPoints.push("🧠 A lower-scoring round, suggesting tighter contests.");
-      } else {
-        keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
-      }
-    } else if (stat === "disposals") {
-      if (roundAverage >= 25) {
-        keyPoints.push("🧠 League-wide disposal output was strong this round.");
-      } else if (roundAverage >= 20) {
-        keyPoints.push("🧠 Disposal numbers sat around typical league levels.");
-      } else if (roundAverage > 0) {
-        keyPoints.push("🧠 A lower-disposal round, suggesting tighter contests.");
-      } else {
-        keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
-      }
+  if (stat === "goals") {
+    if (roundAverage >= 2.5) {
+      keyPoints.push("🧠 League-wide goal output was strong this round.");
+    } else if (roundAverage >= 1.5) {
+      keyPoints.push("🧠 Goal numbers sat around typical league levels.");
+    } else if (roundAverage > 0) {
+      keyPoints.push("🧠 A lower-scoring round, suggesting tighter contests.");
     } else {
-      if (roundAverage >= 90) {
-        keyPoints.push("🧠 League-wide fantasy output was strong this round.");
-      } else if (roundAverage >= 70) {
-        keyPoints.push("🧠 Fantasy numbers sat around typical league levels.");
-      } else if (roundAverage > 0) {
-        keyPoints.push("🧠 A lower-fantasy round, suggesting tighter contests.");
-      } else {
-        keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
-      }
+      keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
+    }
+  } else if (stat === "disposals") {
+    if (roundAverage >= 25) {
+      keyPoints.push("🧠 League-wide disposal output was strong this round.");
+    } else if (roundAverage >= 20) {
+      keyPoints.push("🧠 Disposal numbers sat around typical league levels.");
+    } else if (roundAverage > 0) {
+      keyPoints.push("🧠 A lower-disposal round, suggesting tighter contests.");
+    } else {
+      keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
+    }
+  } else {
+    if (roundAverage >= 90) {
+      keyPoints.push("🧠 League-wide fantasy output was strong this round.");
+    } else if (roundAverage >= 70) {
+      keyPoints.push("🧠 Fantasy numbers sat around typical league levels.");
+    } else if (roundAverage > 0) {
+      keyPoints.push("🧠 A lower-fantasy round, suggesting tighter contests.");
+    } else {
+      keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
     }
   }
 

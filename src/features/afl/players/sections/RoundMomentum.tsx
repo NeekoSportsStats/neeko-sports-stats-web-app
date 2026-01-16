@@ -249,9 +249,7 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
                   {data.roundAverage === 0 ? (
                     <>
                       <p className="text-5xl font-bold text-white/30 mb-3">—</p>
-                      <p className="text-sm text-white/50">
-                        {data.isGrandFinal ? "Not applicable for Grand Final" : "Awaiting more games"}
-                      </p>
+                      <p className="text-sm text-white/50">Awaiting more games</p>
                     </>
                   ) : (
                     <div className="flex flex-col gap-2.5">
