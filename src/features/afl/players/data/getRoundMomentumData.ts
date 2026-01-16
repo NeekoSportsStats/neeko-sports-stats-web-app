@@ -18,13 +18,42 @@ export interface RoundMomentumData {
   currentRound: number;
 }
 
-function getStatValue(stat: RoundStat, disposals: number | null, goals: number | null): number {
-  const d = disposals ?? 0;
-  const g = goals ?? 0;
+interface RoundRow {
+  disposals: number | null;
+  goals: number | null;
+  fantasy_points: number | null;
+}
 
-  if (stat === "goals") return g;
-  if (stat === "disposals") return d;
-  return d * 1 + g * 6;
+interface AvgRow {
+  avg_disposals: number | null;
+  avg_goals: number | null;
+  avg_fantasy: number | null;
+}
+
+function getStatValue(row: RoundRow, stat: RoundStat): number {
+  switch (stat) {
+    case "disposals":
+      return row.disposals ?? 0;
+    case "goals":
+      return row.goals ?? 0;
+    case "fantasy":
+      return row.fantasy_points ?? 0;
+    default:
+      return 0;
+  }
+}
+
+function getAvgStatValue(row: AvgRow, stat: RoundStat): number {
+  switch (stat) {
+    case "disposals":
+      return row.avg_disposals ?? 0;
+    case "goals":
+      return row.avg_goals ?? 0;
+    case "fantasy":
+      return row.avg_fantasy ?? 0;
+    default:
+      return 0;
+  }
 }
 
 function getStatLabel(stat: RoundStat): string {
@@ -39,7 +68,7 @@ export async function getRoundMomentumData(
 ): Promise<RoundMomentumData> {
   const { data: roundData, error: roundError } = await supabase
     .from("round_player_summary")
-    .select("player_id, disposals, goals, round_number")
+    .select("player_id, disposals, goals, fantasy_points, round_number")
     .eq("season", season);
 
   if (roundError) {
@@ -69,7 +98,7 @@ export async function getRoundMomentumData(
 
   const { data: seasonAvgs, error: avgError } = await supabase
     .from("player_season_averages")
-    .select("player_id, games_played, avg_disposals, avg_goals")
+    .select("player_id, games_played, avg_disposals, avg_goals, avg_fantasy")
     .eq("season", season);
 
   if (avgError) {
@@ -98,7 +127,7 @@ export async function getRoundMomentumData(
       .filter((a) => a.games_played >= 5)
       .map((a) => [
         a.player_id,
-        getStatValue(stat, a.avg_disposals, a.avg_goals),
+        getAvgStatValue(a, stat),
       ])
   );
 
@@ -106,7 +135,7 @@ export async function getRoundMomentumData(
   let maxValue = -1;
 
   for (const row of latestRoundData) {
-    const value = getStatValue(stat, row.disposals, row.goals);
+    const value = getStatValue(row, stat);
     if (value > maxValue) {
       maxValue = value;
       topScorePlayer = {
@@ -125,7 +154,7 @@ export async function getRoundMomentumData(
 
   if (avgMap.size > 0) {
     for (const row of latestRoundData) {
-      const roundValue = getStatValue(stat, row.disposals, row.goals);
+      const roundValue = getStatValue(row, stat);
       const avgValue = avgMap.get(row.player_id);
 
       if (avgValue !== undefined) {
@@ -145,7 +174,7 @@ export async function getRoundMomentumData(
   let roundAverage = 0;
   if (!isGrandFinal) {
     const totalValue = latestRoundData.reduce(
-      (sum, r) => sum + getStatValue(stat, r.disposals, r.goals),
+      (sum, r) => sum + getStatValue(r, stat),
       0
     );
     roundAverage =
@@ -155,10 +184,14 @@ export async function getRoundMomentumData(
   const statLabel = getStatLabel(stat);
   const keyPoints: string[] = [];
 
+  const formatValue = (value: number) => {
+    return stat === "fantasy" ? Math.round(value).toString() : value.toString();
+  };
+
   if (isGrandFinal) {
     if (topScorePlayer.value > 0) {
       keyPoints.push(
-        `⭐ ${topScorePlayer.playerName} claimed best-on-ground honors with ${topScorePlayer.value} ${statLabel}.`
+        `⭐ ${topScorePlayer.playerName} claimed best-on-ground honors with ${formatValue(topScorePlayer.value)} ${statLabel}.`
       );
     } else {
       keyPoints.push(`⭐ Grand Final performances still being tallied.`);
@@ -166,7 +199,7 @@ export async function getRoundMomentumData(
 
     if (biggestOverperformer.diff >= 5) {
       keyPoints.push(
-        `📈 ${biggestOverperformer.playerName} rose to the occasion, significantly exceeding their season average (+${biggestOverperformer.diff.toFixed(1)}).`
+        `📈 ${biggestOverperformer.playerName} rose to the occasion, significantly exceeding their season average (+${biggestOverperformer.diff.toFixed(1)} ${statLabel}).`
       );
     } else if (biggestOverperformer.diff > 0) {
       keyPoints.push(
@@ -182,7 +215,7 @@ export async function getRoundMomentumData(
   } else {
     if (topScorePlayer.value > 0) {
       keyPoints.push(
-        `⭐ ${topScorePlayer.playerName} led the round with ${topScorePlayer.value} ${statLabel}.`
+        `⭐ ${topScorePlayer.playerName} led the round with ${formatValue(topScorePlayer.value)} ${statLabel}.`
       );
     } else {
       keyPoints.push(`⭐ No standout ${statLabel} performance this round.`);
@@ -190,7 +223,7 @@ export async function getRoundMomentumData(
 
     if (biggestOverperformer.diff >= 5) {
       keyPoints.push(
-        `📈 ${biggestOverperformer.playerName} significantly exceeded their season average (+${biggestOverperformer.diff.toFixed(1)}).`
+        `📈 ${biggestOverperformer.playerName} significantly exceeded their season average (+${biggestOverperformer.diff.toFixed(1)} ${statLabel}).`
       );
     } else if (biggestOverperformer.diff > 0) {
       keyPoints.push(
