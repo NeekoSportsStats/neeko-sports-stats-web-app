@@ -18,8 +18,41 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
   const [data, setData] = useState<RoundMomentumData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [animatedValues, setAnimatedValues] = useState({ top: 0, overperformer: 0, average: 0 });
 
   const statLabel = getStatLabel(stat);
+
+  useEffect(() => {
+    if (!data) return;
+
+    const duration = 400;
+    const steps = 20;
+    const stepTime = duration / steps;
+
+    let currentStep = 0;
+    const interval = setInterval(() => {
+      currentStep++;
+      const progress = currentStep / steps;
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+      setAnimatedValues({
+        top: data.topScore.value * easeProgress,
+        overperformer: data.biggestOverperformer.diff * easeProgress,
+        average: data.roundAverage * easeProgress,
+      });
+
+      if (currentStep >= steps) {
+        clearInterval(interval);
+        setAnimatedValues({
+          top: data.topScore.value,
+          overperformer: data.biggestOverperformer.diff,
+          average: data.roundAverage,
+        });
+      }
+    }, stepTime);
+
+    return () => clearInterval(interval);
+  }, [data?.topScore.value, data?.biggestOverperformer.diff, data?.roundAverage]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -60,9 +93,17 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
               Round Momentum
             </h2>
           </div>
-          <p className="mt-1.5 text-sm text-white/60 pl-4">
-            {data?.isGrandFinal ? "Grand Final Snapshot" : "Latest completed round"}
-          </p>
+          <div className="mt-3 flex items-center gap-2 pl-4">
+            {data?.isGrandFinal ? (
+              <span className="inline-flex items-center gap-2 rounded-full border border-yellow-500/30 bg-gradient-to-r from-yellow-500/15 to-yellow-600/10 px-4 py-1.5 text-xs font-semibold text-yellow-200 shadow-[0_0_12px_rgba(234,179,8,0.15)]">
+                <div className="h-1 w-1 rounded-full bg-yellow-400 animate-pulse" />
+                Grand Final Snapshot
+              </span>
+            ) : (
+              <p className="text-sm text-white/60">Latest completed round</p>
+            )}
+          </div>
+          <div className="mt-4 h-px bg-gradient-to-r from-transparent via-yellow-500/30 to-transparent shadow-[0_0_8px_rgba(234,179,8,0.2)]" />
         </div>
 
         <div className="mb-8">
@@ -74,11 +115,11 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
               onClick={() => onStatChange("disposals")}
               disabled={stat === "disposals"}
               className={cn(
-                "relative rounded-full px-6 py-3 text-xs font-bold uppercase tracking-wider transition-all duration-300",
+                "relative rounded-full px-6 py-3.5 text-xs font-bold uppercase tracking-wider transition-all duration-200",
                 "backdrop-blur-sm",
                 stat === "disposals"
                   ? "bg-gradient-to-r from-yellow-400 to-yellow-500 text-black shadow-[0_0_32px_rgba(250,204,21,0.6),0_0_16px_rgba(250,204,21,0.4)] scale-105"
-                  : "border border-yellow-500/20 bg-black/40 text-yellow-100/70 hover:border-yellow-500/40 hover:bg-yellow-500/10 hover:text-yellow-100 hover:shadow-[0_0_16px_rgba(250,204,21,0.2)]"
+                  : "border border-yellow-500/20 bg-black/40 text-yellow-100/70 hover:border-yellow-500/50 hover:bg-yellow-500/15 hover:text-yellow-100 hover:shadow-[0_0_20px_rgba(250,204,21,0.3)] hover:scale-102"
               )}
             >
               Disposals
@@ -88,11 +129,11 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
               onClick={() => onStatChange("goals")}
               disabled={stat === "goals"}
               className={cn(
-                "relative rounded-full px-6 py-3 text-xs font-bold uppercase tracking-wider transition-all duration-300",
+                "relative rounded-full px-6 py-3.5 text-xs font-bold uppercase tracking-wider transition-all duration-200",
                 "backdrop-blur-sm",
                 stat === "goals"
                   ? "bg-gradient-to-r from-yellow-400 to-yellow-500 text-black shadow-[0_0_32px_rgba(250,204,21,0.6),0_0_16px_rgba(250,204,21,0.4)] scale-105"
-                  : "border border-yellow-500/20 bg-black/40 text-yellow-100/70 hover:border-yellow-500/40 hover:bg-yellow-500/10 hover:text-yellow-100 hover:shadow-[0_0_16px_rgba(250,204,21,0.2)]"
+                  : "border border-yellow-500/20 bg-black/40 text-yellow-100/70 hover:border-yellow-500/50 hover:bg-yellow-500/15 hover:text-yellow-100 hover:shadow-[0_0_20px_rgba(250,204,21,0.3)] hover:scale-102"
               )}
             >
               Goals
@@ -102,11 +143,11 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
               onClick={() => onStatChange("fantasy")}
               disabled={stat === "fantasy"}
               className={cn(
-                "relative rounded-full px-6 py-3 text-xs font-bold uppercase tracking-wider transition-all duration-300",
+                "relative rounded-full px-6 py-3.5 text-xs font-bold uppercase tracking-wider transition-all duration-200",
                 "backdrop-blur-sm",
                 stat === "fantasy"
                   ? "bg-gradient-to-r from-yellow-400 to-yellow-500 text-black shadow-[0_0_32px_rgba(250,204,21,0.6),0_0_16px_rgba(250,204,21,0.4)] scale-105"
-                  : "border border-yellow-500/20 bg-black/40 text-yellow-100/70 hover:border-yellow-500/40 hover:bg-yellow-500/10 hover:text-yellow-100 hover:shadow-[0_0_16px_rgba(250,204,21,0.2)]"
+                  : "border border-yellow-500/20 bg-black/40 text-yellow-100/70 hover:border-yellow-500/50 hover:bg-yellow-500/15 hover:text-yellow-100 hover:shadow-[0_0_20px_rgba(250,204,21,0.3)] hover:scale-102"
               )}
             >
               Fantasy
@@ -163,13 +204,13 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
                     </>
                   ) : (
                     <div className="flex flex-col gap-2.5">
-                      <p className="text-6xl font-bold bg-gradient-to-br from-white via-yellow-50 to-yellow-200 bg-clip-text text-transparent leading-none">
-                        {stat === "fantasy" ? Math.round(data.topScore.value) : data.topScore.value}
+                      <p className="text-6xl font-extrabold bg-gradient-to-br from-white via-yellow-50 to-yellow-200 bg-clip-text text-transparent leading-none tracking-tight">
+                        {stat === "fantasy" ? Math.round(animatedValues.top) : animatedValues.top.toFixed(stat === "goals" ? 0 : 1)}
                       </p>
-                      <p className="text-sm font-semibold text-white/80">
+                      <p className="text-sm font-bold text-white/90">
                         {data.topScore.playerName}
                       </p>
-                      <p className="text-xs text-yellow-200/50 mt-auto">
+                      <p className="text-xs text-yellow-200/60 mt-auto">
                         {data.isGrandFinal ? "Best on ground (Grand Final)" : `${statLabel} this round`}
                       </p>
                     </div>
@@ -207,13 +248,13 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
                     </>
                   ) : (
                     <div className="flex flex-col gap-2.5">
-                      <p className="text-6xl font-bold bg-gradient-to-br from-emerald-300 via-emerald-400 to-emerald-200 bg-clip-text text-transparent leading-none">
-                        +{data.biggestOverperformer.diff.toFixed(1)}
+                      <p className="text-6xl font-extrabold bg-gradient-to-br from-emerald-300 via-emerald-400 to-emerald-200 bg-clip-text text-transparent leading-none tracking-tight">
+                        +{animatedValues.overperformer.toFixed(1)}
                       </p>
-                      <p className="text-sm font-semibold text-white/80">
+                      <p className="text-sm font-bold text-white/90">
                         {data.biggestOverperformer.playerName}
                       </p>
-                      <p className="text-xs text-emerald-200/50 mt-auto">
+                      <p className="text-xs text-emerald-200/60 mt-auto">
                         {data.isGrandFinal
                           ? "Above season average in the Grand Final"
                           : `${stat === "fantasy" ? Math.round(data.biggestOverperformer.roundValue) : data.biggestOverperformer.roundValue} ${statLabel.toLowerCase()} vs season avg`}
@@ -253,12 +294,14 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
                     </>
                   ) : (
                     <div className="flex flex-col gap-2.5">
-                      <p className="text-6xl font-bold bg-gradient-to-br from-white via-slate-50 to-slate-200 bg-clip-text text-transparent leading-none">
-                        {stat === "fantasy" ? Math.round(data.roundAverage) : data.roundAverage.toFixed(1)}
+                      <p className="text-6xl font-extrabold bg-gradient-to-br from-white via-slate-50 to-slate-200 bg-clip-text text-transparent leading-none tracking-tight">
+                        {stat === "fantasy" ? Math.round(animatedValues.average) : animatedValues.average.toFixed(1)}
                       </p>
-                      <p className="text-sm font-semibold text-white/80">League-wide snapshot</p>
-                      <p className="text-xs text-slate-200/50 mt-auto">
-                        Avg {statLabel.toLowerCase()} per player
+                      <p className="text-sm font-bold text-white/90">League-wide snapshot</p>
+                      <p className="text-xs text-slate-200/60 mt-auto">
+                        {data.isGrandFinal
+                          ? `Avg per player (Grand Final)`
+                          : `Avg ${statLabel.toLowerCase()} per player`}
                       </p>
                     </div>
                   )}
@@ -266,28 +309,37 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
               </div>
             </div>
 
-            <div className="mt-8 rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-black/70 via-black/50 to-yellow-900/10 px-7 py-6 backdrop-blur-sm shadow-[0_0_20px_rgba(234,179,8,0.1)]">
-              <div className="flex items-center gap-3 mb-5">
+            <div className="mt-12 rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-black/70 via-black/50 to-yellow-900/10 px-7 py-6 backdrop-blur-sm shadow-[0_0_20px_rgba(234,179,8,0.1)] relative">
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-yellow-400/40 to-transparent shadow-[0_0_12px_rgba(234,179,8,0.3)]" />
+              <div className="flex items-center gap-3 mb-6">
                 <div className="h-1.5 w-1.5 rounded-full bg-yellow-400 animate-pulse" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-yellow-400/90">
                   Key Takeaways
                 </h3>
               </div>
-              <ul className="space-y-3.5">
-                {data.keyPoints.map((point, index) => (
-                  <li
-                    key={index}
-                    className="flex items-start gap-3 text-sm leading-relaxed text-white/70 hover:text-white/85 transition-colors duration-200"
-                  >
-                    <span className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-yellow-400/60" />
-                    <span>{point}</span>
-                  </li>
-                ))}
+              <ul className="space-y-4">
+                {data.keyPoints.map((point, index) => {
+                  const formatted = point.replace(
+                    /(⭐|📈|🧠)\s+([^,]+?)\s+(led|claimed|rose|significantly|edged|delivered)/gi,
+                    (match, emoji, name, verb) => `${emoji} <strong class="font-bold text-white/95">${name}</strong> ${verb}`
+                  );
+                  return (
+                    <li
+                      key={index}
+                      className="flex items-start gap-3 text-sm leading-relaxed text-white/75 hover:text-white/90 transition-colors duration-200"
+                    >
+                      <span className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-yellow-400/70" />
+                      <span dangerouslySetInnerHTML={{ __html: formatted }} />
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           </>
         )}
       </div>
+
+      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 via-black/20 to-transparent pointer-events-none" />
     </section>
   );
 }
