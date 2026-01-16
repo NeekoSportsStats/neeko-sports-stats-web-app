@@ -68,7 +68,7 @@ export async function getPositionTrendData(params: {
 
   const { data: stats, error } = await supabase
     .schema("afl")
-    .from("player_game_stats_canonical")
+    .from("round_player_summary")
     .select(
       `
         player_id,
