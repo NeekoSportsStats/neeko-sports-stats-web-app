@@ -14,7 +14,6 @@ interface RoundPlayerRow {
   team_id: string;
   disposals: number | null;
   goals: number | null;
-  fantasy_score: number | null;
 }
 
 interface PlayerMeta {
@@ -39,20 +38,17 @@ export async function getRoundSummaryData(params: {
 }): Promise<RoundSummaryData> {
   const { season, stat } = params;
 
-  /* ---------- current round ---------- */
+  /* ---------- resolve current round via RPC (ONLY source of truth) ---------- */
 
   const { data: cr, error: crError } = await supabase
     .schema("afl")
-    .from("current_round")
-    .select("round_number")
-    .eq("season", season)
-    .single();
+    .rpc("get_latest_completed_round", { p_season: season });
 
-  if (crError || !cr?.round_number) {
+  if (crError || !cr?.[0]?.round_number) {
     throw new Error("Failed to resolve current round");
   }
 
-  const currentRound = cr.round_number;
+  const currentRound = cr[0].round_number;
 
   /* ---------- round-level stats ---------- */
 
@@ -66,8 +62,7 @@ export async function getRoundSummaryData(params: {
         player_id,
         team_id,
         disposals,
-        goals,
-        fantasy_score
+        goals
       `
     )
     .eq("season", season)
@@ -155,8 +150,7 @@ export async function getRoundSummaryData(params: {
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
-function getStatValue(row: any, stat: StatKey): number {
-  if (stat === "fantasy") return row.fantasy_score ?? 0;
+function getStatValue(row: RoundPlayerRow, stat: StatKey): number {
   if (stat === "disposals") return row.disposals ?? 0;
   if (stat === "goals") return row.goals ?? 0;
   return 0;
