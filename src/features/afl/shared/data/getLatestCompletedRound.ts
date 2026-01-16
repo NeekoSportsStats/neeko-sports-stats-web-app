@@ -2,7 +2,6 @@ import { supabase } from "@/integrations/supabase/client";
 
 export async function getLatestCompletedRound(season: number): Promise<number> {
   const { data, error } = await supabase
-    .schema("afl")
     .rpc("get_latest_completed_round", { p_season: season });
 
   if (error) {

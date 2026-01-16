@@ -75,7 +75,6 @@ export async function getPositionTrendData(params: {
   }
 
   const { data: stats, error } = await supabase
-    .schema("afl")
     .from("round_player_summary")
     .select(
       `
@@ -99,7 +98,6 @@ export async function getPositionTrendData(params: {
   const playerIds = Array.from(new Set(rows.map((r) => r.player_id)));
 
   const { data: players } = await supabase
-    .schema("afl")
     .from("players")
     .select("id, name")
     .in("id", playerIds);

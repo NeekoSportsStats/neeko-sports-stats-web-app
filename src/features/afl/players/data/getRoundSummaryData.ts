@@ -11,7 +11,6 @@ export async function getRoundSummaryData(): Promise<RoundSummaryData> {
   /* ------------------------------------------------------------------ */
 
   const { data: roundRows, error: roundErr } = await supabase
-    .schema("afl")
     .from("round_player_summary")
     .select("season, round_number")
     .order("round_number", { ascending: false })
@@ -28,7 +27,6 @@ export async function getRoundSummaryData(): Promise<RoundSummaryData> {
   /* ------------------------------------------------------------------ */
 
   const { data: roundPlayers, error: rpError } = await supabase
-    .schema("afl")
     .from("round_player_summary")
     .select("player_id, disposals, goals")
     .eq("season", season)
@@ -45,7 +43,6 @@ export async function getRoundSummaryData(): Promise<RoundSummaryData> {
   const playerIds = [...new Set(roundPlayers.map((p) => p.player_id))];
 
   const { data: players } = await supabase
-    .schema("afl")
     .from("players")
     .select("id, name")
     .in("id", playerIds);
@@ -67,7 +64,6 @@ export async function getRoundSummaryData(): Promise<RoundSummaryData> {
   /* ------------------------------------------------------------------ */
 
   const { data: seasonAvgs } = await supabase
-    .schema("afl")
     .from("player_season_averages")
     .select("player_id, avg_disposals, games_played")
     .eq("season", season)
