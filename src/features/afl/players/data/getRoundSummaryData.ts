@@ -17,7 +17,6 @@ interface RoundPlayerRow {
 
 interface Last10Row {
   player_id: string;
-  rounds_played: number;
   disposals_volatility: number | null;
   goals_volatility: number | null;
 }
@@ -84,15 +83,14 @@ export async function getRoundSummaryData(params: {
     (players ?? []).map((p) => [p.id, p.name])
   );
 
-  /* ---------- last 10 summary ---------- */
+  /* ---------- last 10 consistency ---------- */
 
   const { data: last10 } = await supabase
     .schema("afl")
-    .from("last_10_player_summary")
+    .from("last_10_player_consistency")
     .select(
       `
         player_id,
-        rounds_played,
         disposals_volatility,
         goals_volatility
       `
@@ -101,6 +99,14 @@ export async function getRoundSummaryData(params: {
 
   const last10Map = new Map(
     (last10 ?? []).map((r: Last10Row) => [r.player_id, r])
+  );
+
+  /* ---------- league baseline (last 10 rounds) ---------- */
+
+  const leagueRecentAverage = calculateLeagueRecentAverage(
+    roundStats,
+    stat,
+    currentRound
   );
 
   /* ---------------------------------------------------------------------- */
@@ -115,7 +121,7 @@ export async function getRoundSummaryData(params: {
     currentRound,
     selectedStat: stat,
     availableStats: AFL_STAT_CONFIG.availableStats.filter(
-      (s) => s !== "fantasy" // fantasy intentionally disabled
+      (s) => s !== "fantasy"
     ),
     labels: AFL_STAT_CONFIG.labels,
     units: AFL_STAT_CONFIG.units,
@@ -139,7 +145,8 @@ export async function getRoundSummaryData(params: {
     mostConsistent: calculateMostConsistent(
       last10Map,
       playerMap,
-      stat
+      stat,
+      leagueRecentAverage
     ),
   };
 }
@@ -176,6 +183,22 @@ function buildMomentumSparkline(
   }
 
   return out.slice(-10);
+}
+
+function calculateLeagueRecentAverage(
+  rows: RoundPlayerRow[],
+  stat: StatKey,
+  currentRound: number
+): number {
+  const start = Math.max(1, currentRound - 9);
+  const vals = rows
+    .filter((r) => r.round_number >= start)
+    .map((r) => getStatValue(r, stat))
+    .filter((v) => v > 0);
+
+  return vals.length
+    ? vals.reduce((a, b) => a + b, 0) / vals.length
+    : 1;
 }
 
 function calculateTopScorer(
@@ -231,7 +254,8 @@ function calculateBiggestRiser(
 function calculateMostConsistent(
   last10: Map<string, Last10Row>,
   players: Map<string, string>,
-  stat: StatKey
+  stat: StatKey,
+  leagueAverage: number
 ) {
   let best = { name: "—", percentage: 0 };
 
@@ -241,9 +265,15 @@ function calculateMostConsistent(
         ? row.goals_volatility
         : row.disposals_volatility;
 
-    if (!volatility || row.rounds_played < 3) return;
+    if (!volatility) return;
 
-    const score = Math.round(100 * (1 - volatility / 10));
+    const score = Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(100 * (1 - volatility / Math.max(leagueAverage, 1)))
+      )
+    );
 
     if (score > best.percentage) {
       best = {
