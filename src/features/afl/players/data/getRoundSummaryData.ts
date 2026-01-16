@@ -7,26 +7,26 @@ import { AFL_STAT_CONFIG } from "@/lib/stats/afl/statConfig";
 /* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
 
-interface CurrentRoundRow {
+interface RoundPlayerRow {
+  season: number;
+  round_number: number;
   player_id: string;
-  player_name: string;
   team_id: string;
   disposals: number | null;
   goals: number | null;
   fantasy_score: number | null;
 }
 
-interface Last10Row {
-  player_id: string;
-  disposals_avg: number | null;
-  disposals_volatility: number | null;
-  goals_avg: number | null;
-  rounds_played: number;
+interface PlayerMeta {
+  id: string;
+  name: string;
 }
 
-interface RoundAverageRow {
-  round_number: number;
-  avg_value: number;
+interface Last10Row {
+  player_id: string;
+  rounds_played: number;
+  disposals_volatility?: number | null;
+  goals_volatility?: number | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -39,102 +39,86 @@ export async function getRoundSummaryData(params: {
 }): Promise<RoundSummaryData> {
   const { season, stat } = params;
 
-  /* ---------- resolve current round (Phase A canonical) ---------- */
+  /* ---------- current round ---------- */
 
-  const { data: roundData, error: roundError } = await supabase
+  const { data: cr, error: crError } = await supabase
     .schema("afl")
     .from("current_round")
-    .select("current_round")
+    .select("round_number")
     .eq("season", season)
     .single();
 
-  if (roundError || !roundData) {
+  if (crError || !cr?.round_number) {
     throw new Error("Failed to resolve current round");
   }
 
-  const currentRound = roundData.current_round;
+  const currentRound = cr.round_number;
 
-  /* ---------- current round snapshot ---------- */
+  /* ---------- round-level stats ---------- */
 
-  const { data: currentRoundPlayers, error: currentError } =
-    await supabase
-      .schema("afl")
-      .from("current_round_player_summary")
-      .select(`
+  const { data: roundStats, error: rsError } = await supabase
+    .schema("afl")
+    .from("round_player_summary")
+    .select(
+      `
+        season,
+        round_number,
         player_id,
-        player_name,
         team_id,
         disposals,
         goals,
         fantasy_score
-      `);
+      `
+    )
+    .eq("season", season)
+    .lte("round_number", currentRound);
 
-  if (currentError || !currentRoundPlayers?.length) {
-    throw new Error("No current round data available");
+  if (rsError || !roundStats?.length) {
+    throw new Error("No round player stats available");
   }
 
-  /* ---------- previous round snapshot (for riser) ---------- */
+  /* ---------- player names ---------- */
 
-  const { data: previousRoundPlayers } = await supabase
+  const playerIds = Array.from(
+    new Set(roundStats.map((r) => r.player_id))
+  );
+
+  const { data: players } = await supabase
     .schema("afl")
-    .from("round_player_summary")
-    .select(`
-      player_id,
-      disposals,
-      goals,
-      fantasy_score
-    `)
-    .eq("season", season)
-    .eq("round_number", currentRound - 1);
+    .from("players")
+    .select("id, name")
+    .in("id", playerIds);
 
-  /* ---------- last 10 summary (Phase A canonical) ---------- */
+  const playerMap = new Map(
+    (players ?? []).map((p: PlayerMeta) => [p.id, p.name])
+  );
 
-  const { data: last10, error: last10Error } = await supabase
+  /* ---------- last 10 summary ---------- */
+
+  const { data: last10 } = await supabase
     .schema("afl")
     .from("last_10_player_summary")
-    .select(`
-      player_id,
-      disposals_avg,
-      disposals_volatility,
-      goals_avg,
-      rounds_played
-    `);
+    .select(
+      `
+        player_id,
+        rounds_played,
+        disposals_volatility,
+        goals_volatility
+      `
+    )
+    .eq("season", season);
 
-  if (last10Error || !last10?.length) {
-    throw new Error("Last 10 summary unavailable");
-  }
-
-  /* ---------- momentum pulse (league averages) ---------- */
-
-  const { data: momentumRows } = await supabase
-    .schema("afl")
-    .from("round_player_summary")
-    .select(`
-      round_number,
-      ${stat === "fantasy"
-        ? "AVG(fantasy_score)"
-        : stat === "goals"
-        ? "AVG(goals)"
-        : "AVG(disposals)"} as avg_value
-    `)
-    .eq("season", season)
-    .gte("round_number", currentRound - 9)
-    .lte("round_number", currentRound)
-    .group("round_number")
-    .order("round_number", { ascending: true });
-
-  /* ---------------------------------------------------------------------- */
-  /* DERIVED (SAFE)                                                          */
-  /* ---------------------------------------------------------------------- */
-
-  const topScorer = getTopScorer(currentRoundPlayers, stat);
-  const biggestRiser = getBiggestRiser(
-    currentRoundPlayers,
-    previousRoundPlayers ?? [],
-    stat
+  const last10Map = new Map(
+    (last10 ?? []).map((r: Last10Row) => [r.player_id, r])
   );
-  const mostConsistent = getMostConsistent(last10, currentRoundPlayers);
-  const sparkline = buildSparkline(momentumRows ?? [], currentRound);
+
+  /* ---------------------------------------------------------------------- */
+  /* DERIVED DATA                                                           */
+  /* ---------------------------------------------------------------------- */
+
+  const currentRoundRows = roundStats.filter(
+    (r) => r.round_number === currentRound
+  );
 
   return {
     currentRound,
@@ -144,51 +128,105 @@ export async function getRoundSummaryData(params: {
     units: AFL_STAT_CONFIG.units,
     description: AFL_STAT_CONFIG.descriptions?.[stat],
 
-    sparkline,
-    topScorer,
-    biggestRiser,
-    mostConsistent,
+    sparkline: buildMomentumSparkline(roundStats, stat, currentRound),
+
+    topScorer: calculateTopScorer(
+      currentRoundRows,
+      stat,
+      playerMap
+    ),
+
+    biggestRiser: calculateBiggestRiser(
+      roundStats,
+      currentRoundRows,
+      stat,
+      playerMap
+    ),
+
+    mostConsistent: calculateMostConsistent(
+      last10Map,
+      playerMap,
+      stat
+    ),
   };
 }
 
 /* -------------------------------------------------------------------------- */
-/* HELPERS (PHASE A SAFE)                                                     */
+/* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
-function getStatValue(
-  row: { disposals: number | null; goals: number | null; fantasy_score: number | null },
-  stat: StatKey
-): number {
+function getStatValue(row: any, stat: StatKey): number {
   if (stat === "fantasy") return row.fantasy_score ?? 0;
+  if (stat === "disposals") return row.disposals ?? 0;
   if (stat === "goals") return row.goals ?? 0;
-  return row.disposals ?? 0;
+  return 0;
 }
 
-function getTopScorer(rows: CurrentRoundRow[], stat: StatKey) {
+function buildMomentumSparkline(
+  rows: RoundPlayerRow[],
+  stat: StatKey,
+  currentRound: number
+): number[] {
+  const start = Math.max(1, currentRound - 9);
+  const out: number[] = [];
+
+  for (let r = start; r <= currentRound; r++) {
+    const vals = rows
+      .filter((x) => x.round_number === r)
+      .map((x) => getStatValue(x, stat))
+      .filter((v) => v > 0);
+
+    out.push(
+      vals.length
+        ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
+        : out[out.length - 1] ?? 0
+    );
+  }
+
+  return out.slice(-10);
+}
+
+function calculateTopScorer(
+  rows: RoundPlayerRow[],
+  stat: StatKey,
+  players: Map<string, string>
+) {
   const top = [...rows].sort(
     (a, b) => getStatValue(b, stat) - getStatValue(a, stat)
   )[0];
 
   return top
-    ? { name: top.player_name, value: getStatValue(top, stat) }
+    ? {
+        name: players.get(top.player_id) ?? "—",
+        value: getStatValue(top, stat),
+      }
     : { name: "—", value: 0 };
 }
 
-function getBiggestRiser(
-  current: CurrentRoundRow[],
-  previous: any[],
-  stat: StatKey
+function calculateBiggestRiser(
+  history: RoundPlayerRow[],
+  current: RoundPlayerRow[],
+  stat: StatKey,
+  players: Map<string, string>
 ) {
   let best = { name: "—", diff: 0, currentValue: 0 };
 
   current.forEach((p) => {
-    const prev = previous.find((x) => x.player_id === p.player_id);
+    const prev = history
+      .filter(
+        (h) =>
+          h.player_id === p.player_id &&
+          h.round_number < p.round_number
+      )
+      .sort((a, b) => b.round_number - a.round_number)[0];
+
     if (!prev) return;
 
     const diff = getStatValue(p, stat) - getStatValue(prev, stat);
+
     if (diff > best.diff) {
       best = {
-        name: p.player_name,
+        name: players.get(p.player_id) ?? "—",
         diff: Math.round(diff),
         currentValue: getStatValue(p, stat),
       };
@@ -198,42 +236,30 @@ function getBiggestRiser(
   return best;
 }
 
-function getMostConsistent(
-  last10: Last10Row[],
-  current: CurrentRoundRow[]
+function calculateMostConsistent(
+  last10: Map<string, Last10Row>,
+  players: Map<string, string>,
+  stat: StatKey
 ) {
   let best = { name: "—", percentage: 0 };
 
-  last10.forEach((p) => {
-    if (p.rounds_played < 6) return;
-    if (!p.disposals_avg || !p.disposals_volatility) return;
+  last10.forEach((row, pid) => {
+    const volatility =
+      stat === "goals"
+        ? row.goals_volatility
+        : row.disposals_volatility;
 
-    const score = Math.round(
-      100 * (1 - p.disposals_volatility / p.disposals_avg)
-    );
+    if (!volatility || row.rounds_played < 3) return;
+
+    const score = Math.round(100 * (1 - volatility / 10));
 
     if (score > best.percentage) {
-      const player = current.find((c) => c.player_id === p.player_id);
       best = {
-        name: player?.player_name ?? "—",
+        name: players.get(pid) ?? "—",
         percentage: score,
       };
     }
   });
 
   return best;
-}
-
-function buildSparkline(
-  rows: RoundAverageRow[],
-  currentRound: number
-): number[] {
-  const map = new Map(rows.map((r) => [r.round_number, Math.round(r.avg_value)]));
-
-  const out: number[] = [];
-  for (let r = currentRound - 9; r <= currentRound; r++) {
-    out.push(map.get(r) ?? out[out.length - 1] ?? 0);
-  }
-
-  return out;
 }
