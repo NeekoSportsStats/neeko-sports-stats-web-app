@@ -13,6 +13,7 @@ export interface RoundMomentumData {
     roundValue: number;
   };
   roundAverage: number;
+  keyPoints: string[];
 }
 
 export async function getRoundMomentumData(
@@ -34,10 +35,16 @@ export async function getRoundMomentumData(
   }
 
   if (!roundData || roundData.length === 0) {
+    const statLabel = stat === "goals" ? "goals" : "disposals";
     return {
       topScore: { playerName: "—", value: 0 },
       biggestOverperformer: { playerName: "—", diff: 0, roundValue: 0 },
       roundAverage: 0,
+      keyPoints: [
+        `⭐ No standout ${statLabel} performance this round.`,
+        "📈 No major overperformers emerged this round.",
+        "🧠 Awaiting more data for meaningful league insights.",
+      ],
     };
   }
 
@@ -130,9 +137,55 @@ export async function getRoundMomentumData(
   const roundAverage =
     roundData.length > 0 ? totalValue / roundData.length : 0;
 
+  const statLabel = stat === "goals" ? "goals" : "disposals";
+  const keyPoints: string[] = [];
+
+  if (topScorePlayer.value > 0) {
+    keyPoints.push(
+      `⭐ ${topScorePlayer.playerName} led the round with ${topScorePlayer.value} ${statLabel}.`
+    );
+  } else {
+    keyPoints.push(`⭐ No standout ${statLabel} performance this round.`);
+  }
+
+  if (biggestOverperformer.diff >= 5) {
+    keyPoints.push(
+      `📈 ${biggestOverperformer.playerName} significantly exceeded their season average (+${biggestOverperformer.diff.toFixed(1)}).`
+    );
+  } else if (biggestOverperformer.diff > 0) {
+    keyPoints.push(
+      `📈 ${biggestOverperformer.playerName} edged above their season average.`
+    );
+  } else {
+    keyPoints.push("📈 No major overperformers emerged this round.");
+  }
+
+  if (stat === "goals") {
+    if (roundAverage >= 2.5) {
+      keyPoints.push("🧠 League-wide goal output was strong this round.");
+    } else if (roundAverage >= 1.5) {
+      keyPoints.push("🧠 Goal numbers sat around typical league levels.");
+    } else if (roundAverage > 0) {
+      keyPoints.push("🧠 A lower-scoring round, suggesting tighter contests.");
+    } else {
+      keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
+    }
+  } else {
+    if (roundAverage >= 25) {
+      keyPoints.push("🧠 League-wide disposal output was strong this round.");
+    } else if (roundAverage >= 20) {
+      keyPoints.push("🧠 Disposal numbers sat around typical league levels.");
+    } else if (roundAverage > 0) {
+      keyPoints.push("🧠 A lower-disposal round, suggesting tighter contests.");
+    } else {
+      keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
+    }
+  }
+
   return {
     topScore: topScorePlayer,
     biggestOverperformer,
     roundAverage,
+    keyPoints,
   };
 }
