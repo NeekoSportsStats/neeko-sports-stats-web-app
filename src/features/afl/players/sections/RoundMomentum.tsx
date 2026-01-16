@@ -49,52 +49,57 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
         "shadow-2xl"
       )}
     >
-      <div className="mb-6">
+      <div className="mb-8">
         <h2 className="text-2xl font-bold text-white">Round Momentum</h2>
         <p className="mt-1.5 text-sm text-white/60">
           Latest completed round
         </p>
       </div>
 
-      <div className="mb-6 flex flex-wrap gap-2">
-        <button
-          onClick={() => onStatChange("disposals")}
-          disabled={stat === "disposals"}
-          className={cn(
-            "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-all",
-            stat === "disposals"
-              ? "bg-yellow-400 text-black shadow-[0_0_20px_rgba(250,204,21,0.4)]"
-              : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-          )}
-        >
-          Disposals
-        </button>
+      <div className="mb-8">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-white/40">
+          Stat Lens
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => onStatChange("disposals")}
+            disabled={stat === "disposals"}
+            className={cn(
+              "rounded-full px-5 py-2.5 text-xs font-bold uppercase tracking-wider transition-all",
+              stat === "disposals"
+                ? "bg-yellow-400 text-black shadow-[0_0_24px_rgba(250,204,21,0.5)]"
+                : "border border-white/10 bg-white/5 text-white/60 hover:border-white/20 hover:bg-white/10 hover:text-white"
+            )}
+          >
+            Disposals
+          </button>
 
-        <button
-          onClick={() => onStatChange("goals")}
-          disabled={stat === "goals"}
-          className={cn(
-            "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-all",
-            stat === "goals"
-              ? "bg-yellow-400 text-black shadow-[0_0_20px_rgba(250,204,21,0.4)]"
-              : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-          )}
-        >
-          Goals
-        </button>
+          <button
+            onClick={() => onStatChange("goals")}
+            disabled={stat === "goals"}
+            className={cn(
+              "rounded-full px-5 py-2.5 text-xs font-bold uppercase tracking-wider transition-all",
+              stat === "goals"
+                ? "bg-yellow-400 text-black shadow-[0_0_24px_rgba(250,204,21,0.5)]"
+                : "border border-white/10 bg-white/5 text-white/60 hover:border-white/20 hover:bg-white/10 hover:text-white"
+            )}
+          >
+            Goals
+          </button>
 
-        <button
-          onClick={() => onStatChange("fantasy")}
-          disabled={stat === "fantasy"}
-          className={cn(
-            "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-all",
-            stat === "fantasy"
-              ? "bg-yellow-400 text-black shadow-[0_0_20px_rgba(250,204,21,0.4)]"
-              : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-          )}
-        >
-          Fantasy
-        </button>
+          <button
+            onClick={() => onStatChange("fantasy")}
+            disabled={stat === "fantasy"}
+            className={cn(
+              "rounded-full px-5 py-2.5 text-xs font-bold uppercase tracking-wider transition-all",
+              stat === "fantasy"
+                ? "bg-yellow-400 text-black shadow-[0_0_24px_rgba(250,204,21,0.5)]"
+                : "border border-white/10 bg-white/5 text-white/60 hover:border-white/20 hover:bg-white/10 hover:text-white"
+            )}
+          >
+            Fantasy
+          </button>
+        </div>
       </div>
 
       {loading && (
@@ -115,135 +120,144 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
 
       {data && !loading && !error && (
         <>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-3">
             <div
               className={cn(
-                "relative overflow-hidden rounded-xl border border-white/10",
-                "bg-black/60 px-4 py-5 backdrop-blur-xl",
-                "shadow-[0_0_18px_rgba(0,0,0,0.7)]"
+                "group relative overflow-hidden rounded-2xl border border-white/10",
+                "bg-black/60 px-5 py-6 backdrop-blur-xl",
+                "shadow-[0_0_20px_rgba(0,0,0,0.8)]",
+                "transition-transform duration-200 hover:-translate-y-0.5",
+                "min-h-[180px] flex flex-col"
               )}
             >
-              <div className="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-yellow-500/10 via-transparent to-transparent" />
+              <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-yellow-500/15 via-yellow-500/5 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-              <div className="relative space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-yellow-500/15">
-                    <Trophy className="h-4 w-4 text-yellow-300" />
+              <div className="relative flex flex-col h-full">
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-yellow-500/20 shadow-[0_0_12px_rgba(234,179,8,0.3)]">
+                    <Trophy className="h-4.5 w-4.5 text-yellow-300" />
                   </div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-yellow-200">
+                  <p className="text-xs font-bold uppercase tracking-wider text-yellow-200/90">
                     {statLabel} Leader
                   </p>
                 </div>
 
                 {data.topScore.playerName === "—" ? (
                   <>
-                    <p className="text-3xl font-bold text-white/40">—</p>
+                    <p className="text-4xl font-bold text-white/40 mb-2">—</p>
                     <p className="text-sm text-white/50">Awaiting more games</p>
                   </>
                 ) : (
-                  <>
-                    <p className="text-3xl font-bold text-white">
+                  <div className="flex flex-col gap-2">
+                    <p className="text-5xl font-bold text-white leading-none">
                       {stat === "fantasy" ? Math.round(data.topScore.value) : data.topScore.value}
                     </p>
-                    <p className="text-sm text-white/70">
+                    <p className="text-sm font-medium text-white/60">
                       {data.topScore.playerName}
                     </p>
-                    <p className="text-xs text-white/50">
+                    <p className="text-xs text-white/40 mt-auto">
                       {statLabel} this round
                     </p>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
 
             <div
               className={cn(
-                "relative overflow-hidden rounded-xl border border-white/10",
-                "bg-black/60 px-4 py-5 backdrop-blur-xl",
-                "shadow-[0_0_18px_rgba(0,0,0,0.7)]"
+                "group relative overflow-hidden rounded-2xl border border-white/10",
+                "bg-black/60 px-5 py-6 backdrop-blur-xl",
+                "shadow-[0_0_20px_rgba(0,0,0,0.8)]",
+                "transition-transform duration-200 hover:-translate-y-0.5",
+                "min-h-[180px] flex flex-col"
               )}
             >
-              <div className="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-emerald-500/10 via-transparent to-transparent" />
+              <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-emerald-500/15 via-emerald-500/5 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-              <div className="relative space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15">
-                    <TrendingUp className="h-4 w-4 text-emerald-300" />
+              <div className="relative flex flex-col h-full">
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+                    <TrendingUp className="h-4.5 w-4.5 text-emerald-300" />
                   </div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-200">
+                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-200/90">
                     Overperformer
                   </p>
                 </div>
 
                 {data.biggestOverperformer.playerName === "—" ? (
                   <>
-                    <p className="text-3xl font-bold text-white/40">—</p>
+                    <p className="text-4xl font-bold text-white/40 mb-2">—</p>
                     <p className="text-sm text-white/50">Awaiting season data</p>
                   </>
                 ) : (
-                  <>
-                    <p className="text-3xl font-bold text-emerald-300">
+                  <div className="flex flex-col gap-2">
+                    <p className="text-5xl font-bold text-emerald-300 leading-none">
                       +{data.biggestOverperformer.diff.toFixed(1)}
                     </p>
-                    <p className="text-sm text-white/70">
+                    <p className="text-sm font-medium text-white/60">
                       {data.biggestOverperformer.playerName}
                     </p>
-                    <p className="text-xs text-white/50">
+                    <p className="text-xs text-white/40 mt-auto">
                       {stat === "fantasy" ? Math.round(data.biggestOverperformer.roundValue) : data.biggestOverperformer.roundValue} {statLabel.toLowerCase()} vs season avg
                     </p>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
 
             <div
               className={cn(
-                "relative overflow-hidden rounded-xl border border-white/10",
-                "bg-black/60 px-4 py-5 backdrop-blur-xl",
-                "shadow-[0_0_18px_rgba(0,0,0,0.7)]"
+                "group relative overflow-hidden rounded-2xl border border-white/10",
+                "bg-black/60 px-5 py-6 backdrop-blur-xl",
+                "shadow-[0_0_20px_rgba(0,0,0,0.8)]",
+                "transition-transform duration-200 hover:-translate-y-0.5",
+                "min-h-[180px] flex flex-col"
               )}
             >
-              <div className="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-sky-500/10 via-transparent to-transparent" />
+              <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-slate-500/15 via-slate-500/5 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-              <div className="relative space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-500/15">
-                    <Users className="h-4 w-4 text-sky-300" />
+              <div className="relative flex flex-col h-full">
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-500/20 shadow-[0_0_12px_rgba(148,163,184,0.3)]">
+                    <Users className="h-4.5 w-4.5 text-slate-300" />
                   </div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-sky-200">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-200/90">
                     Round Average
                   </p>
                 </div>
 
                 {data.roundAverage === 0 ? (
                   <>
-                    <p className="text-3xl font-bold text-white/40">—</p>
+                    <p className="text-4xl font-bold text-white/40 mb-2">—</p>
                     <p className="text-sm text-white/50">Awaiting more games</p>
                   </>
                 ) : (
-                  <>
-                    <p className="text-3xl font-bold text-white">
+                  <div className="flex flex-col gap-2">
+                    <p className="text-5xl font-bold text-white leading-none">
                       {stat === "fantasy" ? Math.round(data.roundAverage) : data.roundAverage.toFixed(1)}
                     </p>
-                    <p className="text-sm text-white/70">League-wide snapshot</p>
-                    <p className="text-xs text-white/50">
+                    <p className="text-sm font-medium text-white/60">League-wide snapshot</p>
+                    <p className="text-xs text-white/40 mt-auto">
                       Avg {statLabel.toLowerCase()} per player
                     </p>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="mt-6 rounded-xl border border-white/10 bg-black/40 px-5 py-4">
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-yellow-400/90">
-              Key Points
+          <div className="mt-8 rounded-2xl border border-white/10 bg-black/50 px-6 py-5">
+            <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-yellow-400/80">
+              Key Takeaways
             </h3>
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {data.keyPoints.map((point, index) => (
                 <li
                   key={index}
-                  className="text-sm leading-relaxed text-white/70"
+                  className="text-[13px] leading-relaxed text-white/65"
                 >
                   {point}
                 </li>
