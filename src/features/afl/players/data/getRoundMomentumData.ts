@@ -38,9 +38,8 @@ export async function getRoundMomentumData(
   stat: RoundStat
 ): Promise<RoundMomentumData> {
   const { data: roundData, error: roundError } = await supabase
-    .schema("afl")
     .from("round_player_summary")
-    .select("player_id, disposals, goals, round")
+    .select("player_id, disposals, goals, round_number")
     .eq("season", season);
 
   if (roundError) {
@@ -63,13 +62,12 @@ export async function getRoundMomentumData(
     };
   }
 
-  const currentRound = Math.max(...roundData.map((r) => r.round));
+  const currentRound = Math.max(...roundData.map((r) => r.round_number));
   const isGrandFinal = currentRound >= 28;
 
-  const latestRoundData = roundData.filter((r) => r.round === currentRound);
+  const latestRoundData = roundData.filter((r) => r.round_number === currentRound);
 
   const { data: seasonAvgs, error: avgError } = await supabase
-    .schema("afl")
     .from("player_season_averages")
     .select("player_id, games_played, avg_disposals, avg_goals")
     .eq("season", season);
@@ -83,7 +81,6 @@ export async function getRoundMomentumData(
   );
 
   const { data: players, error: playersError } = await supabase
-    .schema("afl")
     .from("players")
     .select("id, name")
     .in("id", playerIds);
