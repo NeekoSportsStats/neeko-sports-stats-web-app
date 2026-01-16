@@ -8,10 +8,18 @@ interface RoundMomentumProps {
   onStatChange: (stat: RoundStat) => void;
 }
 
+function getStatLabel(stat: RoundStat): string {
+  if (stat === "goals") return "Goals";
+  if (stat === "disposals") return "Disposals";
+  return "Fantasy";
+}
+
 export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps) {
   const [data, setData] = useState<RoundMomentumData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const statLabel = getStatLabel(stat);
 
   useEffect(() => {
     const loadData = async () => {
@@ -76,8 +84,14 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
         </button>
 
         <button
-          disabled
-          className="cursor-not-allowed rounded-full bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white/40 opacity-40"
+          onClick={() => onStatChange("fantasy")}
+          disabled={stat === "fantasy"}
+          className={cn(
+            "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-all",
+            stat === "fantasy"
+              ? "bg-yellow-400 text-black shadow-[0_0_20px_rgba(250,204,21,0.4)]"
+              : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+          )}
         >
           Fantasy
         </button>
@@ -117,7 +131,7 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
                     <Trophy className="h-4 w-4 text-yellow-300" />
                   </div>
                   <p className="text-xs font-bold uppercase tracking-wider text-yellow-200">
-                    Top Score
+                    {statLabel} Leader
                   </p>
                 </div>
 
@@ -129,13 +143,13 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
                 ) : (
                   <>
                     <p className="text-3xl font-bold text-white">
-                      {data.topScore.value}
+                      {stat === "fantasy" ? Math.round(data.topScore.value) : data.topScore.value}
                     </p>
                     <p className="text-sm text-white/70">
                       {data.topScore.playerName}
                     </p>
                     <p className="text-xs text-white/50">
-                      {stat.charAt(0).toUpperCase() + stat.slice(1)} this round
+                      {statLabel} this round
                     </p>
                   </>
                 )}
@@ -175,7 +189,7 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
                       {data.biggestOverperformer.playerName}
                     </p>
                     <p className="text-xs text-white/50">
-                      {data.biggestOverperformer.roundValue} {stat} vs season avg
+                      {stat === "fantasy" ? Math.round(data.biggestOverperformer.roundValue) : data.biggestOverperformer.roundValue} {statLabel.toLowerCase()} vs season avg
                     </p>
                   </>
                 )}
@@ -209,11 +223,11 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
                 ) : (
                   <>
                     <p className="text-3xl font-bold text-white">
-                      {data.roundAverage.toFixed(1)}
+                      {stat === "fantasy" ? Math.round(data.roundAverage) : data.roundAverage.toFixed(1)}
                     </p>
                     <p className="text-sm text-white/70">League-wide snapshot</p>
                     <p className="text-xs text-white/50">
-                      Avg {stat} per player
+                      Avg {statLabel.toLowerCase()} per player
                     </p>
                   </>
                 )}

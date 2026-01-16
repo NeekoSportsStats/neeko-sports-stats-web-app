@@ -16,14 +16,25 @@ export interface RoundMomentumData {
   keyPoints: string[];
 }
 
+function getStatValue(stat: RoundStat, disposals: number | null, goals: number | null): number {
+  const d = disposals ?? 0;
+  const g = goals ?? 0;
+
+  if (stat === "goals") return g;
+  if (stat === "disposals") return d;
+  return d * 1 + g * 6;
+}
+
+function getStatLabel(stat: RoundStat): string {
+  if (stat === "goals") return "goals";
+  if (stat === "disposals") return "disposals";
+  return "fantasy points";
+}
+
 export async function getRoundMomentumData(
   season: number,
   stat: RoundStat
 ): Promise<RoundMomentumData> {
-  if (stat === "fantasy") {
-    throw new Error("Fantasy stats not yet implemented");
-  }
-
   const { data: roundData, error: roundError } = await supabase
     .schema("afl")
     .from("round_player_summary")
@@ -35,7 +46,7 @@ export async function getRoundMomentumData(
   }
 
   if (!roundData || roundData.length === 0) {
-    const statLabel = stat === "goals" ? "goals" : "disposals";
+    const statLabel = getStatLabel(stat);
     return {
       topScore: { playerName: "—", value: 0 },
       biggestOverperformer: { playerName: "—", diff: 0, roundValue: 0 },
@@ -79,14 +90,20 @@ export async function getRoundMomentumData(
   let avgMapFiltered = new Map(
     (seasonAvgs || [])
       .filter((a) => a.games_played >= 5)
-      .map((a) => [a.player_id, stat === "goals" ? a.avg_goals : a.avg_disposals])
+      .map((a) => [
+        a.player_id,
+        getStatValue(stat, a.avg_disposals, a.avg_goals),
+      ])
   );
 
   if (avgMapFiltered.size === 0) {
     avgMapFiltered = new Map(
       (seasonAvgs || [])
         .filter((a) => a.games_played >= 1)
-        .map((a) => [a.player_id, stat === "goals" ? a.avg_goals : a.avg_disposals])
+        .map((a) => [
+          a.player_id,
+          getStatValue(stat, a.avg_disposals, a.avg_goals),
+        ])
     );
   }
 
@@ -96,7 +113,7 @@ export async function getRoundMomentumData(
   let maxValue = -1;
 
   for (const row of roundData) {
-    const value = (stat === "goals" ? row.goals : row.disposals) ?? 0;
+    const value = getStatValue(stat, row.disposals, row.goals);
     if (value > maxValue) {
       maxValue = value;
       topScorePlayer = {
@@ -114,7 +131,7 @@ export async function getRoundMomentumData(
   let maxDiff = -Infinity;
 
   for (const row of roundData) {
-    const roundValue = (stat === "goals" ? row.goals : row.disposals) ?? 0;
+    const roundValue = getStatValue(stat, row.disposals, row.goals);
     const avgValue = avgMap.get(row.player_id);
 
     if (avgValue !== undefined) {
@@ -131,13 +148,13 @@ export async function getRoundMomentumData(
   }
 
   const totalValue = roundData.reduce(
-    (sum, r) => sum + ((stat === "goals" ? r.goals : r.disposals) ?? 0),
+    (sum, r) => sum + getStatValue(stat, r.disposals, r.goals),
     0
   );
   const roundAverage =
     roundData.length > 0 ? totalValue / roundData.length : 0;
 
-  const statLabel = stat === "goals" ? "goals" : "disposals";
+  const statLabel = getStatLabel(stat);
   const keyPoints: string[] = [];
 
   if (topScorePlayer.value > 0) {
@@ -170,13 +187,23 @@ export async function getRoundMomentumData(
     } else {
       keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
     }
-  } else {
+  } else if (stat === "disposals") {
     if (roundAverage >= 25) {
       keyPoints.push("🧠 League-wide disposal output was strong this round.");
     } else if (roundAverage >= 20) {
       keyPoints.push("🧠 Disposal numbers sat around typical league levels.");
     } else if (roundAverage > 0) {
       keyPoints.push("🧠 A lower-disposal round, suggesting tighter contests.");
+    } else {
+      keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
+    }
+  } else {
+    if (roundAverage >= 90) {
+      keyPoints.push("🧠 League-wide fantasy output was strong this round.");
+    } else if (roundAverage >= 70) {
+      keyPoints.push("🧠 Fantasy numbers sat around typical league levels.");
+    } else if (roundAverage > 0) {
+      keyPoints.push("🧠 A lower-fantasy round, suggesting tighter contests.");
     } else {
       keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
     }
