@@ -11,21 +11,15 @@ interface RoundPlayerRow {
   season: number;
   round_number: number;
   player_id: string;
-  team_id: string;
   disposals: number | null;
   goals: number | null;
-}
-
-interface PlayerMeta {
-  id: string;
-  name: string;
 }
 
 interface Last10Row {
   player_id: string;
   rounds_played: number;
-  disposals_volatility?: number | null;
-  goals_volatility?: number | null;
+  disposals_volatility: number | null;
+  goals_volatility: number | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -38,19 +32,22 @@ export async function getRoundSummaryData(params: {
 }): Promise<RoundSummaryData> {
   const { season, stat } = params;
 
-  /* ---------- resolve current round via RPC (ONLY source of truth) ---------- */
+  /* ---------- current round ---------- */
 
   const { data: cr, error: crError } = await supabase
     .schema("afl")
-    .rpc("get_latest_completed_round", { p_season: season });
+    .from("current_round")
+    .select("round_number")
+    .eq("season", season)
+    .single();
 
-  if (crError || !cr?.[0]?.round_number) {
+  if (crError || !cr?.round_number) {
     throw new Error("Failed to resolve current round");
   }
 
-  const currentRound = cr[0].round_number;
+  const currentRound = cr.round_number;
 
-  /* ---------- round-level stats ---------- */
+  /* ---------- round player stats ---------- */
 
   const { data: roundStats, error: rsError } = await supabase
     .schema("afl")
@@ -60,7 +57,6 @@ export async function getRoundSummaryData(params: {
         season,
         round_number,
         player_id,
-        team_id,
         disposals,
         goals
       `
@@ -85,7 +81,7 @@ export async function getRoundSummaryData(params: {
     .in("id", playerIds);
 
   const playerMap = new Map(
-    (players ?? []).map((p: PlayerMeta) => [p.id, p.name])
+    (players ?? []).map((p) => [p.id, p.name])
   );
 
   /* ---------- last 10 summary ---------- */
@@ -118,7 +114,9 @@ export async function getRoundSummaryData(params: {
   return {
     currentRound,
     selectedStat: stat,
-    availableStats: [...AFL_STAT_CONFIG.availableStats],
+    availableStats: AFL_STAT_CONFIG.availableStats.filter(
+      (s) => s !== "fantasy" // fantasy intentionally disabled
+    ),
     labels: AFL_STAT_CONFIG.labels,
     units: AFL_STAT_CONFIG.units,
     description: AFL_STAT_CONFIG.descriptions?.[stat],
@@ -150,7 +148,7 @@ export async function getRoundSummaryData(params: {
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
-function getStatValue(row: RoundPlayerRow, stat: StatKey): number {
+function getStatValue(row: any, stat: StatKey): number {
   if (stat === "disposals") return row.disposals ?? 0;
   if (stat === "goals") return row.goals ?? 0;
   return 0;
