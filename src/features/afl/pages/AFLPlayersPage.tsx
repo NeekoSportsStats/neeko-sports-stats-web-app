@@ -6,11 +6,13 @@ import PositionTrends from "@/features/afl/players/sections/PositionTrends";
 import AIInsights from "@/features/afl/players/sections/AIInsights";
 import MasterTable from "@/features/afl/players/sections/MasterTable";
 import { AFL_STAT_CONFIG } from "@/lib/stats/afl/statConfig";
+import { type RoundStat } from "@/features/afl/players/data/getRoundMomentumData";
 
 export default function AFLPlayersPage() {
   const [activeSection, setActiveSection] = useState("round-momentum");
   const [isStuck, setIsStuck] = useState(false);
   const [showTopButton, setShowTopButton] = useState(false);
+  const [roundStat, setRoundStat] = useState<RoundStat>("disposals");
 
   /* -------------------------------------------------------------------------- */
   /*                         Scroll Spy Section Tracking                        */
@@ -190,7 +192,7 @@ export default function AFLPlayersPage() {
 
       <div className="space-y-20 md:space-y-24">
         <section id="round-momentum" className="scroll-mt-28 animate-premium-section">
-          <RoundMomentum />
+          <RoundMomentum stat={roundStat} onStatChange={setRoundStat} />
         </section>
 
         <section id="form-stability" className="scroll-mt-28 animate-premium-section delay-1">

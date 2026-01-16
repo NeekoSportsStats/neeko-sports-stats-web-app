@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Trophy, TrendingUp, Users } from "lucide-react";
-import { getRoundMomentumData, type RoundMomentumData } from "@/features/afl/players/data/getRoundMomentumData";
+import { getRoundMomentumData, type RoundMomentumData, type RoundStat } from "@/features/afl/players/data/getRoundMomentumData";
 
-export default function RoundMomentum() {
+interface RoundMomentumProps {
+  stat: RoundStat;
+  onStatChange: (stat: RoundStat) => void;
+}
+
+export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps) {
   const [data, setData] = useState<RoundMomentumData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +19,7 @@ export default function RoundMomentum() {
       setError(null);
 
       try {
-        const result = await getRoundMomentumData(2025);
+        const result = await getRoundMomentumData(2025, stat);
         setData(result);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
@@ -26,7 +31,7 @@ export default function RoundMomentum() {
     };
 
     loadData();
-  }, []);
+  }, [stat]);
 
   return (
     <section
@@ -45,6 +50,41 @@ export default function RoundMomentum() {
         <p className="mt-1.5 text-sm text-white/60">
           Latest round snapshot: top performers and league averages
         </p>
+      </div>
+
+      <div className="mb-6 flex flex-wrap gap-2">
+        <button
+          onClick={() => onStatChange("disposals")}
+          disabled={stat === "disposals"}
+          className={cn(
+            "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-all",
+            stat === "disposals"
+              ? "bg-yellow-400 text-black shadow-[0_0_20px_rgba(250,204,21,0.4)]"
+              : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+          )}
+        >
+          Disposals
+        </button>
+
+        <button
+          onClick={() => onStatChange("goals")}
+          disabled={stat === "goals"}
+          className={cn(
+            "rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-all",
+            stat === "goals"
+              ? "bg-yellow-400 text-black shadow-[0_0_20px_rgba(250,204,21,0.4)]"
+              : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+          )}
+        >
+          Goals
+        </button>
+
+        <button
+          disabled
+          className="cursor-not-allowed rounded-full bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white/40 opacity-40"
+        >
+          Fantasy
+        </button>
       </div>
 
       {loading && (
@@ -93,12 +133,14 @@ export default function RoundMomentum() {
                   {data.topScore ? (
                     <>
                       <p className="text-3xl font-bold text-white">
-                        {data.topScore.disposals}
+                        {data.topScore.value}
                       </p>
                       <p className="text-sm text-white/70">
                         {data.topScore.playerName}
                       </p>
-                      <p className="text-xs text-white/50">Disposals this round</p>
+                      <p className="text-xs text-white/50">
+                        {stat.charAt(0).toUpperCase() + stat.slice(1)} this round
+                      </p>
                     </>
                   ) : (
                     <p className="text-sm text-white/50">No data available</p>
@@ -134,7 +176,7 @@ export default function RoundMomentum() {
                         {data.biggestOverperformer.playerName}
                       </p>
                       <p className="text-xs text-white/50">
-                        {data.biggestOverperformer.roundDisposals} disposals vs season avg
+                        {data.biggestOverperformer.roundValue} {stat} vs season avg
                       </p>
                     </>
                   ) : (
@@ -168,7 +210,9 @@ export default function RoundMomentum() {
                         {data.roundAverage.toFixed(1)}
                       </p>
                       <p className="text-sm text-white/70">League-wide</p>
-                      <p className="text-xs text-white/50">Avg disposals per player</p>
+                      <p className="text-xs text-white/50">
+                        Avg {stat} per player
+                      </p>
                     </>
                   ) : (
                     <p className="text-sm text-white/50">No data available</p>

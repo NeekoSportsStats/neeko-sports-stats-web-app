@@ -1,25 +1,32 @@
 import { supabase } from "@/integrations/supabase/client";
 
+export type RoundStat = "disposals" | "goals" | "fantasy";
+
 export interface RoundMomentumData {
   topScore: {
     playerName: string;
-    disposals: number;
+    value: number;
   } | null;
   biggestOverperformer: {
     playerName: string;
     diff: number;
-    roundDisposals: number;
+    roundValue: number;
   } | null;
   roundAverage: number;
 }
 
 export async function getRoundMomentumData(
-  season: number
+  season: number,
+  stat: RoundStat
 ): Promise<RoundMomentumData> {
+  if (stat === "fantasy") {
+    throw new Error("Fantasy stats not yet implemented");
+  }
+
   const { data: roundData, error: roundError } = await supabase
     .schema("afl")
     .from("round_player_summary")
-    .select("player_id, disposals")
+    .select("player_id, disposals, goals")
     .eq("season", season);
 
   if (roundError) {
@@ -37,7 +44,7 @@ export async function getRoundMomentumData(
   const { data: seasonAvgs, error: avgError } = await supabase
     .schema("afl")
     .from("player_season_averages")
-    .select("player_id, games_played, avg_disposals")
+    .select("player_id, games_played, avg_disposals, avg_goals")
     .eq("season", season);
 
   if (avgError) {
@@ -65,19 +72,19 @@ export async function getRoundMomentumData(
   const avgMap = new Map(
     (seasonAvgs || [])
       .filter((a) => a.games_played >= 5)
-      .map((a) => [a.player_id, a.avg_disposals])
+      .map((a) => [a.player_id, stat === "goals" ? a.avg_goals : a.avg_disposals])
   );
 
-  let topScorePlayer: { playerName: string; disposals: number } | null = null;
-  let maxDisposals = -1;
+  let topScorePlayer: { playerName: string; value: number } | null = null;
+  let maxValue = -1;
 
   for (const row of roundData) {
-    const disposals = row.disposals ?? 0;
-    if (disposals > maxDisposals) {
-      maxDisposals = disposals;
+    const value = (stat === "goals" ? row.goals : row.disposals) ?? 0;
+    if (value > maxValue) {
+      maxValue = value;
       topScorePlayer = {
         playerName: nameMap.get(row.player_id) ?? "Unknown",
-        disposals,
+        value,
       };
     }
   }
@@ -85,33 +92,33 @@ export async function getRoundMomentumData(
   let biggestOverperformer: {
     playerName: string;
     diff: number;
-    roundDisposals: number;
+    roundValue: number;
   } | null = null;
   let maxDiff = -Infinity;
 
   for (const row of roundData) {
-    const roundDisposals = row.disposals ?? 0;
-    const avgDisposals = avgMap.get(row.player_id);
+    const roundValue = (stat === "goals" ? row.goals : row.disposals) ?? 0;
+    const avgValue = avgMap.get(row.player_id);
 
-    if (avgDisposals !== undefined) {
-      const diff = roundDisposals - avgDisposals;
+    if (avgValue !== undefined) {
+      const diff = roundValue - avgValue;
       if (diff > maxDiff) {
         maxDiff = diff;
         biggestOverperformer = {
           playerName: nameMap.get(row.player_id) ?? "Unknown",
           diff,
-          roundDisposals,
+          roundValue,
         };
       }
     }
   }
 
-  const totalDisposals = roundData.reduce(
-    (sum, r) => sum + (r.disposals ?? 0),
+  const totalValue = roundData.reduce(
+    (sum, r) => sum + ((stat === "goals" ? r.goals : r.disposals) ?? 0),
     0
   );
   const roundAverage =
-    roundData.length > 0 ? totalDisposals / roundData.length : 0;
+    roundData.length > 0 ? totalValue / roundData.length : 0;
 
   return {
     topScore: topScorePlayer,
