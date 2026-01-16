@@ -52,7 +52,7 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-white">Round Momentum</h2>
         <p className="mt-1.5 text-sm text-white/60">
-          Latest completed round
+          {data?.isGrandFinal ? "Grand Final Snapshot" : "Latest completed round"}
         </p>
       </div>
 
@@ -157,7 +157,7 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
                       {data.topScore.playerName}
                     </p>
                     <p className="text-xs text-white/40 mt-auto">
-                      {statLabel} this round
+                      {data.isGrandFinal ? "Best on ground (Grand Final)" : `${statLabel} this round`}
                     </p>
                   </div>
                 )}
@@ -189,7 +189,7 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
                 {data.biggestOverperformer.playerName === "—" ? (
                   <>
                     <p className="text-4xl font-bold text-white/40 mb-2">—</p>
-                    <p className="text-sm text-white/50">Awaiting season data</p>
+                    <p className="text-sm text-white/50">{data.isGrandFinal ? "No qualifying performances" : "Awaiting season data"}</p>
                   </>
                 ) : (
                   <div className="flex flex-col gap-2">
@@ -200,7 +200,9 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
                       {data.biggestOverperformer.playerName}
                     </p>
                     <p className="text-xs text-white/40 mt-auto">
-                      {stat === "fantasy" ? Math.round(data.biggestOverperformer.roundValue) : data.biggestOverperformer.roundValue} {statLabel.toLowerCase()} vs season avg
+                      {data.isGrandFinal
+                        ? "Above season average in the Grand Final"
+                        : `${stat === "fantasy" ? Math.round(data.biggestOverperformer.roundValue) : data.biggestOverperformer.roundValue} ${statLabel.toLowerCase()} vs season avg`}
                     </p>
                   </div>
                 )}
@@ -232,7 +234,9 @@ export default function RoundMomentum({ stat, onStatChange }: RoundMomentumProps
                 {data.roundAverage === 0 ? (
                   <>
                     <p className="text-4xl font-bold text-white/40 mb-2">—</p>
-                    <p className="text-sm text-white/50">Awaiting more games</p>
+                    <p className="text-sm text-white/50">
+                      {data.isGrandFinal ? "Not applicable for Grand Final" : "Awaiting more games"}
+                    </p>
                   </>
                 ) : (
                   <div className="flex flex-col gap-2">

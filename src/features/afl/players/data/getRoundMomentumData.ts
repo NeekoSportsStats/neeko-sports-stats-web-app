@@ -14,6 +14,8 @@ export interface RoundMomentumData {
   };
   roundAverage: number;
   keyPoints: string[];
+  isGrandFinal: boolean;
+  currentRound: number;
 }
 
 function getStatValue(stat: RoundStat, disposals: number | null, goals: number | null): number {
@@ -38,7 +40,7 @@ export async function getRoundMomentumData(
   const { data: roundData, error: roundError } = await supabase
     .schema("afl")
     .from("round_player_summary")
-    .select("player_id, disposals, goals")
+    .select("player_id, disposals, goals, round")
     .eq("season", season);
 
   if (roundError) {
@@ -56,8 +58,15 @@ export async function getRoundMomentumData(
         "📈 No major overperformers emerged this round.",
         "🧠 Awaiting more data for meaningful league insights.",
       ],
+      isGrandFinal: false,
+      currentRound: 0,
     };
   }
+
+  const currentRound = Math.max(...roundData.map((r) => r.round));
+  const isGrandFinal = currentRound >= 28;
+
+  const latestRoundData = roundData.filter((r) => r.round === currentRound);
 
   const { data: seasonAvgs, error: avgError } = await supabase
     .schema("afl")
@@ -70,7 +79,7 @@ export async function getRoundMomentumData(
   }
 
   const playerIds = Array.from(
-    new Set(roundData.map((r) => r.player_id))
+    new Set(latestRoundData.map((r) => r.player_id))
   );
 
   const { data: players, error: playersError } = await supabase
@@ -87,7 +96,7 @@ export async function getRoundMomentumData(
     (players || []).map((p) => [p.id, p.name])
   );
 
-  let avgMapFiltered = new Map(
+  const avgMap = new Map(
     (seasonAvgs || [])
       .filter((a) => a.games_played >= 5)
       .map((a) => [
@@ -96,23 +105,10 @@ export async function getRoundMomentumData(
       ])
   );
 
-  if (avgMapFiltered.size === 0) {
-    avgMapFiltered = new Map(
-      (seasonAvgs || [])
-        .filter((a) => a.games_played >= 1)
-        .map((a) => [
-          a.player_id,
-          getStatValue(stat, a.avg_disposals, a.avg_goals),
-        ])
-    );
-  }
-
-  const avgMap = avgMapFiltered;
-
   let topScorePlayer: { playerName: string; value: number } = { playerName: "—", value: 0 };
   let maxValue = -1;
 
-  for (const row of roundData) {
+  for (const row of latestRoundData) {
     const value = getStatValue(stat, row.disposals, row.goals);
     if (value > maxValue) {
       maxValue = value;
@@ -130,82 +126,113 @@ export async function getRoundMomentumData(
   } = { playerName: "—", diff: 0, roundValue: 0 };
   let maxDiff = -Infinity;
 
-  for (const row of roundData) {
-    const roundValue = getStatValue(stat, row.disposals, row.goals);
-    const avgValue = avgMap.get(row.player_id);
+  if (avgMap.size > 0) {
+    for (const row of latestRoundData) {
+      const roundValue = getStatValue(stat, row.disposals, row.goals);
+      const avgValue = avgMap.get(row.player_id);
 
-    if (avgValue !== undefined) {
-      const diff = roundValue - avgValue;
-      if (diff > maxDiff) {
-        maxDiff = diff;
-        biggestOverperformer = {
-          playerName: nameMap.get(row.player_id) ?? "Unknown",
-          diff,
-          roundValue,
-        };
+      if (avgValue !== undefined) {
+        const diff = roundValue - avgValue;
+        if (diff > maxDiff) {
+          maxDiff = diff;
+          biggestOverperformer = {
+            playerName: nameMap.get(row.player_id) ?? "Unknown",
+            diff,
+            roundValue,
+          };
+        }
       }
     }
   }
 
-  const totalValue = roundData.reduce(
-    (sum, r) => sum + getStatValue(stat, r.disposals, r.goals),
-    0
-  );
-  const roundAverage =
-    roundData.length > 0 ? totalValue / roundData.length : 0;
+  let roundAverage = 0;
+  if (!isGrandFinal) {
+    const totalValue = latestRoundData.reduce(
+      (sum, r) => sum + getStatValue(stat, r.disposals, r.goals),
+      0
+    );
+    roundAverage =
+      latestRoundData.length > 0 ? totalValue / latestRoundData.length : 0;
+  }
 
   const statLabel = getStatLabel(stat);
   const keyPoints: string[] = [];
 
-  if (topScorePlayer.value > 0) {
-    keyPoints.push(
-      `⭐ ${topScorePlayer.playerName} led the round with ${topScorePlayer.value} ${statLabel}.`
-    );
-  } else {
-    keyPoints.push(`⭐ No standout ${statLabel} performance this round.`);
-  }
-
-  if (biggestOverperformer.diff >= 5) {
-    keyPoints.push(
-      `📈 ${biggestOverperformer.playerName} significantly exceeded their season average (+${biggestOverperformer.diff.toFixed(1)}).`
-    );
-  } else if (biggestOverperformer.diff > 0) {
-    keyPoints.push(
-      `📈 ${biggestOverperformer.playerName} edged above their season average.`
-    );
-  } else {
-    keyPoints.push("📈 No major overperformers emerged this round.");
-  }
-
-  if (stat === "goals") {
-    if (roundAverage >= 2.5) {
-      keyPoints.push("🧠 League-wide goal output was strong this round.");
-    } else if (roundAverage >= 1.5) {
-      keyPoints.push("🧠 Goal numbers sat around typical league levels.");
-    } else if (roundAverage > 0) {
-      keyPoints.push("🧠 A lower-scoring round, suggesting tighter contests.");
+  if (isGrandFinal) {
+    if (topScorePlayer.value > 0) {
+      keyPoints.push(
+        `⭐ ${topScorePlayer.playerName} claimed best-on-ground honors with ${topScorePlayer.value} ${statLabel}.`
+      );
     } else {
-      keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
+      keyPoints.push(`⭐ Grand Final performances still being tallied.`);
     }
-  } else if (stat === "disposals") {
-    if (roundAverage >= 25) {
-      keyPoints.push("🧠 League-wide disposal output was strong this round.");
-    } else if (roundAverage >= 20) {
-      keyPoints.push("🧠 Disposal numbers sat around typical league levels.");
-    } else if (roundAverage > 0) {
-      keyPoints.push("🧠 A lower-disposal round, suggesting tighter contests.");
+
+    if (biggestOverperformer.diff >= 5) {
+      keyPoints.push(
+        `📈 ${biggestOverperformer.playerName} rose to the occasion, significantly exceeding their season average (+${biggestOverperformer.diff.toFixed(1)}).`
+      );
+    } else if (biggestOverperformer.diff > 0) {
+      keyPoints.push(
+        `📈 ${biggestOverperformer.playerName} delivered above their season standard on the biggest stage.`
+      );
     } else {
-      keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
+      keyPoints.push("📈 Grand Final intensity kept most players within their season norms.");
     }
+
+    keyPoints.push(
+      "🧠 League-wide averages are not computed for Grand Finals, as only two teams compete in the season decider."
+    );
   } else {
-    if (roundAverage >= 90) {
-      keyPoints.push("🧠 League-wide fantasy output was strong this round.");
-    } else if (roundAverage >= 70) {
-      keyPoints.push("🧠 Fantasy numbers sat around typical league levels.");
-    } else if (roundAverage > 0) {
-      keyPoints.push("🧠 A lower-fantasy round, suggesting tighter contests.");
+    if (topScorePlayer.value > 0) {
+      keyPoints.push(
+        `⭐ ${topScorePlayer.playerName} led the round with ${topScorePlayer.value} ${statLabel}.`
+      );
     } else {
-      keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
+      keyPoints.push(`⭐ No standout ${statLabel} performance this round.`);
+    }
+
+    if (biggestOverperformer.diff >= 5) {
+      keyPoints.push(
+        `📈 ${biggestOverperformer.playerName} significantly exceeded their season average (+${biggestOverperformer.diff.toFixed(1)}).`
+      );
+    } else if (biggestOverperformer.diff > 0) {
+      keyPoints.push(
+        `📈 ${biggestOverperformer.playerName} edged above their season average.`
+      );
+    } else {
+      keyPoints.push("📈 No major overperformers emerged this round.");
+    }
+
+    if (stat === "goals") {
+      if (roundAverage >= 2.5) {
+        keyPoints.push("🧠 League-wide goal output was strong this round.");
+      } else if (roundAverage >= 1.5) {
+        keyPoints.push("🧠 Goal numbers sat around typical league levels.");
+      } else if (roundAverage > 0) {
+        keyPoints.push("🧠 A lower-scoring round, suggesting tighter contests.");
+      } else {
+        keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
+      }
+    } else if (stat === "disposals") {
+      if (roundAverage >= 25) {
+        keyPoints.push("🧠 League-wide disposal output was strong this round.");
+      } else if (roundAverage >= 20) {
+        keyPoints.push("🧠 Disposal numbers sat around typical league levels.");
+      } else if (roundAverage > 0) {
+        keyPoints.push("🧠 A lower-disposal round, suggesting tighter contests.");
+      } else {
+        keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
+      }
+    } else {
+      if (roundAverage >= 90) {
+        keyPoints.push("🧠 League-wide fantasy output was strong this round.");
+      } else if (roundAverage >= 70) {
+        keyPoints.push("🧠 Fantasy numbers sat around typical league levels.");
+      } else if (roundAverage > 0) {
+        keyPoints.push("🧠 A lower-fantasy round, suggesting tighter contests.");
+      } else {
+        keyPoints.push("🧠 Awaiting more data for meaningful league insights.");
+      }
     }
   }
 
@@ -214,5 +241,7 @@ export async function getRoundMomentumData(
     biggestOverperformer,
     roundAverage,
     keyPoints,
+    isGrandFinal,
+    currentRound,
   };
 }
