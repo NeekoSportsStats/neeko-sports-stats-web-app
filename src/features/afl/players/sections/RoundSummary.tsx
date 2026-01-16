@@ -1,10 +1,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import { TrendingUp, Flame, Shield, Sparkles, Activity } from "lucide-react";
+import { Flame, TrendingUp, Activity } from "lucide-react";
 import { SectionHeader } from "@/components/sports/shared/SectionHeader";
-import type { StatKey } from "@/lib/stats/types";
-import { ConsistencyInfo } from "./ConsistencyInfo";
-import { BiggestRiserInfo } from "./BiggestRiserInfo";
 import { getAflRoundLabel } from "../../shared/data/getAflRoundLabel";
 
 /* -------------------------------------------------------------------------- */
@@ -14,146 +11,59 @@ import { getAflRoundLabel } from "../../shared/data/getAflRoundLabel";
 export type RoundSummaryData = {
   currentRound: number;
 
-  selectedStat: StatKey;
-  availableStats: StatKey[];
-
-  labels: Record<StatKey, string>;
-  units?: Record<StatKey, string>;
-  description?: string;
-
-  sparkline: number[];
-
-  topScorer: {
+  topScore: {
     name: string;
     value: number;
   };
 
-  biggestRiser: {
+  biggestOverperformer: {
     name: string;
     diff: number;
     currentValue: number;
   };
 
-  mostConsistent: {
-    name: string;
-    percentage: number;
+  roundAverage: {
+    avgDisposals: number;
+    avgGoals: number;
   };
 };
-
-/* -------------------------------------------------------------------------- */
-/* SPARKLINE                                                                  */
-/* -------------------------------------------------------------------------- */
-
-function Sparkline({ data }: { data: number[] }) {
-  if (!data.length) return null;
-
-  // Guard against tiny ranges making everything look flat.
-  const maxRaw = Math.max(...data);
-  const minRaw = Math.min(...data);
-
-  // If all values equal, draw a subtle midline instead of a flat bottom line.
-  const rangeRaw = maxRaw - minRaw;
-
-  // Add padding so small movement is still visible.
-  const pad = rangeRaw > 0 ? rangeRaw * 0.2 : 1;
-  const max = maxRaw + pad;
-  const min = minRaw - pad;
-
-  const range = Math.max(max - min, 1e-6);
-  const normalized = data.map((v) => ((v - min) / range) * 100);
-
-  const width = Math.max(normalized.length * 20, 80);
-
-  // If truly flat, center the line.
-  const points =
-    rangeRaw < 1e-6
-      ? normalized.map((_, i) => `${(i / (normalized.length - 1)) * width},50`).join(" ")
-      : normalized
-          .map((v, i) => `${(i / (normalized.length - 1)) * width},${100 - v}`)
-          .join(" ");
-
-  return (
-    <div className="relative h-16 md:h-24 w-full">
-      <svg
-        className="absolute inset-0 h-full w-full"
-        viewBox={`0 0 ${width} 100`}
-        preserveAspectRatio="none"
-      >
-        <polyline
-          points={points}
-          fill="none"
-          stroke="rgba(250, 204, 21, 0.4)"
-          strokeWidth={4}
-          className="drop-shadow-[0_0_10px_rgba(250,204,21,0.6)]"
-        />
-      </svg>
-
-      <svg
-        className="absolute inset-0 h-full w-full"
-        viewBox={`0 0 ${width} 100`}
-        preserveAspectRatio="none"
-      >
-        <polyline
-          points={points}
-          fill="none"
-          stroke="rgb(250, 204, 21)"
-          strokeWidth={2.5}
-        />
-      </svg>
-    </div>
-  );
-}
 
 /* -------------------------------------------------------------------------- */
 /* MINI CARD                                                                  */
 /* -------------------------------------------------------------------------- */
 
-interface MiniCardProps {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  player: string;
-  delay: number;
-  info?: React.ReactNode;
-}
-
 function MiniCard({
   icon: Icon,
   label,
   value,
-  player,
+  subtitle,
   delay,
-  info,
-}: MiniCardProps) {
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  subtitle: string;
+  delay: number;
+}) {
   return (
     <div
       className={cn(
         "relative rounded-2xl border border-yellow-500/20 bg-black/70",
-        "px-4 py-4 md:px-5 md:py-5",
-        "backdrop-blur-sm overflow-hidden",
-        "transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(250,204,21,0.45)]",
+        "px-4 py-4 backdrop-blur-sm",
+        "transition-transform duration-300 hover:-translate-y-1",
         "animate-in fade-in slide-in-from-bottom-4"
       )}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="pointer-events-none absolute inset-x-0 -bottom-12 h-24 bg-gradient-to-t from-yellow-500/15 to-transparent" />
-
-      <div className="relative flex flex-col gap-2 text-left">
-        <div className="flex items-center justify-between">
-          <Icon className="h-5 w-5 text-yellow-400" />
-          <span className="text-[11px] uppercase tracking-[0.16em] text-white/40 flex items-center">
-            {label}
-            {info}
-          </span>
-        </div>
-
-        <div>
-          <p className="text-xl md:text-2xl font-semibold text-yellow-300">
-            {value}
-          </p>
-          <p className="text-xs text-white/55 mt-0.5">{player}</p>
-        </div>
+      <div className="flex items-center justify-between mb-2">
+        <Icon className="h-5 w-5 text-yellow-400" />
+        <span className="text-[11px] uppercase tracking-[0.16em] text-white/40">
+          {label}
+        </span>
       </div>
+
+      <p className="text-2xl font-semibold text-yellow-300">{value}</p>
+      <p className="text-xs text-white/55 mt-1">{subtitle}</p>
     </div>
   );
 }
@@ -164,154 +74,49 @@ function MiniCard({
 
 export default function RoundSummary({
   data,
-  onStatChange,
 }: {
   data: RoundSummaryData;
-  onStatChange: (stat: StatKey) => void;
 }) {
-  const selectedLabel = data.labels[data.selectedStat] || data.selectedStat;
-  const unit = data.units?.[data.selectedStat] || data.selectedStat;
-  const labelLower = selectedLabel.toLowerCase();
-
-  const description =
-    data.description ||
-    `Live round snapshot — track ${labelLower} trends, standout players and role/stability shifts as this stat moves week to week.`;
-
-  const biggestRiserHeadline = React.useMemo(() => {
-    const { name, diff, currentValue } = data.biggestRiser;
-
-    if (name === "—") return "No clear week-to-week riser this round.";
-    if (!Number.isFinite(diff) || Math.abs(diff) < 0.5) {
-      return `${name} held steady (no meaningful change vs last game).`;
-    }
-
-    const sign = diff > 0 ? "+" : "−";
-    const abs = Math.abs(diff);
-
-    if (data.selectedStat === "goals") {
-      return `${name} kicked ${currentValue} g (${sign}${abs.toFixed(0)} vs last game).`;
-    }
-
-    if (data.selectedStat === "fantasy") {
-      return `${name} ${diff > 0 ? "improved" : "dropped"} by ${sign}${abs.toFixed(
-        0
-      )} pts vs last game.`;
-    }
-
-    return `${name} ${diff > 0 ? "improved" : "dropped"} by ${sign}${abs.toFixed(
-      0
-    )} disp vs last game.`;
-  }, [data.biggestRiser, data.selectedStat]);
-
-  const mostConsistentDisplay =
-    data.mostConsistent.name === "—"
-      ? "—"
-      : `${data.mostConsistent.percentage.toFixed(0)}%`;
-
   return (
     <section
       className={cn(
         "relative rounded-3xl border border-yellow-500/20",
         "bg-gradient-to-br from-black via-[#050507] to-[#14100a]",
         "px-4 py-6 md:px-8 md:py-8",
-        "shadow-[0_0_120px_rgba(0,0,0,0.7)] overflow-hidden",
-        "animate-in fade-in slide-in-from-bottom-6"
+        "shadow-[0_0_120px_rgba(0,0,0,0.7)]"
       )}
     >
-      <div className="pointer-events-none absolute -top-40 left-1/2 h-72 w-[480px] -translate-x-1/2 bg-yellow-500/20 blur-3xl" />
+      <SectionHeader
+        eyebrow="Round Momentum"
+        title="Round Snapshot"
+        subtitle={`${getAflRoundLabel(data.currentRound)} • League Overview`}
+        icon={Activity}
+      />
 
-      <div className="relative">
-        <SectionHeader
-          eyebrow="Round Momentum"
-          title="Round Momentum Summary"
-          subtitle={`${getAflRoundLabel(data.currentRound)} • ${selectedLabel} Snapshot`}
-          icon={Sparkles}
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        <MiniCard
+          icon={Flame}
+          label="Top Score"
+          value={`${data.topScore.value} disposals`}
+          subtitle={data.topScore.name}
+          delay={120}
         />
 
-        <div className="-mx-2 mb-4 mt-1 overflow-x-auto scrollbar-thin scrollbar-thumb-yellow-500/30">
-          <div className="flex min-w-max gap-2 px-2 pb-1">
-            {data.availableStats.map((s) => (
-              <button
-                key={s}
-                onClick={() => onStatChange(s)}
-                className={cn(
-                  "snap-start whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition-all",
-                  "backdrop-blur-md border",
-                  data.selectedStat === s
-                    ? "bg-yellow-400 text-black border-yellow-300 shadow-[0_0_22px_rgba(250,204,21,0.65)]"
-                    : "bg-black/30 text-white/70 border-white/10 hover:bg-black/40 hover:text-white"
-                )}
-              >
-                {data.labels[s]}
-              </button>
-            ))}
-          </div>
-        </div>
+        <MiniCard
+          icon={TrendingUp}
+          label="Biggest Overperformer"
+          value={`+${data.biggestOverperformer.diff.toFixed(1)} disp`}
+          subtitle={data.biggestOverperformer.name}
+          delay={180}
+        />
 
-        <div className="grid gap-4 md:grid-cols-2 md:gap-6">
-          <div className="rounded-2xl border border-yellow-500/20 bg-black/70 px-4 py-4 md:px-6 md:py-5 backdrop-blur-sm">
-            <h3 className="mb-2 flex items-center gap-2 text-base md:text-lg font-semibold">
-              <Activity className="h-5 w-5 text-yellow-300" />
-              <span>Round Momentum Pulse</span>
-            </h3>
-            <p className="mb-4 text-sm text-white/70 leading-relaxed">
-              {description}
-            </p>
-            <Sparkline data={data.sparkline} />
-          </div>
-
-          <div className="rounded-2xl border border-yellow-500/20 bg-black/70 px-4 py-4 md:px-6 md:py-5 backdrop-blur-sm">
-            <h3 className="mb-2 flex items-center gap-2 text-base md:text-lg font-semibold">
-              <Flame className="h-5 w-5 text-orange-400" />
-              <span>Key Headlines</span>
-            </h3>
-
-            <ul className="space-y-2 text-sm text-white/80">
-              <li>
-                • <strong>{data.topScorer.name}</strong> led this round with{" "}
-                <strong>
-                  {data.topScorer.value} {unit}
-                </strong>
-                .
-              </li>
-              <li>• {biggestRiserHeadline}</li>
-              <li>
-                • <strong>{data.mostConsistent.name}</strong> holds{" "}
-                <strong>{mostConsistentDisplay}</strong> above-average games.
-              </li>
-              <li>
-                • League-wide {labelLower} output continues to show meaningful
-                stability and role changes.
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="mt-6 grid gap-4 md:mt-7 md:grid-cols-3">
-          <MiniCard
-            icon={Flame}
-            label="Top Score"
-            value={`${data.topScorer.value} ${unit}`}
-            player={data.topScorer.name}
-            delay={160}
-          />
-          <MiniCard
-            icon={TrendingUp}
-            label="Biggest Riser"
-            value={`${data.biggestRiser.diff.toFixed(0)} ${unit}`}
-            player={data.biggestRiser.name}
-            delay={220}
-            info={<BiggestRiserInfo />}
-          />
-          <MiniCard
-            icon={Shield}
-            label="Most Consistent"
-            value={mostConsistentDisplay}
-            player={data.mostConsistent.name}
-            delay={280}
-            info={<ConsistencyInfo />}
-          />
-        </div>
+        <MiniCard
+          icon={Activity}
+          label="Round Average"
+          value={`${data.roundAverage.avgDisposals}`}
+          subtitle="Avg disposals per player"
+          delay={240}
+        />
       </div>
     </section>
   );
