@@ -19,6 +19,9 @@ export interface FormStabilityRow {
   stability_score: number;
   stability_band: StabilityBand;
   stability_confidence: ConfidenceLevel;
+  recent_avg: number | null;
+  season_avg: number | null;
+  diff: number | null;
 }
 
 export interface FormStabilityGridData {
@@ -44,7 +47,10 @@ export async function getFormStabilityGridData(params: {
         variance,
         stability_score,
         stability_band,
-        stability_confidence
+        stability_confidence,
+        recent_avg,
+        season_avg,
+        diff
       `)
       .eq("season", season)
       .order("stability_score", { ascending: false })
@@ -72,6 +78,9 @@ export async function getFormStabilityGridData(params: {
       stability_score: row.stability_score,
       stability_band: row.stability_band as StabilityBand,
       stability_confidence: row.stability_confidence as ConfidenceLevel,
+      recent_avg: row.recent_avg,
+      season_avg: row.season_avg,
+      diff: row.diff,
     }));
 
     return {

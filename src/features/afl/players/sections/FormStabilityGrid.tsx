@@ -1,306 +1,272 @@
 import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Target, Info, CheckCircle2, AlertTriangle, HelpCircle } from "lucide-react";
+import { TrendingUp, Minus, TrendingDown, Info } from "lucide-react";
 import type { StatKey } from "@/lib/stats/types";
 import {
   getFormStabilityGridData,
   type FormStabilityRow,
   type FormStabilityGridData,
-  type StabilityBand,
-  type ConfidenceLevel,
 } from "@/features/afl/players/data/getFormStabilityGridData";
 
-interface StabilityColors {
-  borderAccent: string;
-  glow: string;
-  text: string;
-  progress: string;
-  glowColor: string;
-}
+type CategoryType = "hot" | "stable" | "cold";
 
-function getStabilityColors(band: StabilityBand): StabilityColors {
-  switch (band) {
-    case "Elite Stable":
-      return {
-        borderAccent: "border-l-amber-400",
-        glow: "group-hover:shadow-[0_0_24px_rgba(251,191,36,0.5)]",
-        text: "text-amber-400",
-        progress: "bg-gradient-to-r from-amber-400 to-yellow-300",
-        glowColor: "251,191,36",
-      };
-    case "Reliable":
-      return {
-        borderAccent: "border-l-emerald-400",
-        glow: "group-hover:shadow-[0_0_18px_rgba(52,211,153,0.45)]",
-        text: "text-emerald-400",
-        progress: "bg-emerald-400",
-        glowColor: "52,211,153",
-      };
-    case "Moderate":
-      return {
-        borderAccent: "border-l-amber-500",
-        glow: "group-hover:shadow-[0_0_18px_rgba(245,158,11,0.45)]",
-        text: "text-amber-500",
-        progress: "bg-amber-500",
-        glowColor: "245,158,11",
-      };
-    case "Volatile":
-      return {
-        borderAccent: "border-l-orange-400",
-        glow: "group-hover:shadow-[0_0_18px_rgba(251,146,60,0.45)]",
-        text: "text-orange-400",
-        progress: "bg-orange-400",
-        glowColor: "251,146,60",
-      };
-    case "Chaos":
-      return {
-        borderAccent: "border-l-red-400/80",
-        glow: "group-hover:shadow-[0_0_18px_rgba(248,113,113,0.35)]",
-        text: "text-red-400/90",
-        progress: "bg-red-400/80",
-        glowColor: "248,113,113",
-      };
-  }
-}
-
-function getConfidenceBadge(confidence: ConfidenceLevel, withTooltip = false) {
-  const badges = {
-    full: {
-      label: "Sufficient Sample",
-      icon: CheckCircle2,
-      className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
-      dashed: false,
-      tooltip: "Data Confidence: Indicates how reliable this stability score is based on games played. Fewer games = lower confidence.",
-    },
-    limited: {
-      label: "Limited Sample",
-      icon: AlertTriangle,
-      className: "border-amber-500/40 bg-amber-500/10 text-amber-300",
-      dashed: true,
-      tooltip: "Data Confidence: Indicates how reliable this stability score is based on games played. Fewer games = lower confidence.",
-    },
-    insufficient: {
-      label: "Insufficient Data",
-      icon: HelpCircle,
-      className: "border-white/20 bg-white/5 text-white/40",
-      dashed: false,
-      tooltip: "Data Confidence: Indicates how reliable this stability score is based on games played. Fewer games = lower confidence.",
-    },
+interface CategoryConfig {
+  title: string;
+  subtitle: string;
+  icon: React.ElementType;
+  color: {
+    border: string;
+    glow: string;
+    text: string;
+    badge: string;
+    iconBg: string;
   };
+}
 
-  const config = badges[confidence];
-  const Icon = config.icon;
+const CATEGORY_CONFIG: Record<CategoryType, CategoryConfig> = {
+  hot: {
+    title: "Trending Up",
+    subtitle: "Players outperforming their season baseline",
+    icon: TrendingUp,
+    color: {
+      border: "border-emerald-400/50",
+      glow: "shadow-[0_0_24px_rgba(52,211,153,0.2)]",
+      text: "text-emerald-400",
+      badge: "bg-emerald-500/20 text-emerald-300 border-emerald-400/40",
+      iconBg: "from-emerald-400/20 to-emerald-600/10",
+    },
+  },
+  stable: {
+    title: "Stable",
+    subtitle: "Consistent output relative to season norms",
+    icon: Minus,
+    color: {
+      border: "border-amber-400/50",
+      glow: "shadow-[0_0_24px_rgba(251,191,36,0.2)]",
+      text: "text-amber-400",
+      badge: "bg-amber-500/20 text-amber-300 border-amber-400/40",
+      iconBg: "from-amber-400/20 to-amber-600/10",
+    },
+  },
+  cold: {
+    title: "Trending Down",
+    subtitle: "Recent form below season expectations",
+    icon: TrendingDown,
+    color: {
+      border: "border-orange-400/50",
+      glow: "shadow-[0_0_24px_rgba(251,146,60,0.2)]",
+      text: "text-orange-400",
+      badge: "bg-orange-500/20 text-orange-300 border-orange-400/40",
+      iconBg: "from-orange-400/20 to-orange-600/10",
+    },
+  },
+};
 
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-wider",
-        config.className,
-        config.dashed && "border-dashed"
-      )}
-      title={withTooltip ? config.tooltip : undefined}
-    >
-      <Icon className="h-3 w-3" />
-      {config.label}
-    </span>
+function filterAndCategorize(rows: FormStabilityRow[]) {
+  const validRows = rows.filter(
+    (row) =>
+      row.games_used >= 5 &&
+      row.recent_avg !== null &&
+      row.season_avg !== null &&
+      row.diff !== null
   );
+
+  const hot = validRows
+    .filter((row) => row.diff! >= 5)
+    .sort((a, b) => b.diff! - a.diff!)
+    .slice(0, 5);
+
+  const stable = validRows
+    .filter((row) => Math.abs(row.diff!) <= 2)
+    .sort((a, b) => a.variance - b.variance)
+    .slice(0, 5);
+
+  const cold = validRows
+    .filter((row) => row.diff! <= -5)
+    .sort((a, b) => a.diff! - b.diff!)
+    .slice(0, 5);
+
+  return { hot, stable, cold };
 }
 
-function getBandMeaning(band: StabilityBand): string {
-  switch (band) {
-    case "Elite Stable":
-      return "Highly predictable output";
-    case "Reliable":
-      return "Minor variation";
-    case "Moderate":
-      return "Role dependent swings";
-    case "Volatile":
-      return "Large fluctuations";
-    case "Chaos":
-      return "Extreme variance";
-  }
-}
-
-function PlayerRow({
+function PlayerCard({
   row,
-  stat,
+  category,
   isExpanded,
-  onToggleExpand,
+  onToggle,
 }: {
   row: FormStabilityRow;
-  stat: StatKey;
+  category: CategoryType;
   isExpanded: boolean;
-  onToggleExpand: () => void;
+  onToggle: () => void;
 }) {
-  const colors = getStabilityColors(row.stability_band);
-  const bandMeaning = getBandMeaning(row.stability_band);
+  const config = CATEGORY_CONFIG[category];
+  const diffValue = row.diff ?? 0;
+  const diffSign = diffValue >= 0 ? "+" : "";
 
   return (
     <div className="group relative">
       <button
-        onClick={onToggleExpand}
+        onClick={onToggle}
         className={cn(
-          "w-full text-left relative overflow-hidden rounded-xl border border-white/10 border-l-2 px-6 py-5",
+          "w-full text-left relative overflow-hidden rounded-xl border-l-2 border-r border-t border-b px-4 py-3.5",
           "bg-gradient-to-br from-black/60 via-black/50 to-black/40 backdrop-blur-sm",
-          "transition-all duration-300 cursor-pointer",
+          "transition-all duration-200 cursor-pointer",
           "hover:bg-white/[0.03]",
-          colors.borderAccent,
-          colors.glow
+          config.color.border,
+          `hover:${config.color.glow}`
         )}
       >
-        <div className="relative z-10 grid grid-cols-[2fr_3fr_2fr_1.5fr] gap-8 items-center">
-          <div className="min-w-0">
-            <h3 className="text-sm font-medium text-white truncate">
+        <div className="space-y-2.5">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-sm font-medium text-white leading-tight flex-1">
               {row.player_name}
             </h3>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border",
+                config.color.badge
+              )}
+            >
+              {diffSign}
+              {diffValue.toFixed(1)}
+            </span>
           </div>
 
           <div className="space-y-1.5">
-            <div className="flex items-baseline gap-1" title="Form Stability Score: Measures how consistent a player's performances have been over their most recent games. Higher scores indicate predictable output. Lower scores suggest volatility.">
-              <span className={cn("text-2xl font-bold tabular-nums", colors.text)}>
-                {Math.round(row.stability_score)}
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/40 uppercase tracking-wider">
+                Stability Score
               </span>
-              <span className="text-xs text-white/40 font-medium">/100</span>
+              <span className={cn("text-base font-bold tabular-nums", config.color.text)}>
+                {Math.round(row.stability_score)}
+                <span className="text-xs text-white/40 font-normal">/100</span>
+              </span>
             </div>
-            <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+            <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
               <div
-                className={cn("h-full rounded-full transition-all duration-300", colors.progress)}
+                className={cn(
+                  "h-full rounded-full transition-all duration-300",
+                  config.color.text.replace("text-", "bg-")
+                )}
                 style={{ width: `${Math.min(100, row.stability_score)}%` }}
               />
             </div>
-            <div
-              className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-0.5 border border-white/10"
-              title="Stability Tier: Grouping based on stability score to quickly identify reliable versus volatile players."
-            >
-              <span className="text-[10px] uppercase tracking-wider font-bold text-white/80">
-                {row.stability_band}
+          </div>
+
+          <div className="flex items-center justify-between text-[10px] text-white/50">
+            <span>Last {row.games_used} games</span>
+            {!isExpanded && (
+              <span className="text-white/30">
+                Click to expand
               </span>
-            </div>
-          </div>
-
-          <div className="text-center">
-            {getConfidenceBadge(row.stability_confidence, true)}
-          </div>
-
-          <div className="text-right">
-            <span className="text-sm font-medium text-white/50 tabular-nums">
-              {row.games_used}
-            </span>
-            <p className="text-[9px] text-white/30 uppercase tracking-wider mt-0.5">
-              Games
-            </p>
+            )}
           </div>
         </div>
+
+        {isExpanded && (
+          <div
+            className="mt-3 pt-3 border-t border-white/10 space-y-2.5 animate-in slide-in-from-top-2 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="grid grid-cols-2 gap-3 text-[11px]">
+              <div>
+                <span className="text-white/40 block mb-0.5">Recent Avg</span>
+                <span className="text-white/90 font-semibold text-sm">
+                  {row.recent_avg?.toFixed(1) ?? "—"}
+                </span>
+              </div>
+              <div>
+                <span className="text-white/40 block mb-0.5">Season Avg</span>
+                <span className="text-white/90 font-semibold text-sm">
+                  {row.season_avg?.toFixed(1) ?? "—"}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-white/10">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-white/40">Variance</span>
+                <span className="text-white/90 font-medium">{row.variance.toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between text-[11px] mt-1.5">
+                <span className="text-white/40">Stability Band</span>
+                <span className="text-white/90 font-medium">{row.stability_band}</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 pt-2 border-t border-white/10">
+              <Info className="h-3 w-3 text-white/30 flex-shrink-0 mt-0.5" />
+              <p className="text-[10px] text-white/60 leading-relaxed">
+                {category === "hot" &&
+                  "This player is currently performing above their season average"}
+                {category === "stable" &&
+                  "This player maintains consistent performance close to their season average"}
+                {category === "cold" &&
+                  "This player's recent form is below their season average"}
+              </p>
+            </div>
+          </div>
+        )}
       </button>
-
-      {isExpanded && (
-        <div className="mt-2 rounded-lg border border-white/10 bg-black/90 backdrop-blur-sm px-4 py-3 space-y-2">
-          <div className="flex items-center gap-2">
-            <Info className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
-            <p className="text-xs text-white/80 leading-relaxed">{bandMeaning}</p>
-          </div>
-          <div className="pt-2 border-t border-white/10 grid grid-cols-2 gap-3 text-[11px]">
-            <div title="Performance Variance: Statistical spread of a player's recent scores. Higher variance means bigger swings between good and poor performances.">
-              <span className="text-white/50">Variance:</span>{" "}
-              <span className="text-white/90 font-medium">{row.variance.toFixed(2)}</span>
-            </div>
-            <div>
-              <span className="text-white/50">Sample:</span>{" "}
-              <span className="text-white/90 font-medium">{row.games_used} games</span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-function MobilePlayerCard({
-  row,
-  stat,
-  isExpanded,
-  onToggleExpand,
+function CategoryColumn({
+  category,
+  rows,
+  expandedId,
+  onToggle,
 }: {
-  row: FormStabilityRow;
-  stat: StatKey;
-  isExpanded: boolean;
-  onToggleExpand: () => void;
+  category: CategoryType;
+  rows: FormStabilityRow[];
+  expandedId: string | null;
+  onToggle: (id: string) => void;
 }) {
-  const colors = getStabilityColors(row.stability_band);
-  const bandMeaning = getBandMeaning(row.stability_band);
+  const config = CATEGORY_CONFIG[category];
+  const Icon = config.icon;
 
   return (
-    <div className="group relative">
-      <button
-        onClick={onToggleExpand}
-        className={cn(
-          "w-full text-left relative overflow-hidden rounded-xl border border-white/10 border-l-2 px-4 py-4",
-          "bg-gradient-to-br from-black/60 via-black/50 to-black/40 backdrop-blur-sm",
-          "transition-all duration-300 active:bg-white/[0.03]",
-          colors.borderAccent
-        )}
-      >
-        <div className="relative z-10 space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <h3 className="text-sm font-medium text-white truncate flex-1">
-              {row.player_name}
-            </h3>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-baseline gap-1.5" title="Form Stability Score: Measures how consistent a player's performances have been over their most recent games. Higher scores indicate predictable output. Lower scores suggest volatility.">
-              <span className="text-[10px] uppercase tracking-wider text-white/50">
-                Stability:
-              </span>
-              <span className={cn("text-xl font-bold tabular-nums", colors.text)}>
-                {Math.round(row.stability_score)}
-              </span>
-              <span className="text-xs text-white/40 font-medium">/100</span>
-            </div>
-            <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
-              <div
-                className={cn("h-full rounded-full transition-all duration-300", colors.progress)}
-                style={{ width: `${Math.min(100, row.stability_score)}%` }}
-              />
-            </div>
-          </div>
-
-          {isExpanded && (
-            <div className="pt-3 border-t border-white/10 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">
-                    Confidence
-                  </p>
-                  {getConfidenceBadge(row.stability_confidence)}
-                </div>
-                <div>
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">
-                    Games Used
-                  </p>
-                  <span className="text-base font-semibold text-white tabular-nums">
-                    {row.games_used}
-                  </span>
-                </div>
-              </div>
-              <div title="Stability Tier: Grouping based on stability score to quickly identify reliable versus volatile players.">
-                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">
-                  Band
-                </p>
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-0.5 border border-white/10">
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-white/80">
-                    {row.stability_band}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-start gap-2 pt-2 border-t border-white/10">
-                <Info className="h-3.5 w-3.5 text-white/40 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-white/70 leading-relaxed">{bandMeaning}</p>
-              </div>
-            </div>
+    <div
+      className={cn(
+        "rounded-2xl border p-5 bg-gradient-to-br from-black/40 to-black/20 backdrop-blur-sm",
+        config.color.border,
+        config.color.glow
+      )}
+    >
+      <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/10">
+        <div
+          className={cn(
+            "flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br flex-shrink-0",
+            config.color.iconBg
           )}
+        >
+          <Icon className={cn("h-4.5 w-4.5", config.color.text)} />
         </div>
-      </button>
+        <div className="flex-1 min-w-0">
+          <h3 className={cn("text-base font-bold", config.color.text)}>{config.title}</h3>
+          <p className="text-[10px] text-white/50 mt-0.5 leading-tight">{config.subtitle}</p>
+        </div>
+      </div>
+
+      <div className="space-y-2.5">
+        {rows.length === 0 ? (
+          <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center">
+            <p className="text-xs text-white/40">No players in this category</p>
+          </div>
+        ) : (
+          rows.map((row) => (
+            <PlayerCard
+              key={row.player_id}
+              row={row}
+              category={category}
+              isExpanded={expandedId === row.player_id}
+              onToggle={() => onToggle(row.player_id)}
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -311,7 +277,6 @@ export default function FormStabilityGrid() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
-  const [showHeaderTooltip, setShowHeaderTooltip] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -338,11 +303,7 @@ export default function FormStabilityGrid() {
     goals: "Goals",
   };
 
-  const statSubtitles: Record<StatKey, string> = {
-    fantasy: "Fantasy output consistency",
-    disposals: "Disposal count consistency",
-    goals: "Goal scoring consistency",
-  };
+  const categories = data ? filterAndCategorize(data.rows) : { hot: [], stable: [], cold: [] };
 
   return (
     <section
@@ -356,39 +317,16 @@ export default function FormStabilityGrid() {
 
       <div className="relative z-10">
         <div className="mb-6">
-          <div className="flex items-start gap-3 mb-2">
+          <div className="flex items-start gap-3 mb-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-400/20 to-amber-600/10 shadow-lg shadow-amber-400/20 flex-shrink-0">
-              <Target className="h-5 w-5 text-amber-400" />
+              <TrendingUp className="h-5 w-5 text-amber-400" />
             </div>
             <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
-                  Form Stability Grid
-                </h2>
-                <div className="relative">
-                  <button
-                    onClick={() => setShowHeaderTooltip(!showHeaderTooltip)}
-                    onBlur={() => setTimeout(() => setShowHeaderTooltip(false), 200)}
-                    className="flex items-center justify-center h-6 w-6 rounded-full border border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/20 transition-colors"
-                  >
-                    <Info className="h-3.5 w-3.5 text-amber-400/80" />
-                  </button>
-                  {showHeaderTooltip && (
-                    <div className="absolute left-0 top-full mt-2 w-72 rounded-lg border border-amber-400/20 bg-black/95 backdrop-blur-sm px-4 py-3 shadow-xl z-50">
-                      <h4 className="text-xs font-bold text-amber-400 mb-1.5">Form Stability Score</h4>
-                      <p className="text-xs text-white/80 leading-relaxed">
-                        Measures how consistent a player's performances have been over their most recent games.
-                        Higher scores indicate predictable output. Lower scores suggest volatility.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+                Form Stability Analysis
+              </h2>
               <p className="text-sm text-white/70 mt-2 leading-relaxed">
-                Identify reliable performers and volatile wildcards across recent form
-              </p>
-              <p className="text-xs text-white/50 mt-1.5">
-                {statSubtitles[selectedStat]}
+                Comparative view of trending performers, stable contributors, and underperforming players
               </p>
             </div>
           </div>
@@ -430,46 +368,39 @@ export default function FormStabilityGrid() {
 
         {!loading && !error && data && (
           <>
-            {data.rows.length === 0 ? (
+            {categories.hot.length === 0 &&
+            categories.stable.length === 0 &&
+            categories.cold.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center backdrop-blur-sm">
-                <Target className="h-12 w-12 text-white/20 mx-auto mb-3" />
+                <TrendingUp className="h-12 w-12 text-white/20 mx-auto mb-3" />
                 <p className="text-sm font-semibold text-white/70">
-                  No stability data available yet
+                  Insufficient data for analysis
                 </p>
                 <p className="mt-2 text-xs text-white/50">
-                  Data will appear once sufficient games have been played
+                  Players need at least 5 games to appear in the stability analysis
                 </p>
               </div>
             ) : (
-              <>
-                <div className="hidden md:block space-y-3">
-                  {data.rows.map((row) => (
-                    <PlayerRow
-                      key={row.player_id}
-                      row={row}
-                      stat={selectedStat}
-                      isExpanded={expandedRowId === row.player_id}
-                      onToggleExpand={() =>
-                        setExpandedRowId(expandedRowId === row.player_id ? null : row.player_id)
-                      }
-                    />
-                  ))}
-                </div>
-
-                <div className="md:hidden space-y-3">
-                  {data.rows.map((row) => (
-                    <MobilePlayerCard
-                      key={row.player_id}
-                      row={row}
-                      stat={selectedStat}
-                      isExpanded={expandedRowId === row.player_id}
-                      onToggleExpand={() =>
-                        setExpandedRowId(expandedRowId === row.player_id ? null : row.player_id)
-                      }
-                    />
-                  ))}
-                </div>
-              </>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <CategoryColumn
+                  category="hot"
+                  rows={categories.hot}
+                  expandedId={expandedRowId}
+                  onToggle={(id) => setExpandedRowId(expandedRowId === id ? null : id)}
+                />
+                <CategoryColumn
+                  category="stable"
+                  rows={categories.stable}
+                  expandedId={expandedRowId}
+                  onToggle={(id) => setExpandedRowId(expandedRowId === id ? null : id)}
+                />
+                <CategoryColumn
+                  category="cold"
+                  rows={categories.cold}
+                  expandedId={expandedRowId}
+                  onToggle={(id) => setExpandedRowId(expandedRowId === id ? null : id)}
+                />
+              </div>
             )}
           </>
         )}
