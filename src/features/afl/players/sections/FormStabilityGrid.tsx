@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Target, Info } from "lucide-react";
+import { Target, Info, CheckCircle2, AlertTriangle, HelpCircle } from "lucide-react";
 import type { StatKey } from "@/lib/stats/types";
 import {
   getFormStabilityGridData,
@@ -22,27 +22,27 @@ function getStabilityColors(band: StabilityBand): StabilityColors {
   switch (band) {
     case "Elite Stable":
       return {
+        borderAccent: "border-l-amber-400",
+        glow: "group-hover:shadow-[0_0_24px_rgba(251,191,36,0.5)]",
+        text: "text-amber-400",
+        progress: "bg-gradient-to-r from-amber-400 to-yellow-300",
+        glowColor: "251,191,36",
+      };
+    case "Reliable":
+      return {
         borderAccent: "border-l-emerald-400",
         glow: "group-hover:shadow-[0_0_18px_rgba(52,211,153,0.45)]",
         text: "text-emerald-400",
         progress: "bg-emerald-400",
         glowColor: "52,211,153",
       };
-    case "Reliable":
-      return {
-        borderAccent: "border-l-teal-400",
-        glow: "group-hover:shadow-[0_0_18px_rgba(45,212,191,0.45)]",
-        text: "text-teal-400",
-        progress: "bg-teal-400",
-        glowColor: "45,212,191",
-      };
     case "Moderate":
       return {
-        borderAccent: "border-l-amber-400",
-        glow: "group-hover:shadow-[0_0_18px_rgba(251,191,36,0.45)]",
-        text: "text-amber-400",
-        progress: "bg-amber-400",
-        glowColor: "251,191,36",
+        borderAccent: "border-l-amber-500",
+        glow: "group-hover:shadow-[0_0_18px_rgba(245,158,11,0.45)]",
+        text: "text-amber-500",
+        progress: "bg-amber-500",
+        glowColor: "245,158,11",
       };
     case "Volatile":
       return {
@@ -54,10 +54,10 @@ function getStabilityColors(band: StabilityBand): StabilityColors {
       };
     case "Chaos":
       return {
-        borderAccent: "border-l-red-400",
-        glow: "group-hover:shadow-[0_0_18px_rgba(248,113,113,0.45)]",
-        text: "text-red-400",
-        progress: "bg-red-400",
+        borderAccent: "border-l-red-400/80",
+        glow: "group-hover:shadow-[0_0_18px_rgba(248,113,113,0.35)]",
+        text: "text-red-400/90",
+        progress: "bg-red-400/80",
         glowColor: "248,113,113",
       };
   }
@@ -66,36 +66,41 @@ function getStabilityColors(band: StabilityBand): StabilityColors {
 function getConfidenceBadge(confidence: ConfidenceLevel, withTooltip = false) {
   const badges = {
     full: {
-      label: "CONFIRMED",
+      label: "Sufficient Sample",
+      icon: CheckCircle2,
       className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
       dashed: false,
-      tooltip: "5 games used",
+      tooltip: "Data Confidence: Indicates how reliable this stability score is based on games played. Fewer games = lower confidence.",
     },
     limited: {
-      label: "LIMITED",
+      label: "Limited Sample",
+      icon: AlertTriangle,
       className: "border-amber-500/40 bg-amber-500/10 text-amber-300",
       dashed: true,
-      tooltip: "3–4 games used",
+      tooltip: "Data Confidence: Indicates how reliable this stability score is based on games played. Fewer games = lower confidence.",
     },
     insufficient: {
-      label: "EARLY",
+      label: "Insufficient Data",
+      icon: HelpCircle,
       className: "border-white/20 bg-white/5 text-white/40",
       dashed: false,
-      tooltip: "Small sample size",
+      tooltip: "Data Confidence: Indicates how reliable this stability score is based on games played. Fewer games = lower confidence.",
     },
   };
 
   const config = badges[confidence];
+  const Icon = config.icon;
 
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-wider",
         config.className,
         config.dashed && "border-dashed"
       )}
       title={withTooltip ? config.tooltip : undefined}
     >
+      <Icon className="h-3 w-3" />
       {config.label}
     </span>
   );
@@ -135,7 +140,7 @@ function PlayerRow({
       <button
         onClick={onToggleExpand}
         className={cn(
-          "w-full text-left relative overflow-hidden rounded-xl border border-white/10 border-l-2 px-5 py-4",
+          "w-full text-left relative overflow-hidden rounded-xl border border-white/10 border-l-2 px-6 py-5",
           "bg-gradient-to-br from-black/60 via-black/50 to-black/40 backdrop-blur-sm",
           "transition-all duration-300 cursor-pointer",
           "hover:bg-white/[0.03]",
@@ -143,7 +148,7 @@ function PlayerRow({
           colors.glow
         )}
       >
-        <div className="relative z-10 grid grid-cols-[2fr_3fr_2fr_1.5fr] gap-6 items-center">
+        <div className="relative z-10 grid grid-cols-[2fr_3fr_2fr_1.5fr] gap-8 items-center">
           <div className="min-w-0">
             <h3 className="text-sm font-medium text-white truncate">
               {row.player_name}
@@ -151,10 +156,11 @@ function PlayerRow({
           </div>
 
           <div className="space-y-1.5">
-            <div className="flex items-baseline gap-1.5">
-              <span className={cn("text-xl font-semibold tabular-nums", colors.text)}>
-                {Math.round(row.stability_score)}%
+            <div className="flex items-baseline gap-1" title="Form Stability Score: Measures how consistent a player's performances have been over their most recent games. Higher scores indicate predictable output. Lower scores suggest volatility.">
+              <span className={cn("text-2xl font-bold tabular-nums", colors.text)}>
+                {Math.round(row.stability_score)}
               </span>
+              <span className="text-xs text-white/40 font-medium">/100</span>
             </div>
             <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
               <div
@@ -162,9 +168,14 @@ function PlayerRow({
                 style={{ width: `${Math.min(100, row.stability_score)}%` }}
               />
             </div>
-            <p className="text-[10px] uppercase tracking-wider text-white/70">
-              {row.stability_band}
-            </p>
+            <div
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-0.5 border border-white/10"
+              title="Stability Tier: Grouping based on stability score to quickly identify reliable versus volatile players."
+            >
+              <span className="text-[10px] uppercase tracking-wider font-bold text-white/80">
+                {row.stability_band}
+              </span>
+            </div>
           </div>
 
           <div className="text-center">
@@ -189,7 +200,7 @@ function PlayerRow({
             <p className="text-xs text-white/80 leading-relaxed">{bandMeaning}</p>
           </div>
           <div className="pt-2 border-t border-white/10 grid grid-cols-2 gap-3 text-[11px]">
-            <div>
+            <div title="Performance Variance: Statistical spread of a player's recent scores. Higher variance means bigger swings between good and poor performances.">
               <span className="text-white/50">Variance:</span>{" "}
               <span className="text-white/90 font-medium">{row.variance.toFixed(2)}</span>
             </div>
@@ -237,13 +248,14 @@ function MobilePlayerCard({
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-baseline gap-1.5">
+            <div className="flex items-baseline gap-1.5" title="Form Stability Score: Measures how consistent a player's performances have been over their most recent games. Higher scores indicate predictable output. Lower scores suggest volatility.">
               <span className="text-[10px] uppercase tracking-wider text-white/50">
                 Stability:
               </span>
-              <span className={cn("text-xl font-semibold tabular-nums", colors.text)}>
-                {Math.round(row.stability_score)}%
+              <span className={cn("text-xl font-bold tabular-nums", colors.text)}>
+                {Math.round(row.stability_score)}
               </span>
+              <span className="text-xs text-white/40 font-medium">/100</span>
             </div>
             <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
               <div
@@ -271,11 +283,15 @@ function MobilePlayerCard({
                   </span>
                 </div>
               </div>
-              <div>
+              <div title="Stability Tier: Grouping based on stability score to quickly identify reliable versus volatile players.">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">
                   Band
                 </p>
-                <p className="text-xs text-white/80 capitalize">{row.stability_band}</p>
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-0.5 border border-white/10">
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-white/80">
+                    {row.stability_band}
+                  </span>
+                </div>
               </div>
               <div className="flex items-start gap-2 pt-2 border-t border-white/10">
                 <Info className="h-3.5 w-3.5 text-white/40 flex-shrink-0 mt-0.5" />
@@ -331,46 +347,47 @@ export default function FormStabilityGrid() {
   return (
     <section
       className={cn(
-        "relative rounded-3xl border border-white/10 px-5 py-7 md:px-7 md:py-9 overflow-hidden",
+        "relative rounded-3xl border px-5 py-7 md:px-7 md:py-9 overflow-hidden",
         "bg-gradient-to-br from-[#050507] via-black to-[#0d0d0f]",
-        "shadow-[0_0_40px_rgba(255,255,255,0.05)]"
+        "border-white/10 shadow-[0_0_48px_rgba(251,191,36,0.08),0_0_96px_rgba(251,191,36,0.04)]"
       )}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-amber-500/[0.02] via-transparent to-transparent pointer-events-none" />
 
       <div className="relative z-10">
         <div className="mb-6">
           <div className="flex items-start gap-3 mb-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-white/20 to-white/10 shadow-lg flex-shrink-0">
-              <Target className="h-5 w-5 text-white" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-400/20 to-amber-600/10 shadow-lg shadow-amber-400/20 flex-shrink-0">
+              <Target className="h-5 w-5 text-amber-400" />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <h2 className="text-2xl md:text-3xl font-bold text-white">
+                <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
                   Form Stability Grid
                 </h2>
                 <div className="relative">
                   <button
                     onClick={() => setShowHeaderTooltip(!showHeaderTooltip)}
                     onBlur={() => setTimeout(() => setShowHeaderTooltip(false), 200)}
-                    className="flex items-center justify-center h-6 w-6 rounded-full border border-white/20 bg-white/5 hover:bg-white/10 transition-colors"
+                    className="flex items-center justify-center h-6 w-6 rounded-full border border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/20 transition-colors"
                   >
-                    <Info className="h-3.5 w-3.5 text-white/60" />
+                    <Info className="h-3.5 w-3.5 text-amber-400/80" />
                   </button>
                   {showHeaderTooltip && (
-                    <div className="absolute left-0 top-full mt-2 w-64 rounded-lg border border-white/10 bg-black/95 backdrop-blur-sm px-4 py-3 shadow-xl z-50">
-                      <p className="text-xs text-white/90 leading-relaxed">
-                        Stability measures how predictable a player's recent output is.
-                        Finals are included. Higher % = more reliable.
+                    <div className="absolute left-0 top-full mt-2 w-72 rounded-lg border border-amber-400/20 bg-black/95 backdrop-blur-sm px-4 py-3 shadow-xl z-50">
+                      <h4 className="text-xs font-bold text-amber-400 mb-1.5">Form Stability Score</h4>
+                      <p className="text-xs text-white/80 leading-relaxed">
+                        Measures how consistent a player's performances have been over their most recent games.
+                        Higher scores indicate predictable output. Lower scores suggest volatility.
                       </p>
                     </div>
                   )}
                 </div>
               </div>
-              <p className="text-sm text-white/60 mt-1.5">
-                Consistency across the last 5 games — variance, not ceiling
+              <p className="text-sm text-white/70 mt-2 leading-relaxed">
+                Identify reliable performers and volatile wildcards across recent form
               </p>
-              <p className="text-xs text-white/50 mt-1">
+              <p className="text-xs text-white/50 mt-1.5">
                 {statSubtitles[selectedStat]}
               </p>
             </div>
