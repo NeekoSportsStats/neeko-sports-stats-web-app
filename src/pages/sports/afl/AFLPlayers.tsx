@@ -1,14 +1,27 @@
 import React, { useEffect, useState } from "react";
 
-import RoundMomentum from "@/features/afl/players/sections/RoundMomentum";
-import FormStability from "@/features/afl/players/sections/FormStability";
+import RoundSummary, { type RoundSummaryData } from "@/features/afl/players/sections/RoundSummary";
+import FormStabilityGrid from "@/features/afl/players/sections/FormStabilityGrid";
 import PlayerImpactMap from "@/features/afl/players/sections/PlayerImpactMap";
 import MasterGrid from "@/features/afl/players/sections/MasterGrid";
+import { getRoundSummaryData } from "@/features/afl/players/data/getRoundSummaryData";
 
 export default function AFLPlayersPage() {
   const [activeSection, setActiveSection] = useState("round-momentum");
   const [isStuck, setIsStuck] = useState(false);
   const [showTopButton, setShowTopButton] = useState(false);
+  const [roundSummaryData, setRoundSummaryData] = useState<RoundSummaryData | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getRoundSummaryData();
+        setRoundSummaryData(data);
+      } catch (err) {
+        console.error("Failed to load round summary:", err);
+      }
+    })();
+  }, []);
 
   /* -------------------------------------------------------------------------- */
   /*                         Scroll Spy Section Tracking                        */
@@ -186,11 +199,11 @@ export default function AFLPlayersPage() {
 
       <div className="space-y-20 md:space-y-24">
         <section id="round-momentum" className="scroll-mt-28 animate-premium-section">
-          <RoundMomentum />
+          {roundSummaryData && <RoundSummary data={roundSummaryData} />}
         </section>
 
         <section id="form-stability" className="scroll-mt-28 animate-premium-section delay-1">
-          <FormStability />
+          <FormStabilityGrid />
         </section>
 
         <section id="player-impact" className="scroll-mt-28 animate-premium-section delay-2">

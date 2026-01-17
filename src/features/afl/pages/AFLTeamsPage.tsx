@@ -3,12 +3,10 @@
 
 import React, { useEffect, useState } from "react";
 
-import TeamMomentumPulse from "@/features/afl/teams/sections/TeamMomentumPulse";
-import TeamDashboardTiles from "@/features/afl/teams/sections/TeamDashboardTiles";
-import TeamFormGrid from "@/features/afl/teams/sections/TeamFormGrid";
-import TeamTrends from "@/features/afl/teams/sections/TeamTrends";
-import TeamAIInsights from "@/features/afl/teams/sections/TeamAIInsights";
-import TeamMasterTable from "@/features/afl/teams/sections/TeamMasterTable";
+import TeamMomentumPulse from "@/components/afl/teams/TeamMomentumPulse";
+import TeamFormGrid from "@/components/afl/teams/TeamFormGrid";
+import TeamImpactMap from "@/features/afl/teams/sections/TeamImpactMap";
+import MasterGrid from "@/features/afl/teams/sections/MasterGrid";
 import { AFL_STAT_CONFIG } from "@/lib/stats/afl/statConfig";
 
 export default function AFLTeams() {
@@ -23,11 +21,9 @@ export default function AFLTeams() {
   useEffect(() => {
     const ids = [
       "momentum",
-      "dashboard",
-      "form-grid",
-      "trends",
-      "ai",
-      "master-table",
+      "form-stability",
+      "team-impact",
+      "master-grid",
     ];
 
     const observer = new IntersectionObserver(
@@ -110,11 +106,9 @@ export default function AFLTeams() {
 
   const sections = [
     { id: "momentum", label: "Round Momentum" },
-    { id: "dashboard", label: "Dashboard" },
-    { id: "form-grid", label: "Form Grid" },
-    { id: "trends", label: "Team Trends" },
-    { id: "ai", label: "AI Insights" },
-    { id: "master-table", label: "Master Table" },
+    { id: "form-stability", label: "Team Form Stability" },
+    { id: "team-impact", label: "Team Impact Map" },
+    { id: "master-grid", label: "Master Grid" },
   ];
 
   /* -------------------------------------------------------------------------- */
@@ -195,24 +189,16 @@ export default function AFLTeams() {
         <TeamMomentumPulse statConfig={AFL_STAT_CONFIG} />
       </section>
 
-      <section id="dashboard" className="mb-14 scroll-mt-28">
-        <TeamDashboardTiles statConfig={AFL_STAT_CONFIG} />
-      </section>
-
-      <section id="form-grid" className="mb-14 scroll-mt-28">
+      <section id="form-stability" className="mb-14 scroll-mt-28">
         <TeamFormGrid statConfig={AFL_STAT_CONFIG} />
       </section>
 
-      <section id="trends" className="mb-14 scroll-mt-28">
-        <TeamTrends statConfig={AFL_STAT_CONFIG} />
+      <section id="team-impact" className="mb-14 scroll-mt-28">
+        <TeamImpactMap />
       </section>
 
-      <section id="ai" className="mb-14 scroll-mt-28">
-        <TeamAIInsights statConfig={AFL_STAT_CONFIG} />
-      </section>
-
-      <section id="master-table" className="scroll-mt-28">
-        <TeamMasterTable statConfig={AFL_STAT_CONFIG} />
+      <section id="master-grid" className="scroll-mt-28">
+        <MasterGrid />
       </section>
 
       {/* ------------------------------- BACK TO TOP ------------------------------ */}

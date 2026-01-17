@@ -1,18 +1,27 @@
 import React, { useEffect, useState } from "react";
 
-import RoundMomentum from "@/features/afl/players/sections/RoundMomentum";
+import RoundSummary, { type RoundSummaryData } from "@/features/afl/players/sections/RoundSummary";
 import FormStabilityGrid from "@/features/afl/players/sections/FormStabilityGrid";
-import PositionTrends from "@/features/afl/players/sections/PositionTrends";
-import AIInsights from "@/features/afl/players/sections/AIInsights";
-import MasterTable from "@/features/afl/players/sections/MasterTable";
-import { AFL_STAT_CONFIG } from "@/lib/stats/afl/statConfig";
-import { type RoundStat } from "@/features/afl/players/data/getRoundMomentumData";
+import PlayerImpactMap from "@/features/afl/players/sections/PlayerImpactMap";
+import MasterGrid from "@/features/afl/players/sections/MasterGrid";
+import { getRoundSummaryData } from "@/features/afl/players/data/getRoundSummaryData";
 
 export default function AFLPlayersPage() {
   const [activeSection, setActiveSection] = useState("round-momentum");
   const [isStuck, setIsStuck] = useState(false);
   const [showTopButton, setShowTopButton] = useState(false);
-  const [roundStat, setRoundStat] = useState<RoundStat>("disposals");
+  const [roundSummaryData, setRoundSummaryData] = useState<RoundSummaryData | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getRoundSummaryData();
+        setRoundSummaryData(data);
+      } catch (err) {
+        console.error("Failed to load round summary:", err);
+      }
+    })();
+  }, []);
 
   /* -------------------------------------------------------------------------- */
   /*                         Scroll Spy Section Tracking                        */
@@ -22,9 +31,8 @@ export default function AFLPlayersPage() {
     const ids = [
       "round-momentum",
       "form-stability",
-      "position-trends",
-      "ai-insights",
-      "master-table",
+      "player-impact",
+      "master-grid",
     ];
 
     const observer = new IntersectionObserver(
@@ -113,9 +121,8 @@ export default function AFLPlayersPage() {
   const sections = [
     { id: "round-momentum", label: "Round Momentum" },
     { id: "form-stability", label: "Form Stability" },
-    { id: "position-trends", label: "Position Trends" },
-    { id: "ai-insights", label: "AI Insights" },
-    { id: "master-table", label: "Master Table" },
+    { id: "player-impact", label: "Player Impact Map" },
+    { id: "master-grid", label: "Master Grid" },
   ];
 
   /* -------------------------------------------------------------------------- */
@@ -192,23 +199,19 @@ export default function AFLPlayersPage() {
 
       <div className="space-y-20 md:space-y-24">
         <section id="round-momentum" className="scroll-mt-28 animate-premium-section">
-          <RoundMomentum stat={roundStat} onStatChange={setRoundStat} />
+          {roundSummaryData && <RoundSummary data={roundSummaryData} />}
         </section>
 
         <section id="form-stability" className="scroll-mt-28 animate-premium-section delay-1">
-          <FormStabilityGrid statConfig={AFL_STAT_CONFIG} />
+          <FormStabilityGrid />
         </section>
 
-        <section id="position-trends" className="scroll-mt-28 animate-premium-section delay-2">
-          <PositionTrends statConfig={AFL_STAT_CONFIG} />
+        <section id="player-impact" className="scroll-mt-28 animate-premium-section delay-2">
+          <PlayerImpactMap />
         </section>
 
-        <section id="ai-insights" className="scroll-mt-28 animate-premium-section delay-3">
-          <AIInsights statConfig={AFL_STAT_CONFIG} />
-        </section>
-
-        <section id="master-table" className="scroll-mt-28 animate-premium-section delay-4">
-          <MasterTable statConfig={AFL_STAT_CONFIG} />
+        <section id="master-grid" className="scroll-mt-28 animate-premium-section delay-3">
+          <MasterGrid />
         </section>
       </div>
 
