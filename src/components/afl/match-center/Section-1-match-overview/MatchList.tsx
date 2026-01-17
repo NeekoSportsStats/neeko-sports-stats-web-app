@@ -5,7 +5,7 @@ import type { StatConfig } from "@/lib/stats/types";
 
 type Props = {
   matches: FixtureMatch[];
-  onSelectMatch: (m: FixtureMatch) => void;
+  onSelectMatch?: (m: FixtureMatch) => void;
   statConfig: StatConfig;
 };
 
@@ -51,7 +51,7 @@ export default function MatchList({ matches, onSelectMatch, statConfig }: Props)
               <MatchCard
                 key={match.id}
                 match={match}
-                onClick={() => onSelectMatch(match)}
+                onClick={() => onSelectMatch?.(match)}
                 statConfig={statConfig}
               />
             ))}

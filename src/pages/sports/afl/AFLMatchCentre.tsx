@@ -1,11 +1,9 @@
 // src/pages/sports/afl/AFLMatchCentre.tsx
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 
 import MatchCenterHeader from "@/components/afl/match-center/MatchCenterHeader";
 import MatchList from "@/components/afl/match-center/MatchList";
 import LadderSnapshot, { type LadderRow } from "@/components/afl/match-center/LadderSnapshot";
-import MatchCenterCTA from "@/components/afl/match-center/MatchCenterCTA";
-import MatchDetailOverlay from "@/components/afl/match-center/MatchDetailOverlay";
 import SeasonRoundSelector from "@/components/afl/match-center/SeasonRoundSelector";
 
 import { MOCK_FIXTURES, MOCK_LADDER_TOP16 } from "@/components/afl/match-center/mockData";
@@ -75,18 +73,12 @@ function getDefaultSeasonRound(fixtures: FixtureMatch[]) {
 /* -------------------------------------------------------------------------- */
 
 export default function AFLMatchCentre() {
-  const [activeMatch, setActiveMatch] = useState<FixtureMatch | null>(null);
-
   const initial = useMemo(() => getDefaultSeasonRound(MOCK_FIXTURES), []);
   const [season, setSeason] = useState<Season>(initial.season);
   const [roundNumber, setRoundNumber] = useState<number>(initial.roundNumber);
 
   const isDefaultRound =
     season === initial.season && roundNumber === initial.roundNumber;
-
-  useEffect(() => {
-    setActiveMatch(null);
-  }, [season, roundNumber]);
 
   const filtered = useMemo(() => {
     return MOCK_FIXTURES
@@ -114,29 +106,24 @@ export default function AFLMatchCentre() {
         />
       </div>
 
-      <div className="mt-6 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-        <div className="space-y-6">
-          <MatchList matches={filtered} onSelectMatch={setActiveMatch} statConfig={AFL_STAT_CONFIG} />
-          <MatchCenterCTA />
-        </div>
+      <div className="mt-6 space-y-8">
+        <section>
+          <h2 className="text-xl font-semibold text-white mb-4">Match Overview</h2>
+          <div className="lg:grid lg:grid-cols-[1fr_360px] lg:gap-6">
+            <MatchList matches={filtered} statConfig={AFL_STAT_CONFIG} />
 
-        <div className="hidden lg:block">
-          <LadderSnapshot
-            rows={ladderRows}
-            highlightTeams={
-              activeMatch ? [activeMatch.homeTeam, activeMatch.awayTeam] : []
-            }
-          />
-        </div>
+            <div className="hidden lg:block space-y-4">
+              <h3 className="text-lg font-semibold text-white">Ladder</h3>
+              <LadderSnapshot rows={ladderRows} />
+            </div>
+          </div>
+        </section>
+
+        <section className="lg:hidden">
+          <h2 className="text-xl font-semibold text-white mb-4">Ladder</h2>
+          <LadderSnapshot rows={ladderRows} />
+        </section>
       </div>
-
-      {activeMatch && (
-        <MatchDetailOverlay
-          match={activeMatch}
-          onClose={() => setActiveMatch(null)}
-          statConfig={AFL_STAT_CONFIG}
-        />
-      )}
     </div>
   );
 }
