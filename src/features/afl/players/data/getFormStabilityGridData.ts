@@ -35,7 +35,7 @@ export async function getFormStabilityGridData(params: {
 
   try {
     const { data, error } = await supabase
-      .from("form_stability_grid_final")
+      .from("form_stability_grid")
       .select(`
         season,
         player_id,
