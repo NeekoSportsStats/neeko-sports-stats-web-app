@@ -13,6 +13,7 @@ export interface FormStabilityRow {
   season_avg: number;
   trend_diff: number;
   stability_score: number;
+  stability_band: string;
   trend_label: TrendLabel;
   variance: number;
   confidence_label: string;
@@ -43,6 +44,7 @@ export async function getFormStabilityGridData(params: {
         season_avg,
         trend_diff,
         stability_score,
+        stability_band,
         trend_label,
         variance,
         confidence_label
@@ -74,6 +76,7 @@ export async function getFormStabilityGridData(params: {
       season_avg: row.season_avg,
       trend_diff: row.trend_diff,
       stability_score: row.stability_score,
+      stability_band: row.stability_band,
       trend_label: row.trend_label as TrendLabel,
       variance: row.variance,
       confidence_label: row.confidence_label,

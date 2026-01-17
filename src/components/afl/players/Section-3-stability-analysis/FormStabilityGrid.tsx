@@ -10,23 +10,45 @@ import {
 
 type Tone = "hot" | "stable" | "cold";
 
-function getStabilityBandColor(confidenceLabel: string): string {
-  const lower = confidenceLabel.toLowerCase();
+function getStabilityBandColor(stabilityBand: string): string {
+  const lower = stabilityBand.toLowerCase();
 
-  if (lower.includes("elite") || lower.includes("very high")) {
+  if (lower.includes("elite")) {
     return "bg-yellow-400/30 text-yellow-200 border-yellow-400/40";
   }
-  if (lower.includes("reliable") || lower.includes("high")) {
+  if (lower.includes("reliable")) {
     return "bg-yellow-500/25 text-yellow-300 border-yellow-500/35";
   }
-  if (lower.includes("moderate") || lower.includes("medium")) {
+  if (lower.includes("moderate")) {
     return "bg-amber-500/25 text-amber-300 border-amber-500/35";
   }
-  if (lower.includes("volatile") || lower.includes("low")) {
+  if (lower.includes("volatile")) {
     return "bg-orange-500/25 text-orange-300 border-orange-500/35";
   }
-  if (lower.includes("chaos") || lower.includes("very low")) {
+  if (lower.includes("chaos")) {
     return "bg-red-500/25 text-red-300 border-red-500/35";
+  }
+
+  return "bg-zinc-500/25 text-zinc-300 border-zinc-500/35";
+}
+
+function getConfidenceBadgeColor(confidenceLabel: string): string {
+  const lower = confidenceLabel.toLowerCase();
+
+  if (lower.includes("very high") || lower.includes("elite")) {
+    return "bg-emerald-500/25 text-emerald-200 border-emerald-500/35";
+  }
+  if (lower.includes("high")) {
+    return "bg-green-500/25 text-green-200 border-green-500/35";
+  }
+  if (lower.includes("medium") || lower.includes("moderate")) {
+    return "bg-blue-500/25 text-blue-200 border-blue-500/35";
+  }
+  if (lower.includes("low")) {
+    return "bg-orange-500/25 text-orange-200 border-orange-500/35";
+  }
+  if (lower.includes("very low")) {
+    return "bg-red-500/25 text-red-200 border-red-500/35";
   }
 
   return "bg-zinc-500/25 text-zinc-300 border-zinc-500/35";
@@ -154,10 +176,10 @@ function PlayerCard({
           <div
             className={cn(
               "inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider",
-              getStabilityBandColor(player.confidence_label)
+              getStabilityBandColor(player.stability_band)
             )}
           >
-            {player.confidence_label}
+            {player.stability_band}
           </div>
 
           <div className="text-[11px] text-white/60">
@@ -225,6 +247,20 @@ function PlayerCard({
                   Games Used
                 </p>
                 <p className="font-semibold text-white">{player.games_used}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+              <p className="text-white/50 text-[10px] uppercase tracking-wider">
+                Confidence:
+              </p>
+              <div
+                className={cn(
+                  "inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+                  getConfidenceBadgeColor(player.confidence_label)
+                )}
+              >
+                {player.confidence_label}
               </div>
             </div>
 
