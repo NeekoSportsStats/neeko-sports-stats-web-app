@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from "react";
 
-import RoundSummary from "@/components/afl/players/RoundSummary";
-import FormStabilityGrid from "@/components/afl/players/FormStabilityGrid";
-import PositionTrends from "@/components/afl/players/PositionTrends";
-import AIInsights from "@/components/afl/players/AIInsights";
-import MasterTable from "@/components/afl/players/MasterTable";
-import { AFL_STAT_CONFIG } from "@/lib/stats/afl/statConfig";
+import RoundMomentum from "@/features/afl/players/sections/RoundMomentum";
+import FormStability from "@/features/afl/players/sections/FormStability";
+import PlayerImpactMap from "@/features/afl/players/sections/PlayerImpactMap";
+import MasterGrid from "@/features/afl/players/sections/MasterGrid";
 
 export default function AFLPlayersPage() {
   const [activeSection, setActiveSection] = useState("round-momentum");
@@ -20,9 +18,8 @@ export default function AFLPlayersPage() {
     const ids = [
       "round-momentum",
       "form-stability",
-      "position-trends",
-      "ai-insights",
-      "master-table",
+      "player-impact",
+      "master-grid",
     ];
 
     const observer = new IntersectionObserver(
@@ -111,9 +108,8 @@ export default function AFLPlayersPage() {
   const sections = [
     { id: "round-momentum", label: "Round Momentum" },
     { id: "form-stability", label: "Form Stability" },
-    { id: "position-trends", label: "Position Trends" },
-    { id: "ai-insights", label: "AI Insights" },
-    { id: "master-table", label: "Master Table" },
+    { id: "player-impact", label: "Player Impact Map" },
+    { id: "master-grid", label: "Master Grid" },
   ];
 
   /* -------------------------------------------------------------------------- */
@@ -190,23 +186,19 @@ export default function AFLPlayersPage() {
 
       <div className="space-y-20 md:space-y-24">
         <section id="round-momentum" className="scroll-mt-28 animate-premium-section">
-          <RoundSummary statConfig={AFL_STAT_CONFIG} />
+          <RoundMomentum />
         </section>
 
         <section id="form-stability" className="scroll-mt-28 animate-premium-section delay-1">
-          <FormStabilityGrid statConfig={AFL_STAT_CONFIG} />
+          <FormStability />
         </section>
 
-        <section id="position-trends" className="scroll-mt-28 animate-premium-section delay-2">
-          <PositionTrends statConfig={AFL_STAT_CONFIG} />
+        <section id="player-impact" className="scroll-mt-28 animate-premium-section delay-2">
+          <PlayerImpactMap />
         </section>
 
-        <section id="ai-insights" className="scroll-mt-28 animate-premium-section delay-3">
-          <AIInsights statConfig={AFL_STAT_CONFIG} />
-        </section>
-
-        <section id="master-table" className="scroll-mt-28 animate-premium-section delay-4">
-          <MasterTable statConfig={AFL_STAT_CONFIG} />
+        <section id="master-grid" className="scroll-mt-28 animate-premium-section delay-3">
+          <MasterGrid />
         </section>
       </div>
 
