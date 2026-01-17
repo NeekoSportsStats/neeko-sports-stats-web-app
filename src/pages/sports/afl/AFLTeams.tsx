@@ -3,10 +3,11 @@
 
 import React, { useEffect, useState } from "react";
 
-import RoundMomentum from "@/features/afl/teams/sections/RoundMomentum";
-import FormStability from "@/features/afl/teams/sections/FormStability";
+import TeamMomentumPulse from "@/components/afl/teams/TeamMomentumPulse";
+import TeamFormGrid from "@/components/afl/teams/TeamFormGrid";
 import TeamImpactMap from "@/features/afl/teams/sections/TeamImpactMap";
 import MasterGrid from "@/features/afl/teams/sections/MasterGrid";
+import { AFL_STAT_CONFIG } from "@/lib/stats/afl/statConfig";
 
 export default function AFLTeams() {
   const [activeSection, setActiveSection] = useState("momentum");
@@ -185,11 +186,11 @@ export default function AFLTeams() {
       {/* -------------------------- PAGE SECTIONS -------------------------- */}
 
       <section id="momentum" className="mb-14 scroll-mt-28">
-        <RoundMomentum />
+        <TeamMomentumPulse statConfig={AFL_STAT_CONFIG} />
       </section>
 
       <section id="form-stability" className="mb-14 scroll-mt-28">
-        <FormStability />
+        <TeamFormGrid statConfig={AFL_STAT_CONFIG} />
       </section>
 
       <section id="team-impact" className="mb-14 scroll-mt-28">
