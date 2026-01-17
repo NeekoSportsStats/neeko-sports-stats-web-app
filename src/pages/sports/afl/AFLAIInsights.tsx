@@ -9,7 +9,6 @@ import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
 import PredictabilityTable from "@/components/afl/ai-insights/Section-2-player-predictability/PredictabilityTable";
 import TeamPredictabilityPanel from "@/components/afl/ai-insights/Section-3-team-prediction/TeamPredictabilityPanel";
 import GameFlowMomentumPanel from "@/components/afl/ai-insights/Section-4-game-flow/GameFlowMomentumPanel";
-import PlayerImpactScatterPanel from "@/components/afl/ai-insights/Section-1-hero-scatter/PlayerImpactScatterPanel";
 
 import {
   filterPastFixtures,
@@ -126,15 +125,6 @@ export default function AFLAIInsights() {
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-60" />
           </div>
         </div>
-
-        {/* PLAYER IMPACT MAP */}
-        {selectedMatch && (
-          <PlayerImpactScatterPanel
-            match={selectedMatch}
-            mode={mode}
-            initialLens="fantasy"
-          />
-        )}
 
         {/* PLAYER SCORE PREDICTABILITY */}
         {selectedMatch && (
