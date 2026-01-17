@@ -11,180 +11,193 @@ import {
 } from "@/features/afl/players/data/getFormStabilityGridData";
 
 interface StabilityColors {
-  border: string;
+  borderAccent: string;
   glow: string;
-  bg: string;
   text: string;
   progress: string;
+  glowColor: string;
 }
 
 function getStabilityColors(band: StabilityBand): StabilityColors {
   switch (band) {
     case "Elite Stable":
       return {
-        border: "border-emerald-500/30",
-        glow: "shadow-[0_0_20px_rgba(16,185,129,0.25)]",
-        bg: "bg-emerald-500/10",
-        text: "text-emerald-300",
-        progress: "bg-gradient-to-r from-emerald-500 to-emerald-400",
+        borderAccent: "border-l-emerald-400",
+        glow: "group-hover:shadow-[0_0_18px_rgba(52,211,153,0.45)]",
+        text: "text-emerald-400",
+        progress: "bg-emerald-400",
+        glowColor: "52,211,153",
       };
     case "Reliable":
       return {
-        border: "border-teal-500/30",
-        glow: "shadow-[0_0_20px_rgba(20,184,166,0.25)]",
-        bg: "bg-teal-500/10",
-        text: "text-teal-300",
-        progress: "bg-gradient-to-r from-teal-500 to-teal-400",
+        borderAccent: "border-l-teal-400",
+        glow: "group-hover:shadow-[0_0_18px_rgba(45,212,191,0.45)]",
+        text: "text-teal-400",
+        progress: "bg-teal-400",
+        glowColor: "45,212,191",
       };
     case "Moderate":
       return {
-        border: "border-amber-500/30",
-        glow: "shadow-[0_0_20px_rgba(245,158,11,0.25)]",
-        bg: "bg-amber-500/10",
-        text: "text-amber-300",
-        progress: "bg-gradient-to-r from-amber-500 to-amber-400",
+        borderAccent: "border-l-amber-400",
+        glow: "group-hover:shadow-[0_0_18px_rgba(251,191,36,0.45)]",
+        text: "text-amber-400",
+        progress: "bg-amber-400",
+        glowColor: "251,191,36",
       };
     case "Volatile":
       return {
-        border: "border-orange-500/30",
-        glow: "shadow-[0_0_20px_rgba(249,115,22,0.25)]",
-        bg: "bg-orange-500/10",
-        text: "text-orange-300",
-        progress: "bg-gradient-to-r from-orange-500 to-orange-400",
+        borderAccent: "border-l-orange-400",
+        glow: "group-hover:shadow-[0_0_18px_rgba(251,146,60,0.45)]",
+        text: "text-orange-400",
+        progress: "bg-orange-400",
+        glowColor: "251,146,60",
       };
     case "Chaos":
       return {
-        border: "border-red-500/30",
-        glow: "shadow-[0_0_20px_rgba(239,68,68,0.25)]",
-        bg: "bg-red-500/10",
-        text: "text-red-300",
-        progress: "bg-gradient-to-r from-red-500 to-red-400",
+        borderAccent: "border-l-red-400",
+        glow: "group-hover:shadow-[0_0_18px_rgba(248,113,113,0.45)]",
+        text: "text-red-400",
+        progress: "bg-red-400",
+        glowColor: "248,113,113",
       };
   }
 }
 
-function getConfidenceBadge(confidence: ConfidenceLevel) {
-  switch (confidence) {
-    case "full":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          Full
-        </span>
-      );
-    case "limited":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 border-dashed bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-amber-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-          Limited
-        </span>
-      );
-    case "insufficient":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-2.5 py-0.5 text-[10px] font-medium text-white/40">
-          <span className="h-1.5 w-1.5 rounded-full bg-white/30" />
-          Insufficient
-        </span>
-      );
-  }
+function getConfidenceBadge(confidence: ConfidenceLevel, withTooltip = false) {
+  const badges = {
+    full: {
+      label: "CONFIRMED",
+      className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
+      dashed: false,
+      tooltip: "5 games used",
+    },
+    limited: {
+      label: "LIMITED",
+      className: "border-amber-500/40 bg-amber-500/10 text-amber-300",
+      dashed: true,
+      tooltip: "3–4 games used",
+    },
+    insufficient: {
+      label: "EARLY",
+      className: "border-white/20 bg-white/5 text-white/40",
+      dashed: false,
+      tooltip: "Small sample size",
+    },
+  };
+
+  const config = badges[confidence];
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+        config.className,
+        config.dashed && "border-dashed"
+      )}
+      title={withTooltip ? config.tooltip : undefined}
+    >
+      {config.label}
+    </span>
+  );
 }
 
-function getTooltipText(band: StabilityBand, stat: StatKey): string {
-  const statLabel = stat === "fantasy" ? "fantasy points" : stat === "disposals" ? "disposals" : "goals";
-
+function getBandMeaning(band: StabilityBand): string {
   switch (band) {
     case "Elite Stable":
-      return `Elite consistency in ${statLabel}. This player delivers predictable output week after week with minimal variance.`;
+      return "Highly predictable output";
     case "Reliable":
-      return `Reliable performer in ${statLabel}. Expect consistent contributions with occasional fluctuation.`;
+      return "Minor variation";
     case "Moderate":
-      return `Moderate stability in ${statLabel}. Performance varies but stays within reasonable bounds.`;
+      return "Role dependent swings";
     case "Volatile":
-      return `Volatile ${statLabel} output. Significant swings between high and low performances.`;
+      return "Large fluctuations";
     case "Chaos":
-      return `Highly unpredictable ${statLabel}. Extreme variance makes week-to-week output difficult to forecast.`;
+      return "Extreme variance";
   }
 }
 
 function PlayerRow({
   row,
   stat,
-  showTooltip,
-  onToggleTooltip,
+  isExpanded,
+  onToggleExpand,
 }: {
   row: FormStabilityRow;
   stat: StatKey;
-  showTooltip: boolean;
-  onToggleTooltip: () => void;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
 }) {
   const colors = getStabilityColors(row.stability_band);
-  const tooltipText = getTooltipText(row.stability_band, stat);
+  const bandMeaning = getBandMeaning(row.stability_band);
 
   return (
     <div className="group relative">
-      <div
+      <button
+        onClick={onToggleExpand}
         className={cn(
-          "relative overflow-hidden rounded-xl border px-5 py-4",
-          "bg-gradient-to-br from-black/70 via-black/60 to-black/50 backdrop-blur-sm",
-          "transition-all duration-300",
-          "hover:-translate-y-1 hover:bg-black/80",
-          colors.border,
-          "hover:" + colors.glow
+          "w-full text-left relative overflow-hidden rounded-xl border border-white/10 border-l-2 px-5 py-4",
+          "bg-gradient-to-br from-black/60 via-black/50 to-black/40 backdrop-blur-sm",
+          "transition-all duration-300 cursor-pointer",
+          "hover:bg-white/[0.03]",
+          colors.borderAccent,
+          colors.glow
         )}
       >
-        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-          <div className={cn("absolute inset-0", colors.bg)} />
-        </div>
-
-        <div className="relative z-10 grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center">
+        <div className="relative z-10 grid grid-cols-[2fr_3fr_2fr_1.5fr] gap-6 items-center">
           <div className="min-w-0">
-            <h3 className="text-sm font-bold text-white truncate">
+            <h3 className="text-sm font-medium text-white truncate">
               {row.player_name}
             </h3>
-            <p className="text-xs text-white/60 mt-0.5 capitalize">
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-baseline gap-1.5">
+              <span className={cn("text-xl font-semibold tabular-nums", colors.text)}>
+                {Math.round(row.stability_score)}%
+              </span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className={cn("h-full rounded-full transition-all duration-300", colors.progress)}
+                style={{ width: `${Math.min(100, row.stability_score)}%` }}
+              />
+            </div>
+            <p className="text-[10px] uppercase tracking-wider text-white/70">
               {row.stability_band}
             </p>
           </div>
 
-          <div className="text-center min-w-[80px]">
-            <div className="flex items-baseline gap-1 justify-center">
-              <span className={cn("text-2xl font-extrabold tabular-nums", colors.text)}>
-                {Math.round(row.stability_score)}
-              </span>
-              <span className="text-xs text-white/40">%</span>
-            </div>
-            <div className="mt-2 w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
-              <div
-                className={cn("h-full rounded-full transition-all duration-500", colors.progress)}
-                style={{ width: `${Math.min(100, row.stability_score)}%` }}
-              />
-            </div>
+          <div className="text-center">
+            {getConfidenceBadge(row.stability_confidence, true)}
           </div>
 
-          <div className="text-center min-w-[60px]">
-            <span className="text-base font-bold text-white tabular-nums">
+          <div className="text-right">
+            <span className="text-sm font-medium text-white/50 tabular-nums">
               {row.games_used}
             </span>
-            <p className="text-[10px] text-white/40 uppercase tracking-wider mt-0.5">
+            <p className="text-[9px] text-white/30 uppercase tracking-wider mt-0.5">
               Games
             </p>
           </div>
-
-          <div className="flex items-center gap-2">
-            {getConfidenceBadge(row.stability_confidence)}
-            <button
-              onClick={onToggleTooltip}
-              className="flex items-center justify-center h-7 w-7 rounded-full border border-white/20 bg-white/5 hover:bg-white/10 transition-colors"
-            >
-              <Info className="h-3.5 w-3.5 text-white/60" />
-            </button>
-          </div>
         </div>
-      </div>
+      </button>
 
-      {showTooltip && (
-        <div className="mt-2 rounded-lg border border-white/10 bg-black/90 backdrop-blur-sm px-4 py-3">
-          <p className="text-xs text-white/80 leading-relaxed">{tooltipText}</p>
+      {isExpanded && (
+        <div className="mt-2 rounded-lg border border-white/10 bg-black/90 backdrop-blur-sm px-4 py-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <Info className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
+            <p className="text-xs text-white/80 leading-relaxed">{bandMeaning}</p>
+          </div>
+          <div className="pt-2 border-t border-white/10 grid grid-cols-2 gap-3 text-[11px]">
+            <div>
+              <span className="text-white/50">Variance:</span>{" "}
+              <span className="text-white/90 font-medium">{row.variance.toFixed(2)}</span>
+            </div>
+            <div>
+              <span className="text-white/50">Sample:</span>{" "}
+              <span className="text-white/90 font-medium">{row.games_used} games</span>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -194,94 +207,84 @@ function PlayerRow({
 function MobilePlayerCard({
   row,
   stat,
-  showTooltip,
-  onToggleTooltip,
+  isExpanded,
+  onToggleExpand,
 }: {
   row: FormStabilityRow;
   stat: StatKey;
-  showTooltip: boolean;
-  onToggleTooltip: () => void;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
 }) {
   const colors = getStabilityColors(row.stability_band);
-  const tooltipText = getTooltipText(row.stability_band, stat);
+  const bandMeaning = getBandMeaning(row.stability_band);
 
   return (
     <div className="group relative">
-      <div
+      <button
+        onClick={onToggleExpand}
         className={cn(
-          "relative overflow-hidden rounded-xl border px-4 py-4",
-          "bg-gradient-to-br from-black/70 via-black/60 to-black/50 backdrop-blur-sm",
-          "transition-all duration-300",
-          colors.border,
-          "active:" + colors.glow
+          "w-full text-left relative overflow-hidden rounded-xl border border-white/10 border-l-2 px-4 py-4",
+          "bg-gradient-to-br from-black/60 via-black/50 to-black/40 backdrop-blur-sm",
+          "transition-all duration-300 active:bg-white/[0.03]",
+          colors.borderAccent
         )}
       >
-        <div className="absolute inset-0 opacity-0 group-active:opacity-100 transition-opacity duration-300 pointer-events-none">
-          <div className={cn("absolute inset-0", colors.bg)} />
-        </div>
-
         <div className="relative z-10 space-y-3">
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-bold text-white truncate">
-                {row.player_name}
-              </h3>
-              <p className="text-xs text-white/60 mt-0.5 capitalize">
-                {row.stability_band}
-              </p>
-            </div>
-            <button
-              onClick={onToggleTooltip}
-              className="flex items-center justify-center h-7 w-7 rounded-full border border-white/20 bg-white/5 active:bg-white/10 transition-colors flex-shrink-0"
-            >
-              <Info className="h-3.5 w-3.5 text-white/60" />
-            </button>
+            <h3 className="text-sm font-medium text-white truncate flex-1">
+              {row.player_name}
+            </h3>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">
-                Stability
-              </p>
-              <div className="flex items-baseline gap-1">
-                <span className={cn("text-xl font-extrabold tabular-nums", colors.text)}>
-                  {Math.round(row.stability_score)}
-                </span>
-                <span className="text-xs text-white/40">%</span>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">
-                Games
-              </p>
-              <span className="text-xl font-extrabold text-white tabular-nums">
-                {row.games_used}
+          <div className="space-y-2">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-[10px] uppercase tracking-wider text-white/50">
+                Stability:
+              </span>
+              <span className={cn("text-xl font-semibold tabular-nums", colors.text)}>
+                {Math.round(row.stability_score)}%
               </span>
             </div>
-
-            <div>
-              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">
-                Confidence
-              </p>
-              {getConfidenceBadge(row.stability_confidence)}
+            <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className={cn("h-full rounded-full transition-all duration-300", colors.progress)}
+                style={{ width: `${Math.min(100, row.stability_score)}%` }}
+              />
             </div>
           </div>
 
-          <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
-            <div
-              className={cn("h-full rounded-full transition-all duration-500", colors.progress)}
-              style={{ width: `${Math.min(100, row.stability_score)}%` }}
-            />
-          </div>
+          {isExpanded && (
+            <div className="pt-3 border-t border-white/10 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">
+                    Confidence
+                  </p>
+                  {getConfidenceBadge(row.stability_confidence)}
+                </div>
+                <div>
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">
+                    Games Used
+                  </p>
+                  <span className="text-base font-semibold text-white tabular-nums">
+                    {row.games_used}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">
+                  Band
+                </p>
+                <p className="text-xs text-white/80 capitalize">{row.stability_band}</p>
+              </div>
+              <div className="flex items-start gap-2 pt-2 border-t border-white/10">
+                <Info className="h-3.5 w-3.5 text-white/40 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-white/70 leading-relaxed">{bandMeaning}</p>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-
-      {showTooltip && (
-        <div className="mt-2 rounded-lg border border-white/10 bg-black/90 backdrop-blur-sm px-4 py-3">
-          <p className="text-xs text-white/80 leading-relaxed">{tooltipText}</p>
-        </div>
-      )}
+      </button>
     </div>
   );
 }
@@ -291,13 +294,14 @@ export default function FormStabilityGrid() {
   const [data, setData] = useState<FormStabilityGridData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [openTooltipId, setOpenTooltipId] = useState<string | null>(null);
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+  const [showHeaderTooltip, setShowHeaderTooltip] = useState(false);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       setError(null);
-      setOpenTooltipId(null);
+      setExpandedRowId(null);
       try {
         const res = await getFormStabilityGridData({
           season: 2025,
@@ -318,6 +322,12 @@ export default function FormStabilityGrid() {
     goals: "Goals",
   };
 
+  const statSubtitles: Record<StatKey, string> = {
+    fantasy: "Fantasy output consistency",
+    disposals: "Disposal count consistency",
+    goals: "Goal scoring consistency",
+  };
+
   return (
     <section
       className={cn(
@@ -330,17 +340,41 @@ export default function FormStabilityGrid() {
 
       <div className="relative z-10">
         <div className="mb-6">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-white/20 to-white/10 shadow-lg">
+          <div className="flex items-start gap-3 mb-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-white/20 to-white/10 shadow-lg flex-shrink-0">
               <Target className="h-5 w-5 text-white" />
             </div>
-            <h2 className="text-2xl md:text-3xl font-bold text-white">
-              Form Stability Analysis
-            </h2>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl md:text-3xl font-bold text-white">
+                  Form Stability Grid
+                </h2>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowHeaderTooltip(!showHeaderTooltip)}
+                    onBlur={() => setTimeout(() => setShowHeaderTooltip(false), 200)}
+                    className="flex items-center justify-center h-6 w-6 rounded-full border border-white/20 bg-white/5 hover:bg-white/10 transition-colors"
+                  >
+                    <Info className="h-3.5 w-3.5 text-white/60" />
+                  </button>
+                  {showHeaderTooltip && (
+                    <div className="absolute left-0 top-full mt-2 w-64 rounded-lg border border-white/10 bg-black/95 backdrop-blur-sm px-4 py-3 shadow-xl z-50">
+                      <p className="text-xs text-white/90 leading-relaxed">
+                        Stability measures how predictable a player's recent output is.
+                        Finals are included. Higher % = more reliable.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <p className="text-sm text-white/60 mt-1.5">
+                Consistency across the last 5 games — variance, not ceiling
+              </p>
+              <p className="text-xs text-white/50 mt-1">
+                {statSubtitles[selectedStat]}
+              </p>
+            </div>
           </div>
-          <p className="text-sm text-white/60 pl-[52px]">
-            Consistency metrics based on performance variance across recent games
-          </p>
         </div>
 
         <div className="mb-6 flex flex-wrap gap-2">
@@ -397,9 +431,9 @@ export default function FormStabilityGrid() {
                       key={row.player_id}
                       row={row}
                       stat={selectedStat}
-                      showTooltip={openTooltipId === row.player_id}
-                      onToggleTooltip={() =>
-                        setOpenTooltipId(openTooltipId === row.player_id ? null : row.player_id)
+                      isExpanded={expandedRowId === row.player_id}
+                      onToggleExpand={() =>
+                        setExpandedRowId(expandedRowId === row.player_id ? null : row.player_id)
                       }
                     />
                   ))}
@@ -411,9 +445,9 @@ export default function FormStabilityGrid() {
                       key={row.player_id}
                       row={row}
                       stat={selectedStat}
-                      showTooltip={openTooltipId === row.player_id}
-                      onToggleTooltip={() =>
-                        setOpenTooltipId(openTooltipId === row.player_id ? null : row.player_id)
+                      isExpanded={expandedRowId === row.player_id}
+                      onToggleExpand={() =>
+                        setExpandedRowId(expandedRowId === row.player_id ? null : row.player_id)
                       }
                     />
                   ))}
