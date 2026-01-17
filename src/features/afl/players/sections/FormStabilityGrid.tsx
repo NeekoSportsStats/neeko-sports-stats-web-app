@@ -63,27 +63,16 @@ const CATEGORY_CONFIG: Record<CategoryType, CategoryConfig> = {
 };
 
 function filterAndCategorize(rows: FormStabilityRow[]) {
-  const validRows = rows.filter(
-    (row) =>
-      row.games_used >= 5 &&
-      row.recent_avg !== null &&
-      row.season_avg !== null &&
-      row.diff !== null
-  );
-
-  const hot = validRows
-    .filter((row) => row.diff! >= 5)
-    .sort((a, b) => b.diff! - a.diff!)
+  const hot = rows
+    .filter((row) => row.trend_label === "Trending Up")
     .slice(0, 5);
 
-  const stable = validRows
-    .filter((row) => Math.abs(row.diff!) <= 2)
-    .sort((a, b) => a.variance - b.variance)
+  const stable = rows
+    .filter((row) => row.trend_label === "Stable")
     .slice(0, 5);
 
-  const cold = validRows
-    .filter((row) => row.diff! <= -5)
-    .sort((a, b) => a.diff! - b.diff!)
+  const cold = rows
+    .filter((row) => row.trend_label === "Trending Down")
     .slice(0, 5);
 
   return { hot, stable, cold };
@@ -102,7 +91,7 @@ function PlayerCard({
 }) {
   const config = CATEGORY_CONFIG[category];
   const Icon = config.icon;
-  const diffValue = row.diff ?? 0;
+  const diffValue = row.trend_diff;
   const diffSign = diffValue >= 0 ? "+" : "";
 
   return (
@@ -139,7 +128,7 @@ function PlayerCard({
 
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-white/50 uppercase tracking-wider">
-              {row.stability_band}
+              Score: {Math.round(row.stability_score)}
             </span>
             {!isExpanded && (
               <span className="text-[9px] text-white/30 uppercase tracking-wider">
@@ -176,15 +165,15 @@ function PlayerCard({
 
             <div className="grid grid-cols-2 gap-3 text-[11px]">
               <div>
-                <span className="text-white/40 block mb-1">Last 5 Games</span>
+                <span className="text-white/40 block mb-1">Recent Avg</span>
                 <span className={cn("font-semibold text-base", config.color.text)}>
-                  {row.recent_avg?.toFixed(1) ?? "—"}
+                  {row.recent_avg.toFixed(1)}
                 </span>
               </div>
               <div>
                 <span className="text-white/40 block mb-1">Season Avg</span>
                 <span className="text-white/90 font-semibold text-base">
-                  {row.season_avg?.toFixed(1) ?? "—"}
+                  {row.season_avg.toFixed(1)}
                 </span>
               </div>
             </div>
@@ -195,8 +184,12 @@ function PlayerCard({
                 <span className="text-white/90 font-medium">{row.variance.toFixed(2)}</span>
               </div>
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-white/40">Games Sample</span>
+                <span className="text-white/40">Games Used</span>
                 <span className="text-white/90 font-medium">{row.games_used} games</span>
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-white/40">Confidence</span>
+                <span className="text-white/90 font-medium">{row.confidence_label}</span>
               </div>
             </div>
 
@@ -259,10 +252,10 @@ function CategoryColumn({
         {rows.length === 0 ? (
           <div className="rounded-lg border border-white/10 bg-white/5 p-8 text-center">
             <p className="text-xs text-white/40 leading-relaxed">
-              Insufficient qualifying players
+              No players available
             </p>
             <p className="text-[10px] text-white/20 mt-1.5">
-              Need 5+ games with valid data
+              Check back after more games
             </p>
           </div>
         ) : (

@@ -1,27 +1,21 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { StatKey } from "@/lib/stats/types";
 
-export type StabilityBand =
-  | "Elite Stable"
-  | "Reliable"
-  | "Moderate"
-  | "Volatile"
-  | "Chaos";
-
-export type ConfidenceLevel = "full" | "limited" | "insufficient";
+export type TrendLabel = "Trending Up" | "Stable" | "Trending Down";
 
 export interface FormStabilityRow {
   season: number;
   player_id: string;
   player_name: string;
+  stat_type: string;
   games_used: number;
-  variance: number;
+  recent_avg: number;
+  season_avg: number;
+  trend_diff: number;
   stability_score: number;
-  stability_band: StabilityBand;
-  stability_confidence: ConfidenceLevel;
-  recent_avg: number | null;
-  season_avg: number | null;
-  diff: number | null;
+  trend_label: TrendLabel;
+  variance: number;
+  confidence_label: string;
 }
 
 export interface FormStabilityGridData {
@@ -38,23 +32,24 @@ export async function getFormStabilityGridData(params: {
 
   try {
     const { data, error } = await supabase
-      .from("form_stability_grid")
+      .from("form_stability_grid_final")
       .select(`
         season,
         player_id,
         player_name,
+        stat_type,
         games_used,
-        variance,
-        stability_score,
-        stability_band,
-        stability_confidence,
         recent_avg,
         season_avg,
-        diff
+        trend_diff,
+        stability_score,
+        trend_label,
+        variance,
+        confidence_label
       `)
       .eq("season", season)
-      .order("stability_score", { ascending: false })
-      .order("games_used", { ascending: false });
+      .eq("stat_type", stat)
+      .order("trend_diff", { ascending: false });
 
     if (error) {
       console.error("Error fetching form stability grid:", error);
@@ -73,14 +68,15 @@ export async function getFormStabilityGridData(params: {
       season: row.season,
       player_id: row.player_id,
       player_name: row.player_name,
+      stat_type: row.stat_type,
       games_used: row.games_used,
-      variance: row.variance,
-      stability_score: row.stability_score,
-      stability_band: row.stability_band as StabilityBand,
-      stability_confidence: row.stability_confidence as ConfidenceLevel,
       recent_avg: row.recent_avg,
       season_avg: row.season_avg,
-      diff: row.diff,
+      trend_diff: row.trend_diff,
+      stability_score: row.stability_score,
+      trend_label: row.trend_label as TrendLabel,
+      variance: row.variance,
+      confidence_label: row.confidence_label,
     }));
 
     return {
