@@ -25,7 +25,7 @@ export type RoundSummaryData = {
   roundAverage: {
     avgDisposals: number;
     avgGoals: number;
-    last5Rounds?: number[]; // optional sparkline data
+    last5Rounds?: number[];
   };
 };
 
@@ -35,10 +35,10 @@ export type RoundSummaryData = {
 
 function Sparkline({ points }: { points: number[] }) {
   return (
-    <div className="mt-4 flex items-center gap-2">
+    <div className="mt-3 flex items-center gap-3">
       {points.map((p, i) => (
         <div key={i} className="flex flex-col items-center text-[10px] text-white/50">
-          <div className="h-2 w-2 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.7)]" />
+          <div className="h-2 w-2 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.9)]" />
           <span className="mt-1">{p.toFixed(1)}</span>
         </div>
       ))}
@@ -115,7 +115,7 @@ export default function RoundSummary({ data }: { data: RoundSummaryData }) {
                 key={l}
                 onClick={() => setLens(l as any)}
                 className={cn(
-                  "px-3 py-1.5 rounded-full text-xs border",
+                  "px-3 py-1.5 rounded-full text-xs border transition-all",
                   lens === l
                     ? "bg-yellow-400 text-black border-yellow-300 shadow-[0_0_18px_rgba(250,204,21,0.8)]"
                     : "bg-black/40 border-white/15 text-white/60 hover:border-yellow-400/60 hover:text-white"
@@ -128,24 +128,51 @@ export default function RoundSummary({ data }: { data: RoundSummaryData }) {
         }
       />
 
-      {/* Key Summary */}
-      <div className="mt-3 rounded-xl border border-yellow-400/20 bg-black/50 px-4 py-3 text-sm text-white/70">
-        <div className="flex flex-wrap gap-6">
-          <div>
-            <span className="text-yellow-300 font-semibold">Top:</span>{" "}
-            {data.topScore.name} ({data.topScore.value})
+      {/* ---------------------------------------------------------------------- */}
+      {/* KEY HEADLINES BAR                                                     */}
+      {/* ---------------------------------------------------------------------- */}
+
+      <div className="mt-4 rounded-2xl border border-yellow-500/30 bg-black/70 px-4 py-3 shadow-[0_0_24px_rgba(250,204,21,0.12)]">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3 text-sm text-white/80">
+
+          <div className="flex flex-col">
+            <span className="text-yellow-400 font-semibold text-xs uppercase tracking-[0.18em]">
+              Top Performer
+            </span>
+            <span className="text-yellow-300 text-lg font-bold">
+              {data.topScore.value}
+            </span>
+            <span className="text-white/60 text-xs">
+              {data.topScore.name}
+            </span>
           </div>
-          <div>
-            <span className="text-yellow-300 font-semibold">Over:</span>{" "}
-            {data.biggestOverperformer.name} (+{data.biggestOverperformer.diff})
+
+          <div className="flex flex-col">
+            <span className="text-yellow-400 font-semibold text-xs uppercase tracking-[0.18em]">
+              Biggest Overperformer
+            </span>
+            <span className="text-yellow-300 text-lg font-bold">
+              +{data.biggestOverperformer.diff}
+            </span>
+            <span className="text-white/60 text-xs">
+              {data.biggestOverperformer.name} • {data.biggestOverperformer.currentValue}
+            </span>
           </div>
-          <div>
-            <span className="text-yellow-300 font-semibold">Avg:</span>{" "}
-            {data.roundAverage.avgDisposals.toFixed(1)}
+
+          <div className="flex flex-col">
+            <span className="text-yellow-400 font-semibold text-xs uppercase tracking-[0.18em]">
+              Round Average
+            </span>
+            <span className="text-yellow-300 text-lg font-bold">
+              {data.roundAverage.avgDisposals.toFixed(1)}
+            </span>
+            <span className="text-white/60 text-xs">
+              Avg disposals per player
+            </span>
           </div>
+
         </div>
 
-        {/* Sparkline */}
         {data.roundAverage.last5Rounds && (
           <Sparkline points={data.roundAverage.last5Rounds} />
         )}
