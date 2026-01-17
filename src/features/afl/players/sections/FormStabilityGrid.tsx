@@ -1,245 +1,303 @@
 import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Sparkles, ChevronDown } from "lucide-react";
-import { SectionHeader } from "@/components/sports/shared/SectionHeader";
-import type { StatConfig, StatKey } from "@/lib/stats/types";
+import { Target, Info } from "lucide-react";
+import type { StatKey } from "@/lib/stats/types";
 import {
   getFormStabilityGridData,
-  type PlayerFormMetrics,
+  type FormStabilityRow,
   type FormStabilityGridData,
+  type StabilityBand,
+  type ConfidenceLevel,
 } from "@/features/afl/players/data/getFormStabilityGridData";
 
-type Tone = "hot" | "stable" | "cold";
-
-const PLAYERS_PER_COLUMN = 3;
-
-/* -------------------------------------------------------------------------- */
-/* HELPERS                                                                    */
-/* -------------------------------------------------------------------------- */
-
-function formatMainValue(value: number, stat: StatKey | string): string {
-  if (stat === "goals") {
-    return value < 0.1 ? "—" : value.toFixed(1);
-  }
-  return Math.round(value).toString();
+interface StabilityColors {
+  border: string;
+  glow: string;
+  bg: string;
+  text: string;
+  progress: string;
 }
 
-function formatDelta(delta: number, stat: StatKey | string): string {
-  if (Math.abs(delta) < 0.05) return "±0";
-  const sign = delta > 0 ? "+" : "";
-  if (stat === "goals") {
-    return `${sign}${delta.toFixed(1)}`;
+function getStabilityColors(band: StabilityBand): StabilityColors {
+  switch (band) {
+    case "Elite Stable":
+      return {
+        border: "border-emerald-500/30",
+        glow: "shadow-[0_0_20px_rgba(16,185,129,0.25)]",
+        bg: "bg-emerald-500/10",
+        text: "text-emerald-300",
+        progress: "bg-gradient-to-r from-emerald-500 to-emerald-400",
+      };
+    case "Reliable":
+      return {
+        border: "border-teal-500/30",
+        glow: "shadow-[0_0_20px_rgba(20,184,166,0.25)]",
+        bg: "bg-teal-500/10",
+        text: "text-teal-300",
+        progress: "bg-gradient-to-r from-teal-500 to-teal-400",
+      };
+    case "Moderate":
+      return {
+        border: "border-amber-500/30",
+        glow: "shadow-[0_0_20px_rgba(245,158,11,0.25)]",
+        bg: "bg-amber-500/10",
+        text: "text-amber-300",
+        progress: "bg-gradient-to-r from-amber-500 to-amber-400",
+      };
+    case "Volatile":
+      return {
+        border: "border-orange-500/30",
+        glow: "shadow-[0_0_20px_rgba(249,115,22,0.25)]",
+        bg: "bg-orange-500/10",
+        text: "text-orange-300",
+        progress: "bg-gradient-to-r from-orange-500 to-orange-400",
+      };
+    case "Chaos":
+      return {
+        border: "border-red-500/30",
+        glow: "shadow-[0_0_20px_rgba(239,68,68,0.25)]",
+        bg: "bg-red-500/10",
+        text: "text-red-300",
+        progress: "bg-gradient-to-r from-red-500 to-red-400",
+      };
   }
-  return `${sign}${Math.round(delta)}`;
 }
 
-function generateMicroCopy(
-  tone: Tone,
-  metric: PlayerFormMetrics,
-  stat: StatKey
-): string {
-  const delta = formatDelta(metric.delta_vs_season, stat);
-
-  if (tone === "hot") {
-    return `Up ${delta} vs season baseline`;
+function getConfidenceBadge(confidence: ConfidenceLevel) {
+  switch (confidence) {
+    case "full":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          Full
+        </span>
+      );
+    case "limited":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 border-dashed bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-amber-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+          Limited
+        </span>
+      );
+    case "insufficient":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-2.5 py-0.5 text-[10px] font-medium text-white/40">
+          <span className="h-1.5 w-1.5 rounded-full bg-white/30" />
+          Insufficient
+        </span>
+      );
   }
-
-  if (tone === "stable") {
-    return `Low variance with consistent output`;
-  }
-
-  return `Down ${delta} vs season baseline`;
 }
 
-function getSubtitle(tone: Tone, stat: StatKey): string {
-  if (tone === "hot") return "Biggest recent surges above season baseline";
+function getTooltipText(band: StabilityBand, stat: StatKey): string {
+  const statLabel = stat === "fantasy" ? "fantasy points" : stat === "disposals" ? "disposals" : "goals";
 
-  if (tone === "stable") {
-    if (stat === "fantasy") return "High frequency floors with low variance";
-    if (stat === "disposals") return "Consistent possession baselines";
-    if (stat === "goals") return "Reliable scoring frequency";
+  switch (band) {
+    case "Elite Stable":
+      return `Elite consistency in ${statLabel}. This player delivers predictable output week after week with minimal variance.`;
+    case "Reliable":
+      return `Reliable performer in ${statLabel}. Expect consistent contributions with occasional fluctuation.`;
+    case "Moderate":
+      return `Moderate stability in ${statLabel}. Performance varies but stays within reasonable bounds.`;
+    case "Volatile":
+      return `Volatile ${statLabel} output. Significant swings between high and low performances.`;
+    case "Chaos":
+      return `Highly unpredictable ${statLabel}. Extreme variance makes week-to-week output difficult to forecast.`;
   }
-
-  return "Significant drops below season baseline";
 }
 
-/* -------------------------------------------------------------------------- */
-/* SPARKLINE                                                                  */
-/* -------------------------------------------------------------------------- */
-
-function SparklinePlaceholder() {
-  return (
-    <div className="w-full h-8 flex items-center justify-center rounded border border-white/5 bg-white/[0.02]">
-      <p className="text-[10px] text-white/30">Detailed trend data coming soon</p>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* ROW CARD                                                                  */
-/* -------------------------------------------------------------------------- */
-
-function PlayerRowCard({
-  tone,
-  title,
-  metric,
+function PlayerRow({
+  row,
   stat,
-  isOpen,
-  onToggle,
+  showTooltip,
+  onToggleTooltip,
 }: {
-  tone: Tone;
-  title: string;
-  metric: PlayerFormMetrics;
-  stat: StatKey | string;
-  isOpen: boolean;
-  onToggle: () => void;
+  row: FormStabilityRow;
+  stat: StatKey;
+  showTooltip: boolean;
+  onToggleTooltip: () => void;
 }) {
-  const glow =
-    tone === "hot"
-      ? "shadow-[0_0_16px_rgba(239,68,68,0.35)]"
-      : tone === "stable"
-      ? "shadow-[0_0_16px_rgba(250,204,21,0.30)]"
-      : "shadow-[0_0_16px_rgba(56,189,248,0.35)]";
-
-  const border =
-    tone === "hot"
-      ? "border-red-500/30"
-      : tone === "stable"
-      ? "border-yellow-400/28"
-      : "border-cyan-400/30";
-
-  const badgeBg =
-    tone === "hot"
-      ? "bg-red-500/20 text-red-200"
-      : tone === "stable"
-      ? "bg-yellow-500/20 text-yellow-100"
-      : "bg-cyan-500/20 text-cyan-100";
-
-  const microCopy = generateMicroCopy(tone, metric, stat as StatKey);
-  const teamDisplay = metric.team_name || "—";
+  const colors = getStabilityColors(row.stability_band);
+  const tooltipText = getTooltipText(row.stability_band, stat);
 
   return (
-    <button
-      onClick={onToggle}
-      className={cn(
-        "w-full rounded-xl border px-4 py-3.5 text-left min-h-[120px]",
-        "bg-black/60 backdrop-blur-sm transition-all duration-200",
-        "hover:-translate-y-1 hover:bg-black/70",
-        glow,
-        border
-      )}
-    >
-      <div className="space-y-2">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1.5 flex-1 min-w-0">
-            <span
-              className={cn(
-                "inline-flex items-center rounded-full px-2.5 py-0.5",
-                "text-[10px] font-medium uppercase tracking-[0.12em]",
-                badgeBg
-              )}
-            >
-              {title}
-            </span>
+    <div className="group relative">
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-xl border px-5 py-4",
+          "bg-gradient-to-br from-black/70 via-black/60 to-black/50 backdrop-blur-sm",
+          "transition-all duration-300",
+          "hover:-translate-y-1 hover:bg-black/80",
+          colors.border,
+          "hover:" + colors.glow
+        )}
+      >
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+          <div className={cn("absolute inset-0", colors.bg)} />
+        </div>
 
-            <div>
-              <p className="text-sm font-semibold text-white truncate leading-tight">
-                {metric.player_name}
-              </p>
-              <p className="text-[10px] text-white/45 mt-0.5">{teamDisplay}</p>
+        <div className="relative z-10 grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center">
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-white truncate">
+              {row.player_name}
+            </h3>
+            <p className="text-xs text-white/60 mt-0.5 capitalize">
+              {row.stability_band}
+            </p>
+          </div>
+
+          <div className="text-center min-w-[80px]">
+            <div className="flex items-baseline gap-1 justify-center">
+              <span className={cn("text-2xl font-extrabold tabular-nums", colors.text)}>
+                {Math.round(row.stability_score)}
+              </span>
+              <span className="text-xs text-white/40">%</span>
+            </div>
+            <div className="mt-2 w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className={cn("h-full rounded-full transition-all duration-500", colors.progress)}
+                style={{ width: `${Math.min(100, row.stability_score)}%` }}
+              />
             </div>
           </div>
 
-          <div className="text-right space-y-0.5 flex-shrink-0">
-            <p className="text-base font-bold text-white tabular-nums">
-              {formatMainValue(metric.l5_avg, stat)}
+          <div className="text-center min-w-[60px]">
+            <span className="text-base font-bold text-white tabular-nums">
+              {row.games_used}
+            </span>
+            <p className="text-[10px] text-white/40 uppercase tracking-wider mt-0.5">
+              Games
             </p>
-            <p className="text-[10px] text-white/45 mt-1">
-              <span className="text-[9px] uppercase tracking-wider">L5 AVG</span>
-            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {getConfidenceBadge(row.stability_confidence)}
+            <button
+              onClick={onToggleTooltip}
+              className="flex items-center justify-center h-7 w-7 rounded-full border border-white/20 bg-white/5 hover:bg-white/10 transition-colors"
+            >
+              <Info className="h-3.5 w-3.5 text-white/60" />
+            </button>
           </div>
         </div>
+      </div>
 
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <p className="text-[10px] text-white/60 leading-snug flex-1">
-            {microCopy}
-          </p>
-
-          <div className="flex items-center gap-1 text-[10px] text-white/50 flex-shrink-0">
-            <span className="font-medium">{isOpen ? "Hide" : "Show"}</span>
-            <ChevronDown
-              className={cn(
-                "h-3 w-3 transition-transform duration-200",
-                isOpen && "rotate-180"
-              )}
-            />
-          </div>
+      {showTooltip && (
+        <div className="mt-2 rounded-lg border border-white/10 bg-black/90 backdrop-blur-sm px-4 py-3">
+          <p className="text-xs text-white/80 leading-relaxed">{tooltipText}</p>
         </div>
-
-        {isOpen && (
-          <div className="mt-2.5 space-y-2 border-t border-white/8 pt-2.5">
-            <SparklinePlaceholder />
-            <p className="text-[10px] text-white/40 leading-relaxed">
-              Season avg: {formatMainValue(metric.season_avg, stat)} · Consistency: {metric.consistency.toFixed(0)}%
-            </p>
-          </div>
-        )}
-      </div>
-    </button>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* COLUMN SHELL                                                              */
-/* -------------------------------------------------------------------------- */
-
-function ColumnShell({
-  tone,
-  title,
-  subtitle,
-  children,
-}: {
-  tone: Tone;
-  title: string;
-  subtitle: string;
-  children: React.ReactNode;
-}) {
-  const headingColor =
-    tone === "hot"
-      ? "text-red-300"
-      : tone === "stable"
-      ? "text-yellow-300"
-      : "text-cyan-300";
-
-  return (
-    <div className="flex flex-col h-full">
-      <div className="mb-4 min-h-[52px]">
-        <p className={cn("text-[11px] font-bold uppercase tracking-[0.14em] leading-tight", headingColor)}>
-          {title}
-        </p>
-        <p className="text-[10px] text-white/60 mt-1.5 leading-snug">{subtitle}</p>
-      </div>
-      <div className="space-y-3 flex-1">{children}</div>
+      )}
     </div>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* MAIN COMPONENT                                                            */
-/* -------------------------------------------------------------------------- */
+function MobilePlayerCard({
+  row,
+  stat,
+  showTooltip,
+  onToggleTooltip,
+}: {
+  row: FormStabilityRow;
+  stat: StatKey;
+  showTooltip: boolean;
+  onToggleTooltip: () => void;
+}) {
+  const colors = getStabilityColors(row.stability_band);
+  const tooltipText = getTooltipText(row.stability_band, stat);
 
-export default function FormStabilityGrid({ statConfig }: { statConfig: StatConfig }) {
-  const [selectedStat, setSelectedStat] = useState<StatKey>(statConfig.defaultStat);
-  const [openKey, setOpenKey] = useState<string | null>(null);
+  return (
+    <div className="group relative">
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-xl border px-4 py-4",
+          "bg-gradient-to-br from-black/70 via-black/60 to-black/50 backdrop-blur-sm",
+          "transition-all duration-300",
+          colors.border,
+          "active:" + colors.glow
+        )}
+      >
+        <div className="absolute inset-0 opacity-0 group-active:opacity-100 transition-opacity duration-300 pointer-events-none">
+          <div className={cn("absolute inset-0", colors.bg)} />
+        </div>
+
+        <div className="relative z-10 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold text-white truncate">
+                {row.player_name}
+              </h3>
+              <p className="text-xs text-white/60 mt-0.5 capitalize">
+                {row.stability_band}
+              </p>
+            </div>
+            <button
+              onClick={onToggleTooltip}
+              className="flex items-center justify-center h-7 w-7 rounded-full border border-white/20 bg-white/5 active:bg-white/10 transition-colors flex-shrink-0"
+            >
+              <Info className="h-3.5 w-3.5 text-white/60" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">
+                Stability
+              </p>
+              <div className="flex items-baseline gap-1">
+                <span className={cn("text-xl font-extrabold tabular-nums", colors.text)}>
+                  {Math.round(row.stability_score)}
+                </span>
+                <span className="text-xs text-white/40">%</span>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">
+                Games
+              </p>
+              <span className="text-xl font-extrabold text-white tabular-nums">
+                {row.games_used}
+              </span>
+            </div>
+
+            <div>
+              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">
+                Confidence
+              </p>
+              {getConfidenceBadge(row.stability_confidence)}
+            </div>
+          </div>
+
+          <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+            <div
+              className={cn("h-full rounded-full transition-all duration-500", colors.progress)}
+              style={{ width: `${Math.min(100, row.stability_score)}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {showTooltip && (
+        <div className="mt-2 rounded-lg border border-white/10 bg-black/90 backdrop-blur-sm px-4 py-3">
+          <p className="text-xs text-white/80 leading-relaxed">{tooltipText}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function FormStabilityGrid() {
+  const [selectedStat, setSelectedStat] = useState<StatKey>("fantasy");
   const [data, setData] = useState<FormStabilityGridData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [openTooltipId, setOpenTooltipId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       setError(null);
-      setOpenKey(null);
+      setOpenTooltipId(null);
       try {
         const res = await getFormStabilityGridData({
           season: 2025,
@@ -247,144 +305,126 @@ export default function FormStabilityGrid({ statConfig }: { statConfig: StatConf
         });
         setData(res);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
+        setError(err instanceof Error ? err.message : "Unable to load stability data");
       } finally {
         setLoading(false);
       }
     })();
   }, [selectedStat]);
 
-  const makeKey = (tone: Tone, id: string) => `${tone}-${id}`;
+  const statLabels: Record<StatKey, string> = {
+    fantasy: "Fantasy Points",
+    disposals: "Disposals",
+    goals: "Goals",
+  };
 
   return (
     <section
       className={cn(
-        "relative rounded-3xl border border-white/8 px-5 py-7 md:px-7 md:py-9",
+        "relative rounded-3xl border border-white/10 px-5 py-7 md:px-7 md:py-9 overflow-hidden",
         "bg-gradient-to-br from-[#050507] via-black to-[#0d0d0f]",
-        "shadow-2xl"
+        "shadow-[0_0_40px_rgba(255,255,255,0.05)]"
       )}
     >
-      <SectionHeader
-        title="Form Stability Grid"
-        subtitle="Based on each player's own season baseline (last 5 games vs season average)"
-        icon={Sparkles}
-      />
+      <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none" />
 
-      <div className="mt-5 flex flex-wrap gap-1.5">
-        {statConfig.availableStats.map((s) => (
-          <button
-            key={s}
-            onClick={() => setSelectedStat(s)}
-            className={cn(
-              "rounded-full px-3.5 py-1.5 text-xs border transition-all duration-200",
-              selectedStat === s
-                ? "bg-yellow-400 text-black border-yellow-300 font-semibold shadow-lg"
-                : "bg-white/5 text-white/65 border-white/10 hover:bg-white/10 hover:border-white/20"
-            )}
-          >
-            {statConfig.labels[s]}
-          </button>
-        ))}
-      </div>
-
-      {loading && (
-        <div className="py-20 text-center text-sm text-white/50">
-          Loading stability analysis…
-        </div>
-      )}
-
-      {error && !loading && (
-        <div className="rounded-xl border border-red-500/25 bg-red-500/5 p-6 mt-6">
-          <p className="text-sm text-red-400">
-            Unable to load form stability data.
+      <div className="relative z-10">
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-white/20 to-white/10 shadow-lg">
+              <Target className="h-5 w-5 text-white" />
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold text-white">
+              Form Stability Analysis
+            </h2>
+          </div>
+          <p className="text-sm text-white/60 pl-[52px]">
+            Consistency metrics based on performance variance across recent games
           </p>
         </div>
-      )}
 
-      {!loading && !error && data && (
-        <div className="mt-8 grid gap-5 md:grid-cols-3 items-start">
-          <ColumnShell
-            tone="hot"
-            title="Hot Form Surge"
-            subtitle={getSubtitle("hot", selectedStat)}
-          >
-            {data.hot.length === 0 ? (
-              <div className="text-center py-8 text-xs text-white/40">
-                No hot form players found
-              </div>
-            ) : (
-              data.hot.slice(0, PLAYERS_PER_COLUMN).map((m) => {
-                const key = makeKey("hot", m.player_id);
-                return (
-                  <PlayerRowCard
-                    key={key}
-                    tone="hot"
-                    title="Hot"
-                    metric={m}
-                    stat={selectedStat}
-                    isOpen={openKey === key}
-                    onToggle={() => setOpenKey(openKey === key ? null : key)}
-                  />
-                );
-              })
-            )}
-          </ColumnShell>
-
-          <ColumnShell
-            tone="stable"
-            title="Stability Leaders"
-            subtitle={getSubtitle("stable", selectedStat)}
-          >
-            {data.stable.length === 0 ? (
-              <div className="text-center py-8 text-xs text-white/40">
-                No stable players found
-              </div>
-            ) : (
-              data.stable.slice(0, PLAYERS_PER_COLUMN).map((m) => {
-                const key = makeKey("stable", m.player_id);
-                return (
-                  <PlayerRowCard
-                    key={key}
-                    tone="stable"
-                    title="Stable"
-                    metric={m}
-                    stat={selectedStat}
-                    isOpen={openKey === key}
-                    onToggle={() => setOpenKey(openKey === key ? null : key)}
-                  />
-                );
-              })
-            )}
-          </ColumnShell>
-
-          <ColumnShell
-            tone="cold"
-            title="Cooling Risks"
-            subtitle={getSubtitle("cold", selectedStat)}
-          >
-            {data.cooling.length === 0 ? (
-              <div className="text-center py-8 text-xs text-white/40">
-                No cooling players found
-              </div>
-            ) : (
-              data.cooling.slice(0, PLAYERS_PER_COLUMN).map((m) => {
-                const key = makeKey("cold", m.player_id);
-                return (
-                  <PlayerRowCard
-                    key={key}
-                    tone="cold"
-                    title="Cooling"
-                    metric={m}
-                    stat={selectedStat}
-                    isOpen={openKey === key}
-                    onToggle={() => setOpenKey(openKey === key ? null : key)}
-                  />
-                );
-              })
-            )}
-          </ColumnShell>
+        <div className="mb-6 flex flex-wrap gap-2">
+          {(["fantasy", "disposals", "goals"] as StatKey[]).map((s) => (
+            <button
+              key={s}
+              onClick={() => setSelectedStat(s)}
+              className={cn(
+                "rounded-full px-5 py-2.5 text-xs font-bold uppercase tracking-wider transition-all duration-200",
+                "backdrop-blur-sm",
+                selectedStat === s
+                  ? "bg-gradient-to-r from-white/90 to-white/80 text-black shadow-[0_0_24px_rgba(255,255,255,0.4)] scale-105"
+                  : "border border-white/20 bg-white/5 text-white/70 hover:border-white/40 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.2)] hover:scale-102"
+              )}
+            >
+              {statLabels[s]}
+            </button>
+          ))}
         </div>
-      )}
+
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center space-y-4">
+              <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-white/20 border-r-white/80 shadow-lg"></div>
+              <p className="text-sm text-white/60">Loading stability analysis...</p>
+            </div>
+          </div>
+        )}
+
+        {error && !loading && (
+          <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-8 backdrop-blur-sm">
+            <p className="text-sm font-semibold text-red-400">Failed to load stability data</p>
+            <p className="mt-2 text-xs text-red-300/70">{error}</p>
+          </div>
+        )}
+
+        {!loading && !error && data && (
+          <>
+            {data.rows.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center backdrop-blur-sm">
+                <Target className="h-12 w-12 text-white/20 mx-auto mb-3" />
+                <p className="text-sm font-semibold text-white/70">
+                  No stability data available yet
+                </p>
+                <p className="mt-2 text-xs text-white/50">
+                  Data will appear once sufficient games have been played
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="hidden md:block space-y-3">
+                  {data.rows.map((row) => (
+                    <PlayerRow
+                      key={row.player_id}
+                      row={row}
+                      stat={selectedStat}
+                      showTooltip={openTooltipId === row.player_id}
+                      onToggleTooltip={() =>
+                        setOpenTooltipId(openTooltipId === row.player_id ? null : row.player_id)
+                      }
+                    />
+                  ))}
+                </div>
+
+                <div className="md:hidden space-y-3">
+                  {data.rows.map((row) => (
+                    <MobilePlayerCard
+                      key={row.player_id}
+                      row={row}
+                      stat={selectedStat}
+                      showTooltip={openTooltipId === row.player_id}
+                      onToggleTooltip={() =>
+                        setOpenTooltipId(openTooltipId === row.player_id ? null : row.player_id)
+                      }
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 via-black/20 to-transparent pointer-events-none" />
     </section>
   );
 }
