@@ -1,7 +1,8 @@
 import React, { useMemo } from "react";
 import PlayerImpactScatterPanel from "@/components/afl/ai-insights/Section-1-hero-scatter/PlayerImpactScatterPanel";
-import { MOCK_FIXTURES } from "@/components/afl/match-center/data/mockData";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
+
+const MOCK_FIXTURES: any[] = [];
 
 type Scope = "match" | "league";
 

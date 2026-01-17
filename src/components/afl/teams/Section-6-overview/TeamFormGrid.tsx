@@ -6,8 +6,23 @@
 // E) Fully patched BACK CARD with balanced JSX
 
 import React, { useMemo, useState } from "react";
-import { MOCK_TEAMS, AFLTeam } from "../data/mockTeams";
 import { Flame, CircleDot, Snowflake } from "lucide-react";
+
+interface AFLTeam {
+  id: number;
+  name: string;
+  code: string;
+  shortName: string;
+  colors: { primary: string; secondary: string };
+  margins: number[];
+  midfieldTrend: number[];
+  scores: number[];
+  clearanceDom: number[];
+  consistencyIndex: number;
+  fixtureDifficulty: { score: string; opponents: string[] };
+}
+
+const MOCK_TEAMS: AFLTeam[] = [];
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -28,7 +43,9 @@ interface ClassifiedTeams {
 /* -------------------------------------------------------------------------- */
 
 function getBaseMomentum(team: AFLTeam): number {
-  const last5 = team.margins.slice(-5);
+  const margins = team.margins || [];
+  if (margins.length === 0) return 0;
+  const last5 = margins.slice(-5);
   return last5.reduce((a, b) => a + b, 0) / last5.length;
 }
 
@@ -305,7 +322,7 @@ function TeamFormCard({
   const formattedScore = formatMetric(score);
   const barWidth = intensityWidth(score);
 
-  const trend = team.midfieldTrend;
+  const trend = team.midfieldTrend || [];
 
   return (
     <div
@@ -403,8 +420,8 @@ function TeamFormCard({
                 Attack Δ
               </div>
               <div className="font-semibold">
-                {(team.scores.at(-1)! - team.scores.at(-2)!) >= 0 ? "+" : ""}
-                {team.scores.at(-1)! - team.scores.at(-2)!}
+                {((team.scores || []).at(-1) || 0) - ((team.scores || []).at(-2) || 0) >= 0 ? "+" : ""}
+                {((team.scores || []).at(-1) || 0) - ((team.scores || []).at(-2) || 0)}
               </div>
             </div>
 
@@ -414,8 +431,8 @@ function TeamFormCard({
                 Defence Δ
               </div>
               <div className="font-semibold">
-                {(team.margins.at(-1)! - team.margins.at(-2)!) >= 0 ? "+" : ""}
-                {team.margins.at(-1)! - team.margins.at(-2)!}
+                {((team.margins || []).at(-1) || 0) - ((team.margins || []).at(-2) || 0) >= 0 ? "+" : ""}
+                {((team.margins || []).at(-1) || 0) - ((team.margins || []).at(-2) || 0)}
               </div>
             </div>
 
@@ -425,7 +442,7 @@ function TeamFormCard({
                 Clear %
               </div>
               <div className="font-semibold">
-                {team.clearanceDom.at(-1)!}%
+                {(team.clearanceDom || []).at(-1) || 0}%
               </div>
             </div>
 
@@ -434,7 +451,7 @@ function TeamFormCard({
               <div className="text-[9px] uppercase text-neutral-500 tracking-[0.14em]">
                 Consist.
               </div>
-              <div className="font-semibold">{team.consistencyIndex}</div>
+              <div className="font-semibold">{team.consistencyIndex || 0}</div>
             </div>
 
             {/* Pressure */}
@@ -450,7 +467,7 @@ function TeamFormCard({
               <div className="text-[9px] uppercase text-neutral-500 tracking-[0.14em]">
                 Fixture
               </div>
-              <div className="font-semibold">{team.fixtureDifficulty.score}</div>
+              <div className="font-semibold">{team.fixtureDifficulty?.score || "—"}</div>
             </div>
 
           </div>
@@ -462,9 +479,9 @@ function TeamFormCard({
             </div>
 
             <div className="mt-1 flex flex-wrap gap-1.5">
-              {team.fixtureDifficulty.opponents.map((op) => (
+              {(team.fixtureDifficulty?.opponents || []).map((op, idx) => (
                 <code
-                  key={op}
+                  key={op || idx}
                   className="rounded bg-white/5 px-1.5 py-[1px] text-[9px] text-neutral-300"
                 >
                   {op}

@@ -2,9 +2,9 @@ import React, { useMemo, useState, useEffect } from "react";
 import { Crown, ChevronDown } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/afl/match-center/types";
-import { MOCK_FIXTURES } from "@/components/afl/match-center/mockData";
-
 import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
+
+const MOCK_FIXTURES: FixtureMatch[] = [];
 
 import PredictabilityTable from "@/features/afl/ai-insights/sections/PlayerPredictability";
 import TeamPredictabilityPanel from "@/features/afl/ai-insights/sections/TeamPredictability";

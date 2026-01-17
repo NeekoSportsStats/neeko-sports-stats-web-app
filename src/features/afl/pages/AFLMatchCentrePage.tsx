@@ -8,9 +8,11 @@ import MatchCenterCTA from "@/components/afl/match-center/MatchCenterCTA";
 import MatchDetailOverlay from "@/components/afl/match-center/MatchDetailOverlay";
 import SeasonRoundSelector from "@/components/afl/match-center/SeasonRoundSelector";
 
-import { MOCK_FIXTURES, MOCK_LADDER_TOP16 } from "@/components/afl/match-center/mockData";
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import { AFL_STAT_CONFIG } from "@/lib/stats/afl/statConfig";
+
+const MOCK_FIXTURES: FixtureMatch[] = [];
+const MOCK_LADDER_TOP16: any[] = [];
 
 type Season = 2025 | 2026;
 

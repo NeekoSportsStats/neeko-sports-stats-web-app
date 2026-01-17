@@ -8,8 +8,9 @@
 // - 6 editorial headlines
 
 import React from "react";
-import { MOCK_TEAMS } from "../data/mockTeams";
 import { Flame, Shield, TrendingUp, BarChart3, Zap } from "lucide-react";
+
+const MOCK_TEAMS: any[] = [];
 
 /* ============================================================================
    Inject Keyframes
@@ -211,22 +212,34 @@ export default function TeamMomentumPulse() {
 
   const teams = MOCK_TEAMS;
 
-  const fantasyTeam = [...teams].sort((a, b) => b.attackRating - a.attackRating)[0];
-  const scoringTeam = [...teams].sort((a, b) => b.scores[roundIndex] - a.scores[roundIndex])[0];
-  const defenceTeam = [...teams].sort((a, b) => b.defenceRating - a.defenceRating)[0];
+  const placeholderTeam = {
+    name: "—",
+    attackRating: 0,
+    defenceRating: 0,
+    scores: [0],
+    margins: [0],
+    attackTrend: [0, 0, 0],
+    defenceTrend: [0, 0, 0]
+  };
 
-  const momentum = teams
-    .map(t => ({
-      team: t,
-      delta: (t.margins?.[roundIndex] ?? 0) - (t.margins?.[prev] ?? 0),
-    }))
-    .sort((a, b) => b.delta - a.delta)[0];
+  const fantasyTeam = teams.length > 0 ? [...teams].sort((a, b) => (b.attackRating || 0) - (a.attackRating || 0))[0] : placeholderTeam;
+  const scoringTeam = teams.length > 0 ? [...teams].sort((a, b) => ((b.scores || [])[roundIndex] || 0) - ((a.scores || [])[roundIndex] || 0))[0] : placeholderTeam;
+  const defenceTeam = teams.length > 0 ? [...teams].sort((a, b) => (b.defenceRating || 0) - (a.defenceRating || 0))[0] : placeholderTeam;
+
+  const momentum = teams.length > 0
+    ? teams
+        .map(t => ({
+          team: t,
+          delta: ((t.margins || [])[roundIndex] || 0) - ((t.margins || [])[prev] || 0),
+        }))
+        .sort((a, b) => b.delta - a.delta)[0]
+    : { team: placeholderTeam, delta: 0 };
 
   const headlines = [
     "Midfield usage shifted significantly this round, with several clubs testing wider rotations.",
-    `${fantasyTeam.name} drove a major fantasy surge thanks to increased stoppage exposure.`,
-    `${defenceTeam.name} maintained elite defensive structure for extended phases.`,
-    `${momentum.team.name} produced the strongest round-to-round momentum lift in R22 → R23.`,
+    `${fantasyTeam.name || "—"} drove a major fantasy surge thanks to increased stoppage exposure.`,
+    `${defenceTeam.name || "—"} maintained elite defensive structure for extended phases.`,
+    `${momentum.team.name || "—"} produced the strongest round-to-round momentum lift in R22 → R23.`,
     "Hybrid forward–mid roles delivered spikes in contest generation and volatility.",
     "Late-match defensive tightening reduced scoring flow across multiple games.",
   ];
@@ -290,37 +303,37 @@ export default function TeamMomentumPulse() {
               <div className="mt-4 grid gap-6 sm:grid-cols-2">
                 <InsightCard
                   title="Highest Fantasy Surge"
-                  team={fantasyTeam.name}
-                  metricValue={`${fantasyTeam.attackRating}/100`}
+                  team={fantasyTeam.name || "—"}
+                  metricValue={`${fantasyTeam.attackRating || 0}/100`}
                   metricLabel="Usage score"
-                  values={fantasyTeam.attackTrend}
+                  values={fantasyTeam.attackTrend || [0, 0, 0]}
                   icon={BarChart3}
                 />
 
                 <InsightCard
                   title="Most Dominant Scoring Team"
-                  team={scoringTeam.name}
-                  metricValue={`${scoringTeam.scores[roundIndex]} pts`}
+                  team={scoringTeam.name || "—"}
+                  metricValue={`${(scoringTeam.scores || [])[roundIndex] || 0} pts`}
                   metricLabel="Score impact"
-                  values={scoringTeam.scores}
+                  values={scoringTeam.scores || [0, 0, 0]}
                   icon={Flame}
                 />
 
                 <InsightCard
                   title="Strongest Defensive Wall"
-                  team={defenceTeam.name}
-                  metricValue={`${defenceTeam.defenceRating}/100`}
+                  team={defenceTeam.name || "—"}
+                  metricValue={`${defenceTeam.defenceRating || 0}/100`}
                   metricLabel="Defence rating"
-                  values={defenceTeam.defenceTrend}
+                  values={defenceTeam.defenceTrend || [0, 0, 0]}
                   icon={Shield}
                 />
 
                 <InsightCard
                   title="Biggest Momentum Riser"
-                  team={momentum.team.name}
-                  metricValue={`${momentum.delta} pts`}
+                  team={momentum.team.name || "—"}
+                  metricValue={`${momentum.delta || 0} pts`}
                   metricLabel="Momentum swing"
-                  values={momentum.team.margins}
+                  values={momentum.team.margins || [0, 0, 0]}
                   icon={TrendingUp}
                 />
               </div>
