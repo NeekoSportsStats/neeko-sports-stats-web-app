@@ -39,17 +39,14 @@ export async function getFormStabilityGridData(params: {
       .select(`
         season,
         player_id,
+        player_name,
         games_used,
         variance,
         stability_score,
         stability_band,
-        stability_confidence,
-        players:player_id (
-          name
-        )
+        stability_confidence
       `)
       .eq("season", season)
-      .eq("stat_type", stat)
       .order("stability_score", { ascending: false })
       .order("games_used", { ascending: false });
 
@@ -69,7 +66,7 @@ export async function getFormStabilityGridData(params: {
     const rows: FormStabilityRow[] = data.map((row: any) => ({
       season: row.season,
       player_id: row.player_id,
-      player_name: row.players?.name || "Unknown Player",
+      player_name: row.player_name,
       games_used: row.games_used,
       variance: row.variance,
       stability_score: row.stability_score,
@@ -84,10 +81,6 @@ export async function getFormStabilityGridData(params: {
     };
   } catch (error) {
     console.error("Error in getFormStabilityGridData:", error);
-    return {
-      rows: [],
-      season,
-      stat,
-    };
+    throw error;
   }
 }
