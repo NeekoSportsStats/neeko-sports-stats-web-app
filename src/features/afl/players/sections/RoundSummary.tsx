@@ -37,8 +37,8 @@ function Sparkline({ points }: { points: number[] }) {
   return (
     <div className="mt-3 flex items-center gap-3">
       {points.map((p, i) => (
-        <div key={i} className="flex flex-col items-center text-[10px] text-white/50">
-          <div className="h-2 w-2 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.9)]" />
+        <div key={i} className="flex flex-col items-center text-[10px] text-white/40">
+          <div className="h-2 w-2 rounded-full bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.9)]" />
           <span className="mt-1">{p.toFixed(1)}</span>
         </div>
       ))}
@@ -66,8 +66,7 @@ function MiniCard({
   return (
     <div
       className={cn(
-        "relative rounded-2xl border border-yellow-500/20 bg-black/70",
-        "px-4 py-4 backdrop-blur-sm",
+        "rounded-2xl border border-yellow-500/20 bg-black/70 px-4 py-4",
         "transition-transform duration-300 hover:-translate-y-1",
         "animate-in fade-in slide-in-from-bottom-4"
       )}
@@ -94,15 +93,7 @@ export default function RoundSummary({ data }: { data: RoundSummaryData }) {
   const [lens, setLens] = useState<"fantasy" | "disposals" | "goals">("fantasy");
 
   return (
-    <section
-      className={cn(
-        "relative rounded-3xl border border-yellow-500/20",
-        "bg-gradient-to-br from-black via-[#050507] to-[#14100a]",
-        "px-4 py-6 md:px-8 md:py-8",
-        "shadow-[0_0_120px_rgba(0,0,0,0.7)]"
-      )}
-    >
-      {/* Header */}
+    <section className="rounded-3xl border border-yellow-500/20 bg-black/80 px-6 py-6">
       <SectionHeader
         eyebrow="Round Momentum"
         title="Round Snapshot"
@@ -115,9 +106,9 @@ export default function RoundSummary({ data }: { data: RoundSummaryData }) {
                 key={l}
                 onClick={() => setLens(l as any)}
                 className={cn(
-                  "px-3 py-1.5 rounded-full text-xs border transition-all",
+                  "px-3 py-1.5 rounded-full text-xs border",
                   lens === l
-                    ? "bg-yellow-400 text-black border-yellow-300 shadow-[0_0_18px_rgba(250,204,21,0.8)]"
+                    ? "bg-yellow-400 text-black border-yellow-300 shadow-[0_0_16px_rgba(250,204,21,0.8)]"
                     : "bg-black/40 border-white/15 text-white/60 hover:border-yellow-400/60 hover:text-white"
                 )}
               >
@@ -128,49 +119,41 @@ export default function RoundSummary({ data }: { data: RoundSummaryData }) {
         }
       />
 
-      {/* ---------------------------------------------------------------------- */}
-      {/* KEY HEADLINES BAR                                                     */}
-      {/* ---------------------------------------------------------------------- */}
+      {/* ------------------------------ HEADLINE STRIP ------------------------------ */}
 
-      <div className="mt-4 rounded-2xl border border-yellow-500/30 bg-black/70 px-4 py-3 shadow-[0_0_24px_rgba(250,204,21,0.12)]">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3 text-sm text-white/80">
-
-          <div className="flex flex-col">
-            <span className="text-yellow-400 font-semibold text-xs uppercase tracking-[0.18em]">
+      <div className="mt-4 rounded-2xl border border-yellow-500/25 bg-black/70 px-6 py-4 shadow-[0_0_28px_rgba(250,204,21,0.12)]">
+        <div className="grid grid-cols-3 gap-6 text-sm text-white/80">
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-yellow-400">
               Top Performer
-            </span>
-            <span className="text-yellow-300 text-lg font-bold">
+            </div>
+            <div className="text-yellow-300 text-lg font-bold">
               {data.topScore.value}
-            </span>
-            <span className="text-white/60 text-xs">
-              {data.topScore.name}
-            </span>
+            </div>
+            <div className="text-white/50 text-xs">{data.topScore.name}</div>
           </div>
 
-          <div className="flex flex-col">
-            <span className="text-yellow-400 font-semibold text-xs uppercase tracking-[0.18em]">
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-yellow-400">
               Biggest Overperformer
-            </span>
-            <span className="text-yellow-300 text-lg font-bold">
+            </div>
+            <div className="text-yellow-300 text-lg font-bold">
               +{data.biggestOverperformer.diff}
-            </span>
-            <span className="text-white/60 text-xs">
+            </div>
+            <div className="text-white/50 text-xs">
               {data.biggestOverperformer.name} • {data.biggestOverperformer.currentValue}
-            </span>
+            </div>
           </div>
 
-          <div className="flex flex-col">
-            <span className="text-yellow-400 font-semibold text-xs uppercase tracking-[0.18em]">
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-yellow-400">
               Round Average
-            </span>
-            <span className="text-yellow-300 text-lg font-bold">
+            </div>
+            <div className="text-yellow-300 text-lg font-bold">
               {data.roundAverage.avgDisposals.toFixed(1)}
-            </span>
-            <span className="text-white/60 text-xs">
-              Avg disposals per player
-            </span>
+            </div>
+            <div className="text-white/50 text-xs">Avg disposals per player</div>
           </div>
-
         </div>
 
         {data.roundAverage.last5Rounds && (
@@ -178,7 +161,8 @@ export default function RoundSummary({ data }: { data: RoundSummaryData }) {
         )}
       </div>
 
-      {/* Mini Cards */}
+      {/* ------------------------------ MINI CARDS ------------------------------ */}
+
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         <MiniCard
           icon={Flame}
