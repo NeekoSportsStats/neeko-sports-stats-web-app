@@ -30,7 +30,7 @@ const CATEGORY_CONFIG: Record<CategoryType, CategoryConfig> = {
     icon: TrendingUp,
     color: {
       border: "border-emerald-400/50",
-      glow: "shadow-[0_0_24px_rgba(52,211,153,0.2)]",
+      glow: "shadow-[0_0_16px_rgba(52,211,153,0.14)]",
       text: "text-emerald-400",
       badge: "bg-emerald-500/20 text-emerald-300 border-emerald-400/40",
       iconBg: "from-emerald-400/20 to-emerald-600/10",
@@ -42,7 +42,7 @@ const CATEGORY_CONFIG: Record<CategoryType, CategoryConfig> = {
     icon: Minus,
     color: {
       border: "border-amber-400/50",
-      glow: "shadow-[0_0_24px_rgba(251,191,36,0.2)]",
+      glow: "shadow-[0_0_16px_rgba(251,191,36,0.14)]",
       text: "text-amber-400",
       badge: "bg-amber-500/20 text-amber-300 border-amber-400/40",
       iconBg: "from-amber-400/20 to-amber-600/10",
@@ -54,7 +54,7 @@ const CATEGORY_CONFIG: Record<CategoryType, CategoryConfig> = {
     icon: TrendingDown,
     color: {
       border: "border-orange-400/50",
-      glow: "shadow-[0_0_24px_rgba(251,146,60,0.2)]",
+      glow: "shadow-[0_0_16px_rgba(251,146,60,0.14)]",
       text: "text-orange-400",
       badge: "bg-orange-500/20 text-orange-300 border-orange-400/40",
       iconBg: "from-orange-400/20 to-orange-600/10",
@@ -101,6 +101,7 @@ function PlayerCard({
   onToggle: () => void;
 }) {
   const config = CATEGORY_CONFIG[category];
+  const Icon = config.icon;
   const diffValue = row.diff ?? 0;
   const diffSign = diffValue >= 0 ? "+" : "";
 
@@ -119,12 +120,15 @@ function PlayerCard({
       >
         <div className="space-y-2.5">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-sm font-medium text-white leading-tight flex-1">
-              {row.player_name}
-            </h3>
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Icon className={cn("h-4 w-4 flex-shrink-0", config.color.text)} />
+              <h3 className="text-sm font-medium text-white leading-tight truncate">
+                {row.player_name}
+              </h3>
+            </div>
             <span
               className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border",
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border flex-shrink-0",
                 config.color.badge
               )}
             >
@@ -133,32 +137,13 @@ function PlayerCard({
             </span>
           </div>
 
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-white/40 uppercase tracking-wider">
-                Stability Score
-              </span>
-              <span className={cn("text-base font-bold tabular-nums", config.color.text)}>
-                {Math.round(row.stability_score)}
-                <span className="text-xs text-white/40 font-normal">/100</span>
-              </span>
-            </div>
-            <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-all duration-300",
-                  config.color.text.replace("text-", "bg-")
-                )}
-                style={{ width: `${Math.min(100, row.stability_score)}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between text-[10px] text-white/50">
-            <span>Last {row.games_used} games</span>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-white/50 uppercase tracking-wider">
+              {row.stability_band}
+            </span>
             {!isExpanded && (
-              <span className="text-white/30">
-                Click to expand
+              <span className="text-[9px] text-white/30 uppercase tracking-wider">
+                Tap to expand
               </span>
             )}
           </div>
@@ -166,32 +151,52 @@ function PlayerCard({
 
         {isExpanded && (
           <div
-            className="mt-3 pt-3 border-t border-white/10 space-y-2.5 animate-in slide-in-from-top-2 duration-200"
+            className="mt-3 pt-3 border-t border-white/10 space-y-3 animate-in slide-in-from-top-2 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-white/40 uppercase tracking-wider">
+                  Stability Score
+                </span>
+                <span className={cn("text-lg font-bold tabular-nums", config.color.text)}>
+                  {Math.round(row.stability_score)}
+                </span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all duration-300",
+                    config.color.text.replace("text-", "bg-")
+                  )}
+                  style={{ width: `${Math.min(100, row.stability_score)}%` }}
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-3 text-[11px]">
               <div>
-                <span className="text-white/40 block mb-0.5">Recent Avg</span>
-                <span className="text-white/90 font-semibold text-sm">
+                <span className="text-white/40 block mb-1">Last 5 Games</span>
+                <span className={cn("font-semibold text-base", config.color.text)}>
                   {row.recent_avg?.toFixed(1) ?? "—"}
                 </span>
               </div>
               <div>
-                <span className="text-white/40 block mb-0.5">Season Avg</span>
-                <span className="text-white/90 font-semibold text-sm">
+                <span className="text-white/40 block mb-1">Season Avg</span>
+                <span className="text-white/90 font-semibold text-base">
                   {row.season_avg?.toFixed(1) ?? "—"}
                 </span>
               </div>
             </div>
 
-            <div className="pt-2 border-t border-white/10">
+            <div className="pt-2 border-t border-white/10 space-y-1.5">
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-white/40">Variance</span>
                 <span className="text-white/90 font-medium">{row.variance.toFixed(2)}</span>
               </div>
-              <div className="flex items-center justify-between text-[11px] mt-1.5">
-                <span className="text-white/40">Stability Band</span>
-                <span className="text-white/90 font-medium">{row.stability_band}</span>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-white/40">Games Sample</span>
+                <span className="text-white/90 font-medium">{row.games_used} games</span>
               </div>
             </div>
 
@@ -199,11 +204,11 @@ function PlayerCard({
               <Info className="h-3 w-3 text-white/30 flex-shrink-0 mt-0.5" />
               <p className="text-[10px] text-white/60 leading-relaxed">
                 {category === "hot" &&
-                  "This player is currently performing above their season average"}
+                  "Outperforming season baseline by significant margin"}
                 {category === "stable" &&
-                  "This player maintains consistent performance close to their season average"}
+                  "Maintaining consistent output near season average"}
                 {category === "cold" &&
-                  "This player's recent form is below their season average"}
+                  "Recent form trending below season expectations"}
               </p>
             </div>
           </div>
@@ -252,8 +257,13 @@ function CategoryColumn({
 
       <div className="space-y-2.5">
         {rows.length === 0 ? (
-          <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-center">
-            <p className="text-xs text-white/40">No players in this category</p>
+          <div className="rounded-lg border border-white/10 bg-white/5 p-8 text-center">
+            <p className="text-xs text-white/40 leading-relaxed">
+              Insufficient qualifying players
+            </p>
+            <p className="text-[10px] text-white/20 mt-1.5">
+              Need 5+ games with valid data
+            </p>
           </div>
         ) : (
           rows.map((row) => (
@@ -351,11 +361,35 @@ export default function FormStabilityGrid() {
         </div>
 
         {loading && (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center space-y-4">
-              <div className="inline-block h-10 w-10 animate-spin rounded-full border-4 border-solid border-white/20 border-r-white/80 shadow-lg"></div>
-              <p className="text-sm text-white/60">Loading stability analysis...</p>
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {[0, 1, 2].map((col) => (
+              <div
+                key={col}
+                className="rounded-2xl border border-white/10 p-5 bg-gradient-to-br from-black/40 to-black/20 backdrop-blur-sm"
+              >
+                <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/10">
+                  <div className="h-9 w-9 rounded-full bg-white/5 animate-pulse" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-24 bg-white/5 rounded animate-pulse" />
+                    <div className="h-2 w-32 bg-white/5 rounded animate-pulse" />
+                  </div>
+                </div>
+                <div className="space-y-2.5">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      className="rounded-xl border border-white/10 bg-gradient-to-br from-black/60 via-black/50 to-black/40 px-4 py-3.5 space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="h-4 w-32 bg-white/5 rounded animate-pulse" />
+                        <div className="h-5 w-12 bg-white/5 rounded-full animate-pulse" />
+                      </div>
+                      <div className="h-2 w-20 bg-white/5 rounded animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
