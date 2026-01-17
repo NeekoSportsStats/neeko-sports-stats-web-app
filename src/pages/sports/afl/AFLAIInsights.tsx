@@ -1,14 +1,13 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { Crown, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 import type { FixtureMatch } from "@/components/afl/match-center/types";
 import { MOCK_FIXTURES } from "@/components/afl/match-center/mockData";
 
-import type { PremiumMode } from "@/components/afl/ai-insights/data/types";
-
-import PredictabilityTable from "@/components/afl/ai-insights/Section-2-player-predictability/PredictabilityTable";
-import TeamPredictabilityPanel from "@/components/afl/ai-insights/Section-3-team-prediction/TeamPredictabilityPanel";
-import GameFlowMomentumPanel from "@/components/afl/ai-insights/Section-4-game-flow/GameFlowMomentumPanel";
+import GamePreviewAI from "@/features/afl/ai-insights/sections/GamePreviewAI";
+import AIPlayerPredictions from "@/features/afl/ai-insights/sections/AIPlayerPredictions";
+import AITeamPredictions from "@/features/afl/ai-insights/sections/AITeamPredictions";
+import MasterGrid from "@/features/afl/ai-insights/sections/MasterGrid";
 
 import {
   filterPastFixtures,
@@ -36,10 +35,6 @@ function currentRound(fixtures: FixtureMatch[]) {
 
 export default function AFLAIInsights() {
   const fixtures = MOCK_FIXTURES as unknown as FixtureMatch[];
-
-  /* ---------------- GLOBAL STATE ---------------- */
-
-  const [mode, setMode] = useState<PremiumMode>("free");
 
   /* ---------------- ROUND + MATCH ---------------- */
 
@@ -86,24 +81,11 @@ export default function AFLAIInsights() {
     <div className="min-h-screen bg-[#070707] text-white">
       <div className="mx-auto max-w-6xl px-4 py-8 space-y-12">
         {/* HEADER */}
-        <header className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">AFL AI Insights</h1>
-            <p className="mt-1 text-sm text-white/60">
-              Match-scoped intelligence
-            </p>
-          </div>
-
-          {/* NEEKO+ TOGGLE */}
-          <button
-            onClick={() =>
-              setMode((m) => (m === "premium" ? "free" : "premium"))
-            }
-            className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/10 px-4 py-2 text-sm text-amber-200 hover:bg-amber-400/20"
-          >
-            <Crown className="h-4 w-4" />
-            {mode === "premium" ? "Neeko+ ON" : "Neeko+ OFF"}
-          </button>
+        <header>
+          <h1 className="text-3xl font-bold">AFL AI Insights</h1>
+          <p className="mt-1 text-sm text-white/60">
+            Match-scoped intelligence
+          </p>
         </header>
 
         {/* MATCH SELECTOR */}
@@ -126,32 +108,26 @@ export default function AFLAIInsights() {
           </div>
         </div>
 
-        {/* PLAYER SCORE PREDICTABILITY */}
-        {selectedMatch && (
-          <PredictabilityTable
-            fixtures={pastFixtures}
-            match={selectedMatch}
-            mode={mode}
-          />
-        )}
+        {/* SECTION 1: GAME PREVIEW AI */}
+        <GamePreviewAI
+          selectedMatch={selectedMatch}
+          pastFixtures={pastFixtures}
+        />
 
-        {/* TEAM SCORE PREDICTABILITY */}
-        {selectedMatch && (
-          <TeamPredictabilityPanel
-            mode={mode}
-            match={selectedMatch as any}
-            fixtures={pastFixtures}
-          />
-        )}
+        {/* SECTION 2: AI PLAYER PREDICTIONS */}
+        <AIPlayerPredictions
+          selectedMatch={selectedMatch}
+          pastFixtures={pastFixtures}
+        />
 
-        {/* GAME FLOW & MOMENTUM */}
-        {selectedMatch && (
-          <GameFlowMomentumPanel
-            mode={mode}
-            match={selectedMatch as any}
-            fixtures={pastFixtures}
-          />
-        )}
+        {/* SECTION 3: AI TEAM PREDICTIONS */}
+        <AITeamPredictions
+          selectedMatch={selectedMatch}
+          pastFixtures={pastFixtures}
+        />
+
+        {/* SECTION 4: MASTER GRID */}
+        <MasterGrid />
       </div>
     </div>
   );
