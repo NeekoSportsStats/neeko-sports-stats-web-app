@@ -20,7 +20,6 @@ function formatValue(stat: RoundStat, value: number) {
 }
 
 function formatDiff(stat: RoundStat, diff: number) {
-  // keep one decimal for diff so it looks analytical
   const d = Number(diff.toFixed(1));
   const sign = d >= 0 ? "+" : "";
   return `${sign}${d}`;
@@ -30,13 +29,9 @@ function formatDiff(stat: RoundStat, diff: number) {
 /* SPARKLINE                                                                  */
 /* -------------------------------------------------------------------------- */
 
-function SparklineBars({
-  values,
-  stat,
-}: {
-  values: number[];
-  stat: RoundStat;
-}) {
+function SparklineBars({ values, stat }: { values: number[]; stat: RoundStat }) {
+  if (!values?.length) return null;
+
   const max = Math.max(...values, 1);
 
   return (
@@ -47,10 +42,7 @@ function SparklineBars({
           return (
             <div key={i} className="flex flex-col items-center">
               <div
-                className={cn(
-                  "w-2 rounded-full bg-yellow-400",
-                  "shadow-[0_0_14px_rgba(250,204,21,0.65)]"
-                )}
+                className="w-2 rounded-full bg-yellow-400 shadow-[0_0_14px_rgba(250,204,21,0.65)]"
                 style={{ height: `${h}px` }}
               />
             </div>
@@ -141,27 +133,24 @@ export default function RoundSummary() {
 
   const roundLabel = useMemo(() => {
     if (!data?.currentRound) return "Round Snapshot";
-    const label = data.isGrandFinal ? "Grand Final" : `Round ${data.currentRound}`;
-    return label;
+    return data.isGrandFinal ? "Grand Final" : `Round ${data.currentRound}`;
   }, [data?.currentRound, data?.isGrandFinal]);
 
   if (!data) return null;
 
   const topVal = formatValue(stat, data.topScore.value);
-  const overDiff = formatDiff(stat, data.biggestOverperformer.diff);
+  const overDiff =
+    data.biggestOverperformer?.diff > 0
+      ? formatDiff(stat, data.biggestOverperformer.diff)
+      : "—";
+
   const leagueAvg = data.roundAverage;
 
   return (
-    <section
-      className={cn(
-        "rounded-3xl border border-yellow-500/20",
-        "bg-gradient-to-br from-black via-[#050507] to-[#14100a]",
-        "px-5 py-5 md:px-6 md:py-6",
-        "shadow-[0_0_80px_rgba(0,0,0,0.85)]"
-      )}
-    >
-      {/* HEADER ROW */}
-      <div className="flex items-start justify-between gap-3">
+    <section className="rounded-3xl border border-yellow-500/20 bg-gradient-to-br from-black via-[#050507] to-[#14100a] px-5 py-6 shadow-[0_0_80px_rgba(0,0,0,0.85)]">
+
+      {/* HEADER */}
+      <div className="flex items-start justify-between">
         <div>
           <div className="text-[10px] uppercase tracking-[0.30em] text-yellow-300/70">
             Round Momentum
@@ -169,74 +158,49 @@ export default function RoundSummary() {
           <h2 className="mt-1 text-xl md:text-2xl font-bold text-white">
             Round Snapshot
           </h2>
-          <p className="mt-1 text-xs text-white/55">{roundLabel} • League Overview</p>
+          <p className="mt-1 text-xs text-white/55">
+            {roundLabel} • League Overview
+          </p>
         </div>
 
-        {/* Lens pills */}
+        {/* LENS PILLS */}
         <div className="flex gap-2">
-          {(["fantasy", "disposals", "goals"] as RoundStat[]).map((l) => {
-            const active = stat === l;
-            return (
-              <button
-                key={l}
-                onClick={() => setStat(l)}
-                className={cn(
-                  "px-3 py-1.5 rounded-full text-xs border transition-all",
-                  "backdrop-blur-sm",
-                  active
-                    ? "bg-yellow-400 text-black border-yellow-300 shadow-[0_0_18px_rgba(250,204,21,0.65)]"
-                    : "bg-black/40 border-white/20 text-white/70 hover:border-yellow-400/50 hover:text-white"
-                )}
-              >
-                {l === "fantasy" ? "Fantasy" : l === "disposals" ? "Disposals" : "Goals"}
-              </button>
-            );
-          })}
+          {(["fantasy", "disposals", "goals"] as RoundStat[]).map((l) => (
+            <button
+              key={l}
+              onClick={() => setStat(l)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-xs border",
+                stat === l
+                  ? "bg-yellow-400 text-black border-yellow-300 shadow-[0_0_18px_rgba(250,204,21,0.65)]"
+                  : "bg-black/40 border-white/20 text-white/70 hover:border-yellow-400/50"
+              )}
+            >
+              {l.charAt(0).toUpperCase() + l.slice(1)}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* KEY SUMMARY STRIP (restored “key summaries box”) */}
+      {/* HERO STRIP */}
       <div className="mt-5 rounded-2xl border border-yellow-400/20 bg-black/55 px-4 py-4 shadow-[0_0_30px_rgba(250,204,21,0.10)]">
         <div className="grid grid-cols-3 gap-3">
-          <HeroMetric
-            icon={Flame}
-            title="Top Performer"
-            value={topVal}
-            sub={data.topScore.playerName}
-            stat={stat}
-            align="left"
-          />
-
+          <HeroMetric icon={Flame} title="Top Performer" value={topVal} sub={data.topScore.playerName} stat={stat} />
           <HeroMetric
             icon={TrendingUp}
             title="Biggest Over"
             value={overDiff}
-            sub={
-              data.biggestOverperformer.playerName === "—"
-                ? "No clear overperformer"
-                : data.biggestOverperformer.playerName
-            }
+            sub={data.biggestOverperformer?.playerName ?? "Within season norms"}
             stat={stat}
             align="center"
           />
-
-          <HeroMetric
-            icon={Activity}
-            title="League Avg"
-            value={String(leagueAvg)}
-            sub="League average"
-            stat={stat}
-            align="right"
-          />
+          <HeroMetric icon={Activity} title="League Avg" value={String(leagueAvg)} sub="League average" stat={stat} align="right" />
         </div>
 
-        {/* Sparkline */}
-        {data.sparkline && data.sparkline.length > 0 && (
-          <SparklineBars values={data.sparkline} stat={stat} />
-        )}
+        <SparklineBars values={data.sparkline ?? []} stat={stat} />
       </div>
 
-      {/* KEY HEADLINES (restored + stronger) */}
+      {/* KEY POINTS */}
       <div className="mt-4 space-y-1.5 text-xs text-white/60">
         {data.keyPoints.map((k, i) => (
           <div key={i} className="flex gap-2">
