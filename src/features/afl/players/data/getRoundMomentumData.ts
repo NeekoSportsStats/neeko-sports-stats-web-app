@@ -12,19 +12,19 @@ export type RoundMomentumData = {
   sparkline?: number[];
 };
 
-function statValue(row: any, stat: RoundStat) {
+function statValue(row: any, stat: RoundStat): number {
   if (stat === "goals") return row.goals ?? 0;
   if (stat === "fantasy") return row.fantasy_points ?? 0;
   return row.disposals ?? 0;
 }
 
-function avgStatValue(avg: any, stat: RoundStat) {
-  if (stat === "goals") return Number(avg.avg_goals ?? 0);
-  if (stat === "fantasy") return Number(avg.avg_fantasy ?? 0);
-  return Number(avg.avg_disposals ?? 0);
+function avgStatValue(avgRow: any, stat: RoundStat): number {
+  if (stat === "goals") return Number(avgRow.avg_goals ?? 0);
+  if (stat === "fantasy") return Number(avgRow.avg_fantasy ?? 0);
+  return Number(avgRow.avg_disposals ?? 0);
 }
 
-function avgForRound(rows: any[], stat: RoundStat) {
+function roundAverageFor(rows: any[], stat: RoundStat): number {
   if (!rows.length) return 0;
   const total = rows.reduce((s, r) => s + statValue(r, stat), 0);
   return Number((total / rows.length).toFixed(1));
@@ -41,9 +41,9 @@ export async function getRoundMomentumData(season: number, stat: RoundStat): Pro
       topScore: { playerName: "—", value: 0 },
       biggestOverperformer: { playerName: "—", diff: 0, roundValue: 0 },
       roundAverage: 0,
-      keyPoints: ["No data available yet."],
-      currentRound: 0,
+      keyPoints: ["No round data available."],
       isGrandFinal: false,
+      currentRound: 0,
       sparkline: [],
     };
   }
@@ -57,46 +57,55 @@ export async function getRoundMomentumData(season: number, stat: RoundStat): Pro
     .eq("season", season)
     .gte("games_played", 5);
 
-  const avgMap = new Map((averages ?? []).map((a) => [a.player_id, a]));
+  const avgMap = new Map(averages?.map((a) => [a.player_id, a]) ?? []);
 
   const top = latest.reduce((m, r) => (statValue(r, stat) > statValue(m, stat) ? r : m));
 
-  const over = latest
+  // Biggest Over logic
+  let over = latest
     .filter((r) => avgMap.has(r.player_id))
-    .map((r) => {
-      const avg = avgStatValue(avgMap.get(r.player_id), stat);
-      return {
-        player_id: r.player_id,
-        diff: Number((statValue(r, stat) - avg).toFixed(1)),
-        roundValue: statValue(r, stat),
-      };
-    })
-    .filter((r) => r.diff >= 3) // only meaningful
+    .map((r) => ({
+      player_id: r.player_id,
+      diff: statValue(r, stat) - avgStatValue(avgMap.get(r.player_id), stat),
+      roundValue: statValue(r, stat),
+    }))
     .sort((a, b) => b.diff - a.diff)[0];
 
+  if (!over) {
+    const roundAvg = roundAverageFor(latest, stat);
+    over = latest
+      .map((r) => ({
+        player_id: r.player_id,
+        diff: statValue(r, stat) - roundAvg,
+        roundValue: statValue(r, stat),
+      }))
+      .sort((a, b) => b.diff - a.diff)[0];
+  }
+
   const { data: players } = await supabase.from("players").select("id, name").in("id", latest.map((r) => r.player_id));
+
   const nameMap = new Map(players?.map((p) => [p.id, p.name]) ?? []);
 
-  const sparklineRounds = Array.from(new Set(rows.map((r) => r.round_number))).sort((a, b) => a - b).slice(-5);
-  const sparkline = sparklineRounds.map((r) => avgForRound(rows.filter((x) => x.round_number === r), stat));
-
-  const roundAvg = avgForRound(latest, stat);
+  const roundAvg = roundAverageFor(latest, stat);
 
   return {
     topScore: { playerName: nameMap.get(top.player_id) ?? "Unknown", value: statValue(top, stat) },
-    biggestOverperformer: over
-      ? { playerName: nameMap.get(over.player_id) ?? "Unknown", diff: over.diff, roundValue: over.roundValue }
-      : { playerName: "—", diff: 0, roundValue: 0 },
+    biggestOverperformer: {
+      playerName: nameMap.get(over.player_id) ?? "—",
+      diff: Number(over.diff.toFixed(1)),
+      roundValue: over.roundValue,
+    },
     roundAverage: roundAvg,
     keyPoints: [
       `⭐ ${nameMap.get(top.player_id)} led the round.`,
-      over
-        ? `📈 ${nameMap.get(over.player_id)} exceeded their season average (+${over.diff}).`
-        : "📈 No players significantly exceeded their season averages.",
-      `🧠 League average: ${roundAvg}.`,
+      `📈 Biggest overperformer: ${nameMap.get(over.player_id)} (+${Number(over.diff.toFixed(1))}).`,
+      `🧠 League average: ${roundAvg} ${stat}.`,
     ],
-    currentRound,
     isGrandFinal: currentRound >= 28,
-    sparkline,
+    currentRound,
+    sparkline: Array.from(new Set(rows.map((r) => r.round_number)))
+      .sort((a, b) => a - b)
+      .slice(-5)
+      .map((rn) => roundAverageFor(rows.filter((r) => r.round_number === rn), stat)),
   };
 }
