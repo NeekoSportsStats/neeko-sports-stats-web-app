@@ -1,194 +1,229 @@
-import React, { useState } from "react";
-import { Search, Maximize2, Minimize2 } from "lucide-react";
-import { PlayerData, StatLens, getAvailableTeams } from "./getPlayers";
+import React, { useEffect, useMemo, useState } from "react";
+import { PlayerData, StatLens } from "./getPlayers";
+import { ChevronDown, ChevronsDown } from "lucide-react";
 
 interface PlayerGridProps {
   players: PlayerData[];
-  onSelectPlayer: (player: PlayerData) => void;
   lens: StatLens;
-  onLensChange: (lens: StatLens) => void;
-  team: string;
-  onTeamChange: (team: string) => void;
-  search: string;
-  onSearchChange: (search: string) => void;
+  onPlayerSelect: (player: PlayerData) => void;
 }
 
-export default function PlayerGrid({
-  players,
-  onSelectPlayer,
-  lens,
-  onLensChange,
-  team,
-  onTeamChange,
-  search,
-  onSearchChange,
-}: PlayerGridProps) {
-  const [isCompact, setIsCompact] = useState(false);
-  const teams = getAvailableTeams();
+function scoreChipClass(score: number | null, lens: StatLens) {
+  if (score == null) {
+    return "bg-white/5 border-white/10 text-white/35";
+  }
 
-  const lensOptions: { value: StatLens; label: string }[] = [
-    { value: "fantasy", label: "Fantasy" },
-    { value: "disposals", label: "Disposals" },
-    { value: "goals", label: "Goals" },
-  ];
+  // Simple lens thresholds for chip coloring
+  if (lens === "goals") {
+    if (score >= 3) return "bg-emerald-500/15 border-emerald-400/30 text-emerald-300";
+    if (score >= 2) return "bg-yellow-500/15 border-yellow-400/30 text-yellow-300";
+    return "bg-red-500/10 border-red-400/25 text-red-300";
+  }
 
-  const allRounds = players.length > 0 ? players[0].rounds.map(r => r.round) : [];
+  if (lens === "disposals") {
+    if (score >= 28) return "bg-emerald-500/15 border-emerald-400/30 text-emerald-300";
+    if (score >= 20) return "bg-yellow-500/15 border-yellow-400/30 text-yellow-300";
+    return "bg-red-500/10 border-red-400/25 text-red-300";
+  }
 
+  // fantasy
+  if (score >= 90) return "bg-emerald-500/15 border-emerald-400/30 text-emerald-300";
+  if (score >= 70) return "bg-yellow-500/15 border-yellow-400/30 text-yellow-300";
+  return "bg-red-500/10 border-red-400/25 text-red-300";
+}
+
+function statLabel(lens: StatLens) {
+  if (lens === "fantasy") return "pts";
+  if (lens === "disposals") return "disp";
+  return "g";
+}
+
+function getLastNRoundsDisplay(rounds: PlayerData["rounds"], n: number) {
+  // exclude OR for “last 5 rounds” feel, but fallback if not enough
+  const nonOR = rounds.filter((r) => r.round !== "OR");
+  const src = nonOR.length >= n ? nonOR : rounds;
+  return src.slice(-n);
+}
+
+export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGridProps) {
+  // Progressive rendering to reduce lag
+  const STEP = 40;
+  const [visibleCount, setVisibleCount] = useState<number>(STEP);
+
+  useEffect(() => {
+    // reset whenever the underlying list changes (filters/search/lens)
+    setVisibleCount(STEP);
+  }, [lens, players.length]);
+
+  const total = players.length;
+  const visiblePlayers = useMemo(() => players.slice(0, visibleCount), [players, visibleCount]);
+
+  const canShowMore = visibleCount < total;
+
+  // Split rendering:
+  // - Mobile: cards (fast, readable)
+  // - Desktop+: table (sticky header + horizontal scroll)
   return (
     <div className="space-y-4">
-      <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4">
-        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-          <select
-            value={team}
-            onChange={(e) => onTeamChange(e.target.value)}
-            className="px-4 py-2 rounded-lg border border-white/10 bg-black/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
-          >
-            {teams.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+      {/* MOBILE LIST */}
+      <div className="block lg:hidden space-y-3">
+        {visiblePlayers.map((player) => {
+          const last5 = getLastNRoundsDisplay(player.rounds, 5);
+          return (
+            <button
+              key={player.id}
+              onClick={() => onPlayerSelect(player)}
+              className="w-full text-left rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4 active:scale-[0.99] transition"
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className="w-1.5 h-12 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: player.teamColor || "#666" }}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-white font-semibold truncate">{player.name}</div>
+                      <div className="text-xs text-white/55 truncate">
+                        {player.team} · {player.role}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-yellow-400 font-bold">
+                        {player.stats.avg}
+                        <span className="text-[10px] text-white/45 ml-1">{statLabel(lens)}</span>
+                      </div>
+                      <div className="text-[10px] text-white/45">
+                        {player.stats.games} gms
+                      </div>
+                    </div>
+                  </div>
 
-          <div className="relative flex-1 sm:flex-initial sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
-            <input
-              type="text"
-              placeholder="Search player, team or role"
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-white/10 bg-black/60 text-white text-sm placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-2">
-            {lensOptions.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => onLensChange(option.value)}
-                className={`px-3.5 py-1.5 rounded-full border text-xs font-medium transition-all ${
-                  lens === option.value
-                    ? "bg-yellow-400 text-black border-yellow-300 shadow-[0_0_20px_rgba(250,204,21,0.7)]"
-                    : "bg-black/40 border-white/20 text-white/70 hover:border-yellow-400/60"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={() => setIsCompact(!isCompact)}
-            className="p-2 rounded-lg border border-white/10 bg-black/60 text-white/70 hover:text-white hover:border-yellow-400/60 transition-all"
-            title={isCompact ? "Comfortable view" : "Compact view"}
-          >
-            {isCompact ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
-          </button>
-        </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {last5.map((r) => (
+                      <div
+                        key={r.round}
+                        className={`px-2.5 py-1 rounded-lg border text-xs font-semibold ${scoreChipClass(
+                          r.score,
+                          lens
+                        )}`}
+                      >
+                        <span className="text-[10px] text-white/40 mr-1">{r.round}</span>
+                        {r.score == null ? "—" : r.score}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="border-b border-white/10">
-              <tr className="bg-white/5">
-                <th className="sticky left-0 z-10 bg-black/80 backdrop-blur-xl px-4 py-3 text-left text-xs font-semibold text-white/70 uppercase tracking-wider border-r border-white/10">
-                  Player
-                </th>
-                {allRounds.map((round) => (
+      {/* DESKTOP TABLE */}
+      <div className="hidden lg:block">
+        <div className="rounded-xl border border-white/10 bg-black/30 backdrop-blur-xl overflow-hidden">
+          {/* This wrapper gives us true sticky header (vertical) AND horizontal scroll */}
+          <div className="max-h-[72vh] overflow-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="text-xs text-white/60 uppercase tracking-wider">
                   <th
-                    key={round}
-                    className="px-3 py-3 text-center text-xs font-semibold text-white/70 uppercase tracking-wider min-w-[60px]"
+                    className="sticky top-0 z-30 bg-black/80 backdrop-blur-xl px-4 py-3 text-left border-b border-white/10"
+                    style={{ minWidth: "240px" }}
                   >
-                    {round}
+                    Player
                   </th>
-                ))}
-                <th className="sticky right-0 z-10 bg-black/80 backdrop-blur-xl px-4 py-3 text-left text-xs font-semibold text-white/70 uppercase tracking-wider border-l border-white/10 min-w-[200px]">
-                  Stats & Hit Rate
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {players.length === 0 ? (
-                <tr>
-                  <td colSpan={allRounds.length + 2} className="px-4 py-12 text-center text-white/50">
-                    No players found matching your filters
-                  </td>
+
+                  {players[0]?.rounds.map((round) => (
+                    <th
+                      key={round.round}
+                      className="sticky top-0 z-20 bg-black/80 backdrop-blur-xl px-2 py-3 text-center border-b border-white/10"
+                      style={{ minWidth: "56px" }}
+                    >
+                      {round.round}
+                    </th>
+                  ))}
+
+                  <th
+                    className="sticky top-0 z-30 bg-black/80 backdrop-blur-xl px-4 py-3 text-left border-b border-white/10"
+                    style={{ minWidth: "280px" }}
+                  >
+                    Stats & Hit Rate
+                  </th>
                 </tr>
-              ) : (
-                players.map((player) => (
+              </thead>
+
+              <tbody>
+                {visiblePlayers.map((player) => (
                   <tr
                     key={player.id}
-                    onClick={() => onSelectPlayer(player)}
-                    className="hover:bg-white/5 cursor-pointer transition-colors group"
+                    className="border-b border-white/5 hover:bg-white/5 cursor-pointer transition-all"
+                    onClick={() => onPlayerSelect(player)}
                   >
-                    <td className={`sticky left-0 z-10 bg-black/80 backdrop-blur-xl border-r border-white/10 group-hover:bg-white/5 ${
-                      isCompact ? "px-3 py-2" : "px-4 py-4"
-                    }`}>
+                    {/* Sticky left column */}
+                    <td className="sticky left-0 z-10 bg-black/70 backdrop-blur-xl px-4 py-4 border-r border-white/5">
                       <div className="flex items-center gap-3">
                         <div
                           className="w-1 h-10 rounded-full"
                           style={{ backgroundColor: player.teamColor || "#666" }}
                         />
-                        <div>
-                          <div className={`font-medium text-white ${isCompact ? "text-sm" : ""}`}>
+                        <div className="min-w-0">
+                          <div className="text-white font-semibold truncate max-w-[180px]">
                             {player.name}
                           </div>
-                          <div className={`text-white/50 ${isCompact ? "text-xs" : "text-sm"}`}>
+                          <div className="text-xs text-white/50 truncate max-w-[180px]">
                             {player.team} · {player.role}
                           </div>
                         </div>
                       </div>
                     </td>
 
+                    {/* Rounds */}
                     {player.rounds.map((round) => (
-                      <td
-                        key={round.round}
-                        className={`text-center ${isCompact ? "px-2 py-2" : "px-3 py-4"}`}
-                      >
+                      <td key={round.round} className="px-2 py-4 text-center">
                         <div
-                          className={`inline-flex items-center justify-center rounded-md font-semibold ${
-                            isCompact ? "text-xs px-2 py-1 min-w-[44px]" : "text-sm px-2.5 py-1.5 min-w-[52px]"
-                          } ${
-                            round.score >= 80
-                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                              : round.score >= 60
-                              ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/40"
-                              : "bg-red-500/20 text-red-300 border border-red-500/40"
-                          }`}
+                          className={`inline-flex items-center justify-center min-w-[44px] px-3 py-1 rounded-lg border text-sm font-semibold ${scoreChipClass(
+                            round.score,
+                            lens
+                          )}`}
                         >
-                          {round.score}
+                          {round.score == null ? "—" : round.score}
                         </div>
                       </td>
                     ))}
 
-                    <td className={`sticky right-0 z-10 bg-black/80 backdrop-blur-xl border-l border-white/10 group-hover:bg-white/5 ${
-                      isCompact ? "px-3 py-2" : "px-4 py-4"
-                    }`}>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-3 text-xs">
-                          <span className="text-white/50">AVG</span>
-                          <span className="font-semibold text-yellow-400">{player.stats.avg}</span>
-                          <span className="text-white/30">·</span>
-                          <span className="text-white/50">MIN</span>
-                          <span className="text-white">{player.stats.min}</span>
-                          <span className="text-white/30">·</span>
-                          <span className="text-white/50">MAX</span>
-                          <span className="text-white">{player.stats.max}</span>
+                    {/* Sticky right column */}
+                    <td className="sticky right-0 z-10 bg-black/70 backdrop-blur-xl px-4 py-4 border-l border-white/5">
+                      <div className="space-y-3">
+                        <div className="flex items-baseline justify-between">
+                          <div className="text-xs text-white/50 uppercase tracking-wider">
+                            AVG
+                          </div>
+                          <div className="text-yellow-400 font-bold text-lg">
+                            {player.stats.avg}
+                          </div>
                         </div>
-                        <div className="space-y-1">
+
+                        <div className="flex items-center justify-between text-xs text-white/50">
+                          <span>MIN {player.stats.min}</span>
+                          <span>MAX {player.stats.max}</span>
+                          <span>{player.stats.games} gms</span>
+                        </div>
+
+                        <div className="space-y-2">
                           {player.hitRates.slice(0, 3).map((hr) => (
-                            <div key={hr.threshold} className="flex items-center gap-2">
-                              <span className="text-[10px] text-white/40 w-8">{hr.threshold}+</span>
-                              <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div key={hr.threshold} className="flex items-center gap-3">
+                              <span className="text-xs text-white/50 w-10">
+                                {hr.threshold}+
+                              </span>
+                              <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
                                 <div
-                                  className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500"
+                                  className="h-full bg-yellow-400"
                                   style={{ width: `${hr.percentage}%` }}
                                 />
                               </div>
-                              <span className="text-[10px] text-white/50 w-10 text-right">
+                              <span className="text-xs text-white/60 w-12 text-right">
                                 {Math.round(hr.percentage)}%
                               </span>
                             </div>
@@ -197,16 +232,48 @@ export default function PlayerGrid({
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      {players.length > 0 && (
-        <div className="text-center text-sm text-white/50">
-          Showing {players.length} player{players.length !== 1 ? "s" : ""}
+      {/* SHOW MORE CONTROLS */}
+      {total > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="text-xs text-white/50">
+            Showing <span className="text-white/70 font-semibold">{Math.min(visibleCount, total)}</span> of{" "}
+            <span className="text-white/70 font-semibold">{total}</span> players
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              disabled={!canShowMore}
+              onClick={() => setVisibleCount((c) => Math.min(total, c + STEP))}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition ${
+                canShowMore
+                  ? "border-yellow-400/40 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15"
+                  : "border-white/10 bg-white/5 text-white/30 cursor-not-allowed"
+              }`}
+            >
+              <ChevronDown className="h-4 w-4" />
+              Show more (+{STEP})
+            </button>
+
+            <button
+              disabled={!canShowMore}
+              onClick={() => setVisibleCount(total)}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition ${
+                canShowMore
+                  ? "border-white/15 bg-white/5 text-white/70 hover:bg-white/10"
+                  : "border-white/10 bg-white/5 text-white/30 cursor-not-allowed"
+              }`}
+            >
+              <ChevronsDown className="h-4 w-4" />
+              Show all
+            </button>
+          </div>
         </div>
       )}
     </div>
