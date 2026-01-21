@@ -1,136 +1,194 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { RoundSummaryData } from "../sections/RoundSummary";
 
-/* -------------------------------------------------------------------------- */
-/* MAIN FETCH                                                                 */
-/* -------------------------------------------------------------------------- */
+export type RoundStat = "disposals" | "goals" | "fantasy";
 
-export async function getRoundSummaryData(): Promise<RoundSummaryData> {
-  /* ------------------------------------------------------------------ */
-  /* 1. Resolve latest available round (safe, no view dependency)       */
-  /* ------------------------------------------------------------------ */
+export type RoundMomentumData = {
+  topScore: { playerName: string; value: number };
+  biggestOverperformer: { playerName: string; diff: number; roundValue: number };
+  roundAverage: number;
+  keyPoints: string[];
+  isGrandFinal: boolean;
+  currentRound: number;
+  sparkline?: number[];
+};
 
-  const { data: roundRows, error: roundErr } = await supabase
+function getStatLabel(stat: RoundStat) {
+  if (stat === "goals") return "goals";
+  if (stat === "disposals") return "disposals";
+  return "fantasy points";
+}
+
+function statValue(row: any, stat: RoundStat): number {
+  if (stat === "goals") return Number(row.goals ?? 0);
+  if (stat === "fantasy") return Number(row.fantasy_points ?? 0);
+  return Number(row.disposals ?? 0);
+}
+
+function avgStatValue(avgRow: any, stat: RoundStat): number {
+  // avg_* can come back as string depending on view definition — always coerce
+  if (stat === "goals") return Number(avgRow?.avg_goals ?? 0);
+  if (stat === "fantasy") return Number(avgRow?.avg_fantasy ?? 0);
+  return Number(avgRow?.avg_disposals ?? 0);
+}
+
+function roundAverageFor(rows: any[], stat: RoundStat): number {
+  if (!rows.length) return 0;
+  const total = rows.reduce((s, r) => s + statValue(r, stat), 0);
+  return Number((total / rows.length).toFixed(1));
+}
+
+function signalThreshold(stat: RoundStat) {
+  if (stat === "goals") return 1.0;
+  if (stat === "fantasy") return 10.0;
+  return 5.0;
+}
+
+export async function getRoundMomentumData(
+  season: number,
+  stat: RoundStat
+): Promise<RoundMomentumData> {
+  const { data: rows, error: roundError } = await supabase
     .from("round_player_summary")
-    .select("season, round_number")
-    .order("round_number", { ascending: false })
-    .limit(1);
+    .select("player_id, disposals, goals, fantasy_points, round_number")
+    .eq("season", season);
 
-  if (roundErr || !roundRows?.length) {
-    throw new Error("Unable to resolve latest round");
+  if (roundError) {
+    return {
+      topScore: { playerName: "—", value: 0 },
+      biggestOverperformer: { playerName: "—", diff: 0, roundValue: 0 },
+      roundAverage: 0,
+      keyPoints: [`Failed to load round data (${roundError.message}).`],
+      isGrandFinal: false,
+      currentRound: 0,
+      sparkline: [],
+    };
   }
 
-  const { season, round_number } = roundRows[0];
+  if (!rows || rows.length === 0) {
+    const statLabel = getStatLabel(stat);
+    return {
+      topScore: { playerName: "—", value: 0 },
+      biggestOverperformer: { playerName: "—", diff: 0, roundValue: 0 },
+      roundAverage: 0,
+      keyPoints: [`No ${statLabel} data available yet.`],
+      isGrandFinal: false,
+      currentRound: 0,
+      sparkline: [],
+    };
+  }
 
-  /* ------------------------------------------------------------------ */
-  /* 2. Fetch round player stats                                        */
-  /* ------------------------------------------------------------------ */
+  const currentRound = Math.max(...rows.map((r) => r.round_number));
+  const isGrandFinal = currentRound >= 28;
 
-  const { data: roundPlayers, error: rpError } = await supabase
-    .from("round_player_summary")
-    .select("player_id, disposals, goals")
+  const latest = rows.filter((r) => r.round_number === currentRound);
+
+  // Sparkline: last 5 rounds league averages
+  const lastRounds = Array.from(new Set(rows.map((r) => r.round_number)))
+    .sort((a, b) => a - b)
+    .slice(-5);
+
+  const sparkline = lastRounds.map((rn) => {
+    const rRows = rows.filter((r) => r.round_number === rn);
+    return roundAverageFor(rRows, stat);
+  });
+
+  // Season averages (>=5 games)
+  const { data: averages, error: avgError } = await supabase
+    .from("player_season_averages")
+    .select("player_id, avg_disposals, avg_goals, avg_fantasy, games_played")
     .eq("season", season)
-    .eq("round_number", round_number);
+    .gte("games_played", 5);
 
-  if (rpError || !roundPlayers?.length) {
-    throw new Error("No round player stats available");
-  }
+  // avgError is not fatal — we still show top + league avg + sparkline
+  const avgMap = new Map((averages ?? []).map((a) => [a.player_id, a]));
 
-  /* ------------------------------------------------------------------ */
-  /* 3. Player names                                                    */
-  /* ------------------------------------------------------------------ */
-
-  const playerIds = [...new Set(roundPlayers.map((p) => p.player_id))];
-
+  // Names
+  const playerIds = Array.from(new Set(latest.map((r) => r.player_id)));
   const { data: players } = await supabase
     .from("players")
     .select("id, name")
     .in("id", playerIds);
 
-  const playerMap = new Map(
-    (players ?? []).map((p) => [p.id, p.name])
+  const nameMap = new Map((players ?? []).map((p) => [p.id, p.name]));
+  const safeName = (id: string) => nameMap.get(id) ?? "Unknown";
+
+  // Top performer
+  const top = latest.reduce((m, r) =>
+    statValue(r, stat) > statValue(m, stat) ? r : m
   );
 
-  /* ------------------------------------------------------------------ */
-  /* 4. Top score (this round)                                          */
-  /* ------------------------------------------------------------------ */
+  // Biggest overperformer (do NOT filter out — always pick best diff among eligible)
+  let over:
+    | { player_id: string; diff: number; roundValue: number; avgValue: number }
+    | undefined;
 
-  const topPlayer = roundPlayers.reduce((max, p) =>
-    (p.disposals ?? 0) > (max.disposals ?? 0) ? p : max
+  if (!avgError && avgMap.size > 0) {
+    const overList = latest
+      .filter((r) => avgMap.has(r.player_id))
+      .map((r) => {
+        const a = avgMap.get(r.player_id)!;
+        const roundVal = statValue(r, stat);
+        const avgVal = avgStatValue(a, stat);
+        return {
+          player_id: r.player_id,
+          diff: Number((roundVal - avgVal).toFixed(1)),
+          roundValue: roundVal,
+          avgValue: avgVal,
+        };
+      })
+      .sort((a, b) => b.diff - a.diff);
+
+    over = overList[0];
+  }
+
+  const roundAvg = roundAverageFor(latest, stat);
+  const statLabel = getStatLabel(stat);
+
+  const keyPoints: string[] = [];
+
+  keyPoints.push(
+    `⭐ ${safeName(top.player_id)} led the round.`
   );
 
-  /* ------------------------------------------------------------------ */
-  /* 5. Season averages (overperformer)                                 */
-  /* ------------------------------------------------------------------ */
+  if (over && Number.isFinite(over.diff)) {
+    if (over.diff >= signalThreshold(stat)) {
+      keyPoints.push(
+        `📈 ${safeName(over.player_id)} significantly exceeded their season average (+${over.diff} ${statLabel}).`
+      );
+    } else if (over.diff > 0) {
+      keyPoints.push(
+        `📈 No major overperformer signal — best was ${safeName(over.player_id)} (+${over.diff}).`
+      );
+    } else {
+      keyPoints.push(
+        "📈 No players significantly exceeded their season averages."
+      );
+    }
+  } else {
+    keyPoints.push(
+      avgError
+        ? "📈 Overperformer signal unavailable (season averages query failed)."
+        : "📈 No overperformer signal (insufficient season averages)."
+    );
+  }
 
-  const { data: seasonAvgs } = await supabase
-    .from("player_season_averages")
-    .select("player_id, avg_disposals, games_played")
-    .eq("season", season)
-    .gte("games_played", 5);
-
-  const avgMap = new Map(
-    (seasonAvgs ?? []).map((p) => [
-      p.player_id,
-      Number(p.avg_disposals),
-    ])
+  keyPoints.push(
+    `🧠 League average: ${roundAvg}.`
   );
-
-  const overperformers = roundPlayers
-    .filter((p) => avgMap.has(p.player_id))
-    .map((p) => ({
-      ...p,
-      diff: (p.disposals ?? 0) - avgMap.get(p.player_id)!,
-    }))
-    .sort((a, b) => b.diff - a.diff);
-
-  const biggestOver = overperformers[0];
-
-  /* ------------------------------------------------------------------ */
-  /* 6. League averages                                                 */
-  /* ------------------------------------------------------------------ */
-
-  const totalDisposals = roundPlayers.reduce(
-    (sum, p) => sum + (p.disposals ?? 0),
-    0
-  );
-
-  const totalGoals = roundPlayers.reduce(
-    (sum, p) => sum + (p.goals ?? 0),
-    0
-  );
-
-  /* ------------------------------------------------------------------ */
-  /* FINAL PAYLOAD                                                      */
-  /* ------------------------------------------------------------------ */
 
   return {
-    currentRound: round_number,
-
-    topScore: {
-      name: playerMap.get(topPlayer.player_id) ?? "—",
-      value: topPlayer.disposals ?? 0,
-    },
-
-    biggestOverperformer: biggestOver
+    topScore: { playerName: safeName(top.player_id), value: statValue(top, stat) },
+    biggestOverperformer: over
       ? {
-          name: playerMap.get(biggestOver.player_id) ?? "—",
-          diff: Number(biggestOver.diff.toFixed(1)),
-          currentValue: biggestOver.disposals ?? 0,
+          playerName: safeName(over.player_id),
+          diff: over.diff,
+          roundValue: over.roundValue,
         }
-      : {
-          name: "—",
-          diff: 0,
-          currentValue: 0,
-        },
-
-    roundAverage: {
-      avgDisposals: Number(
-        (totalDisposals / roundPlayers.length).toFixed(1)
-      ),
-      avgGoals: Number(
-        (totalGoals / roundPlayers.length).toFixed(2)
-      ),
-    },
+      : { playerName: "—", diff: 0, roundValue: 0 },
+    roundAverage: roundAvg,
+    keyPoints,
+    isGrandFinal,
+    currentRound,
+    sparkline,
   };
 }
