@@ -20,12 +20,15 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
     { value: "goals", label: "Goals" },
   ];
 
-  const recentRounds = player.rounds.slice(-5);
-  const chartData = player.rounds
+  const recentRounds = player.rounds
     .filter((r) => r.round !== "OR")
+    .slice(-5);
+
+  const chartData = player.rounds
+    .filter((r) => r.round !== "OR" && r.score != null)
     .map((r) => ({
       round: r.round,
-      score: r.score,
+      score: r.score as number,
     }));
 
   const handleViewAIAnalysis = () => {
@@ -61,7 +64,7 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
           </div>
 
           <div className="space-y-8">
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {lensOptions.map((option) => (
                 <button
                   key={option.value}
@@ -82,25 +85,29 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
                 Last 5 Rounds
               </h3>
               <div className="flex flex-wrap gap-3">
-                {recentRounds.map((round) => (
-                  <div
-                    key={round.round}
-                    className="flex flex-col items-center gap-2 px-4 py-3 rounded-lg border border-white/10 bg-white/5"
-                  >
-                    <span className="text-xs text-white/50">{round.round}</span>
-                    <span
-                      className={`text-2xl font-bold ${
-                        round.score >= 80
-                          ? "text-emerald-400"
-                          : round.score >= 60
-                          ? "text-yellow-400"
-                          : "text-red-400"
-                      }`}
+                {recentRounds.map((round) => {
+                  const score = round.score;
+                  const color =
+                    score == null
+                      ? "text-white/35"
+                      : score >= 80
+                      ? "text-emerald-400"
+                      : score >= 60
+                      ? "text-yellow-400"
+                      : "text-red-400";
+
+                  return (
+                    <div
+                      key={round.round}
+                      className="flex flex-col items-center gap-2 px-4 py-3 rounded-lg border border-white/10 bg-white/5"
                     >
-                      {round.score}
-                    </span>
-                  </div>
-                ))}
+                      <span className="text-xs text-white/50">{round.round}</span>
+                      <span className={`text-2xl font-bold ${color}`}>
+                        {score == null ? "—" : score}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -108,41 +115,46 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
               <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-6">
                 Performance Trend
               </h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <XAxis
-                      dataKey="round"
-                      stroke="#666"
-                      style={{ fontSize: "12px" }}
-                      tick={{ fill: "#999" }}
-                    />
-                    <YAxis
-                      stroke="#666"
-                      style={{ fontSize: "12px" }}
-                      tick={{ fill: "#999" }}
-                      domain={[0, "dataMax + 20"]}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#000",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        borderRadius: "8px",
-                      }}
-                      labelStyle={{ color: "#fff" }}
-                      itemStyle={{ color: "#FCD34D" }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="score"
-                      stroke="#FCD34D"
-                      strokeWidth={3}
-                      dot={{ fill: "#FCD34D", r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+
+              {chartData.length === 0 ? (
+                <div className="text-sm text-white/45">No trend data available.</div>
+              ) : (
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <XAxis
+                        dataKey="round"
+                        stroke="#666"
+                        style={{ fontSize: "12px" }}
+                        tick={{ fill: "#999" }}
+                      />
+                      <YAxis
+                        stroke="#666"
+                        style={{ fontSize: "12px" }}
+                        tick={{ fill: "#999" }}
+                        domain={[0, "dataMax + 20"]}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#000",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          borderRadius: "8px",
+                        }}
+                        labelStyle={{ color: "#fff" }}
+                        itemStyle={{ color: "#FCD34D" }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="score"
+                        stroke="#FCD34D"
+                        strokeWidth={3}
+                        dot={{ fill: "#FCD34D", r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -153,27 +165,33 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
                     Season Summary
                   </h3>
                 </div>
+
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-white/60">Average</span>
                     <span className="text-2xl font-bold text-yellow-400">{player.stats.avg}</span>
                   </div>
+
                   <div className="flex items-center justify-between">
                     <span className="text-white/60">Minimum</span>
                     <span className="text-lg font-semibold text-white">{player.stats.min}</span>
                   </div>
+
                   <div className="flex items-center justify-between">
                     <span className="text-white/60">Maximum</span>
                     <span className="text-lg font-semibold text-white">{player.stats.max}</span>
                   </div>
+
                   <div className="flex items-center justify-between">
                     <span className="text-white/60">Games Played</span>
                     <span className="text-lg font-semibold text-white">{player.stats.games}</span>
                   </div>
+
                   <div className="flex items-center justify-between">
-                    <span className="text-white/60">Total Points</span>
+                    <span className="text-white/60">Total</span>
                     <span className="text-lg font-semibold text-white">{player.stats.total}</span>
                   </div>
+
                   <div className="flex items-center justify-between border-t border-white/10 pt-4">
                     <span className="text-white/60">Volatility</span>
                     <span className="text-lg font-semibold text-orange-400">
@@ -190,11 +208,12 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
                     Hit Rate Ladder
                   </h3>
                 </div>
+
                 <div className="space-y-4">
                   {player.hitRates.map((hr) => (
                     <div key={hr.threshold} className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-white/60">{hr.threshold}+ Points</span>
+                        <span className="text-white/60">{hr.threshold}+ </span>
                         <div className="flex items-center gap-2">
                           <span className="text-white font-semibold">
                             {hr.count}/{player.stats.games}
@@ -220,16 +239,17 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
               <div className="flex items-start gap-3 mb-4">
                 <TrendingUp className="h-6 w-6 text-yellow-400 flex-shrink-0 mt-1" />
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-white mb-2">
-                    AI Performance Summary
-                  </h3>
+                  <h3 className="text-lg font-semibold text-white mb-2">AI Performance Summary</h3>
                   <p className="text-white/70 leading-relaxed">
-                    {player.name} has demonstrated {player.stats.volatility < 15 ? "consistent" : "variable"}
-                    {" "}form this season with an average of {player.stats.avg} points per game.
-                    {player.hitRates[0].percentage > 70
-                      ? " Strong reliability hitting 60+ points in most games."
-                      : " Performance varies significantly game-to-game."}
-                    {" "}Peak performance of {player.stats.max} suggests high ceiling potential.
+                    {player.name} has shown{" "}
+                    {player.stats.volatility < 15 ? "stable, repeatable" : "high-variance"} output
+                    so far. Across {player.stats.games} games, the average sits at{" "}
+                    <span className="text-white font-semibold">{player.stats.avg}</span>, with a
+                    ceiling of{" "}
+                    <span className="text-white font-semibold">{player.stats.max}</span>.
+                    {player.hitRates[0]?.percentage >= 70
+                      ? " The floor looks reliable — strong hit rate on your baseline threshold."
+                      : " The floor is less reliable — hit rates suggest more week-to-week swing."}
                   </p>
                 </div>
               </div>
