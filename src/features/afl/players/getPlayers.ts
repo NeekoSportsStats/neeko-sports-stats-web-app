@@ -1,10 +1,23 @@
-import { supabase } from "@/lib/supabaseClient";
-
 export type StatLens = "fantasy" | "disposals" | "goals";
 
 export interface RoundScore {
-  round: string;
-  score: number;
+  round: string; // OR, R1, R2...
+  score: number | null; // null = missed game / bye
+}
+
+export interface HitRate {
+  threshold: number;
+  count: number;
+  percentage: number;
+}
+
+export interface PlayerStats {
+  avg: number;
+  min: number;
+  max: number;
+  games: number; // counts non-null scores (includes OR if present and non-null)
+  total: number;
+  volatility: number; // std dev-ish
 }
 
 export interface PlayerData {
@@ -12,155 +25,164 @@ export interface PlayerData {
   name: string;
   team: string;
   role: string;
-  teamColor?: string;
+  teamColor: string;
   rounds: RoundScore[];
-  stats: {
-    avg: number;
-    min: number;
-    max: number;
-    games: number;
-    total: number;
-    volatility: number;
-  };
-  hitRates: {
-    threshold: number;
-    percentage: number;
-    count: number;
-  }[];
+  stats: PlayerStats;
+  hitRates: HitRate[];
 }
 
-export interface PlayersQueryParams {
-  team?: string;
-  search?: string;
-  lens?: StatLens;
+const TEAM_COLORS: Record<string, string> = {
+  "Richmond": "#FCD34D",
+  "Gold Coast": "#F97316",
+  "Carlton": "#60A5FA",
+  "Collingwood": "#A3A3A3",
+  "Brisbane": "#F59E0B",
+  "Geelong": "#34D399",
+  "Melbourne": "#EF4444",
+  "Port Adelaide": "#22C55E",
+  "St Kilda": "#DC2626",
+  "Adelaide": "#3B82F6",
+  "Essendon": "#EF4444",
+  "Sydney": "#F87171",
+  "Hawthorn": "#FBBF24",
+  "Western Bulldogs": "#60A5FA",
+};
+
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
 }
 
-function generateMockPlayerData(): PlayerData[] {
-  const teams = [
-    { name: "Adelaide", color: "#002B5C" },
-    { name: "Brisbane", color: "#A30046" },
-    { name: "Carlton", color: "#0E1E2D" },
-    { name: "Collingwood", color: "#000000" },
-    { name: "Essendon", color: "#CC2031" },
-    { name: "Fremantle", color: "#2A0D45" },
-    { name: "Geelong", color: "#001F3D" },
-    { name: "Gold Coast", color: "#C8102E" },
-    { name: "GWS", color: "#F15A22" },
-    { name: "Hawthorn", color: "#4D2004" },
-    { name: "Melbourne", color: "#CC2031" },
-    { name: "North Melbourne", color: "#003F87" },
-    { name: "Port Adelaide", color: "#008AAB" },
-    { name: "Richmond", color: "#FFD200" },
-    { name: "St Kilda", color: "#ED0F05" },
-    { name: "Sydney", color: "#ED171F" },
-    { name: "West Coast", color: "#00209F" },
-    { name: "Western Bulldogs", color: "#014896" },
-  ];
+function round1(n: number) {
+  return Math.round(n * 10) / 10;
+}
 
-  const roles = ["MID", "FWD", "DEF", "RUC"];
-  const firstNames = ["Jack", "Tom", "Lachie", "Sam", "Bailey", "Nick", "Toby", "Max", "Marcus", "Zach"];
-  const lastNames = ["Smith", "Jones", "Williams", "Brown", "Davis", "Wilson", "Moore", "Taylor", "Anderson", "Thomas"];
+function computeVolatility(values: number[]) {
+  // light-weight std dev
+  if (values.length <= 1) return 0;
+  const mean = values.reduce((s, v) => s + v, 0) / values.length;
+  const variance =
+    values.reduce((s, v) => s + (v - mean) * (v - mean), 0) / values.length;
+  return Math.sqrt(variance);
+}
 
-  const players: PlayerData[] = [];
-
-  teams.forEach((team, teamIdx) => {
-    for (let i = 0; i < 6; i++) {
-      const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-      const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-      const role = roles[Math.floor(Math.random() * roles.length)];
-
-      const rounds: RoundScore[] = [];
-      const roundCount = 10;
-
-      for (let r = 0; r <= roundCount; r++) {
-        const roundLabel = r === 0 ? "OR" : `R${r}`;
-        const baseScore = 60 + Math.random() * 40;
-        const variance = (Math.random() - 0.5) * 30;
-        const score = Math.max(20, Math.round(baseScore + variance));
-        rounds.push({ round: roundLabel, score });
-      }
-
-      const scores = rounds.filter(r => r.round !== "OR").map(r => r.score);
-      const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-      const min = Math.min(...scores);
-      const max = Math.max(...scores);
-      const total = scores.reduce((a, b) => a + b, 0);
-      const variance = scores.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / scores.length;
-      const volatility = Math.sqrt(variance);
-
-      const hitRates = [60, 70, 80, 90, 100].map(threshold => {
-        const count = scores.filter(s => s >= threshold).length;
-        const percentage = (count / scores.length) * 100;
-        return { threshold, percentage, count };
-      });
-
-      players.push({
-        id: `${teamIdx}-${i}`,
-        name: `${firstName} ${lastName}`,
-        team: team.name,
-        role,
-        teamColor: team.color,
-        rounds,
-        stats: {
-          avg: Math.round(avg * 10) / 10,
-          min,
-          max,
-          games: scores.length,
-          total,
-          volatility: Math.round(volatility * 10) / 10,
-        },
-        hitRates,
-      });
-    }
+function buildHitRates(values: number[], thresholds: number[]): HitRate[] {
+  const games = values.length;
+  return thresholds.map((t) => {
+    const count = values.filter((v) => v >= t).length;
+    const pct = games > 0 ? (count / games) * 100 : 0;
+    return { threshold: t, count, percentage: pct };
   });
-
-  return players.sort((a, b) => b.stats.avg - a.stats.avg);
 }
 
-export async function getPlayers(params?: PlayersQueryParams): Promise<PlayerData[]> {
-  let players = generateMockPlayerData();
+function computeStatsFromRounds(rounds: RoundScore[]): PlayerStats {
+  // exclude missed games
+  const values = rounds
+    .map((r) => r.score)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
 
-  if (params?.team && params.team !== "All Teams") {
-    players = players.filter(p => p.team === params.team);
-  }
+  const games = values.length;
+  const total = values.reduce((s, v) => s + v, 0);
+  const avg = games > 0 ? total / games : 0;
+  const min = games > 0 ? Math.min(...values) : 0;
+  const max = games > 0 ? Math.max(...values) : 0;
+  const volatility = computeVolatility(values);
 
-  if (params?.search) {
-    const search = params.search.toLowerCase();
-    players = players.filter(p =>
-      p.name.toLowerCase().includes(search) ||
-      p.team.toLowerCase().includes(search) ||
-      p.role.toLowerCase().includes(search)
-    );
-  }
-
-  return players;
+  return {
+    avg: round1(avg),
+    min,
+    max,
+    games,
+    total,
+    volatility: round1(volatility),
+  };
 }
 
-export async function getPlayerById(id: string): Promise<PlayerData | null> {
-  const players = await getPlayers();
-  return players.find(p => p.id === id) || null;
+function thresholdsForLens(lens: StatLens) {
+  // You can tune these later per stat lens.
+  // Fantasy wants 60/70/80/90/100 vibe.
+  if (lens === "fantasy") return [60, 70, 80, 90, 100];
+
+  // Disposals typical thresholds
+  if (lens === "disposals") return [15, 20, 25, 30, 35];
+
+  // Goals typical thresholds
+  return [1, 2, 3, 4, 5];
+}
+
+function baseAndSpreadForLens(lens: StatLens) {
+  if (lens === "fantasy") return { base: 85, spread: 18 };
+  if (lens === "disposals") return { base: 22, spread: 8 };
+  return { base: 1.4, spread: 1.4 };
+}
+
+function generateScore(lens: StatLens) {
+  const { base, spread } = baseAndSpreadForLens(lens);
+  // simple pseudo-normal-ish
+  const u = Math.random();
+  const v = Math.random();
+  const z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+
+  const raw = base + z * spread;
+  if (lens === "goals") return clamp(Math.round(raw), 0, 8);
+  return clamp(Math.round(raw), 0, 150);
+}
+
+function maybeMissGame(prob: number) {
+  return Math.random() < prob;
 }
 
 export function getAvailableTeams(): string[] {
-  return [
-    "All Teams",
-    "Adelaide",
-    "Brisbane",
-    "Carlton",
-    "Collingwood",
-    "Essendon",
-    "Fremantle",
-    "Geelong",
-    "Gold Coast",
-    "GWS",
-    "Hawthorn",
-    "Melbourne",
-    "North Melbourne",
-    "Port Adelaide",
-    "Richmond",
-    "St Kilda",
-    "Sydney",
-    "West Coast",
-    "Western Bulldogs",
+  return ["All Teams", ...Object.keys(TEAM_COLORS)];
+}
+
+export function getPlayers(lens: StatLens): PlayerData[] {
+  // MOCK players — replace later with Supabase view
+  const mockPlayers = [
+    { id: "p1", name: "Lachie Moore", team: "Gold Coast", role: "FWD" },
+    { id: "p2", name: "Sam Anderson", team: "Richmond", role: "FWD" },
+    { id: "p3", name: "Bailey Anderson", team: "St Kilda", role: "MID" },
+    { id: "p4", name: "Marcus Williams", team: "Adelaide", role: "RUC" },
+    { id: "p5", name: "Sam Jones", team: "Port Adelaide", role: "MID" },
+    { id: "p6", name: "Bailey Smith", team: "Western Bulldogs", role: "MID" },
+    { id: "p7", name: "Sam Brown", team: "Gold Coast", role: "DEF" },
+    { id: "p8", name: "Will Ashcroft", team: "Brisbane", role: "MID" },
+    { id: "p9", name: "Max Holmes", team: "Geelong", role: "MID" },
+    { id: "p10", name: "Hugh McCluggage", team: "Brisbane", role: "MID" },
   ];
+
+  const roundLabels = ["OR", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10"];
+
+  // Miss probability — small but enough to exercise UI logic
+  const missProb = 0.08;
+
+  return mockPlayers.map((p) => {
+    const rounds: RoundScore[] = roundLabels.map((label) => {
+      // allow missed games; keep OR rarely missed
+      const missed = label === "OR" ? maybeMissGame(missProb * 0.3) : maybeMissGame(missProb);
+      return {
+        round: label,
+        score: missed ? null : generateScore(lens),
+      };
+    });
+
+    const stats = computeStatsFromRounds(rounds);
+
+    // hit rates should also ignore null games
+    const values = rounds
+      .map((r) => r.score)
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+
+    const hitRates = buildHitRates(values, thresholdsForLens(lens));
+
+    return {
+      id: p.id,
+      name: p.name,
+      team: p.team,
+      role: p.role,
+      teamColor: TEAM_COLORS[p.team] ?? "#666",
+      rounds,
+      stats,
+      hitRates,
+    };
+  });
 }
