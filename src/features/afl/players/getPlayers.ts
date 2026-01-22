@@ -109,20 +109,33 @@ function thresholdsForLens(lens: StatLens) {
   return [1, 2, 3, 4, 5];
 }
 
-function baseAndSpreadForLens(lens: StatLens) {
-  if (lens === "fantasy") return { base: 85, spread: 18 };
-  if (lens === "disposals") return { base: 22, spread: 8 };
-  return { base: 1.4, spread: 1.4 };
+function baseAndSpreadForLens(lens: StatLens, playerTier: "elite" | "premium" | "mid" | "bench") {
+  if (lens === "fantasy") {
+    if (playerTier === "elite") return { base: 105, spread: 12 };
+    if (playerTier === "premium") return { base: 92, spread: 14 };
+    if (playerTier === "mid") return { base: 78, spread: 16 };
+    return { base: 62, spread: 18 };
+  }
+  if (lens === "disposals") {
+    if (playerTier === "elite") return { base: 30, spread: 5 };
+    if (playerTier === "premium") return { base: 25, spread: 6 };
+    if (playerTier === "mid") return { base: 20, spread: 7 };
+    return { base: 14, spread: 8 };
+  }
+  // goals
+  if (playerTier === "elite") return { base: 2.2, spread: 1.2 };
+  if (playerTier === "premium") return { base: 1.6, spread: 1.1 };
+  if (playerTier === "mid") return { base: 0.9, spread: 0.9 };
+  return { base: 0.4, spread: 0.6 };
 }
 
-function generateScore(lens: StatLens) {
-  const { base, spread } = baseAndSpreadForLens(lens);
-  // simple pseudo-normal-ish
+function generateScore(lens: StatLens, playerTier: "elite" | "premium" | "mid" | "bench", volatility: number = 1.0) {
+  const { base, spread } = baseAndSpreadForLens(lens, playerTier);
   const u = Math.random();
   const v = Math.random();
   const z = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
 
-  const raw = base + z * spread;
+  const raw = base + z * spread * volatility;
   if (lens === "goals") return clamp(Math.round(raw), 0, 8);
   return clamp(Math.round(raw), 0, 150);
 }
@@ -137,65 +150,112 @@ export function getAvailableTeams(): string[] {
 
 export function getPlayers(lens: StatLens): PlayerData[] {
   const teams = Object.keys(TEAM_COLORS);
-  const roles = ["FWD", "MID", "DEF", "RUC"];
-  const firstNames = [
-    "Lachie", "Sam", "Bailey", "Marcus", "Will", "Max", "Hugh", "Patrick", "Clayton", "Jack",
-    "Christian", "Touk", "Andrew", "Zach", "Callum", "Nick", "Isaac", "Chad", "Errol", "Jordan",
-    "Travis", "Jeremy", "Rory", "Tom", "Jake", "Liam", "Luke", "Matt", "Ben", "Josh",
-    "Connor", "Dylan", "James", "Ryan", "Alex", "Daniel", "Michael", "Adam", "Zac", "Tim",
-    "Noah", "Harry", "Oscar", "Charlie", "Oliver", "George", "Thomas", "Henry", "William", "Jacob",
-    "Cooper", "Mason", "Archie", "Logan", "Riley", "Caleb"
-  ];
-  const lastNames = [
-    "Moore", "Anderson", "Smith", "Williams", "Jones", "Brown", "Ashcroft", "Holmes", "McCluggage",
-    "Bontempelli", "Cripps", "Petracca", "Neale", "Oliver", "Steele", "Miller", "Brayshaw", "Merrett",
-    "Mills", "Daicos", "Heeney", "Warner", "Gulden", "Dawson", "Walsh", "Boak", "Cameron", "Laird",
-    "Macrae", "Stewart", "Zorko", "Docherty", "Taranto", "Greene", "Taylor", "Sicily", "Whitfield",
-    "Kelly", "Treloar", "Gaff", "Parker", "Kennedy", "Dangerfield", "Duncan", "Hawkins", "Cameron",
-    "Lynch", "De Goey", "Sidebottom", "Pendlebury", "Grundy", "Martin", "Vlastuin", "Short"
-  ];
 
-  const mockPlayers = [];
-  for (let i = 0; i < 60; i++) {
-    const firstName = firstNames[i % firstNames.length];
-    const lastName = lastNames[i % lastNames.length];
-    const team = teams[i % teams.length];
-    const role = roles[i % roles.length];
-    mockPlayers.push({
-      id: `p${i + 1}`,
-      name: `${firstName} ${lastName}`,
-      team,
-      role,
-    });
-  }
+  const realAFLPlayers = [
+    { name: "Marcus Bontempelli", team: "Western Bulldogs", role: "MID", tier: "elite" as const, volatility: 0.8 },
+    { name: "Patrick Cripps", team: "Carlton", role: "MID", tier: "elite" as const, volatility: 0.9 },
+    { name: "Christian Petracca", team: "Melbourne", role: "MID", tier: "elite" as const, volatility: 1.0 },
+    { name: "Lachie Neale", team: "Brisbane", role: "MID", tier: "elite" as const, volatility: 0.7 },
+    { name: "Clayton Oliver", team: "Melbourne", role: "MID", tier: "elite" as const, volatility: 0.85 },
+    { name: "Touk Miller", team: "Gold Coast", role: "MID", tier: "premium" as const, volatility: 0.75 },
+    { name: "Jack Steele", team: "St Kilda", role: "MID", tier: "premium" as const, volatility: 1.1 },
+    { name: "Andrew Brayshaw", team: "Richmond", role: "MID", tier: "premium" as const, volatility: 0.9 },
+    { name: "Zach Merrett", team: "Essendon", role: "MID", tier: "premium" as const, volatility: 0.8 },
+    { name: "Callum Mills", team: "Sydney", role: "MID", tier: "premium" as const, volatility: 1.0 },
+    { name: "Nick Daicos", team: "Collingwood", role: "MID", tier: "premium" as const, volatility: 0.95 },
+    { name: "Isaac Heeney", team: "Sydney", role: "FWD", tier: "elite" as const, volatility: 1.2 },
+    { name: "Chad Warner", team: "Sydney", role: "MID", tier: "premium" as const, volatility: 1.15 },
+    { name: "Errol Gulden", team: "Sydney", role: "MID", tier: "premium" as const, volatility: 0.9 },
+    { name: "Jordan Dawson", team: "Adelaide", role: "DEF", tier: "premium" as const, volatility: 0.8 },
+    { name: "Sam Walsh", team: "Carlton", role: "MID", tier: "premium" as const, volatility: 1.0 },
+    { name: "Travis Boak", team: "Port Adelaide", role: "MID", tier: "mid" as const, volatility: 1.1 },
+    { name: "Jeremy Cameron", team: "Geelong", role: "FWD", tier: "elite" as const, volatility: 1.3 },
+    { name: "Tom Hawkins", team: "Geelong", role: "FWD", tier: "premium" as const, volatility: 1.4 },
+    { name: "Charlie Cameron", team: "Brisbane", role: "FWD", tier: "premium" as const, volatility: 1.3 },
+    { name: "Jake Lloyd", team: "Sydney", role: "DEF", tier: "premium" as const, volatility: 0.7 },
+    { name: "Jack Sinclair", team: "St Kilda", role: "MID", tier: "mid" as const, volatility: 1.0 },
+    { name: "Lachie Whitfield", team: "Richmond", role: "DEF", tier: "premium" as const, volatility: 0.85 },
+    { name: "Tim Kelly", team: "Geelong", role: "MID", tier: "mid" as const, volatility: 0.95 },
+    { name: "Connor Rozee", team: "Port Adelaide", role: "MID", tier: "premium" as const, volatility: 1.1 },
+    { name: "Bailey Smith", team: "Western Bulldogs", role: "MID", tier: "mid" as const, volatility: 1.2 },
+    { name: "Sam Docherty", team: "Carlton", role: "DEF", tier: "mid" as const, volatility: 0.9 },
+    { name: "Rory Laird", team: "Adelaide", role: "MID", tier: "mid" as const, volatility: 0.85 },
+    { name: "Jack Macrae", team: "Western Bulldogs", role: "MID", tier: "mid" as const, volatility: 1.0 },
+    { name: "Tom Stewart", team: "Geelong", role: "DEF", tier: "premium" as const, volatility: 0.75 },
+    { name: "Dayne Zorko", team: "Brisbane", role: "MID", tier: "mid" as const, volatility: 1.15 },
+    { name: "Max Gawn", team: "Melbourne", role: "RUC", tier: "elite" as const, volatility: 0.9 },
+    { name: "Brodie Grundy", team: "Collingwood", role: "RUC", tier: "premium" as const, volatility: 1.0 },
+    { name: "Tim English", team: "Western Bulldogs", role: "RUC", tier: "premium" as const, volatility: 1.1 },
+    { name: "Rowan Marshall", team: "St Kilda", role: "RUC", tier: "mid" as const, volatility: 1.2 },
+    { name: "Sean Darcy", team: "Richmond", role: "RUC", tier: "premium" as const, volatility: 1.15 },
+    { name: "Tom Lynch", team: "Richmond", role: "FWD", tier: "premium" as const, volatility: 1.35 },
+    { name: "Dustin Martin", team: "Richmond", role: "FWD", tier: "mid" as const, volatility: 1.3 },
+    { name: "Nick Vlastuin", team: "Richmond", role: "DEF", tier: "mid" as const, volatility: 0.9 },
+    { name: "Dylan Grimes", team: "Richmond", role: "DEF", tier: "bench" as const, volatility: 1.0 },
+    { name: "Noah Anderson", team: "Gold Coast", role: "MID", tier: "mid" as const, volatility: 1.1 },
+    { name: "Matt Rowell", team: "Gold Coast", role: "MID", tier: "mid" as const, volatility: 1.25 },
+    { name: "Ben King", team: "Gold Coast", role: "FWD", tier: "premium" as const, volatility: 1.4 },
+    { name: "Jack Lukosius", team: "Gold Coast", role: "FWD", tier: "mid" as const, volatility: 1.35 },
+    { name: "Sam Flanders", team: "Gold Coast", role: "MID", tier: "bench" as const, volatility: 1.2 },
+    { name: "Luke Davies-Uniacke", team: "Richmond", role: "MID", tier: "mid" as const, volatility: 1.15 },
+    { name: "Harry Sheezel", team: "Richmond", role: "DEF", tier: "premium" as const, volatility: 0.85 },
+    { name: "Tarryn Thomas", team: "Richmond", role: "FWD", tier: "bench" as const, volatility: 1.5 },
+    { name: "Jai Newcombe", team: "Hawthorn", role: "MID", tier: "mid" as const, volatility: 1.0 },
+    { name: "James Sicily", team: "Hawthorn", role: "DEF", tier: "premium" as const, volatility: 0.95 },
+    { name: "Chad Wingard", team: "Hawthorn", role: "FWD", tier: "bench" as const, volatility: 1.6 },
+    { name: "Darcy Parish", team: "Essendon", role: "MID", tier: "premium" as const, volatility: 1.05 },
+    { name: "Kyle Langford", team: "Essendon", role: "FWD", tier: "mid" as const, volatility: 1.3 },
+    { name: "Sam Draper", team: "Essendon", role: "RUC", tier: "mid" as const, volatility: 1.2 },
+    { name: "Callum Coleman-Jones", team: "Essendon", role: "RUC", tier: "bench" as const, volatility: 1.4 },
+    { name: "Darcy Moore", team: "Collingwood", role: "DEF", tier: "premium" as const, volatility: 0.85 },
+    { name: "Jordan De Goey", team: "Collingwood", role: "MID", tier: "premium" as const, volatility: 1.25 },
+    { name: "Scott Pendlebury", team: "Collingwood", role: "MID", tier: "mid" as const, volatility: 0.9 },
+    { name: "Steele Sidebottom", team: "Collingwood", role: "MID", tier: "mid" as const, volatility: 0.95 },
+    { name: "Ollie Wines", team: "Port Adelaide", role: "MID", tier: "mid" as const, volatility: 1.1 },
+  ];
 
   const roundLabels = [
     "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10",
     "R11", "R12", "R13", "R14", "R15", "R16", "R17", "R18", "R19", "R20"
   ];
 
-  const missProb = 0.12;
+  return realAFLPlayers.map((p, idx) => {
+    const missProb = p.tier === "elite" ? 0.08 : p.tier === "premium" ? 0.10 : p.tier === "mid" ? 0.12 : 0.15;
 
-  return mockPlayers.map((p) => {
-    const rounds: RoundScore[] = roundLabels.map((label) => {
+    let hotStreak = false;
+    let coldStreak = false;
+    const streakStart = Math.floor(Math.random() * 15);
+    const streakLength = 3 + Math.floor(Math.random() * 3);
+
+    const rounds: RoundScore[] = roundLabels.map((label, roundIdx) => {
       const missed = maybeMissGame(missProb);
+      if (missed) return { round: label, score: null };
+
+      if (roundIdx >= streakStart && roundIdx < streakStart + streakLength) {
+        hotStreak = Math.random() > 0.5;
+        coldStreak = !hotStreak && Math.random() > 0.7;
+      } else {
+        hotStreak = false;
+        coldStreak = false;
+      }
+
+      const streakMultiplier = hotStreak ? 1.15 : coldStreak ? 0.85 : 1.0;
+      const adjustedVolatility = p.volatility * streakMultiplier;
+
       return {
         round: label,
-        score: missed ? null : generateScore(lens),
+        score: generateScore(lens, p.tier, adjustedVolatility),
       };
     });
 
     const stats = computeStatsFromRounds(rounds);
-
-    // hit rates should also ignore null games
     const values = rounds
       .map((r) => r.score)
       .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
-
     const hitRates = buildHitRates(values, thresholdsForLens(lens));
 
     return {
-      id: p.id,
+      id: `p${idx + 1}`,
       name: p.name,
       team: p.team,
       role: p.role,

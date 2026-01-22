@@ -44,28 +44,28 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
   const canShowMore = visibleCount < total;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="rounded-xl border border-white/10 bg-black/30 backdrop-blur-xl overflow-hidden">
         <div className="overflow-x-auto">
           <div className="inline-block min-w-full">
-            <div className="max-h-[75vh] overflow-y-auto">
-              <table className="w-full border-collapse text-sm">
+            <div className="max-h-[68vh] overflow-y-auto">
+              <table className="w-full border-collapse">
                 <thead>
-                  <tr className="text-xs text-white/60 uppercase tracking-wider">
-                    <th className="sticky left-0 top-0 z-40 bg-black/90 backdrop-blur-xl px-4 py-3 text-left border-b border-r border-white/10 min-w-[220px]">
+                  <tr className="text-[10px] text-white/55 uppercase tracking-[0.08em] font-medium">
+                    <th className="sticky left-0 top-0 z-40 bg-black/95 backdrop-blur-xl px-3 py-1.5 text-left border-b border-r border-white/10 min-w-[200px]">
                       Player
                     </th>
 
                     {players[0]?.rounds.map((round) => (
                       <th
                         key={round.round}
-                        className="sticky top-0 z-30 bg-black/90 backdrop-blur-xl px-3 py-3 text-center border-b border-white/10 min-w-[64px]"
+                        className="sticky top-0 z-30 bg-black/95 backdrop-blur-xl px-2 py-1.5 text-center border-b border-white/10 min-w-[56px]"
                       >
                         {round.round}
                       </th>
                     ))}
 
-                    <th className="sticky right-0 top-0 z-40 bg-black/90 backdrop-blur-xl px-4 py-3 text-left border-b border-l border-white/10 min-w-[240px]">
+                    <th className="sticky right-0 top-0 z-40 bg-black/95 backdrop-blur-xl px-3 py-1.5 text-left border-b border-l border-white/10 min-w-[220px]">
                       Summary
                     </th>
                   </tr>
@@ -75,22 +75,22 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
                   {visiblePlayers.map((player, idx) => (
                     <tr
                       key={player.id}
-                      className={`border-b border-white/5 hover:bg-white/5 cursor-pointer transition-all ${
-                        idx % 2 === 0 ? "bg-white/[0.02]" : ""
+                      className={`border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors ${
+                        idx % 2 === 0 ? "bg-white/[0.015]" : ""
                       }`}
                       onClick={() => onPlayerSelect(player)}
                     >
-                      <td className="sticky left-0 z-20 bg-black/80 backdrop-blur-xl px-4 py-3 border-r border-white/5">
-                        <div className="flex items-center gap-3">
+                      <td className="sticky left-0 z-20 bg-black/85 backdrop-blur-xl px-3 py-1.5 border-r border-white/5">
+                        <div className="flex items-center gap-2.5">
                           <div
-                            className="w-1 h-10 rounded-full flex-shrink-0"
+                            className="w-0.5 h-7 rounded-full flex-shrink-0"
                             style={{ backgroundColor: player.teamColor || "#666" }}
                           />
-                          <div className="min-w-0">
-                            <div className="text-white font-semibold truncate">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-white text-[13px] font-semibold truncate leading-tight">
                               {player.name}
                             </div>
-                            <div className="text-xs text-white/50 truncate">
+                            <div className="text-[10px] text-white/45 truncate leading-tight mt-0.5">
                               {player.team} · {player.role}
                             </div>
                           </div>
@@ -98,9 +98,9 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
                       </td>
 
                       {player.rounds.map((round) => (
-                        <td key={round.round} className="px-3 py-3 text-center">
+                        <td key={round.round} className="px-2 py-1.5 text-center">
                           <div
-                            className={`inline-flex items-center justify-center min-w-[48px] px-2.5 py-1.5 rounded-lg border text-sm font-semibold ${scoreChipClass(
+                            className={`inline-flex items-center justify-center min-w-[40px] px-1.5 py-0.5 rounded-md border text-[11px] font-bold tabular-nums ${scoreChipClass(
                               round.score,
                               lens
                             )}`}
@@ -110,18 +110,18 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
                         </td>
                       ))}
 
-                      <td className="sticky right-0 z-20 bg-black/80 backdrop-blur-xl px-4 py-3 border-l border-white/5">
-                        <div className="text-xs text-white/70 whitespace-nowrap">
-                          <span className="text-white/50">AVG</span>{" "}
+                      <td className="sticky right-0 z-20 bg-black/85 backdrop-blur-xl px-3 py-1.5 border-l border-white/5">
+                        <div className="text-[11px] text-white/65 whitespace-nowrap font-medium tabular-nums">
+                          <span className="text-white/45">AVG</span>{" "}
                           <span className="text-yellow-400 font-bold">{player.stats.avg}</span>
-                          {" | "}
-                          <span className="text-white/50">MIN</span>{" "}
-                          <span className="text-white">{player.stats.min}</span>
-                          {" | "}
-                          <span className="text-white/50">MAX</span>{" "}
-                          <span className="text-white">{player.stats.max}</span>
-                          {" | "}
-                          <span className="text-white/50">{player.stats.games} gms</span>
+                          {" · "}
+                          <span className="text-white/45">MIN</span>{" "}
+                          <span className="text-white/80">{player.stats.min}</span>
+                          {" · "}
+                          <span className="text-white/45">MAX</span>{" "}
+                          <span className="text-white/80">{player.stats.max}</span>
+                          {" · "}
+                          <span className="text-white/45">{player.stats.games}g</span>
                         </div>
                       </td>
                     </tr>
@@ -134,8 +134,8 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
       </div>
 
       {total > 0 && (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="text-xs text-white/50">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+          <div className="text-[11px] text-white/45 font-medium">
             Showing <span className="text-white/70 font-semibold">{Math.min(visibleCount, total)}</span> of{" "}
             <span className="text-white/70 font-semibold">{total}</span> players
           </div>
@@ -143,13 +143,13 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
           <button
             disabled={!canShowMore}
             onClick={() => setVisibleCount((c) => Math.min(total, c + STEP))}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition ${
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border text-xs font-semibold transition-all touch-manipulation ${
               canShowMore
-                ? "border-yellow-400/40 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15"
+                ? "border-yellow-400/40 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/15 active:scale-[0.98]"
                 : "border-white/10 bg-white/5 text-white/30 cursor-not-allowed"
             }`}
           >
-            <ChevronDown className="h-4 w-4" />
+            <ChevronDown className="h-3.5 w-3.5" />
             Show more (+{STEP})
           </button>
         </div>
