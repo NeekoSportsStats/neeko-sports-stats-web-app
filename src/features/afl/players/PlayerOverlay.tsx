@@ -87,14 +87,20 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
               <div className="flex flex-wrap gap-3">
                 {recentRounds.map((round) => {
                   const score = round.score;
-                  const color =
-                    score == null
-                      ? "text-white/35"
-                      : score >= 80
-                      ? "text-emerald-400"
-                      : score >= 60
-                      ? "text-yellow-400"
-                      : "text-red-400";
+
+                  const getColor = () => {
+                    if (score == null) return "text-white/35";
+
+                    if (lens === "fantasy") {
+                      return score >= 80 ? "text-emerald-400" : score >= 60 ? "text-yellow-400" : "text-red-400";
+                    }
+
+                    if (lens === "disposals") {
+                      return score >= 25 ? "text-emerald-400" : score >= 20 ? "text-yellow-400" : "text-red-400";
+                    }
+
+                    return score >= 2 ? "text-emerald-400" : score >= 1 ? "text-yellow-400" : "text-red-400";
+                  };
 
                   return (
                     <div
@@ -102,7 +108,7 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
                       className="flex flex-col items-center gap-2 px-4 py-3 rounded-lg border border-white/10 bg-white/5"
                     >
                       <span className="text-xs text-white/50">{round.round}</span>
-                      <span className={`text-2xl font-bold ${color}`}>
+                      <span className={`text-2xl font-bold ${getColor()}`}>
                         {score == null ? "—" : score}
                       </span>
                     </div>

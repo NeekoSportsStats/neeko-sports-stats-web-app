@@ -12,7 +12,7 @@ export default function AFLPlayersPage() {
   const [season, setSeason] = useState<Season>("2025");
   const [team, setTeam] = useState<string>("All Teams");
   const [query, setQuery] = useState<string>("");
-  const [selected, setSelected] = useState<PlayerData | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const teams = useMemo(() => getAvailableTeams(), []);
   const allPlayers = useMemo(() => getPlayers(lens), [lens]);
@@ -30,6 +30,11 @@ export default function AFLPlayersPage() {
       );
     });
   }, [allPlayers, team, query]);
+
+  const selected = useMemo(() => {
+    if (!selectedId) return null;
+    return allPlayers.find((p) => p.id === selectedId) || null;
+  }, [selectedId, allPlayers]);
 
   return (
     <div className="min-h-screen">
@@ -141,7 +146,7 @@ export default function AFLPlayersPage() {
               </p>
             </div>
           ) : (
-            <PlayerGrid players={filtered} lens={lens} onPlayerSelect={setSelected} />
+            <PlayerGrid players={filtered} lens={lens} onPlayerSelect={(p) => setSelectedId(p.id)} />
           )}
         </div>
       </div>
@@ -152,7 +157,7 @@ export default function AFLPlayersPage() {
           player={selected}
           lens={lens}
           onLensChange={(l) => setLens(l)}
-          onClose={() => setSelected(null)}
+          onClose={() => setSelectedId(null)}
         />
       )}
     </div>
