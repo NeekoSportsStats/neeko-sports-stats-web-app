@@ -212,7 +212,7 @@ export function getPlayers(lens: StatLens): PlayerData[] {
     { name: "Scott Pendlebury", team: "Collingwood", role: "MID", tier: "mid" as const, volatility: 0.9 },
     { name: "Steele Sidebottom", team: "Collingwood", role: "MID", tier: "mid" as const, volatility: 0.95 },
     { name: "Ollie Wines", team: "Port Adelaide", role: "MID", tier: "mid" as const, volatility: 1.1 },
-  ];
+  ].slice(0, 50);
 
   const roundLabels = [
     "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10",
