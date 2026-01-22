@@ -39,7 +39,7 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
     <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto">
       <div className="min-h-screen p-4 md:p-8">
         <div className="max-w-5xl mx-auto">
-          <div className="flex items-start justify-between mb-8">
+          <div className="flex items-start justify-between mb-6">
             <div className="flex items-center gap-4">
               <div
                 className="w-2 h-16 rounded-full"
@@ -63,7 +63,7 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
             </button>
           </div>
 
-          <div className="space-y-8">
+          <div className="space-y-10">
             <div className="flex gap-2 flex-wrap">
               {lensOptions.map((option) => (
                 <button
@@ -80,7 +80,7 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
               ))}
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6">
+            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4">
               <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-4">
                 Last 5 Rounds
               </h3>
@@ -111,8 +111,8 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6">
-              <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-6">
+            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4">
+              <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-4">
                 Performance Trend
               </h3>
 
@@ -158,8 +158,8 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6">
-                <div className="flex items-center gap-2 mb-6">
+              <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4">
+                <div className="flex items-center gap-2 mb-4">
                   <Activity className="h-5 w-5 text-yellow-400" />
                   <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider">
                     Season Summary
@@ -201,8 +201,8 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
                 </div>
               </div>
 
-              <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6">
-                <div className="flex items-center gap-2 mb-6">
+              <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4">
+                <div className="flex items-center gap-2 mb-4">
                   <Target className="h-5 w-5 text-yellow-400" />
                   <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider">
                     Hit Rate Ladder
@@ -235,7 +235,7 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
               </div>
             </div>
 
-            <div className="rounded-xl border border-yellow-400/40 bg-gradient-to-br from-yellow-500/10 to-amber-500/10 backdrop-blur-xl p-6">
+            <div className="rounded-xl border border-yellow-400/40 bg-gradient-to-br from-yellow-500/10 to-amber-500/10 backdrop-blur-xl p-5">
               <div className="flex items-start gap-3 mb-4">
                 <TrendingUp className="h-6 w-6 text-yellow-400 flex-shrink-0 mt-1" />
                 <div className="flex-1">

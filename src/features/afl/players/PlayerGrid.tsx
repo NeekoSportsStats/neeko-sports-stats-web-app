@@ -98,20 +98,20 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="text-[10px] text-white/55 uppercase tracking-[0.08em] font-medium">
-                    <th className="sticky left-0 top-0 z-40 bg-black/95 backdrop-blur-xl px-3 py-2 text-left border-b border-r border-white/10 min-w-[200px] shadow-[2px_0_8px_rgba(0,0,0,0.3)]">
+                    <th className="sticky left-0 top-0 z-40 bg-black/95 backdrop-blur-xl px-3 py-1.5 text-left border-b border-r border-white/10 min-w-[200px] shadow-[2px_0_8px_rgba(0,0,0,0.3)]">
                       Player
                     </th>
 
                     {sortedPlayers[0]?.rounds.map((round) => (
                       <th
                         key={round.round}
-                        className="sticky top-0 z-30 bg-black/95 backdrop-blur-xl px-2 py-2 text-center border-b border-white/10 min-w-[56px]"
+                        className="sticky top-0 z-30 bg-black/95 backdrop-blur-xl px-2 py-1.5 text-center border-b border-white/10 min-w-[56px]"
                       >
                         {round.round}
                       </th>
                     ))}
 
-                    <th className="sticky right-0 top-0 z-40 bg-black/95 backdrop-blur-xl px-3 py-2 text-left border-b border-l border-white/10 min-w-[220px] shadow-[-2px_0_8px_rgba(0,0,0,0.3)]">
+                    <th className="sticky right-0 top-0 z-40 bg-black/95 backdrop-blur-xl px-3 py-1.5 text-left border-b border-l border-white/10 min-w-[220px] shadow-[-2px_0_8px_rgba(0,0,0,0.3)]">
                       Summary
                     </th>
                   </tr>
@@ -126,7 +126,7 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
                       }`}
                       onClick={() => onPlayerSelect(player)}
                     >
-                      <td className="sticky left-0 z-20 bg-black/85 backdrop-blur-xl px-3 py-1.5 border-r border-white/5 shadow-[2px_0_8px_rgba(0,0,0,0.2)]">
+                      <td className="sticky left-0 z-20 bg-black/85 backdrop-blur-xl px-3 py-2 border-r border-white/5 shadow-[2px_0_8px_rgba(0,0,0,0.2)]">
                         <div className="flex items-center gap-2.5">
                           <div
                             className="w-0.5 h-8 rounded-full flex-shrink-0"
@@ -144,7 +144,7 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
                       </td>
 
                       {player.rounds.map((round) => (
-                        <td key={round.round} className="px-2 py-1.5 text-center">
+                        <td key={round.round} className="px-2 py-2 text-center">
                           <div
                             className={`inline-flex items-center justify-center min-w-[40px] px-1.5 py-1.5 rounded-md border text-[12px] font-bold tabular-nums ${getColorClass(
                               round.score,
@@ -156,7 +156,7 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
                         </td>
                       ))}
 
-                      <td className="sticky right-0 z-20 bg-black/85 backdrop-blur-xl px-3 py-1.5 border-l border-white/5 shadow-[-2px_0_8px_rgba(0,0,0,0.2)]">
+                      <td className="sticky right-0 z-20 bg-black/85 backdrop-blur-xl px-3 py-2 border-l border-white/5 shadow-[-2px_0_8px_rgba(0,0,0,0.2)]">
                         <div className="space-y-1.5">
                           <div className="flex items-baseline gap-2">
                             <span className="text-[9px] text-white/40 uppercase tracking-wider font-medium">AVG</span>

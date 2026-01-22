@@ -35,7 +35,7 @@ export default function AFLPlayersPage() {
     <div className="min-h-screen">
       <div className="mx-auto max-w-7xl px-4 md:px-8 py-10">
         {/* HERO */}
-        <div className="mb-6">
+        <div className="mb-4">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-yellow-400/30 bg-yellow-500/10 text-yellow-200">
             <Grid3X3 className="h-4 w-4" />
             <span className="text-[11px] uppercase tracking-[0.22em] font-semibold">
@@ -55,7 +55,7 @@ export default function AFLPlayersPage() {
         <div
           className={cn(
             "rounded-2xl border border-white/10 bg-black/35 backdrop-blur-xl",
-            "px-4 py-4 md:px-5 md:py-5"
+            "px-4 py-2.5 md:px-5 md:py-3"
           )}
         >
           <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
@@ -129,7 +129,7 @@ export default function AFLPlayersPage() {
         </div>
 
         {/* GRID OR COMING SOON */}
-        <div className="mt-6">
+        <div className="mt-4">
           {season === "2026" ? (
             <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl p-12 text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-500/10 border border-yellow-400/30 mb-6">
