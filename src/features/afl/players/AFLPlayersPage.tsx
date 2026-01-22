@@ -1,12 +1,15 @@
 import React, { useMemo, useState } from "react";
-import { Search, Grid3X3 } from "lucide-react";
+import { Search, Grid3X3, Calendar } from "lucide-react";
 import PlayerGrid from "./PlayerGrid";
 import PlayerOverlay from "./PlayerOverlay";
 import { getAvailableTeams, getPlayers, PlayerData, StatLens } from "./getPlayers";
 import { cn } from "@/lib/utils";
 
+type Season = "2025" | "2026";
+
 export default function AFLPlayersPage() {
   const [lens, setLens] = useState<StatLens>("fantasy");
+  const [season, setSeason] = useState<Season>("2025");
   const [team, setTeam] = useState<string>("All Teams");
   const [query, setQuery] = useState<string>("");
   const [selected, setSelected] = useState<PlayerData | null>(null);
@@ -44,8 +47,7 @@ export default function AFLPlayersPage() {
             Full Season Player Ledger
           </h1>
           <p className="mt-2 text-white/55 max-w-2xl">
-            Complete round-by-round performance snapshot for every player — filter by team, swap stat
-            lens, and open any player for deeper trend + hit-rate insights.
+            Track every player's form, ceiling and consistency across the entire season.
           </p>
         </div>
 
@@ -81,6 +83,28 @@ export default function AFLPlayersPage() {
               </div>
             </div>
 
+            {/* Season pills */}
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-white/40" />
+              {(["2025", "2026"] as Season[]).map((s) => {
+                const active = season === s;
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setSeason(s)}
+                    className={cn(
+                      "px-3 h-9 rounded-full border text-sm font-semibold transition-all",
+                      active
+                        ? "bg-white/10 text-white border-white/20"
+                        : "bg-black/40 border-white/10 text-white/50 hover:border-white/20"
+                    )}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+
             {/* Lens pills */}
             <div className="flex items-center gap-2 justify-between sm:justify-start">
               {(["fantasy", "disposals", "goals"] as StatLens[]).map((l) => {
@@ -104,9 +128,21 @@ export default function AFLPlayersPage() {
           </div>
         </div>
 
-        {/* GRID */}
+        {/* GRID OR COMING SOON */}
         <div className="mt-6">
-          <PlayerGrid players={filtered} lens={lens} onPlayerSelect={setSelected} />
+          {season === "2026" ? (
+            <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl p-12 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-500/10 border border-yellow-400/30 mb-6">
+                <Calendar className="h-8 w-8 text-yellow-400" />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-3">2026 Season Coming Soon</h3>
+              <p className="text-white/55 max-w-md mx-auto">
+                Full data will be released after Round 1.
+              </p>
+            </div>
+          ) : (
+            <PlayerGrid players={filtered} lens={lens} onPlayerSelect={setSelected} />
+          )}
         </div>
       </div>
 
