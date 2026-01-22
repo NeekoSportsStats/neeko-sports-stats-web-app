@@ -156,20 +156,15 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
 
                   <td className="sticky right-0 z-20 bg-black/85 backdrop-blur-xl px-3 py-3 border-l border-white/5 shadow-[-2px_0_8px_rgba(0,0,0,0.2)]">
                     <div className="space-y-1.5">
-                      <div className="flex items-baseline gap-2">
+                      <div className="flex items-center gap-2 whitespace-nowrap">
                         <span className="text-[9px] text-white/40 uppercase tracking-wider font-medium">AVG</span>
-                        <span className="text-xl font-bold text-yellow-400 tabular-nums">{player.stats.avg}</span>
-                      </div>
-
-                      <div className="text-[11px] text-white/55 font-medium tabular-nums">
-                        <span className="text-white/75">{player.stats.games}</span>
-                        <span className="text-white/40"> games</span>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-[9px] text-white/45 font-medium tabular-nums">
-                        <span>MIN <span className="text-white/65">{player.stats.min}</span></span>
-                        <span className="text-white/20">·</span>
-                        <span>MAX <span className="text-white/65">{player.stats.max}</span></span>
+                        <span className="text-lg font-bold text-yellow-400 tabular-nums">{player.stats.avg}</span>
+                        <span className="text-white/25">•</span>
+                        <span className="text-[11px] text-white/55 font-medium tabular-nums">{player.stats.games}g</span>
+                        <span className="text-white/25">•</span>
+                        <span className="text-[10px] text-white/45 font-medium tabular-nums">Min <span className="text-white/65">{player.stats.min}</span></span>
+                        <span className="text-white/25">•</span>
+                        <span className="text-[10px] text-white/45 font-medium tabular-nums">Max <span className="text-white/65">{player.stats.max}</span></span>
                       </div>
 
                       <div className="space-y-0.5 pt-1">
