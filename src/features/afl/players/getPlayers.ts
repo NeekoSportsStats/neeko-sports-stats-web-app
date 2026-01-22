@@ -136,29 +136,49 @@ export function getAvailableTeams(): string[] {
 }
 
 export function getPlayers(lens: StatLens): PlayerData[] {
-  // MOCK players — replace later with Supabase view
-  const mockPlayers = [
-    { id: "p1", name: "Lachie Moore", team: "Gold Coast", role: "FWD" },
-    { id: "p2", name: "Sam Anderson", team: "Richmond", role: "FWD" },
-    { id: "p3", name: "Bailey Anderson", team: "St Kilda", role: "MID" },
-    { id: "p4", name: "Marcus Williams", team: "Adelaide", role: "RUC" },
-    { id: "p5", name: "Sam Jones", team: "Port Adelaide", role: "MID" },
-    { id: "p6", name: "Bailey Smith", team: "Western Bulldogs", role: "MID" },
-    { id: "p7", name: "Sam Brown", team: "Gold Coast", role: "DEF" },
-    { id: "p8", name: "Will Ashcroft", team: "Brisbane", role: "MID" },
-    { id: "p9", name: "Max Holmes", team: "Geelong", role: "MID" },
-    { id: "p10", name: "Hugh McCluggage", team: "Brisbane", role: "MID" },
+  const teams = Object.keys(TEAM_COLORS);
+  const roles = ["FWD", "MID", "DEF", "RUC"];
+  const firstNames = [
+    "Lachie", "Sam", "Bailey", "Marcus", "Will", "Max", "Hugh", "Patrick", "Clayton", "Jack",
+    "Christian", "Touk", "Andrew", "Zach", "Callum", "Nick", "Isaac", "Chad", "Errol", "Jordan",
+    "Travis", "Jeremy", "Rory", "Tom", "Jake", "Liam", "Luke", "Matt", "Ben", "Josh",
+    "Connor", "Dylan", "James", "Ryan", "Alex", "Daniel", "Michael", "Adam", "Zac", "Tim",
+    "Noah", "Harry", "Oscar", "Charlie", "Oliver", "George", "Thomas", "Henry", "William", "Jacob",
+    "Cooper", "Mason", "Archie", "Logan", "Riley", "Caleb"
+  ];
+  const lastNames = [
+    "Moore", "Anderson", "Smith", "Williams", "Jones", "Brown", "Ashcroft", "Holmes", "McCluggage",
+    "Bontempelli", "Cripps", "Petracca", "Neale", "Oliver", "Steele", "Miller", "Brayshaw", "Merrett",
+    "Mills", "Daicos", "Heeney", "Warner", "Gulden", "Dawson", "Walsh", "Boak", "Cameron", "Laird",
+    "Macrae", "Stewart", "Zorko", "Docherty", "Taranto", "Greene", "Taylor", "Sicily", "Whitfield",
+    "Kelly", "Treloar", "Gaff", "Parker", "Kennedy", "Dangerfield", "Duncan", "Hawkins", "Cameron",
+    "Lynch", "De Goey", "Sidebottom", "Pendlebury", "Grundy", "Martin", "Vlastuin", "Short"
   ];
 
-  const roundLabels = ["OR", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10"];
+  const mockPlayers = [];
+  for (let i = 0; i < 60; i++) {
+    const firstName = firstNames[i % firstNames.length];
+    const lastName = lastNames[i % lastNames.length];
+    const team = teams[i % teams.length];
+    const role = roles[i % roles.length];
+    mockPlayers.push({
+      id: `p${i + 1}`,
+      name: `${firstName} ${lastName}`,
+      team,
+      role,
+    });
+  }
 
-  // Miss probability — small but enough to exercise UI logic
-  const missProb = 0.08;
+  const roundLabels = [
+    "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10",
+    "R11", "R12", "R13", "R14", "R15", "R16", "R17", "R18", "R19", "R20"
+  ];
+
+  const missProb = 0.12;
 
   return mockPlayers.map((p) => {
     const rounds: RoundScore[] = roundLabels.map((label) => {
-      // allow missed games; keep OR rarely missed
-      const missed = label === "OR" ? maybeMissGame(missProb * 0.3) : maybeMissGame(missProb);
+      const missed = maybeMissGame(missProb);
       return {
         round: label,
         score: missed ? null : generateScore(lens),
