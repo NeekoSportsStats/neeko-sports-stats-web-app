@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { PlayerData, StatLens } from "./getPlayers";
+import { PlayerData, StatLens } from "./getPlayersSupabase";
 import { ChevronDown } from "lucide-react";
 
 interface PlayerGridProps {

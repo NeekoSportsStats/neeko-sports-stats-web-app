@@ -1,6 +1,6 @@
 import React from "react";
 import { X, TrendingUp, Activity, Target } from "lucide-react";
-import { PlayerData, StatLens } from "./getPlayers";
+import { PlayerData, StatLens } from "./getPlayersSupabase";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useNavigate } from "react-router-dom";
 

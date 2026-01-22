@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Search, Grid3X3, Calendar } from "lucide-react";
 import PlayerGrid from "./PlayerGrid";
 import PlayerOverlay from "./PlayerOverlay";
-import { getAvailableTeams, getPlayers, PlayerData, StatLens } from "./getPlayers";
+import { getAvailableTeams, getPlayers, PlayerData, StatLens } from "./getPlayersSupabase";
 import { cn } from "@/lib/utils";
 
 type Season = "2025" | "2026";
@@ -13,9 +13,24 @@ export default function AFLPlayersPage() {
   const [team, setTeam] = useState<string>("All Teams");
   const [query, setQuery] = useState<string>("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [teams, setTeams] = useState<string[]>(["All Teams"]);
+  const [allPlayers, setAllPlayers] = useState<PlayerData[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const teams = useMemo(() => getAvailableTeams(), []);
-  const allPlayers = useMemo(() => getPlayers(lens), [lens]);
+  useEffect(() => {
+    getAvailableTeams().then(setTeams);
+  }, []);
+
+  useEffect(() => {
+    const fetchPlayers = async () => {
+      setLoading(true);
+      const seasonNum = parseInt(season);
+      const players = await getPlayers(lens, seasonNum);
+      setAllPlayers(players);
+      setLoading(false);
+    };
+    fetchPlayers();
+  }, [lens, season]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -135,14 +150,28 @@ export default function AFLPlayersPage() {
 
         {/* GRID OR COMING SOON */}
         <div className="mt-4">
-          {season === "2026" ? (
+          {loading ? (
+            <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl p-12 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-500/10 border border-yellow-400/30 mb-6 animate-pulse">
+                <Grid3X3 className="h-8 w-8 text-yellow-400" />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-3">Loading Player Data</h3>
+              <p className="text-white/55 max-w-md mx-auto">
+                Fetching stats from database...
+              </p>
+            </div>
+          ) : season === "2026" ? (
             <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl p-12 text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-500/10 border border-yellow-400/30 mb-6">
                 <Calendar className="h-8 w-8 text-yellow-400" />
               </div>
-              <h3 className="text-2xl font-bold text-white mb-3">2026 Season Coming Soon</h3>
+              <h3 className="text-2xl font-bold text-white mb-3">2026 season data will be available after Round 1</h3>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl p-12 text-center">
+              <h3 className="text-2xl font-bold text-white mb-3">No Players Found</h3>
               <p className="text-white/55 max-w-md mx-auto">
-                Full data will be released after Round 1.
+                Try adjusting your filters.
               </p>
             </div>
           ) : (
