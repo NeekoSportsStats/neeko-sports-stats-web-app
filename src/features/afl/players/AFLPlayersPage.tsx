@@ -25,7 +25,13 @@ export default function AFLPlayersPage() {
     const fetchPlayers = async () => {
       setLoading(true);
       const seasonNum = parseInt(season);
+      console.log(`📊 Fetching players for season ${seasonNum}, lens: ${lens}`);
       const players = await getPlayers(lens, seasonNum);
+      console.log(`✓ Loaded ${players.length} players`);
+      if (players.length > 0) {
+        const sampleRounds = Object.keys(players[0].rounds);
+        console.log(`✓ Round range: ${Math.min(...sampleRounds.map(Number))} to ${Math.max(...sampleRounds.map(Number))}`);
+      }
       setAllPlayers(players);
       setLoading(false);
     };

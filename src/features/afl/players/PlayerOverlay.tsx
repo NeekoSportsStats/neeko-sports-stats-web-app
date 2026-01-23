@@ -21,17 +21,29 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
   ];
 
   const recentRounds = useMemo(() => {
-    return player.rounds
-      .filter((r) => r.round && r.round !== "OR")
+    const roundNumbers = Object.keys(player.rounds)
+      .map(Number)
+      .filter(n => !isNaN(n))
+      .sort((a, b) => a - b)
       .slice(-5);
+
+    return roundNumbers.map(num => ({
+      roundNum: num,
+      score: player.rounds[num]
+    }));
   }, [player.rounds]);
 
   const chartData = useMemo(() => {
-    return player.rounds
-      .filter((r) => r.round && r.round !== "OR" && r.score != null)
-      .map((r) => ({
-        round: r.round,
-        score: r.score as number,
+    const roundNumbers = Object.keys(player.rounds)
+      .map(Number)
+      .filter(n => !isNaN(n))
+      .sort((a, b) => a - b);
+
+    return roundNumbers
+      .filter(num => player.rounds[num] != null)
+      .map(num => ({
+        round: `R${num}`,
+        score: player.rounds[num] as number,
       }));
   }, [player.rounds]);
 
@@ -108,10 +120,10 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
 
                   return (
                     <div
-                      key={round.round}
+                      key={round.roundNum}
                       className="flex flex-col items-center gap-2 px-4 py-3 rounded-lg border border-white/10 bg-white/5"
                     >
-                      <span className="text-xs text-white/50">{round.round}</span>
+                      <span className="text-xs text-white/50">R{round.roundNum}</span>
                       <span className={`text-2xl font-bold ${getColor()}`}>
                         {score == null ? "—" : score}
                       </span>

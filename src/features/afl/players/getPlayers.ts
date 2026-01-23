@@ -2,11 +2,6 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type StatLens = "fantasy" | "disposals" | "goals";
 
-export interface RoundScore {
-  round: string;
-  score: number | null;
-}
-
 export interface HitRate {
   threshold: number;
   count: number;
@@ -28,7 +23,7 @@ export interface PlayerData {
   team: string;
   role: string;
   teamColor: string;
-  rounds: RoundScore[];
+  rounds: { [roundNumber: number]: number | null };
   stats: PlayerStats;
   hitRates: HitRate[];
 }
@@ -131,6 +126,7 @@ export async function getPlayers(
     console.log(`Fetched ${data.length} rows for season ${season}`);
 
     const playerMap = new Map<string, any>();
+    const allRounds = new Set<number>();
 
     for (const row of data) {
       if (!row.player_id || !row.player_name || row.round_number == null) {
@@ -139,6 +135,7 @@ export async function getPlayers(
       }
 
       const playerId = row.player_id;
+      allRounds.add(row.round_number);
 
       if (!playerMap.has(playerId)) {
         playerMap.set(playerId, {
@@ -147,7 +144,7 @@ export async function getPlayers(
           team: row.team || "Unknown",
           role: row.role || "Unknown",
           teamColor: row.team_color || "#666666",
-          rounds: [],
+          rounds: {},
           rawValues: [],
         });
       }
@@ -157,16 +154,14 @@ export async function getPlayers(
       const rawScore = row[statColumn];
       const score = isPlayed && rawScore != null ? rawScore : null;
 
-      playerData.rounds.push({
-        round: `R${row.round_number}`,
-        score,
-      });
+      playerData.rounds[row.round_number] = score;
 
       if (isPlayed && score !== null && score > 0) {
         playerData.rawValues.push(score);
       }
     }
 
+    const maxRound = Math.max(...Array.from(allRounds));
     const result: PlayerData[] = [];
     const thresholds = thresholdsForLens(lens);
 
@@ -187,8 +182,8 @@ export async function getPlayers(
       });
     }
 
-    console.log(`Processed ${result.length} players with rounds:`,
-      result[0]?.rounds?.length || 0);
+    console.log(`✓ Processed ${result.length} players across ${maxRound} rounds`);
+    console.log(`✓ Sample player rounds:`, Object.keys(result[0]?.rounds || {}));
 
     return result;
   } catch (err) {

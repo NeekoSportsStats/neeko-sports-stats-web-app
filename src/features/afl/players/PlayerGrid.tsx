@@ -86,7 +86,15 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
 
   const roundHeaders = useMemo(() => {
     if (sortedPlayers.length === 0) return [];
-    return sortedPlayers[0]?.rounds || [];
+    const firstPlayer = sortedPlayers[0];
+    if (!firstPlayer?.rounds) return [];
+
+    const roundNumbers = Object.keys(firstPlayer.rounds)
+      .map(Number)
+      .filter(n => !isNaN(n))
+      .sort((a, b) => a - b);
+
+    return roundNumbers;
   }, [sortedPlayers]);
 
   const cap = isMobile ? CAP_MOBILE : CAP_DESKTOP;
@@ -105,12 +113,12 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
                   Player
                 </th>
 
-                {roundHeaders.map((round) => (
+                {roundHeaders.map((roundNum) => (
                   <th
-                    key={round.round}
+                    key={roundNum}
                     className="sticky top-0 z-30 bg-black/95 backdrop-blur-xl px-2 py-2 text-center border-b border-white/10 min-w-[56px]"
                   >
-                    {round.round}
+                    R{roundNum}
                   </th>
                 ))}
 
@@ -146,18 +154,21 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
                     </div>
                   </td>
 
-                  {player.rounds.map((round) => (
-                    <td key={round.round} className="px-2 py-3 text-center">
-                      <div
-                        className={`inline-flex items-center justify-center min-w-[42px] px-2 py-2 rounded-md border text-[12.5px] font-bold tabular-nums ${getColorClass(
-                          round.score,
-                          lens
-                        )}`}
-                      >
-                        {round.score == null ? "–" : round.score}
-                      </div>
-                    </td>
-                  ))}
+                  {roundHeaders.map((roundNum) => {
+                    const score = player.rounds[roundNum];
+                    return (
+                      <td key={roundNum} className="px-2 py-3 text-center">
+                        <div
+                          className={`inline-flex items-center justify-center min-w-[42px] px-2 py-2 rounded-md border text-[12.5px] font-bold tabular-nums ${getColorClass(
+                            score ?? null,
+                            lens
+                          )}`}
+                        >
+                          {score == null ? "–" : score}
+                        </div>
+                      </td>
+                    );
+                  })}
 
                   <td className="sticky right-0 z-20 bg-black/85 backdrop-blur-xl px-3 py-3 border-l border-white/5 shadow-[-2px_0_8px_rgba(0,0,0,0.2)]">
                     <div className="space-y-1.5">
