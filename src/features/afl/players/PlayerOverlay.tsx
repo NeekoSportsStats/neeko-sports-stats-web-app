@@ -4,6 +4,7 @@ import { PlayerData, StatLens } from "./getPlayers";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useNavigate } from "react-router-dom";
 import { getRoundLabel } from "./utils";
+import { getPerformanceSummaryText } from "./performanceSummary";
 
 interface PlayerOverlayProps {
   player: PlayerData;
@@ -93,8 +94,19 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
   }, [player.rounds]);
 
   const handleViewAIAnalysis = () => {
-    navigate("/sports/afl/ai-analysis");
+    navigate("/sports/afl/ai-insights");
   };
+
+  const performanceSummary = useMemo(() => {
+    return getPerformanceSummaryText({
+      lens,
+      avg: player.stats.avg,
+      min: player.stats.min,
+      max: player.stats.max,
+      gamesPlayed: player.stats.games,
+      volatility: player.stats.volatility,
+    });
+  }, [lens, player.stats]);
 
   return (
     <div
@@ -309,9 +321,14 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
               <div className="flex items-start gap-3 mb-4">
                 <TrendingUp className="h-6 w-6 text-yellow-400 flex-shrink-0 mt-1" />
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-white mb-2">AI Performance Summary</h3>
-                  <p className="text-white/50 leading-relaxed italic">
-                    AI insights will appear here once analysis is enabled.
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-lg font-semibold text-white">Performance Summary</h3>
+                    <span className="px-2 py-0.5 rounded-full bg-yellow-400/20 border border-yellow-400/40 text-yellow-300 text-[10px] font-medium uppercase tracking-wide">
+                      Rule-based
+                    </span>
+                  </div>
+                  <p className="text-white/80 leading-relaxed text-[14px]">
+                    {performanceSummary}
                   </p>
                 </div>
               </div>
@@ -319,6 +336,7 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
               <button
                 onClick={handleViewAIAnalysis}
                 className="w-full py-3 px-6 rounded-lg bg-yellow-400 text-black font-semibold hover:bg-yellow-300 transition-all shadow-[0_0_30px_rgba(250,204,21,0.5)] hover:shadow-[0_0_40px_rgba(250,204,21,0.7)]"
+                title="AI Insights coming soon"
               >
                 View Full AI Analysis
               </button>
