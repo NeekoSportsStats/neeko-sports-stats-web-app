@@ -36,6 +36,9 @@ function createSupabaseClient(): SupabaseClient {
   });
 
   supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
+    db: {
+      schema: 'afl'
+    },
     auth: {
       flowType: "pkce",
       persistSession: true,

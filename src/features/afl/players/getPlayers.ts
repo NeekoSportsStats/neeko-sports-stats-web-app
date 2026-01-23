@@ -88,7 +88,7 @@ function computeStatsFromValues(values: number[]): PlayerStats {
 export async function getAvailableTeams(): Promise<string[]> {
   try {
     const { data, error } = await supabase
-      .from("afl.teams")
+      .from("teams")
       .select("name")
       .order("name");
 
@@ -113,7 +113,7 @@ export async function getPlayers(
 
   try {
     const { data, error } = await supabase
-      .from("afl.player_grid_view")
+      .from("player_grid_view")
       .select("*")
       .eq("season", season)
       .order("round_number");
