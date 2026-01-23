@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Search, Grid3X3, Calendar } from "lucide-react";
 import PlayerGrid from "./PlayerGrid";
 import PlayerOverlay from "./PlayerOverlay";
-import { getAvailableTeams, getPlayers, PlayerData, StatLens } from "./getPlayersSupabase";
+import { getAvailableTeams, getPlayers, PlayerData, StatLens } from "./getPlayers";
 import { cn } from "@/lib/utils";
 
 type Season = "2025" | "2026";
