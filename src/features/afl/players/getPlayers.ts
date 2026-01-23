@@ -28,6 +28,12 @@ export interface PlayerData {
   hitRates: HitRate[];
 }
 
+export interface PlayersResponse {
+  players: PlayerData[];
+  minRound: number;
+  maxRound: number;
+}
+
 function getStatColumn(lens: StatLens): "fantasy_points" | "disposals" | "goals" {
   switch (lens) {
     case "fantasy":
@@ -103,7 +109,7 @@ export async function getAvailableTeams(): Promise<string[]> {
 export async function getPlayers(
   lens: StatLens,
   season: number
-): Promise<PlayerData[]> {
+): Promise<PlayersResponse> {
   const statColumn = getStatColumn(lens);
 
   try {
@@ -115,12 +121,12 @@ export async function getPlayers(
 
     if (error) {
       console.error("Error fetching player data:", error);
-      return [];
+      return { players: [], minRound: 0, maxRound: 0 };
     }
 
     if (!data || data.length === 0) {
       console.log(`No player data found for season ${season}`);
-      return [];
+      return { players: [], minRound: 0, maxRound: 0 };
     }
 
     console.log(`Fetched ${data.length} rows for season ${season}`);
@@ -161,7 +167,8 @@ export async function getPlayers(
       }
     }
 
-    const maxRound = Math.max(...Array.from(allRounds));
+    const minRound = 0;
+    const maxRound = allRounds.size > 0 ? Math.max(...Array.from(allRounds)) : 0;
     const result: PlayerData[] = [];
     const thresholds = thresholdsForLens(lens);
 
@@ -182,12 +189,15 @@ export async function getPlayers(
       });
     }
 
-    console.log(`✓ Processed ${result.length} players across ${maxRound} rounds`);
-    console.log(`✓ Sample player rounds:`, Object.keys(result[0]?.rounds || {}));
+    console.log(`Round range: ${minRound} to ${maxRound}`);
+    console.log(`✓ Processed ${result.length} players`);
+    if (result.length > 0) {
+      console.log(`Sample player rounds:`, Object.keys(result[0].rounds).sort((a, b) => Number(a) - Number(b)));
+    }
 
-    return result;
+    return { players: result, minRound, maxRound };
   } catch (err) {
     console.error("Exception fetching player data:", err);
-    return [];
+    return { players: [], minRound: 0, maxRound: 0 };
   }
 }

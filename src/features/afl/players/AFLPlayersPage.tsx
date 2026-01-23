@@ -15,6 +15,8 @@ export default function AFLPlayersPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [teams, setTeams] = useState<string[]>(["All Teams"]);
   const [allPlayers, setAllPlayers] = useState<PlayerData[]>([]);
+  const [minRound, setMinRound] = useState<number>(0);
+  const [maxRound, setMaxRound] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -26,13 +28,16 @@ export default function AFLPlayersPage() {
       setLoading(true);
       const seasonNum = parseInt(season);
       console.log(`📊 Fetching players for season ${seasonNum}, lens: ${lens}`);
-      const players = await getPlayers(lens, seasonNum);
-      console.log(`✓ Loaded ${players.length} players`);
-      if (players.length > 0) {
-        const sampleRounds = Object.keys(players[0].rounds);
-        console.log(`✓ Round range: ${Math.min(...sampleRounds.map(Number))} to ${Math.max(...sampleRounds.map(Number))}`);
+      const response = await getPlayers(lens, seasonNum);
+      console.log(`✓ Loaded ${response.players.length} players`);
+      console.log(`✓ Round range: ${response.minRound} to ${response.maxRound}`);
+      if (response.players.length > 0) {
+        const sampleRounds = Object.keys(response.players[0].rounds).sort((a, b) => Number(a) - Number(b));
+        console.log(`Sample player rounds:`, sampleRounds);
       }
-      setAllPlayers(players);
+      setAllPlayers(response.players);
+      setMinRound(response.minRound);
+      setMaxRound(response.maxRound);
       setLoading(false);
     };
     fetchPlayers();
@@ -181,7 +186,13 @@ export default function AFLPlayersPage() {
               </p>
             </div>
           ) : (
-            <PlayerGrid players={filtered} lens={lens} onPlayerSelect={(p) => setSelectedId(p.id)} />
+            <PlayerGrid
+              players={filtered}
+              lens={lens}
+              minRound={minRound}
+              maxRound={maxRound}
+              onPlayerSelect={(p) => setSelectedId(p.id)}
+            />
           )}
         </div>
       </div>

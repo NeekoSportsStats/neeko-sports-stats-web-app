@@ -5,6 +5,8 @@ import { ChevronDown } from "lucide-react";
 interface PlayerGridProps {
   players: PlayerData[];
   lens: StatLens;
+  minRound: number;
+  maxRound: number;
   onPlayerSelect: (player: PlayerData) => void;
 }
 
@@ -50,7 +52,7 @@ function getHitRateBarColor(percentage: number, threshold: number, lens: StatLen
   return percentage >= 50 ? "bg-red-400" : "bg-red-400/50";
 }
 
-export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGridProps) {
+export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayerSelect }: PlayerGridProps) {
   const INITIAL_DESKTOP = 20;
   const STEP_DESKTOP = 20;
   const CAP_DESKTOP = 120;
@@ -85,17 +87,13 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
   );
 
   const roundHeaders = useMemo(() => {
-    if (sortedPlayers.length === 0) return [];
-    const firstPlayer = sortedPlayers[0];
-    if (!firstPlayer?.rounds) return [];
-
-    const roundNumbers = Object.keys(firstPlayer.rounds)
-      .map(Number)
-      .filter(n => !isNaN(n))
-      .sort((a, b) => a - b);
-
-    return roundNumbers;
-  }, [sortedPlayers]);
+    if (maxRound === 0) return [];
+    const rounds = [];
+    for (let i = minRound; i <= maxRound; i++) {
+      rounds.push(i);
+    }
+    return rounds;
+  }, [minRound, maxRound]);
 
   const cap = isMobile ? CAP_MOBILE : CAP_DESKTOP;
   const step = isMobile ? STEP_MOBILE : STEP_DESKTOP;

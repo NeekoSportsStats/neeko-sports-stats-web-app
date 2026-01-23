@@ -23,7 +23,7 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
   const recentRounds = useMemo(() => {
     const roundNumbers = Object.keys(player.rounds)
       .map(Number)
-      .filter(n => !isNaN(n))
+      .filter(n => !isNaN(n) && player.rounds[n] != null)
       .sort((a, b) => a - b)
       .slice(-5);
 
