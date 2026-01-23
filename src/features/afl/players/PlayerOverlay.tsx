@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { X, TrendingUp, Activity, Target } from "lucide-react";
 import { PlayerData, StatLens } from "./getPlayers";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -20,16 +20,20 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
     { value: "goals", label: "Goals" },
   ];
 
-  const recentRounds = player.rounds
-    .filter((r) => r.round !== "OR")
-    .slice(-5);
+  const recentRounds = useMemo(() => {
+    return player.rounds
+      .filter((r) => r.round && r.round !== "OR")
+      .slice(-5);
+  }, [player.rounds]);
 
-  const chartData = player.rounds
-    .filter((r) => r.round !== "OR" && r.score != null)
-    .map((r) => ({
-      round: r.round,
-      score: r.score as number,
-    }));
+  const chartData = useMemo(() => {
+    return player.rounds
+      .filter((r) => r.round && r.round !== "OR" && r.score != null)
+      .map((r) => ({
+        round: r.round,
+        score: r.score as number,
+      }));
+  }, [player.rounds]);
 
   const handleViewAIAnalysis = () => {
     navigate("/sports/afl/ai-analysis");

@@ -124,35 +124,45 @@ export async function getPlayers(
     }
 
     if (!data || data.length === 0) {
+      console.log(`No player data found for season ${season}`);
       return [];
     }
+
+    console.log(`Fetched ${data.length} rows for season ${season}`);
 
     const playerMap = new Map<string, any>();
 
     for (const row of data) {
+      if (!row.player_id || !row.player_name || row.round_number == null) {
+        console.warn("Skipping invalid row:", row);
+        continue;
+      }
+
       const playerId = row.player_id;
 
       if (!playerMap.has(playerId)) {
         playerMap.set(playerId, {
           id: playerId,
-          name: row.player_name,
-          team: row.team,
-          role: row.role,
-          teamColor: row.team_color,
+          name: row.player_name || "Unknown",
+          team: row.team || "Unknown",
+          role: row.role || "Unknown",
+          teamColor: row.team_color || "#666666",
           rounds: [],
           rawValues: [],
         });
       }
 
       const playerData = playerMap.get(playerId);
-      const score = row.played ? row[statColumn] || 0 : null;
+      const isPlayed = row.played === true;
+      const rawScore = row[statColumn];
+      const score = isPlayed && rawScore != null ? rawScore : null;
 
       playerData.rounds.push({
         round: `R${row.round_number}`,
         score,
       });
 
-      if (row.played && score !== null && score > 0) {
+      if (isPlayed && score !== null && score > 0) {
         playerData.rawValues.push(score);
       }
     }
@@ -176,6 +186,9 @@ export async function getPlayers(
         hitRates,
       });
     }
+
+    console.log(`Processed ${result.length} players with rounds:`,
+      result[0]?.rounds?.length || 0);
 
     return result;
   } catch (err) {

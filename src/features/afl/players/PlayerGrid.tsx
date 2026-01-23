@@ -84,6 +84,11 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
     [sortedPlayers, visibleCount]
   );
 
+  const roundHeaders = useMemo(() => {
+    if (sortedPlayers.length === 0) return [];
+    return sortedPlayers[0]?.rounds || [];
+  }, [sortedPlayers]);
+
   const cap = isMobile ? CAP_MOBILE : CAP_DESKTOP;
   const step = isMobile ? STEP_MOBILE : STEP_DESKTOP;
   const canShowMore = visibleCount < total && visibleCount < cap;
@@ -100,7 +105,7 @@ export default function PlayerGrid({ players, lens, onPlayerSelect }: PlayerGrid
                   Player
                 </th>
 
-                {sortedPlayers[0]?.rounds.map((round) => (
+                {roundHeaders.map((round) => (
                   <th
                     key={round.round}
                     className="sticky top-0 z-30 bg-black/95 backdrop-blur-xl px-2 py-2 text-center border-b border-white/10 min-w-[56px]"
