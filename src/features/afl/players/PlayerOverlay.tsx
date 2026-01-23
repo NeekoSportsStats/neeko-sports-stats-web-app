@@ -1,8 +1,9 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useRef } from "react";
 import { X, TrendingUp, Activity, Target } from "lucide-react";
 import { PlayerData, StatLens } from "./getPlayers";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useNavigate } from "react-router-dom";
+import { getRoundLabel } from "./utils";
 
 interface PlayerOverlayProps {
   player: PlayerData;
@@ -13,12 +14,56 @@ interface PlayerOverlayProps {
 
 export default function PlayerOverlay({ player, lens, onLensChange, onClose }: PlayerOverlayProps) {
   const navigate = useNavigate();
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   const lensOptions: { value: StatLens; label: string }[] = [
     { value: "fantasy", label: "Fantasy" },
     { value: "disposals", label: "Disposals" },
     { value: "goals", label: "Goals" },
   ];
+
+  const hitRateThresholds = useMemo(() => {
+    if (lens === "fantasy") return [60, 70, 80, 90, 100];
+    if (lens === "disposals") return [15, 20, 25, 30, 35];
+    return [1, 2, 3, 4, 5];
+  }, [lens]);
+
+  const recalculatedHitRates = useMemo(() => {
+    const values = Object.values(player.rounds).filter(
+      (v): v is number => typeof v === "number" && v >= 0
+    );
+    const games = values.length;
+
+    return hitRateThresholds.map((threshold) => {
+      const count = values.filter((v) => v >= threshold).length;
+      const percentage = games > 0 ? (count / games) * 100 : 0;
+      return { threshold, count, percentage };
+    });
+  }, [player.rounds, hitRateThresholds]);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (overlayRef.current && e.target === overlayRef.current) {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    document.addEventListener("mousedown", handleClickOutside);
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
 
   const recentRounds = useMemo(() => {
     const roundNumbers = Object.keys(player.rounds)
@@ -52,7 +97,10 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto">
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto"
+    >
       <div className="min-h-screen p-4 md:p-8">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-start justify-between mb-6">
@@ -123,7 +171,7 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
                       key={round.roundNum}
                       className="flex flex-col items-center gap-2 px-4 py-3 rounded-lg border border-white/10 bg-white/5"
                     >
-                      <span className="text-xs text-white/50">R{round.roundNum}</span>
+                      <span className="text-xs text-white/50">{getRoundLabel(round.roundNum)}</span>
                       <span className={`text-2xl font-bold ${getColor()}`}>
                         {score == null ? "—" : score}
                       </span>
@@ -179,7 +227,7 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-6">
               <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4">
                 <div className="flex items-center gap-2 mb-4">
                   <Activity className="h-5 w-5 text-yellow-400" />
@@ -232,7 +280,7 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
                 </div>
 
                 <div className="space-y-4">
-                  {player.hitRates.map((hr) => (
+                  {recalculatedHitRates.map((hr) => (
                     <div key={hr.threshold} className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-white/60">{hr.threshold}+ </span>
@@ -262,16 +310,8 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
                 <TrendingUp className="h-6 w-6 text-yellow-400 flex-shrink-0 mt-1" />
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-white mb-2">AI Performance Summary</h3>
-                  <p className="text-white/70 leading-relaxed">
-                    {player.name} has shown{" "}
-                    {player.stats.volatility < 15 ? "stable, repeatable" : "high-variance"} output
-                    so far. Across {player.stats.games} games, the average sits at{" "}
-                    <span className="text-white font-semibold">{player.stats.avg}</span>, with a
-                    ceiling of{" "}
-                    <span className="text-white font-semibold">{player.stats.max}</span>.
-                    {player.hitRates[0]?.percentage >= 70
-                      ? " The floor looks reliable — strong hit rate on your baseline threshold."
-                      : " The floor is less reliable — hit rates suggest more week-to-week swing."}
+                  <p className="text-white/50 leading-relaxed italic">
+                    AI insights will appear here once analysis is enabled.
                   </p>
                 </div>
               </div>

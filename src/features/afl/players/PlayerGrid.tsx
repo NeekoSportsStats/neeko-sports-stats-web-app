@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { PlayerData, StatLens } from "./getPlayers";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { getRoundLabel, getRoundTooltip } from "./utils";
 
 interface PlayerGridProps {
   players: PlayerData[];
@@ -12,7 +13,7 @@ interface PlayerGridProps {
 
 function getColorClass(score: number | null, lens: StatLens): string {
   if (score == null) {
-    return "bg-white/5 border-white/10 text-white/35";
+    return "bg-transparent border-transparent text-white/25";
   }
 
   if (lens === "fantasy") {
@@ -62,6 +63,8 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
 
   const [visibleCount, setVisibleCount] = useState<number>(INITIAL_DESKTOP);
   const [isMobile, setIsMobile] = useState(false);
+  const [scrollPos, setScrollPos] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -75,6 +78,49 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
   useEffect(() => {
     setVisibleCount(isMobile ? INITIAL_MOBILE : INITIAL_DESKTOP);
   }, [lens, players.length, isMobile]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      setScrollPos(container.scrollLeft);
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.shiftKey) {
+        e.preventDefault();
+        container.scrollLeft += e.deltaY;
+      }
+    };
+
+    container.addEventListener("scroll", handleScroll);
+    container.addEventListener("wheel", handleWheel, { passive: false });
+
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      container.removeEventListener("wheel", handleWheel);
+    };
+  }, []);
+
+  const handleScrollLeft = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const scrollAmount = 200;
+    container.scrollBy({ left: -scrollAmount, behavior: "smooth" });
+  };
+
+  const handleScrollRight = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const scrollAmount = 200;
+    container.scrollBy({ left: scrollAmount, behavior: "smooth" });
+  };
+
+  const canScrollLeft = scrollPos > 10;
+  const canScrollRight = scrollContainerRef.current
+    ? scrollPos < scrollContainerRef.current.scrollWidth - scrollContainerRef.current.clientWidth - 10
+    : true;
 
   const sortedPlayers = useMemo(() => {
     return [...players].sort((a, b) => b.stats.avg - a.stats.avg);
@@ -95,6 +141,13 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
     return rounds;
   }, [minRound, maxRound]);
 
+  const visibleRounds = useMemo(() => {
+    if (isMobile) {
+      return roundHeaders.filter(r => r === 0 || r === 1 || r === 2);
+    }
+    return roundHeaders;
+  }, [roundHeaders, isMobile]);
+
   const cap = isMobile ? CAP_MOBILE : CAP_DESKTOP;
   const step = isMobile ? STEP_MOBILE : STEP_DESKTOP;
   const canShowMore = visibleCount < total && visibleCount < cap;
@@ -102,8 +155,43 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
 
   return (
     <div className="space-y-3">
-      <div className="rounded-xl border border-white/10 bg-black/30 backdrop-blur-xl overflow-hidden">
-        <div className="max-h-[68vh] overflow-x-auto overflow-y-auto">
+      <div className="flex items-center gap-2 px-2 py-2 rounded-lg bg-yellow-500/5 border border-yellow-400/20">
+        <Info className="h-3.5 w-3.5 text-yellow-400 flex-shrink-0" />
+        <p className="text-[11px] text-yellow-200/70 leading-snug">
+          Sorted by highest season average. Includes finals rounds. Results may differ from AFL / Champion Data.
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-white/10 bg-black/30 backdrop-blur-xl overflow-hidden relative">
+        {!isMobile && canScrollLeft && (
+          <button
+            onClick={handleScrollLeft}
+            className="absolute left-[200px] top-1/2 -translate-y-1/2 z-30 p-2 rounded-full bg-black/90 border border-white/20 text-white/70 hover:text-white hover:border-yellow-400/60 transition-all shadow-lg"
+            style={{ opacity: canScrollLeft ? 1 : 0, pointerEvents: canScrollLeft ? "auto" : "none" }}
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+        )}
+
+        {!isMobile && canScrollRight && (
+          <button
+            onClick={handleScrollRight}
+            className="absolute right-[220px] top-1/2 -translate-y-1/2 z-30 p-2 rounded-full bg-black/90 border border-white/20 text-white/70 hover:text-white hover:border-yellow-400/60 transition-all shadow-lg"
+            style={{ opacity: canScrollRight ? 1 : 0, pointerEvents: canScrollRight ? "auto" : "none" }}
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        )}
+
+        <div
+          ref={scrollContainerRef}
+          className="max-h-[68vh] overflow-x-auto overflow-y-auto relative"
+          style={{
+            background: !isMobile
+              ? `linear-gradient(to right, transparent 200px, rgba(0,0,0,0.4) 210px, rgba(0,0,0,0.4) calc(100% - 230px), transparent calc(100% - 220px))`
+              : undefined
+          }}
+        >
           <table className="w-full border-collapse">
             <thead>
               <tr className="text-[10px] text-white/55 uppercase tracking-[0.08em] font-medium">
@@ -111,12 +199,13 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                   Player
                 </th>
 
-                {roundHeaders.map((roundNum) => (
+                {visibleRounds.map((roundNum) => (
                   <th
                     key={roundNum}
                     className="sticky top-0 z-30 bg-black/95 backdrop-blur-xl px-2 py-2 text-center border-b border-white/10 min-w-[56px]"
+                    title={getRoundTooltip(roundNum)}
                   >
-                    R{roundNum}
+                    {getRoundLabel(roundNum)}
                   </th>
                 ))}
 
@@ -152,7 +241,7 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                     </div>
                   </td>
 
-                  {roundHeaders.map((roundNum) => {
+                  {visibleRounds.map((roundNum) => {
                     const score = player.rounds[roundNum];
                     return (
                       <td key={roundNum} className="px-2 py-3 text-center">
@@ -162,7 +251,7 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                             lens
                           )}`}
                         >
-                          {score == null ? "–" : score}
+                          {score == null ? "—" : score}
                         </div>
                       </td>
                     );
