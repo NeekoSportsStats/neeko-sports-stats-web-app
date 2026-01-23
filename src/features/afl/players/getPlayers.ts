@@ -59,28 +59,26 @@ function computeVolatility(values: number[]): number {
   return Math.round(Math.sqrt(variance) * 10) / 10;
 }
 
-function buildHitRates(values: number[], thresholds: number[]): HitRate[] {
-  const games = values.length;
+function buildHitRates(values: number[], thresholds: number[], totalGames: number): HitRate[] {
   return thresholds.map((t) => {
     const count = values.filter((v) => v >= t).length;
-    const pct = games > 0 ? (count / games) * 100 : 0;
+    const pct = totalGames > 0 ? (count / totalGames) * 100 : 0;
     return { threshold: t, count, percentage: pct };
   });
 }
 
-function computeStatsFromValues(values: number[]): PlayerStats {
-  const games = values.length;
+function computeStatsFromValues(values: number[], totalGames: number): PlayerStats {
   const total = values.reduce((s, v) => s + v, 0);
-  const avg = games > 0 ? total / games : 0;
-  const min = games > 0 ? Math.min(...values) : 0;
-  const max = games > 0 ? Math.max(...values) : 0;
+  const avg = totalGames > 0 ? total / totalGames : 0;
+  const min = values.length > 0 ? Math.min(...values) : 0;
+  const max = values.length > 0 ? Math.max(...values) : 0;
   const volatility = computeVolatility(values);
 
   return {
     avg: Math.round(avg * 10) / 10,
     min,
     max,
-    games,
+    games: totalGames,
     total,
     volatility,
   };
@@ -182,6 +180,7 @@ export async function getPlayers(
           teamColor: row.team_color || "#666666",
           rounds: {},
           rawValues: [],
+          roundsPlayed: new Set<number>(),
         });
       }
 
@@ -192,8 +191,11 @@ export async function getPlayers(
 
       playerData.rounds[row.round_number] = score;
 
-      if (isPlayed && score !== null && score > 0) {
-        playerData.rawValues.push(score);
+      if (isPlayed) {
+        playerData.roundsPlayed.add(row.round_number);
+        if (score !== null && score > 0) {
+          playerData.rawValues.push(score);
+        }
       }
     }
 
@@ -204,8 +206,9 @@ export async function getPlayers(
 
     for (const [_, playerData] of playerMap) {
       const values = playerData.rawValues;
-      const stats = computeStatsFromValues(values);
-      const hitRates = buildHitRates(values, thresholds);
+      const totalGames = playerData.roundsPlayed.size;
+      const stats = computeStatsFromValues(values, totalGames);
+      const hitRates = buildHitRates(values, thresholds, totalGames);
 
       result.push({
         id: playerData.id,

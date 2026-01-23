@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { PlayerData, StatLens } from "./getPlayers";
-import { ChevronDown, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { getRoundLabel, getRoundTooltip } from "./utils";
 
 interface PlayerGridProps {
@@ -154,19 +154,12 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
   const hitCap = visibleCount >= cap && total > cap;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 px-2 py-2 rounded-lg bg-yellow-500/5 border border-yellow-400/20">
-        <Info className="h-3.5 w-3.5 text-yellow-400 flex-shrink-0" />
-        <p className="text-[11px] text-yellow-200/70 leading-snug">
-          Sorted by highest season average. Includes finals rounds. Results may differ from AFL / Champion Data.
-        </p>
-      </div>
-
-      <div className="rounded-xl border border-white/10 bg-black/30 backdrop-blur-xl overflow-hidden relative">
+    <div>
+      <div className="relative">
         {!isMobile && canScrollLeft && (
           <button
             onClick={handleScrollLeft}
-            className="absolute left-[200px] top-1/2 -translate-y-1/2 z-30 p-2 rounded-full bg-black/90 border border-white/20 text-white/70 hover:text-white hover:border-yellow-400/60 transition-all shadow-lg"
+            className="absolute left-[-48px] top-1/2 -translate-y-1/2 z-30 p-2 rounded-full bg-black/90 border border-white/20 text-white/70 hover:text-white hover:border-yellow-400/60 transition-all shadow-lg"
             style={{ opacity: canScrollLeft ? 1 : 0, pointerEvents: canScrollLeft ? "auto" : "none" }}
           >
             <ChevronLeft className="h-5 w-5" />
@@ -176,12 +169,14 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
         {!isMobile && canScrollRight && (
           <button
             onClick={handleScrollRight}
-            className="absolute right-[220px] top-1/2 -translate-y-1/2 z-30 p-2 rounded-full bg-black/90 border border-white/20 text-white/70 hover:text-white hover:border-yellow-400/60 transition-all shadow-lg"
+            className="absolute right-[-48px] top-1/2 -translate-y-1/2 z-30 p-2 rounded-full bg-black/90 border border-white/20 text-white/70 hover:text-white hover:border-yellow-400/60 transition-all shadow-lg"
             style={{ opacity: canScrollRight ? 1 : 0, pointerEvents: canScrollRight ? "auto" : "none" }}
           >
             <ChevronRight className="h-5 w-5" />
           </button>
         )}
+
+        <div className="rounded-xl border border-white/10 bg-black/30 backdrop-blur-xl overflow-hidden">
 
         <div
           ref={scrollContainerRef}
@@ -296,6 +291,7 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
               ))}
             </tbody>
           </table>
+        </div>
         </div>
       </div>
 

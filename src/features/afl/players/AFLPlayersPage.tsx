@@ -1,9 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Search, Grid3X3, Calendar } from "lucide-react";
+import { Search, Grid3X3, Calendar, Info } from "lucide-react";
 import PlayerGrid from "./PlayerGrid";
 import PlayerOverlay from "./PlayerOverlay";
 import { getAvailableTeams, getPlayers, PlayerData, StatLens } from "./getPlayers";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type Season = "2025" | "2026";
 
@@ -67,19 +73,36 @@ export default function AFLPlayersPage() {
       <div className="mx-auto max-w-7xl px-4 md:px-8 py-10">
         {/* HERO */}
         <div className="mb-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-yellow-400/30 bg-yellow-500/10 text-yellow-200">
-            <Grid3X3 className="h-4 w-4" />
-            <span className="text-[11px] uppercase tracking-[0.22em] font-semibold">
-              Master Grid
-            </span>
-          </div>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-yellow-400/30 bg-yellow-500/10 text-yellow-200">
+                <Grid3X3 className="h-4 w-4" />
+                <span className="text-[11px] uppercase tracking-[0.22em] font-semibold">
+                  Master Grid
+                </span>
+              </div>
 
-          <h1 className="mt-4 text-4xl md:text-5xl font-extrabold text-white">
-            Full Season Player Ledger
-          </h1>
-          <p className="mt-2 text-white/55 max-w-2xl">
-            Track every player's form, ceiling and consistency across the entire season.
-          </p>
+              <h1 className="mt-4 text-4xl md:text-5xl font-extrabold text-white">
+                Full Season Player Ledger
+              </h1>
+              <p className="mt-2 text-white/55 max-w-2xl">
+                Track every player's form, ceiling and consistency across the entire season.
+              </p>
+            </div>
+
+            <TooltipProvider>
+              <Tooltip delayDuration={200}>
+                <TooltipTrigger asChild>
+                  <button className="p-2 rounded-lg border border-white/10 bg-black/30 text-white/40 hover:text-yellow-400 hover:border-yellow-400/40 transition-colors">
+                    <Info className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left" className="max-w-xs bg-black/95 border-white/20 text-white/90 text-xs">
+                  <p>Sorted by highest season average. Includes finals rounds. Results may differ from AFL / Champion Data.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
 
         {/* FILTER BAR */}

@@ -33,14 +33,14 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
     const values = Object.values(player.rounds).filter(
       (v): v is number => typeof v === "number" && v >= 0
     );
-    const games = values.length;
+    const totalGames = player.stats.games;
 
     return hitRateThresholds.map((threshold) => {
       const count = values.filter((v) => v >= threshold).length;
-      const percentage = games > 0 ? (count / games) * 100 : 0;
+      const percentage = totalGames > 0 ? (count / totalGames) * 100 : 0;
       return { threshold, count, percentage };
     });
-  }, [player.rounds, hitRateThresholds]);
+  }, [player.rounds, hitRateThresholds, player.stats.games]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -239,7 +239,7 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
               )}
             </div>
 
-            <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4">
                 <div className="flex items-center gap-2 mb-4">
                   <Activity className="h-5 w-5 text-yellow-400" />
