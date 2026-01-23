@@ -113,28 +113,58 @@ export async function getPlayers(
   const statColumn = getStatColumn(lens);
 
   try {
-    const { data, error } = await supabase
-      .from("player_grid_view")
-      .select("*")
-      .eq("season", season)
-      .order("round_number");
+    const pageSize = 1000;
+    let allData: any[] = [];
+    let from = 0;
+    let hasMore = true;
 
-    if (error) {
-      console.error("Error fetching player data:", error);
-      return { players: [], minRound: 0, maxRound: 0 };
+    while (hasMore) {
+      const to = from + pageSize - 1;
+      const { data, error } = await supabase
+        .from("player_grid_view")
+        .select("season, round_number, player_id, player_name, team, role, team_color, played, disposals, goals, fantasy_points")
+        .eq("season", season)
+        .order("round_number", { ascending: true })
+        .order("player_name", { ascending: true })
+        .range(from, to);
+
+      if (error) {
+        console.error("Error fetching player data:", error);
+        return { players: [], minRound: 0, maxRound: 0 };
+      }
+
+      if (!data || data.length === 0) {
+        break;
+      }
+
+      allData = allData.concat(data);
+      hasMore = data.length === pageSize;
+      from = to + 1;
     }
 
-    if (!data || data.length === 0) {
+    if (allData.length === 0) {
       console.log(`No player data found for season ${season}`);
       return { players: [], minRound: 0, maxRound: 0 };
     }
 
-    console.log(`Fetched ${data.length} rows for season ${season}`);
+    console.log(`✓ Fetched total ${allData.length} rows for season ${season}`);
+
+    const sampleNonZero = allData.find(r => r.fantasy_points && r.fantasy_points > 0);
+    if (sampleNonZero) {
+      console.log(`Sample row with fantasy_points > 0:`, {
+        player: sampleNonZero.player_name,
+        team: sampleNonZero.team,
+        round: sampleNonZero.round_number,
+        fantasy_points: sampleNonZero.fantasy_points,
+        disposals: sampleNonZero.disposals,
+        goals: sampleNonZero.goals
+      });
+    }
 
     const playerMap = new Map<string, any>();
     const allRounds = new Set<number>();
 
-    for (const row of data) {
+    for (const row of allData) {
       if (!row.player_id || !row.player_name || row.round_number == null) {
         console.warn("Skipping invalid row:", row);
         continue;
@@ -167,7 +197,7 @@ export async function getPlayers(
       }
     }
 
-    const minRound = 0;
+    const minRound = allRounds.size > 0 ? Math.min(...Array.from(allRounds)) : 0;
     const maxRound = allRounds.size > 0 ? Math.max(...Array.from(allRounds)) : 0;
     const result: PlayerData[] = [];
     const thresholds = thresholdsForLens(lens);
@@ -189,10 +219,19 @@ export async function getPlayers(
       });
     }
 
-    console.log(`Round range: ${minRound} to ${maxRound}`);
+    console.log(`✓ Round range: ${minRound} to ${maxRound}`);
     console.log(`✓ Processed ${result.length} players`);
     if (result.length > 0) {
-      console.log(`Sample player rounds:`, Object.keys(result[0].rounds).sort((a, b) => Number(a) - Number(b)));
+      const firstPlayer = result[0];
+      const firstPlayerRounds = Object.keys(firstPlayer.rounds).sort((a, b) => Number(a) - Number(b));
+      console.log(`First player: ${firstPlayer.name} (${firstPlayer.team})`);
+      console.log(`First player available rounds:`, firstPlayerRounds);
+      console.log(`First player stats:`, {
+        avg: firstPlayer.stats.avg,
+        games: firstPlayer.stats.games,
+        min: firstPlayer.stats.min,
+        max: firstPlayer.stats.max
+      });
     }
 
     return { players: result, minRound, maxRound };
