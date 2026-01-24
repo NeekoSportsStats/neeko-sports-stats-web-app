@@ -121,7 +121,7 @@ export async function getPlayers(
       const to = from + pageSize - 1;
       const { data, error } = await supabase
         .from("player_round_with_colors")
-        .select("season, round_number, player, team, position, team_color, played, disposals, goals, fantasy_points")
+        .select("season, round_number, player, team, position, team_color, disposals, goals, fantasy_points")
         .eq("season", 2025)
         .order("round_number", { ascending: true })
         .order("player", { ascending: true })
@@ -186,15 +186,15 @@ export async function getPlayers(
       }
 
       const playerData = playerMap.get(playerName);
-      const isPlayed = row.played === true;
       const rawScore = row[statColumn];
-      const score = isPlayed && rawScore != null ? rawScore : null;
+      const score = rawScore != null ? rawScore : null;
+      const isPlayed = score !== null;
 
       playerData.rounds[row.round_number] = score;
 
       if (isPlayed) {
         playerData.roundsPlayed.add(row.round_number);
-        if (score !== null && score > 0) {
+        if (score > 0) {
           playerData.rawValues.push(score);
         }
       }

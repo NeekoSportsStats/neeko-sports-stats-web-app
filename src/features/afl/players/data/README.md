@@ -41,13 +41,12 @@ SELECT
   team,             -- Team name
   position,         -- Player position
   team_color,       -- Team color for UI
-  round_number,     -- Round number (not 'round')
-  played,           -- Boolean indicating if player participated
+  round_number,     -- Round number
   disposals,        -- Disposals count
   goals,            -- Goals count
   fantasy_points,   -- Fantasy points
   season            -- Season year (always 2025)
-FROM afl.player_round_stats_2025
+FROM afl.player_round_with_colors
 WHERE season = 2025;
 ```
 
