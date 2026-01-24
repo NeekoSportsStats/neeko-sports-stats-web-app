@@ -121,7 +121,7 @@ export async function getPlayers(
       const to = from + pageSize - 1;
       const { data, error } = await supabase
         .from("player_round_stats_2025")
-        .select("season, round_number, player_id, player, team, position, team_color, played, disposals, goals, fantasy_points")
+        .select("season, round_number, player, team, position, team_color, played, disposals, goals, fantasy_points")
         .eq("season", 2025)
         .order("round_number", { ascending: true })
         .order("player", { ascending: true })
@@ -164,18 +164,18 @@ export async function getPlayers(
     const allRounds = new Set<number>();
 
     for (const row of allData) {
-      if (!row.player_id || !row.player || row.round_number == null) {
+      if (!row.player || row.round_number == null) {
         console.warn("Skipping invalid row:", row);
         continue;
       }
 
-      const playerId = row.player_id;
+      const playerName = row.player;
       allRounds.add(row.round_number);
 
-      if (!playerMap.has(playerId)) {
-        playerMap.set(playerId, {
-          id: playerId,
-          name: row.player || "Unknown",
+      if (!playerMap.has(playerName)) {
+        playerMap.set(playerName, {
+          id: playerName,
+          name: playerName,
           team: row.team || "Unknown",
           role: row.position || "Unknown",
           teamColor: row.team_color || "#666666",
@@ -185,7 +185,7 @@ export async function getPlayers(
         });
       }
 
-      const playerData = playerMap.get(playerId);
+      const playerData = playerMap.get(playerName);
       const isPlayed = row.played === true;
       const rawScore = row[statColumn];
       const score = isPlayed && rawScore != null ? rawScore : null;

@@ -261,11 +261,11 @@ function CategoryColumn({
         ) : (
           rows.map((row) => (
             <PlayerCard
-              key={row.player_id}
+              key={row.player_name}
               row={row}
               category={category}
-              isExpanded={expandedId === row.player_id}
-              onToggle={() => onToggle(row.player_id)}
+              isExpanded={expandedId === row.player_name}
+              onToggle={() => onToggle(row.player_name)}
             />
           ))
         )}

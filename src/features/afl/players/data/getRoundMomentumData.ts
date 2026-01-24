@@ -33,7 +33,7 @@ function roundAverageFor(rows: any[], stat: RoundStat): number {
 export async function getRoundMomentumData(season: number, stat: RoundStat): Promise<RoundMomentumData> {
   const { data: rows } = await supabase
     .from("player_round_stats_2025")
-    .select("player_id, player, disposals, goals, fantasy_points, round_number")
+    .select("player, disposals, goals, fantasy_points, round_number")
     .eq("season", 2025);
 
   if (!rows?.length) {
@@ -53,20 +53,20 @@ export async function getRoundMomentumData(season: number, stat: RoundStat): Pro
 
   const { data: averages } = await supabase
     .from("player_season_totals_2025")
-    .select("player_id, avg_disposals, avg_goals, avg_fantasy, games_played")
+    .select("player, avg_disposals, avg_goals, avg_fantasy, games_played")
     .eq("season", 2025)
     .gte("games_played", 5);
 
-  const avgMap = new Map(averages?.map((a) => [a.player_id, a]) ?? []);
+  const avgMap = new Map(averages?.map((a) => [a.player, a]) ?? []);
 
   const top = latest.reduce((m, r) => (statValue(r, stat) > statValue(m, stat) ? r : m));
 
   // Biggest Over logic
   let over = latest
-    .filter((r) => avgMap.has(r.player_id))
+    .filter((r) => avgMap.has(r.player))
     .map((r) => ({
-      player_id: r.player_id,
-      diff: statValue(r, stat) - avgStatValue(avgMap.get(r.player_id), stat),
+      player: r.player,
+      diff: statValue(r, stat) - avgStatValue(avgMap.get(r.player), stat),
       roundValue: statValue(r, stat),
     }))
     .sort((a, b) => b.diff - a.diff)[0];
@@ -75,28 +75,26 @@ export async function getRoundMomentumData(season: number, stat: RoundStat): Pro
     const roundAvg = roundAverageFor(latest, stat);
     over = latest
       .map((r) => ({
-        player_id: r.player_id,
+        player: r.player,
         diff: statValue(r, stat) - roundAvg,
         roundValue: statValue(r, stat),
       }))
       .sort((a, b) => b.diff - a.diff)[0];
   }
 
-  const nameMap = new Map(latest.map((r) => [r.player_id, r.player]));
-
   const roundAvg = roundAverageFor(latest, stat);
 
   return {
-    topScore: { playerName: nameMap.get(top.player_id) ?? "Unknown", value: statValue(top, stat) },
+    topScore: { playerName: top.player, value: statValue(top, stat) },
     biggestOverperformer: {
-      playerName: nameMap.get(over.player_id) ?? "—",
+      playerName: over.player,
       diff: Number(over.diff.toFixed(1)),
       roundValue: over.roundValue,
     },
     roundAverage: roundAvg,
     keyPoints: [
-      `⭐ ${nameMap.get(top.player_id)} led the round.`,
-      `📈 Biggest overperformer: ${nameMap.get(over.player_id)} (+${Number(over.diff.toFixed(1))}).`,
+      `⭐ ${top.player} led the round.`,
+      `📈 Biggest overperformer: ${over.player} (+${Number(over.diff.toFixed(1))}).`,
       `🧠 League average: ${roundAvg} ${stat}.`,
     ],
     isGrandFinal: currentRound >= 28,

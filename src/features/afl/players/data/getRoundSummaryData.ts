@@ -49,7 +49,7 @@ export async function getRoundMomentumData(
 ): Promise<RoundMomentumData> {
   const { data: rows, error: roundError } = await supabase
     .from("player_round_stats_2025")
-    .select("player_id, player, disposals, goals, fantasy_points, round_number")
+    .select("player, disposals, goals, fantasy_points, round_number")
     .eq("season", 2025);
 
   if (roundError) {
@@ -95,16 +95,12 @@ export async function getRoundMomentumData(
   // Season averages (>=5 games)
   const { data: averages, error: avgError } = await supabase
     .from("player_season_totals_2025")
-    .select("player_id, avg_disposals, avg_goals, avg_fantasy, games_played")
+    .select("player, avg_disposals, avg_goals, avg_fantasy, games_played")
     .eq("season", 2025)
     .gte("games_played", 5);
 
   // avgError is not fatal — we still show top + league avg + sparkline
-  const avgMap = new Map((averages ?? []).map((a) => [a.player_id, a]));
-
-  // Names from player_round_stats_2025 data
-  const nameMap = new Map(latest.map((r) => [r.player_id, r.player]));
-  const safeName = (id: string) => nameMap.get(id) ?? "Unknown";
+  const avgMap = new Map((averages ?? []).map((a) => [a.player, a]));
 
   // Top performer
   const top = latest.reduce((m, r) =>
@@ -113,18 +109,18 @@ export async function getRoundMomentumData(
 
   // Biggest overperformer (do NOT filter out — always pick best diff among eligible)
   let over:
-    | { player_id: string; diff: number; roundValue: number; avgValue: number }
+    | { player: string; diff: number; roundValue: number; avgValue: number }
     | undefined;
 
   if (!avgError && avgMap.size > 0) {
     const overList = latest
-      .filter((r) => avgMap.has(r.player_id))
+      .filter((r) => avgMap.has(r.player))
       .map((r) => {
-        const a = avgMap.get(r.player_id)!;
+        const a = avgMap.get(r.player)!;
         const roundVal = statValue(r, stat);
         const avgVal = avgStatValue(a, stat);
         return {
-          player_id: r.player_id,
+          player: r.player,
           diff: Number((roundVal - avgVal).toFixed(1)),
           roundValue: roundVal,
           avgValue: avgVal,
@@ -141,17 +137,17 @@ export async function getRoundMomentumData(
   const keyPoints: string[] = [];
 
   keyPoints.push(
-    `⭐ ${safeName(top.player_id)} led the round.`
+    `⭐ ${top.player} led the round.`
   );
 
   if (over && Number.isFinite(over.diff)) {
     if (over.diff >= signalThreshold(stat)) {
       keyPoints.push(
-        `📈 ${safeName(over.player_id)} significantly exceeded their season average (+${over.diff} ${statLabel}).`
+        `📈 ${over.player} significantly exceeded their season average (+${over.diff} ${statLabel}).`
       );
     } else if (over.diff > 0) {
       keyPoints.push(
-        `📈 No major overperformer signal — best was ${safeName(over.player_id)} (+${over.diff}).`
+        `📈 No major overperformer signal — best was ${over.player} (+${over.diff}).`
       );
     } else {
       keyPoints.push(
@@ -171,10 +167,10 @@ export async function getRoundMomentumData(
   );
 
   return {
-    topScore: { playerName: safeName(top.player_id), value: statValue(top, stat) },
+    topScore: { playerName: top.player, value: statValue(top, stat) },
     biggestOverperformer: over
       ? {
-          playerName: safeName(over.player_id),
+          playerName: over.player,
           diff: over.diff,
           roundValue: over.roundValue,
         }

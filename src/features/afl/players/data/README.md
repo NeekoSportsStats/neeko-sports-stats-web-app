@@ -30,27 +30,25 @@ const fetchData = async () => {
 
 ### Required Database Schema
 
-This function expects a table named `afl_player_game_stats` with the following structure:
+This function uses the `afl.player_round_stats_2025` table:
 
 ```sql
-CREATE TABLE afl_player_game_stats (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  player_id UUID NOT NULL,
-  player_name TEXT NOT NULL,
-  season INTEGER NOT NULL,
-  round INTEGER NOT NULL,
-  fantasy NUMERIC DEFAULT 0,
-  disposals INTEGER DEFAULT 0,
-  goals INTEGER DEFAULT 0,
-  kicks INTEGER DEFAULT 0,
-  marks INTEGER DEFAULT 0,
-  tackles INTEGER DEFAULT 0,
-  hitouts INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE INDEX idx_afl_player_stats_lookup
-  ON afl_player_game_stats(season, round);
+-- Primary data source for all AFL 2025 player statistics
+-- Uses player (TEXT) as the primary key for the 2025 season
+-- No joins required - all data in a single table
+SELECT
+  player,           -- Player name (primary key)
+  team,             -- Team name
+  position,         -- Player position
+  team_color,       -- Team color for UI
+  round_number,     -- Round number (not 'round')
+  played,           -- Boolean indicating if player participated
+  disposals,        -- Disposals count
+  goals,            -- Goals count
+  fantasy_points,   -- Fantasy points
+  season            -- Season year (always 2025)
+FROM afl.player_round_stats_2025
+WHERE season = 2025;
 ```
 
 ### Data Aggregations
@@ -99,23 +97,18 @@ const fetchData = async () => {
 
 ### Required Database Schema
 
-This function uses the `public.afl_player_stats` table:
+This function uses the `afl.player_round_stats_2025` table:
 
 ```sql
-CREATE TABLE afl_player_stats (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  player TEXT NOT NULL,
-  team TEXT,
-  position TEXT,
-  round_order INTEGER,
-  disposals INTEGER DEFAULT 0,
-  goals INTEGER DEFAULT 0,
-  fantasy_points INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE INDEX idx_afl_player_stats_player ON afl_player_stats(player);
-CREATE INDEX idx_afl_player_stats_position ON afl_player_stats(position);
+-- Uses player (TEXT) as the primary key for the 2025 season
+SELECT
+  player,           -- Player name (primary key)
+  round_number,     -- Round number
+  disposals,        -- Disposals count
+  goals,            -- Goals count
+  season            -- Season year (always 2025)
+FROM afl.player_round_stats_2025
+WHERE season = 2025;
 ```
 
 ### Data Calculations
@@ -192,22 +185,27 @@ const fetchData = async () => {
 
 ### Required Database Schema
 
-This function uses the `public.afl_player_stats` table:
+This function uses the computed view `afl.form_stability_grid_final`:
 
 ```sql
-CREATE TABLE afl_player_stats (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  player TEXT NOT NULL,
-  team TEXT,
-  position TEXT,
-  round_order INTEGER,
-  disposals INTEGER DEFAULT 0,
-  goals INTEGER DEFAULT 0,
-  fantasy_points INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE INDEX idx_afl_player_stats_player ON afl_player_stats(player);
+-- Pre-computed form stability metrics
+-- This is a materialized view that aggregates data from player_round_stats_2025
+SELECT
+  season,
+  player_id,        -- Note: View still uses player_id for backward compatibility
+  player_name,      -- Player name for display
+  stat_type,        -- 'fantasy', 'disposals', or 'goals'
+  games_used,       -- Number of games in calculation
+  recent_avg,       -- Last N games average
+  season_avg,       -- Full season average
+  trend_diff,       -- recent_avg - season_avg
+  stability_score,  -- Consistency metric (0-100)
+  stability_band,   -- Category: 'High', 'Medium', 'Low'
+  trend_label,      -- 'Trending Up', 'Stable', 'Trending Down'
+  variance,         -- Statistical variance
+  confidence_label  -- Confidence in the prediction
+FROM afl.form_stability_grid_final
+WHERE season = 2025;
 ```
 
 ### Data Calculations

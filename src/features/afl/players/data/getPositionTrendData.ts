@@ -6,7 +6,7 @@ import type { StatKey } from "@/lib/stats/types";
 /* -------------------------------------------------------------------------- */
 
 export interface PositionPlayerMetrics {
-  player_id: string;
+  player: string;
   full_name: string;
   last_5_values: number[];
   season_avg: number;
@@ -25,7 +25,6 @@ export interface PositionTrendData {
 }
 
 interface RoundPlayerRow {
-  player_id: string;
   player: string;
   round_number: number;
   disposals: number | null;
@@ -74,7 +73,6 @@ export async function getPositionTrendData(params: {
     .from("player_round_stats_2025")
     .select(
       `
-        player_id,
         player,
         round_number,
         disposals,
@@ -82,7 +80,7 @@ export async function getPositionTrendData(params: {
       `
     )
     .eq("season", 2025)
-    .order("player_id", { ascending: true })
+    .order("player", { ascending: true })
     .order("round_number", { ascending: true });
 
   if (error || !stats || stats.length === 0) {
@@ -90,14 +88,6 @@ export async function getPositionTrendData(params: {
   }
 
   const rows = stats as RoundPlayerRow[];
-
-  // Pull player names from player_round_stats_2025 data
-  const playerNameMap = new Map<string, string>();
-  rows.forEach((r) => {
-    if (r.player_id && r.player) {
-      playerNameMap.set(r.player_id, r.player);
-    }
-  });
 
   const playerMap = new Map<
     string,
@@ -107,14 +97,14 @@ export async function getPositionTrendData(params: {
   rows.forEach((row) => {
     const value = getStatValue(stat, row);
 
-    if (!playerMap.has(row.player_id)) {
-      playerMap.set(row.player_id, {
-        name: playerNameMap.get(row.player_id) ?? "Unknown Player",
+    if (!playerMap.has(row.player)) {
+      playerMap.set(row.player, {
+        name: row.player,
         games: [],
       });
     }
 
-    playerMap.get(row.player_id)!.games.push({
+    playerMap.get(row.player)!.games.push({
       round: row.round_number,
       value,
     });
@@ -122,13 +112,13 @@ export async function getPositionTrendData(params: {
 
   const metrics: PositionPlayerMetrics[] = [];
 
-  playerMap.forEach((player, playerId) => {
-    if (player.games.length < 3) return;
+  playerMap.forEach((playerData, playerName) => {
+    if (playerData.games.length < 3) return;
 
-    player.games.sort((a, b) => a.round - b.round);
+    playerData.games.sort((a, b) => a.round - b.round);
 
-    const allValues = player.games.map((g) => g.value);
-    const last5 = player.games.slice(-5).map((g) => g.value);
+    const allValues = playerData.games.map((g) => g.value);
+    const last5 = playerData.games.slice(-5).map((g) => g.value);
     if (last5.length < 3) return;
 
     const seasonAvg = allValues.reduce((a, b) => a + b, 0) / allValues.length;
@@ -142,8 +132,8 @@ export async function getPositionTrendData(params: {
     const composite = delta * (0.3 + 0.7 * (stability / 100));
 
     metrics.push({
-      player_id: playerId, // ✅ keep real UUID
-      full_name: player.name,
+      player: playerName,
+      full_name: playerData.name,
       last_5_values: last5,
       season_avg: seasonAvg,
       l5_avg: l5Avg,
