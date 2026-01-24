@@ -9,26 +9,24 @@ const fmt1 = (v: any): string => {
   return Number.isFinite(num) ? num.toFixed(1) : "—";
 };
 
+/**
+ * STRICT FRONTEND GUARD FOR ROUND LABELS
+ *
+ * This component ONLY renders round labels from the backend round_display field.
+ * NO dynamic generation of R24, R24(1), or R24(2) labels.
+ *
+ * The backend must provide exact labels like:
+ * - "R1", "R2", ..., "R23"
+ * - "R24(1)" for Round 24 Game 1
+ * - "R24(2)" for Round 24 Game 2
+ * - "FW1", "SF", "PF", "GF" for finals
+ *
+ * Column order is determined by round_sort_key from the backend.
+ * Duplicate labels collapse into a single column (using display_label as unique key).
+ */
 function formatRoundLabel(label: string): string {
-  // Handle split rounds like "Round 24 (1/2)" → "R24 (1)"
-  if (label.includes('(1/2)')) {
-    const num = label.match(/\d+/)?.[0];
-    return `R${num} (1)`;
-  }
-
-  // Handle split rounds like "Round 24 (2/2)" → "R24 (2)"
-  if (label.includes('(2/2)')) {
-    const num = label.match(/\d+/)?.[0];
-    return `R${num} (2)`;
-  }
-
-  // Handle regular rounds like "Round 24" → "R24"
-  if (label.startsWith('Round ')) {
-    const num = label.replace('Round ', '').trim();
-    return `R${num}`;
-  }
-
-  // Keep finals labels as-is (FW1, SF, PF, GF)
+  // GUARD: Use backend label directly without transformation
+  // This prevents dynamic generation of R24 variations
   return label;
 }
 
@@ -152,11 +150,23 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
     [sortedPlayers, visibleCount]
   );
 
+  /**
+   * COLUMN GENERATION LOGIC
+   *
+   * Key Points:
+   * 1. display_label is the ONLY unique identifier (from backend round_display)
+   * 2. If duplicate display_label values exist, they automatically collapse into one column
+   * 3. Column order is determined by round_sort_key (backend controlled)
+   * 4. Mobile and desktop use the SAME source (no separate logic)
+   *
+   * Expected column order: ... R23 → R24(1) → R24(2) → FW1 → SF → PF → GF
+   */
   const allGameColumns = useMemo(() => {
     const gameColumnsMap = new Map<string, { round_sort_key: number; display_label: string }>();
 
     for (const player of players) {
       for (const game of player.games) {
+        // GUARD: Use display_label as unique key - duplicates automatically collapse
         if (!gameColumnsMap.has(game.display_label)) {
           gameColumnsMap.set(game.display_label, {
             round_sort_key: game.round_sort_key,
@@ -167,11 +177,18 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
     }
 
     const columns = Array.from(gameColumnsMap.values());
+    // Sort by round_sort_key to ensure correct column order
     columns.sort((a, b) => a.round_sort_key - b.round_sort_key);
 
     return columns;
   }, [players]);
 
+  /**
+   * MOBILE & DESKTOP CONSISTENCY
+   *
+   * Both mobile and desktop render the SAME columns from allGameColumns.
+   * No separate round lists or filtering logic.
+   */
   const visibleGameColumns = useMemo(() => {
     return allGameColumns;
   }, [allGameColumns]);
@@ -230,6 +247,7 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                     }`}
                     title={col.display_label}
                   >
+                    {/* GUARD: Render backend round_display directly - no transformation */}
                     {formatRoundLabel(col.display_label)}
                   </th>
                 ))}
@@ -285,6 +303,7 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                   </td>
 
                   {visibleGameColumns.map((col) => {
+                    // GUARD: Match game data by display_label (not round_sort_key)
                     const game = player.games.find(g => g.display_label === col.display_label);
                     const score = game?.score ?? null;
                     return (
