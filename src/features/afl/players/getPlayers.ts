@@ -120,7 +120,7 @@ export async function getPlayers(
     while (hasMore) {
       const to = from + pageSize - 1;
       const { data, error } = await supabase
-        .from("player_round_stats_2025")
+        .from("player_round_with_colors")
         .select("season, round_number, player, team, position, team_color, played, disposals, goals, fantasy_points")
         .eq("season", 2025)
         .order("round_number", { ascending: true })
