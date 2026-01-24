@@ -154,23 +154,26 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
    * COLUMN GENERATION LOGIC
    *
    * Key Points:
-   * 1. display_label is the ONLY unique identifier (from backend round_display)
-   * 2. If duplicate display_label values exist, they automatically collapse into one column
-   * 3. Column order is determined by round_sort_key (backend controlled)
+   * 1. Composite key (round_number-match_index) is the unique identifier
+   * 2. display_label is generated for UI display only
+   * 3. Column order is determined by round_sort_key
    * 4. Mobile and desktop use the SAME source (no separate logic)
    *
    * Expected column order: ... R23 → R24(1) → R24(2) → FW1 → SF → PF → GF
    */
   const allGameColumns = useMemo(() => {
-    const gameColumnsMap = new Map<string, { round_sort_key: number; display_label: string }>();
+    const gameColumnsMap = new Map<string, { round_sort_key: number; display_label: string; round_number: number; match_index: number }>();
 
     for (const player of players) {
       for (const game of player.games) {
-        // GUARD: Use display_label as unique key - duplicates automatically collapse
-        if (!gameColumnsMap.has(game.display_label)) {
-          gameColumnsMap.set(game.display_label, {
+        // Use composite key: round_number-match_index
+        const columnKey = `${game.round_number}-${game.match_index}`;
+        if (!gameColumnsMap.has(columnKey)) {
+          gameColumnsMap.set(columnKey, {
             round_sort_key: game.round_sort_key,
             display_label: game.display_label,
+            round_number: game.round_number,
+            match_index: game.match_index,
           });
         }
       }
@@ -239,18 +242,20 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                   Player
                 </th>
 
-                {visibleGameColumns.map((col) => (
-                  <th
-                    key={col.display_label}
-                    className={`sticky top-0 z-30 bg-black/95 backdrop-blur-xl py-2 text-center border-b border-white/10 ${
-                      isMobile ? 'px-1 min-w-[44px] text-[9px]' : 'px-2 min-w-[56px]'
-                    }`}
-                    title={col.display_label}
-                  >
-                    {/* GUARD: Render backend round_display directly - no transformation */}
-                    {formatRoundLabel(col.display_label)}
-                  </th>
-                ))}
+                {visibleGameColumns.map((col) => {
+                  const columnKey = `${col.round_number}-${col.match_index}`;
+                  return (
+                    <th
+                      key={columnKey}
+                      className={`sticky top-0 z-30 bg-black/95 backdrop-blur-xl py-2 text-center border-b border-white/10 ${
+                        isMobile ? 'px-1 min-w-[44px] text-[9px]' : 'px-2 min-w-[56px]'
+                      }`}
+                      title={col.display_label}
+                    >
+                      {formatRoundLabel(col.display_label)}
+                    </th>
+                  );
+                })}
 
                 {!isMobile && (
                   <th className="sticky right-0 top-0 z-40 bg-black/95 backdrop-blur-xl px-3 py-2 text-left border-b border-l border-white/10 min-w-[220px] shadow-[-2px_0_8px_rgba(0,0,0,0.3)]">
@@ -303,11 +308,12 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                   </td>
 
                   {visibleGameColumns.map((col) => {
-                    // GUARD: Match game data by display_label (not round_sort_key)
-                    const game = player.games.find(g => g.display_label === col.display_label);
+                    // Match game data by composite key (round_number-match_index)
+                    const game = player.games.find(g => g.round_number === col.round_number && g.match_index === col.match_index);
                     const score = game?.score ?? null;
+                    const columnKey = `${col.round_number}-${col.match_index}`;
                     return (
-                      <td key={col.display_label} className={isMobile ? 'px-1 py-3 text-center' : 'px-2 py-3 text-center'}>
+                      <td key={columnKey} className={isMobile ? 'px-1 py-3 text-center' : 'px-2 py-3 text-center'}>
                         <div
                           className={`inline-flex items-center justify-center rounded-md border font-bold tabular-nums ${
                             isMobile
