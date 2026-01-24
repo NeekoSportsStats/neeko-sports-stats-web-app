@@ -153,12 +153,12 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
   );
 
   const allGameColumns = useMemo(() => {
-    const gameColumnsSet = new Map<number, { round_sort_key: number; display_label: string }>();
+    const gameColumnsMap = new Map<string, { round_sort_key: number; display_label: string }>();
 
     for (const player of players) {
       for (const game of player.games) {
-        if (!gameColumnsSet.has(game.round_sort_key)) {
-          gameColumnsSet.set(game.round_sort_key, {
+        if (!gameColumnsMap.has(game.display_label)) {
+          gameColumnsMap.set(game.display_label, {
             round_sort_key: game.round_sort_key,
             display_label: game.display_label,
           });
@@ -166,37 +166,10 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
       }
     }
 
-    const columns = Array.from(gameColumnsSet.values());
+    const columns = Array.from(gameColumnsMap.values());
     columns.sort((a, b) => a.round_sort_key - b.round_sort_key);
 
-    // Filter out duplicate base rounds when split rounds exist
-    // e.g., if we have "Round 24", "Round 24 (1/2)", and "Round 24 (2/2)",
-    // we only keep the split versions
-    const roundNumbers = new Set<string>();
-    const hasSplitRounds = new Set<string>();
-
-    // First pass: identify which rounds have split versions
-    for (const col of columns) {
-      if (col.display_label.includes('(1/2)') || col.display_label.includes('(2/2)')) {
-        const num = col.display_label.match(/Round (\d+)/)?.[1];
-        if (num) {
-          hasSplitRounds.add(num);
-        }
-      }
-    }
-
-    // Second pass: filter out base rounds that have split versions
-    const filteredColumns = columns.filter((col) => {
-      const match = col.display_label.match(/^Round (\d+)$/);
-      if (match && match[1]) {
-        const roundNum = match[1];
-        // Exclude this base round if it has split versions
-        return !hasSplitRounds.has(roundNum);
-      }
-      return true;
-    });
-
-    return filteredColumns;
+    return columns;
   }, [players]);
 
   const visibleGameColumns = useMemo(() => {
@@ -251,7 +224,7 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
 
                 {visibleGameColumns.map((col) => (
                   <th
-                    key={col.round_sort_key}
+                    key={col.display_label}
                     className={`sticky top-0 z-30 bg-black/95 backdrop-blur-xl py-2 text-center border-b border-white/10 ${
                       isMobile ? 'px-1 min-w-[44px] text-[9px]' : 'px-2 min-w-[56px]'
                     }`}
@@ -312,10 +285,10 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                   </td>
 
                   {visibleGameColumns.map((col) => {
-                    const game = player.games.find(g => g.round_sort_key === col.round_sort_key);
+                    const game = player.games.find(g => g.display_label === col.display_label);
                     const score = game?.score ?? null;
                     return (
-                      <td key={col.round_sort_key} className={isMobile ? 'px-1 py-3 text-center' : 'px-2 py-3 text-center'}>
+                      <td key={col.display_label} className={isMobile ? 'px-1 py-3 text-center' : 'px-2 py-3 text-center'}>
                         <div
                           className={`inline-flex items-center justify-center rounded-md border font-bold tabular-nums ${
                             isMobile
