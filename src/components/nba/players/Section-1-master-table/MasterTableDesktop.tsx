@@ -273,7 +273,7 @@ export default function MasterTableDesktop({
       </div>
 
       {/* ================= TABLE (SCROLL CONTAINER) ================= */}
-      <div className="relative max-h-[65vh] overflow-y-auto overflow-x-auto scrollbar-none">
+      <div className="relative overflow-x-auto scrollbar-none">
         <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-black/90 to-transparent z-40" />
         <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-black/90 to-transparent z-40" />
 

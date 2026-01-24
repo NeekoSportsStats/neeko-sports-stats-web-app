@@ -177,7 +177,7 @@ export default function TeamMasterTableDesktop({
           </div>
         </div>
 
-        <div className="relative max-h-[65vh] overflow-x-auto overflow-y-auto">
+        <div className="relative overflow-x-auto">
           <div
             className="flex text-[11px]"
             style={{

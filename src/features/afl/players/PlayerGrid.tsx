@@ -225,7 +225,7 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
 
         <div
           ref={scrollContainerRef}
-          className="max-h-[68vh] overflow-x-auto overflow-y-auto relative"
+          className="overflow-x-auto relative"
           style={{
             background: !isMobile
               ? `linear-gradient(to right, transparent 200px, rgba(0,0,0,0.4) 210px, rgba(0,0,0,0.4) calc(100% - 230px), transparent calc(100% - 220px))`
