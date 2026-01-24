@@ -33,7 +33,7 @@ export async function getFormStabilityGridData(params: {
 
   try {
     const { data, error } = await supabase
-      .from("afl.form_stability_grid_final")
+      .from("form_stability_grid_final")
       .select(`
         season,
         player_id,

@@ -32,7 +32,7 @@ function roundAverageFor(rows: any[], stat: RoundStat): number {
 
 export async function getRoundMomentumData(season: number, stat: RoundStat): Promise<RoundMomentumData> {
   const { data: rows } = await supabase
-    .from("afl.round_player_summary")
+    .from("round_player_summary")
     .select("player_id, disposals, goals, fantasy_points, round_number")
     .eq("season", 2025);
 
@@ -52,7 +52,7 @@ export async function getRoundMomentumData(season: number, stat: RoundStat): Pro
   const latest = rows.filter((r) => r.round_number === currentRound);
 
   const { data: averages } = await supabase
-    .from("afl.player_season_totals_2025")
+    .from("player_season_totals_2025")
     .select("player_id, avg_disposals, avg_goals, avg_fantasy, games_played")
     .eq("season", 2025)
     .gte("games_played", 5);
@@ -82,7 +82,7 @@ export async function getRoundMomentumData(season: number, stat: RoundStat): Pro
       .sort((a, b) => b.diff - a.diff)[0];
   }
 
-  const { data: players } = await supabase.from("afl.players").select("id, name").in("id", latest.map((r) => r.player_id));
+  const { data: players } = await supabase.from("players").select("id, name").in("id", latest.map((r) => r.player_id));
 
   const nameMap = new Map(players?.map((p) => [p.id, p.name]) ?? []);
 

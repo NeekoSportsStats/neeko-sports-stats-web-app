@@ -48,7 +48,7 @@ export async function getRoundMomentumData(
   stat: RoundStat
 ): Promise<RoundMomentumData> {
   const { data: rows, error: roundError } = await supabase
-    .from("afl.round_player_summary")
+    .from("round_player_summary")
     .select("player_id, disposals, goals, fantasy_points, round_number")
     .eq("season", 2025);
 
@@ -94,7 +94,7 @@ export async function getRoundMomentumData(
 
   // Season averages (>=5 games)
   const { data: averages, error: avgError } = await supabase
-    .from("afl.player_season_totals_2025")
+    .from("player_season_totals_2025")
     .select("player_id, avg_disposals, avg_goals, avg_fantasy, games_played")
     .eq("season", 2025)
     .gte("games_played", 5);
@@ -105,7 +105,7 @@ export async function getRoundMomentumData(
   // Names
   const playerIds = Array.from(new Set(latest.map((r) => r.player_id)));
   const { data: players } = await supabase
-    .from("afl.players")
+    .from("players")
     .select("id, name")
     .in("id", playerIds);
 

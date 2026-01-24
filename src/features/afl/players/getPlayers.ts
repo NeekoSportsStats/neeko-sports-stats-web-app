@@ -87,7 +87,7 @@ function computeStatsFromValues(values: number[], totalGames: number): PlayerSta
 export async function getAvailableTeams(): Promise<string[]> {
   try {
     const { data, error } = await supabase
-      .from("afl.teams")
+      .from("teams")
       .select("name")
       .order("name");
 
@@ -119,7 +119,7 @@ export async function getPlayers(
     while (hasMore) {
       const to = from + pageSize - 1;
       const { data, error } = await supabase
-        .from("afl.player_round_stats_2025")
+        .from("player_round_stats_2025")
         .select("season, round_number, player_id, player, team, position, team_color, played, disposals, goals, fantasy_points")
         .eq("season", 2025)
         .order("round_number", { ascending: true })
