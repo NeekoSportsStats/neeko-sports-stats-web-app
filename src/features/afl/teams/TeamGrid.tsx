@@ -33,9 +33,9 @@ function getColorClass(score: number | null, lens: StatLens): string {
   }
 
   if (lens === "disposals") {
-    if (score >= 330) return "bg-blue-500/15 border-blue-400/30 text-blue-300";
-    if (score >= 290) return "bg-emerald-500/15 border-emerald-400/30 text-emerald-300";
-    if (score >= 250) return "bg-yellow-500/15 border-yellow-400/30 text-yellow-300";
+    if (score >= 350) return "bg-blue-500/15 border-blue-400/30 text-blue-300";
+    if (score >= 310) return "bg-emerald-500/15 border-emerald-400/30 text-emerald-300";
+    if (score >= 275) return "bg-yellow-500/15 border-yellow-400/30 text-yellow-300";
     return "bg-red-500/10 border-red-400/25 text-red-300";
   }
 
@@ -51,9 +51,9 @@ function getHitRateBarColor(percentage: number, threshold: number, lens: StatLen
     if (threshold >= 1650) return percentage >= 50 ? "bg-emerald-400" : "bg-emerald-400/50";
     if (threshold >= 1500) return percentage >= 50 ? "bg-yellow-400" : "bg-yellow-400/50";
   } else if (lens === "disposals") {
-    if (threshold >= 330) return percentage >= 50 ? "bg-blue-400" : "bg-blue-400/50";
-    if (threshold >= 290) return percentage >= 50 ? "bg-emerald-400" : "bg-emerald-400/50";
-    if (threshold >= 250) return percentage >= 50 ? "bg-yellow-400" : "bg-yellow-400/50";
+    if (threshold >= 350) return percentage >= 50 ? "bg-blue-400" : "bg-blue-400/50";
+    if (threshold >= 310) return percentage >= 50 ? "bg-emerald-400" : "bg-emerald-400/50";
+    if (threshold >= 275) return percentage >= 50 ? "bg-yellow-400" : "bg-yellow-400/50";
   } else {
     if (threshold >= 16) return percentage >= 50 ? "bg-blue-400" : "bg-blue-400/50";
     if (threshold >= 13) return percentage >= 50 ? "bg-emerald-400" : "bg-emerald-400/50";

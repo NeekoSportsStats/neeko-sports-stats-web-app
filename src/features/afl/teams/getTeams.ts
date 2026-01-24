@@ -55,7 +55,7 @@ function getStatColumn(lens: StatLens): "fantasy_points" | "disposals" | "goals"
 
 function thresholdsForLens(lens: StatLens): number[] {
   if (lens === "fantasy") return [1400, 1500, 1600, 1700, 1800];
-  if (lens === "disposals") return [250, 275, 300, 325, 350];
+  if (lens === "disposals") return [275, 300, 325, 350, 375];
   return [10, 12, 14, 16, 18];
 }
 
