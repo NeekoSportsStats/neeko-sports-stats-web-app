@@ -32,7 +32,7 @@ function roundAverageFor(rows: any[], stat: RoundStat): number {
 
 export async function getRoundMomentumData(season: number, stat: RoundStat): Promise<RoundMomentumData> {
   const { data: rows } = await supabase
-    .from("player_round_stats_2025")
+    .from("player_round_with_colors")
     .select("player, disposals, goals, fantasy_points, round_number")
     .eq("season", 2025);
 
