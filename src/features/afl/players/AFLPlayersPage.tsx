@@ -70,22 +70,35 @@ export default function AFLPlayersPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="mx-auto max-w-7xl px-4 md:px-8 py-10">
+      <div className="mx-auto max-w-7xl px-4 md:px-8 py-6 md:py-10">
         {/* HERO */}
-        <div className="mb-4">
+        <div className="mb-3 md:mb-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-yellow-400/30 bg-yellow-500/10 text-yellow-200">
-                <Grid3X3 className="h-4 w-4" />
-                <span className="text-[11px] uppercase tracking-[0.22em] font-semibold">
-                  Master Grid
-                </span>
-              </div>
+              <TooltipProvider>
+                <Tooltip delayDuration={300}>
+                  <TooltipTrigger asChild>
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-yellow-400/30 bg-yellow-500/10 text-yellow-200 md:cursor-default cursor-pointer">
+                      <Grid3X3 className="h-4 w-4" />
+                      <span className="text-[11px] uppercase tracking-[0.22em] font-semibold">
+                        Master Grid
+                      </span>
+                      <Info className="h-3 w-3 md:hidden" />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="md:hidden max-w-xs bg-black/95 border-white/20 text-white/90 text-xs">
+                    <div className="space-y-1">
+                      <p className="font-semibold">Master Grid</p>
+                      <p className="text-white/70">View every player's season at a glance. Scroll horizontally to explore rounds and finals.</p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
-              <h1 className="mt-4 text-4xl md:text-5xl font-extrabold text-white">
+              <h1 className="mt-3 md:mt-4 text-4xl md:text-5xl font-extrabold text-white">
                 Full Season Player Ledger
               </h1>
-              <p className="mt-2 text-white/55 max-w-2xl">
+              <p className="mt-1.5 md:mt-2 text-white/55 max-w-2xl">
                 Track every player's form, ceiling and consistency across the entire season.
               </p>
             </div>
@@ -109,7 +122,7 @@ export default function AFLPlayersPage() {
         <div
           className={cn(
             "rounded-2xl border border-white/10 bg-black/35 backdrop-blur-xl",
-            "px-4 py-2.5 md:px-5 md:py-3"
+            "px-4 py-2 md:px-5 md:py-3"
           )}
         >
           <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
@@ -168,7 +181,8 @@ export default function AFLPlayersPage() {
                     key={l}
                     onClick={() => setLens(l)}
                     className={cn(
-                      "px-4 h-10 rounded-full border text-sm font-semibold transition-all",
+                      "rounded-full border text-sm font-semibold transition-all",
+                      "px-3.5 h-9 md:px-4 md:h-10",
                       active
                         ? "bg-yellow-400 text-black border-yellow-300 shadow-[0_0_18px_rgba(250,204,21,0.60)]"
                         : "bg-black/40 border-white/15 text-white/70 hover:border-yellow-400/50"
@@ -183,7 +197,7 @@ export default function AFLPlayersPage() {
         </div>
 
         {/* GRID OR COMING SOON */}
-        <div className="mt-4">
+        <div className="mt-3 md:mt-4">
           {loading ? (
             <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl p-12 text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-500/10 border border-yellow-400/30 mb-6 animate-pulse">

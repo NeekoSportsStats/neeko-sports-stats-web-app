@@ -292,7 +292,7 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                         <div
                           className={`inline-flex items-center justify-center rounded-md border font-bold tabular-nums ${
                             isMobile
-                              ? 'min-w-[36px] px-1.5 py-1.5 text-[11px]'
+                              ? 'min-w-[36px] px-[5px] py-[5.5px] text-[11px]'
                               : 'min-w-[42px] px-2 py-2 text-[12.5px]'
                           } ${getColorClass(score, lens)}`}
                         >

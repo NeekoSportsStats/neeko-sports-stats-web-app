@@ -129,17 +129,17 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
       ref={overlayRef}
       className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto"
     >
-      <div className="min-h-screen p-4 md:p-8">
+      <div className="min-h-screen p-3 md:p-8">
         <div className="max-w-5xl mx-auto">
-          <div className="flex items-start justify-between mb-6">
+          <div className="flex items-start justify-between mb-4 md:mb-6">
             <div className="flex items-center gap-4">
               <div
-                className="w-2 h-16 rounded-full"
+                className="w-2 h-16 md:h-16 h-14 rounded-full"
                 style={{ backgroundColor: player.teamColor || "#666" }}
               />
               <div>
-                <h2 className="text-3xl font-bold text-white">{player.name}</h2>
-                <div className="mt-1 flex items-center gap-3 text-white/60">
+                <h2 className="text-2xl md:text-3xl font-bold text-white">{player.name}</h2>
+                <div className="mt-0.5 md:mt-1 flex items-center gap-3 text-sm md:text-base text-white/60">
                   <span>{player.team}</span>
                   <span>·</span>
                   <span>{player.role}</span>
@@ -155,13 +155,15 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
             </button>
           </div>
 
-          <div className="space-y-10">
+          <div className="space-y-6 md:space-y-10">
             <div className="flex gap-2 flex-wrap">
               {lensOptions.map((option) => (
                 <button
                   key={option.value}
                   onClick={() => onLensChange(option.value)}
-                  className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                  className={`rounded-full border text-sm font-medium transition-all ${
+                    isMobile ? 'px-3.5 py-1.5' : 'px-4 py-2'
+                  } ${
                     lens === option.value
                       ? "bg-yellow-400 text-black border-yellow-300 shadow-[0_0_20px_rgba(250,204,21,0.7)]"
                       : "bg-black/40 border-white/20 text-white/70 hover:border-yellow-400/60"
