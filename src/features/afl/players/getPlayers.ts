@@ -87,17 +87,18 @@ function computeStatsFromValues(values: number[], totalGames: number): PlayerSta
 export async function getAvailableTeams(): Promise<string[]> {
   try {
     const { data, error } = await supabase
-      .from("teams")
-      .select("name")
-      .order("name");
+      .from("player_round_stats_2025")
+      .select("team")
+      .eq("season", 2025);
 
     if (error) {
       console.error("Error fetching teams:", error);
       return ["All Teams"];
     }
 
-    const teams = data || [];
-    return ["All Teams", ...teams.map((t) => t.name)];
+    const uniqueTeams = Array.from(new Set((data || []).map(r => r.team).filter(Boolean)));
+    uniqueTeams.sort();
+    return ["All Teams", ...uniqueTeams];
   } catch (err) {
     console.error("Exception fetching teams:", err);
     return ["All Teams"];

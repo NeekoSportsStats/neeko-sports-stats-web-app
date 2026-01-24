@@ -26,14 +26,10 @@ export interface PositionTrendData {
 
 interface RoundPlayerRow {
   player_id: string;
+  player: string;
   round_number: number;
   disposals: number | null;
   goals: number | null;
-}
-
-interface PlayerMeta {
-  id: string;
-  name: string;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -75,10 +71,11 @@ export async function getPositionTrendData(params: {
   }
 
   const { data: stats, error } = await supabase
-    .from("round_player_summary")
+    .from("player_round_stats_2025")
     .select(
       `
         player_id,
+        player,
         round_number,
         disposals,
         goals
@@ -94,18 +91,13 @@ export async function getPositionTrendData(params: {
 
   const rows = stats as RoundPlayerRow[];
 
-  // Pull player names (players table exists and has: id, name)
-  const playerIds = Array.from(new Set(rows.map((r) => r.player_id)));
-
-  const { data: players } = await supabase
-    .from("players")
-    .select("id, name")
-    .in("id", playerIds);
-
-  const playerNameMap = new Map(
-    (players as PlayerMeta[] | null | undefined)?.map((p) => [p.id, p.name]) ??
-      []
-  );
+  // Pull player names from player_round_stats_2025 data
+  const playerNameMap = new Map<string, string>();
+  rows.forEach((r) => {
+    if (r.player_id && r.player) {
+      playerNameMap.set(r.player_id, r.player);
+    }
+  });
 
   const playerMap = new Map<
     string,

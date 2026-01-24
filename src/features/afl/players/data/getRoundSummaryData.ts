@@ -48,8 +48,8 @@ export async function getRoundMomentumData(
   stat: RoundStat
 ): Promise<RoundMomentumData> {
   const { data: rows, error: roundError } = await supabase
-    .from("round_player_summary")
-    .select("player_id, disposals, goals, fantasy_points, round_number")
+    .from("player_round_stats_2025")
+    .select("player_id, player, disposals, goals, fantasy_points, round_number")
     .eq("season", 2025);
 
   if (roundError) {
@@ -102,14 +102,8 @@ export async function getRoundMomentumData(
   // avgError is not fatal — we still show top + league avg + sparkline
   const avgMap = new Map((averages ?? []).map((a) => [a.player_id, a]));
 
-  // Names
-  const playerIds = Array.from(new Set(latest.map((r) => r.player_id)));
-  const { data: players } = await supabase
-    .from("players")
-    .select("id, name")
-    .in("id", playerIds);
-
-  const nameMap = new Map((players ?? []).map((p) => [p.id, p.name]));
+  // Names from player_round_stats_2025 data
+  const nameMap = new Map(latest.map((r) => [r.player_id, r.player]));
   const safeName = (id: string) => nameMap.get(id) ?? "Unknown";
 
   // Top performer

@@ -32,8 +32,8 @@ function roundAverageFor(rows: any[], stat: RoundStat): number {
 
 export async function getRoundMomentumData(season: number, stat: RoundStat): Promise<RoundMomentumData> {
   const { data: rows } = await supabase
-    .from("round_player_summary")
-    .select("player_id, disposals, goals, fantasy_points, round_number")
+    .from("player_round_stats_2025")
+    .select("player_id, player, disposals, goals, fantasy_points, round_number")
     .eq("season", 2025);
 
   if (!rows?.length) {
@@ -82,9 +82,7 @@ export async function getRoundMomentumData(season: number, stat: RoundStat): Pro
       .sort((a, b) => b.diff - a.diff)[0];
   }
 
-  const { data: players } = await supabase.from("players").select("id, name").in("id", latest.map((r) => r.player_id));
-
-  const nameMap = new Map(players?.map((p) => [p.id, p.name]) ?? []);
+  const nameMap = new Map(latest.map((r) => [r.player_id, r.player]));
 
   const roundAvg = roundAverageFor(latest, stat);
 
