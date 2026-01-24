@@ -120,9 +120,9 @@ export async function getPlayers(
       const to = from + pageSize - 1;
       const { data, error } = await supabase
         .from("afl.player_round_stats_2025")
-        .select("season, round, player_id, player, team, position, team_color, played, disposals, goals, fantasy_points")
+        .select("season, round_number, player_id, player, team, position, team_color, played, disposals, goals, fantasy_points")
         .eq("season", 2025)
-        .order("round", { ascending: true })
+        .order("round_number", { ascending: true })
         .order("player", { ascending: true })
         .range(from, to);
 
@@ -152,7 +152,7 @@ export async function getPlayers(
       console.log(`Sample row with fantasy_points > 0:`, {
         player: sampleNonZero.player,
         team: sampleNonZero.team,
-        round: sampleNonZero.round,
+        round: sampleNonZero.round_number,
         fantasy_points: sampleNonZero.fantasy_points,
         disposals: sampleNonZero.disposals,
         goals: sampleNonZero.goals
@@ -163,13 +163,13 @@ export async function getPlayers(
     const allRounds = new Set<number>();
 
     for (const row of allData) {
-      if (!row.player_id || !row.player || row.round == null) {
+      if (!row.player_id || !row.player || row.round_number == null) {
         console.warn("Skipping invalid row:", row);
         continue;
       }
 
       const playerId = row.player_id;
-      allRounds.add(row.round);
+      allRounds.add(row.round_number);
 
       if (!playerMap.has(playerId)) {
         playerMap.set(playerId, {
@@ -189,10 +189,10 @@ export async function getPlayers(
       const rawScore = row[statColumn];
       const score = isPlayed && rawScore != null ? rawScore : null;
 
-      playerData.rounds[row.round] = score;
+      playerData.rounds[row.round_number] = score;
 
       if (isPlayed) {
-        playerData.roundsPlayed.add(row.round);
+        playerData.roundsPlayed.add(row.round_number);
         if (score !== null && score > 0) {
           playerData.rawValues.push(score);
         }
