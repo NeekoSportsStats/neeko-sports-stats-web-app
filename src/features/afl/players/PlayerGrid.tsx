@@ -9,6 +9,29 @@ const fmt1 = (v: any): string => {
   return Number.isFinite(num) ? num.toFixed(1) : "—";
 };
 
+function formatRoundLabel(label: string): string {
+  // Handle split rounds like "Round 24 (1/2)" → "R24 (1)"
+  if (label.includes('(1/2)')) {
+    const num = label.match(/\d+/)?.[0];
+    return `R${num} (1)`;
+  }
+
+  // Handle split rounds like "Round 24 (2/2)" → "R24 (2)"
+  if (label.includes('(2/2)')) {
+    const num = label.match(/\d+/)?.[0];
+    return `R${num} (2)`;
+  }
+
+  // Handle regular rounds like "Round 24" → "R24"
+  if (label.startsWith('Round ')) {
+    const num = label.replace('Round ', '').trim();
+    return `R${num}`;
+  }
+
+  // Keep finals labels as-is (FW1, SF, PF, GF)
+  return label;
+}
+
 interface PlayerGridProps {
   players: PlayerData[];
   lens: StatLens;
@@ -145,7 +168,35 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
 
     const columns = Array.from(gameColumnsSet.values());
     columns.sort((a, b) => a.round_sort_key - b.round_sort_key);
-    return columns;
+
+    // Filter out duplicate base rounds when split rounds exist
+    // e.g., if we have "Round 24", "Round 24 (1/2)", and "Round 24 (2/2)",
+    // we only keep the split versions
+    const roundNumbers = new Set<string>();
+    const hasSplitRounds = new Set<string>();
+
+    // First pass: identify which rounds have split versions
+    for (const col of columns) {
+      if (col.display_label.includes('(1/2)') || col.display_label.includes('(2/2)')) {
+        const num = col.display_label.match(/Round (\d+)/)?.[1];
+        if (num) {
+          hasSplitRounds.add(num);
+        }
+      }
+    }
+
+    // Second pass: filter out base rounds that have split versions
+    const filteredColumns = columns.filter((col) => {
+      const match = col.display_label.match(/^Round (\d+)$/);
+      if (match && match[1]) {
+        const roundNum = match[1];
+        // Exclude this base round if it has split versions
+        return !hasSplitRounds.has(roundNum);
+      }
+      return true;
+    });
+
+    return filteredColumns;
   }, [players]);
 
   const visibleGameColumns = useMemo(() => {
@@ -207,7 +258,7 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                     className="sticky top-0 z-30 bg-black/95 backdrop-blur-xl px-2 py-2 text-center border-b border-white/10 min-w-[56px]"
                     title={col.display_label}
                   >
-                    {col.display_label}
+                    {formatRoundLabel(col.display_label)}
                   </th>
                 ))}
 
