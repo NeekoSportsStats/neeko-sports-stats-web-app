@@ -19,9 +19,10 @@ export interface PlayerStats {
 
 export interface GameEntry {
   round_number: number;
+  round_sort_key: number;
   display_label: string;
   score: number | null;
-  game_index: number;
+  played: boolean;
 }
 
 export interface PlayerData {
@@ -75,12 +76,23 @@ function buildHitRates(values: number[], thresholds: number[], totalGames: numbe
   });
 }
 
-function computeStatsFromValues(values: number[], totalGames: number): PlayerStats {
+function computeStatsFromValues(values: number[], totalGames: number, lens: StatLens): PlayerStats {
   const total = values.reduce((s, v) => s + v, 0);
   const avg = totalGames > 0 ? total / totalGames : 0;
   const min = values.length > 0 ? Math.min(...values) : 0;
   const max = values.length > 0 ? Math.max(...values) : 0;
   const volatility = computeVolatility(values);
+
+  if (lens === "goals") {
+    return {
+      avg: Math.round(avg * 10) / 10,
+      min,
+      max,
+      games: totalGames,
+      total: Math.round(total * 10) / 10,
+      volatility: Math.round(volatility * 10) / 10,
+    };
+  }
 
   return {
     avg: Math.round(avg * 10) / 10,
@@ -128,10 +140,10 @@ export async function getPlayers(
     while (hasMore) {
       const to = from + pageSize - 1;
       const { data, error } = await supabase
-        .from("player_round_with_colors")
-        .select("season, round_number, player, team, position, team_color, disposals, goals, fantasy_points")
+        .from("v_player_round_canonical_2025")
+        .select("season, round_number, round_display, round_sort_key, player, team, position, team_color, played, disposals, goals, fantasy_points")
         .eq("season", 2025)
-        .order("round_number", { ascending: true })
+        .order("round_sort_key", { ascending: true })
         .order("player", { ascending: true })
         .range(from, to);
 
@@ -173,7 +185,7 @@ export async function getPlayers(
     const playerGamesMap = new Map<string, Array<any>>();
 
     for (const row of allData) {
-      if (!row.player || row.round_number == null) {
+      if (!row.player || row.round_number == null || row.round_sort_key == null) {
         console.warn("Skipping invalid row:", row);
         continue;
       }
@@ -199,45 +211,24 @@ export async function getPlayers(
       const playerGames = playerGamesMap.get(playerName)!;
       const rawScore = row[statColumn];
       const score = rawScore != null ? rawScore : null;
-      const isPlayed = score !== null;
+      const isPlayed = row.played === true;
 
       playerGames.push({
         round_number: row.round_number,
+        round_sort_key: row.round_sort_key,
+        display_label: row.round_display || `${row.round_number}`,
         score: score,
+        played: isPlayed,
       });
 
       if (!playerData.rounds[row.round_number]) {
         playerData.rounds[row.round_number] = score;
       }
 
-      if (isPlayed) {
+      if (isPlayed && score !== null) {
         playerData.roundsPlayed.add(row.round_number);
         if (score > 0) {
           playerData.rawValues.push(score);
-        }
-      }
-    }
-
-    for (const [playerName, games] of playerGamesMap) {
-      games.sort((a, b) => a.round_number - b.round_number);
-
-      const roundCounts = new Map<number, number>();
-      for (const game of games) {
-        roundCounts.set(game.round_number, (roundCounts.get(game.round_number) || 0) + 1);
-      }
-
-      const roundIndices = new Map<number, number>();
-      for (const game of games) {
-        const currentIndex = (roundIndices.get(game.round_number) || 0) + 1;
-        roundIndices.set(game.round_number, currentIndex);
-
-        const totalGames = roundCounts.get(game.round_number) || 1;
-        game.game_index = currentIndex;
-
-        if (totalGames > 1) {
-          game.display_label = `${game.round_number} (${currentIndex}/${totalGames})`;
-        } else {
-          game.display_label = `${game.round_number}`;
         }
       }
     }
@@ -250,7 +241,7 @@ export async function getPlayers(
     for (const [playerName, playerData] of playerMap) {
       const values = playerData.rawValues;
       const totalGames = playerData.roundsPlayed.size;
-      const stats = computeStatsFromValues(values, totalGames);
+      const stats = computeStatsFromValues(values, totalGames, lens);
       const hitRates = buildHitRates(values, thresholds, totalGames);
       const games = playerGamesMap.get(playerName) || [];
 

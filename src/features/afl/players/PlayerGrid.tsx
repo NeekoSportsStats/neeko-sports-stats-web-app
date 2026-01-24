@@ -3,6 +3,11 @@ import { PlayerData, StatLens } from "./getPlayers";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { getRoundLabel, getRoundTooltip } from "./utils";
 
+const fmt1 = (v: any): string => {
+  const num = Number(v);
+  return Number.isFinite(num) ? num.toFixed(1) : "—";
+};
+
 interface PlayerGridProps {
   players: PlayerData[];
   lens: StatLens;
@@ -133,23 +138,21 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
   );
 
   const allGameColumns = useMemo(() => {
-    const gameColumnsSet = new Map<string, { round_number: number; display_label: string; sort_key: string }>();
+    const gameColumnsSet = new Map<number, { round_sort_key: number; display_label: string }>();
 
     for (const player of players) {
       for (const game of player.games) {
-        const key = `${game.round_number}_${game.game_index}`;
-        if (!gameColumnsSet.has(key)) {
-          gameColumnsSet.set(key, {
-            round_number: game.round_number,
+        if (!gameColumnsSet.has(game.round_sort_key)) {
+          gameColumnsSet.set(game.round_sort_key, {
+            round_sort_key: game.round_sort_key,
             display_label: game.display_label,
-            sort_key: `${game.round_number.toString().padStart(3, '0')}_${game.game_index}`,
           });
         }
       }
     }
 
     const columns = Array.from(gameColumnsSet.values());
-    columns.sort((a, b) => a.sort_key.localeCompare(b.sort_key));
+    columns.sort((a, b) => a.round_sort_key - b.round_sort_key);
     return columns;
   }, [players]);
 
@@ -208,9 +211,9 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
 
                 {visibleGameColumns.map((col) => (
                   <th
-                    key={`${col.round_number}_${col.display_label}`}
+                    key={col.round_sort_key}
                     className="sticky top-0 z-30 bg-black/95 backdrop-blur-xl px-2 py-2 text-center border-b border-white/10 min-w-[56px]"
-                    title={getRoundTooltip(col.round_number)}
+                    title={col.display_label}
                   >
                     {col.display_label}
                   </th>
@@ -249,12 +252,10 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                   </td>
 
                   {visibleGameColumns.map((col) => {
-                    const game = player.games.find(
-                      g => g.round_number === col.round_number && g.display_label === col.display_label
-                    );
+                    const game = player.games.find(g => g.round_sort_key === col.round_sort_key);
                     const score = game?.score ?? null;
                     return (
-                      <td key={`${col.round_number}_${col.display_label}`} className="px-2 py-3 text-center">
+                      <td key={col.round_sort_key} className="px-2 py-3 text-center">
                         <div
                           className={`inline-flex items-center justify-center min-w-[42px] px-2 py-2 rounded-md border text-[12.5px] font-bold tabular-nums ${getColorClass(
                             score,
@@ -271,7 +272,9 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-2 whitespace-nowrap">
                         <span className="text-[9px] text-white/40 uppercase tracking-wider font-medium">AVG</span>
-                        <span className="text-lg font-bold text-yellow-400 tabular-nums">{player.stats.avg}</span>
+                        <span className="text-lg font-bold text-yellow-400 tabular-nums">
+                          {lens === "goals" ? fmt1(player.stats.avg) : player.stats.avg}
+                        </span>
                         <span className="text-white/25">•</span>
                         <span className="text-[11px] text-white/55 font-medium tabular-nums">{player.stats.games}g</span>
                         <span className="text-white/25">•</span>

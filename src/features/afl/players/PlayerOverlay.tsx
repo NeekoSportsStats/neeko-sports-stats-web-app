@@ -6,6 +6,11 @@ import { useNavigate } from "react-router-dom";
 import { getRoundLabel } from "./utils";
 import { getPerformanceSummaryText } from "./performanceSummary";
 
+const fmt1 = (v: any): string => {
+  const num = Number(v);
+  return Number.isFinite(num) ? num.toFixed(1) : "—";
+};
+
 interface PlayerOverlayProps {
   player: PlayerData;
   lens: StatLens;
@@ -40,17 +45,16 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
   }, [lens]);
 
   const recalculatedHitRates = useMemo(() => {
-    const values = player.games
-      .map(g => g.score)
-      .filter((v): v is number => typeof v === "number" && v >= 0);
-    const totalGames = player.stats.games;
+    const playedGames = player.games.filter(g => g.played && g.score != null);
+    const values = playedGames.map(g => g.score as number);
+    const totalGames = playedGames.length;
 
     return hitRateThresholds.map((threshold) => {
       const count = values.filter((v) => v >= threshold).length;
       const percentage = totalGames > 0 ? (count / totalGames) * 100 : 0;
       return { threshold, count, percentage };
     });
-  }, [player.games, hitRateThresholds, player.stats.games]);
+  }, [player.games, hitRateThresholds]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -264,7 +268,9 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-white/60">Average</span>
-                      <span className="text-2xl font-bold text-yellow-400">{player.stats.avg}</span>
+                      <span className="text-2xl font-bold text-yellow-400">
+                        {lens === "goals" ? fmt1(player.stats.avg) : player.stats.avg}
+                      </span>
                     </div>
 
                     <div className="flex items-center justify-between">
@@ -284,13 +290,15 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
 
                     <div className="flex items-center justify-between">
                       <span className="text-white/60">Total</span>
-                      <span className="text-lg font-semibold text-white">{player.stats.total}</span>
+                      <span className="text-lg font-semibold text-white">
+                        {lens === "goals" ? fmt1(player.stats.total) : player.stats.total}
+                      </span>
                     </div>
 
                     <div className="flex items-center justify-between border-t border-white/10 pt-4">
                       <span className="text-white/60">Volatility</span>
                       <span className="text-lg font-semibold text-orange-400">
-                        {player.stats.volatility}
+                        {lens === "goals" ? fmt1(player.stats.volatility) : player.stats.volatility}
                       </span>
                     </div>
                   </div>
@@ -306,27 +314,30 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
                 </div>
 
                 <div className="space-y-4">
-                  {recalculatedHitRates.map((hr) => (
-                    <div key={hr.threshold} className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-white/60">{hr.threshold}+ </span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-white font-semibold">
-                            {hr.count}/{player.stats.games}
-                          </span>
-                          <span className="text-yellow-400 font-bold">
-                            {Math.round(hr.percentage)}%
-                          </span>
+                  {recalculatedHitRates.map((hr, idx) => {
+                    const playedGames = player.games.filter(g => g.played && g.score != null).length;
+                    return (
+                      <div key={`${hr.threshold}_${idx}`} className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-white/60">{hr.threshold}+ </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-white font-semibold">
+                              {hr.count}/{playedGames}
+                            </span>
+                            <span className="text-yellow-400 font-bold">
+                              {Math.round(hr.percentage)}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 transition-all duration-500"
+                            style={{ width: `${hr.percentage}%` }}
+                          />
                         </div>
                       </div>
-                      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 transition-all duration-500"
-                          style={{ width: `${hr.percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
