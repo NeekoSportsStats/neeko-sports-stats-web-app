@@ -132,21 +132,33 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
     [sortedPlayers, visibleCount]
   );
 
-  const roundHeaders = useMemo(() => {
-    if (maxRound === 0) return [];
-    const rounds = [];
-    for (let i = minRound; i <= maxRound; i++) {
-      rounds.push(i);
-    }
-    return rounds;
-  }, [minRound, maxRound]);
+  const allGameColumns = useMemo(() => {
+    const gameColumnsSet = new Map<string, { round_number: number; display_label: string; sort_key: string }>();
 
-  const visibleRounds = useMemo(() => {
-    if (isMobile) {
-      return roundHeaders.filter(r => r === 0 || r === 1 || r === 2);
+    for (const player of players) {
+      for (const game of player.games) {
+        const key = `${game.round_number}_${game.game_index}`;
+        if (!gameColumnsSet.has(key)) {
+          gameColumnsSet.set(key, {
+            round_number: game.round_number,
+            display_label: game.display_label,
+            sort_key: `${game.round_number.toString().padStart(3, '0')}_${game.game_index}`,
+          });
+        }
+      }
     }
-    return roundHeaders;
-  }, [roundHeaders, isMobile]);
+
+    const columns = Array.from(gameColumnsSet.values());
+    columns.sort((a, b) => a.sort_key.localeCompare(b.sort_key));
+    return columns;
+  }, [players]);
+
+  const visibleGameColumns = useMemo(() => {
+    if (isMobile) {
+      return allGameColumns.slice(0, 3);
+    }
+    return allGameColumns;
+  }, [allGameColumns, isMobile]);
 
   const cap = isMobile ? CAP_MOBILE : CAP_DESKTOP;
   const step = isMobile ? STEP_MOBILE : STEP_DESKTOP;
@@ -194,13 +206,13 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                   Player
                 </th>
 
-                {visibleRounds.map((roundNum) => (
+                {visibleGameColumns.map((col) => (
                   <th
-                    key={roundNum}
+                    key={`${col.round_number}_${col.display_label}`}
                     className="sticky top-0 z-30 bg-black/95 backdrop-blur-xl px-2 py-2 text-center border-b border-white/10 min-w-[56px]"
-                    title={getRoundTooltip(roundNum)}
+                    title={getRoundTooltip(col.round_number)}
                   >
-                    {getRoundLabel(roundNum)}
+                    {col.display_label}
                   </th>
                 ))}
 
@@ -236,13 +248,16 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                     </div>
                   </td>
 
-                  {visibleRounds.map((roundNum) => {
-                    const score = player.rounds[roundNum];
+                  {visibleGameColumns.map((col) => {
+                    const game = player.games.find(
+                      g => g.round_number === col.round_number && g.display_label === col.display_label
+                    );
+                    const score = game?.score ?? null;
                     return (
-                      <td key={roundNum} className="px-2 py-3 text-center">
+                      <td key={`${col.round_number}_${col.display_label}`} className="px-2 py-3 text-center">
                         <div
                           className={`inline-flex items-center justify-center min-w-[42px] px-2 py-2 rounded-md border text-[12.5px] font-bold tabular-nums ${getColorClass(
-                            score ?? null,
+                            score,
                             lens
                           )}`}
                         >

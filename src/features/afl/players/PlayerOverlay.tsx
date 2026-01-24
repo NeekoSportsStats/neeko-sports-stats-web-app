@@ -16,6 +16,16 @@ interface PlayerOverlayProps {
 export default function PlayerOverlay({ player, lens, onLensChange, onClose }: PlayerOverlayProps) {
   const navigate = useNavigate();
   const overlayRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const lensOptions: { value: StatLens; label: string }[] = [
     { value: "fantasy", label: "Fantasy" },
@@ -30,9 +40,9 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
   }, [lens]);
 
   const recalculatedHitRates = useMemo(() => {
-    const values = Object.values(player.rounds).filter(
-      (v): v is number => typeof v === "number" && v >= 0
-    );
+    const values = player.games
+      .map(g => g.score)
+      .filter((v): v is number => typeof v === "number" && v >= 0);
     const totalGames = player.stats.games;
 
     return hitRateThresholds.map((threshold) => {
@@ -40,7 +50,7 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
       const percentage = totalGames > 0 ? (count / totalGames) * 100 : 0;
       return { threshold, count, percentage };
     });
-  }, [player.rounds, hitRateThresholds, player.stats.games]);
+  }, [player.games, hitRateThresholds, player.stats.games]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -67,31 +77,33 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
   }, [onClose]);
 
   const recentRounds = useMemo(() => {
-    const roundNumbers = Object.keys(player.rounds)
-      .map(Number)
-      .filter(n => !isNaN(n) && player.rounds[n] != null)
-      .sort((a, b) => a - b)
+    const games = [...player.games]
+      .filter(g => g.score != null)
+      .sort((a, b) => {
+        if (a.round_number !== b.round_number) return a.round_number - b.round_number;
+        return a.game_index - b.game_index;
+      })
       .slice(-5);
 
-    return roundNumbers.map(num => ({
-      roundNum: num,
-      score: player.rounds[num]
+    return games.map(game => ({
+      roundNum: game.round_number,
+      displayLabel: game.display_label,
+      score: game.score
     }));
-  }, [player.rounds]);
+  }, [player.games]);
 
   const chartData = useMemo(() => {
-    const roundNumbers = Object.keys(player.rounds)
-      .map(Number)
-      .filter(n => !isNaN(n))
-      .sort((a, b) => a - b);
-
-    return roundNumbers
-      .filter(num => player.rounds[num] != null)
-      .map(num => ({
-        round: `R${num}`,
-        score: player.rounds[num] as number,
+    return player.games
+      .filter(g => g.score != null)
+      .sort((a, b) => {
+        if (a.round_number !== b.round_number) return a.round_number - b.round_number;
+        return a.game_index - b.game_index;
+      })
+      .map(game => ({
+        round: game.display_label,
+        score: game.score as number,
       }));
-  }, [player.rounds]);
+  }, [player.games]);
 
   const handleViewAIAnalysis = () => {
     navigate("/sports/afl/ai-insights");
@@ -180,10 +192,10 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
 
                   return (
                     <div
-                      key={round.roundNum}
+                      key={`${round.roundNum}_${round.displayLabel}`}
                       className="flex flex-col items-center gap-2 px-4 py-3 rounded-lg border border-white/10 bg-white/5"
                     >
-                      <span className="text-xs text-white/50">{getRoundLabel(round.roundNum)}</span>
+                      <span className="text-xs text-white/50">{round.displayLabel}</span>
                       <span className={`text-2xl font-bold ${getColor()}`}>
                         {score == null ? "—" : score}
                       </span>
@@ -239,49 +251,51 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
               )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <Activity className="h-5 w-5 text-yellow-400" />
-                  <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider">
-                    Season Summary
-                  </h3>
+            <div className={`grid grid-cols-1 ${!isMobile ? 'lg:grid-cols-2' : ''} gap-6`}>
+              {!isMobile && (
+                <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Activity className="h-5 w-5 text-yellow-400" />
+                    <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider">
+                      Season Summary
+                    </h3>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/60">Average</span>
+                      <span className="text-2xl font-bold text-yellow-400">{player.stats.avg}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/60">Minimum</span>
+                      <span className="text-lg font-semibold text-white">{player.stats.min}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/60">Maximum</span>
+                      <span className="text-lg font-semibold text-white">{player.stats.max}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/60">Games Played</span>
+                      <span className="text-lg font-semibold text-white">{player.stats.games}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/60">Total</span>
+                      <span className="text-lg font-semibold text-white">{player.stats.total}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-white/10 pt-4">
+                      <span className="text-white/60">Volatility</span>
+                      <span className="text-lg font-semibold text-orange-400">
+                        {player.stats.volatility}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/60">Average</span>
-                    <span className="text-2xl font-bold text-yellow-400">{player.stats.avg}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/60">Minimum</span>
-                    <span className="text-lg font-semibold text-white">{player.stats.min}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/60">Maximum</span>
-                    <span className="text-lg font-semibold text-white">{player.stats.max}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/60">Games Played</span>
-                    <span className="text-lg font-semibold text-white">{player.stats.games}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/60">Total</span>
-                    <span className="text-lg font-semibold text-white">{player.stats.total}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between border-t border-white/10 pt-4">
-                    <span className="text-white/60">Volatility</span>
-                    <span className="text-lg font-semibold text-orange-400">
-                      {player.stats.volatility}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              )}
 
               <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4">
                 <div className="flex items-center gap-2 mb-4">

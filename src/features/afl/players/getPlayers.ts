@@ -17,12 +17,20 @@ export interface PlayerStats {
   volatility: number;
 }
 
+export interface GameEntry {
+  round_number: number;
+  display_label: string;
+  score: number | null;
+  game_index: number;
+}
+
 export interface PlayerData {
   id: string;
   name: string;
   team: string;
   role: string;
   teamColor: string;
+  games: GameEntry[];
   rounds: { [roundNumber: number]: number | null };
   stats: PlayerStats;
   hitRates: HitRate[];
@@ -162,6 +170,7 @@ export async function getPlayers(
 
     const playerMap = new Map<string, any>();
     const allRounds = new Set<number>();
+    const playerGamesMap = new Map<string, Array<any>>();
 
     for (const row of allData) {
       if (!row.player || row.round_number == null) {
@@ -183,14 +192,23 @@ export async function getPlayers(
           rawValues: [],
           roundsPlayed: new Set<number>(),
         });
+        playerGamesMap.set(playerName, []);
       }
 
       const playerData = playerMap.get(playerName);
+      const playerGames = playerGamesMap.get(playerName)!;
       const rawScore = row[statColumn];
       const score = rawScore != null ? rawScore : null;
       const isPlayed = score !== null;
 
-      playerData.rounds[row.round_number] = score;
+      playerGames.push({
+        round_number: row.round_number,
+        score: score,
+      });
+
+      if (!playerData.rounds[row.round_number]) {
+        playerData.rounds[row.round_number] = score;
+      }
 
       if (isPlayed) {
         playerData.roundsPlayed.add(row.round_number);
@@ -200,16 +218,41 @@ export async function getPlayers(
       }
     }
 
+    for (const [playerName, games] of playerGamesMap) {
+      games.sort((a, b) => a.round_number - b.round_number);
+
+      const roundCounts = new Map<number, number>();
+      for (const game of games) {
+        roundCounts.set(game.round_number, (roundCounts.get(game.round_number) || 0) + 1);
+      }
+
+      const roundIndices = new Map<number, number>();
+      for (const game of games) {
+        const currentIndex = (roundIndices.get(game.round_number) || 0) + 1;
+        roundIndices.set(game.round_number, currentIndex);
+
+        const totalGames = roundCounts.get(game.round_number) || 1;
+        game.game_index = currentIndex;
+
+        if (totalGames > 1) {
+          game.display_label = `${game.round_number} (${currentIndex}/${totalGames})`;
+        } else {
+          game.display_label = `${game.round_number}`;
+        }
+      }
+    }
+
     const minRound = allRounds.size > 0 ? Math.min(...Array.from(allRounds)) : 0;
     const maxRound = allRounds.size > 0 ? Math.max(...Array.from(allRounds)) : 0;
     const result: PlayerData[] = [];
     const thresholds = thresholdsForLens(lens);
 
-    for (const [_, playerData] of playerMap) {
+    for (const [playerName, playerData] of playerMap) {
       const values = playerData.rawValues;
       const totalGames = playerData.roundsPlayed.size;
       const stats = computeStatsFromValues(values, totalGames);
       const hitRates = buildHitRates(values, thresholds, totalGames);
+      const games = playerGamesMap.get(playerName) || [];
 
       result.push({
         id: playerData.id,
@@ -217,6 +260,7 @@ export async function getPlayers(
         team: playerData.team,
         role: playerData.role,
         teamColor: playerData.teamColor,
+        games: games,
         rounds: playerData.rounds,
         stats,
         hitRates,
