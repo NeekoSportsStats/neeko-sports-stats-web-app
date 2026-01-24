@@ -110,7 +110,7 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
   }, [player.games]);
 
   const handleViewAIAnalysis = () => {
-    navigate("/sports/afl/ai-insights");
+    navigate("/sports/afl/ai-analysis");
   };
 
   const performanceSummary = useMemo(() => {
