@@ -48,7 +48,7 @@ export async function getRoundMomentumData(
   stat: RoundStat
 ): Promise<RoundMomentumData> {
   const { data: rows, error: roundError } = await supabase
-    .from("player_round_stats_2025")
+    .from("player_round_with_colors")
     .select("player, disposals, goals, fantasy_points, round_number")
     .eq("season", 2025);
 
