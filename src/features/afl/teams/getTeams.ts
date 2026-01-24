@@ -1,122 +1,236 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 
 export type StatLens = "fantasy" | "disposals" | "goals";
 
-export interface RoundScore {
-  round: string;
-  score: number;
+export interface HitRate {
+  threshold: number;
+  count: number;
+  percentage: number;
+}
+
+export interface TeamStats {
+  avg: number;
+  min: number;
+  max: number;
+  games: number;
+  total: number;
+  volatility: number;
+}
+
+export interface GameEntry {
+  round_number: number;
+  round_sort_key: number;
+  display_label: string;
+  score: number | null;
+  played: boolean;
+  match_index: number;
 }
 
 export interface TeamData {
   id: string;
   name: string;
-  abbreviation: string;
-  color: string;
-  rounds: RoundScore[];
-  stats: {
-    avg: number;
-    min: number;
-    max: number;
-    games: number;
-    total: number;
-    volatility: number;
-  };
-  hitRates: {
-    threshold: number;
-    percentage: number;
-    count: number;
-  }[];
+  teamColor: string;
+  games: GameEntry[];
+  rounds: { [key: string]: number | null };
+  stats: TeamStats;
+  hitRates: HitRate[];
 }
 
-export interface TeamsQueryParams {
-  search?: string;
-  lens?: StatLens;
+export interface TeamsResponse {
+  teams: TeamData[];
+  minRound: number;
+  maxRound: number;
 }
 
-function generateMockTeamData(): TeamData[] {
-  const teams = [
-    { name: "Adelaide Crows", abbreviation: "ADE", color: "#002B5C" },
-    { name: "Brisbane Lions", abbreviation: "BRL", color: "#A30046" },
-    { name: "Carlton Blues", abbreviation: "CAR", color: "#0E1E2D" },
-    { name: "Collingwood Magpies", abbreviation: "COL", color: "#000000" },
-    { name: "Essendon Bombers", abbreviation: "ESS", color: "#CC2031" },
-    { name: "Fremantle Dockers", abbreviation: "FRE", color: "#2A0D45" },
-    { name: "Geelong Cats", abbreviation: "GEE", color: "#001F3D" },
-    { name: "Gold Coast Suns", abbreviation: "GCS", color: "#C8102E" },
-    { name: "GWS Giants", abbreviation: "GWS", color: "#F15A22" },
-    { name: "Hawthorn Hawks", abbreviation: "HAW", color: "#4D2004" },
-    { name: "Melbourne Demons", abbreviation: "MEL", color: "#CC2031" },
-    { name: "North Melbourne Kangaroos", abbreviation: "NTH", color: "#003F87" },
-    { name: "Port Adelaide Power", abbreviation: "POR", color: "#008AAB" },
-    { name: "Richmond Tigers", abbreviation: "RIC", color: "#FFD200" },
-    { name: "St Kilda Saints", abbreviation: "STK", color: "#ED0F05" },
-    { name: "Sydney Swans", abbreviation: "SYD", color: "#ED171F" },
-    { name: "West Coast Eagles", abbreviation: "WCE", color: "#00209F" },
-    { name: "Western Bulldogs", abbreviation: "WBD", color: "#014896" },
-  ];
+function getStatColumn(lens: StatLens): "fantasy_points" | "disposals" | "goals" {
+  switch (lens) {
+    case "fantasy":
+      return "fantasy_points";
+    case "disposals":
+      return "disposals";
+    case "goals":
+      return "goals";
+  }
+}
 
-  const teamsData: TeamData[] = teams.map((team, idx) => {
-    const rounds: RoundScore[] = [];
-    const roundCount = 10;
+function thresholdsForLens(lens: StatLens): number[] {
+  if (lens === "fantasy") return [1400, 1500, 1600, 1700, 1800];
+  if (lens === "disposals") return [250, 275, 300, 325, 350];
+  return [10, 12, 14, 16, 18];
+}
 
-    for (let r = 0; r <= roundCount; r++) {
-      const roundLabel = r === 0 ? "OR" : `R${r}`;
-      const baseScore = 1600 + Math.random() * 400;
-      const variance = (Math.random() - 0.5) * 200;
-      const score = Math.max(1200, Math.round(baseScore + variance));
-      rounds.push({ round: roundLabel, score });
-    }
+function computeVolatility(values: number[]): number {
+  if (values.length <= 1) return 0;
+  const mean = values.reduce((s, v) => s + v, 0) / values.length;
+  const variance =
+    values.reduce((s, v) => s + (v - mean) * (v - mean), 0) / values.length;
+  return Math.round(Math.sqrt(variance) * 10) / 10;
+}
 
-    const scores = rounds.filter(r => r.round !== "OR").map(r => r.score);
-    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-    const min = Math.min(...scores);
-    const max = Math.max(...scores);
-    const total = scores.reduce((a, b) => a + b, 0);
-    const variance = scores.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / scores.length;
-    const volatility = Math.sqrt(variance);
-
-    const hitRates = [1600, 1700, 1800, 1900, 2000].map(threshold => {
-      const count = scores.filter(s => s >= threshold).length;
-      const percentage = (count / scores.length) * 100;
-      return { threshold, percentage, count };
-    });
-
-    return {
-      id: `team-${idx}`,
-      name: team.name,
-      abbreviation: team.abbreviation,
-      color: team.color,
-      rounds,
-      stats: {
-        avg: Math.round(avg),
-        min,
-        max,
-        games: scores.length,
-        total,
-        volatility: Math.round(volatility),
-      },
-      hitRates,
-    };
+function buildHitRates(values: number[], thresholds: number[], totalGames: number): HitRate[] {
+  return thresholds.map((t) => {
+    const count = values.filter((v) => v >= t).length;
+    const pct = totalGames > 0 ? (count / totalGames) * 100 : 0;
+    return { threshold: t, count, percentage: pct };
   });
-
-  return teamsData.sort((a, b) => b.stats.avg - a.stats.avg);
 }
 
-export async function getTeams(params?: TeamsQueryParams): Promise<TeamData[]> {
-  let teams = generateMockTeamData();
+function computeStatsFromValues(values: number[], totalGames: number, lens: StatLens): TeamStats {
+  const total = values.reduce((s, v) => s + v, 0);
+  const avg = totalGames > 0 ? total / totalGames : 0;
+  const min = values.length > 0 ? Math.min(...values) : 0;
+  const max = values.length > 0 ? Math.max(...values) : 0;
+  const volatility = computeVolatility(values);
 
-  if (params?.search) {
-    const search = params.search.toLowerCase();
-    teams = teams.filter(t =>
-      t.name.toLowerCase().includes(search) ||
-      t.abbreviation.toLowerCase().includes(search)
-    );
+  if (lens === "goals") {
+    return {
+      avg: Math.round(avg * 10) / 10,
+      min: Math.round(min * 10) / 10,
+      max: Math.round(max * 10) / 10,
+      games: totalGames,
+      total: Math.round(total * 10) / 10,
+      volatility: Math.round(volatility * 10) / 10,
+    };
   }
 
-  return teams;
+  return {
+    avg: Math.round(avg * 10) / 10,
+    min: Math.round(min),
+    max: Math.round(max),
+    games: totalGames,
+    total: Math.round(total),
+    volatility,
+  };
 }
 
-export async function getTeamById(id: string): Promise<TeamData | null> {
-  const teams = await getTeams();
-  return teams.find(t => t.id === id) || null;
+export async function getTeams(
+  lens: StatLens,
+  season: number
+): Promise<TeamsResponse> {
+  const statColumn = getStatColumn(lens);
+
+  try {
+    const pageSize = 1000;
+    let allData: any[] = [];
+    let from = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const to = from + pageSize - 1;
+      const { data, error } = await supabase
+        .from("v_team_round_canonical_2025")
+        .select("season, round_number, round_display, round_sort_key, team, team_color, played, disposals, goals, fantasy_points, match_index")
+        .eq("season", 2025)
+        .order("round_sort_key", { ascending: true })
+        .order("match_index", { ascending: true })
+        .order("team", { ascending: true })
+        .range(from, to);
+
+      if (error) {
+        console.error("Error fetching team data:", error);
+        return { teams: [], minRound: 0, maxRound: 0 };
+      }
+
+      if (!data || data.length === 0) {
+        break;
+      }
+
+      allData = allData.concat(data);
+      hasMore = data.length === pageSize;
+      from = to + 1;
+    }
+
+    if (allData.length === 0) {
+      console.log(`No team data found for season ${season}`);
+      return { teams: [], minRound: 0, maxRound: 0 };
+    }
+
+    console.log(`✓ Fetched total ${allData.length} rows for season ${season} (teams)`);
+
+    const teamMap = new Map<string, any>();
+    const allRounds = new Set<number>();
+    const teamGamesMap = new Map<string, Array<any>>();
+
+    for (const row of allData) {
+      if (!row.team || row.round_number == null || row.round_sort_key == null) {
+        console.warn("Skipping invalid row:", row);
+        continue;
+      }
+
+      const teamName = row.team;
+      allRounds.add(row.round_number);
+
+      if (!teamMap.has(teamName)) {
+        teamMap.set(teamName, {
+          id: teamName,
+          name: teamName,
+          teamColor: row.team_color || "#666666",
+          rounds: {},
+          rawValues: [],
+          roundsPlayed: new Set<number>(),
+        });
+        teamGamesMap.set(teamName, []);
+      }
+
+      const teamData = teamMap.get(teamName);
+      const teamGames = teamGamesMap.get(teamName)!;
+      const rawScore = row[statColumn];
+      const score = rawScore != null ? rawScore : null;
+      const isPlayed = row.played === true;
+
+      const matchIndex = row.match_index || 1;
+
+      teamGames.push({
+        round_number: row.round_number,
+        round_sort_key: row.round_sort_key,
+        display_label: matchIndex > 1 ? `R${row.round_number}(${matchIndex})` : `R${row.round_number}`,
+        score: score,
+        played: isPlayed,
+        match_index: matchIndex,
+      });
+
+      const roundKey = `${row.round_number}_${matchIndex}`;
+      if (!teamData.rounds[roundKey]) {
+        teamData.rounds[roundKey] = score;
+      }
+
+      if (isPlayed && score !== null) {
+        teamData.roundsPlayed.add(row.round_number);
+        if (score > 0) {
+          teamData.rawValues.push(score);
+        }
+      }
+    }
+
+    const minRound = allRounds.size > 0 ? Math.min(...Array.from(allRounds)) : 0;
+    const maxRound = allRounds.size > 0 ? Math.max(...Array.from(allRounds)) : 0;
+    const result: TeamData[] = [];
+    const thresholds = thresholdsForLens(lens);
+
+    for (const [teamName, teamData] of teamMap) {
+      const values = teamData.rawValues;
+      const totalGames = teamData.roundsPlayed.size;
+      const stats = computeStatsFromValues(values, totalGames, lens);
+      const hitRates = buildHitRates(values, thresholds, totalGames);
+      const games = teamGamesMap.get(teamName) || [];
+
+      result.push({
+        id: teamData.id,
+        name: teamData.name,
+        teamColor: teamData.teamColor,
+        games: games,
+        rounds: teamData.rounds,
+        stats,
+        hitRates,
+      });
+    }
+
+    console.log(`✓ Round range: ${minRound} to ${maxRound}`);
+    console.log(`✓ Processed ${result.length} teams`);
+
+    return { teams: result, minRound, maxRound };
+  } catch (err) {
+    console.error("Exception fetching team data:", err);
+    return { teams: [], minRound: 0, maxRound: 0 };
+  }
 }
