@@ -220,7 +220,7 @@ export async function getPlayers(
       playerGames.push({
         round_number: row.round_number,
         round_sort_key: row.round_sort_key,
-        display_label: row.round_display || `${row.round_number}`,
+        display_label: row.round_display || `R${row.round_number}${matchIndex > 1 ? `(${matchIndex})` : ''}`,
         score: score,
         played: isPlayed,
         match_index: matchIndex,
