@@ -70,7 +70,7 @@ export async function getPositionTrendData(params: {
   }
 
   const { data: stats, error } = await supabase
-    .from("player_round_stats_2025")
+    .from("player_round_with_colors")
     .select(
       `
         player,
