@@ -25,6 +25,7 @@ export interface MatchData {
   id: string;
   round: string;
   season: number;
+  match_index: number; // Added to support double-header rounds (e.g., R24 2025)
   status: MatchStatus;
   homeTeam: TeamInfo;
   awayTeam: TeamInfo;
@@ -148,9 +149,10 @@ function generateMockMatches(season: number, round: string): MatchData[] {
     const time = timeOptions[i % timeOptions.length];
 
     matches.push({
-      id: `match-${season}-${round}-${i}`,
+      id: `match-${season}-${round}-${i}-match1`, // Include match_index in ID for uniqueness
       round,
       season,
+      match_index: 1, // Default to 1 for regular rounds
       status: "upcoming",
       homeTeam: homeInfo,
       awayTeam: awayInfo,

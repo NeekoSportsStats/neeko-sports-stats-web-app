@@ -23,6 +23,7 @@ export interface GameEntry {
   display_label: string;
   score: number | null;
   played: boolean;
+  match_index: number;
 }
 
 export interface PlayerData {
@@ -32,7 +33,7 @@ export interface PlayerData {
   role: string;
   teamColor: string;
   games: GameEntry[];
-  rounds: { [roundNumber: number]: number | null };
+  rounds: { [key: string]: number | null }; // Changed to string key to support "round_matchIndex" format (e.g., "24_1", "24_2")
   stats: PlayerStats;
   hitRates: HitRate[];
 }
@@ -141,9 +142,10 @@ export async function getPlayers(
       const to = from + pageSize - 1;
       const { data, error } = await supabase
         .from("v_player_round_canonical_2025")
-        .select("season, round_number, round_display, round_sort_key, player, team, position, team_color, played, disposals, goals, fantasy_points")
+        .select("season, round_number, round_display, round_sort_key, player, team, position, team_color, played, disposals, goals, fantasy_points, match_index")
         .eq("season", 2025)
         .order("round_sort_key", { ascending: true })
+        .order("match_index", { ascending: true })
         .order("player", { ascending: true })
         .range(from, to);
 
@@ -213,19 +215,27 @@ export async function getPlayers(
       const score = rawScore != null ? rawScore : null;
       const isPlayed = row.played === true;
 
+      const matchIndex = row.match_index || 1;
+
       playerGames.push({
         round_number: row.round_number,
         round_sort_key: row.round_sort_key,
         display_label: row.round_display || `${row.round_number}`,
         score: score,
         played: isPlayed,
+        match_index: matchIndex,
       });
 
-      if (!playerData.rounds[row.round_number]) {
-        playerData.rounds[row.round_number] = score;
+      // Use compound key (round_matchIndex) to support double-header rounds like R24
+      // e.g., "24_1" for R24 game 1, "24_2" for R24 game 2
+      const roundKey = `${row.round_number}_${matchIndex}`;
+      if (!playerData.rounds[roundKey]) {
+        playerData.rounds[roundKey] = score;
       }
 
       if (isPlayed && score !== null) {
+        // Note: roundsPlayed tracks unique round_numbers, not individual matches
+        // This means R24 game 1 and game 2 count as games in the same round
         playerData.roundsPlayed.add(row.round_number);
         if (score > 0) {
           playerData.rawValues.push(score);
