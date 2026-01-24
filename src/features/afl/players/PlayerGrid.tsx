@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { PlayerData, StatLens } from "./getPlayers";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { getRoundLabel, getRoundTooltip } from "./utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const fmt1 = (v: any): string => {
   const num = Number(v);
@@ -66,19 +67,10 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
   const STEP_MOBILE = 10;
   const CAP_MOBILE = 40;
 
+  const isMobile = useIsMobile();
   const [visibleCount, setVisibleCount] = useState<number>(INITIAL_DESKTOP);
-  const [isMobile, setIsMobile] = useState(false);
   const [scrollPos, setScrollPos] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
 
   useEffect(() => {
     setVisibleCount(isMobile ? INITIAL_MOBILE : INITIAL_DESKTOP);
@@ -219,9 +211,11 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                   </th>
                 ))}
 
-                <th className="sticky right-0 top-0 z-40 bg-black/95 backdrop-blur-xl px-3 py-2 text-left border-b border-l border-white/10 min-w-[220px] shadow-[-2px_0_8px_rgba(0,0,0,0.3)]">
-                  Summary
-                </th>
+                {!isMobile && (
+                  <th className="sticky right-0 top-0 z-40 bg-black/95 backdrop-blur-xl px-3 py-2 text-left border-b border-l border-white/10 min-w-[220px] shadow-[-2px_0_8px_rgba(0,0,0,0.3)]">
+                    Summary
+                  </th>
+                )}
               </tr>
             </thead>
 
@@ -268,43 +262,45 @@ export default function PlayerGrid({ players, lens, minRound, maxRound, onPlayer
                     );
                   })}
 
-                  <td className="sticky right-0 z-20 bg-black/85 backdrop-blur-xl px-3 py-3 border-l border-white/5 shadow-[-2px_0_8px_rgba(0,0,0,0.2)]">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2 whitespace-nowrap">
-                        <span className="text-[9px] text-white/40 uppercase tracking-wider font-medium">AVG</span>
-                        <span className="text-lg font-bold text-yellow-400 tabular-nums">
-                          {lens === "goals" ? fmt1(player.stats.avg) : player.stats.avg}
-                        </span>
-                        <span className="text-white/25">•</span>
-                        <span className="text-[11px] text-white/55 font-medium tabular-nums">{player.stats.games}g</span>
-                        <span className="text-white/25">•</span>
-                        <span className="text-[10px] text-white/45 font-medium tabular-nums">Min <span className="text-white/65">{player.stats.min}</span></span>
-                        <span className="text-white/25">•</span>
-                        <span className="text-[10px] text-white/45 font-medium tabular-nums">Max <span className="text-white/65">{player.stats.max}</span></span>
-                      </div>
+                  {!isMobile && (
+                    <td className="sticky right-0 z-20 bg-black/85 backdrop-blur-xl px-3 py-3 border-l border-white/5 shadow-[-2px_0_8px_rgba(0,0,0,0.2)] ledger-summary-column">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2 whitespace-nowrap">
+                          <span className="text-[9px] text-white/40 uppercase tracking-wider font-medium">AVG</span>
+                          <span className="text-lg font-bold text-yellow-400 tabular-nums">
+                            {lens === "goals" ? fmt1(player.stats.avg) : player.stats.avg}
+                          </span>
+                          <span className="text-white/25">•</span>
+                          <span className="text-[11px] text-white/55 font-medium tabular-nums">{player.stats.games}g</span>
+                          <span className="text-white/25">•</span>
+                          <span className="text-[10px] text-white/45 font-medium tabular-nums">Min <span className="text-white/65">{player.stats.min}</span></span>
+                          <span className="text-white/25">•</span>
+                          <span className="text-[10px] text-white/45 font-medium tabular-nums">Max <span className="text-white/65">{player.stats.max}</span></span>
+                        </div>
 
-                      <div className="space-y-0.5 pt-1">
-                        {player.hitRates.slice(0, 3).map((hr) => (
-                          <div key={hr.threshold} className="flex items-center gap-1.5">
-                            <span className="text-[9px] text-white/35 w-7 tabular-nums">{hr.threshold}+</span>
-                            <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full transition-all ${getHitRateBarColor(
-                                  hr.percentage,
-                                  hr.threshold,
-                                  lens
-                                )}`}
-                                style={{ width: `${hr.percentage}%` }}
-                              />
+                        <div className="space-y-0.5 pt-1">
+                          {player.hitRates.slice(0, 3).map((hr) => (
+                            <div key={hr.threshold} className="flex items-center gap-1.5">
+                              <span className="text-[9px] text-white/35 w-7 tabular-nums">{hr.threshold}+</span>
+                              <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full transition-all ${getHitRateBarColor(
+                                    hr.percentage,
+                                    hr.threshold,
+                                    lens
+                                  )}`}
+                                  style={{ width: `${hr.percentage}%` }}
+                                />
+                              </div>
+                              <span className="text-[9px] text-white/40 w-8 text-right tabular-nums">
+                                {Math.round(hr.percentage)}%
+                              </span>
                             </div>
-                            <span className="text-[9px] text-white/40 w-8 text-right tabular-nums">
-                              {Math.round(hr.percentage)}%
-                            </span>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  </td>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
