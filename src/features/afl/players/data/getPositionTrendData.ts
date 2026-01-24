@@ -75,7 +75,7 @@ export async function getPositionTrendData(params: {
   }
 
   const { data: stats, error } = await supabase
-    .from("round_player_summary")
+    .from("afl.round_player_summary")
     .select(
       `
         player_id,
@@ -84,7 +84,7 @@ export async function getPositionTrendData(params: {
         goals
       `
     )
-    .eq("season", season)
+    .eq("season", 2025)
     .order("player_id", { ascending: true })
     .order("round_number", { ascending: true });
 
@@ -98,7 +98,7 @@ export async function getPositionTrendData(params: {
   const playerIds = Array.from(new Set(rows.map((r) => r.player_id)));
 
   const { data: players } = await supabase
-    .from("players")
+    .from("afl.players")
     .select("id, name")
     .in("id", playerIds);
 

@@ -33,7 +33,7 @@ export async function getFormStabilityGridData(params: {
 
   try {
     const { data, error } = await supabase
-      .from("form_stability_grid")
+      .from("afl.form_stability_grid_final")
       .select(`
         season,
         player_id,
@@ -49,7 +49,7 @@ export async function getFormStabilityGridData(params: {
         variance,
         confidence_label
       `)
-      .eq("season", season)
+      .eq("season", 2025)
       .eq("stat_type", stat)
       .order("trend_diff", { ascending: false });
 

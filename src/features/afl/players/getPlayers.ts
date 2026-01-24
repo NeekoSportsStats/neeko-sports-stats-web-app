@@ -87,7 +87,7 @@ function computeStatsFromValues(values: number[], totalGames: number): PlayerSta
 export async function getAvailableTeams(): Promise<string[]> {
   try {
     const { data, error } = await supabase
-      .from("teams")
+      .from("afl.teams")
       .select("name")
       .order("name");
 
@@ -119,11 +119,11 @@ export async function getPlayers(
     while (hasMore) {
       const to = from + pageSize - 1;
       const { data, error } = await supabase
-        .from("player_grid_view")
-        .select("season, round_number, player_id, player_name, team, role, team_color, played, disposals, goals, fantasy_points")
-        .eq("season", season)
-        .order("round_number", { ascending: true })
-        .order("player_name", { ascending: true })
+        .from("afl.player_round_stats_2025")
+        .select("season, round, player_id, player, team, position, team_color, played, disposals, goals, fantasy_points")
+        .eq("season", 2025)
+        .order("round", { ascending: true })
+        .order("player", { ascending: true })
         .range(from, to);
 
       if (error) {
@@ -150,9 +150,9 @@ export async function getPlayers(
     const sampleNonZero = allData.find(r => r.fantasy_points && r.fantasy_points > 0);
     if (sampleNonZero) {
       console.log(`Sample row with fantasy_points > 0:`, {
-        player: sampleNonZero.player_name,
+        player: sampleNonZero.player,
         team: sampleNonZero.team,
-        round: sampleNonZero.round_number,
+        round: sampleNonZero.round,
         fantasy_points: sampleNonZero.fantasy_points,
         disposals: sampleNonZero.disposals,
         goals: sampleNonZero.goals
@@ -163,20 +163,20 @@ export async function getPlayers(
     const allRounds = new Set<number>();
 
     for (const row of allData) {
-      if (!row.player_id || !row.player_name || row.round_number == null) {
+      if (!row.player_id || !row.player || row.round == null) {
         console.warn("Skipping invalid row:", row);
         continue;
       }
 
       const playerId = row.player_id;
-      allRounds.add(row.round_number);
+      allRounds.add(row.round);
 
       if (!playerMap.has(playerId)) {
         playerMap.set(playerId, {
           id: playerId,
-          name: row.player_name || "Unknown",
+          name: row.player || "Unknown",
           team: row.team || "Unknown",
-          role: row.role || "Unknown",
+          role: row.position || "Unknown",
           teamColor: row.team_color || "#666666",
           rounds: {},
           rawValues: [],
@@ -189,10 +189,10 @@ export async function getPlayers(
       const rawScore = row[statColumn];
       const score = isPlayed && rawScore != null ? rawScore : null;
 
-      playerData.rounds[row.round_number] = score;
+      playerData.rounds[row.round] = score;
 
       if (isPlayed) {
-        playerData.roundsPlayed.add(row.round_number);
+        playerData.roundsPlayed.add(row.round);
         if (score !== null && score > 0) {
           playerData.rawValues.push(score);
         }

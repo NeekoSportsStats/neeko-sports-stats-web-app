@@ -48,9 +48,9 @@ export async function getRoundMomentumData(
   stat: RoundStat
 ): Promise<RoundMomentumData> {
   const { data: rows, error: roundError } = await supabase
-    .from("round_player_summary")
+    .from("afl.round_player_summary")
     .select("player_id, disposals, goals, fantasy_points, round_number")
-    .eq("season", season);
+    .eq("season", 2025);
 
   if (roundError) {
     return {
@@ -94,9 +94,9 @@ export async function getRoundMomentumData(
 
   // Season averages (>=5 games)
   const { data: averages, error: avgError } = await supabase
-    .from("player_season_averages")
+    .from("afl.player_season_totals_2025")
     .select("player_id, avg_disposals, avg_goals, avg_fantasy, games_played")
-    .eq("season", season)
+    .eq("season", 2025)
     .gte("games_played", 5);
 
   // avgError is not fatal — we still show top + league avg + sparkline
@@ -105,7 +105,7 @@ export async function getRoundMomentumData(
   // Names
   const playerIds = Array.from(new Set(latest.map((r) => r.player_id)));
   const { data: players } = await supabase
-    .from("players")
+    .from("afl.players")
     .select("id, name")
     .in("id", playerIds);
 
