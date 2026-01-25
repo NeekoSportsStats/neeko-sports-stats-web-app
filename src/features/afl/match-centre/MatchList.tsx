@@ -7,6 +7,12 @@ interface MatchListProps {
   onSelectMatch: (match: MatchData) => void;
 }
 
+function formatScore(score: number): string {
+  const goals = Math.floor(score / 6);
+  const behinds = score % 6;
+  return `${goals}.${behinds}.${score}`;
+}
+
 export default function MatchList({ matches, onSelectMatch }: MatchListProps) {
   if (matches.length === 0) {
     return (
@@ -16,119 +22,104 @@ export default function MatchList({ matches, onSelectMatch }: MatchListProps) {
     );
   }
 
+  const groupedByDate = matches.reduce((acc, match) => {
+    if (!acc[match.date]) {
+      acc[match.date] = [];
+    }
+    acc[match.date].push(match);
+    return acc;
+  }, {} as Record<string, MatchData[]>);
+
   return (
-    <div className="space-y-3">
-      {matches.map((match) => (
-        <button
-          key={match.id}
-          onClick={() => onSelectMatch(match)}
-          className="w-full rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6 hover:bg-white/5 hover:border-yellow-400/40 transition-all group text-left"
-        >
-          <div className="flex flex-col md:flex-row md:items-center gap-6">
-            <div className="flex-1 space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 flex-1">
-                  <div
-                    className="w-1.5 h-12 rounded-full"
-                    style={{ backgroundColor: match.homeTeam.color }}
-                  />
-                  <div className="flex-1">
-                    <div className="text-lg font-semibold text-white">
-                      {match.homeTeam.name}
+    <div className="space-y-8">
+      {Object.entries(groupedByDate).map(([date, dateMatches]) => (
+        <div key={date}>
+          <h3 className="text-lg font-semibold text-white/80 mb-4">{date}</h3>
+          <div className="space-y-3">
+            {dateMatches.map((match) => (
+              <button
+                key={match.id}
+                onClick={() => onSelectMatch(match)}
+                className="w-full rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6 hover:bg-white/5 hover:border-yellow-400/40 transition-all group text-left"
+              >
+                <div className="flex flex-col md:flex-row md:items-center gap-6">
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div
+                          className="w-1.5 h-12 rounded-full"
+                          style={{ backgroundColor: match.homeTeam.color }}
+                        />
+                        <div className="flex-1">
+                          <div className="text-lg font-semibold text-white">
+                            {match.homeTeam.name}
+                          </div>
+                          <div className="text-sm text-white/50">
+                            {match.homeTeam.abbreviation}
+                          </div>
+                          {match.status === 'final' && match.homeScore !== undefined && (
+                            <div className="text-sm font-bold text-yellow-400 mt-1">
+                              {formatScore(match.homeScore)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-2xl font-bold text-white/40 px-4">VS</div>
+
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="flex-1 text-right">
+                          <div className="text-lg font-semibold text-white">
+                            {match.awayTeam.name}
+                          </div>
+                          <div className="text-sm text-white/50">
+                            {match.awayTeam.abbreviation}
+                          </div>
+                          {match.status === 'final' && match.awayScore !== undefined && (
+                            <div className="text-sm font-bold text-yellow-400 mt-1">
+                              {formatScore(match.awayScore)}
+                            </div>
+                          )}
+                        </div>
+                        <div
+                          className="w-1.5 h-12 rounded-full"
+                          style={{ backgroundColor: match.awayTeam.color }}
+                        />
+                      </div>
                     </div>
-                    <div className="text-sm text-white/50">
-                      {match.homeTeam.abbreviation}
-                      {match.homeTeam.ladderPosition && (
-                        <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-white/10">
-                          #{match.homeTeam.ladderPosition}
-                        </span>
-                      )}
+
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-white/60">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        <span>{match.venue}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        <span>{match.time}</span>
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-semibold uppercase ${
+                          match.status === 'final'
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : match.status === 'live'
+                            ? 'bg-yellow-500/20 text-yellow-400'
+                            : 'bg-blue-500/20 text-blue-400'
+                        }`}
+                      >
+                        {match.status}
+                      </span>
                     </div>
                   </div>
-                </div>
 
-                <div className="text-2xl font-bold text-white/40 px-4">VS</div>
-
-                <div className="flex items-center gap-3 flex-1">
-                  <div className="flex-1 text-right">
-                    <div className="text-lg font-semibold text-white">
-                      {match.awayTeam.name}
-                    </div>
-                    <div className="text-sm text-white/50">
-                      {match.awayTeam.abbreviation}
-                      {match.awayTeam.ladderPosition && (
-                        <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-white/10">
-                          #{match.awayTeam.ladderPosition}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div
-                    className="w-1.5 h-12 rounded-full"
-                    style={{ backgroundColor: match.awayTeam.color }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-4 text-sm text-white/60">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  <span>{match.venue}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  <span>
-                    {match.date} · {match.time}
-                  </span>
-                </div>
-              </div>
-
-              {match.homeTeam.recentForm && match.awayTeam.recentForm && (
-                <div className="flex items-center gap-6 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="text-white/50">Recent:</span>
-                    <div className="flex gap-1">
-                      {match.homeTeam.recentForm.map((result, idx) => (
-                        <span
-                          key={idx}
-                          className={`w-5 h-5 rounded flex items-center justify-center font-semibold ${
-                            result === "W"
-                              ? "bg-emerald-500/20 text-emerald-400"
-                              : "bg-red-500/20 text-red-400"
-                          }`}
-                        >
-                          {result}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-white/50">Recent:</span>
-                    <div className="flex gap-1">
-                      {match.awayTeam.recentForm.map((result, idx) => (
-                        <span
-                          key={idx}
-                          className={`w-5 h-5 rounded flex items-center justify-center font-semibold ${
-                            result === "W"
-                              ? "bg-emerald-500/20 text-emerald-400"
-                              : "bg-red-500/20 text-red-400"
-                          }`}
-                        >
-                          {result}
-                        </span>
-                      ))}
-                    </div>
+                  <div className="flex items-center gap-2 text-white/40 group-hover:text-yellow-400 transition-colors">
+                    <span className="text-sm font-medium">View Details</span>
+                    <ChevronRight className="h-5 w-5" />
                   </div>
                 </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 text-white/40 group-hover:text-yellow-400 transition-colors">
-              <span className="text-sm font-medium">View Details</span>
-              <ChevronRight className="h-5 w-5" />
-            </div>
+              </button>
+            ))}
           </div>
-        </button>
+        </div>
       ))}
     </div>
   );
