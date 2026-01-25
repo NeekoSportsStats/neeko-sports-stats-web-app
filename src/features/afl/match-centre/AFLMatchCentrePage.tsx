@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Calendar } from "lucide-react";
-import { getMatches, getAvailableSeasons, getAvailableRounds, MatchData } from "./getMatches";
+import { getRoundMatches, getAvailableSeasons, getAvailableRounds, DayMatches } from "./getMatches";
 import MatchList from "./MatchList";
 import MatchOverlay from "./MatchOverlay";
+import type { MatchData } from "./getMatches";
 
 export default function AFLMatchCentrePage() {
-  const [matches, setMatches] = useState<MatchData[]>([]);
+  const [dayMatches, setDayMatches] = useState<DayMatches[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMatch, setSelectedMatch] = useState<MatchData | null>(null);
   const [season, setSeason] = useState(2025);
@@ -19,15 +20,15 @@ export default function AFLMatchCentrePage() {
       loadMatches();
     } else {
       setLoading(false);
-      setMatches([]);
+      setDayMatches([]);
     }
   }, [season, round]);
 
   const loadMatches = async () => {
     setLoading(true);
     try {
-      const data = await getMatches(season, round);
-      setMatches(data);
+      const data = await getRoundMatches(season, round);
+      setDayMatches(data);
     } catch (error) {
       console.error("Failed to load matches:", error);
     } finally {
@@ -74,7 +75,13 @@ export default function AFLMatchCentrePage() {
                 </label>
                 <select
                   value={season}
-                  onChange={(e) => setSeason(Number(e.target.value))}
+                  onChange={(e) => {
+                    const newSeason = Number(e.target.value);
+                    setSeason(newSeason);
+                    if (newSeason === 2026) {
+                      setRound(1);
+                    }
+                  }}
                   className="px-4 py-2 rounded-lg border border-white/10 bg-black/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
                 >
                   {seasons.map((s) => (
@@ -96,12 +103,20 @@ export default function AFLMatchCentrePage() {
                   className="px-4 py-2 rounded-lg border border-white/10 bg-black/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {rounds.map((r) => (
-                    <option key={r} value={r}>
-                      Round {r}
+                    <option key={r.value} value={r.value}>
+                      {r.label}
                     </option>
                   ))}
                 </select>
               </div>
+
+              {is2026 && (
+                <div className="flex items-end">
+                  <div className="px-3 py-2 rounded-lg bg-yellow-500/20 text-yellow-400 text-xs font-semibold uppercase tracking-wider">
+                    Coming Soon
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -125,12 +140,12 @@ export default function AFLMatchCentrePage() {
               <p className="text-white/50">Loading matches...</p>
             </div>
           </div>
-        ) : matches.length === 0 ? (
+        ) : dayMatches.length === 0 ? (
           <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-12 text-center">
-            <p className="text-white/60">No matches found for Round {round}</p>
+            <p className="text-white/60">No matches found for this round</p>
           </div>
         ) : (
-          <MatchList matches={matches} onSelectMatch={setSelectedMatch} />
+          <MatchList dayMatches={dayMatches} onSelectMatch={setSelectedMatch} />
         )}
       </div>
 

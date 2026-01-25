@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { X, MapPin, Clock, Target } from "lucide-react";
-import { MatchData } from "./getMatches";
+import type { MatchData, PlayerInfo } from "./getMatches";
+import { getMatchTop3, getMatchPlayers } from "./getMatches";
 import MatchScatter from "./MatchScatter";
 
 interface MatchOverlayProps {
@@ -10,6 +11,32 @@ interface MatchOverlayProps {
 
 export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const [homeTopPlayers, setHomeTopPlayers] = useState<PlayerInfo[]>([]);
+  const [awayTopPlayers, setAwayTopPlayers] = useState<PlayerInfo[]>([]);
+  const [scatterPlayers, setScatterPlayers] = useState<PlayerInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadMatchData = async () => {
+      setLoading(true);
+      try {
+        const [top3Data, playersData] = await Promise.all([
+          getMatchTop3(match.season, match.roundNumber, match.matchIndex),
+          getMatchPlayers(match.season, match.roundNumber, match.matchIndex),
+        ]);
+
+        setHomeTopPlayers(top3Data.home);
+        setAwayTopPlayers(top3Data.away);
+        setScatterPlayers(playersData);
+      } catch (error) {
+        console.error("Failed to load match data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadMatchData();
+  }, [match.season, match.roundNumber, match.matchIndex]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -50,14 +77,14 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
                 </span>
                 <span
                   className={`px-2 py-1 rounded text-xs font-semibold uppercase ${
-                    match.status === 'final'
-                      ? 'bg-emerald-500/20 text-emerald-400'
-                      : match.status === 'live'
-                      ? 'bg-yellow-500/20 text-yellow-400'
-                      : 'bg-blue-500/20 text-blue-400'
+                    match.status === "final"
+                      ? "bg-emerald-500/20 text-emerald-400"
+                      : match.status === "live"
+                      ? "bg-yellow-500/20 text-yellow-400"
+                      : "bg-blue-500/20 text-blue-400"
                   }`}
                 >
-                  {match.status === 'final' ? 'Completed' : match.status === 'live' ? 'Live' : 'Upcoming'}
+                  {match.status === "final" ? "Completed" : match.status === "live" ? "Live" : "Upcoming"}
                 </span>
               </div>
               <h2 className="text-3xl font-bold text-white">Match Detail</h2>
@@ -86,9 +113,17 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
                     <div className="text-sm text-white/50 mt-1">
                       {match.homeTeam.abbreviation}
                     </div>
-                    {match.status === 'final' && match.homeScore !== undefined && (
-                      <div className="text-xl font-bold text-yellow-400 mt-2">
-                        {match.homeScore}
+                    {match.status === "final" && match.homeScore !== undefined && (
+                      <div className="mt-2">
+                        {match.homeGoals !== undefined && match.homeBehinds !== undefined ? (
+                          <div className="text-xl font-bold text-yellow-400">
+                            {match.homeGoals}.{match.homeBehinds}.{match.homeScore}
+                          </div>
+                        ) : (
+                          <div className="text-xl font-bold text-yellow-400">
+                            {match.homeScore}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -104,9 +139,17 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
                     <div className="text-sm text-white/50 mt-1">
                       {match.awayTeam.abbreviation}
                     </div>
-                    {match.status === 'final' && match.awayScore !== undefined && (
-                      <div className="text-xl font-bold text-yellow-400 mt-2">
-                        {match.awayScore}
+                    {match.status === "final" && match.awayScore !== undefined && (
+                      <div className="mt-2">
+                        {match.awayGoals !== undefined && match.awayBehinds !== undefined ? (
+                          <div className="text-xl font-bold text-yellow-400">
+                            {match.awayGoals}.{match.awayBehinds}.{match.awayScore}
+                          </div>
+                        ) : (
+                          <div className="text-xl font-bold text-yellow-400">
+                            {match.awayScore}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -131,72 +174,104 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
               </div>
             </div>
 
-            {(match.homeTopPlayers && match.homeTopPlayers.length > 0) ||
-             (match.awayTopPlayers && match.awayTopPlayers.length > 0) ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {match.homeTopPlayers && match.homeTopPlayers.length > 0 && (
-                  <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Target className="h-5 w-5 text-yellow-400" />
-                      <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider">
-                        {match.homeTeam.abbreviation} Top 3 Players
-                      </h3>
-                    </div>
-                    <div className="space-y-3">
-                      {match.homeTopPlayers.map((player) => (
-                        <div
-                          key={player.id}
-                          className="flex items-center justify-between p-3 rounded-lg bg-white/5"
-                        >
-                          <div>
-                            <div className="font-semibold text-white">{player.name}</div>
-                            <div className="text-xs text-white/50">{player.role}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-lg font-bold text-yellow-400">
-                              {player.fantasyPoints}
-                            </div>
-                            <div className="text-xs text-white/50">fantasy pts</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {match.awayTopPlayers && match.awayTopPlayers.length > 0 && (
-                  <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Target className="h-5 w-5 text-yellow-400" />
-                      <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider">
-                        {match.awayTeam.abbreviation} Top 3 Players
-                      </h3>
-                    </div>
-                    <div className="space-y-3">
-                      {match.awayTopPlayers.map((player) => (
-                        <div
-                          key={player.id}
-                          className="flex items-center justify-between p-3 rounded-lg bg-white/5"
-                        >
-                          <div>
-                            <div className="font-semibold text-white">{player.name}</div>
-                            <div className="text-xs text-white/50">{player.role}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-lg font-bold text-yellow-400">
-                              {player.fantasyPoints}
-                            </div>
-                            <div className="text-xs text-white/50">fantasy pts</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-10 h-10 border-4 border-yellow-400/20 border-t-yellow-400 rounded-full animate-spin" />
+                  <p className="text-white/50 text-sm">Loading player data...</p>
+                </div>
               </div>
-            ) : null}
+            ) : (
+              <>
+                {(homeTopPlayers.length > 0 || awayTopPlayers.length > 0) && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {homeTopPlayers.length > 0 && (
+                      <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                          <Target className="h-5 w-5 text-yellow-400" />
+                          <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider">
+                            {match.homeTeam.abbreviation} Top 3 Players
+                          </h3>
+                        </div>
+                        <div className="space-y-3">
+                          {homeTopPlayers.map((player) => (
+                            <div
+                              key={player.id}
+                              className="flex items-center justify-between p-3 rounded-lg bg-white/5"
+                            >
+                              <div>
+                                <div className="font-semibold text-white">{player.name}</div>
+                                <div className="text-xs text-white/50">{player.role}</div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-lg font-bold text-yellow-400">
+                                  {player.fantasyPoints}
+                                </div>
+                                <div className="text-xs text-white/50">fantasy pts</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-            <MatchScatter match={match} />
+                    {awayTopPlayers.length > 0 && (
+                      <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                          <Target className="h-5 w-5 text-yellow-400" />
+                          <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider">
+                            {match.awayTeam.abbreviation} Top 3 Players
+                          </h3>
+                        </div>
+                        <div className="space-y-3">
+                          {awayTopPlayers.map((player) => (
+                            <div
+                              key={player.id}
+                              className="flex items-center justify-between p-3 rounded-lg bg-white/5"
+                            >
+                              <div>
+                                <div className="font-semibold text-white">{player.name}</div>
+                                <div className="text-xs text-white/50">{player.role}</div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-lg font-bold text-yellow-400">
+                                  {player.fantasyPoints}
+                                </div>
+                                <div className="text-xs text-white/50">fantasy pts</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {scatterPlayers.length > 0 && (
+                  <MatchScatter
+                    players={scatterPlayers}
+                    homeTeam={match.homeTeam}
+                    awayTeam={match.awayTeam}
+                  />
+                )}
+
+                <div className="rounded-xl border border-yellow-400/40 bg-gradient-to-br from-yellow-500/10 to-amber-500/10 backdrop-blur-xl p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white mb-1">
+                        AI Match Preview
+                      </h3>
+                      <p className="text-sm text-white/60">
+                        Advanced insights and predictions coming soon
+                      </p>
+                    </div>
+                    <div className="px-4 py-2 rounded-lg bg-yellow-500/20 text-yellow-400 text-xs font-semibold uppercase tracking-wider">
+                      Coming Soon
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
