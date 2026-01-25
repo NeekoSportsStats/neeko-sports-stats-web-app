@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Calendar } from "lucide-react";
-import { getRoundMatches, getAvailableSeasons, getAvailableRounds, DayMatches } from "./getMatches";
+import { getRoundMatches, DayMatches, MatchData } from "./getMatches";
 import MatchList from "./MatchList";
 import MatchOverlay from "./MatchOverlay";
-import type { MatchData } from "./getMatches";
 
 export default function AFLMatchCentrePage() {
   const [dayMatches, setDayMatches] = useState<DayMatches[]>([]);
@@ -12,8 +11,17 @@ export default function AFLMatchCentrePage() {
   const [season, setSeason] = useState(2025);
   const [round, setRound] = useState(1);
 
-  const seasons = getAvailableSeasons();
-  const rounds = getAvailableRounds();
+  const roundOptions = [
+    { value: 0, label: "Opening Round" },
+    ...Array.from({ length: 24 }, (_, i) => ({
+      value: i + 1,
+      label: `Round ${i + 1}`,
+    })),
+    { value: 25, label: "Finals Week 1" },
+    { value: 26, label: "Finals Week 2" },
+    { value: 27, label: "Finals Week 3" },
+    { value: 28, label: "Finals Week 4" },
+  ];
 
   useEffect(() => {
     if (season === 2025) {
@@ -75,20 +83,13 @@ export default function AFLMatchCentrePage() {
                 </label>
                 <select
                   value={season}
-                  onChange={(e) => {
-                    const newSeason = Number(e.target.value);
-                    setSeason(newSeason);
-                    if (newSeason === 2026) {
-                      setRound(1);
-                    }
-                  }}
+                  onChange={(e) => setSeason(Number(e.target.value))}
                   className="px-4 py-2 rounded-lg border border-white/10 bg-black/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
                 >
-                  {seasons.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
+                  <option value={2025}>2025</option>
+                  <option value={2026} disabled>
+                    2026
+                  </option>
                 </select>
               </div>
 
@@ -102,7 +103,7 @@ export default function AFLMatchCentrePage() {
                   disabled={is2026}
                   className="px-4 py-2 rounded-lg border border-white/10 bg-black/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {rounds.map((r) => (
+                  {roundOptions.map((r) => (
                     <option key={r.value} value={r.value}>
                       {r.label}
                     </option>
@@ -125,12 +126,7 @@ export default function AFLMatchCentrePage() {
           <div className="rounded-xl border border-yellow-400/40 bg-gradient-to-br from-yellow-500/10 to-amber-500/10 backdrop-blur-xl p-12 text-center">
             <div className="max-w-md mx-auto space-y-4">
               <h2 className="text-3xl font-bold text-white">2026 Season</h2>
-              <p className="text-lg text-white/70">
-                Coming Soon — will be enabled closer to Round 0
-              </p>
-              <p className="text-sm text-white/50">
-                Check back later for 2026 fixtures and match data
-              </p>
+              <p className="text-lg text-white/70">Coming Soon</p>
             </div>
           </div>
         ) : loading ? (
@@ -139,10 +135,6 @@ export default function AFLMatchCentrePage() {
               <div className="w-12 h-12 border-4 border-yellow-400/20 border-t-yellow-400 rounded-full animate-spin" />
               <p className="text-white/50">Loading matches...</p>
             </div>
-          </div>
-        ) : dayMatches.length === 0 ? (
-          <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-12 text-center">
-            <p className="text-white/60">No matches found for this round</p>
           </div>
         ) : (
           <MatchList dayMatches={dayMatches} onSelectMatch={setSelectedMatch} />

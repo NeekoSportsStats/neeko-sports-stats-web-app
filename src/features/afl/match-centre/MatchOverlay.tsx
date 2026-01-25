@@ -1,19 +1,78 @@
 import React, { useEffect, useRef, useState } from "react";
 import { X, MapPin, Clock, Target } from "lucide-react";
-import type { MatchData, PlayerInfo } from "./getMatches";
-import { getMatchTop3, getMatchPlayers } from "./getMatches";
+import type { MatchData, PlayerData } from "./getMatches";
+import { getMatchPlayers } from "./getMatches";
 import MatchScatter from "./MatchScatter";
+import { supabase } from "@/lib/supabaseClient";
 
 interface MatchOverlayProps {
   match: MatchData;
   onClose: () => void;
 }
 
+interface TopPlayer {
+  name: string;
+  team: string;
+  fantasyPoints: number;
+}
+
+async function getTop3Players(
+  season: number,
+  round: number,
+  matchIndex: number
+): Promise<{ home: TopPlayer[]; away: TopPlayer[] }> {
+  const { data, error } = await supabase
+    .from("v_match_center_top3_players_2025")
+    .select("*")
+    .eq("season", season)
+    .eq("round_number", round)
+    .eq("match_index", matchIndex)
+    .order("team_id", { ascending: true })
+    .order("rank", { ascending: true });
+
+  if (error || !data || data.length === 0) {
+    return { home: [], away: [] };
+  }
+
+  const teamIds = [...new Set(data.map((p) => p.team_id))];
+  const homeTeamId = teamIds[0];
+
+  const home: TopPlayer[] = [];
+  const away: TopPlayer[] = [];
+
+  data.forEach((row) => {
+    const player: TopPlayer = {
+      name: row.player_name,
+      team: row.team_abbr,
+      fantasyPoints: row.fantasy_points || 0,
+    };
+
+    if (row.team_id === homeTeamId) {
+      home.push(player);
+    } else {
+      away.push(player);
+    }
+  });
+
+  return { home, away };
+}
+
+function formatScore(score: number | null): { goals: number; behinds: number; total: number } | null {
+  if (score === null) return null;
+  return {
+    goals: Math.floor(score / 6),
+    behinds: score % 6,
+    total: score,
+  };
+}
+
 export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
-  const [homeTopPlayers, setHomeTopPlayers] = useState<PlayerInfo[]>([]);
-  const [awayTopPlayers, setAwayTopPlayers] = useState<PlayerInfo[]>([]);
-  const [scatterPlayers, setScatterPlayers] = useState<PlayerInfo[]>([]);
+  const [topPlayers, setTopPlayers] = useState<{ home: TopPlayer[]; away: TopPlayer[] }>({
+    home: [],
+    away: [],
+  });
+  const [scatterPlayers, setScatterPlayers] = useState<PlayerData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,12 +80,11 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
       setLoading(true);
       try {
         const [top3Data, playersData] = await Promise.all([
-          getMatchTop3(match.season, match.roundNumber, match.matchIndex),
-          getMatchPlayers(match.season, match.roundNumber, match.matchIndex),
+          getTop3Players(match.season, match.roundNumber, match.vendorGameId),
+          getMatchPlayers(match.season, match.roundNumber, match.vendorGameId),
         ]);
 
-        setHomeTopPlayers(top3Data.home);
-        setAwayTopPlayers(top3Data.away);
+        setTopPlayers(top3Data);
         setScatterPlayers(playersData);
       } catch (error) {
         console.error("Failed to load match data:", error);
@@ -36,7 +94,7 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     };
 
     loadMatchData();
-  }, [match.season, match.roundNumber, match.matchIndex]);
+  }, [match.season, match.roundNumber, match.vendorGameId]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -62,6 +120,10 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     };
   }, [onClose]);
 
+  const homeScoreData = formatScore(match.homeScore);
+  const awayScoreData = formatScore(match.awayScore);
+  const isFinal = match.status === "FT";
+
   return (
     <div
       ref={overlayRef}
@@ -73,18 +135,10 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <span className="text-sm font-semibold text-yellow-400 uppercase tracking-wider">
-                  {match.round} · {match.season}
+                  {match.roundLabel} · {match.season}
                 </span>
-                <span
-                  className={`px-2 py-1 rounded text-xs font-semibold uppercase ${
-                    match.status === "final"
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : match.status === "live"
-                      ? "bg-yellow-500/20 text-yellow-400"
-                      : "bg-blue-500/20 text-blue-400"
-                  }`}
-                >
-                  {match.status === "final" ? "Completed" : match.status === "live" ? "Live" : "Upcoming"}
+                <span className="px-2 py-1 rounded text-xs font-semibold uppercase bg-emerald-500/20 text-emerald-400">
+                  {isFinal ? "Final" : "Upcoming"}
                 </span>
               </div>
               <h2 className="text-3xl font-bold text-white">Match Detail</h2>
@@ -104,26 +158,14 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
                 <div className="flex items-center gap-4 flex-1">
                   <div
                     className="w-2 h-20 rounded-full"
-                    style={{ backgroundColor: match.homeTeam.color }}
+                    style={{ backgroundColor: match.homeTeamColor }}
                   />
                   <div className="text-center md:text-left">
-                    <div className="text-2xl font-bold text-white">
-                      {match.homeTeam.name}
-                    </div>
-                    <div className="text-sm text-white/50 mt-1">
-                      {match.homeTeam.abbreviation}
-                    </div>
-                    {match.status === "final" && match.homeScore !== undefined && (
-                      <div className="mt-2">
-                        {match.homeGoals !== undefined && match.homeBehinds !== undefined ? (
-                          <div className="text-xl font-bold text-yellow-400">
-                            {match.homeGoals}.{match.homeBehinds}.{match.homeScore}
-                          </div>
-                        ) : (
-                          <div className="text-xl font-bold text-yellow-400">
-                            {match.homeScore}
-                          </div>
-                        )}
+                    <div className="text-2xl font-bold text-white">{match.homeTeam}</div>
+                    <div className="text-sm text-white/50 mt-1">{match.homeTeamAbbr}</div>
+                    {isFinal && homeScoreData && (
+                      <div className="mt-2 text-xl font-bold text-yellow-400">
+                        {homeScoreData.goals}.{homeScoreData.behinds}.{homeScoreData.total}
                       </div>
                     )}
                   </div>
@@ -133,29 +175,17 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
 
                 <div className="flex items-center gap-4 flex-1">
                   <div className="text-center md:text-right">
-                    <div className="text-2xl font-bold text-white">
-                      {match.awayTeam.name}
-                    </div>
-                    <div className="text-sm text-white/50 mt-1">
-                      {match.awayTeam.abbreviation}
-                    </div>
-                    {match.status === "final" && match.awayScore !== undefined && (
-                      <div className="mt-2">
-                        {match.awayGoals !== undefined && match.awayBehinds !== undefined ? (
-                          <div className="text-xl font-bold text-yellow-400">
-                            {match.awayGoals}.{match.awayBehinds}.{match.awayScore}
-                          </div>
-                        ) : (
-                          <div className="text-xl font-bold text-yellow-400">
-                            {match.awayScore}
-                          </div>
-                        )}
+                    <div className="text-2xl font-bold text-white">{match.awayTeam}</div>
+                    <div className="text-sm text-white/50 mt-1">{match.awayTeamAbbr}</div>
+                    {isFinal && awayScoreData && (
+                      <div className="mt-2 text-xl font-bold text-yellow-400">
+                        {awayScoreData.goals}.{awayScoreData.behinds}.{awayScoreData.total}
                       </div>
                     )}
                   </div>
                   <div
                     className="w-2 h-20 rounded-full"
-                    style={{ backgroundColor: match.awayTeam.color }}
+                    style={{ backgroundColor: match.awayTeamColor }}
                   />
                 </div>
               </div>
@@ -167,9 +197,7 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
-                  <span>
-                    {match.date} · {match.time}
-                  </span>
+                  <span>{match.gameTime}</span>
                 </div>
               </div>
             </div>
@@ -183,26 +211,23 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
               </div>
             ) : (
               <>
-                {(homeTopPlayers.length > 0 || awayTopPlayers.length > 0) && (
+                {(topPlayers.home.length > 0 || topPlayers.away.length > 0) && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {homeTopPlayers.length > 0 && (
+                    {topPlayers.home.length > 0 && (
                       <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6">
                         <div className="flex items-center gap-2 mb-4">
                           <Target className="h-5 w-5 text-yellow-400" />
                           <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider">
-                            {match.homeTeam.abbreviation} Top 3 Players
+                            {match.homeTeamAbbr} Top 3 Players
                           </h3>
                         </div>
                         <div className="space-y-3">
-                          {homeTopPlayers.map((player) => (
+                          {topPlayers.home.map((player, idx) => (
                             <div
-                              key={player.id}
+                              key={idx}
                               className="flex items-center justify-between p-3 rounded-lg bg-white/5"
                             >
-                              <div>
-                                <div className="font-semibold text-white">{player.name}</div>
-                                <div className="text-xs text-white/50">{player.role}</div>
-                              </div>
+                              <div className="font-semibold text-white">{player.name}</div>
                               <div className="text-right">
                                 <div className="text-lg font-bold text-yellow-400">
                                   {player.fantasyPoints}
@@ -215,24 +240,21 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
                       </div>
                     )}
 
-                    {awayTopPlayers.length > 0 && (
+                    {topPlayers.away.length > 0 && (
                       <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6">
                         <div className="flex items-center gap-2 mb-4">
                           <Target className="h-5 w-5 text-yellow-400" />
                           <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider">
-                            {match.awayTeam.abbreviation} Top 3 Players
+                            {match.awayTeamAbbr} Top 3 Players
                           </h3>
                         </div>
                         <div className="space-y-3">
-                          {awayTopPlayers.map((player) => (
+                          {topPlayers.away.map((player, idx) => (
                             <div
-                              key={player.id}
+                              key={idx}
                               className="flex items-center justify-between p-3 rounded-lg bg-white/5"
                             >
-                              <div>
-                                <div className="font-semibold text-white">{player.name}</div>
-                                <div className="text-xs text-white/50">{player.role}</div>
-                              </div>
+                              <div className="font-semibold text-white">{player.name}</div>
                               <div className="text-right">
                                 <div className="text-lg font-bold text-yellow-400">
                                   {player.fantasyPoints}
@@ -250,26 +272,12 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
                 {scatterPlayers.length > 0 && (
                   <MatchScatter
                     players={scatterPlayers}
-                    homeTeam={match.homeTeam}
-                    awayTeam={match.awayTeam}
+                    homeTeamAbbr={match.homeTeamAbbr}
+                    homeTeamColor={match.homeTeamColor}
+                    awayTeamAbbr={match.awayTeamAbbr}
+                    awayTeamColor={match.awayTeamColor}
                   />
                 )}
-
-                <div className="rounded-xl border border-yellow-400/40 bg-gradient-to-br from-yellow-500/10 to-amber-500/10 backdrop-blur-xl p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-white mb-1">
-                        AI Match Preview
-                      </h3>
-                      <p className="text-sm text-white/60">
-                        Advanced insights and predictions coming soon
-                      </p>
-                    </div>
-                    <div className="px-4 py-2 rounded-lg bg-yellow-500/20 text-yellow-400 text-xs font-semibold uppercase tracking-wider">
-                      Coming Soon
-                    </div>
-                  </div>
-                </div>
               </>
             )}
           </div>
