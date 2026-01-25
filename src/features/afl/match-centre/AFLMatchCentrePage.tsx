@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Calendar } from "lucide-react";
-import { getMatches, getAvailableRounds, MatchData } from "./getMatches";
+import { getMatches, getAvailableSeasons, getAvailableRounds, MatchData } from "./getMatches";
 import MatchList from "./MatchList";
 import MatchOverlay from "./MatchOverlay";
 
@@ -8,18 +8,25 @@ export default function AFLMatchCentrePage() {
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMatch, setSelectedMatch] = useState<MatchData | null>(null);
+  const [season, setSeason] = useState(2025);
   const [round, setRound] = useState(1);
 
+  const seasons = getAvailableSeasons();
   const rounds = getAvailableRounds();
 
   useEffect(() => {
-    loadMatches();
-  }, [round]);
+    if (season === 2025) {
+      loadMatches();
+    } else {
+      setLoading(false);
+      setMatches([]);
+    }
+  }, [season, round]);
 
   const loadMatches = async () => {
     setLoading(true);
     try {
-      const data = await getMatches(round);
+      const data = await getMatches(season, round);
       setMatches(data);
     } catch (error) {
       console.error("Failed to load matches:", error);
@@ -27,6 +34,8 @@ export default function AFLMatchCentrePage() {
       setLoading(false);
     }
   };
+
+  const is2026 = season === 2026;
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
@@ -42,7 +51,7 @@ export default function AFLMatchCentrePage() {
               AFL Match Centre
             </h1>
             <p className="mt-3 text-lg text-white/60 max-w-3xl">
-              2025 season fixtures and results with player performance data
+              Season fixtures and results with player performance data
             </p>
           </div>
         </header>
@@ -51,33 +60,65 @@ export default function AFLMatchCentrePage() {
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
             <div className="space-y-1">
               <div className="text-xs font-semibold uppercase tracking-wider text-yellow-200/80">
-                Select Round
+                Filters
               </div>
               <p className="text-xs text-white/60">
-                View fixtures and results for any round
+                Select season and round to view fixtures
               </p>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-xs text-white/50 uppercase tracking-wider">
-                Round
-              </label>
-              <select
-                value={round}
-                onChange={(e) => setRound(Number(e.target.value))}
-                className="px-4 py-2 rounded-lg border border-white/10 bg-black/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
-              >
-                {rounds.map((r) => (
-                  <option key={r} value={r}>
-                    Round {r}
-                  </option>
-                ))}
-              </select>
+            <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-white/50 uppercase tracking-wider">
+                  Season
+                </label>
+                <select
+                  value={season}
+                  onChange={(e) => setSeason(Number(e.target.value))}
+                  className="px-4 py-2 rounded-lg border border-white/10 bg-black/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
+                >
+                  {seasons.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-white/50 uppercase tracking-wider">
+                  Round
+                </label>
+                <select
+                  value={round}
+                  onChange={(e) => setRound(Number(e.target.value))}
+                  disabled={is2026}
+                  className="px-4 py-2 rounded-lg border border-white/10 bg-black/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {rounds.map((r) => (
+                    <option key={r} value={r}>
+                      Round {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         </div>
 
-        {loading ? (
+        {is2026 ? (
+          <div className="rounded-xl border border-yellow-400/40 bg-gradient-to-br from-yellow-500/10 to-amber-500/10 backdrop-blur-xl p-12 text-center">
+            <div className="max-w-md mx-auto space-y-4">
+              <h2 className="text-3xl font-bold text-white">2026 Season</h2>
+              <p className="text-lg text-white/70">
+                Coming Soon — will be enabled closer to Round 0
+              </p>
+              <p className="text-sm text-white/50">
+                Check back later for 2026 fixtures and match data
+              </p>
+            </div>
+          </div>
+        ) : loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="flex flex-col items-center gap-4">
               <div className="w-12 h-12 border-4 border-yellow-400/20 border-t-yellow-400 rounded-full animate-spin" />
@@ -89,14 +130,7 @@ export default function AFLMatchCentrePage() {
             <p className="text-white/60">No matches found for Round {round}</p>
           </div>
         ) : (
-          <div className="space-y-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">
-                Round {round} ({matches.length} {matches.length === 1 ? 'match' : 'matches'})
-              </h2>
-            </div>
-            <MatchList matches={matches} onSelectMatch={setSelectedMatch} />
-          </div>
+          <MatchList matches={matches} onSelectMatch={setSelectedMatch} />
         )}
       </div>
 

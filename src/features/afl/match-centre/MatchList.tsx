@@ -7,12 +7,6 @@ interface MatchListProps {
   onSelectMatch: (match: MatchData) => void;
 }
 
-function formatScore(score: number): string {
-  const goals = Math.floor(score / 6);
-  const behinds = score % 6;
-  return `${goals}.${behinds}.${score}`;
-}
-
 export default function MatchList({ matches, onSelectMatch }: MatchListProps) {
   if (matches.length === 0) {
     return (
@@ -47,7 +41,7 @@ export default function MatchList({ matches, onSelectMatch }: MatchListProps) {
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3 flex-1">
                         <div
-                          className="w-1.5 h-12 rounded-full"
+                          className="w-1.5 h-16 rounded-full"
                           style={{ backgroundColor: match.homeTeam.color }}
                         />
                         <div className="flex-1">
@@ -59,7 +53,7 @@ export default function MatchList({ matches, onSelectMatch }: MatchListProps) {
                           </div>
                           {match.status === 'final' && match.homeScore !== undefined && (
                             <div className="text-sm font-bold text-yellow-400 mt-1">
-                              {formatScore(match.homeScore)}
+                              {match.homeScore}
                             </div>
                           )}
                         </div>
@@ -77,12 +71,12 @@ export default function MatchList({ matches, onSelectMatch }: MatchListProps) {
                           </div>
                           {match.status === 'final' && match.awayScore !== undefined && (
                             <div className="text-sm font-bold text-yellow-400 mt-1">
-                              {formatScore(match.awayScore)}
+                              {match.awayScore}
                             </div>
                           )}
                         </div>
                         <div
-                          className="w-1.5 h-12 rounded-full"
+                          className="w-1.5 h-16 rounded-full"
                           style={{ backgroundColor: match.awayTeam.color }}
                         />
                       </div>
@@ -106,9 +100,15 @@ export default function MatchList({ matches, onSelectMatch }: MatchListProps) {
                             : 'bg-blue-500/20 text-blue-400'
                         }`}
                       >
-                        {match.status}
+                        {match.status === 'final' ? 'Completed' : match.status === 'live' ? 'Live' : 'Upcoming'}
                       </span>
                     </div>
+
+                    {match.status === 'final' && (match.homeScore !== undefined || match.awayScore !== undefined) && (
+                      <div className="text-xs text-white/40 italic">
+                        Goals/behinds breakdown coming soon
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2 text-white/40 group-hover:text-yellow-400 transition-colors">

@@ -35,12 +35,6 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     };
   }, [onClose]);
 
-  function formatScore(score: number): string {
-    const goals = Math.floor(score / 6);
-    const behinds = score % 6;
-    return `${goals}.${behinds}.${score}`;
-  }
-
   return (
     <div
       ref={overlayRef}
@@ -63,7 +57,7 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
                       : 'bg-blue-500/20 text-blue-400'
                   }`}
                 >
-                  {match.status}
+                  {match.status === 'final' ? 'Completed' : match.status === 'live' ? 'Live' : 'Upcoming'}
                 </span>
               </div>
               <h2 className="text-3xl font-bold text-white">Match Detail</h2>
@@ -94,7 +88,7 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
                     </div>
                     {match.status === 'final' && match.homeScore !== undefined && (
                       <div className="text-xl font-bold text-yellow-400 mt-2">
-                        {formatScore(match.homeScore)}
+                        {match.homeScore}
                       </div>
                     )}
                   </div>
@@ -112,7 +106,7 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
                     </div>
                     {match.status === 'final' && match.awayScore !== undefined && (
                       <div className="text-xl font-bold text-yellow-400 mt-2">
-                        {formatScore(match.awayScore)}
+                        {match.awayScore}
                       </div>
                     )}
                   </div>

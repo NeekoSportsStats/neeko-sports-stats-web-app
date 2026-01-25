@@ -17,8 +17,6 @@ export interface PlayerInfo {
   fantasyPoints: number;
   disposals: number;
   goals: number;
-  marks: number;
-  tackles: number;
 }
 
 export interface MatchData {
@@ -33,42 +31,34 @@ export interface MatchData {
   venue: string;
   date: string;
   time: string;
+  gameTime: string;
   homeScore?: number;
   awayScore?: number;
   homeTopPlayers?: PlayerInfo[];
   awayTopPlayers?: PlayerInfo[];
 }
 
-interface MatchRow {
-  id: string;
+interface MatchCenterGameRow {
+  vendor_game_id: string;
   season: number;
   round_number: number;
+  round_label: string;
   match_index: number;
-  venue: string;
   match_date: string;
   match_time: string | null;
-  status: MatchStatus;
+  game_time: string;
+  venue: string;
+  home_team: string;
+  home_team_abbr: string;
+  home_team_color: string;
+  home_team_id: string;
+  away_team: string;
+  away_team_abbr: string;
+  away_team_color: string;
+  away_team_id: string;
   home_score: number | null;
   away_score: number | null;
-  home_team: {
-    id: string;
-    name: string;
-    abbreviation: string;
-    color: string;
-  };
-  away_team: {
-    id: string;
-    name: string;
-    abbreviation: string;
-    color: string;
-  };
-}
-
-function formatRoundLabel(roundNumber: number, matchIndex: number = 1): string {
-  if (matchIndex > 1) {
-    return `R${roundNumber}(${matchIndex})`;
-  }
-  return `R${roundNumber}`;
+  status: string;
 }
 
 function formatDate(dateStr: string): string {
@@ -88,6 +78,12 @@ function formatTime(timeStr: string | null): string {
   const ampm = hour >= 12 ? "PM" : "AM";
   const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
   return `${displayHour}:${min} ${ampm}`;
+}
+
+function mapStatus(status: string): MatchStatus {
+  if (status === "FT") return "final";
+  if (status === "LIVE") return "live";
+  return "upcoming";
 }
 
 async function getTopPlayersForMatch(
@@ -119,12 +115,9 @@ async function getTopPlayersForMatch(
   }
 
   return data.map((row: any) => {
+    const fantasyPoints = row.fantasy_points || 0;
     const disposals = row.disposals || 0;
     const goals = row.goals || 0;
-    const fantasyPoints = row.fantasy_points || 0;
-
-    const marks = Math.floor(disposals * 0.3);
-    const tackles = Math.floor(disposals * 0.25);
 
     return {
       id: row.players.id,
@@ -134,34 +127,18 @@ async function getTopPlayersForMatch(
       fantasyPoints,
       disposals,
       goals,
-      marks,
-      tackles,
     };
   });
 }
 
-export async function getMatches(round: number): Promise<MatchData[]> {
+export async function getMatches(season: number, round: number): Promise<MatchData[]> {
   try {
     const { data, error } = await supabase
-      .from("matches")
-      .select(`
-        id,
-        season,
-        round_number,
-        match_index,
-        venue,
-        match_date,
-        match_time,
-        status,
-        home_score,
-        away_score,
-        home_team:teams!matches_home_team_id_fkey(id, name, abbreviation, color),
-        away_team:teams!matches_away_team_id_fkey(id, name, abbreviation, color)
-      `)
-      .eq("season", 2025)
+      .from("v_match_center_games")
+      .select("*")
+      .eq("season", season)
       .eq("round_number", round)
-      .order("match_date", { ascending: true })
-      .order("match_time", { ascending: true });
+      .order("game_time", { ascending: true });
 
     if (error) {
       console.error("Error fetching matches:", error);
@@ -174,46 +151,47 @@ export async function getMatches(round: number): Promise<MatchData[]> {
 
     const matches: MatchData[] = await Promise.all(
       data.map(async (row: any) => {
-        const matchRow = row as unknown as MatchRow;
+        const gameRow = row as unknown as MatchCenterGameRow;
 
         const homeTopPlayers = await getTopPlayersForMatch(
-          matchRow.season,
-          matchRow.round_number,
-          matchRow.match_index,
-          matchRow.home_team.id
+          gameRow.season,
+          gameRow.round_number,
+          gameRow.match_index,
+          gameRow.home_team_id
         );
 
         const awayTopPlayers = await getTopPlayersForMatch(
-          matchRow.season,
-          matchRow.round_number,
-          matchRow.match_index,
-          matchRow.away_team.id
+          gameRow.season,
+          gameRow.round_number,
+          gameRow.match_index,
+          gameRow.away_team_id
         );
 
         return {
-          id: matchRow.id,
-          round: formatRoundLabel(matchRow.round_number, matchRow.match_index),
-          roundNumber: matchRow.round_number,
-          season: matchRow.season,
-          matchIndex: matchRow.match_index,
-          status: matchRow.status,
+          id: gameRow.vendor_game_id,
+          round: gameRow.round_label,
+          roundNumber: gameRow.round_number,
+          season: gameRow.season,
+          matchIndex: gameRow.match_index,
+          status: mapStatus(gameRow.status),
           homeTeam: {
-            id: matchRow.home_team.id,
-            name: matchRow.home_team.name,
-            abbreviation: matchRow.home_team.abbreviation,
-            color: matchRow.home_team.color,
+            id: gameRow.home_team_id,
+            name: gameRow.home_team,
+            abbreviation: gameRow.home_team_abbr,
+            color: gameRow.home_team_color,
           },
           awayTeam: {
-            id: matchRow.away_team.id,
-            name: matchRow.away_team.name,
-            abbreviation: matchRow.away_team.abbreviation,
-            color: matchRow.away_team.color,
+            id: gameRow.away_team_id,
+            name: gameRow.away_team,
+            abbreviation: gameRow.away_team_abbr,
+            color: gameRow.away_team_color,
           },
-          venue: matchRow.venue,
-          date: formatDate(matchRow.match_date),
-          time: formatTime(matchRow.match_time),
-          homeScore: matchRow.home_score ?? undefined,
-          awayScore: matchRow.away_score ?? undefined,
+          venue: gameRow.venue,
+          date: formatDate(gameRow.match_date),
+          time: formatTime(gameRow.match_time),
+          gameTime: gameRow.game_time,
+          homeScore: gameRow.home_score ?? undefined,
+          awayScore: gameRow.away_score ?? undefined,
           homeTopPlayers,
           awayTopPlayers,
         };
@@ -228,7 +206,7 @@ export async function getMatches(round: number): Promise<MatchData[]> {
 }
 
 export function getAvailableSeasons(): number[] {
-  return [2025];
+  return [2025, 2026];
 }
 
 export function getAvailableRounds(): number[] {
