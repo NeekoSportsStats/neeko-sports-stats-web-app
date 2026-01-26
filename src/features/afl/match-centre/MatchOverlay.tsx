@@ -82,25 +82,43 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
   }, [match.season, match.roundNumber, match.matchIndex]);
 
   const { leftTop3, rightTop3, leftTeam, rightTeam } = useMemo(() => {
-    const teams = [...new Set(players.map((p) => p.team))];
+    const teams = [...new Set(players.map((p) => p.team))].filter(Boolean);
+
+    if (teams.length !== 2) {
+      console.warn(
+        `[MatchOverlay] match_index=${match.matchIndex} has ${teams.length} teams:`,
+        teams
+      );
+    }
+
     const [left, right] = teams;
 
-    if (!left || !right) {
-      return { leftTop3: [], rightTop3: [], leftTeam: left ?? "", rightTeam: right ?? "" };
+    if (!left) {
+      return { leftTop3: [], rightTop3: [], leftTeam: "", rightTeam: "" };
     }
+
+    const sortByScore = (a: PlayerData, b: PlayerData) => {
+      const aScore = a.fantasyPoints ?? a.disposals ?? 0;
+      const bScore = b.fantasyPoints ?? b.disposals ?? 0;
+      return bScore - aScore;
+    };
 
     const leftPlayers = players
       .filter((p) => p.team === left)
-      .sort((a, b) => (b.fantasyPoints ?? 0) - (a.fantasyPoints ?? 0))
+      .sort(sortByScore)
       .slice(0, 3);
 
-    const rightPlayers = players
-      .filter((p) => p.team === right)
-      .sort((a, b) => (b.fantasyPoints ?? 0) - (a.fantasyPoints ?? 0))
-      .slice(0, 3);
+    const rightPlayers = right
+      ? players.filter((p) => p.team === right).sort(sortByScore).slice(0, 3)
+      : [];
 
-    return { leftTop3: leftPlayers, rightTop3: rightPlayers, leftTeam: left, rightTeam: right };
-  }, [players]);
+    return {
+      leftTop3: leftPlayers,
+      rightTop3: rightPlayers,
+      leftTeam: left,
+      rightTeam: right ?? "",
+    };
+  }, [players, match.matchIndex]);
 
   return (
     <div
