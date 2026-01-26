@@ -83,8 +83,11 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
 
   const { leftTop3, rightTop3, leftTeam, rightTeam } = useMemo(() => {
     const teams = [...new Set(players.map((p) => p.team))];
-    const left = teams[0] ?? match.homeTeam.name;
-    const right = teams[1] ?? match.awayTeam.name;
+    const [left, right] = teams;
+
+    if (!left || !right) {
+      return { leftTop3: [], rightTop3: [], leftTeam: left ?? "", rightTeam: right ?? "" };
+    }
 
     const leftPlayers = players
       .filter((p) => p.team === left)
@@ -97,7 +100,7 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
       .slice(0, 3);
 
     return { leftTop3: leftPlayers, rightTop3: rightPlayers, leftTeam: left, rightTeam: right };
-  }, [players, match.homeTeam.name, match.awayTeam.name]);
+  }, [players]);
 
   return (
     <div
