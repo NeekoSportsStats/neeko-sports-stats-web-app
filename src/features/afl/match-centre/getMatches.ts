@@ -150,7 +150,7 @@ export async function getTopPlayers(
 ): Promise<TopPlayer[]> {
   const { data, error } = await supabase
     .schema("afl")
-    .from("v_match_center_top_players")
+    .from("player_round_with_colors")
     .select("*")
     .eq("season", season)
     .eq("round_number", roundNumber)
