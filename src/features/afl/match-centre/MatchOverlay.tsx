@@ -1,55 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { X, MapPin, Clock } from "lucide-react";
-import type { MatchData, PlayerData } from "./getMatches";
-import { getMatchPlayers } from "./getMatches";
+import type { MatchData, PlayerData, TopPlayer } from "./getMatches";
+import { getMatchPlayers, getTopPlayers } from "./getMatches";
 import MatchScatter from "./MatchScatter";
-import { supabase } from "@/lib/supabaseClient";
 
 interface MatchOverlayProps {
   match: MatchData;
   onClose: () => void;
-}
-
-type TopPlayer = {
-  player: string;
-  team: string;
-  fantasyPoints: number;
-};
-
-async function getTop3Players(
-  season: number,
-  roundNumber: number,
-  matchIndex: number,
-  homeTeamName: string,
-  awayTeamName: string
-): Promise<{ home: TopPlayer[]; away: TopPlayer[] }> {
-  const { data, error } = await supabase
-    .schema("afl")
-    .from("v_match_center_top_players_2025")
-    .select("player, team, fantasy_points, team_rank, match_index, season, round_number")
-    .eq("season", season)
-    .eq("round_number", roundNumber)
-    .eq("match_index", matchIndex)
-    .lte("team_rank", 3)
-    .order("team_rank", { ascending: true });
-
-  if (error || !data) return { home: [], away: [] };
-
-  const home: TopPlayer[] = [];
-  const away: TopPlayer[] = [];
-
-  for (const r of data as any[]) {
-    const item: TopPlayer = {
-      player: r.player,
-      team: r.team,
-      fantasyPoints: Number(r.fantasy_points ?? 0),
-    };
-
-    if (r.team === homeTeamName) home.push(item);
-    else if (r.team === awayTeamName) away.push(item);
-  }
-
-  return { home, away };
 }
 
 function formatLocalTime(localIso: string | null, utcIso: string | null) {
@@ -60,12 +17,46 @@ function formatLocalTime(localIso: string | null, utcIso: string | null) {
   return d.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 }
 
+interface TeamTopPlayersProps {
+  team: string;
+  players: TopPlayer[];
+}
+
+function TeamTopPlayers({ team, players }: TeamTopPlayersProps) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/40 p-5">
+      <div className="text-xs uppercase tracking-wider text-white/60 mb-3">
+        {team} • Top 3 Players
+      </div>
+      {players.length === 0 ? (
+        <div className="text-white/50">No data</div>
+      ) : (
+        <div className="space-y-3">
+          {players.map((p, idx) => (
+            <div
+              key={idx}
+              className="rounded-xl border border-white/10 bg-black/50 px-4 py-3"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-white font-medium">{p.player}</div>
+                <div className="text-[#F5C84C] font-bold">{p.fantasy_points}</div>
+              </div>
+              <div className="flex items-center gap-4 text-xs text-white/60">
+                <span>Disposals: {p.disposals}</span>
+                <span>Goals: {p.goals}</span>
+                <span>Tackles: {p.tackles}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
-  const [topPlayers, setTopPlayers] = useState<{ home: TopPlayer[]; away: TopPlayer[] }>({
-    home: [],
-    away: [],
-  });
+  const [topPlayers, setTopPlayers] = useState<TopPlayer[]>([]);
   const [players, setPlayers] = useState<PlayerData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -82,17 +73,19 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
       setLoading(true);
       try {
         const [tp, pl] = await Promise.all([
-          getTop3Players(
-            match.season,
-            match.roundNumber,
-            match.matchIndex,
-            match.homeTeam.name,
-            match.awayTeam.name
-          ),
+          getTopPlayers(match.season, match.roundNumber, match.matchIndex),
           getMatchPlayers(match.season, match.roundNumber, match.matchIndex),
         ]);
         setTopPlayers(tp);
         setPlayers(pl);
+
+        if (tp.length === 0) {
+          console.warn("No top players returned from SQL view", {
+            season: match.season,
+            round: match.roundNumber,
+            matchIndex: match.matchIndex,
+          });
+        }
       } catch (e) {
         console.error("Overlay load failed:", e);
       } finally {
@@ -100,7 +93,16 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
       }
     };
     load();
-  }, [match.season, match.roundNumber, match.matchIndex, match.homeTeam.name, match.awayTeam.name]);
+  }, [match.season, match.roundNumber, match.matchIndex]);
+
+  const playersByTeam = useMemo(() => {
+    const map: Record<string, TopPlayer[]> = {};
+    topPlayers.forEach((p) => {
+      if (!map[p.team]) map[p.team] = [];
+      map[p.team].push(p);
+    });
+    return map;
+  }, [topPlayers]);
 
   return (
     <div
@@ -156,62 +158,31 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-2xl border border-white/10 bg-black/40 p-5">
-              <div className="text-xs uppercase tracking-wider text-white/60 mb-3">
-                {match.homeTeam.name} • Top 3 Players
+          {loading ? (
+            <div className="flex items-center justify-center py-10">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-10 h-10 border-4 border-yellow-400/20 border-t-yellow-400 rounded-full animate-spin" />
+                <p className="text-white/50 text-sm">Loading players...</p>
               </div>
-              {loading ? (
-                <div className="text-white/60">Loading…</div>
-              ) : topPlayers.home.length === 0 ? (
-                <div className="text-white/50">No data</div>
-              ) : (
-                <div className="space-y-3">
-                  {topPlayers.home.map((p, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-xl border border-white/10 bg-black/50 px-4 py-3 flex items-center justify-between"
-                    >
-                      <div className="text-white font-medium">{p.player}</div>
-                      <div className="text-[#F5C84C] font-bold">{p.fantasyPoints}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-
-            <div className="rounded-2xl border border-white/10 bg-black/40 p-5">
-              <div className="text-xs uppercase tracking-wider text-white/60 mb-3">
-                {match.awayTeam.name} • Top 3 Players
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(playersByTeam).map(([team, players]) => (
+                  <TeamTopPlayers key={team} team={team} players={players} />
+                ))}
               </div>
-              {loading ? (
-                <div className="text-white/60">Loading…</div>
-              ) : topPlayers.away.length === 0 ? (
-                <div className="text-white/50">No data</div>
-              ) : (
-                <div className="space-y-3">
-                  {topPlayers.away.map((p, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-xl border border-white/10 bg-black/50 px-4 py-3 flex items-center justify-between"
-                    >
-                      <div className="text-white font-medium">{p.player}</div>
-                      <div className="text-[#F5C84C] font-bold">{p.fantasyPoints}</div>
-                    </div>
-                  ))}
+
+              <MatchScatter players={players} />
+
+              <div className="rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-r from-[#F5C84C]/20 to-transparent p-6">
+                <div className="text-white font-semibold mb-1">AI Match Preview</div>
+                <div className="text-white/70 text-sm">
+                  Coming soon — will use player efficiency/volume and team context.
                 </div>
-              )}
-            </div>
-          </div>
-
-          <MatchScatter players={players} />
-
-          <div className="rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-r from-[#F5C84C]/20 to-transparent p-6">
-            <div className="text-white font-semibold mb-1">AI Match Preview</div>
-            <div className="text-white/70 text-sm">
-              Coming soon — will use player efficiency/volume and team context.
-            </div>
-          </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

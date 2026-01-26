@@ -40,6 +40,20 @@ export type PlayerData = {
   position?: string | null;
 };
 
+export type TopPlayer = {
+  season: number;
+  round_number: number;
+  match_index: number;
+  team: string;
+  opponent: string;
+  player: string;
+  fantasy_points: number;
+  disposals: number;
+  goals: number;
+  tackles: number;
+  team_rank: number;
+};
+
 function formatDayLabel(isoDate: string) {
   const d = new Date(isoDate + "T00:00:00");
   return d.toLocaleDateString(undefined, {
@@ -127,4 +141,23 @@ export async function getMatchPlayers(
     goals: safeNum(r.goals),
     position: r.position ?? null,
   }));
+}
+
+export async function getTopPlayers(
+  season: number,
+  roundNumber: number,
+  matchIndex: number
+): Promise<TopPlayer[]> {
+  const { data, error } = await supabase
+    .schema("afl")
+    .from("v_match_center_top_players")
+    .select("*")
+    .eq("season", season)
+    .eq("round_number", roundNumber)
+    .eq("match_index", matchIndex)
+    .order("team", { ascending: true })
+    .order("team_rank", { ascending: true });
+
+  if (error) throw error;
+  return data ?? [];
 }
