@@ -1,137 +1,66 @@
 import React from "react";
-import { MapPin, Clock, ChevronRight } from "lucide-react";
-import type { DayMatches, MatchData } from "./getMatches";
+import type { DayGroup, MatchData } from "./getMatches";
 
-interface MatchListProps {
-  dayMatches: DayMatches[];
-  onSelectMatch: (match: MatchData) => void;
+function formatTime(localIso: string | null, utcIso: string | null) {
+  const iso = localIso || utcIso;
+  if (!iso) return "TBC";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "TBC";
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
-function formatScore(score: number | null): { goals: number; behinds: number; total: number } | null {
-  if (score === null) return null;
-  const goals = Math.floor(score / 6);
-  const behinds = score % 6;
-  return { goals, behinds, total: score };
+interface Props {
+  groups: DayGroup[];
+  onSelectMatch: (m: MatchData) => void;
 }
 
-function formatTime(timeStr: string): string {
-  if (!timeStr) return "TBC";
-
-  try {
-    const [hours, minutes] = timeStr.split(":");
-    const hour = parseInt(hours);
-    const min = minutes;
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-    return `${displayHour}:${min} ${ampm}`;
-  } catch {
-    return "TBC";
-  }
-}
-
-export default function MatchList({ dayMatches, onSelectMatch }: MatchListProps) {
-  if (dayMatches.length === 0) {
+export default function MatchList({ groups, onSelectMatch }: Props) {
+  if (!groups || groups.length === 0) {
     return (
-      <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-12 text-center">
-        <p className="text-white/60">No matches found for this round</p>
+      <div className="rounded-2xl border border-white/10 bg-black/30 p-10 text-center text-white/50">
+        No matches found for this round.
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      {dayMatches.map((day) => (
-        <div key={day.dayLabel}>
-          <h3 className="text-lg font-semibold text-white/80 mb-4">{day.dayLabel}</h3>
-          <div className="space-y-3">
-            {day.matches.map((match, idx) => {
-              const homeScoreData = formatScore(match.homeScore);
-              const awayScoreData = formatScore(match.awayScore);
-              const isFinal = match.status === "FT";
+      {groups.map((g, idx) => (
+        <div key={idx} className="space-y-4">
+          <div className="text-white/80 font-semibold">{g.dayLabel}</div>
 
-              return (
-                <button
-                  key={`${match.vendorGameId}-${idx}`}
-                  onClick={() => onSelectMatch(match)}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6 hover:bg-white/5 hover:border-yellow-400/40 transition-all group text-left"
-                >
-                  <div className="flex flex-col md:flex-row md:items-center gap-6">
-                    <div className="flex-1 space-y-4">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3 flex-1">
-                          <div
-                            className="w-1.5 h-16 rounded-full"
-                            style={{ backgroundColor: match.homeTeamColor }}
-                          />
-                          <div className="flex-1">
-                            <div className="text-lg font-semibold text-white">
-                              {match.homeTeam}
-                            </div>
-                            <div className="text-sm text-white/50">
-                              {match.homeTeamAbbr}
-                            </div>
-                          </div>
-                        </div>
-
-                        {isFinal && homeScoreData && awayScoreData ? (
-                          <div className="text-center px-4">
-                            <div className="text-2xl font-bold text-yellow-400">
-                              {homeScoreData.goals}.{homeScoreData.behinds}.{homeScoreData.total}
-                            </div>
-                            <div className="text-xs text-white/40 my-1">vs</div>
-                            <div className="text-2xl font-bold text-yellow-400">
-                              {awayScoreData.goals}.{awayScoreData.behinds}.{awayScoreData.total}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-2xl font-bold text-white/40 px-4">VS</div>
-                        )}
-
-                        <div className="flex items-center gap-3 flex-1">
-                          <div className="flex-1 text-right">
-                            <div className="text-lg font-semibold text-white">
-                              {match.awayTeam}
-                            </div>
-                            <div className="text-sm text-white/50">
-                              {match.awayTeamAbbr}
-                            </div>
-                          </div>
-                          <div
-                            className="w-1.5 h-16 rounded-full"
-                            style={{ backgroundColor: match.awayTeamColor }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-white/60">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          <span>{match.venue}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          <span>{formatTime(match.gameTime)}</span>
-                        </div>
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-semibold uppercase ${
-                            isFinal
-                              ? "bg-emerald-500/20 text-emerald-400"
-                              : "bg-blue-500/20 text-blue-400"
-                          }`}
-                        >
-                          {isFinal ? "Final" : "Upcoming"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-white/40 group-hover:text-yellow-400 transition-colors">
-                      <span className="text-sm font-medium">View Details</span>
-                      <ChevronRight className="h-5 w-5" />
-                    </div>
+          <div className="space-y-4">
+            {g.matches.map((m) => (
+              <button
+                key={m.vendorGameId}
+                onClick={() => onSelectMatch(m)}
+                className="w-full text-left rounded-2xl border border-white/10 bg-black/30 hover:bg-black/40 transition p-6"
+              >
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <div>
+                    <div className="text-white font-semibold">{m.homeTeam.name}</div>
+                    <div className="text-[#F5C84C] font-bold">{m.homeScore ?? "—"}</div>
                   </div>
-                </button>
-              );
-            })}
+                  <div className="text-center text-white/40 font-black text-2xl">VS</div>
+                  <div className="text-right">
+                    <div className="text-white font-semibold">{m.awayTeam.name}</div>
+                    <div className="text-[#F5C84C] font-bold">{m.awayScore ?? "—"}</div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-white/60">
+                  <div>{m.venue ?? "TBC"}</div>
+                  <div>{formatTime(m.gameTimeLocal, m.gameTime)}</div>
+                  <div className="px-2 py-1 rounded-md border border-white/10 bg-white/5 text-xs uppercase tracking-wider">
+                    {m.status ?? "TBC"}
+                  </div>
+                  <div className="ml-auto text-white/50 text-sm flex items-center gap-2">
+                    <span>View Details</span>
+                    <span>›</span>
+                  </div>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       ))}

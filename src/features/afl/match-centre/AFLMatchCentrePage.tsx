@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Calendar } from "lucide-react";
-import { getRoundMatches, DayMatches, MatchData } from "./getMatches";
+import { getRoundMatches, DayGroup, MatchData } from "./getMatches";
 import MatchList from "./MatchList";
 import MatchOverlay from "./MatchOverlay";
 
 export default function AFLMatchCentrePage() {
-  const [dayMatches, setDayMatches] = useState<DayMatches[]>([]);
+  const [groups, setGroups] = useState<DayGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMatch, setSelectedMatch] = useState<MatchData | null>(null);
   const [season, setSeason] = useState(2025);
@@ -28,7 +28,7 @@ export default function AFLMatchCentrePage() {
       loadMatches();
     } else {
       setLoading(false);
-      setDayMatches([]);
+      setGroups([]);
     }
   }, [season, round]);
 
@@ -36,7 +36,7 @@ export default function AFLMatchCentrePage() {
     setLoading(true);
     try {
       const data = await getRoundMatches(season, round);
-      setDayMatches(data);
+      setGroups(data);
     } catch (error) {
       console.error("Failed to load matches:", error);
     } finally {
@@ -137,7 +137,7 @@ export default function AFLMatchCentrePage() {
             </div>
           </div>
         ) : (
-          <MatchList dayMatches={dayMatches} onSelectMatch={setSelectedMatch} />
+          <MatchList groups={groups} onSelectMatch={setSelectedMatch} />
         )}
       </div>
 
