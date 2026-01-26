@@ -51,7 +51,6 @@ export type TopPlayer = {
   disposals: number;
   goals: number;
   tackles: number;
-  team_rank: number;
 };
 
 function formatDayLabel(isoDate: string) {
@@ -149,15 +148,25 @@ export async function getTopPlayers(
   matchIndex: number
 ): Promise<TopPlayer[]> {
   const { data, error } = await supabase
-    .schema("afl")
     .from("player_round_with_colors")
-    .select("*")
+    .select("season, round_number, match_index, team, opponent, player, fantasy_points, disposals, goals, tackles")
     .eq("season", season)
     .eq("round_number", roundNumber)
     .eq("match_index", matchIndex)
     .order("team", { ascending: true })
-    .order("team_rank", { ascending: true });
+    .order("fantasy_points", { ascending: false });
 
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map((r: any) => ({
+    season: r.season,
+    round_number: r.round_number,
+    match_index: r.match_index,
+    team: r.team,
+    opponent: r.opponent,
+    player: r.player,
+    fantasy_points: r.fantasy_points ?? 0,
+    disposals: r.disposals ?? 0,
+    goals: r.goals ?? 0,
+    tackles: r.tackles ?? 0,
+  }));
 }
