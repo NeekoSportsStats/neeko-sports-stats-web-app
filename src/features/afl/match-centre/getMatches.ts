@@ -122,8 +122,7 @@ export async function getMatchPlayers(
   matchIndex: number
 ): Promise<PlayerData[]> {
   const { data, error } = await supabase
-    .schema("afl")
-    .from("v_player_round_canonical_2025")
+    .from("player_round_with_colors")
     .select("player, team, team_color, disposals, fantasy_points, goals, position")
     .eq("season", season)
     .eq("round_number", roundNumber)

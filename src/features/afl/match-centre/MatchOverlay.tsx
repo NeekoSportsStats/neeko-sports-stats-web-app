@@ -70,8 +70,14 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     const load = async () => {
       setLoading(true);
       try {
-        const pl = await getMatchPlayers(match.season, match.roundNumber, match.matchIndex);
-        setPlayers(pl);
+        const matchPlayers = await getMatchPlayers(match.season, match.roundNumber, match.matchIndex);
+        console.log(
+          "[MatchOverlay] match_index",
+          match.matchIndex,
+          "teams:",
+          [...new Set(matchPlayers.map((p) => p.team))]
+        );
+        setPlayers(matchPlayers);
       } catch (e) {
         console.error("Overlay load failed:", e);
       } finally {
