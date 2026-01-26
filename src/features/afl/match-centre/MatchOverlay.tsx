@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { X, MapPin, Clock } from "lucide-react";
-import type { MatchData, PlayerData, TopPlayer } from "./getMatches";
-import { getMatchPlayers, getTopPlayers } from "./getMatches";
+import type { MatchData, PlayerData } from "./getMatches";
+import { getMatchPlayers } from "./getMatches";
 import MatchScatter from "./MatchScatter";
 
 interface MatchOverlayProps {
@@ -19,7 +19,7 @@ function formatLocalTime(localIso: string | null, utcIso: string | null) {
 
 interface TeamTopPlayersProps {
   team: string;
-  players: TopPlayer[];
+  players: PlayerData[];
 }
 
 function TeamTopPlayers({ team, players }: TeamTopPlayersProps) {
@@ -39,12 +39,11 @@ function TeamTopPlayers({ team, players }: TeamTopPlayersProps) {
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="text-white font-medium">{p.player}</div>
-                <div className="text-[#F5C84C] font-bold">{p.fantasy_points}</div>
+                <div className="text-[#F5C84C] font-bold">{p.fantasyPoints ?? 0}</div>
               </div>
               <div className="flex items-center gap-4 text-xs text-white/60">
-                <span>Disposals: {p.disposals}</span>
-                <span>Goals: {p.goals}</span>
-                <span>Tackles: {p.tackles}</span>
+                <span>Disposals: {p.disposals ?? 0}</span>
+                <span>Goals: {p.goals ?? 0}</span>
               </div>
             </div>
           ))}
@@ -56,7 +55,6 @@ function TeamTopPlayers({ team, players }: TeamTopPlayersProps) {
 
 export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
-  const [topPlayers, setTopPlayers] = useState<TopPlayer[]>([]);
   const [players, setPlayers] = useState<PlayerData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -72,20 +70,8 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     const load = async () => {
       setLoading(true);
       try {
-        const [tp, pl] = await Promise.all([
-          getTopPlayers(match.season, match.roundNumber, match.matchIndex),
-          getMatchPlayers(match.season, match.roundNumber, match.matchIndex),
-        ]);
-        setTopPlayers(tp);
+        const pl = await getMatchPlayers(match.season, match.roundNumber, match.matchIndex);
         setPlayers(pl);
-
-        if (tp.length === 0) {
-          console.warn("No top players returned from SQL view", {
-            season: match.season,
-            round: match.roundNumber,
-            matchIndex: match.matchIndex,
-          });
-        }
       } catch (e) {
         console.error("Overlay load failed:", e);
       } finally {
@@ -95,17 +81,23 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     load();
   }, [match.season, match.roundNumber, match.matchIndex]);
 
-  const playersByTeam = useMemo(() => {
-    const teams = [...new Set(topPlayers.map((p) => p.team))];
-    const map: Record<string, TopPlayer[]> = {};
-    teams.forEach((team) => {
-      map[team] = topPlayers
-        .filter((p) => p.team === team)
-        .sort((a, b) => b.fantasy_points - a.fantasy_points)
-        .slice(0, 3);
-    });
-    return map;
-  }, [topPlayers]);
+  const { leftTop3, rightTop3, leftTeam, rightTeam } = useMemo(() => {
+    const teams = [...new Set(players.map((p) => p.team))];
+    const left = teams[0] ?? match.homeTeam.name;
+    const right = teams[1] ?? match.awayTeam.name;
+
+    const leftPlayers = players
+      .filter((p) => p.team === left)
+      .sort((a, b) => (b.fantasyPoints ?? 0) - (a.fantasyPoints ?? 0))
+      .slice(0, 3);
+
+    const rightPlayers = players
+      .filter((p) => p.team === right)
+      .sort((a, b) => (b.fantasyPoints ?? 0) - (a.fantasyPoints ?? 0))
+      .slice(0, 3);
+
+    return { leftTop3: leftPlayers, rightTop3: rightPlayers, leftTeam: left, rightTeam: right };
+  }, [players, match.homeTeam.name, match.awayTeam.name]);
 
   return (
     <div
@@ -171,9 +163,8 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Object.entries(playersByTeam).map(([team, players]) => (
-                  <TeamTopPlayers key={team} team={team} players={players} />
-                ))}
+                <TeamTopPlayers team={leftTeam} players={leftTop3} />
+                <TeamTopPlayers team={rightTeam} players={rightTop3} />
               </div>
 
               <MatchScatter players={players} />
