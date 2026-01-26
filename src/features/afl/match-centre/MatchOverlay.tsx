@@ -96,10 +96,13 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
   }, [match.season, match.roundNumber, match.matchIndex]);
 
   const playersByTeam = useMemo(() => {
+    const teams = [...new Set(topPlayers.map((p) => p.team))];
     const map: Record<string, TopPlayer[]> = {};
-    topPlayers.forEach((p) => {
-      if (!map[p.team]) map[p.team] = [];
-      map[p.team].push(p);
+    teams.forEach((team) => {
+      map[team] = topPlayers
+        .filter((p) => p.team === team)
+        .sort((a, b) => b.fantasy_points - a.fantasy_points)
+        .slice(0, 3);
     });
     return map;
   }, [topPlayers]);
