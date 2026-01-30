@@ -135,7 +135,7 @@ export async function getMatchPlayers(
 
   const { data, error } = await supabase
     .schema("afl")
-    .from("v_match_center_players_2025")
+    .from("v_match_center_players_2025_canonical")
     .select("player_name, team_name, team_color, disposals, fantasy_points, goals, player_role")
     .eq("season", season)
     .eq("round_number", roundNumber)
