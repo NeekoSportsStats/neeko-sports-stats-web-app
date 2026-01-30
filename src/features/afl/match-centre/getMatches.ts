@@ -131,10 +131,11 @@ export async function getMatchPlayers(
   roundNumber: number,
   matchIndex: number
 ): Promise<PlayerData[]> {
-  console.log(`[getMatchPlayers] Querying: season=${season}, round=${roundNumber}, matchIndex=${matchIndex}`);
+  console.log(`[getMatchPlayers] Querying canonical view: season=${season}, round=${roundNumber}, matchIndex=${matchIndex}`);
 
   const { data, error } = await supabase
-    .from("player_round_with_colors")
+    .schema("afl")
+    .from("player_round_stats_2025_canonical")
     .select("player, team, team_color, disposals, fantasy_points, goals, position")
     .eq("season", season)
     .eq("round_number", roundNumber)
@@ -148,6 +149,22 @@ export async function getMatchPlayers(
 
   const teams = [...new Set((data ?? []).map((r: any) => r.team))];
   console.log(`[getMatchPlayers] Returned ${data?.length ?? 0} players from teams:`, teams);
+
+  if (teams.length !== 2) {
+    console.warn(`[getMatchPlayers] ⚠️ Expected exactly 2 teams, got ${teams.length}:`, teams);
+  }
+
+  if (data && data.length !== 46) {
+    console.warn(`[getMatchPlayers] ⚠️ Expected ~46 players, got ${data.length}`);
+  }
+
+  console.log("[MatchCentre]", {
+    season,
+    roundNumber,
+    matchIndex,
+    teams,
+    playerCount: data?.length ?? 0,
+  });
 
   return (data ?? []).map((r: any) => ({
     player: r.player,
@@ -166,7 +183,8 @@ export async function getTopPlayers(
   matchIndex: number
 ): Promise<TopPlayer[]> {
   const { data, error } = await supabase
-    .from("player_round_with_colors")
+    .schema("afl")
+    .from("player_round_stats_2025_canonical")
     .select("season, round_number, match_index, team, opponent, player, fantasy_points, disposals, goals, tackles")
     .eq("season", season)
     .eq("round_number", roundNumber)
