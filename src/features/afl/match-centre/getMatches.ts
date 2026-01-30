@@ -135,8 +135,8 @@ export async function getMatchPlayers(
 
   const { data, error } = await supabase
     .schema("afl")
-    .from("player_round_stats_2025_canonical")
-    .select("player, team, team_color, disposals, fantasy_points, goals, position")
+    .from("v_match_center_players_2025")
+    .select("player_name, team_name, team_color, disposals, fantasy_points, goals, player_role")
     .eq("season", season)
     .eq("round_number", roundNumber)
     .eq("match_index", matchIndex)
@@ -147,7 +147,7 @@ export async function getMatchPlayers(
     throw error;
   }
 
-  const teams = [...new Set((data ?? []).map((r: any) => r.team))];
+  const teams = [...new Set((data ?? []).map((r: any) => r.team_name))];
   console.log(`[getMatchPlayers] Returned ${data?.length ?? 0} players from teams:`, teams);
 
   if (teams.length !== 2) {
@@ -167,13 +167,13 @@ export async function getMatchPlayers(
   });
 
   return (data ?? []).map((r: any) => ({
-    player: r.player,
-    team: r.team,
+    player: r.player_name,
+    team: r.team_name,
     teamColor: r.team_color ?? null,
     disposals: safeNum(r.disposals),
     fantasyPoints: safeNum(r.fantasy_points),
     goals: safeNum(r.goals),
-    position: r.position ?? null,
+    position: r.player_role ?? null,
   }));
 }
 
@@ -184,25 +184,31 @@ export async function getTopPlayers(
 ): Promise<TopPlayer[]> {
   const { data, error } = await supabase
     .schema("afl")
-    .from("player_round_stats_2025_canonical")
-    .select("season, round_number, match_index, team, opponent, player, fantasy_points, disposals, goals, tackles")
+    .from("v_match_center_top3_players_2025")
+    .select("season, round_number, match_index, team_abbr, player_name, fantasy_points, disposals, goals")
     .eq("season", season)
     .eq("round_number", roundNumber)
     .eq("match_index", matchIndex)
-    .order("team", { ascending: true })
+    .order("team_abbr", { ascending: true })
     .order("fantasy_points", { ascending: false });
 
   if (error) throw error;
+
+  const teams = [...new Set((data ?? []).map((r: any) => r.team_abbr))];
+  const opponent = teams.length === 2
+    ? (team: string) => teams.find(t => t !== team) ?? ""
+    : () => "";
+
   return (data ?? []).map((r: any) => ({
     season: r.season,
     round_number: r.round_number,
     match_index: r.match_index,
-    team: r.team,
-    opponent: r.opponent,
-    player: r.player,
+    team: r.team_abbr,
+    opponent: opponent(r.team_abbr),
+    player: r.player_name,
     fantasy_points: r.fantasy_points ?? 0,
     disposals: r.disposals ?? 0,
     goals: r.goals ?? 0,
-    tackles: r.tackles ?? 0,
+    tackles: 0,
   }));
 }
