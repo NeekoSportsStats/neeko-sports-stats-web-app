@@ -79,31 +79,41 @@ export async function getRoundMatches(season: number, roundNumber: number): Prom
   if (error) throw error;
   if (!data || data.length === 0) return [];
 
+  console.log(`[getRoundMatches] Loading S${season} R${roundNumber}`);
+
   return data.map((row: any) => {
     const matchDay: string = row.match_day;
     const matchesRaw: any[] = Array.isArray(row.matches) ? row.matches : [];
 
-    const matches: MatchData[] = matchesRaw.map((m: any) => ({
-      vendorGameId: Number(m.vendor_game_id),
-      season: Number(row.season),
-      roundNumber: Number(row.round_number),
-      roundLabel: row.round_label ?? null,
-      matchIndex: Number(m.match_index ?? 0),
-      venue: m.venue ?? null,
-      status: m.status ?? null,
-      homeScore: safeNum(m.home_score),
-      awayScore: safeNum(m.away_score),
-      gameTime: m.game_time ?? null,
-      gameTimeLocal: m.game_time_local ?? null,
-      homeTeam: {
-        name: m.home_team ?? m.home_team_name ?? "Home",
-        color: m.home_color ?? null,
-      },
-      awayTeam: {
-        name: m.away_team ?? m.away_team_name ?? "Away",
-        color: m.away_color ?? null,
-      },
-    }));
+    const matches: MatchData[] = matchesRaw.map((m: any) => {
+      const matchIndex = Number(m.match_index ?? 0);
+      const homeTeam = m.home_team ?? m.home_team_name ?? "Home";
+      const awayTeam = m.away_team ?? m.away_team_name ?? "Away";
+
+      console.log(`[getRoundMatches]   ${homeTeam} vs ${awayTeam} | matchIndex: ${matchIndex} | raw: ${m.match_index}`);
+
+      return {
+        vendorGameId: Number(m.vendor_game_id),
+        season: Number(row.season),
+        roundNumber: Number(row.round_number),
+        roundLabel: row.round_label ?? null,
+        matchIndex: matchIndex,
+        venue: m.venue ?? null,
+        status: m.status ?? null,
+        homeScore: safeNum(m.home_score),
+        awayScore: safeNum(m.away_score),
+        gameTime: m.game_time ?? null,
+        gameTimeLocal: m.game_time_local ?? null,
+        homeTeam: {
+          name: homeTeam,
+          color: m.home_color ?? null,
+        },
+        awayTeam: {
+          name: awayTeam,
+          color: m.away_color ?? null,
+        },
+      };
+    });
 
     return {
       season: Number(row.season),
@@ -121,6 +131,8 @@ export async function getMatchPlayers(
   roundNumber: number,
   matchIndex: number
 ): Promise<PlayerData[]> {
+  console.log(`[getMatchPlayers] Querying: season=${season}, round=${roundNumber}, matchIndex=${matchIndex}`);
+
   const { data, error } = await supabase
     .from("player_round_with_colors")
     .select("player, team, team_color, disposals, fantasy_points, goals, position")
@@ -129,7 +141,14 @@ export async function getMatchPlayers(
     .eq("match_index", matchIndex)
     .order("fantasy_points", { ascending: false });
 
-  if (error) throw error;
+  if (error) {
+    console.error("[getMatchPlayers] Query error:", error);
+    throw error;
+  }
+
+  const teams = [...new Set((data ?? []).map((r: any) => r.team))];
+  console.log(`[getMatchPlayers] Returned ${data?.length ?? 0} players from teams:`, teams);
+
   return (data ?? []).map((r: any) => ({
     player: r.player,
     team: r.team,

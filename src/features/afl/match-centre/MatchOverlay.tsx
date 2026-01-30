@@ -70,13 +70,43 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     const load = async () => {
       setLoading(true);
       try {
-        const matchPlayers = await getMatchPlayers(match.season, match.roundNumber, match.matchIndex);
-        console.log(
-          "[MatchOverlay] match_index",
-          match.matchIndex,
-          "teams:",
-          [...new Set(matchPlayers.map((p) => p.team))]
-        );
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        console.log("[MatchOverlay] SELECTED MATCH:");
+        console.log("  Header shows:", match.homeTeam.name, "vs", match.awayTeam.name);
+        console.log("  match.matchIndex:", match.matchIndex);
+        console.log("  match.season:", match.season);
+        console.log("  match.roundNumber:", match.roundNumber);
+        console.log("  vendorGameId:", match.vendorGameId);
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        const matchIndex = match.matchIndex;
+        console.log("[MatchOverlay] Query params:", {
+          season: match.season,
+          roundNumber: match.roundNumber,
+          matchIndex: matchIndex,
+        });
+
+        const matchPlayers = await getMatchPlayers(match.season, match.roundNumber, matchIndex);
+
+        const returnedTeams = [...new Set(matchPlayers.map((p) => p.team))];
+        console.log("[MatchOverlay] Returned teams:", returnedTeams);
+        console.log("[MatchOverlay] Returned player count:", matchPlayers.length);
+
+        const expectedTeams = [match.homeTeam.name, match.awayTeam.name];
+        const teamsMatch =
+          returnedTeams.length === 2 &&
+          expectedTeams.every(t => returnedTeams.includes(t));
+
+        if (!teamsMatch) {
+          console.error("❌ TEAM MISMATCH DETECTED!");
+          console.error("  Expected:", expectedTeams);
+          console.error("  Got:", returnedTeams);
+          console.error("  This means the matchIndex is incorrect or the data is wrong.");
+        } else {
+          console.log("✅ Teams match correctly!");
+        }
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
         setPlayers(matchPlayers);
       } catch (e) {
         console.error("Overlay load failed:", e);
@@ -85,7 +115,7 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
       }
     };
     load();
-  }, [match.season, match.roundNumber, match.matchIndex]);
+  }, [match.season, match.roundNumber, match.matchIndex, match.homeTeam.name, match.awayTeam.name, match.vendorGameId]);
 
   const { leftTop3, rightTop3, leftTeam, rightTeam } = useMemo(() => {
     const teams = [...new Set(players.map((p) => p.team))].filter(Boolean);

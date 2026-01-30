@@ -33,7 +33,10 @@ export default function MatchList({ groups, onSelectMatch }: Props) {
             {g.matches.map((m) => (
               <button
                 key={m.vendorGameId}
-                onClick={() => onSelectMatch(m)}
+                onClick={() => {
+                  console.log("[MatchList] Clicked match:", m.homeTeam.name, "vs", m.awayTeam.name, "| matchIndex:", m.matchIndex);
+                  onSelectMatch(m);
+                }}
                 className="w-full text-left rounded-2xl border border-white/10 bg-black/30 hover:bg-black/40 transition p-6"
               >
                 <div className="grid grid-cols-3 items-center gap-4">
