@@ -117,21 +117,14 @@ export async function resolveMatchIndex(params: {
 
 export async function fetchMatchPlayers(
   season: number,
-  round: number | undefined,
-  matchIndex: number
+  vendorGameId: string
 ): Promise<MatchPlayer[]> {
-  let query = supabase
+  const { data, error } = await supabase
     .schema("afl")
-    .from("v_match_center_players_canonical")
+    .from("v_match_center_players_2025_canonical")
     .select("*")
     .eq("season", season)
-    .eq("match_index", matchIndex);
-
-  if (typeof round === "number") {
-    query = query.eq("round_number", round);
-  }
-
-  const { data, error } = await query;
+    .eq("vendor_game_id", vendorGameId);
 
   if (error) {
     console.error("[fetchMatchPlayers] Error:", error);
@@ -144,8 +137,8 @@ export async function fetchMatchPlayers(
 
   return data.map((row): MatchPlayer => ({
     season: row.season ?? season,
-    round_number: row.round_number ?? (round ?? 0),
-    match_index: row.match_index ?? matchIndex,
+    round_number: row.round_number ?? 0,
+    match_index: row.match_index ?? 0,
     team_name: row.team_name ?? "Unknown",
     team_color: safeColor(row.team_color),
     player_name: row.player_name ?? "Unknown Player",

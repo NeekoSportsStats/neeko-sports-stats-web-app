@@ -33,16 +33,18 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     setLoading(true);
     try {
       const season = match.season ?? 2025;
-      const roundNumber = match.round_number ?? 1;
-      const matchIndex = match.match_index;
+      const vendorGameId = match.vendor_game_id;
 
-      if (typeof matchIndex !== "number") {
-        console.warn("[MatchOverlay] match_index is not a number");
+      if (!vendorGameId) {
+        console.warn("[MatchOverlay] vendor_game_id is missing");
+        setPlayers([]);
+        setLoading(false);
+        return;
       }
 
-      console.log("[MatchOverlay] Loading players:", { season, roundNumber, matchIndex });
+      console.log("[MatchOverlay] Loading players:", { season, vendorGameId });
 
-      const rawPlayers = await fetchMatchPlayers(season, undefined, matchIndex);
+      const rawPlayers = await fetchMatchPlayers(season, vendorGameId);
 
       const returnedTeams = [...new Set(rawPlayers.map((p) => p.team_name))];
       console.log("[MatchOverlay] Returned teams:", returnedTeams);
