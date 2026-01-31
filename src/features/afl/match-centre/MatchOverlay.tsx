@@ -1,68 +1,25 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { X, MapPin, Clock } from "lucide-react";
-import { fetchMatchPlayers, computeTop3, type MatchPlayer } from "@/lib/afl/matchCenter";
+import { fetchMatchPlayers } from "./services/matchCenter.service";
+import { computeTop3 } from "./utils";
+import type { MatchSummary, MatchPlayer } from "./types";
 import MatchScatter from "./MatchScatter";
 
-type MatchData = {
-  vendor_game_id?: string;
-  match_id?: string;
-  season?: number;
-  round_number?: number;
-  round_label?: string;
-  match_index?: number;
-  venue?: string;
-  status?: string;
-  home_score?: number | null;
-  away_score?: number | null;
-  homeTeam: { name: string; color: string | null };
-  awayTeam: { name: string; color: string | null };
-  gameTime: string | null;
-  gameTimeLocal: string | null;
-  vendorGameId?: number;
-  roundNumber?: number;
-  roundLabel?: string;
-  homeScore?: number | null;
-  awayScore?: number | null;
-};
-
 interface MatchOverlayProps {
-  match: MatchData;
+  match: MatchSummary;
   onClose: () => void;
 }
 
-type PlayerData = {
-  player: string;
-  team: string;
-  teamColor?: string | null;
-  disposals: number | null;
-  fantasyPoints: number | null;
-  goals?: number | null;
-  position?: string | null;
-};
-
-function formatLocalTime(localIso: string | null, utcIso: string | null) {
-  const iso = localIso || utcIso;
-  if (!iso) return "TBC";
-  const d = new Date(iso);
+function formatLocalTime(gameTime: string | null | undefined) {
+  if (!gameTime) return "TBC";
+  const d = new Date(gameTime);
   if (Number.isNaN(d.getTime())) return "TBC";
   return d.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 }
 
-function adaptPlayer(mp: MatchPlayer): PlayerData {
-  return {
-    player: mp.player_name ?? "Unknown",
-    team: mp.team_name ?? "Unknown",
-    teamColor: mp.team_color ?? null,
-    disposals: mp.disposals ?? 0,
-    fantasyPoints: mp.fantasy_points ?? 0,
-    goals: mp.goals ?? 0,
-    position: mp.player_role ?? null,
-  };
-}
-
 interface TeamTopPlayersProps {
   team: string;
-  players: PlayerData[];
+  players: MatchPlayer[];
 }
 
 function TeamTopPlayers({ team, players }: TeamTopPlayersProps) {
@@ -81,8 +38,8 @@ function TeamTopPlayers({ team, players }: TeamTopPlayersProps) {
               className="rounded-xl border border-white/10 bg-black/50 px-4 py-3"
             >
               <div className="flex items-center justify-between mb-2">
-                <div className="text-white font-medium">{p.player}</div>
-                <div className="text-[#F5C84C] font-bold">{p.fantasyPoints ?? 0}</div>
+                <div className="text-white font-medium">{p.player_name ?? "Unknown"}</div>
+                <div className="text-[#F5C84C] font-bold">{p.fantasy_points ?? 0}</div>
               </div>
               <div className="flex items-center gap-4 text-xs text-white/60">
                 <span>Disposals: {p.disposals ?? 0}</span>
@@ -98,7 +55,7 @@ function TeamTopPlayers({ team, players }: TeamTopPlayersProps) {
 
 export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
-  const [players, setPlayers] = useState<PlayerData[]>([]);
+  const [players, setPlayers] = useState<MatchPlayer[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -113,32 +70,25 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     setLoading(true);
     try {
       const season = match.season ?? 2025;
-      const roundNumber = match.round_number ?? match.roundNumber ?? 1;
+      const roundNumber = match.round_number ?? 1;
       const matchIndex = match.match_index ?? 0;
 
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log("[MatchOverlay] SELECTED MATCH:");
-      console.log("  Header shows:", match.homeTeam.name, "vs", match.awayTeam.name);
-      console.log("  match.match_index:", match.match_index);
-      console.log("  match.season:", match.season);
-      console.log("  match.round_number:", match.round_number);
-      console.log("  vendor_game_id:", match.vendor_game_id);
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      if (matchIndex === 0) {
+        console.warn("[MatchOverlay] match_index is 0, disabling player data");
+        setPlayers([]);
+        setLoading(false);
+        return;
+      }
 
-      console.log("[MatchOverlay] Query params:", {
-        season,
-        roundNumber,
-        matchIndex,
-      });
+      console.log("[MatchOverlay] Loading players:", { season, roundNumber, matchIndex });
 
       const rawPlayers = await fetchMatchPlayers(season, roundNumber, matchIndex);
-      const adaptedPlayers = rawPlayers.map(adaptPlayer);
 
-      const returnedTeams = [...new Set(adaptedPlayers.map((p) => p.team))];
+      const returnedTeams = [...new Set(rawPlayers.map((p) => p.team_name))];
       console.log("[MatchOverlay] Returned teams:", returnedTeams);
-      console.log("[MatchOverlay] Returned player count:", adaptedPlayers.length);
+      console.log("[MatchOverlay] Returned player count:", rawPlayers.length);
 
-      const expectedTeams = [match.homeTeam.name, match.awayTeam.name];
+      const expectedTeams = [match.home_team, match.away_team];
       const teamsMatch =
         returnedTeams.length === 2 &&
         expectedTeams.every((t) => returnedTeams.includes(t));
@@ -147,27 +97,25 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
         console.error("❌ TEAM MISMATCH DETECTED!");
         console.error("  Expected:", expectedTeams);
         console.error("  Got:", returnedTeams);
-        console.error("  This means the matchIndex is incorrect or the data is wrong.");
       } else {
         console.log("✅ Teams match correctly!");
       }
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-      setPlayers(adaptedPlayers);
+      setPlayers(rawPlayers);
     } catch (e) {
       console.error("Overlay load failed:", e);
       setPlayers([]);
     } finally {
       setLoading(false);
     }
-  }, [match.season, match.round_number, match.roundNumber, match.match_index, match.vendor_game_id, match.homeTeam.name, match.awayTeam.name]);
+  }, [match.season, match.round_number, match.match_index, match.home_team, match.away_team]);
 
   useEffect(() => {
     loadPlayers();
   }, [loadPlayers]);
 
   const { leftTop3, rightTop3, leftTeam, rightTeam } = useMemo(() => {
-    const teams = [...new Set(players.map((p) => p.team))].filter(Boolean);
+    const teams = [...new Set(players.map((p) => p.team_name))].filter(Boolean);
 
     if (teams.length !== 2) {
       console.warn(
@@ -182,55 +130,26 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
       return { leftTop3: [], rightTop3: [], leftTeam: "", rightTeam: "" };
     }
 
-    const leftPlayers = players.filter((p) => p.team === left);
-    const rightPlayers = right ? players.filter((p) => p.team === right) : [];
+    const leftPlayers = players.filter((p) => p.team_name === left);
+    const rightPlayers = right ? players.filter((p) => p.team_name === right) : [];
 
-    const leftTop = computeTop3(leftPlayers.map((p) => ({
-      fantasy_points: p.fantasyPoints ?? 0,
-      disposals: p.disposals ?? 0,
-      player_name: p.player,
-      team_name: p.team,
-    })));
-
-    const rightTop = computeTop3(rightPlayers.map((p) => ({
-      fantasy_points: p.fantasyPoints ?? 0,
-      disposals: p.disposals ?? 0,
-      player_name: p.player,
-      team_name: p.team,
-    })));
-
-    const leftTop3Adapted = leftTop.map((mp): PlayerData => ({
-      player: mp.player_name ?? "Unknown",
-      team: mp.team_name ?? "Unknown",
-      disposals: mp.disposals ?? 0,
-      fantasyPoints: mp.fantasy_points ?? 0,
-      goals: 0,
-      position: null,
-    }));
-
-    const rightTop3Adapted = rightTop.map((mp): PlayerData => ({
-      player: mp.player_name ?? "Unknown",
-      team: mp.team_name ?? "Unknown",
-      disposals: mp.disposals ?? 0,
-      fantasyPoints: mp.fantasy_points ?? 0,
-      goals: 0,
-      position: null,
-    }));
+    const leftTop = computeTop3(leftPlayers);
+    const rightTop = computeTop3(rightPlayers);
 
     return {
-      leftTop3: leftTop3Adapted,
-      rightTop3: rightTop3Adapted,
-      leftTeam: left,
+      leftTop3: leftTop,
+      rightTop3: rightTop,
+      leftTeam: left ?? "",
       rightTeam: right ?? "",
     };
   }, [players, match.match_index]);
 
-  const roundLabel = match.round_label ?? match.roundLabel ?? "AFL";
+  const roundLabel = match.round_label ?? "AFL";
   const season = match.season ?? 2025;
   const status = match.status ?? "";
   const venue = match.venue ?? "TBC";
-  const homeScore = match.home_score ?? match.homeScore ?? null;
-  const awayScore = match.away_score ?? match.awayScore ?? null;
+  const homeScore = match.home_score ?? null;
+  const awayScore = match.away_score ?? null;
 
   return (
     <div
@@ -260,14 +179,14 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
           <div className="rounded-2xl border border-white/10 bg-black/40 p-6">
             <div className="grid grid-cols-3 items-center gap-4">
               <div>
-                <div className="text-white font-semibold text-xl">{match.homeTeam.name}</div>
+                <div className="text-white font-semibold text-xl">{match.home_team ?? "Home"}</div>
                 <div className="text-[#F5C84C] text-2xl font-bold">
                   {homeScore ?? "—"}
                 </div>
               </div>
               <div className="text-center text-white/40 text-3xl font-black">VS</div>
               <div className="text-right">
-                <div className="text-white font-semibold text-xl">{match.awayTeam.name}</div>
+                <div className="text-white font-semibold text-xl">{match.away_team ?? "Away"}</div>
                 <div className="text-[#F5C84C] text-2xl font-bold">
                   {awayScore ?? "—"}
                 </div>
@@ -281,7 +200,7 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-white/50" />
-                <span>{formatLocalTime(match.gameTimeLocal, match.gameTime)}</span>
+                <span>{formatLocalTime(match.game_time)}</span>
               </div>
             </div>
           </div>
@@ -292,6 +211,10 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
                 <div className="w-10 h-10 border-4 border-yellow-400/20 border-t-yellow-400 rounded-full animate-spin" />
                 <p className="text-white/50 text-sm">Loading players...</p>
               </div>
+            </div>
+          ) : match.match_index === 0 ? (
+            <div className="rounded-2xl border border-yellow-400/30 bg-yellow-500/10 p-6 text-center">
+              <div className="text-white/70">Match data unavailable</div>
             </div>
           ) : (
             <>

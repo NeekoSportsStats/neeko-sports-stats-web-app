@@ -1,36 +1,16 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Calendar } from "lucide-react";
-import { fetchMatches, type DayGroup, type MatchSummary } from "@/lib/afl/matchCenter";
+import { fetchMatches } from "./services/matchCenter.service";
+import { groupMatchesByDay } from "./utils";
+import type { DayGroup, MatchSummary } from "./types";
 import MatchList from "./MatchList";
 import MatchOverlay from "./MatchOverlay";
 
-type MatchData = MatchSummary & {
-  homeTeam: { name: string; color: string | null };
-  awayTeam: { name: string; color: string | null };
-  gameTime: string | null;
-  gameTimeLocal: string | null;
-};
-
-function adaptMatch(m: MatchSummary): MatchData {
-  return {
-    ...m,
-    homeTeam: {
-      name: m.home_team ?? "Home",
-      color: m.home_team_color ?? null,
-    },
-    awayTeam: {
-      name: m.away_team ?? "Away",
-      color: m.away_team_color ?? null,
-    },
-    gameTime: m.game_time ?? null,
-    gameTimeLocal: m.game_time_local ?? null,
-  };
-}
-
 export default function AFLMatchCentrePage() {
+  const [allMatches, setAllMatches] = useState<MatchSummary[]>([]);
   const [groups, setGroups] = useState<DayGroup[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedMatch, setSelectedMatch] = useState<MatchData | null>(null);
+  const [selectedMatch, setSelectedMatch] = useState<MatchSummary | null>(null);
   const [season, setSeason] = useState(2025);
   const [round, setRound] = useState(1);
 
@@ -49,29 +29,36 @@ export default function AFLMatchCentrePage() {
   const loadMatches = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchMatches(season, round);
-      setGroups(data);
+      const data = await fetchMatches(season);
+      setAllMatches(data);
     } catch (error) {
       console.error("Failed to load matches:", error);
-      setGroups([]);
+      setAllMatches([]);
     } finally {
       setLoading(false);
     }
-  }, [season, round]);
+  }, [season]);
 
   useEffect(() => {
     if (season === 2025) {
       loadMatches();
     } else {
       setLoading(false);
+      setAllMatches([]);
       setGroups([]);
     }
-  }, [season, round, loadMatches]);
+  }, [season, loadMatches]);
+
+  useEffect(() => {
+    const filtered = allMatches.filter((m) => m.round_number === round);
+    const grouped = groupMatchesByDay(filtered);
+    setGroups(grouped);
+  }, [allMatches, round]);
 
   const is2026 = season === 2026;
 
   const handleSelectMatch = useCallback((m: MatchSummary) => {
-    setSelectedMatch(adaptMatch(m));
+    setSelectedMatch(m);
   }, []);
 
   return (

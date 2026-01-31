@@ -9,10 +9,20 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import type { PlayerData } from "./getMatches";
+import type { MatchPlayer } from "./types";
+
+type PlayerData = {
+  player: string;
+  team: string;
+  teamColor?: string | null;
+  disposals: number | null;
+  fantasyPoints: number | null;
+  goals?: number | null;
+  position?: string | null;
+};
 
 interface Props {
-  players: PlayerData[];
+  players: MatchPlayer[] | PlayerData[];
 }
 
 function round2(n: number) {
@@ -22,15 +32,18 @@ function round2(n: number) {
 export default function MatchScatter({ players }: Props) {
   const data = (players ?? [])
     .map((p) => {
-      const disp = p.disposals ?? 0;
-      const fp = p.fantasyPoints ?? 0;
+      const disp = ("disposals" in p ? p.disposals : 0) ?? 0;
+      const fp = ("fantasy_points" in p ? p.fantasy_points : "fantasyPoints" in p ? (p as any).fantasyPoints : 0) ?? 0;
+      const playerName = ("player_name" in p ? p.player_name : "player" in p ? (p as any).player : "Unknown") ?? "Unknown";
+      const teamName = ("team_name" in p ? p.team_name : "team" in p ? (p as any).team : "Unknown") ?? "Unknown";
+      const teamColor = ("team_color" in p ? p.team_color : "teamColor" in p ? (p as any).teamColor : null) ?? null;
       const eff = disp > 0 ? fp / disp : 0;
       return {
-        player: p.player,
-        team: p.team,
+        player: playerName,
+        team: teamName,
         volume: disp,
         efficiency: eff,
-        teamColor: p.teamColor || "#999",
+        teamColor: teamColor || "#999",
         fantasyPoints: fp,
       };
     })
