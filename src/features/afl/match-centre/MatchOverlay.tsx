@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { X, MapPin, Clock } from "lucide-react";
-import { fetchMatchPlayers, computeTop3 } from "./services/matchCenter.service";
+import { fetchMatchPlayers } from "./services/matchCenter.service";
 import type { MatchSummary, MatchPlayer } from "./types";
 import MatchScatter from "./MatchScatter";
 
@@ -14,6 +14,11 @@ function formatLocalTime(gameTime: string | null | undefined) {
   const d = new Date(gameTime);
   if (Number.isNaN(d.getTime())) return "TBC";
   return d.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+}
+
+function normalizeTeamName(name: string): string {
+  if (!name) return "";
+  return name.replace(/ (Tigers|Blues|Hawks|Cats|Saints|Bombers|Demons|Kangaroos|Magpies|Lions|Suns|Giants|Swans|Eagles|Dockers|Crows|Power)$/, "").trim();
 }
 
 export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
@@ -71,9 +76,21 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     loadPlayers();
   }, [loadPlayers]);
 
-  const top3Players = useMemo(() => {
-    return computeTop3(players);
-  }, [players]);
+  const homeTop3 = useMemo(() => {
+    const homeTeam = normalizeTeamName(match.home_team ?? "");
+    return players
+      .filter((p) => normalizeTeamName(p.team_name ?? "") === homeTeam)
+      .sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0))
+      .slice(0, 3);
+  }, [players, match.home_team]);
+
+  const awayTop3 = useMemo(() => {
+    const awayTeam = normalizeTeamName(match.away_team ?? "");
+    return players
+      .filter((p) => normalizeTeamName(p.team_name ?? "") === awayTeam)
+      .sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0))
+      .slice(0, 3);
+  }, [players, match.away_team]);
 
   const uniqueTeams = useMemo(() => {
     return [...new Set(players.map((p) => p.team_name))].filter(Boolean);
@@ -168,31 +185,65 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
           ) : (
             <>
               <div className="rounded-2xl border border-white/10 bg-black/40 p-5">
-                <div className="text-xs uppercase tracking-wider text-white/60 mb-3">
-                  Top 3 Players
+                <div className="text-xs uppercase tracking-wider text-white/60 mb-4">
+                  Top Players
                 </div>
-                {top3Players.length === 0 ? (
-                  <div className="text-white/50">No data</div>
+                {homeTop3.length === 0 && awayTop3.length === 0 ? (
+                  <div className="text-white/50">Player data unavailable for this match</div>
                 ) : (
-                  <div className="space-y-3">
-                    {top3Players.map((p, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-xl border border-white/10 bg-black/50 px-4 py-3"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-3">
-                            <div className="text-white font-medium">{p.player_name ?? "Unknown"}</div>
-                            <div className="text-xs text-white/50">{p.team_name ?? ""}</div>
-                          </div>
-                          <div className="text-[#F5C84C] font-bold">{p.fantasy_points ?? 0}</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <div className="text-sm font-semibold text-white mb-3">{match.home_team}</div>
+                      {homeTop3.length === 0 ? (
+                        <div className="text-white/50 text-sm">No data</div>
+                      ) : (
+                        <div className="space-y-3">
+                          {homeTop3.map((p, idx) => (
+                            <div
+                              key={idx}
+                              className="rounded-xl border border-white/10 bg-black/50 px-4 py-3"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-3">
+                                  <div className="text-white font-medium">{p.player_name ?? "Unknown"}</div>
+                                </div>
+                                <div className="text-[#F5C84C] font-bold">{p.fantasy_points ?? 0}</div>
+                              </div>
+                              <div className="flex items-center gap-4 text-xs text-white/60">
+                                <span>Disposals: {p.disposals ?? 0}</span>
+                                <span>Goals: {p.goals ?? 0}</span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <div className="flex items-center gap-4 text-xs text-white/60">
-                          <span>Disposals: {p.disposals ?? 0}</span>
-                          <span>Goals: {p.goals ?? 0}</span>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-white mb-3">{match.away_team}</div>
+                      {awayTop3.length === 0 ? (
+                        <div className="text-white/50 text-sm">No data</div>
+                      ) : (
+                        <div className="space-y-3">
+                          {awayTop3.map((p, idx) => (
+                            <div
+                              key={idx}
+                              className="rounded-xl border border-white/10 bg-black/50 px-4 py-3"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-3">
+                                  <div className="text-white font-medium">{p.player_name ?? "Unknown"}</div>
+                                </div>
+                                <div className="text-[#F5C84C] font-bold">{p.fantasy_points ?? 0}</div>
+                              </div>
+                              <div className="flex items-center gap-4 text-xs text-white/60">
+                                <span>Disposals: {p.disposals ?? 0}</span>
+                                <span>Goals: {p.goals ?? 0}</span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                    ))}
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
