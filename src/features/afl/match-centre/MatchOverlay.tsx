@@ -36,11 +36,8 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
       const roundNumber = match.round_number ?? 1;
       const matchIndex = match.match_index;
 
-      if (typeof matchIndex !== "number" || matchIndex <= 0) {
-        console.warn("[MatchOverlay] match_index is missing or invalid");
-        setPlayers([]);
-        setLoading(false);
-        return;
+      if (typeof matchIndex !== "number") {
+        console.warn("[MatchOverlay] match_index is not a number");
       }
 
       console.log("[MatchOverlay] Loading players:", { season, roundNumber, matchIndex });
@@ -72,7 +69,7 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
   }, [loadPlayers]);
 
   const { team1Name, team2Name, team1Top3, team2Top3 } = useMemo(() => {
-    const uniqueTeams = [...new Set(players.map((p) => p.team_name).filter(Boolean))];
+    const uniqueTeams = [...new Set(players.map((p) => p.team).filter(Boolean))];
 
     if (uniqueTeams.length === 0) {
       return { team1Name: "", team2Name: "", team1Top3: [], team2Top3: [] };
@@ -82,13 +79,13 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     const t2 = uniqueTeams[1] || "";
 
     const t1Players = players
-      .filter((p) => p.team_name === t1)
+      .filter((p) => p.team === t1)
       .sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0))
       .slice(0, 3);
 
     const t2Players = t2
       ? players
-          .filter((p) => p.team_name === t2)
+          .filter((p) => p.team === t2)
           .sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0))
           .slice(0, 3)
       : [];
