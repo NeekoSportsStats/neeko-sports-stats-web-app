@@ -40,35 +40,26 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
 
       const rawPlayers = await fetchMatchPlayers(season, roundNumber, matchIndex);
 
-      const homeTeam = match.home_team;
-      const awayTeam = match.away_team;
-
-      const filteredPlayers = rawPlayers.filter(
-        (p) => p.team_name === homeTeam || p.team_name === awayTeam
-      );
-
       console.log("[MatchOverlay] Raw player count:", rawPlayers.length);
-      console.log("[MatchOverlay] Filtered player count:", filteredPlayers.length);
-      console.log("[MatchOverlay] Match teams:", { homeTeam, awayTeam });
 
-      const returnedTeams = [...new Set(filteredPlayers.map((p) => p.team_name))];
-      console.log("[MatchOverlay] Returned teams:", returnedTeams);
+      const uniqueTeams = [...new Set(rawPlayers.map((p) => p.team_name).filter(Boolean))];
+      console.log("[MatchOverlay] Derived teams:", uniqueTeams);
 
-      setPlayers(filteredPlayers);
+      setPlayers(rawPlayers);
     } catch (e) {
       console.error("Overlay load failed:", e);
       setPlayers([]);
     } finally {
       setLoading(false);
     }
-  }, [match.season, match.round_number, match.match_index, match.home_team, match.away_team]);
+  }, [match.season, match.round_number, match.match_index]);
 
   useEffect(() => {
     loadPlayers();
   }, [loadPlayers]);
 
   const { team1Name, team2Name, team1Top3, team2Top3 } = useMemo(() => {
-    const uniqueTeams = [...new Set(players.map((p) => p.team).filter(Boolean))];
+    const uniqueTeams = [...new Set(players.map((p) => p.team_name).filter(Boolean))];
 
     if (uniqueTeams.length === 0) {
       return { team1Name: "", team2Name: "", team1Top3: [], team2Top3: [] };
@@ -78,13 +69,13 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     const t2 = uniqueTeams[1] || "";
 
     const t1Players = players
-      .filter((p) => p.team === t1)
+      .filter((p) => p.team_name === t1)
       .sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0))
       .slice(0, 3);
 
     const t2Players = t2
       ? players
-          .filter((p) => p.team === t2)
+          .filter((p) => p.team_name === t2)
           .sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0))
           .slice(0, 3)
       : [];
