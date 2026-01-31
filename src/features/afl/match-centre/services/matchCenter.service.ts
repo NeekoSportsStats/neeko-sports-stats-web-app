@@ -12,9 +12,7 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
     .schema("afl")
     .from("v_match_center_games")
     .select("*")
-    .eq("season", season)
-    .order("match_date", { ascending: true })
-    .order("match_time", { ascending: true });
+    .eq("season", season);
 
   if (error) {
     console.error("[fetchMatches] Error:", error);
@@ -56,7 +54,7 @@ export async function fetchMatchPlayers(
 ): Promise<MatchPlayer[]> {
   const { data, error } = await supabase
     .schema("afl")
-    .from("v_match_center_players_2025_canonical")
+    .from("v_match_center_players_canonical")
     .select("*")
     .eq("season", season)
     .eq("round_number", round)
@@ -64,7 +62,7 @@ export async function fetchMatchPlayers(
 
   if (error) {
     console.error("[fetchMatchPlayers] Error:", error);
-    throw new Error(`Failed to fetch players from v_match_center_players_2025_canonical: ${error.message}`);
+    throw new Error(`Failed to fetch players from v_match_center_players_canonical: ${error.message}`);
   }
 
   if (!data || data.length === 0) {
@@ -93,6 +91,43 @@ export async function fetchMatchTeamTotals(
   season: number,
   vendorGameId: string
 ): Promise<MatchTeamTotal[]> {
-  console.warn("[fetchMatchTeamTotals] Team stats view not available, returning empty array");
-  return [];
+  const { data, error } = await supabase
+    .schema("afl")
+    .from("v_match_center_team_stats")
+    .select("*")
+    .eq("season", season)
+    .eq("vendor_game_id", vendorGameId);
+
+  if (error) {
+    console.error("[fetchMatchTeamTotals] Error:", error);
+    return [];
+  }
+
+  if (!data || data.length === 0) {
+    return [];
+  }
+
+  return data.map((row): MatchTeamTotal => ({
+    season: row.season ?? season,
+    vendor_game_id: row.vendor_game_id ?? vendorGameId,
+    team_id: row.team_id,
+    team_name: row.team_name ?? "Unknown",
+    team_abbr: row.team_abbr ?? "UNK",
+    team_color: safeColor(row.team_color),
+    total_disposals: row.total_disposals ?? 0,
+    total_goals: row.total_goals ?? 0,
+    total_fantasy_points: row.total_fantasy_points ?? 0,
+  }));
+}
+
+export function computeTop3(players: MatchPlayer[]): MatchPlayer[] {
+  if (!players || players.length === 0) return [];
+
+  const sorted = [...players].sort((a, b) => {
+    const fpDiff = (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0);
+    if (fpDiff !== 0) return fpDiff;
+    return (b.disposals ?? 0) - (a.disposals ?? 0);
+  });
+
+  return sorted.slice(0, 3);
 }
