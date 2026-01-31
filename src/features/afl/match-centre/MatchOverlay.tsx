@@ -16,11 +16,6 @@ function formatLocalTime(gameTime: string | null | undefined) {
   return d.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 }
 
-function normalizeTeamName(name: string): string {
-  if (!name) return "";
-  return name.replace(/ (Tigers|Blues|Hawks|Cats|Saints|Bombers|Demons|Kangaroos|Magpies|Lions|Suns|Giants|Swans|Eagles|Dockers|Crows|Power)$/, "").trim();
-}
-
 export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const [players, setPlayers] = useState<MatchPlayer[]>([]);
@@ -76,24 +71,34 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     loadPlayers();
   }, [loadPlayers]);
 
-  const homeTop3 = useMemo(() => {
-    const homeTeam = normalizeTeamName(match.home_team ?? "");
-    return players
-      .filter((p) => normalizeTeamName(p.team_name ?? "") === homeTeam)
+  const { team1Name, team2Name, team1Top3, team2Top3 } = useMemo(() => {
+    const uniqueTeams = [...new Set(players.map((p) => p.team_name).filter(Boolean))];
+
+    if (uniqueTeams.length === 0) {
+      return { team1Name: "", team2Name: "", team1Top3: [], team2Top3: [] };
+    }
+
+    const t1 = uniqueTeams[0] as string;
+    const t2 = uniqueTeams[1] || "";
+
+    const t1Players = players
+      .filter((p) => p.team_name === t1)
       .sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0))
       .slice(0, 3);
-  }, [players, match.home_team]);
 
-  const awayTop3 = useMemo(() => {
-    const awayTeam = normalizeTeamName(match.away_team ?? "");
-    return players
-      .filter((p) => normalizeTeamName(p.team_name ?? "") === awayTeam)
-      .sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0))
-      .slice(0, 3);
-  }, [players, match.away_team]);
+    const t2Players = t2
+      ? players
+          .filter((p) => p.team_name === t2)
+          .sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0))
+          .slice(0, 3)
+      : [];
 
-  const uniqueTeams = useMemo(() => {
-    return [...new Set(players.map((p) => p.team_name))].filter(Boolean);
+    return {
+      team1Name: t1,
+      team2Name: t2,
+      team1Top3: t1Players,
+      team2Top3: t2Players,
+    };
   }, [players]);
 
   const roundLabel = match.round_label ?? "AFL";
@@ -102,9 +107,6 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
   const venue = match.venue ?? "TBC";
   const homeScore = match.home_score ?? null;
   const awayScore = match.away_score ?? null;
-
-  const hasValidMatchIndex = typeof match.match_index === "number" && match.match_index > 0;
-  const hasDataMismatch = uniqueTeams.length > 2 && players.length > 0;
 
   return (
     <div
@@ -167,38 +169,23 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
                 <p className="text-white/50 text-sm">Loading players...</p>
               </div>
             </div>
-          ) : !hasValidMatchIndex ? (
-            <div className="rounded-2xl border border-yellow-400/30 bg-yellow-500/10 p-6 text-center">
-              <div className="text-white/70">Insights unavailable</div>
-            </div>
-          ) : hasDataMismatch ? (
-            <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-6 text-center">
-              <div className="text-white/70">Match data mismatch</div>
-              <div className="text-white/50 text-sm mt-2">
-                Expected 2 teams but found {uniqueTeams.length}
-              </div>
-            </div>
-          ) : players.length === 0 ? (
-            <div className="rounded-2xl border border-yellow-400/30 bg-yellow-500/10 p-6 text-center">
-              <div className="text-white/70">No player data available</div>
-            </div>
           ) : (
             <>
               <div className="rounded-2xl border border-white/10 bg-black/40 p-5">
                 <div className="text-xs uppercase tracking-wider text-white/60 mb-4">
                   Top Players
                 </div>
-                {homeTop3.length === 0 && awayTop3.length === 0 ? (
+                {team1Top3.length === 0 && team2Top3.length === 0 ? (
                   <div className="text-white/50">Player data unavailable for this match</div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <div className="text-sm font-semibold text-white mb-3">{match.home_team}</div>
-                      {homeTop3.length === 0 ? (
+                      <div className="text-sm font-semibold text-white mb-3">{team1Name || match.home_team}</div>
+                      {team1Top3.length === 0 ? (
                         <div className="text-white/50 text-sm">No data</div>
                       ) : (
                         <div className="space-y-3">
-                          {homeTop3.map((p, idx) => (
+                          {team1Top3.map((p, idx) => (
                             <div
                               key={idx}
                               className="rounded-xl border border-white/10 bg-black/50 px-4 py-3"
@@ -219,12 +206,12 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
                       )}
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-white mb-3">{match.away_team}</div>
-                      {awayTop3.length === 0 ? (
+                      <div className="text-sm font-semibold text-white mb-3">{team2Name || match.away_team}</div>
+                      {team2Top3.length === 0 ? (
                         <div className="text-white/50 text-sm">No data</div>
                       ) : (
                         <div className="space-y-3">
-                          {awayTop3.map((p, idx) => (
+                          {team2Top3.map((p, idx) => (
                             <div
                               key={idx}
                               className="rounded-xl border border-white/10 bg-black/50 px-4 py-3"
