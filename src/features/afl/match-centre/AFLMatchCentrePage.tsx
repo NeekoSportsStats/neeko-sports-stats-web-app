@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Calendar } from "lucide-react";
-import { fetchMatches } from "./services/matchCenter.service";
+import { fetchMatches, resolveMatchIndex } from "./services/matchCenter.service";
 import { groupMatchesByDay } from "./utils";
 import type { DayGroup, MatchSummary } from "./types";
 import MatchList from "./MatchList";
@@ -11,6 +11,7 @@ export default function AFLMatchCentrePage() {
   const [groups, setGroups] = useState<DayGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMatch, setSelectedMatch] = useState<MatchSummary | null>(null);
+  const [resolvingIndex, setResolvingIndex] = useState(false);
   const [season, setSeason] = useState(2025);
   const [round, setRound] = useState(1);
 
@@ -57,9 +58,33 @@ export default function AFLMatchCentrePage() {
 
   const is2026 = season === 2026;
 
-  const handleSelectMatch = useCallback((m: MatchSummary) => {
-    setSelectedMatch(m);
-  }, []);
+  const handleSelectMatch = useCallback(
+    async (m: MatchSummary) => {
+      setResolvingIndex(true);
+      try {
+        const matchIndex = await resolveMatchIndex({
+          season: m.season ?? 2025,
+          round_number: m.round_number ?? 1,
+          home_team: m.home_team ?? "",
+          away_team: m.away_team ?? "",
+        });
+
+        setSelectedMatch({
+          ...m,
+          match_index: matchIndex,
+        });
+      } catch (error) {
+        console.error("Failed to resolve match_index:", error);
+        setSelectedMatch({
+          ...m,
+          match_index: undefined,
+        });
+      } finally {
+        setResolvingIndex(false);
+      }
+    },
+    []
+  );
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
@@ -156,7 +181,7 @@ export default function AFLMatchCentrePage() {
         )}
       </div>
 
-      {selectedMatch && (
+      {selectedMatch && !resolvingIndex && (
         <MatchOverlay match={selectedMatch} onClose={() => setSelectedMatch(null)} />
       )}
     </div>

@@ -37,7 +37,7 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
       const matchIndex = match.match_index;
 
       if (typeof matchIndex !== "number" || matchIndex <= 0) {
-        console.warn("[MatchOverlay] match_index is missing or invalid, disabling player data");
+        console.warn("[MatchOverlay] match_index is missing or invalid");
         setPlayers([]);
         setLoading(false);
         return;
@@ -51,13 +51,10 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
       console.log("[MatchOverlay] Returned teams:", returnedTeams);
       console.log("[MatchOverlay] Returned player count:", rawPlayers.length);
 
-      const expectedTeams = [match.home_team, match.away_team];
-
       if (returnedTeams.length > 2) {
         console.warn(
           `[MatchOverlay] Match data mismatch: season=${season}, round=${roundNumber}, match_index=${matchIndex}`
         );
-        console.warn(`  Expected teams: ${expectedTeams.join(", ")}`);
         console.warn(`  Returned teams: ${returnedTeams.join(", ")}`);
       }
 
@@ -68,7 +65,7 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     } finally {
       setLoading(false);
     }
-  }, [match.season, match.round_number, match.match_index, match.home_team, match.away_team]);
+  }, [match.season, match.round_number, match.match_index]);
 
   useEffect(() => {
     loadPlayers();
@@ -186,7 +183,7 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-3">
                             <div className="text-white font-medium">{p.player_name ?? "Unknown"}</div>
-                            <div className="text-xs text-white/50">{p.team_abbr ?? ""}</div>
+                            <div className="text-xs text-white/50">{p.team_name ?? ""}</div>
                           </div>
                           <div className="text-[#F5C84C] font-bold">{p.fantasy_points ?? 0}</div>
                         </div>
