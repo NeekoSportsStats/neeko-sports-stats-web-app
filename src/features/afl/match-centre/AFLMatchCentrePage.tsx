@@ -1,8 +1,31 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Calendar } from "lucide-react";
-import { getRoundMatches, DayGroup, MatchData } from "./getMatches";
+import { fetchMatches, type DayGroup, type MatchSummary } from "@/lib/afl/matchCenter";
 import MatchList from "./MatchList";
 import MatchOverlay from "./MatchOverlay";
+
+type MatchData = MatchSummary & {
+  homeTeam: { name: string; color: string | null };
+  awayTeam: { name: string; color: string | null };
+  gameTime: string | null;
+  gameTimeLocal: string | null;
+};
+
+function adaptMatch(m: MatchSummary): MatchData {
+  return {
+    ...m,
+    homeTeam: {
+      name: m.home_team ?? "Home",
+      color: m.home_team_color ?? null,
+    },
+    awayTeam: {
+      name: m.away_team ?? "Away",
+      color: m.away_team_color ?? null,
+    },
+    gameTime: m.game_time ?? null,
+    gameTimeLocal: m.game_time_local ?? null,
+  };
+}
 
 export default function AFLMatchCentrePage() {
   const [groups, setGroups] = useState<DayGroup[]>([]);
@@ -23,6 +46,19 @@ export default function AFLMatchCentrePage() {
     { value: 28, label: "Finals Week 4" },
   ];
 
+  const loadMatches = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await fetchMatches(season, round);
+      setGroups(data);
+    } catch (error) {
+      console.error("Failed to load matches:", error);
+      setGroups([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [season, round]);
+
   useEffect(() => {
     if (season === 2025) {
       loadMatches();
@@ -30,21 +66,13 @@ export default function AFLMatchCentrePage() {
       setLoading(false);
       setGroups([]);
     }
-  }, [season, round]);
-
-  const loadMatches = async () => {
-    setLoading(true);
-    try {
-      const data = await getRoundMatches(season, round);
-      setGroups(data);
-    } catch (error) {
-      console.error("Failed to load matches:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [season, round, loadMatches]);
 
   const is2026 = season === 2026;
+
+  const handleSelectMatch = useCallback((m: MatchSummary) => {
+    setSelectedMatch(adaptMatch(m));
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
@@ -137,7 +165,7 @@ export default function AFLMatchCentrePage() {
             </div>
           </div>
         ) : (
-          <MatchList groups={groups} onSelectMatch={setSelectedMatch} />
+          <MatchList groups={groups} onSelectMatch={handleSelectMatch} />
         )}
       </div>
 
