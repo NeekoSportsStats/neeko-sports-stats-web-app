@@ -28,7 +28,7 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
     season: row.season ?? season,
     round_number: row.round_number ?? 0,
     round_label: row.round_label ?? `R${row.round_number ?? 0}`,
-    match_index: row.match_index ?? 0,
+    match_index: typeof row.match_index === "number" && row.match_index > 0 ? row.match_index : undefined,
     match_date: row.match_date ?? "",
     match_time: row.match_time ?? "",
     game_time: row.game_time ?? "",

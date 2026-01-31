@@ -58,8 +58,35 @@ export default function AFLMatchCentrePage() {
   const is2026 = season === 2026;
 
   const handleSelectMatch = useCallback((m: MatchSummary) => {
-    setSelectedMatch(m);
-  }, []);
+    const matchToSelect = { ...m };
+
+    if (typeof matchToSelect.match_index !== "number" || matchToSelect.match_index <= 0) {
+      const roundMatches = allMatches
+        .filter(
+          (match) =>
+            match.season === matchToSelect.season &&
+            match.round_number === matchToSelect.round_number
+        )
+        .sort((a, b) => {
+          const timeA = a.game_time || "";
+          const timeB = b.game_time || "";
+          return timeA.localeCompare(timeB);
+        });
+
+      const index = roundMatches.findIndex(
+        (match) => match.vendor_game_id === matchToSelect.vendor_game_id
+      );
+
+      if (index >= 0) {
+        matchToSelect.match_index = index + 1;
+        console.log(
+          `[AFLMatchCentre] Derived match_index=${matchToSelect.match_index} for ${matchToSelect.home_team} vs ${matchToSelect.away_team}`
+        );
+      }
+    }
+
+    setSelectedMatch(matchToSelect);
+  }, [allMatches]);
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">

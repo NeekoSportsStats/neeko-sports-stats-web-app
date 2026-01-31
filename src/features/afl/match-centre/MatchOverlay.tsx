@@ -71,10 +71,10 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     try {
       const season = match.season ?? 2025;
       const roundNumber = match.round_number ?? 1;
-      const matchIndex = match.match_index ?? 0;
+      const matchIndex = match.match_index;
 
-      if (matchIndex === 0) {
-        console.warn("[MatchOverlay] match_index is 0, disabling player data");
+      if (typeof matchIndex !== "number" || matchIndex <= 0) {
+        console.warn("[MatchOverlay] match_index is missing or invalid, disabling player data");
         setPlayers([]);
         setLoading(false);
         return;
@@ -117,7 +117,7 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
   const { leftTop3, rightTop3, leftTeam, rightTeam } = useMemo(() => {
     const teams = [...new Set(players.map((p) => p.team_name))].filter(Boolean);
 
-    if (teams.length !== 2) {
+    if (teams.length !== 2 && players.length > 0) {
       console.warn(
         `[MatchOverlay] match_index=${match.match_index} has ${teams.length} teams:`,
         teams
@@ -150,6 +150,8 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
   const venue = match.venue ?? "TBC";
   const homeScore = match.home_score ?? null;
   const awayScore = match.away_score ?? null;
+
+  const hasValidMatchIndex = typeof match.match_index === "number" && match.match_index > 0;
 
   return (
     <div
@@ -212,9 +214,13 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
                 <p className="text-white/50 text-sm">Loading players...</p>
               </div>
             </div>
-          ) : match.match_index === 0 ? (
+          ) : !hasValidMatchIndex ? (
             <div className="rounded-2xl border border-yellow-400/30 bg-yellow-500/10 p-6 text-center">
-              <div className="text-white/70">Match data unavailable</div>
+              <div className="text-white/70">Insights unavailable</div>
+            </div>
+          ) : players.length === 0 ? (
+            <div className="rounded-2xl border border-yellow-400/30 bg-yellow-500/10 p-6 text-center">
+              <div className="text-white/70">No player data available</div>
             </div>
           ) : (
             <>
