@@ -33,38 +33,35 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     setLoading(true);
     try {
       const season = match.season ?? 2025;
-      const vendorGameId = match.vendor_game_id;
+      const roundNumber = match.round_number ?? 1;
+      const matchIndex = match.match_index ?? 1;
 
-      if (!vendorGameId) {
-        console.warn("[MatchOverlay] vendor_game_id is missing");
-        setPlayers([]);
-        setLoading(false);
-        return;
-      }
+      console.log("[MatchOverlay] Loading players:", { season, roundNumber, matchIndex });
 
-      console.log("[MatchOverlay] Loading players:", { season, vendorGameId });
+      const rawPlayers = await fetchMatchPlayers(season, roundNumber, matchIndex);
 
-      const rawPlayers = await fetchMatchPlayers(season, vendorGameId);
+      const homeTeam = match.home_team;
+      const awayTeam = match.away_team;
 
-      const returnedTeams = [...new Set(rawPlayers.map((p) => p.team_name))];
+      const filteredPlayers = rawPlayers.filter(
+        (p) => p.team_name === homeTeam || p.team_name === awayTeam
+      );
+
+      console.log("[MatchOverlay] Raw player count:", rawPlayers.length);
+      console.log("[MatchOverlay] Filtered player count:", filteredPlayers.length);
+      console.log("[MatchOverlay] Match teams:", { homeTeam, awayTeam });
+
+      const returnedTeams = [...new Set(filteredPlayers.map((p) => p.team_name))];
       console.log("[MatchOverlay] Returned teams:", returnedTeams);
-      console.log("[MatchOverlay] Returned player count:", rawPlayers.length);
 
-      if (returnedTeams.length > 2) {
-        console.warn(
-          `[MatchOverlay] Match data mismatch: season=${season}, round=${roundNumber}, match_index=${matchIndex}`
-        );
-        console.warn(`  Returned teams: ${returnedTeams.join(", ")}`);
-      }
-
-      setPlayers(rawPlayers);
+      setPlayers(filteredPlayers);
     } catch (e) {
       console.error("Overlay load failed:", e);
       setPlayers([]);
     } finally {
       setLoading(false);
     }
-  }, [match.season, match.round_number, match.match_index]);
+  }, [match.season, match.round_number, match.match_index, match.home_team, match.away_team]);
 
   useEffect(() => {
     loadPlayers();
