@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { X, MapPin, Clock } from "lucide-react";
-import { fetchMatchPlayers } from "./services/matchCenter.service";
-import { computeTop3 } from "./utils";
+import { fetchMatchPlayers, computeTop3 } from "./services/matchCenter.service";
 import type { MatchSummary, MatchPlayer } from "./types";
 import MatchScatter from "./MatchScatter";
 
@@ -15,42 +14,6 @@ function formatLocalTime(gameTime: string | null | undefined) {
   const d = new Date(gameTime);
   if (Number.isNaN(d.getTime())) return "TBC";
   return d.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
-}
-
-interface TeamTopPlayersProps {
-  team: string;
-  players: MatchPlayer[];
-}
-
-function TeamTopPlayers({ team, players }: TeamTopPlayersProps) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-black/40 p-5">
-      <div className="text-xs uppercase tracking-wider text-white/60 mb-3">
-        {team} • Top 3 Players
-      </div>
-      {players.length === 0 ? (
-        <div className="text-white/50">No data</div>
-      ) : (
-        <div className="space-y-3">
-          {players.map((p, idx) => (
-            <div
-              key={idx}
-              className="rounded-xl border border-white/10 bg-black/50 px-4 py-3"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-white font-medium">{p.player_name ?? "Unknown"}</div>
-                <div className="text-[#F5C84C] font-bold">{p.fantasy_points ?? 0}</div>
-              </div>
-              <div className="flex items-center gap-4 text-xs text-white/60">
-                <span>Disposals: {p.disposals ?? 0}</span>
-                <span>Goals: {p.goals ?? 0}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
@@ -89,16 +52,13 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
       console.log("[MatchOverlay] Returned player count:", rawPlayers.length);
 
       const expectedTeams = [match.home_team, match.away_team];
-      const teamsMatch =
-        returnedTeams.length === 2 &&
-        expectedTeams.every((t) => returnedTeams.includes(t));
 
-      if (!teamsMatch) {
-        console.error("❌ TEAM MISMATCH DETECTED!");
-        console.error("  Expected:", expectedTeams);
-        console.error("  Got:", returnedTeams);
-      } else {
-        console.log("✅ Teams match correctly!");
+      if (returnedTeams.length > 2) {
+        console.warn(
+          `[MatchOverlay] Match data mismatch: season=${season}, round=${roundNumber}, match_index=${matchIndex}`
+        );
+        console.warn(`  Expected teams: ${expectedTeams.join(", ")}`);
+        console.warn(`  Returned teams: ${returnedTeams.join(", ")}`);
       }
 
       setPlayers(rawPlayers);
@@ -114,35 +74,13 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     loadPlayers();
   }, [loadPlayers]);
 
-  const { leftTop3, rightTop3, leftTeam, rightTeam } = useMemo(() => {
-    const teams = [...new Set(players.map((p) => p.team_name))].filter(Boolean);
+  const top3Players = useMemo(() => {
+    return computeTop3(players);
+  }, [players]);
 
-    if (teams.length !== 2 && players.length > 0) {
-      console.warn(
-        `[MatchOverlay] match_index=${match.match_index} has ${teams.length} teams:`,
-        teams
-      );
-    }
-
-    const [left, right] = teams;
-
-    if (!left) {
-      return { leftTop3: [], rightTop3: [], leftTeam: "", rightTeam: "" };
-    }
-
-    const leftPlayers = players.filter((p) => p.team_name === left);
-    const rightPlayers = right ? players.filter((p) => p.team_name === right) : [];
-
-    const leftTop = computeTop3(leftPlayers);
-    const rightTop = computeTop3(rightPlayers);
-
-    return {
-      leftTop3: leftTop,
-      rightTop3: rightTop,
-      leftTeam: left ?? "",
-      rightTeam: right ?? "",
-    };
-  }, [players, match.match_index]);
+  const uniqueTeams = useMemo(() => {
+    return [...new Set(players.map((p) => p.team_name))].filter(Boolean);
+  }, [players]);
 
   const roundLabel = match.round_label ?? "AFL";
   const season = match.season ?? 2025;
@@ -152,6 +90,7 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
   const awayScore = match.away_score ?? null;
 
   const hasValidMatchIndex = typeof match.match_index === "number" && match.match_index > 0;
+  const hasDataMismatch = uniqueTeams.length > 2 && players.length > 0;
 
   return (
     <div
@@ -218,15 +157,47 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
             <div className="rounded-2xl border border-yellow-400/30 bg-yellow-500/10 p-6 text-center">
               <div className="text-white/70">Insights unavailable</div>
             </div>
+          ) : hasDataMismatch ? (
+            <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-6 text-center">
+              <div className="text-white/70">Match data mismatch</div>
+              <div className="text-white/50 text-sm mt-2">
+                Expected 2 teams but found {uniqueTeams.length}
+              </div>
+            </div>
           ) : players.length === 0 ? (
             <div className="rounded-2xl border border-yellow-400/30 bg-yellow-500/10 p-6 text-center">
               <div className="text-white/70">No player data available</div>
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <TeamTopPlayers team={leftTeam} players={leftTop3} />
-                <TeamTopPlayers team={rightTeam} players={rightTop3} />
+              <div className="rounded-2xl border border-white/10 bg-black/40 p-5">
+                <div className="text-xs uppercase tracking-wider text-white/60 mb-3">
+                  Top 3 Players
+                </div>
+                {top3Players.length === 0 ? (
+                  <div className="text-white/50">No data</div>
+                ) : (
+                  <div className="space-y-3">
+                    {top3Players.map((p, idx) => (
+                      <div
+                        key={idx}
+                        className="rounded-xl border border-white/10 bg-black/50 px-4 py-3"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <div className="text-white font-medium">{p.player_name ?? "Unknown"}</div>
+                            <div className="text-xs text-white/50">{p.team_abbr ?? ""}</div>
+                          </div>
+                          <div className="text-[#F5C84C] font-bold">{p.fantasy_points ?? 0}</div>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-white/60">
+                          <span>Disposals: {p.disposals ?? 0}</span>
+                          <span>Goals: {p.goals ?? 0}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <MatchScatter players={players} />
