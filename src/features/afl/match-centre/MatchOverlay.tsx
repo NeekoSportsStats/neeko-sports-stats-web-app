@@ -16,6 +16,32 @@ function formatLocalTime(gameTime: string | null | undefined) {
   return d.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 }
 
+function normaliseTeamName(name?: string | null) {
+  if (!name) return "";
+
+  return name
+    .toLowerCase()
+    .replace("greater western sydney", "gws")
+    .replace("gws giants", "gws")
+    .replace("giants", "")
+    .replace("tigers", "")
+    .replace("blues", "")
+    .replace("swans", "")
+    .replace("eagles", "")
+    .replace("dockers", "")
+    .replace("demons", "")
+    .replace("bombers", "")
+    .replace("hawks", "")
+    .replace("magpies", "")
+    .replace("saints", "")
+    .replace("kangaroos", "")
+    .replace("power", "")
+    .replace("cats", "")
+    .replace("lions", "")
+    .replace("suns", "")
+    .trim();
+}
+
 export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const [players, setPlayers] = useState<MatchPlayer[]>([]);
@@ -59,34 +85,37 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
   }, [loadPlayers]);
 
   const { team1Name, team2Name, team1Top3, team2Top3 } = useMemo(() => {
-    const uniqueTeams = [...new Set(players.map((p) => p.team_name).filter(Boolean))];
+    const homeKey = normaliseTeamName(match.home_team);
+    const awayKey = normaliseTeamName(match.away_team);
 
-    if (uniqueTeams.length === 0) {
-      return { team1Name: "", team2Name: "", team1Top3: [], team2Top3: [] };
+    const scopedPlayers = players.filter(p => {
+      const teamKey = normaliseTeamName(p.team_name);
+      return teamKey === homeKey || teamKey === awayKey;
+    });
+
+    const teamMap = new Map<string, MatchPlayer[]>();
+
+    for (const p of scopedPlayers) {
+      const key = normaliseTeamName(p.team_name);
+      if (!teamMap.has(key)) teamMap.set(key, []);
+      teamMap.get(key)!.push(p);
     }
 
-    const t1 = uniqueTeams[0] as string;
-    const t2 = uniqueTeams[1] || "";
-
-    const t1Players = players
-      .filter((p) => p.team_name === t1)
+    const homePlayers = (teamMap.get(homeKey) || [])
       .sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0))
       .slice(0, 3);
 
-    const t2Players = t2
-      ? players
-          .filter((p) => p.team_name === t2)
-          .sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0))
-          .slice(0, 3)
-      : [];
+    const awayPlayers = (teamMap.get(awayKey) || [])
+      .sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0))
+      .slice(0, 3);
 
     return {
-      team1Name: t1,
-      team2Name: t2,
-      team1Top3: t1Players,
-      team2Top3: t2Players,
+      team1Name: match.home_team ?? "",
+      team2Name: match.away_team ?? "",
+      team1Top3: homePlayers,
+      team2Top3: awayPlayers,
     };
-  }, [players]);
+  }, [players, match.home_team, match.away_team]);
 
   const roundLabel = match.round_label ?? "AFL";
   const season = match.season ?? 2025;
