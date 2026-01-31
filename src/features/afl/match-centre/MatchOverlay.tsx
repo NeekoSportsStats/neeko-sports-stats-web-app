@@ -42,7 +42,7 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
 
       console.log("[MatchOverlay] Loading players:", { season, roundNumber, matchIndex });
 
-      const rawPlayers = await fetchMatchPlayers(season, roundNumber, matchIndex);
+      const rawPlayers = await fetchMatchPlayers(season, undefined, matchIndex);
 
       const returnedTeams = [...new Set(rawPlayers.map((p) => p.team_name))];
       console.log("[MatchOverlay] Returned teams:", returnedTeams);
