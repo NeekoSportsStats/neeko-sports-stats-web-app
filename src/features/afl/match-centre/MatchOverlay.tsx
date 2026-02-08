@@ -60,25 +60,33 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     try {
       const season = match.season ?? 2025;
       const roundNumber = match.round_number ?? 1;
-      const matchIndex = match.match_index ?? 1;
+      const matchIndex = match.match_index;
 
-      console.log("[MatchOverlay] Loading players:", { season, roundNumber, matchIndex });
+      // Guard: never call fetchMatchPlayers without a resolved match_index.
+      // An undefined match_index means resolveMatchIndex could not find this
+      // game in the players view — fetching with a guessed value (e.g. 1)
+      // would silently return the wrong match's players.
+      if (matchIndex == null) {
+        console.debug(
+          "[MatchOverlay] match_index is undefined — skipping player fetch for %s vs %s (season=%d round=%d)",
+          match.home_team,
+          match.away_team,
+          season,
+          roundNumber
+        );
+        setPlayers([]);
+        return;
+      }
 
       const rawPlayers = await fetchMatchPlayers(season, roundNumber, matchIndex);
-
-      console.log("[MatchOverlay] Raw player count:", rawPlayers.length);
-
-      const uniqueTeams = [...new Set(rawPlayers.map((p) => p.team_name).filter(Boolean))];
-      console.log("[MatchOverlay] Derived teams:", uniqueTeams);
-
       setPlayers(rawPlayers);
     } catch (e) {
-      console.error("Overlay load failed:", e);
+      console.error("[MatchOverlay] Player fetch failed:", e);
       setPlayers([]);
     } finally {
       setLoading(false);
     }
-  }, [match.season, match.round_number, match.match_index]);
+  }, [match.season, match.round_number, match.match_index, match.home_team, match.away_team]);
 
   useEffect(() => {
     loadPlayers();
