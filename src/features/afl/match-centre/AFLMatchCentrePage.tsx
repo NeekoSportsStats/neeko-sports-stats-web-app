@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Calendar } from "lucide-react";
-import { fetchMatches, fetchMatchOverlayTimeline, fetchMatchPlayerStats, fetchMatchScatterData } from "./services/matchCenter.service";
+import { fetchMatches, fetchMatchOverlayTimeline, fetchMatchPlayerStats, fetchMatchScatterData, fetchQuarterScores } from "./services/matchCenter.service";
 import { groupMatchesByDay } from "./utils";
-import type { DayGroup, MatchSummary, MatchTimeline, MatchPlayerStats, MatchScatterPoint } from "./types";
+import type { DayGroup, MatchSummary, MatchTimeline, MatchPlayerStats, MatchScatterPoint, QuarterScore } from "./types";
 import MatchList from "./MatchList";
 import MatchOverlay from "./MatchOverlay";
 
@@ -15,6 +15,7 @@ export default function AFLMatchCentrePage() {
   const [timeline, setTimeline] = useState<MatchTimeline | null>(null);
   const [matchPlayerStats, setMatchPlayerStats] = useState<MatchPlayerStats[]>([]);
   const [scatterData, setScatterData] = useState<MatchScatterPoint[]>([]);
+  const [quarterScores, setQuarterScores] = useState<QuarterScore[]>([]);
   const [season, setSeason] = useState(2025);
   const [round, setRound] = useState(1);
 
@@ -75,6 +76,7 @@ export default function AFLMatchCentrePage() {
       setTimeline(null);
       setMatchPlayerStats([]);
       setScatterData([]);
+      setQuarterScores([]);
 
       fetchMatchOverlayTimeline({ match_id: id })
         .then((data) => setTimeline(data))
@@ -87,6 +89,10 @@ export default function AFLMatchCentrePage() {
       fetchMatchScatterData({ match_id: id })
         .then((points) => setScatterData(points))
         .catch(() => setScatterData([]));
+
+      fetchQuarterScores({ match_id: id })
+        .then((qs) => setQuarterScores(qs))
+        .catch(() => setQuarterScores([]));
     },
     []
   );
@@ -200,11 +206,13 @@ export default function AFLMatchCentrePage() {
           timeline={timeline}
           matchPlayerStats={matchPlayerStats}
           scatterData={scatterData}
+          quarterScores={quarterScores}
           onClose={() => {
             setSelectedMatch(null);
             setTimeline(null);
             setMatchPlayerStats([]);
             setScatterData([]);
+            setQuarterScores([]);
           }}
         />
       )}

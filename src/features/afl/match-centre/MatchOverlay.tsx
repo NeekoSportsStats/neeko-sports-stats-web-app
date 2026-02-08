@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { X, MapPin, Clock } from "lucide-react";
-import type { MatchSummary, MatchPlayer, MatchPlayerStats, MatchScatterPoint, MatchTimeline } from "./types";
+import type { MatchSummary, MatchPlayer, MatchPlayerStats, MatchScatterPoint, MatchTimeline, QuarterScore } from "./types";
 import MatchScatter from "./MatchScatter";
 import MomentumTimeline from "./MomentumTimeline";
 
@@ -9,6 +9,7 @@ interface MatchOverlayProps {
   timeline?: MatchTimeline | null;
   matchPlayerStats?: MatchPlayerStats[];
   scatterData?: MatchScatterPoint[];
+  quarterScores?: QuarterScore[];
   onClose: () => void;
 }
 
@@ -73,7 +74,7 @@ function normaliseTeamName(name?: string | null) {
     .trim();
 }
 
-export default function MatchOverlay({ match, timeline, matchPlayerStats, scatterData, onClose }: MatchOverlayProps) {
+export default function MatchOverlay({ match, timeline, matchPlayerStats, scatterData, quarterScores, onClose }: MatchOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -238,6 +239,41 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                 </div>
               </div>
             </div>
+
+            {quarterScores && quarterScores.length > 0 && (
+              <div className="mt-5 pt-5 border-t border-white/10">
+                <div className="grid gap-px rounded-lg overflow-hidden bg-white/5"
+                  style={{ gridTemplateColumns: `minmax(56px, auto) repeat(${quarterScores.length}, 1fr)` }}
+                >
+                  <div className="bg-black/40 px-3 py-2" />
+                  {quarterScores.map((q) => (
+                    <div key={`qh-${q.quarter}`} className="bg-black/40 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-white/50">
+                      Q{q.quarter}
+                    </div>
+                  ))}
+
+                  <div className="bg-black/30 px-3 py-2 text-xs font-medium text-white/70 truncate">
+                    {match.home_team_abbr ?? match.home_team ?? "Home"}
+                  </div>
+                  {quarterScores.map((q) => (
+                    <div key={`qh-home-${q.quarter}`} className="bg-black/30 px-3 py-2 text-center text-sm text-white">
+                      <span className="font-medium">{q.home_goals}.{q.home_behinds}</span>
+                      <span className="text-white/40 ml-1">({q.home_points})</span>
+                    </div>
+                  ))}
+
+                  <div className="bg-black/30 px-3 py-2 text-xs font-medium text-white/70 truncate">
+                    {match.away_team_abbr ?? match.away_team ?? "Away"}
+                  </div>
+                  {quarterScores.map((q) => (
+                    <div key={`qh-away-${q.quarter}`} className="bg-black/30 px-3 py-2 text-center text-sm text-white">
+                      <span className="font-medium">{q.away_goals}.{q.away_behinds}</span>
+                      <span className="text-white/40 ml-1">({q.away_points})</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="mt-5 pt-5 border-t border-white/10 flex flex-wrap gap-5 text-sm text-white/70">
               {venue && (
