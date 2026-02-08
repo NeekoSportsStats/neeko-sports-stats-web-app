@@ -78,7 +78,7 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
         )}
       </div>
 
-      <div className="h-[280px] md:h-[340px] w-full">
+      <div className="min-h-[320px] h-[320px] md:h-[360px] w-full overflow-x-auto">
         <ResponsiveContainer width="100%" height="100%">
           <ScatterChart margin={{ top: 10, right: 10, bottom: 30, left: 20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#333" />
@@ -141,7 +141,17 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                   opacity={1}
                   shape={(props: Record<string, unknown>) => {
                     const { cx, cy } = props as { cx: number; cy: number };
-                    return <circle cx={cx} cy={cy} r={5} fill={resolvedHomeColor} fillOpacity={0.85} stroke={resolvedHomeColor} strokeWidth={2} />;
+                    return (
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={5}
+                        fill={resolvedHomeColor}
+                        fillOpacity={0.8}
+                        stroke="rgba(255,255,255,0.3)"
+                        strokeWidth={1.5}
+                      />
+                    );
                   }}
                 />
                 <Scatter
@@ -150,12 +160,40 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                   opacity={1}
                   shape={(props: Record<string, unknown>) => {
                     const { cx, cy } = props as { cx: number; cy: number };
-                    return <circle cx={cx} cy={cy} r={5} fill={resolvedAwayColor} fillOpacity={0.85} stroke={resolvedAwayColor} strokeWidth={2} />;
+                    return (
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={5}
+                        fill={resolvedAwayColor}
+                        fillOpacity={0.8}
+                        stroke="rgba(255,255,255,0.3)"
+                        strokeWidth={1.5}
+                      />
+                    );
                   }}
                 />
               </>
             ) : (
-              <Scatter data={data} fill="#3B82F6" opacity={0.85} />
+              <Scatter
+                data={data}
+                fill="#3B82F6"
+                opacity={1}
+                shape={(props: Record<string, unknown>) => {
+                  const { cx, cy } = props as { cx: number; cy: number };
+                  return (
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={5}
+                      fill="#3B82F6"
+                      fillOpacity={0.8}
+                      stroke="rgba(255,255,255,0.3)"
+                      strokeWidth={1.5}
+                    />
+                  );
+                }}
+              />
             )}
           </ScatterChart>
         </ResponsiveContainer>

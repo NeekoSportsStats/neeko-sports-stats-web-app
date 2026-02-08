@@ -301,10 +301,10 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
 
             {formattedQuarterSummary && formattedQuarterSummary.length > 0 && (
               <div className="mt-5 pt-5 border-t border-white/10">
-                <div className="text-xs uppercase tracking-wider text-white/50 mb-2">Quarter Scores</div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-white/70">
+                <div className="text-xs uppercase tracking-wider text-white/50 mb-3">Quarter Scores</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-white/70">
                   {formattedQuarterSummary.map((quarter, idx) => (
-                    <div key={idx} className="text-center">{quarter}</div>
+                    <div key={idx} className="text-center py-1">{quarter}</div>
                   ))}
                 </div>
               </div>
@@ -339,14 +339,14 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
 
           {statsReady ? (
             <>
-              <div className="rounded-2xl border border-white/10 bg-black/40 p-5">
+              <div className="rounded-2xl border border-white/10 bg-black/40 p-5 md:p-6">
                 <div className="text-xs uppercase tracking-wider text-white/60 mb-4">
-                  Top Players
+                  Top Performers
                 </div>
                 {team1Top3.length === 0 && team2Top3.length === 0 ? (
                   <div className="text-white/50">Player data unavailable for this match</div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
                     <div>
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: homeColor }} />

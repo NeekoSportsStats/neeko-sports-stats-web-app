@@ -67,14 +67,14 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
     return (
       <div className="rounded-xl border border-white/10 bg-black/40 p-4 md:p-6">
         <div className="h-5 md:h-6 w-40 md:w-48 rounded bg-white/5 animate-pulse mb-3 md:mb-4" />
-        <div className="h-[180px] md:h-[200px] rounded bg-white/5 animate-pulse" />
+        <div className="h-[240px] md:h-[260px] rounded bg-white/5 animate-pulse" />
       </div>
     );
   }
 
   if (data.length === 0) {
     return (
-      <div className="rounded-xl border border-white/10 bg-black/40 p-4 md:p-6">
+      <div className="rounded-xl border border-white/10 bg-black/40 p-5 md:p-6">
         <h3 className="text-base md:text-lg font-semibold text-white mb-1">Match Momentum</h3>
         <p className="text-xs md:text-sm text-white/40">Momentum data not available for this match.</p>
       </div>
@@ -93,20 +93,17 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4 md:p-6">
+    <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-5 md:p-6">
       <div className="mb-3 md:mb-4">
         <h3 className="text-base md:text-lg font-semibold text-white mb-1">Match Momentum</h3>
-        <p className="text-xs md:text-sm text-white/60">
-          <span className="text-[#F5C84C]">{homeTeam}</span>
-          {" (positive) vs "}
-          <span className="text-white">{awayTeam}</span>
-          {" (negative)"}
+        <p className="text-xs md:text-sm text-white/60 leading-relaxed">
+          Tracking the ebb and flow throughout the contest. <span className="text-[#F5C84C]">{homeTeam}</span> positive, <span className="text-white/80">{awayTeam}</span> negative.
         </p>
       </div>
 
-      <div className="h-[180px] md:h-[220px] w-full">
+      <div className="min-h-[240px] h-[240px] md:h-[260px] w-full overflow-x-auto">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 10, right: 8, bottom: 10, left: 8 }}>
+          <AreaChart data={data} margin={{ top: 10, right: 10, bottom: 20, left: 10 }}>
             <defs>
               <linearGradient id="momentumPos" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#F5C84C" stopOpacity={0.5} />
@@ -124,7 +121,8 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
               dataKey="label"
               stroke="#666"
               tick={{ fill: "#666", fontSize: 9 }}
-              interval="preserveStartEnd"
+              interval={50}
+              minTickGap={30}
             />
             <YAxis
               stroke="#666"
