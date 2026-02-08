@@ -1,13 +1,6 @@
 import React from "react";
 import type { DayGroup, MatchSummary } from "./types";
 
-function formatTime(gameTime: string | null | undefined) {
-  if (!gameTime) return "TBC";
-  const d = new Date(gameTime);
-  if (Number.isNaN(d.getTime())) return "TBC";
-  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
 interface Props {
   groups: DayGroup[];
   onSelectMatch: (m: MatchSummary) => void;
@@ -73,7 +66,6 @@ export default function MatchList({ groups, onSelectMatch }: Props) {
 
                     <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-white/60">
                       <div>{venue}</div>
-                      <div>{formatTime(m.game_time)}</div>
                       <div className="px-2 py-1 rounded-md border border-white/10 bg-white/5 text-xs uppercase tracking-wider">
                         {status}
                       </div>

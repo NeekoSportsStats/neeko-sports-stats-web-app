@@ -13,39 +13,11 @@ interface MatchOverlayProps {
   onClose: () => void;
 }
 
-function formatMatchDateTime(
-  gameTime: string | null | undefined,
-  matchDate: string | null | undefined,
-  matchTime: string | null | undefined,
-) {
-  let d: Date | null = null;
-
-  if (gameTime) {
-    const parsed = new Date(gameTime);
-    if (!Number.isNaN(parsed.getTime())) d = parsed;
-  }
-
-  if (!d && matchDate && matchTime) {
-    const parsed = new Date(`${matchDate}T${matchTime}`);
-    if (!Number.isNaN(parsed.getTime())) d = parsed;
-  }
-
-  if (!d && matchDate) {
-    const parsed = new Date(`${matchDate}T00:00:00`);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-    }
-  }
-
-  if (!d) return null;
-
-  return d.toLocaleString(undefined, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+function formatMatchDate(matchDate: string | null | undefined) {
+  if (!matchDate) return null;
+  const parsed = new Date(`${matchDate}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 }
 
 function normaliseTeamName(name?: string | null) {
@@ -195,7 +167,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
   const resolvedStatus = match.status || "";
   const resolvedVenue = match.venue || null;
   const venue = resolvedVenue && resolvedVenue !== "TBC" ? resolvedVenue : null;
-  const formattedTime = formatMatchDateTime(match.game_time, match.match_date, match.match_time);
+  const formattedTime = formatMatchDate(match.match_date);
   const homeScore = match.home_score ?? null;
   const awayScore = match.away_score ?? null;
 

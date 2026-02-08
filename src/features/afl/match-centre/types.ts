@@ -4,8 +4,6 @@ export type MatchSummary = {
   round_number?: number;
   round_label?: string;
   match_date?: string;
-  match_time?: string;
-  game_time?: string;
   venue?: string;
   home_team?: string;
   home_team_abbr?: string;

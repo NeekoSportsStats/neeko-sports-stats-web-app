@@ -16,16 +16,13 @@ const NEUTRAL_COLOR = "var(--neutral-500)";
 export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   const { data, error } = await supabase
     .schema("afl")
-    .from("v_match_center_games")
+    .from("match_center_games_base")
     .select(`
-      vendor_game_id,
+      match_id,
       season,
       round_number,
       round_label,
-      match_index,
       match_date,
-      match_time,
-      game_time,
       venue,
       home_team,
       home_team_abbr,
@@ -41,8 +38,7 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
     `)
     .eq("season", 2025)
     .order("round_number", { ascending: true })
-    .order("match_date", { ascending: true })
-    .order("match_time", { ascending: true });
+    .order("match_date", { ascending: true });
 
   if (error) {
     console.error("[fetchMatches]", error);
@@ -54,13 +50,11 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   }
 
   return data.map((row): MatchSummary => ({
-    match_id: String(row.vendor_game_id ?? ""),
+    match_id: String(row.match_id ?? ""),
     season: row.season ?? season,
     round_number: row.round_number ?? 0,
     round_label: row.round_label ?? `R${row.round_number ?? 0}`,
     match_date: row.match_date ? String(row.match_date) : undefined,
-    match_time: row.match_time ? String(row.match_time) : undefined,
-    game_time: row.game_time ? String(row.game_time) : undefined,
     venue: row.venue ?? undefined,
     home_team: row.home_team ?? "Home",
     home_team_abbr: row.home_team_abbr ?? undefined,
