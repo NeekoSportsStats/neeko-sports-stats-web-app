@@ -57,6 +57,7 @@ function normaliseTeamName(name?: string | null) {
 function computeBiggestSwing(margin: { quarter: number; minute: number; margin_delta: number }[]): {
   swing: number;
   quarter: number | null;
+  direction: "positive" | "negative";
 } | null {
   if (!margin || margin.length < 2) return null;
 
@@ -64,6 +65,7 @@ function computeBiggestSwing(margin: { quarter: number; minute: number; margin_d
 
   let bestSwing = 0;
   let bestQuarter: number | null = null;
+  let bestDirection: "positive" | "negative" = "positive";
 
   for (let i = 0; i < sorted.length; i++) {
     let cumulative = 0;
@@ -78,12 +80,13 @@ function computeBiggestSwing(margin: { quarter: number; minute: number; margin_d
     }
     if (Math.abs(maxInWindow) > Math.abs(bestSwing)) {
       bestSwing = maxInWindow;
+      bestDirection = maxInWindow > 0 ? "positive" : "negative";
       bestQuarter = sorted[i].quarter > 0 ? sorted[i].quarter : null;
     }
   }
 
   if (Math.abs(bestSwing) <= 6) return null;
-  return { swing: Math.abs(bestSwing), quarter: bestQuarter };
+  return { swing: Math.abs(bestSwing), quarter: bestQuarter, direction: bestDirection };
 }
 
 export default function MatchOverlay({ match, timeline, matchPlayerStats, scatterData, quarterSummary, onClose }: MatchOverlayProps) {
@@ -177,8 +180,16 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
     if (timeline?.margin && timeline.margin.length > 0) {
       const swing = computeBiggestSwing(timeline.margin);
       if (swing && swing.swing > 12) {
-        const quarterText = swing.quarter ? ` ${swing.quarter === 1 ? "midway through the opening term" : swing.quarter === 2 ? "late in the second quarter" : swing.quarter === 3 ? "after the main break" : "heading into the final term"}` : "";
-        const teamName = swing.swing > 0 ? home : away;
+        const quarterText = swing.quarter
+          ? swing.quarter === 1
+            ? " midway through the opening term"
+            : swing.quarter === 2
+              ? " late in the second quarter"
+              : swing.quarter === 3
+                ? " after the main break"
+                : " heading into the final term"
+          : "";
+        const teamName = swing.direction === "positive" ? home : away;
         const phrases = [
           `${teamName} seized control${quarterText}, producing a dominant scoring burst.`,
           `A sharp momentum shift${quarterText} saw ${teamName} wrestle back control of the contest.`,
@@ -228,7 +239,10 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
 
   const formattedQuarterSummary = useMemo(() => {
     if (!quarterSummary) return null;
-    return quarterSummary.split("\n").filter(s => s.trim());
+    return quarterSummary
+      .split(/\s{2,}/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
   }, [quarterSummary]);
 
   return (

@@ -203,13 +203,12 @@ export async function fetchMatchMomentum(matchId: string): Promise<MomentumPoint
   const { data, error } = await supabase
     .schema("afl")
     .from("v_match_team_momentum_2025")
-    .select("match_id, season, quarter, minute, momentum")
+    .select("match_id, team, minute, momentum_value")
     .eq("match_id", matchId)
-    .order("quarter", { ascending: true })
     .order("minute", { ascending: true });
 
   if (error) {
-    console.debug("[fetchMatchMomentum] Query failed (view may not exist):", error.message);
+    console.warn("[fetchMatchMomentum] Query failed:", error.message);
     return [];
   }
 
@@ -217,10 +216,10 @@ export async function fetchMatchMomentum(matchId: string): Promise<MomentumPoint
 
   return data.map((row): MomentumPoint => ({
     match_id: String(row.match_id ?? matchId),
-    season: Number(row.season ?? 2025),
-    quarter: Number(row.quarter ?? 1),
+    season: 2025,
+    quarter: Math.floor(Number(row.minute ?? 0) / 25) + 1,
     minute: Number(row.minute ?? 0),
-    momentum: Number(row.momentum ?? 0),
+    momentum: Number(row.momentum_value ?? 0),
   }));
 }
 
@@ -308,59 +307,30 @@ export async function fetchQuarterSummary(params: {
   const { data, error } = await supabase
     .schema("afl")
     .from("v_match_quarter_summary_2025")
-    .select("match_id, quarter, home_goals, home_behinds, home_points, away_goals, away_behinds, away_points")
+    .select("match_id, quarter_summary")
     .eq("match_id", params.match_id)
-    .order("quarter", { ascending: true });
+    .maybeSingle();
 
   if (error) {
-    console.debug("[fetchQuarterSummary]", error.message);
+    console.warn("[fetchQuarterSummary] Error:", error.message);
     return null;
   }
 
-  if (!data || data.length === 0) return null;
-
-  const parts = data.map((row) => {
-    const q = row.quarter ?? 1;
-    const hg = row.home_goals ?? 0;
-    const hb = row.home_behinds ?? 0;
-    const hp = row.home_points ?? (hg * 6 + hb);
-    const ag = row.away_goals ?? 0;
-    const ab = row.away_behinds ?? 0;
-    const ap = row.away_points ?? (ag * 6 + ab);
-    return `Q${q} ${hg}.${hb} (${hp}) – ${ag}.${ab} (${ap})`;
-  });
+  if (!data) return null;
 
   return {
-    match_id: String(params.match_id),
-    quarter_summary: parts.join("\n"),
+    match_id: String(data.match_id ?? params.match_id),
+    quarter_summary: data.quarter_summary ?? "",
   };
 }
 
 export async function fetchRoundQuarterScores(matchIds: string[]): Promise<QuarterScoreRow[]> {
   if (matchIds.length === 0) return [];
 
-  const { data, error } = await supabase
-    .schema("afl")
-    .from("v_match_quarter_summary_2025")
-    .select("match_id, quarter, home_goals, home_behinds, home_points, away_goals, away_behinds, away_points")
-    .in("match_id", matchIds)
-    .order("quarter", { ascending: true });
+  console.warn(
+    "[fetchRoundQuarterScores] Quarter-by-quarter data unavailable. " +
+    "v_match_quarter_summary_2025 only returns pre-formatted text summaries."
+  );
 
-  if (error) {
-    console.debug("[fetchRoundQuarterScores]", error.message);
-    return [];
-  }
-
-  if (!data || data.length === 0) return [];
-
-  return data.map((row): QuarterScoreRow => ({
-    match_id: String(row.match_id ?? ""),
-    quarter: Number(row.quarter ?? 1),
-    home_goals: Number(row.home_goals ?? 0),
-    home_behinds: Number(row.home_behinds ?? 0),
-    home_points: Number(row.home_points ?? 0),
-    away_goals: Number(row.away_goals ?? 0),
-    away_behinds: Number(row.away_behinds ?? 0),
-    away_points: Number(row.away_points ?? 0),
-  }));
+  return [];
 }
