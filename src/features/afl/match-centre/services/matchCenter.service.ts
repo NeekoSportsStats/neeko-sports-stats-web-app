@@ -308,8 +308,9 @@ export async function fetchQuarterSummary(params: {
   const { data, error } = await supabase
     .schema("afl")
     .from("v_match_quarter_summary_2025")
-    .select("match_id, home_goals, home_behinds, home_points, away_goals, away_behinds, away_points")
-    .eq("match_id", params.match_id);
+    .select("match_id, quarter, home_goals, home_behinds, home_points, away_goals, away_behinds, away_points")
+    .eq("match_id", params.match_id)
+    .order("quarter", { ascending: true });
 
   if (error) {
     console.debug("[fetchQuarterSummary]", error.message);
@@ -318,18 +319,20 @@ export async function fetchQuarterSummary(params: {
 
   if (!data || data.length === 0) return null;
 
-  const parts = data.map((row, index) => {
-    const q = index + 1;
+  const parts = data.map((row) => {
+    const q = row.quarter ?? 1;
     const hg = row.home_goals ?? 0;
     const hb = row.home_behinds ?? 0;
+    const hp = row.home_points ?? (hg * 6 + hb);
     const ag = row.away_goals ?? 0;
     const ab = row.away_behinds ?? 0;
-    return `Q${q}: ${hg}.${hb} - ${ag}.${ab}`;
+    const ap = row.away_points ?? (ag * 6 + ab);
+    return `Q${q} ${hg}.${hb} (${hp}) – ${ag}.${ab} (${ap})`;
   });
 
   return {
     match_id: String(params.match_id),
-    quarter_summary: parts.join(" | "),
+    quarter_summary: parts.join("\n"),
   };
 }
 
@@ -339,8 +342,9 @@ export async function fetchRoundQuarterScores(matchIds: string[]): Promise<Quart
   const { data, error } = await supabase
     .schema("afl")
     .from("v_match_quarter_summary_2025")
-    .select("match_id, home_goals, home_behinds, home_points, away_goals, away_behinds, away_points")
-    .in("match_id", matchIds);
+    .select("match_id, quarter, home_goals, home_behinds, home_points, away_goals, away_behinds, away_points")
+    .in("match_id", matchIds)
+    .order("quarter", { ascending: true });
 
   if (error) {
     console.debug("[fetchRoundQuarterScores]", error.message);
@@ -349,24 +353,14 @@ export async function fetchRoundQuarterScores(matchIds: string[]): Promise<Quart
 
   if (!data || data.length === 0) return [];
 
-  const groupedByMatch = new Map<string, QuarterScoreRow[]>();
-
-  data.forEach((row) => {
-    const matchId = String(row.match_id ?? "");
-    if (!groupedByMatch.has(matchId)) {
-      groupedByMatch.set(matchId, []);
-    }
-    groupedByMatch.get(matchId)!.push({
-      match_id: matchId,
-      quarter: groupedByMatch.get(matchId)!.length + 1,
-      home_goals: Number(row.home_goals ?? 0),
-      home_behinds: Number(row.home_behinds ?? 0),
-      home_points: Number(row.home_points ?? 0),
-      away_goals: Number(row.away_goals ?? 0),
-      away_behinds: Number(row.away_behinds ?? 0),
-      away_points: Number(row.away_points ?? 0),
-    });
-  });
-
-  return Array.from(groupedByMatch.values()).flat();
+  return data.map((row): QuarterScoreRow => ({
+    match_id: String(row.match_id ?? ""),
+    quarter: Number(row.quarter ?? 1),
+    home_goals: Number(row.home_goals ?? 0),
+    home_behinds: Number(row.home_behinds ?? 0),
+    home_points: Number(row.home_points ?? 0),
+    away_goals: Number(row.away_goals ?? 0),
+    away_behinds: Number(row.away_behinds ?? 0),
+    away_points: Number(row.away_points ?? 0),
+  }));
 }

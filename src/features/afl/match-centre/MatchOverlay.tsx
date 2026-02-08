@@ -176,11 +176,17 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
 
     if (timeline?.margin && timeline.margin.length > 0) {
       const swing = computeBiggestSwing(timeline.margin);
-      if (swing) {
-        const quarterText = swing.quarter ? ` in Q${swing.quarter}` : "";
-        sentences.push(
-          `The biggest sustained momentum swing was ${swing.swing} points over a 10-minute stretch${quarterText}.`
-        );
+      if (swing && swing.swing > 12) {
+        const quarterText = swing.quarter ? ` ${swing.quarter === 1 ? "midway through the opening term" : swing.quarter === 2 ? "late in the second quarter" : swing.quarter === 3 ? "after the main break" : "heading into the final term"}` : "";
+        const teamName = swing.swing > 0 ? home : away;
+        const phrases = [
+          `${teamName} seized control${quarterText}, producing a dominant scoring burst.`,
+          `A sharp momentum shift${quarterText} saw ${teamName} wrestle back control of the contest.`,
+          `${teamName} applied sustained pressure${quarterText}, extending their lead with consecutive scoring.`
+        ];
+        sentences.push(phrases[Math.floor(Math.random() * phrases.length)]);
+      } else if (swing && swing.swing > 6) {
+        sentences.push("Both teams traded momentum throughout the contest with no extended periods of dominance.");
       }
     }
 
@@ -222,7 +228,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
 
   const formattedQuarterSummary = useMemo(() => {
     if (!quarterSummary) return null;
-    return quarterSummary.replace(/\s{2,}/g, " | ").trim();
+    return quarterSummary.split("\n").filter(s => s.trim());
   }, [quarterSummary]);
 
   return (
@@ -250,7 +256,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-4 md:p-6 space-y-4 md:space-y-6">
           <div className="rounded-2xl border border-white/10 bg-black/40 p-6">
             <div className="grid grid-cols-3 items-center gap-4">
               <div>
@@ -279,10 +285,14 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
               </div>
             </div>
 
-            {formattedQuarterSummary && (
+            {formattedQuarterSummary && formattedQuarterSummary.length > 0 && (
               <div className="mt-5 pt-5 border-t border-white/10">
                 <div className="text-xs uppercase tracking-wider text-white/50 mb-2">Quarter Scores</div>
-                <div className="text-sm text-white/70 leading-relaxed line-clamp-2 md:line-clamp-none">{formattedQuarterSummary}</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-white/70">
+                  {formattedQuarterSummary.map((quarter, idx) => (
+                    <div key={idx} className="text-center">{quarter}</div>
+                  ))}
+                </div>
               </div>
             )}
 
