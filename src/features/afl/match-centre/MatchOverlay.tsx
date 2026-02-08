@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { X, MapPin, Clock } from "lucide-react";
-import type { MatchSummary, MatchPlayer, MatchPlayerStats, MatchScatterPoint, MatchTimeline, QuarterScore } from "./types";
+import type { MatchSummary, MatchHeader, MatchPlayer, MatchPlayerStats, MatchScatterPoint, MatchTimeline, QuarterScore } from "./types";
 import MatchScatter from "./MatchScatter";
 import MomentumTimeline from "./MomentumTimeline";
 
 interface MatchOverlayProps {
   match: MatchSummary;
+  header?: MatchHeader | null;
   timeline?: MatchTimeline | null;
   matchPlayerStats?: MatchPlayerStats[];
   scatterData?: MatchScatterPoint[];
@@ -74,7 +75,7 @@ function normaliseTeamName(name?: string | null) {
     .trim();
 }
 
-export default function MatchOverlay({ match, timeline, matchPlayerStats, scatterData, quarterScores, onClose }: MatchOverlayProps) {
+export default function MatchOverlay({ match, header, timeline, matchPlayerStats, scatterData, quarterScores, onClose }: MatchOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -190,13 +191,14 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
     return sentences;
   }, [matchPlayerStats, match.home_score, match.away_score, match.home_team, match.away_team, timeline, team1Top3, team2Top3]);
 
-  const roundLabel = match.round_label ?? "AFL";
+  const roundLabel = header?.round_label || match.round_label || "AFL";
   const season = match.season ?? 2025;
-  const status = match.status ?? "";
-  const venue = match.venue && match.venue !== "TBC" ? match.venue : null;
+  const resolvedStatus = header?.status || match.status || "";
+  const resolvedVenue = header?.venue || match.venue || null;
+  const venue = resolvedVenue && resolvedVenue !== "TBC" ? resolvedVenue : null;
   const formattedTime = formatMatchDateTime(match.game_time, match.match_date, match.match_time);
-  const homeScore = match.home_score ?? null;
-  const awayScore = match.away_score ?? null;
+  const homeScore = header?.home_score ?? match.home_score ?? null;
+  const awayScore = header?.away_score ?? match.away_score ?? null;
 
   return (
     <div
@@ -210,7 +212,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
         <div className="flex items-center justify-between p-5 border-b border-white/10">
           <div>
             <div className="text-xs uppercase tracking-wider text-white/60">
-              {roundLabel} • {season} • {status}
+              {roundLabel} • {season} • {resolvedStatus}
             </div>
             <div className="text-2xl font-bold text-white">Match Detail</div>
           </div>

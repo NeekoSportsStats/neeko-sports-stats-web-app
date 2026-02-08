@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabaseClient";
 import type {
   MatchSummary,
+  MatchHeader,
   MatchPlayerStats,
   MatchScatterPoint,
   MomentumPoint,
@@ -81,7 +82,7 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
       match_date: fixtureDate ?? (row.match_date ? String(row.match_date) : undefined),
       match_time: row.match_time ? String(row.match_time) : undefined,
       game_time: row.game_time ? String(row.game_time) : undefined,
-      venue: row.venue ?? "TBC",
+      venue: row.venue ?? undefined,
       home_team: row.home_team ?? "Home",
       home_team_abbr: row.home_team_abbr ?? undefined,
       home_team_color: row.home_team_color ?? NEUTRAL_COLOR,
@@ -95,6 +96,39 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
       status: row.status ?? "Scheduled",
     };
   });
+}
+
+export async function fetchMatchHeader(params: {
+  match_id: string;
+}): Promise<MatchHeader | null> {
+  if (!params.match_id) return null;
+
+  const { data, error } = await supabase
+    .schema("afl")
+    .from("v_match_center_round_days")
+    .select(
+      "match_id, venue, status, round_label, home_team, away_team, home_score, away_score"
+    )
+    .eq("match_id", params.match_id)
+    .maybeSingle();
+
+  if (error) {
+    console.debug("[fetchMatchHeader]", error.message);
+    return null;
+  }
+
+  if (!data) return null;
+
+  return {
+    match_id: String(data.match_id),
+    venue: data.venue ?? null,
+    status: data.status ?? null,
+    round_label: data.round_label ?? null,
+    home_team: data.home_team ?? null,
+    away_team: data.away_team ?? null,
+    home_score: data.home_score ?? null,
+    away_score: data.away_score ?? null,
+  };
 }
 
 export async function fetchMatchPlayerStats(params: {
