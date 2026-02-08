@@ -38,7 +38,7 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
     `)
     .eq("season", 2025)
     .order("round_number", { ascending: true })
-    .order("match_date", { ascending: true });
+    .order("match_id", { ascending: true });
 
   if (error) {
     console.error("[fetchMatches]", error);
