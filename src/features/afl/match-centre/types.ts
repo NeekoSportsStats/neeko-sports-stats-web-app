@@ -119,15 +119,9 @@ export type MatchScatterPoint = {
   y_fantasy_vs_avg: number;
 };
 
-export type QuarterScore = {
+export type QuarterSummary = {
   match_id: string;
-  quarter: number;
-  home_goals: number;
-  home_behinds: number;
-  home_points: number;
-  away_goals: number;
-  away_behinds: number;
-  away_points: number;
+  quarter_summary: string;
 };
 
 export type DayGroup = {

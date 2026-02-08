@@ -8,7 +8,7 @@ import type {
   TimelineEvent,
   TimelineScoring,
   TimelineMargin,
-  QuarterScore,
+  QuarterSummary,
 } from "../types";
 
 const NEUTRAL_COLOR = "var(--neutral-500)";
@@ -273,35 +273,27 @@ export async function fetchMatchOverlayTimeline(params: {
   };
 }
 
-export async function fetchQuarterScores(params: {
+export async function fetchQuarterSummary(params: {
   match_id: string;
-}): Promise<QuarterScore[]> {
-  if (!params.match_id) return [];
+}): Promise<QuarterSummary | null> {
+  if (!params.match_id) return null;
 
   const { data, error } = await supabase
     .schema("afl")
     .from("v_match_quarter_summary_2025")
-    .select(
-      "match_id, quarter, home_goals, home_behinds, home_points, away_goals, away_behinds, away_points"
-    )
+    .select("match_id, quarter_summary")
     .eq("match_id", params.match_id)
-    .order("quarter", { ascending: true });
+    .maybeSingle();
 
   if (error) {
-    console.debug("[fetchQuarterScores] Query failed (view may not have data):", error.message);
-    return [];
+    console.debug("[fetchQuarterSummary] Query failed:", error.message);
+    return null;
   }
 
-  if (!data || data.length === 0) return [];
+  if (!data) return null;
 
-  return data.map((row): QuarterScore => ({
-    match_id: String(row.match_id ?? params.match_id),
-    quarter: Number(row.quarter ?? 0),
-    home_goals: Number(row.home_goals ?? 0),
-    home_behinds: Number(row.home_behinds ?? 0),
-    home_points: Number(row.home_points ?? 0),
-    away_goals: Number(row.away_goals ?? 0),
-    away_behinds: Number(row.away_behinds ?? 0),
-    away_points: Number(row.away_points ?? 0),
-  }));
+  return {
+    match_id: String(data.match_id ?? params.match_id),
+    quarter_summary: String(data.quarter_summary ?? ""),
+  };
 }
