@@ -1,3 +1,8 @@
+// ⚠️ CONTRACT LOCK:
+// match_date exists in the data for display purposes only.
+// Do NOT introduce time-based filtering or sorting logic.
+// The service layer controls all ordering via round_number + match_id.
+
 import React from "react";
 import type { DayGroup, MatchSummary } from "./types";
 import type { QuarterScoreRow } from "./services/matchCenter.service";

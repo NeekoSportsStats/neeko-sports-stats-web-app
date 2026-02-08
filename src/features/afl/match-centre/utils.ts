@@ -1,3 +1,8 @@
+// ⚠️ CONTRACT LOCK:
+// match_center_games_base has dates but they're not reliable for sorting.
+// Grouping uses match_date for display but preserves natural match_id order.
+// Do NOT introduce time-based sorting logic.
+
 import type { MatchPlayer, MatchSummary, DayGroup } from "./types";
 
 export function computeTop3(players: MatchPlayer[]): MatchPlayer[] {
@@ -44,7 +49,10 @@ export function groupMatchesByDay(matches: MatchSummary[]): DayGroup[] {
     grouped.get(matchDate)!.matches.push(match);
   }
 
-  return Array.from(grouped.values()).sort((a, b) =>
-    a.match_date.localeCompare(b.match_date)
-  );
+  return Array.from(grouped.values()).sort((a, b) => {
+    if (a.match_date === "Unknown" && b.match_date !== "Unknown") return 1;
+    if (a.match_date !== "Unknown" && b.match_date === "Unknown") return -1;
+    if (a.match_date === "Unknown" && b.match_date === "Unknown") return 0;
+    return a.match_date.localeCompare(b.match_date);
+  });
 }

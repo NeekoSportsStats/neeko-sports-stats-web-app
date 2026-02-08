@@ -1,3 +1,8 @@
+// ⚠️ CONTRACT LOCK:
+// MatchSummary reflects afl.match_center_games_base schema.
+// match_date exists for display only - do NOT use for sorting/ordering.
+// All ordering MUST be done via round_number + match_id in queries.
+
 export type MatchSummary = {
   match_id?: string;
   season?: number;

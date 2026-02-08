@@ -1,3 +1,8 @@
+// ⚠️ CONTRACT LOCK:
+// Match Centre uses afl.match_center_games_base as the canonical source.
+// All ordering is handled by the service layer (round_number + match_id).
+// Do NOT add date-based sorting or filtering logic.
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Calendar } from "lucide-react";
 import {
