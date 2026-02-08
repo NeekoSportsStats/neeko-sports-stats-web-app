@@ -11,7 +11,16 @@ import type {
   QuarterSummary,
 } from "../types";
 
-const NEUTRAL_COLOR = "var(--neutral-500)";
+export type QuarterScoreRow = {
+  match_id: string;
+  quarter: number;
+  home_goals: number;
+  home_behinds: number;
+  home_points: number;
+  away_goals: number;
+  away_behinds: number;
+  away_points: number;
+};
 
 export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   const { data, error } = await supabase
@@ -22,21 +31,23 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
       season,
       round_number,
       round_label,
-      round_instance,
-      home_team_vendor,
-      away_team_vendor,
+      match_date,
+      venue,
+      home_team,
+      home_team_abbr,
+      home_team_color,
+      home_team_id,
+      away_team,
+      away_team_abbr,
+      away_team_color,
+      away_team_id,
       home_score,
       away_score,
-      home_goals,
-      home_behinds,
-      away_goals,
-      away_behinds,
-      venue,
       status
     `)
     .eq("season", 2025)
     .order("round_number", { ascending: true })
-    .order("match_id", { ascending: true });
+    .order("match_date", { ascending: true });
 
   if (error) {
     console.error("[fetchMatches]", error);
@@ -52,9 +63,16 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
     season: row.season ?? season,
     round_number: row.round_number ?? 0,
     round_label: row.round_label ?? `R${row.round_number ?? 0}`,
+    match_date: row.match_date ?? undefined,
     venue: row.venue ?? undefined,
-    home_team: String(row.home_team_vendor ?? "Home"),
-    away_team: String(row.away_team_vendor ?? "Away"),
+    home_team: String(row.home_team ?? "Home"),
+    home_team_abbr: String(row.home_team_abbr ?? ""),
+    home_team_color: String(row.home_team_color ?? ""),
+    home_team_id: String(row.home_team_id ?? ""),
+    away_team: String(row.away_team ?? "Away"),
+    away_team_abbr: String(row.away_team_abbr ?? ""),
+    away_team_color: String(row.away_team_color ?? ""),
+    away_team_id: String(row.away_team_id ?? ""),
     home_score: row.home_score ?? null,
     away_score: row.away_score ?? null,
     status: row.status ?? "Scheduled",
@@ -94,7 +112,7 @@ export async function fetchMatchPlayerStats(params: {
     .order("fantasy_points", { ascending: false });
 
   if (error) {
-    console.error("[fetchMatchPlayerStats]", error);
+    console.debug("[fetchMatchPlayerStats]", error.message);
     return [];
   }
 
@@ -147,7 +165,7 @@ export async function fetchMatchScatterData(params: {
     .eq("match_id", params.match_id);
 
   if (error) {
-    console.error("[fetchMatchScatterData]", error);
+    console.debug("[fetchMatchScatterData]", error.message);
     return [];
   }
 
@@ -168,9 +186,6 @@ export async function fetchMatchScatterData(params: {
   }));
 }
 
-// Fetches per-minute momentum data for a single match from
-// afl.v_match_team_momentum_2025.  The view may not exist yet —
-// the catch block ensures the overlay never crashes.
 export async function fetchMatchMomentum(matchId: string): Promise<MomentumPoint[]> {
   const { data, error } = await supabase
     .schema("afl")
@@ -181,8 +196,6 @@ export async function fetchMatchMomentum(matchId: string): Promise<MomentumPoint
     .order("minute", { ascending: true });
 
   if (error) {
-    // View may not be deployed yet — log but never throw so overlay
-    // rendering is unaffected.
     console.debug("[fetchMatchMomentum] Query failed (view may not exist):", error.message);
     return [];
   }
@@ -216,7 +229,7 @@ export async function fetchMatchOverlayTimeline(params: {
       .eq("match_id", params.match_id)
       .then(({ data, error }) => {
         if (error) {
-          console.error("[fetchMatchOverlayTimeline] events query failed:", error.message);
+          console.debug("[fetchMatchOverlayTimeline] events query failed:", error.message);
           return [] as TimelineEvent[];
         }
         return (data ?? []).map((r): TimelineEvent => ({
@@ -235,7 +248,7 @@ export async function fetchMatchOverlayTimeline(params: {
       .eq("match_id", params.match_id)
       .then(({ data, error }) => {
         if (error) {
-          console.error("[fetchMatchOverlayTimeline] scoring query failed:", error.message);
+          console.debug("[fetchMatchOverlayTimeline] scoring query failed:", error.message);
           return [] as TimelineScoring[];
         }
         return (data ?? []).map((r): TimelineScoring => ({
@@ -254,7 +267,7 @@ export async function fetchMatchOverlayTimeline(params: {
       .eq("match_id", params.match_id)
       .then(({ data, error }) => {
         if (error) {
-          console.error("[fetchMatchOverlayTimeline] margin query failed:", error.message);
+          console.debug("[fetchMatchOverlayTimeline] margin query failed:", error.message);
           return [] as TimelineMargin[];
         }
         return (data ?? []).map((r): TimelineMargin => ({
@@ -281,19 +294,57 @@ export async function fetchQuarterSummary(params: {
   const { data, error } = await supabase
     .schema("afl")
     .from("v_match_quarter_summary_2025")
-    .select("match_id, quarter_summary")
+    .select("match_id, quarter, home_goals, home_behinds, home_points, away_goals, away_behinds, away_points")
     .eq("match_id", params.match_id)
-    .maybeSingle();
+    .order("quarter", { ascending: true });
 
   if (error) {
     console.debug("[fetchQuarterSummary] Query failed:", error.message);
     return null;
   }
 
-  if (!data) return null;
+  if (!data || data.length === 0) return null;
+
+  const parts = data.map(row => {
+    const q = row.quarter ?? 0;
+    const hg = row.home_goals ?? 0;
+    const hb = row.home_behinds ?? 0;
+    const ag = row.away_goals ?? 0;
+    const ab = row.away_behinds ?? 0;
+    return `Q${q}: ${hg}.${hb} - ${ag}.${ab}`;
+  });
 
   return {
-    match_id: String(data.match_id ?? params.match_id),
-    quarter_summary: String(data.quarter_summary ?? ""),
+    match_id: String(params.match_id),
+    quarter_summary: parts.join(" | "),
   };
+}
+
+export async function fetchRoundQuarterScores(matchIds: string[]): Promise<QuarterScoreRow[]> {
+  if (matchIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .schema("afl")
+    .from("v_match_quarter_summary_2025")
+    .select("match_id, quarter, home_goals, home_behinds, home_points, away_goals, away_behinds, away_points")
+    .in("match_id", matchIds)
+    .order("quarter", { ascending: true });
+
+  if (error) {
+    console.debug("[fetchRoundQuarterScores] Query failed:", error.message);
+    return [];
+  }
+
+  if (!data || data.length === 0) return [];
+
+  return data.map((row): QuarterScoreRow => ({
+    match_id: String(row.match_id ?? ""),
+    quarter: Number(row.quarter ?? 0),
+    home_goals: Number(row.home_goals ?? 0),
+    home_behinds: Number(row.home_behinds ?? 0),
+    home_points: Number(row.home_points ?? 0),
+    away_goals: Number(row.away_goals ?? 0),
+    away_behinds: Number(row.away_behinds ?? 0),
+    away_points: Number(row.away_points ?? 0),
+  }));
 }

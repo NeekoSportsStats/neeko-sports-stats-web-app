@@ -1,6 +1,14 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Calendar } from "lucide-react";
-import { fetchMatches, fetchMatchOverlayTimeline, fetchMatchPlayerStats, fetchMatchScatterData, fetchQuarterSummary } from "./services/matchCenter.service";
+import {
+  fetchMatches,
+  fetchMatchOverlayTimeline,
+  fetchMatchPlayerStats,
+  fetchMatchScatterData,
+  fetchQuarterSummary,
+  fetchRoundQuarterScores,
+} from "./services/matchCenter.service";
+import type { QuarterScoreRow } from "./services/matchCenter.service";
 import { groupMatchesByDay } from "./utils";
 import type { DayGroup, MatchSummary, MatchTimeline, MatchPlayerStats, MatchScatterPoint } from "./types";
 import MatchList from "./MatchList";
@@ -16,8 +24,10 @@ export default function AFLMatchCentrePage() {
   const [matchPlayerStats, setMatchPlayerStats] = useState<MatchPlayerStats[]>([]);
   const [scatterData, setScatterData] = useState<MatchScatterPoint[]>([]);
   const [quarterSummary, setQuarterSummary] = useState<string | null>(null);
+  const [quarterScoresMap, setQuarterScoresMap] = useState<Map<string, QuarterScoreRow[]>>(new Map());
   const [season, setSeason] = useState(2025);
   const [round, setRound] = useState(1);
+  const initialLoadDone = useRef(false);
 
   const roundOptions = [
     { value: 0, label: "Opening Round" },
@@ -37,7 +47,12 @@ export default function AFLMatchCentrePage() {
     try {
       const data = await fetchMatches(season);
       setAllMatches(data);
-      setGroups(groupMatchesByDay(data));
+
+      if (!initialLoadDone.current && data.length > 0) {
+        const maxRound = Math.max(...data.map(m => m.round_number ?? 0));
+        setRound(maxRound);
+        initialLoadDone.current = true;
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to load matches";
       console.error("Failed to load matches:", err);
@@ -60,11 +75,25 @@ export default function AFLMatchCentrePage() {
   }, [season, loadMatches]);
 
   useEffect(() => {
-    // Guard: allMatches should always be an array but ?? [] prevents a
-    // crash if a concurrent setState race yields null/undefined.
     const filtered = (allMatches ?? []).filter((m) => m.round_number === round);
     const grouped = groupMatchesByDay(filtered);
     setGroups(grouped);
+
+    const matchIds = filtered.map(m => m.match_id).filter(Boolean) as string[];
+    if (matchIds.length > 0) {
+      fetchRoundQuarterScores(matchIds)
+        .then(scores => {
+          const map = new Map<string, QuarterScoreRow[]>();
+          for (const s of scores) {
+            if (!map.has(s.match_id)) map.set(s.match_id, []);
+            map.get(s.match_id)!.push(s);
+          }
+          setQuarterScoresMap(map);
+        })
+        .catch(() => setQuarterScoresMap(new Map()));
+    } else {
+      setQuarterScoresMap(new Map());
+    }
   }, [allMatches, round]);
 
   const is2026 = season === 2026;
@@ -111,7 +140,7 @@ export default function AFLMatchCentrePage() {
               AFL Match Centre
             </h1>
             <p className="mt-3 text-lg text-white/60 max-w-3xl">
-              Season fixtures and results with player performance data
+              Season results and player performance analysis
             </p>
           </div>
         </header>
@@ -123,7 +152,7 @@ export default function AFLMatchCentrePage() {
                 Filters
               </div>
               <p className="text-xs text-white/60">
-                Select season and round to view fixtures
+                Select season and round to view results
               </p>
             </div>
 
@@ -196,7 +225,11 @@ export default function AFLMatchCentrePage() {
             <p className="text-white/50 text-sm">No matches available</p>
           </div>
         ) : (
-          <MatchList groups={groups} onSelectMatch={handleSelectMatch} />
+          <MatchList
+            groups={groups}
+            onSelectMatch={handleSelectMatch}
+            quarterScoresMap={quarterScoresMap}
+          />
         )}
       </div>
 
