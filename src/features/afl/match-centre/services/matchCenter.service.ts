@@ -10,71 +10,59 @@ function safeColor(color: string | null | undefined): string {
 export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   const { data, error } = await supabase
     .schema("afl")
-    .from("v_match_center_games")
+    .from("match_center_games_base")
     .select(`
-      vendor_game_id,
+      match_id,
       season,
-      round_number,
       round_label,
-      match_date,
-      match_time,
-      game_time,
-      venue,
-      home_team,
-      home_team_abbr,
-      home_team_color,
-      home_team_id,
-      away_team,
-      away_team_abbr,
-      away_team_color,
-      away_team_id,
+      round_number,
+      round_instance,
+      home_team_vendor,
+      away_team_vendor,
       home_score,
       away_score,
-      status
+      home_goals,
+      home_behinds,
+      away_goals,
+      away_behinds,
+      venue,
+      status,
+      updated_at
     `)
-    .eq("season", season)
-    .order("match_date", { ascending: true });
+    .eq("season", 2025)
+    .order("round_number", { ascending: true })
+    .order("match_id", { ascending: true });
 
   if (error) {
-    console.error("[fetchMatches] Error:", error);
-    throw new Error(`Failed to fetch matches: ${error.message}`);
+    console.error("[fetchMatches]", error);
+    throw error;
   }
 
   if (!data || data.length === 0) {
-    console.debug("[fetchMatches] No matches returned for season", season);
     return [];
   }
 
-  return data.map((row): MatchSummary => {
-    if (!row.vendor_game_id) {
-      console.debug("[fetchMatches] Row missing vendor_game_id:", row);
-    }
-    if (!row.match_date) {
-      console.debug("[fetchMatches] Row missing match_date:", row.vendor_game_id);
-    }
-
-    return {
-      vendor_game_id: String(row.vendor_game_id ?? ""),
-      season: row.season ?? season,
-      round_number: row.round_number ?? 0,
-      round_label: row.round_label ?? `R${row.round_number ?? 0}`,
-      match_date: row.match_date ?? null,
-      match_time: row.match_time ?? null,
-      game_time: row.game_time ?? null,
-      venue: row.venue ?? "TBC",
-      home_team: row.home_team ?? "Home",
-      home_team_abbr: row.home_team_abbr ?? undefined,
-      home_team_color: safeColor(row.home_team_color),
-      home_team_id: row.home_team_id ?? undefined,
-      away_team: row.away_team ?? "Away",
-      away_team_abbr: row.away_team_abbr ?? undefined,
-      away_team_color: safeColor(row.away_team_color),
-      away_team_id: row.away_team_id ?? undefined,
-      home_score: row.home_score ?? null,
-      away_score: row.away_score ?? null,
-      status: row.status ?? "Scheduled",
-    };
-  });
+  return data.map((row): MatchSummary => ({
+    vendor_game_id: String(row.match_id ?? ""),
+    season: row.season ?? season,
+    round_number: row.round_number ?? 0,
+    round_label: row.round_label ?? `R${row.round_number ?? 0}`,
+    match_date: row.updated_at ? String(row.updated_at).slice(0, 10) : null,
+    match_time: null,
+    game_time: null,
+    venue: row.venue ?? "TBC",
+    home_team: row.home_team_vendor ?? "Home",
+    home_team_abbr: undefined,
+    home_team_color: NEUTRAL_COLOR,
+    home_team_id: undefined,
+    away_team: row.away_team_vendor ?? "Away",
+    away_team_abbr: undefined,
+    away_team_color: NEUTRAL_COLOR,
+    away_team_id: undefined,
+    home_score: row.home_score ?? null,
+    away_score: row.away_score ?? null,
+    status: row.status ?? "Scheduled",
+  }));
 }
 
 // Canonical name map: normalises all known AFL team-name variants to a
