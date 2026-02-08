@@ -12,11 +12,39 @@ interface MatchOverlayProps {
   onClose: () => void;
 }
 
-function formatLocalTime(gameTime: string | null | undefined) {
-  if (!gameTime) return "TBC";
-  const d = new Date(gameTime);
-  if (Number.isNaN(d.getTime())) return "TBC";
-  return d.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+function formatMatchDateTime(
+  gameTime: string | null | undefined,
+  matchDate: string | null | undefined,
+  matchTime: string | null | undefined,
+) {
+  let d: Date | null = null;
+
+  if (gameTime) {
+    const parsed = new Date(gameTime);
+    if (!Number.isNaN(parsed.getTime())) d = parsed;
+  }
+
+  if (!d && matchDate && matchTime) {
+    const parsed = new Date(`${matchDate}T${matchTime}`);
+    if (!Number.isNaN(parsed.getTime())) d = parsed;
+  }
+
+  if (!d && matchDate) {
+    const parsed = new Date(`${matchDate}T00:00:00`);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+    }
+  }
+
+  if (!d) return null;
+
+  return d.toLocaleString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function normaliseTeamName(name?: string | null) {
@@ -164,7 +192,8 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
   const roundLabel = match.round_label ?? "AFL";
   const season = match.season ?? 2025;
   const status = match.status ?? "";
-  const venue = match.venue ?? "TBC";
+  const venue = match.venue && match.venue !== "TBC" ? match.venue : null;
+  const formattedTime = formatMatchDateTime(match.game_time, match.match_date, match.match_time);
   const homeScore = match.home_score ?? null;
   const awayScore = match.away_score ?? null;
 
@@ -211,14 +240,18 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
             </div>
 
             <div className="mt-5 pt-5 border-t border-white/10 flex flex-wrap gap-5 text-sm text-white/70">
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-white/50" />
-                <span>{venue}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-white/50" />
-                <span>{formatLocalTime(match.game_time)}</span>
-              </div>
+              {venue && (
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-white/50" />
+                  <span>{venue}</span>
+                </div>
+              )}
+              {formattedTime && (
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-white/50" />
+                  <span>{formattedTime}</span>
+                </div>
+              )}
             </div>
           </div>
 
