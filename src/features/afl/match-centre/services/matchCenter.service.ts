@@ -15,28 +15,33 @@ const NEUTRAL_COLOR = "var(--neutral-500)";
 export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   const { data, error } = await supabase
     .schema("afl")
-    .from("match_center_games_base")
+    .from("v_match_center_games")
     .select(`
-      match_id,
+      vendor_game_id,
       season,
-      round_label,
       round_number,
-      round_instance,
-      home_team_vendor,
-      away_team_vendor,
+      round_label,
+      match_index,
+      match_date,
+      match_time,
+      game_time,
+      venue,
+      home_team,
+      home_team_abbr,
+      home_team_color,
+      home_team_id,
+      away_team,
+      away_team_abbr,
+      away_team_color,
+      away_team_id,
       home_score,
       away_score,
-      home_goals,
-      home_behinds,
-      away_goals,
-      away_behinds,
-      venue,
-      status,
-      updated_at
+      status
     `)
     .eq("season", 2025)
     .order("round_number", { ascending: true })
-    .order("match_id", { ascending: true });
+    .order("match_date", { ascending: true })
+    .order("match_time", { ascending: true });
 
   if (error) {
     console.error("[fetchMatches]", error);
@@ -48,22 +53,22 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   }
 
   return data.map((row): MatchSummary => ({
-    match_id: String(row.match_id ?? ""),
+    match_id: String(row.vendor_game_id ?? ""),
     season: row.season ?? season,
     round_number: row.round_number ?? 0,
     round_label: row.round_label ?? `R${row.round_number ?? 0}`,
-    match_date: row.updated_at ? String(row.updated_at).slice(0, 10) : null,
-    match_time: null,
-    game_time: null,
+    match_date: row.match_date ? String(row.match_date) : undefined,
+    match_time: row.match_time ? String(row.match_time) : undefined,
+    game_time: row.game_time ? String(row.game_time) : undefined,
     venue: row.venue ?? "TBC",
-    home_team: row.home_team_vendor ?? "Home",
-    home_team_abbr: undefined,
-    home_team_color: NEUTRAL_COLOR,
-    home_team_id: undefined,
-    away_team: row.away_team_vendor ?? "Away",
-    away_team_abbr: undefined,
-    away_team_color: NEUTRAL_COLOR,
-    away_team_id: undefined,
+    home_team: row.home_team ?? "Home",
+    home_team_abbr: row.home_team_abbr ?? undefined,
+    home_team_color: row.home_team_color ?? NEUTRAL_COLOR,
+    home_team_id: row.home_team_id ? String(row.home_team_id) : undefined,
+    away_team: row.away_team ?? "Away",
+    away_team_abbr: row.away_team_abbr ?? undefined,
+    away_team_color: row.away_team_color ?? NEUTRAL_COLOR,
+    away_team_id: row.away_team_id ? String(row.away_team_id) : undefined,
     home_score: row.home_score ?? null,
     away_score: row.away_score ?? null,
     status: row.status ?? "Scheduled",
