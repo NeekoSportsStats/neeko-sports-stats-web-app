@@ -59,6 +59,13 @@ export type MomentumPoint = {
   momentum: number;
 };
 
+export type OverlayPlayer = {
+  player_id: string;
+  player_name: string;
+  team_id: string;
+  team_name: string;
+};
+
 export type DayGroup = {
   season: number;
   round_number: number;

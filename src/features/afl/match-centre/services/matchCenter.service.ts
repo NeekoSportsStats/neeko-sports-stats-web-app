@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
-import type { MatchSummary, MatchPlayer, MatchTeamTotal, MomentumPoint } from "../types";
+import type { MatchSummary, MatchPlayer, MatchTeamTotal, MomentumPoint, OverlayPlayer } from "../types";
 
 const NEUTRAL_COLOR = "var(--neutral-500)";
 
@@ -204,6 +204,38 @@ export async function resolveMatchIndex(params: {
   }
 
   return undefined;
+}
+
+export async function fetchMatchOverlayPlayers(params: {
+  vendor_game_id: string;
+}): Promise<OverlayPlayer[]> {
+  if (!params.vendor_game_id) {
+    console.debug("[fetchMatchOverlayPlayers] No vendor_game_id provided");
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .schema("afl")
+    .from("v_match_center_players_2025_canonical")
+    .select(`
+      player_id,
+      player_name,
+      team_id,
+      team_name
+    `)
+    .eq("vendor_game_id", params.vendor_game_id);
+
+  if (error) {
+    console.error("[fetchMatchOverlayPlayers] Error:", error);
+    return [];
+  }
+
+  return (data ?? []).map((row) => ({
+    player_id: String(row.player_id ?? ""),
+    player_name: String(row.player_name ?? "Unknown"),
+    team_id: String(row.team_id ?? ""),
+    team_name: String(row.team_name ?? "Unknown"),
+  }));
 }
 
 export async function fetchMatchPlayers(

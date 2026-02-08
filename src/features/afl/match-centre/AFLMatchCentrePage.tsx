@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Calendar } from "lucide-react";
-import { fetchMatches, resolveMatchIndex } from "./services/matchCenter.service";
+import { fetchMatches, resolveMatchIndex, fetchMatchOverlayPlayers } from "./services/matchCenter.service";
 import { groupMatchesByDay } from "./utils";
-import type { DayGroup, MatchSummary } from "./types";
+import type { DayGroup, MatchSummary, OverlayPlayer } from "./types";
 import MatchList from "./MatchList";
 import MatchOverlay from "./MatchOverlay";
 
@@ -12,7 +12,7 @@ export default function AFLMatchCentrePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<MatchSummary | null>(null);
-  const [resolvingIndex, setResolvingIndex] = useState(false);
+  const [overlayPlayers, setOverlayPlayers] = useState<OverlayPlayer[]>([]);
   const [season, setSeason] = useState(2025);
   const [round, setRound] = useState(1);
 
@@ -66,29 +66,34 @@ export default function AFLMatchCentrePage() {
   const is2026 = season === 2026;
 
   const handleSelectMatch = useCallback(
-    async (m: MatchSummary) => {
-      setResolvingIndex(true);
-      try {
-        const matchIndex = await resolveMatchIndex({
-          season: m.season ?? 2025,
-          round_number: m.round_number ?? 1,
-          home_team: m.home_team ?? "",
-          away_team: m.away_team ?? "",
+    (m: MatchSummary) => {
+      setSelectedMatch(m);
+      setOverlayPlayers([]);
+
+      resolveMatchIndex({
+        season: m.season ?? 2025,
+        round_number: m.round_number ?? 1,
+        home_team: m.home_team ?? "",
+        away_team: m.away_team ?? "",
+      })
+        .then((matchIndex) => {
+          setSelectedMatch((prev) =>
+            prev ? { ...prev, match_index: matchIndex } : null
+          );
+        })
+        .catch((err) => {
+          console.error("Failed to resolve match_index:", err);
         });
 
-        setSelectedMatch({
-          ...m,
-          match_index: matchIndex,
+      fetchMatchOverlayPlayers({
+        vendor_game_id: m.vendor_game_id ?? "",
+      })
+        .then((players) => {
+          setOverlayPlayers(players);
+        })
+        .catch(() => {
+          setOverlayPlayers([]);
         });
-      } catch (error) {
-        console.error("Failed to resolve match_index:", error);
-        setSelectedMatch({
-          ...m,
-          match_index: undefined,
-        });
-      } finally {
-        setResolvingIndex(false);
-      }
     },
     []
   );
@@ -196,8 +201,14 @@ export default function AFLMatchCentrePage() {
         )}
       </div>
 
-      {selectedMatch && !resolvingIndex && (
-        <MatchOverlay match={selectedMatch} onClose={() => setSelectedMatch(null)} />
+      {selectedMatch && (
+        <MatchOverlay
+          match={selectedMatch}
+          onClose={() => {
+            setSelectedMatch(null);
+            setOverlayPlayers([]);
+          }}
+        />
       )}
     </div>
   );
