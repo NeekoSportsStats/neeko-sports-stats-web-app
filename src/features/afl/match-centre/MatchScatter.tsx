@@ -7,50 +7,22 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
+  ReferenceLine,
 } from "recharts";
-import type { MatchPlayer } from "./types";
-
-type PlayerData = {
-  player: string;
-  team: string;
-  teamColor?: string | null;
-  disposals: number | null;
-  fantasyPoints: number | null;
-  goals?: number | null;
-  position?: string | null;
-};
+import type { MatchScatterPoint } from "./types";
 
 interface Props {
-  players: MatchPlayer[] | PlayerData[];
+  scatterData: MatchScatterPoint[];
 }
 
 function round2(n: number) {
   return Math.round(n * 100) / 100;
 }
 
-export default function MatchScatter({ players }: Props) {
-  // Guard: filter out null/undefined entries that would crash the
-  // `"disposals" in p` checks below (TypeError on `in` operator).
-  const data = (players ?? [])
-    .filter((p): p is NonNullable<typeof p> => p != null)
-    .map((p) => {
-      const disp = ("disposals" in p ? p.disposals : 0) ?? 0;
-      const fp = ("fantasy_points" in p ? p.fantasy_points : "fantasyPoints" in p ? (p as any).fantasyPoints : 0) ?? 0;
-      const playerName = ("player_name" in p ? p.player_name : "player" in p ? (p as any).player : "Unknown") ?? "Unknown";
-      const teamName = ("team_name" in p ? p.team_name : "team" in p ? (p as any).team : "Unknown") ?? "Unknown";
-      const teamColor = ("team_color" in p ? p.team_color : "teamColor" in p ? (p as any).teamColor : null) ?? null;
-      const eff = disp > 0 ? fp / disp : 0;
-      return {
-        player: playerName,
-        team: teamName,
-        volume: disp,
-        efficiency: eff,
-        teamColor: teamColor || "#999",
-        fantasyPoints: fp,
-      };
-    })
-    .filter((d) => d.volume > 0 || d.fantasyPoints > 0);
+export default function MatchScatter({ scatterData }: Props) {
+  const data = (scatterData ?? []).filter(
+    (d) => d.x_disposals_vs_avg !== 0 || d.y_fantasy_vs_avg !== 0
+  );
 
   if (data.length === 0) return null;
 
@@ -58,10 +30,10 @@ export default function MatchScatter({ players }: Props) {
     <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6">
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-white mb-1">
-          Player Efficiency vs Volume
+          Player Impact vs Average
         </h3>
         <p className="text-sm text-white/60">
-          Volume = disposals. Efficiency = fantasy points per disposal.
+          Disposals and fantasy points compared to season average
         </p>
       </div>
 
@@ -71,11 +43,11 @@ export default function MatchScatter({ players }: Props) {
             <CartesianGrid strokeDasharray="3 3" stroke="#333" />
             <XAxis
               type="number"
-              dataKey="volume"
-              name="Disposals"
+              dataKey="x_disposals_vs_avg"
+              name="Disposals vs Avg"
               stroke="#999"
               label={{
-                value: "Volume (Disposals) →",
+                value: "Disposals vs Avg",
                 position: "bottom",
                 offset: 15,
                 style: { fill: "#999", fontSize: "12px" },
@@ -83,11 +55,11 @@ export default function MatchScatter({ players }: Props) {
             />
             <YAxis
               type="number"
-              dataKey="efficiency"
-              name="Efficiency"
+              dataKey="y_fantasy_vs_avg"
+              name="Fantasy vs Avg"
               stroke="#999"
               label={{
-                value: "Efficiency (FP / Disposal) →",
+                value: "Fantasy vs Avg",
                 angle: -90,
                 position: "left",
                 offset: 10,
@@ -95,34 +67,30 @@ export default function MatchScatter({ players }: Props) {
               }}
             />
 
+            <ReferenceLine x={0} stroke="#555" strokeDasharray="3 3" />
+            <ReferenceLine y={0} stroke="#555" strokeDasharray="3 3" />
+
             <Tooltip
               cursor={{ strokeDasharray: "3 3" }}
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null;
-                const d: any = payload[0].payload;
+                const d = payload[0].payload as MatchScatterPoint;
                 return (
                   <div className="rounded-lg border border-white/20 bg-black/90 backdrop-blur-xl p-3 shadow-xl">
                     <div className="font-semibold text-white mb-1">{d.player}</div>
-                    <div className="text-sm text-white/70">{d.team}</div>
+                    <div className="text-sm text-white/70">{d.player_team}</div>
                     <div className="text-sm text-white/70">
-                      Disposals: {d.volume}
+                      Disposals: {d.disposals} (avg {round2(d.avg_disposals)})
                     </div>
                     <div className="text-sm text-white/70">
-                      Fantasy: {d.fantasyPoints}
-                    </div>
-                    <div className="text-sm text-white/70">
-                      Efficiency: {round2(d.efficiency)}
+                      Fantasy: {d.fantasy_points} (avg {round2(d.avg_fantasy)})
                     </div>
                   </div>
                 );
               }}
             />
 
-            <Scatter data={data}>
-              {data.map((entry, idx) => (
-                <Cell key={idx} fill={entry.teamColor} opacity={0.85} />
-              ))}
-            </Scatter>
+            <Scatter data={data} fill="#F5C84C" opacity={0.85} />
           </ScatterChart>
         </ResponsiveContainer>
       </div>

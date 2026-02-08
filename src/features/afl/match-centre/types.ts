@@ -116,6 +116,20 @@ export type MatchPlayerStats = {
   fantasy_points: number;
 };
 
+export type MatchScatterPoint = {
+  match_id: string;
+  round_instance: number;
+  player: string;
+  player_team: string;
+  opponent_team: string;
+  disposals: number;
+  fantasy_points: number;
+  avg_disposals: number;
+  avg_fantasy: number;
+  x_disposals_vs_avg: number;
+  y_fantasy_vs_avg: number;
+};
+
 export type DayGroup = {
   season: number;
   round_number: number;

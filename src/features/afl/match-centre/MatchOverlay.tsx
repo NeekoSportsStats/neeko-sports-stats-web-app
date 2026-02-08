@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { X, MapPin, Clock } from "lucide-react";
-import type { MatchSummary, MatchPlayer, MatchPlayerStats, MatchTimeline } from "./types";
+import type { MatchSummary, MatchPlayer, MatchPlayerStats, MatchScatterPoint, MatchTimeline } from "./types";
 import MatchScatter from "./MatchScatter";
 import MomentumTimeline from "./MomentumTimeline";
 
@@ -8,6 +8,7 @@ interface MatchOverlayProps {
   match: MatchSummary;
   timeline?: MatchTimeline | null;
   matchPlayerStats?: MatchPlayerStats[];
+  scatterData?: MatchScatterPoint[];
   onClose: () => void;
 }
 
@@ -44,7 +45,7 @@ function normaliseTeamName(name?: string | null) {
     .trim();
 }
 
-export default function MatchOverlay({ match, timeline, matchPlayerStats, onClose }: MatchOverlayProps) {
+export default function MatchOverlay({ match, timeline, matchPlayerStats, scatterData, onClose }: MatchOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -242,7 +243,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, onClos
                 )}
               </div>
 
-              <MatchScatter players={players} />
+              <MatchScatter scatterData={scatterData ?? []} />
 
               {/* Momentum chart loads independently — never blocks
                   the overlay and silently shows an empty state if

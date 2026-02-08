@@ -3,6 +3,7 @@ import type {
   MatchSummary,
   MatchPlayer,
   MatchPlayerStats,
+  MatchScatterPoint,
   MatchTeamTotal,
   MomentumPoint,
   OverlayPlayer,
@@ -303,6 +304,54 @@ export async function fetchMatchPlayerStats(params: {
     hitouts: Number(row.hitouts ?? 0),
     time_on_ground: Number(row.time_on_ground ?? 0),
     fantasy_points: Number(row.fantasy_points ?? 0),
+  }));
+}
+
+export async function fetchMatchScatterData(params: {
+  match_id: string;
+}): Promise<MatchScatterPoint[]> {
+  if (!params.match_id) {
+    console.debug("[fetchMatchScatterData] No match_id provided");
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .schema("afl")
+    .from("v_match_scatter_2025")
+    .select(`
+      match_id,
+      round_instance,
+      player,
+      player_team,
+      opponent_team,
+      disposals,
+      fantasy_points,
+      avg_disposals,
+      avg_fantasy,
+      x_disposals_vs_avg,
+      y_fantasy_vs_avg
+    `)
+    .eq("match_id", params.match_id);
+
+  if (error) {
+    console.error("[fetchMatchScatterData]", error);
+    return [];
+  }
+
+  if (!data || data.length === 0) return [];
+
+  return data.map((row): MatchScatterPoint => ({
+    match_id: String(row.match_id ?? params.match_id),
+    round_instance: Number(row.round_instance ?? 0),
+    player: String(row.player ?? "Unknown"),
+    player_team: String(row.player_team ?? ""),
+    opponent_team: String(row.opponent_team ?? ""),
+    disposals: Number(row.disposals ?? 0),
+    fantasy_points: Number(row.fantasy_points ?? 0),
+    avg_disposals: Number(row.avg_disposals ?? 0),
+    avg_fantasy: Number(row.avg_fantasy ?? 0),
+    x_disposals_vs_avg: Number(row.x_disposals_vs_avg ?? 0),
+    y_fantasy_vs_avg: Number(row.y_fantasy_vs_avg ?? 0),
   }));
 }
 
