@@ -66,6 +66,37 @@ export type OverlayPlayer = {
   team_name: string;
 };
 
+export type TimelineEvent = {
+  match_id: string;
+  team_vendor_id: string;
+  player_vendor_id: string;
+  quarter: number;
+  minute: number;
+  event_type: string;
+};
+
+export type TimelineScoring = {
+  match_id: string;
+  team_vendor_id: string;
+  quarter: number;
+  minute: number;
+  event_type: string;
+  points: number;
+};
+
+export type TimelineMargin = {
+  match_id: string;
+  quarter: number;
+  minute: number;
+  margin_delta: number;
+};
+
+export type MatchTimeline = {
+  events: TimelineEvent[];
+  scoring: TimelineScoring[];
+  margin: TimelineMargin[];
+};
+
 export type DayGroup = {
   season: number;
   round_number: number;

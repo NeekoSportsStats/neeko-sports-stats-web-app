@@ -1,5 +1,15 @@
 import { supabase } from "@/lib/supabaseClient";
-import type { MatchSummary, MatchPlayer, MatchTeamTotal, MomentumPoint, OverlayPlayer } from "../types";
+import type {
+  MatchSummary,
+  MatchPlayer,
+  MatchTeamTotal,
+  MomentumPoint,
+  OverlayPlayer,
+  MatchTimeline,
+  TimelineEvent,
+  TimelineScoring,
+  TimelineMargin,
+} from "../types";
 
 const NEUTRAL_COLOR = "var(--neutral-500)";
 
@@ -313,6 +323,81 @@ export async function fetchMatchMomentum(matchId: string): Promise<MomentumPoint
     minute: Number(row.minute ?? 0),
     momentum: Number(row.momentum ?? 0),
   }));
+}
+
+export async function fetchMatchOverlayTimeline(params: {
+  match_id: string;
+}): Promise<MatchTimeline> {
+  const empty: MatchTimeline = { events: [], scoring: [], margin: [] };
+
+  if (!params.match_id) {
+    console.debug("[fetchMatchOverlayTimeline] No match_id provided");
+    return empty;
+  }
+
+  const [eventsResult, scoringResult, marginResult] = await Promise.all([
+    supabase
+      .schema("afl")
+      .from("v_match_events_2025")
+      .select("match_id, team_vendor_id, player_vendor_id, quarter, minute, event_type")
+      .eq("match_id", params.match_id)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[fetchMatchOverlayTimeline] events query failed:", error.message);
+          return [] as TimelineEvent[];
+        }
+        return (data ?? []).map((r): TimelineEvent => ({
+          match_id: String(r.match_id ?? params.match_id),
+          team_vendor_id: String(r.team_vendor_id ?? ""),
+          player_vendor_id: String(r.player_vendor_id ?? ""),
+          quarter: Number(r.quarter ?? 0),
+          minute: Number(r.minute ?? 0),
+          event_type: String(r.event_type ?? ""),
+        }));
+      }),
+    supabase
+      .schema("afl")
+      .from("v_match_event_scoring_2025")
+      .select("match_id, team_vendor_id, quarter, minute, event_type, points")
+      .eq("match_id", params.match_id)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[fetchMatchOverlayTimeline] scoring query failed:", error.message);
+          return [] as TimelineScoring[];
+        }
+        return (data ?? []).map((r): TimelineScoring => ({
+          match_id: String(r.match_id ?? params.match_id),
+          team_vendor_id: String(r.team_vendor_id ?? ""),
+          quarter: Number(r.quarter ?? 0),
+          minute: Number(r.minute ?? 0),
+          event_type: String(r.event_type ?? ""),
+          points: Number(r.points ?? 0),
+        }));
+      }),
+    supabase
+      .schema("afl")
+      .from("v_match_event_margin_2025")
+      .select("match_id, quarter, minute, margin_delta")
+      .eq("match_id", params.match_id)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[fetchMatchOverlayTimeline] margin query failed:", error.message);
+          return [] as TimelineMargin[];
+        }
+        return (data ?? []).map((r): TimelineMargin => ({
+          match_id: String(r.match_id ?? params.match_id),
+          quarter: Number(r.quarter ?? 0),
+          minute: Number(r.minute ?? 0),
+          margin_delta: Number(r.margin_delta ?? 0),
+        }));
+      }),
+  ]);
+
+  return {
+    events: eventsResult,
+    scoring: scoringResult,
+    margin: marginResult,
+  };
 }
 
 export function computeTop3(players: MatchPlayer[]): MatchPlayer[] {

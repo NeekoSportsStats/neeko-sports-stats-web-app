@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Calendar } from "lucide-react";
-import { fetchMatches, resolveMatchIndex, fetchMatchOverlayPlayers } from "./services/matchCenter.service";
+import { fetchMatches, resolveMatchIndex, fetchMatchOverlayPlayers, fetchMatchOverlayTimeline } from "./services/matchCenter.service";
 import { groupMatchesByDay } from "./utils";
-import type { DayGroup, MatchSummary, OverlayPlayer } from "./types";
+import type { DayGroup, MatchSummary, OverlayPlayer, MatchTimeline } from "./types";
 import MatchList from "./MatchList";
 import MatchOverlay from "./MatchOverlay";
 
@@ -13,6 +13,7 @@ export default function AFLMatchCentrePage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<MatchSummary | null>(null);
   const [overlayPlayers, setOverlayPlayers] = useState<OverlayPlayer[]>([]);
+  const [timeline, setTimeline] = useState<MatchTimeline | null>(null);
   const [season, setSeason] = useState(2025);
   const [round, setRound] = useState(1);
 
@@ -70,6 +71,7 @@ export default function AFLMatchCentrePage() {
     (m: MatchSummary) => {
       setSelectedMatch(m);
       setOverlayPlayers([]);
+      setTimeline(null);
 
       resolveMatchIndex({
         season: m.season ?? 2025,
@@ -94,6 +96,16 @@ export default function AFLMatchCentrePage() {
         })
         .catch(() => {
           setOverlayPlayers([]);
+        });
+
+      fetchMatchOverlayTimeline({
+        match_id: m.vendor_game_id ?? "",
+      })
+        .then((data) => {
+          setTimeline(data);
+        })
+        .catch(() => {
+          setTimeline({ events: [], scoring: [], margin: [] });
         });
     },
     []
@@ -205,9 +217,11 @@ export default function AFLMatchCentrePage() {
       {selectedMatch && (
         <MatchOverlay
           match={selectedMatch}
+          timeline={timeline}
           onClose={() => {
             setSelectedMatch(null);
             setOverlayPlayers([]);
+            setTimeline(null);
           }}
         />
       )}

@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { X, MapPin, Clock } from "lucide-react";
 import { fetchMatchPlayers } from "./services/matchCenter.service";
-import type { MatchSummary, MatchPlayer } from "./types";
+import type { MatchSummary, MatchPlayer, MatchTimeline } from "./types";
 import MatchScatter from "./MatchScatter";
 import MomentumTimeline from "./MomentumTimeline";
 
 interface MatchOverlayProps {
   match: MatchSummary;
+  timeline?: MatchTimeline | null;
   onClose: () => void;
 }
 
@@ -43,7 +44,7 @@ function normaliseTeamName(name?: string | null) {
     .trim();
 }
 
-export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
+export default function MatchOverlay({ match, timeline, onClose }: MatchOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const [players, setPlayers] = useState<MatchPlayer[]>([]);
   const [loading, setLoading] = useState(true);
