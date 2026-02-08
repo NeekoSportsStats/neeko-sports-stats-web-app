@@ -243,16 +243,13 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                 )}
               </div>
 
-              <MatchScatter scatterData={scatterData ?? []} />
-
-              {/* Momentum chart loads independently — never blocks
-                  the overlay and silently shows an empty state if
-                  the backend view isn't deployed yet. */}
               <MomentumTimeline
                 matchId={match.match_id}
                 homeTeam={match.home_team ?? "Home"}
                 awayTeam={match.away_team ?? "Away"}
               />
+
+              <MatchScatter scatterData={scatterData ?? []} />
 
               <div className="rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-r from-[#F5C84C]/20 to-transparent p-6">
                 <div className="text-white font-semibold mb-1">AI Match Preview</div>
