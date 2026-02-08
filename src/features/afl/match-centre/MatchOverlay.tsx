@@ -56,25 +56,20 @@ function normaliseTeamName(name?: string | null) {
 
 function computeBiggestSwing(margin: { quarter: number; minute: number; margin_delta: number }[]): {
   swing: number;
-  quarter: number;
+  quarter: number | null;
 } | null {
   if (!margin || margin.length < 2) return null;
 
-  const sorted = [...margin].sort((a, b) => {
-    if (a.quarter !== b.quarter) return a.quarter - b.quarter;
-    return a.minute - b.minute;
-  });
+  const sorted = [...margin].sort((a, b) => a.minute - b.minute);
 
   let bestSwing = 0;
-  let bestQuarter = 1;
+  let bestQuarter: number | null = null;
 
   for (let i = 0; i < sorted.length; i++) {
     let cumulative = 0;
     let maxInWindow = 0;
     for (let j = i; j < sorted.length; j++) {
-      const timeDiff =
-        (sorted[j].quarter - sorted[i].quarter) * 30 +
-        (sorted[j].minute - sorted[i].minute);
+      const timeDiff = sorted[j].minute - sorted[i].minute;
       if (timeDiff > 10) break;
       cumulative += sorted[j].margin_delta;
       if (Math.abs(cumulative) > Math.abs(maxInWindow)) {
@@ -83,7 +78,7 @@ function computeBiggestSwing(margin: { quarter: number; minute: number; margin_d
     }
     if (Math.abs(maxInWindow) > Math.abs(bestSwing)) {
       bestSwing = maxInWindow;
-      bestQuarter = sorted[i].quarter;
+      bestQuarter = sorted[i].quarter > 0 ? sorted[i].quarter : null;
     }
   }
 
@@ -182,8 +177,9 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
     if (timeline?.margin && timeline.margin.length > 0) {
       const swing = computeBiggestSwing(timeline.margin);
       if (swing) {
+        const quarterText = swing.quarter ? ` in Q${swing.quarter}` : "";
         sentences.push(
-          `The biggest sustained momentum swing was ${swing.swing} points over a 10-minute stretch in Q${swing.quarter}.`
+          `The biggest sustained momentum swing was ${swing.swing} points over a 10-minute stretch${quarterText}.`
         );
       }
     }

@@ -276,8 +276,9 @@ export async function fetchMatchOverlayTimeline(params: {
     supabase
       .schema("afl")
       .from("v_match_event_margin_2025")
-      .select("match_id, quarter, minute, margin_delta")
+      .select("match_id, minute, margin_delta")
       .eq("match_id", params.match_id)
+      .order("minute", { ascending: true })
       .then(({ data, error }) => {
         if (error) {
           console.debug("[fetchMatchOverlayTimeline] margin query failed:", error.message);
@@ -285,7 +286,7 @@ export async function fetchMatchOverlayTimeline(params: {
         }
         return (data ?? []).map((r): TimelineMargin => ({
           match_id: String(r.match_id ?? params.match_id),
-          quarter: Number(r.quarter ?? 0),
+          quarter: 0,
           minute: Number(r.minute ?? 0),
           margin_delta: Number(r.margin_delta ?? 0),
         }));
@@ -307,19 +308,18 @@ export async function fetchQuarterSummary(params: {
   const { data, error } = await supabase
     .schema("afl")
     .from("v_match_quarter_summary_2025")
-    .select("match_id, quarter, home_goals, home_behinds, home_points, away_goals, away_behinds, away_points")
-    .eq("match_id", params.match_id)
-    .order("quarter", { ascending: true });
+    .select("match_id, home_goals, home_behinds, home_points, away_goals, away_behinds, away_points")
+    .eq("match_id", params.match_id);
 
   if (error) {
-    console.debug("[fetchQuarterSummary] Query failed:", error.message);
+    console.debug("[fetchQuarterSummary]", error.message);
     return null;
   }
 
   if (!data || data.length === 0) return null;
 
-  const parts = data.map(row => {
-    const q = row.quarter ?? 0;
+  const parts = data.map((row, index) => {
+    const q = index + 1;
     const hg = row.home_goals ?? 0;
     const hb = row.home_behinds ?? 0;
     const ag = row.away_goals ?? 0;
@@ -339,25 +339,34 @@ export async function fetchRoundQuarterScores(matchIds: string[]): Promise<Quart
   const { data, error } = await supabase
     .schema("afl")
     .from("v_match_quarter_summary_2025")
-    .select("match_id, quarter, home_goals, home_behinds, home_points, away_goals, away_behinds, away_points")
-    .in("match_id", matchIds)
-    .order("quarter", { ascending: true });
+    .select("match_id, home_goals, home_behinds, home_points, away_goals, away_behinds, away_points")
+    .in("match_id", matchIds);
 
   if (error) {
-    console.debug("[fetchRoundQuarterScores] Query failed:", error.message);
+    console.debug("[fetchRoundQuarterScores]", error.message);
     return [];
   }
 
   if (!data || data.length === 0) return [];
 
-  return data.map((row): QuarterScoreRow => ({
-    match_id: String(row.match_id ?? ""),
-    quarter: Number(row.quarter ?? 0),
-    home_goals: Number(row.home_goals ?? 0),
-    home_behinds: Number(row.home_behinds ?? 0),
-    home_points: Number(row.home_points ?? 0),
-    away_goals: Number(row.away_goals ?? 0),
-    away_behinds: Number(row.away_behinds ?? 0),
-    away_points: Number(row.away_points ?? 0),
-  }));
+  const groupedByMatch = new Map<string, QuarterScoreRow[]>();
+
+  data.forEach((row) => {
+    const matchId = String(row.match_id ?? "");
+    if (!groupedByMatch.has(matchId)) {
+      groupedByMatch.set(matchId, []);
+    }
+    groupedByMatch.get(matchId)!.push({
+      match_id: matchId,
+      quarter: groupedByMatch.get(matchId)!.length + 1,
+      home_goals: Number(row.home_goals ?? 0),
+      home_behinds: Number(row.home_behinds ?? 0),
+      home_points: Number(row.home_points ?? 0),
+      away_goals: Number(row.away_goals ?? 0),
+      away_behinds: Number(row.away_behinds ?? 0),
+      away_points: Number(row.away_points ?? 0),
+    });
+  });
+
+  return Array.from(groupedByMatch.values()).flat();
 }
