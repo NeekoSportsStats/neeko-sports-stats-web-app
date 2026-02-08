@@ -11,8 +11,29 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   const { data, error } = await supabase
     .schema("afl")
     .from("v_match_center_games")
-    .select("*")
-    .eq("season", season);
+    .select(`
+      vendor_game_id,
+      season,
+      round_number,
+      round_label,
+      match_date,
+      match_time,
+      game_time,
+      venue,
+      home_team,
+      home_team_abbr,
+      home_team_color,
+      home_team_id,
+      away_team,
+      away_team_abbr,
+      away_team_color,
+      away_team_id,
+      home_score,
+      away_score,
+      status
+    `)
+    .eq("season", season)
+    .order("match_date", { ascending: true });
 
   if (error) {
     console.error("[fetchMatches] Error:", error);
