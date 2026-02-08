@@ -206,12 +206,19 @@ export async function resolveMatchIndex(params: {
   return undefined;
 }
 
+const overlayPlayerCache = new Map<string, OverlayPlayer[]>();
+
 export async function fetchMatchOverlayPlayers(params: {
   vendor_game_id: string;
 }): Promise<OverlayPlayer[]> {
   if (!params.vendor_game_id) {
     console.debug("[fetchMatchOverlayPlayers] No vendor_game_id provided");
     return [];
+  }
+
+  const cached = overlayPlayerCache.get(params.vendor_game_id);
+  if (cached) {
+    return cached;
   }
 
   const { data, error } = await supabase
@@ -230,12 +237,15 @@ export async function fetchMatchOverlayPlayers(params: {
     return [];
   }
 
-  return (data ?? []).map((row) => ({
+  const result = (data ?? []).map((row) => ({
     player_id: String(row.player_id ?? ""),
     player_name: String(row.player_name ?? "Unknown"),
     team_id: String(row.team_id ?? ""),
     team_name: String(row.team_name ?? "Unknown"),
   }));
+
+  overlayPlayerCache.set(params.vendor_game_id, result);
+  return result;
 }
 
 export async function fetchMatchPlayers(
