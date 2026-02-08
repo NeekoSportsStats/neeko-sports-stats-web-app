@@ -34,6 +34,7 @@ export default function AFLMatchCentrePage() {
     try {
       const data = await fetchMatches(season);
       setAllMatches(data);
+      setGroups(groupMatchesByDay(data));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to load matches";
       console.error("Failed to load matches:", err);
