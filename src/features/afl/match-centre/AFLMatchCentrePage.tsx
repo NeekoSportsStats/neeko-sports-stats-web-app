@@ -10,6 +10,7 @@ export default function AFLMatchCentrePage() {
   const [allMatches, setAllMatches] = useState<MatchSummary[]>([]);
   const [groups, setGroups] = useState<DayGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<MatchSummary | null>(null);
   const [resolvingIndex, setResolvingIndex] = useState(false);
   const [season, setSeason] = useState(2025);
@@ -29,12 +30,16 @@ export default function AFLMatchCentrePage() {
 
   const loadMatches = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await fetchMatches(season);
       setAllMatches(data);
-    } catch (error) {
-      console.error("Failed to load matches:", error);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to load matches";
+      console.error("Failed to load matches:", err);
+      setError(message);
       setAllMatches([]);
+      setGroups([]);
     } finally {
       setLoading(false);
     }
@@ -177,6 +182,14 @@ export default function AFLMatchCentrePage() {
               <div className="w-12 h-12 border-4 border-yellow-400/20 border-t-yellow-400 rounded-full animate-spin" />
               <p className="text-white/50">Loading matches...</p>
             </div>
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center py-20">
+            <p className="text-red-400 text-sm">{error}</p>
+          </div>
+        ) : groups.length === 0 ? (
+          <div className="flex items-center justify-center py-20">
+            <p className="text-white/50 text-sm">No matches available</p>
           </div>
         ) : (
           <MatchList groups={groups} onSelectMatch={handleSelectMatch} />
