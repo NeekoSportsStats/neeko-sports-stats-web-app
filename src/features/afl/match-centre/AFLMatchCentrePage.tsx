@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Calendar } from "lucide-react";
-import { fetchMatches, resolveMatchIndex, fetchMatchOverlayPlayers, fetchMatchOverlayTimeline, fetchMatchPlayerStats, fetchMatchScatterData } from "./services/matchCenter.service";
+import { fetchMatches, fetchMatchOverlayTimeline, fetchMatchPlayerStats, fetchMatchScatterData } from "./services/matchCenter.service";
 import { groupMatchesByDay } from "./utils";
-import type { DayGroup, MatchSummary, OverlayPlayer, MatchTimeline, MatchPlayerStats, MatchScatterPoint } from "./types";
+import type { DayGroup, MatchSummary, MatchTimeline, MatchPlayerStats, MatchScatterPoint } from "./types";
 import MatchList from "./MatchList";
 import MatchOverlay from "./MatchOverlay";
 
@@ -12,7 +12,6 @@ export default function AFLMatchCentrePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<MatchSummary | null>(null);
-  const [overlayPlayers, setOverlayPlayers] = useState<OverlayPlayer[]>([]);
   const [timeline, setTimeline] = useState<MatchTimeline | null>(null);
   const [matchPlayerStats, setMatchPlayerStats] = useState<MatchPlayerStats[]>([]);
   const [scatterData, setScatterData] = useState<MatchScatterPoint[]>([]);
@@ -71,66 +70,23 @@ export default function AFLMatchCentrePage() {
 
   const handleSelectMatch = useCallback(
     (m: MatchSummary) => {
+      const id = m.match_id ?? "";
       setSelectedMatch(m);
-      setOverlayPlayers([]);
       setTimeline(null);
       setMatchPlayerStats([]);
       setScatterData([]);
 
-      resolveMatchIndex({
-        season: m.season ?? 2025,
-        round_number: m.round_number ?? 1,
-        home_team: m.home_team ?? "",
-        away_team: m.away_team ?? "",
-      })
-        .then((matchIndex) => {
-          setSelectedMatch((prev) =>
-            prev ? { ...prev, match_index: matchIndex } : null
-          );
-        })
-        .catch((err) => {
-          console.error("Failed to resolve match_index:", err);
-        });
+      fetchMatchOverlayTimeline({ match_id: id })
+        .then((data) => setTimeline(data))
+        .catch(() => setTimeline({ events: [], scoring: [], margin: [] }));
 
-      fetchMatchOverlayPlayers({
-        vendor_game_id: m.vendor_game_id ?? "",
-      })
-        .then((players) => {
-          setOverlayPlayers(players);
-        })
-        .catch(() => {
-          setOverlayPlayers([]);
-        });
+      fetchMatchPlayerStats({ match_id: id })
+        .then((stats) => setMatchPlayerStats(stats))
+        .catch(() => setMatchPlayerStats([]));
 
-      fetchMatchOverlayTimeline({
-        match_id: m.vendor_game_id ?? "",
-      })
-        .then((data) => {
-          setTimeline(data);
-        })
-        .catch(() => {
-          setTimeline({ events: [], scoring: [], margin: [] });
-        });
-
-      fetchMatchPlayerStats({
-        match_id: m.vendor_game_id ?? "",
-      })
-        .then((stats) => {
-          setMatchPlayerStats(stats);
-        })
-        .catch(() => {
-          setMatchPlayerStats([]);
-        });
-
-      fetchMatchScatterData({
-        match_id: m.vendor_game_id ?? "",
-      })
-        .then((points) => {
-          setScatterData(points);
-        })
-        .catch(() => {
-          setScatterData([]);
-        });
+      fetchMatchScatterData({ match_id: id })
+        .then((points) => setScatterData(points))
+        .catch(() => setScatterData([]));
     },
     []
   );
@@ -246,7 +202,6 @@ export default function AFLMatchCentrePage() {
           scatterData={scatterData}
           onClose={() => {
             setSelectedMatch(null);
-            setOverlayPlayers([]);
             setTimeline(null);
             setMatchPlayerStats([]);
             setScatterData([]);

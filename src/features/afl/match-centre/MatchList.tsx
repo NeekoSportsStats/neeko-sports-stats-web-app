@@ -55,11 +55,8 @@ export default function MatchList({ groups, onSelectMatch }: Props) {
 
                 return (
                   <button
-                    key={m.vendor_game_id ?? idx}
-                    onClick={() => {
-                      console.log("[MatchList] Clicked match:", homeTeam, "vs", awayTeam, "| matchIndex:", m.match_index);
-                      onSelectMatch(m);
-                    }}
+                    key={m.match_id ?? idx}
+                    onClick={() => onSelectMatch(m)}
                     className="w-full text-left rounded-2xl border border-white/10 bg-black/30 hover:bg-black/40 transition p-6"
                   >
                     <div className="grid grid-cols-3 items-center gap-4">

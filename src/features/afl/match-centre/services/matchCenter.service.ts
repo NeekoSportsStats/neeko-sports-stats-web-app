@@ -1,12 +1,9 @@
 import { supabase } from "@/lib/supabaseClient";
 import type {
   MatchSummary,
-  MatchPlayer,
   MatchPlayerStats,
   MatchScatterPoint,
-  MatchTeamTotal,
   MomentumPoint,
-  OverlayPlayer,
   MatchTimeline,
   TimelineEvent,
   TimelineScoring,
@@ -14,10 +11,6 @@ import type {
 } from "../types";
 
 const NEUTRAL_COLOR = "var(--neutral-500)";
-
-function safeColor(color: string | null | undefined): string {
-  return color && color.trim() !== "" ? color : NEUTRAL_COLOR;
-}
 
 export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   const { data, error } = await supabase
@@ -55,7 +48,7 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   }
 
   return data.map((row): MatchSummary => ({
-    vendor_game_id: String(row.match_id ?? ""),
+    match_id: String(row.match_id ?? ""),
     season: row.season ?? season,
     round_number: row.round_number ?? 0,
     round_label: row.round_label ?? `R${row.round_number ?? 0}`,
@@ -75,177 +68,6 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
     away_score: row.away_score ?? null,
     status: row.status ?? "Scheduled",
   }));
-}
-
-// Canonical name map: normalises all known AFL team-name variants to a
-// single stable key so server-side names and client-side names always agree.
-const AFL_CANONICAL: Record<string, string> = {
-  "adelaide": "adelaide",
-  "adelaide crows": "adelaide",
-  "brisbane": "brisbane",
-  "brisbane lions": "brisbane",
-  "carlton": "carlton",
-  "carlton blues": "carlton",
-  "collingwood": "collingwood",
-  "collingwood magpies": "collingwood",
-  "essendon": "essendon",
-  "essendon bombers": "essendon",
-  "fremantle": "fremantle",
-  "fremantle dockers": "fremantle",
-  "geelong": "geelong",
-  "geelong cats": "geelong",
-  "gold coast": "gold coast",
-  "gold coast suns": "gold coast",
-  "gws": "gws",
-  "gws giants": "gws",
-  "greater western sydney": "gws",
-  "greater western sydney giants": "gws",
-  "hawthorn": "hawthorn",
-  "hawthorn hawks": "hawthorn",
-  "melbourne": "melbourne",
-  "melbourne demons": "melbourne",
-  "north melbourne": "north melbourne",
-  "north melbourne kangaroos": "north melbourne",
-  "kangaroos": "north melbourne",
-  "port adelaide": "port adelaide",
-  "port adelaide power": "port adelaide",
-  "richmond": "richmond",
-  "richmond tigers": "richmond",
-  "st kilda": "st kilda",
-  "st kilda saints": "st kilda",
-  "sydney": "sydney",
-  "sydney swans": "sydney",
-  "west coast": "west coast",
-  "west coast eagles": "west coast",
-  "western bulldogs": "western bulldogs",
-  "footscray": "western bulldogs",
-};
-
-function toCanonical(name: string): string {
-  const key = name.trim().toLowerCase();
-  return AFL_CANONICAL[key] ?? key;
-}
-
-export async function resolveMatchIndex(params: {
-  season: number;
-  round_number: number;
-  home_team: string;
-  away_team: string;
-}): Promise<number | undefined> {
-  // Fetch ALL (match_index, team_name) pairs for the round.
-  // This avoids server-side .in() filtering which silently returns zero rows
-  // when team names differ between the games view and the players view.
-  const { data, error } = await supabase
-    .schema("afl")
-    .from("v_match_center_players_2025_canonical")
-    .select("match_index, team_name")
-    .eq("season", params.season)
-    .eq("round_number", params.round_number);
-
-  if (error) {
-    console.error("[resolveMatchIndex] Query failed:", error);
-    return undefined;
-  }
-
-  if (!data || data.length === 0) {
-    console.debug(
-      "[resolveMatchIndex] No player rows for season=%d round=%d",
-      params.season,
-      params.round_number
-    );
-    return undefined;
-  }
-
-  // Build map: match_index → Set<canonical team name>
-  const indexToTeams = new Map<number, Set<string>>();
-  for (const row of data) {
-    const idx = Number(row.match_index);
-    if (!Number.isFinite(idx) || !row.team_name) continue;
-    if (!indexToTeams.has(idx)) indexToTeams.set(idx, new Set());
-    indexToTeams.get(idx)!.add(toCanonical(row.team_name));
-  }
-
-  const homeCanonical = toCanonical(params.home_team);
-  const awayCanonical = toCanonical(params.away_team);
-
-  // Find the single match_index that contains both teams
-  const matched: number[] = [];
-  for (const [idx, teams] of indexToTeams) {
-    if (teams.has(homeCanonical) && teams.has(awayCanonical)) {
-      matched.push(idx);
-    }
-  }
-
-  if (matched.length === 1) {
-    return matched[0];
-  }
-
-  // Mismatch logging: surface exactly what went wrong
-  if (matched.length === 0) {
-    console.debug(
-      "[resolveMatchIndex] No match_index contains both teams.\n" +
-        "  home_team=%s (canonical=%s)\n" +
-        "  away_team=%s (canonical=%s)\n" +
-        "  Available indexes & teams: %o",
-      params.home_team,
-      homeCanonical,
-      params.away_team,
-      awayCanonical,
-      Object.fromEntries([...indexToTeams].map(([k, v]) => [k, [...v]]))
-    );
-  } else {
-    console.warn(
-      "[resolveMatchIndex] Ambiguous: %d indexes matched for %s vs %s: %o",
-      matched.length,
-      homeCanonical,
-      awayCanonical,
-      matched
-    );
-  }
-
-  return undefined;
-}
-
-const overlayPlayerCache = new Map<string, OverlayPlayer[]>();
-
-export async function fetchMatchOverlayPlayers(params: {
-  vendor_game_id: string;
-}): Promise<OverlayPlayer[]> {
-  if (!params.vendor_game_id) {
-    console.debug("[fetchMatchOverlayPlayers] No vendor_game_id provided");
-    return [];
-  }
-
-  const cached = overlayPlayerCache.get(params.vendor_game_id);
-  if (cached) {
-    return cached;
-  }
-
-  const { data, error } = await supabase
-    .schema("afl")
-    .from("v_match_center_players_2025_canonical")
-    .select(`
-      player_id,
-      player_name,
-      team_id,
-      team_name
-    `)
-    .eq("vendor_game_id", params.vendor_game_id);
-
-  if (error) {
-    console.error("[fetchMatchOverlayPlayers] Error:", error);
-    return [];
-  }
-
-  const result = (data ?? []).map((row) => ({
-    player_id: String(row.player_id ?? ""),
-    player_name: String(row.player_name ?? "Unknown"),
-    team_id: String(row.team_id ?? ""),
-    team_name: String(row.team_name ?? "Unknown"),
-  }));
-
-  overlayPlayerCache.set(params.vendor_game_id, result);
-  return result;
 }
 
 export async function fetchMatchPlayerStats(params: {
@@ -355,55 +177,6 @@ export async function fetchMatchScatterData(params: {
   }));
 }
 
-export async function fetchMatchPlayers(
-  season: number,
-  roundNumber: number,
-  matchIndex: number
-): Promise<MatchPlayer[]> {
-  const { data, error } = await supabase
-    .schema("afl")
-    .from("v_match_center_players_2025_canonical")
-    .select("*")
-    .eq("season", season)
-    .eq("round_number", roundNumber)
-    .eq("match_index", matchIndex);
-
-  if (error) {
-    console.error("[fetchMatchPlayers] Error:", error);
-    throw new Error(`Failed to fetch players: ${error.message}`);
-  }
-
-  if (!data || data.length === 0) {
-    console.debug("[fetchMatchPlayers] No players for", { season, roundNumber, matchIndex });
-    return [];
-  }
-
-  return data.map((row): MatchPlayer => ({
-    season: row.season ?? season,
-    round_number: row.round_number ?? roundNumber,
-    match_index: row.match_index ?? matchIndex,
-    team_id: row.team_id ?? undefined,
-    team_name: row.team_name ?? "Unknown",
-    team_abbr: row.team_abbr ?? undefined,
-    team_color: safeColor(row.team_color),
-    player_name: row.player_name ?? "Unknown Player",
-    player_role: row.player_role ?? "Unknown",
-    fantasy_points: Number(row.fantasy_points ?? 0),
-    disposals: Number(row.disposals ?? 0),
-    goals: Number(row.goals ?? 0),
-    efficiency: row.efficiency ?? undefined,
-    opponent_name: row.opponent_name ?? "Unknown",
-  }));
-}
-
-export async function fetchMatchTeamTotals(
-  season: number,
-  vendorGameId: string
-): Promise<MatchTeamTotal[]> {
-  console.debug("[fetchMatchTeamTotals] v_match_center_team_stats view does not exist yet; returning empty");
-  return [];
-}
-
 // Fetches per-minute momentum data for a single match from
 // afl.v_match_team_momentum_2025.  The view may not exist yet —
 // the catch block ensures the overlay never crashes.
@@ -507,16 +280,4 @@ export async function fetchMatchOverlayTimeline(params: {
     scoring: scoringResult,
     margin: marginResult,
   };
-}
-
-export function computeTop3(players: MatchPlayer[]): MatchPlayer[] {
-  if (!players || players.length === 0) return [];
-
-  const sorted = [...players].sort((a, b) => {
-    const fpDiff = (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0);
-    if (fpDiff !== 0) return fpDiff;
-    return (b.disposals ?? 0) - (a.disposals ?? 0);
-  });
-
-  return sorted.slice(0, 3);
 }

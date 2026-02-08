@@ -1,9 +1,8 @@
 export type MatchSummary = {
-  vendor_game_id?: string;
+  match_id?: string;
   season?: number;
   round_number?: number;
   round_label?: string;
-  match_index?: number;
   match_date?: string;
   match_time?: string;
   game_time?: string;
@@ -25,7 +24,6 @@ export type MatchSummary = {
 export type MatchPlayer = {
   season?: number;
   round_number?: number;
-  match_index?: number;
   team_id?: string;
   team_name?: string;
   team_abbr?: string;
@@ -42,7 +40,7 @@ export type MatchPlayer = {
 
 export type MatchTeamTotal = {
   season?: number;
-  vendor_game_id?: string;
+  match_id?: string;
   team_name?: string;
   team_color?: string;
   total_disposals?: number;
@@ -57,13 +55,6 @@ export type MomentumPoint = {
   quarter: number;
   minute: number;
   momentum: number;
-};
-
-export type OverlayPlayer = {
-  player_id: string;
-  player_name: string;
-  team_id: string;
-  team_name: string;
 };
 
 export type TimelineEvent = {

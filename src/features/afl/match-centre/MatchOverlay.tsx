@@ -249,7 +249,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                   the overlay and silently shows an empty state if
                   the backend view isn't deployed yet. */}
               <MomentumTimeline
-                vendorGameId={match.vendor_game_id}
+                matchId={match.match_id}
                 homeTeam={match.home_team ?? "Home"}
                 awayTeam={match.away_team ?? "Away"}
               />

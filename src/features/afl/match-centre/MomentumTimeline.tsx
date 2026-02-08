@@ -13,7 +13,7 @@ import { fetchMatchMomentum } from "./services/matchCenter.service";
 import type { MomentumPoint } from "./types";
 
 interface Props {
-  vendorGameId: string | undefined;
+  matchId: string | undefined;
   homeTeam: string;
   awayTeam: string;
 }
@@ -34,7 +34,7 @@ function toChartData(points: MomentumPoint[]): ChartRow[] {
 
 const QUARTER_BOUNDARIES = [1, 2, 3, 4];
 
-export default function MomentumTimeline({ vendorGameId, homeTeam, awayTeam }: Props) {
+export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props) {
   const [data, setData] = useState<ChartRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -43,14 +43,14 @@ export default function MomentumTimeline({ vendorGameId, homeTeam, awayTeam }: P
 
     async function load() {
       // Guard: if there's no game id we can't query — bail silently.
-      if (!vendorGameId) {
+      if (!matchId) {
         setData([]);
         setLoading(false);
         return;
       }
 
       try {
-        const raw = await fetchMatchMomentum(vendorGameId);
+        const raw = await fetchMatchMomentum(matchId);
         if (!cancelled) setData(toChartData(raw));
       } catch {
         if (!cancelled) setData([]);
@@ -61,7 +61,7 @@ export default function MomentumTimeline({ vendorGameId, homeTeam, awayTeam }: P
 
     load();
     return () => { cancelled = true; };
-  }, [vendorGameId]);
+  }, [matchId]);
 
   if (loading) {
     return (
