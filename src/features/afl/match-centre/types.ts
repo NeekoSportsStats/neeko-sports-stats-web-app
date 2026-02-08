@@ -97,6 +97,25 @@ export type MatchTimeline = {
   margin: TimelineMargin[];
 };
 
+export type MatchPlayerStats = {
+  match_id: string;
+  round_instance: number;
+  player: string;
+  player_team: string;
+  opponent_team: string;
+  position: string;
+  disposals: number;
+  kicks: number;
+  handballs: number;
+  marks: number;
+  tackles: number;
+  goals: number;
+  behinds: number;
+  hitouts: number;
+  time_on_ground: number;
+  fantasy_points: number;
+};
+
 export type DayGroup = {
   season: number;
   round_number: number;

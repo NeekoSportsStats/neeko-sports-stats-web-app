@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Calendar } from "lucide-react";
-import { fetchMatches, resolveMatchIndex, fetchMatchOverlayPlayers, fetchMatchOverlayTimeline } from "./services/matchCenter.service";
+import { fetchMatches, resolveMatchIndex, fetchMatchOverlayPlayers, fetchMatchOverlayTimeline, fetchMatchPlayerStats } from "./services/matchCenter.service";
 import { groupMatchesByDay } from "./utils";
-import type { DayGroup, MatchSummary, OverlayPlayer, MatchTimeline } from "./types";
+import type { DayGroup, MatchSummary, OverlayPlayer, MatchTimeline, MatchPlayerStats } from "./types";
 import MatchList from "./MatchList";
 import MatchOverlay from "./MatchOverlay";
 
@@ -14,6 +14,7 @@ export default function AFLMatchCentrePage() {
   const [selectedMatch, setSelectedMatch] = useState<MatchSummary | null>(null);
   const [overlayPlayers, setOverlayPlayers] = useState<OverlayPlayer[]>([]);
   const [timeline, setTimeline] = useState<MatchTimeline | null>(null);
+  const [matchPlayerStats, setMatchPlayerStats] = useState<MatchPlayerStats[]>([]);
   const [season, setSeason] = useState(2025);
   const [round, setRound] = useState(1);
 
@@ -72,6 +73,7 @@ export default function AFLMatchCentrePage() {
       setSelectedMatch(m);
       setOverlayPlayers([]);
       setTimeline(null);
+      setMatchPlayerStats([]);
 
       resolveMatchIndex({
         season: m.season ?? 2025,
@@ -106,6 +108,16 @@ export default function AFLMatchCentrePage() {
         })
         .catch(() => {
           setTimeline({ events: [], scoring: [], margin: [] });
+        });
+
+      fetchMatchPlayerStats({
+        match_id: m.vendor_game_id ?? "",
+      })
+        .then((stats) => {
+          setMatchPlayerStats(stats);
+        })
+        .catch(() => {
+          setMatchPlayerStats([]);
         });
     },
     []
@@ -218,10 +230,12 @@ export default function AFLMatchCentrePage() {
         <MatchOverlay
           match={selectedMatch}
           timeline={timeline}
+          matchPlayerStats={matchPlayerStats}
           onClose={() => {
             setSelectedMatch(null);
             setOverlayPlayers([]);
             setTimeline(null);
+            setMatchPlayerStats([]);
           }}
         />
       )}

@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabaseClient";
 import type {
   MatchSummary,
   MatchPlayer,
+  MatchPlayerStats,
   MatchTeamTotal,
   MomentumPoint,
   OverlayPlayer,
@@ -244,6 +245,65 @@ export async function fetchMatchOverlayPlayers(params: {
 
   overlayPlayerCache.set(params.vendor_game_id, result);
   return result;
+}
+
+export async function fetchMatchPlayerStats(params: {
+  match_id: string;
+}): Promise<MatchPlayerStats[]> {
+  if (!params.match_id) {
+    console.debug("[fetchMatchPlayerStats] No match_id provided");
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .schema("afl")
+    .from("v_player_match_stats_2025")
+    .select(`
+      match_id,
+      round_instance,
+      player,
+      player_team,
+      opponent_team,
+      position,
+      disposals,
+      kicks,
+      handballs,
+      marks,
+      tackles,
+      goals,
+      behinds,
+      hitouts,
+      time_on_ground,
+      fantasy_points
+    `)
+    .eq("match_id", params.match_id)
+    .order("fantasy_points", { ascending: false });
+
+  if (error) {
+    console.error("[fetchMatchPlayerStats]", error);
+    return [];
+  }
+
+  if (!data || data.length === 0) return [];
+
+  return data.map((row): MatchPlayerStats => ({
+    match_id: String(row.match_id ?? params.match_id),
+    round_instance: Number(row.round_instance ?? 0),
+    player: String(row.player ?? "Unknown"),
+    player_team: String(row.player_team ?? ""),
+    opponent_team: String(row.opponent_team ?? ""),
+    position: String(row.position ?? ""),
+    disposals: Number(row.disposals ?? 0),
+    kicks: Number(row.kicks ?? 0),
+    handballs: Number(row.handballs ?? 0),
+    marks: Number(row.marks ?? 0),
+    tackles: Number(row.tackles ?? 0),
+    goals: Number(row.goals ?? 0),
+    behinds: Number(row.behinds ?? 0),
+    hitouts: Number(row.hitouts ?? 0),
+    time_on_ground: Number(row.time_on_ground ?? 0),
+    fantasy_points: Number(row.fantasy_points ?? 0),
+  }));
 }
 
 export async function fetchMatchPlayers(

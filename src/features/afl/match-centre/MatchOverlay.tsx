@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { X, MapPin, Clock } from "lucide-react";
-import { fetchMatchPlayers } from "./services/matchCenter.service";
-import type { MatchSummary, MatchPlayer, MatchTimeline } from "./types";
+import type { MatchSummary, MatchPlayer, MatchPlayerStats, MatchTimeline } from "./types";
 import MatchScatter from "./MatchScatter";
 import MomentumTimeline from "./MomentumTimeline";
 
 interface MatchOverlayProps {
   match: MatchSummary;
   timeline?: MatchTimeline | null;
+  matchPlayerStats?: MatchPlayerStats[];
   onClose: () => void;
 }
 
@@ -44,10 +44,8 @@ function normaliseTeamName(name?: string | null) {
     .trim();
 }
 
-export default function MatchOverlay({ match, timeline, onClose }: MatchOverlayProps) {
+export default function MatchOverlay({ match, timeline, matchPlayerStats, onClose }: MatchOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
-  const [players, setPlayers] = useState<MatchPlayer[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -57,42 +55,20 @@ export default function MatchOverlay({ match, timeline, onClose }: MatchOverlayP
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  const loadPlayers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const season = match.season ?? 2025;
-      const roundNumber = match.round_number ?? 1;
-      const matchIndex = match.match_index;
+  const statsReady = matchPlayerStats && matchPlayerStats.length > 0;
 
-      // Guard: never call fetchMatchPlayers without a resolved match_index.
-      // An undefined match_index means resolveMatchIndex could not find this
-      // game in the players view — fetching with a guessed value (e.g. 1)
-      // would silently return the wrong match's players.
-      if (matchIndex == null) {
-        console.debug(
-          "[MatchOverlay] match_index is undefined — skipping player fetch for %s vs %s (season=%d round=%d)",
-          match.home_team,
-          match.away_team,
-          season,
-          roundNumber
-        );
-        setPlayers([]);
-        return;
-      }
-
-      const rawPlayers = await fetchMatchPlayers(season, roundNumber, matchIndex);
-      setPlayers(rawPlayers);
-    } catch (e) {
-      console.error("[MatchOverlay] Player fetch failed:", e);
-      setPlayers([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [match.season, match.round_number, match.match_index, match.home_team, match.away_team]);
-
-  useEffect(() => {
-    loadPlayers();
-  }, [loadPlayers]);
+  const players: MatchPlayer[] = useMemo(() => {
+    if (!matchPlayerStats || matchPlayerStats.length === 0) return [];
+    return matchPlayerStats.map((s): MatchPlayer => ({
+      player_name: s.player,
+      team_name: s.player_team,
+      opponent_name: s.opponent_team,
+      player_role: s.position,
+      fantasy_points: s.fantasy_points,
+      disposals: s.disposals,
+      goals: s.goals,
+    }));
+  }, [matchPlayerStats]);
 
   const { team1Name, team2Name, team1Top3, team2Top3 } = useMemo(() => {
     const homeKey = normaliseTeamName(match.home_team);
@@ -193,7 +169,7 @@ export default function MatchOverlay({ match, timeline, onClose }: MatchOverlayP
             </div>
           </div>
 
-          {loading ? (
+          {!statsReady ? (
             <div className="flex items-center justify-center py-10">
               <div className="flex flex-col items-center gap-3">
                 <div className="w-10 h-10 border-4 border-yellow-400/20 border-t-yellow-400 rounded-full animate-spin" />
