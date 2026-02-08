@@ -1,26 +1,31 @@
 // ⚠️ CONTRACT LOCK:
 // MatchSummary reflects afl.match_center_games_base schema.
-// match_date exists for display only - do NOT use for sorting/ordering.
+// NO match_date, match_time, home_team, away_team exist.
 // All ordering MUST be done via round_number + match_id in queries.
+//
+// AUTHORITATIVE SCHEMA:
+// - match_id, season, round_number, round_label, round_instance
+// - home_team_vendor, away_team_vendor (NOT home_team / away_team)
+// - home_score, away_score, home_goals, home_behinds, away_goals, away_behinds
+// - venue, status, updated_at
 
 export type MatchSummary = {
   match_id?: string;
   season?: number;
   round_number?: number;
   round_label?: string;
-  match_date?: string;
+  round_instance?: number;
   venue?: string;
-  home_team?: string;
-  home_team_abbr?: string;
-  home_team_color?: string;
-  home_team_id?: string;
-  away_team?: string;
-  away_team_abbr?: string;
-  away_team_color?: string;
-  away_team_id?: string;
+  home_team_vendor?: string;
+  away_team_vendor?: string;
   home_score?: number | null;
   away_score?: number | null;
+  home_goals?: number | null;
+  home_behinds?: number | null;
+  away_goals?: number | null;
+  away_behinds?: number | null;
   status?: string;
+  updated_at?: string;
   [key: string]: unknown;
 };
 
@@ -129,10 +134,10 @@ export type QuarterSummary = {
   quarter_summary: string;
 };
 
-export type DayGroup = {
+export type RoundGroup = {
   season: number;
   round_number: number;
   round_label: string;
-  match_date: string;
+  round_instance?: number;
   matches: MatchSummary[];
 };

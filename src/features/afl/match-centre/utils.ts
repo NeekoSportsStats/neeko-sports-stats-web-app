@@ -1,9 +1,11 @@
 // ⚠️ CONTRACT LOCK:
-// match_center_games_base has dates but they're not reliable for sorting.
-// Grouping uses match_date for display but preserves natural match_id order.
-// Do NOT introduce time-based sorting logic.
+// afl.match_center_games_base has NO match_date or match_time.
+// Do NOT introduce date-based selection or ordering.
+// Ordering must remain round_number + match_id only.
+//
+// Grouping is done by round_instance (for double-header rounds) or round_label.
 
-import type { MatchPlayer, MatchSummary, DayGroup } from "./types";
+import type { MatchPlayer, MatchSummary, RoundGroup } from "./types";
 
 export function computeTop3(players: MatchPlayer[]): MatchPlayer[] {
   if (!players || players.length === 0) {
@@ -26,33 +28,37 @@ export function computeTop3(players: MatchPlayer[]): MatchPlayer[] {
   return sorted.slice(0, 3);
 }
 
-export function groupMatchesByDay(matches: MatchSummary[]): DayGroup[] {
+export function groupMatchesByRound(matches: MatchSummary[]): RoundGroup[] {
   if (!matches || matches.length === 0) {
     return [];
   }
 
-  const grouped = new Map<string, DayGroup>();
+  const grouped = new Map<string, RoundGroup>();
 
   for (const match of matches) {
-    const matchDate = match.match_date ?? "Unknown";
+    const groupKey = match.round_instance
+      ? `${match.round_label}-${match.round_instance}`
+      : match.round_label ?? `R${match.round_number ?? 0}`;
 
-    if (!grouped.has(matchDate)) {
-      grouped.set(matchDate, {
+    if (!grouped.has(groupKey)) {
+      grouped.set(groupKey, {
         season: match.season ?? 2025,
-        round_number: match.round_number ?? 1,
-        round_label: match.round_label ?? "R1",
-        match_date: matchDate,
+        round_number: match.round_number ?? 0,
+        round_label: match.round_label ?? `R${match.round_number ?? 0}`,
+        round_instance: match.round_instance,
         matches: [],
       });
     }
 
-    grouped.get(matchDate)!.matches.push(match);
+    grouped.get(groupKey)!.matches.push(match);
   }
 
   return Array.from(grouped.values()).sort((a, b) => {
-    if (a.match_date === "Unknown" && b.match_date !== "Unknown") return 1;
-    if (a.match_date !== "Unknown" && b.match_date === "Unknown") return -1;
-    if (a.match_date === "Unknown" && b.match_date === "Unknown") return 0;
-    return a.match_date.localeCompare(b.match_date);
+    if (a.round_number !== b.round_number) {
+      return a.round_number - b.round_number;
+    }
+    const aInstance = a.round_instance ?? 0;
+    const bInstance = b.round_instance ?? 0;
+    return aInstance - bInstance;
   });
 }

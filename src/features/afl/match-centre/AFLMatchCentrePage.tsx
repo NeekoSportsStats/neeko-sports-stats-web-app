@@ -2,6 +2,9 @@
 // Match Centre uses afl.match_center_games_base as the canonical source.
 // All ordering is handled by the service layer (round_number + match_id).
 // Do NOT add date-based sorting or filtering logic.
+//
+// afl.match_center_games_base has NO match_date or match_time.
+// Use round-based grouping only.
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Calendar } from "lucide-react";
@@ -14,14 +17,14 @@ import {
   fetchRoundQuarterScores,
 } from "./services/matchCenter.service";
 import type { QuarterScoreRow } from "./services/matchCenter.service";
-import { groupMatchesByDay } from "./utils";
-import type { DayGroup, MatchSummary, MatchTimeline, MatchPlayerStats, MatchScatterPoint } from "./types";
+import { groupMatchesByRound } from "./utils";
+import type { RoundGroup, MatchSummary, MatchTimeline, MatchPlayerStats, MatchScatterPoint } from "./types";
 import MatchList from "./MatchList";
 import MatchOverlay from "./MatchOverlay";
 
 export default function AFLMatchCentrePage() {
   const [allMatches, setAllMatches] = useState<MatchSummary[]>([]);
-  const [groups, setGroups] = useState<DayGroup[]>([]);
+  const [groups, setGroups] = useState<RoundGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<MatchSummary | null>(null);
@@ -81,7 +84,7 @@ export default function AFLMatchCentrePage() {
 
   useEffect(() => {
     const filtered = (allMatches ?? []).filter((m) => m.round_number === round);
-    const grouped = groupMatchesByDay(filtered);
+    const grouped = groupMatchesByRound(filtered);
     setGroups(grouped);
 
     const matchIds = filtered.map(m => m.match_id).filter(Boolean) as string[];

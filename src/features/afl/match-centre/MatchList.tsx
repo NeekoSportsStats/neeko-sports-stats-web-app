@@ -1,27 +1,16 @@
 // ⚠️ CONTRACT LOCK:
-// match_date exists in the data for display purposes only.
-// Do NOT introduce time-based filtering or sorting logic.
-// The service layer controls all ordering via round_number + match_id.
+// afl.match_center_games_base has NO match_date or match_time.
+// Do NOT introduce date-based selection or ordering.
+// Display is round-based only using round_label and round_instance.
 
 import React from "react";
-import type { DayGroup, MatchSummary } from "./types";
+import type { RoundGroup, MatchSummary } from "./types";
 import type { QuarterScoreRow } from "./services/matchCenter.service";
 
 interface Props {
-  groups: DayGroup[];
+  groups: RoundGroup[];
   onSelectMatch: (m: MatchSummary) => void;
   quarterScoresMap?: Map<string, QuarterScoreRow[]>;
-}
-
-function formatDayLabel(dateStr: string, roundLabel: string, roundNumber: number): string {
-  const parsed = new Date(`${dateStr}T12:00:00`);
-  if (Number.isNaN(parsed.getTime()) || dateStr === "Unknown" || !dateStr) {
-    return roundLabel || `Round ${roundNumber}`;
-  }
-  const weekday = parsed.toLocaleDateString("en-AU", { weekday: "long" });
-  const day = parsed.getDate();
-  const month = parsed.toLocaleDateString("en-AU", { month: "short" });
-  return `${weekday} ${day} ${month}`;
 }
 
 function computeWonBy(m: MatchSummary): string | null {
@@ -31,7 +20,7 @@ function computeWonBy(m: MatchSummary): string | null {
   if (m.status !== "FT") return null;
   const margin = Math.abs(h - a);
   if (margin === 0) return "Draw";
-  const winner = h > a ? (m.home_team ?? "Home") : (m.away_team ?? "Away");
+  const winner = h > a ? (m.home_team_vendor ?? "Home") : (m.away_team_vendor ?? "Away");
   return `${winner} won by ${margin} pts`;
 }
 
@@ -47,29 +36,23 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
   return (
     <div className="space-y-8">
       {groups.map((g, idx) => {
-        const dayLabel = formatDayLabel(g.match_date, g.round_label, g.round_number);
-        const roundCtx = g.round_label || `Round ${g.round_number}`;
+        const roundLabel = g.round_label || `Round ${g.round_number}`;
         const matches = g.matches ?? [];
 
         return (
           <div key={idx} className="space-y-4">
             <div className="flex items-baseline gap-3">
-              <span className="text-white/90 font-semibold">{dayLabel}</span>
-              {dayLabel !== roundCtx && (
-                <span className="text-white/40 text-sm">{roundCtx}</span>
-              )}
+              <span className="text-white/90 font-semibold text-lg">{roundLabel}</span>
             </div>
 
             <div className="space-y-4">
               {matches.map((m, mIdx) => {
-                const homeTeam = m.home_team ?? "Home";
-                const awayTeam = m.away_team ?? "Away";
+                const homeTeam = m.home_team_vendor ?? "Home";
+                const awayTeam = m.away_team_vendor ?? "Away";
                 const isFinished = m.status === "FT";
                 const venue = m.venue && m.venue !== "TBC" ? m.venue : null;
                 const homeScore = m.home_score ?? null;
                 const awayScore = m.away_score ?? null;
-                const homeColor = (m.home_team_color as string) || "#F5C84C";
-                const awayColor = (m.away_team_color as string) || "#999";
                 const wonBy = computeWonBy(m);
 
                 const quarters = quarterScoresMap?.get(m.match_id ?? "") ?? [];
@@ -84,7 +67,7 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                     <div className="grid grid-cols-3 items-start gap-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: homeColor }} />
+                          <div className="w-2 h-2 rounded-full bg-[#F5C84C]" />
                           <div className="text-white font-semibold">{homeTeam}</div>
                         </div>
                         <div className="text-[#F5C84C] text-xl font-bold">{homeScore ?? "—"}</div>
@@ -109,7 +92,7 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                       <div className="text-right space-y-1">
                         <div className="flex items-center gap-2 justify-end">
                           <div className="text-white font-semibold">{awayTeam}</div>
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: awayColor }} />
+                          <div className="w-2 h-2 rounded-full bg-white/40" />
                         </div>
                         <div className="text-[#F5C84C] text-xl font-bold">{awayScore ?? "—"}</div>
                         {hasQuarters && (

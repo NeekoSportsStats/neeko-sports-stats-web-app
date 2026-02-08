@@ -1,5 +1,10 @@
+// ⚠️ CONTRACT LOCK:
+// afl.match_center_games_base has NO match_date or match_time.
+// Do NOT introduce date-based display or formatting.
+// Use home_team_vendor and away_team_vendor only.
+
 import React, { useEffect, useRef, useMemo } from "react";
-import { X, MapPin, Clock } from "lucide-react";
+import { X, MapPin } from "lucide-react";
 import type { MatchSummary, MatchPlayer, MatchPlayerStats, MatchScatterPoint, MatchTimeline } from "./types";
 import MatchScatter from "./MatchScatter";
 import MomentumTimeline from "./MomentumTimeline";
@@ -11,13 +16,6 @@ interface MatchOverlayProps {
   scatterData?: MatchScatterPoint[];
   quarterSummary?: string | null;
   onClose: () => void;
-}
-
-function formatMatchDate(matchDate: string | null | undefined) {
-  if (!matchDate) return null;
-  const parsed = new Date(`${matchDate}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 }
 
 function normaliseTeamName(name?: string | null) {
@@ -109,8 +107,8 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
   }, [matchPlayerStats]);
 
   const { team1Name, team2Name, team1Top3, team2Top3 } = useMemo(() => {
-    const homeKey = normaliseTeamName(match.home_team);
-    const awayKey = normaliseTeamName(match.away_team);
+    const homeKey = normaliseTeamName(match.home_team_vendor);
+    const awayKey = normaliseTeamName(match.away_team_vendor);
     const safePlayers = Array.isArray(players) ? players : [];
     const scopedPlayers = safePlayers
       .filter((p): p is MatchPlayer => p != null)
@@ -134,19 +132,19 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
       .slice(0, 3);
 
     return {
-      team1Name: match.home_team ?? "",
-      team2Name: match.away_team ?? "",
+      team1Name: match.home_team_vendor ?? "",
+      team2Name: match.away_team_vendor ?? "",
       team1Top3: homePlayers,
       team2Top3: awayPlayers,
     };
-  }, [players, match.home_team, match.away_team]);
+  }, [players, match.home_team_vendor, match.away_team_vendor]);
 
   const insightSentences = useMemo(() => {
     const sentences: string[] = [];
     const hScore = match.home_score ?? null;
     const aScore = match.away_score ?? null;
-    const home = match.home_team ?? "Home";
-    const away = match.away_team ?? "Away";
+    const home = match.home_team_vendor ?? "Home";
+    const away = match.away_team_vendor ?? "Away";
 
     if (hScore != null && aScore != null) {
       const margin = Math.abs(hScore - aScore);
@@ -195,25 +193,24 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
     }
 
     return sentences.length > 0 ? sentences : null;
-  }, [matchPlayerStats, match.home_score, match.away_score, match.home_team, match.away_team, timeline, team1Top3, team2Top3]);
+  }, [matchPlayerStats, match.home_score, match.away_score, match.home_team_vendor, match.away_team_vendor, timeline, team1Top3, team2Top3]);
 
   const roundLabel = match.round_label || "AFL";
   const season = match.season ?? 2025;
   const isFinished = match.status === "FT";
   const venue = match.venue && match.venue !== "TBC" ? match.venue : null;
-  const formattedTime = formatMatchDate(match.match_date);
   const homeScore = match.home_score ?? null;
   const awayScore = match.away_score ?? null;
-  const homeColor = (match.home_team_color as string) || "#F5C84C";
-  const awayColor = (match.away_team_color as string) || "#999";
+  const homeColor = "#F5C84C";
+  const awayColor = "#999";
 
   const wonByLabel = useMemo(() => {
     if (homeScore == null || awayScore == null || !isFinished) return null;
     const margin = Math.abs(homeScore - awayScore);
     if (margin === 0) return "Draw";
-    const winner = homeScore > awayScore ? (match.home_team ?? "Home") : (match.away_team ?? "Away");
+    const winner = homeScore > awayScore ? (match.home_team_vendor ?? "Home") : (match.away_team_vendor ?? "Away");
     return `${winner} won by ${margin} points`;
-  }, [homeScore, awayScore, isFinished, match.home_team, match.away_team]);
+  }, [homeScore, awayScore, isFinished, match.home_team_vendor, match.away_team_vendor]);
 
   const formattedQuarterSummary = useMemo(() => {
     if (!quarterSummary) return null;
@@ -251,7 +248,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
               <div>
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: homeColor }} />
-                  <div className="text-white font-semibold text-xl">{match.home_team ?? "Home"}</div>
+                  <div className="text-white font-semibold text-xl">{match.home_team_vendor ?? "Home"}</div>
                 </div>
                 <div className="text-[#F5C84C] text-2xl font-bold mt-1">
                   {homeScore ?? "—"}
@@ -265,7 +262,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
               </div>
               <div className="text-right">
                 <div className="flex items-center gap-2 justify-end">
-                  <div className="text-white font-semibold text-xl">{match.away_team ?? "Away"}</div>
+                  <div className="text-white font-semibold text-xl">{match.away_team_vendor ?? "Away"}</div>
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: awayColor }} />
                 </div>
                 <div className="text-[#F5C84C] text-2xl font-bold mt-1">
@@ -288,12 +285,6 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                   <span>{venue}</span>
                 </div>
               )}
-              {formattedTime && (
-                <div className="flex items-center gap-2 text-white/50">
-                  <Clock className="h-4 w-4" />
-                  <span>{formattedTime}</span>
-                </div>
-              )}
               {isFinished && (
                 <div className="px-2 py-0.5 rounded-md border border-white/10 bg-white/5 text-xs uppercase tracking-wider text-white/40">
                   FT
@@ -304,8 +295,8 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
 
           <MomentumTimeline
             matchId={match.match_id}
-            homeTeam={match.home_team ?? "Home"}
-            awayTeam={match.away_team ?? "Away"}
+            homeTeam={match.home_team_vendor ?? "Home"}
+            awayTeam={match.away_team_vendor ?? "Away"}
           />
 
           {statsReady ? (
@@ -321,7 +312,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                     <div>
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: homeColor }} />
-                        <div className="text-sm font-semibold text-white">{team1Name || match.home_team}</div>
+                        <div className="text-sm font-semibold text-white">{team1Name || match.home_team_vendor}</div>
                       </div>
                       {team1Top3.length === 0 ? (
                         <div className="text-white/50 text-sm">No data</div>
@@ -348,7 +339,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                     <div>
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: awayColor }} />
-                        <div className="text-sm font-semibold text-white">{team2Name || match.away_team}</div>
+                        <div className="text-sm font-semibold text-white">{team2Name || match.away_team_vendor}</div>
                       </div>
                       {team2Top3.length === 0 ? (
                         <div className="text-white/50 text-sm">No data</div>
@@ -378,8 +369,8 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
 
               <MatchScatter
                 scatterData={scatterData ?? []}
-                homeTeam={match.home_team ?? "Home"}
-                awayTeam={match.away_team ?? "Away"}
+                homeTeam={match.home_team_vendor ?? "Home"}
+                awayTeam={match.away_team_vendor ?? "Away"}
                 homeColor={homeColor}
                 awayColor={awayColor}
               />

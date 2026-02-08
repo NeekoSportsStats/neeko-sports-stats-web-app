@@ -22,11 +22,21 @@ export type QuarterScoreRow = {
   away_points: number;
 };
 
-// ⚠️ WARNING:
-// This query is locked to the canonical afl.match_center_games_base table.
-// The 2025 season is frozen (216 rows).
-// Ordering by match_id ensures consistent results without date dependencies.
-// Do NOT add, remove, or modify columns without verifying the actual schema.
+// ⚠️ CONTRACT LOCK:
+// afl.match_center_games_base has NO match_date or match_time.
+// Do NOT introduce date-based selection or ordering.
+// Ordering must remain round_number + match_id only.
+//
+// AUTHORITATIVE SCHEMA (DO NOT DEVIATE):
+// - match_id, season, round_number, round_label, round_instance
+// - home_team_vendor, away_team_vendor
+// - home_score, away_score, home_goals, home_behinds, away_goals, away_behinds
+// - venue, status, updated_at
+//
+// DOES NOT CONTAIN:
+// - match_date, match_time
+// - home_team, away_team
+// - team colours, abbreviations, or IDs
 export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   const { data, error } = await supabase
     .schema("afl")
@@ -36,26 +46,25 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
       season,
       round_number,
       round_label,
-      match_date,
-      venue,
-      home_team,
-      home_team_abbr,
-      home_team_color,
-      home_team_id,
-      away_team,
-      away_team_abbr,
-      away_team_color,
-      away_team_id,
+      round_instance,
+      home_team_vendor,
+      away_team_vendor,
       home_score,
       away_score,
-      status
+      home_goals,
+      home_behinds,
+      away_goals,
+      away_behinds,
+      venue,
+      status,
+      updated_at
     `)
     .eq("season", 2025)
     .order("round_number", { ascending: true })
     .order("match_id", { ascending: true });
 
   if (error) {
-    console.error("[fetchMatches]", error);
+    console.error("[fetchMatches] Supabase error:", error);
     throw error;
   }
 
@@ -68,19 +77,18 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
     season: row.season ?? season,
     round_number: row.round_number ?? 0,
     round_label: row.round_label ?? `R${row.round_number ?? 0}`,
-    match_date: row.match_date ?? undefined,
-    venue: row.venue ?? undefined,
-    home_team: String(row.home_team ?? "Home"),
-    home_team_abbr: String(row.home_team_abbr ?? ""),
-    home_team_color: String(row.home_team_color ?? ""),
-    home_team_id: String(row.home_team_id ?? ""),
-    away_team: String(row.away_team ?? "Away"),
-    away_team_abbr: String(row.away_team_abbr ?? ""),
-    away_team_color: String(row.away_team_color ?? ""),
-    away_team_id: String(row.away_team_id ?? ""),
+    round_instance: row.round_instance ?? undefined,
+    home_team_vendor: String(row.home_team_vendor ?? "Home"),
+    away_team_vendor: String(row.away_team_vendor ?? "Away"),
     home_score: row.home_score ?? null,
     away_score: row.away_score ?? null,
+    home_goals: row.home_goals ?? null,
+    home_behinds: row.home_behinds ?? null,
+    away_goals: row.away_goals ?? null,
+    away_behinds: row.away_behinds ?? null,
+    venue: row.venue ?? undefined,
     status: row.status ?? "Scheduled",
+    updated_at: row.updated_at ?? undefined,
   }));
 }
 
