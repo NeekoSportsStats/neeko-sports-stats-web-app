@@ -164,12 +164,20 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
 
   const roundLabel = match.round_label || "AFL";
   const season = match.season ?? 2025;
-  const resolvedStatus = match.status || "";
+  const isFinished = match.status === "FT";
+  const resolvedStatus = match.status || (isFinished ? "" : "");
   const resolvedVenue = match.venue || null;
   const venue = resolvedVenue && resolvedVenue !== "TBC" ? resolvedVenue : null;
   const formattedTime = formatMatchDate(match.match_date);
   const homeScore = match.home_score ?? null;
   const awayScore = match.away_score ?? null;
+  const homeScoreline = (match as Record<string, unknown>).home_scoreline as string | undefined;
+  const awayScoreline = (match as Record<string, unknown>).away_scoreline as string | undefined;
+
+  const formattedQuarterSummary = useMemo(() => {
+    if (!quarterSummary) return null;
+    return quarterSummary.replace(/\s{2,}/g, " | ").trim();
+  }, [quarterSummary]);
 
   return (
     <div
@@ -203,6 +211,9 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                 <div className="text-[#F5C84C] text-2xl font-bold">
                   {homeScore ?? "—"}
                 </div>
+                {homeScoreline && (
+                  <div className="text-white/40 text-sm">({homeScoreline})</div>
+                )}
               </div>
               <div className="text-center text-white/40 text-3xl font-black">VS</div>
               <div className="text-right">
@@ -210,13 +221,16 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                 <div className="text-[#F5C84C] text-2xl font-bold">
                   {awayScore ?? "—"}
                 </div>
+                {awayScoreline && (
+                  <div className="text-white/40 text-sm">({awayScoreline})</div>
+                )}
               </div>
             </div>
 
-            {quarterSummary && (
+            {formattedQuarterSummary && (
               <div className="mt-5 pt-5 border-t border-white/10">
                 <div className="text-xs uppercase tracking-wider text-white/50 mb-2">Quarter Scores</div>
-                <div className="text-sm text-white/80 whitespace-pre-line">{quarterSummary}</div>
+                <div className="text-sm text-white/70 leading-relaxed line-clamp-2 md:line-clamp-none">{formattedQuarterSummary}</div>
               </div>
             )}
 
@@ -318,12 +332,12 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
               <MatchScatter scatterData={scatterData ?? []} />
 
               <div className="rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-r from-[#F5C84C]/20 to-transparent p-6">
-                <div className="text-white font-semibold mb-1">Finished Game Insights</div>
-                <div className="text-white/70 text-sm space-y-1">
-                  {insightSentences ? (
+                <div className="text-white font-semibold mb-2">Finished Game Insights</div>
+                <div className="text-white/70 text-sm leading-relaxed space-y-2">
+                  {insightSentences && insightSentences.length > 0 ? (
                     insightSentences.map((s, i) => <p key={i}>{s}</p>)
                   ) : (
-                    <p>Insights will appear once player stats load.</p>
+                    <p>Insights unavailable for this match.</p>
                   )}
                 </div>
               </div>

@@ -18,17 +18,18 @@ export default function MatchList({ groups, onSelectMatch }: Props) {
   return (
     <div className="space-y-8">
       {groups.map((g, idx) => {
-        // Guard: new Date() on a missing/malformed match_date produces
-        // Invalid Date — fall back to the raw string so the UI never
-        // shows "Invalid Date".
         const parsed = new Date(g.match_date);
-        const dayLabel = Number.isNaN(parsed.getTime())
-          ? (g.match_date || "Date TBC")
-          : parsed.toLocaleDateString(undefined, {
+        const isValidDate =
+          !Number.isNaN(parsed.getTime()) &&
+          g.match_date !== "Unknown" &&
+          g.match_date !== "";
+        const dayLabel = isValidDate
+          ? parsed.toLocaleDateString(undefined, {
               weekday: "long",
               month: "short",
               day: "numeric",
-            });
+            })
+          : g.round_label || `Round ${g.round_number}`;
 
         // Guard: matches array may be undefined if upstream data is sparse.
         const matches = g.matches ?? [];
@@ -41,8 +42,9 @@ export default function MatchList({ groups, onSelectMatch }: Props) {
               {matches.map((m) => {
                 const homeTeam = m.home_team ?? "Home";
                 const awayTeam = m.away_team ?? "Away";
-                const venue = m.venue ?? "TBC";
-                const status = m.status ?? "TBC";
+                const isFinished = m.status === "FT";
+                const venue = m.venue && m.venue !== "TBC" ? m.venue : null;
+                const status = m.status || (isFinished ? null : "TBC");
                 const homeScore = m.home_score ?? null;
                 const awayScore = m.away_score ?? null;
 
@@ -65,10 +67,12 @@ export default function MatchList({ groups, onSelectMatch }: Props) {
                     </div>
 
                     <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-white/60">
-                      <div>{venue}</div>
-                      <div className="px-2 py-1 rounded-md border border-white/10 bg-white/5 text-xs uppercase tracking-wider">
-                        {status}
-                      </div>
+                      {venue && <div>{venue}</div>}
+                      {status && (
+                        <div className="px-2 py-1 rounded-md border border-white/10 bg-white/5 text-xs uppercase tracking-wider">
+                          {status}
+                        </div>
+                      )}
                       <div className="ml-auto text-white/50 text-sm flex items-center gap-2">
                         <span>View Details</span>
                         <span>›</span>
