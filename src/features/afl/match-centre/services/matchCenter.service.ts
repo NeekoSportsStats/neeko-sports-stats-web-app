@@ -56,43 +56,133 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   });
 }
 
+// Canonical name map: normalises all known AFL team-name variants to a
+// single stable key so server-side names and client-side names always agree.
+const AFL_CANONICAL: Record<string, string> = {
+  "adelaide": "adelaide",
+  "adelaide crows": "adelaide",
+  "brisbane": "brisbane",
+  "brisbane lions": "brisbane",
+  "carlton": "carlton",
+  "carlton blues": "carlton",
+  "collingwood": "collingwood",
+  "collingwood magpies": "collingwood",
+  "essendon": "essendon",
+  "essendon bombers": "essendon",
+  "fremantle": "fremantle",
+  "fremantle dockers": "fremantle",
+  "geelong": "geelong",
+  "geelong cats": "geelong",
+  "gold coast": "gold coast",
+  "gold coast suns": "gold coast",
+  "gws": "gws",
+  "gws giants": "gws",
+  "greater western sydney": "gws",
+  "greater western sydney giants": "gws",
+  "hawthorn": "hawthorn",
+  "hawthorn hawks": "hawthorn",
+  "melbourne": "melbourne",
+  "melbourne demons": "melbourne",
+  "north melbourne": "north melbourne",
+  "north melbourne kangaroos": "north melbourne",
+  "kangaroos": "north melbourne",
+  "port adelaide": "port adelaide",
+  "port adelaide power": "port adelaide",
+  "richmond": "richmond",
+  "richmond tigers": "richmond",
+  "st kilda": "st kilda",
+  "st kilda saints": "st kilda",
+  "sydney": "sydney",
+  "sydney swans": "sydney",
+  "west coast": "west coast",
+  "west coast eagles": "west coast",
+  "western bulldogs": "western bulldogs",
+  "footscray": "western bulldogs",
+};
+
+function toCanonical(name: string): string {
+  const key = name.trim().toLowerCase();
+  return AFL_CANONICAL[key] ?? key;
+}
+
 export async function resolveMatchIndex(params: {
   season: number;
   round_number: number;
   home_team: string;
   away_team: string;
 }): Promise<number | undefined> {
+  // Fetch ALL (match_index, team_name) pairs for the round.
+  // This avoids server-side .in() filtering which silently returns zero rows
+  // when team names differ between the games view and the players view.
   const { data, error } = await supabase
     .schema("afl")
     .from("v_match_center_players_2025_canonical")
     .select("match_index, team_name")
     .eq("season", params.season)
-    .eq("round_number", params.round_number)
-    .in("team_name", [params.home_team, params.away_team]);
+    .eq("round_number", params.round_number);
 
   if (error) {
-    console.error("[resolveMatchIndex] Error:", error);
+    console.error("[resolveMatchIndex] Query failed:", error);
     return undefined;
   }
 
   if (!data || data.length === 0) {
-    console.debug("[resolveMatchIndex] No rows for", params.home_team, "vs", params.away_team);
-    return undefined;
-  }
-
-  const matchIndexes = [...new Set(data.map((r) => r.match_index))].filter(
-    (idx): idx is number => typeof idx === "number"
-  );
-
-  if (matchIndexes.length !== 1) {
-    console.warn(
-      `[resolveMatchIndex] Expected 1 match_index, found ${matchIndexes.length}:`,
-      matchIndexes
+    console.debug(
+      "[resolveMatchIndex] No player rows for season=%d round=%d",
+      params.season,
+      params.round_number
     );
     return undefined;
   }
 
-  return matchIndexes[0];
+  // Build map: match_index → Set<canonical team name>
+  const indexToTeams = new Map<number, Set<string>>();
+  for (const row of data) {
+    const idx = Number(row.match_index);
+    if (!Number.isFinite(idx) || !row.team_name) continue;
+    if (!indexToTeams.has(idx)) indexToTeams.set(idx, new Set());
+    indexToTeams.get(idx)!.add(toCanonical(row.team_name));
+  }
+
+  const homeCanonical = toCanonical(params.home_team);
+  const awayCanonical = toCanonical(params.away_team);
+
+  // Find the single match_index that contains both teams
+  const matched: number[] = [];
+  for (const [idx, teams] of indexToTeams) {
+    if (teams.has(homeCanonical) && teams.has(awayCanonical)) {
+      matched.push(idx);
+    }
+  }
+
+  if (matched.length === 1) {
+    return matched[0];
+  }
+
+  // Mismatch logging: surface exactly what went wrong
+  if (matched.length === 0) {
+    console.debug(
+      "[resolveMatchIndex] No match_index contains both teams.\n" +
+        "  home_team=%s (canonical=%s)\n" +
+        "  away_team=%s (canonical=%s)\n" +
+        "  Available indexes & teams: %o",
+      params.home_team,
+      homeCanonical,
+      params.away_team,
+      awayCanonical,
+      Object.fromEntries([...indexToTeams].map(([k, v]) => [k, [...v]]))
+    );
+  } else {
+    console.warn(
+      "[resolveMatchIndex] Ambiguous: %d indexes matched for %s vs %s: %o",
+      matched.length,
+      homeCanonical,
+      awayCanonical,
+      matched
+    );
+  }
+
+  return undefined;
 }
 
 export async function fetchMatchPlayers(
