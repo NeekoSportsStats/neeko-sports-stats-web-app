@@ -7,42 +7,10 @@ function safeColor(color: string | null | undefined): string {
   return color && color.trim() !== "" ? color : NEUTRAL_COLOR;
 }
 
-function toCanonical(teamName: string): string {
-  const suffixes = [
-    " Tigers",
-    " Blues",
-    " Hawks",
-    " Cats",
-    " Saints",
-    " Magpies",
-    " Bombers",
-    " Demons",
-    " Eagles",
-    " Crows",
-    " Kangaroos",
-    " Bulldogs",
-    " Lions",
-    " Power",
-    " Swans",
-    " Dockers",
-    " Giants",
-    " Suns",
-  ];
-
-  let canonical = teamName;
-  for (const suffix of suffixes) {
-    if (canonical.endsWith(suffix)) {
-      canonical = canonical.slice(0, -suffix.length).trim();
-      break;
-    }
-  }
-  return canonical;
-}
-
 export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   const { data, error } = await supabase
     .schema("afl")
-    .from("v_match_center_matches_ui")
+    .from("v_match_center_games")
     .select("*")
     .eq("season", season);
 
@@ -52,26 +20,40 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   }
 
   if (!data || data.length === 0) {
+    console.debug("[fetchMatches] No matches returned for season", season);
     return [];
   }
 
-  return data.map((row): MatchSummary => ({
-    vendor_game_id: String(row.vendor_game_id ?? ""),
-    season: row.season ?? season,
-    round_number: row.round_number ?? 0,
-    round_label: row.round_label ?? `R${row.round_number ?? 0}`,
-    match_date: row.match_date_utc ?? null,
-    match_time: row.match_time_utc ?? null,
-    game_time: row.match_date_utc ?? null,
-    venue: row.venue ?? "TBC",
-    home_team: row.home_team ?? "Home",
-    home_team_color: safeColor(row.home_team_color),
-    away_team: row.away_team ?? "Away",
-    away_team_color: safeColor(row.away_team_color),
-    home_score: row.home_score ?? null,
-    away_score: row.away_score ?? null,
-    status: row.status_short ?? "Scheduled",
-  }));
+  return data.map((row): MatchSummary => {
+    if (!row.vendor_game_id) {
+      console.debug("[fetchMatches] Row missing vendor_game_id:", row);
+    }
+    if (!row.match_date) {
+      console.debug("[fetchMatches] Row missing match_date:", row.vendor_game_id);
+    }
+
+    return {
+      vendor_game_id: String(row.vendor_game_id ?? ""),
+      season: row.season ?? season,
+      round_number: row.round_number ?? 0,
+      round_label: row.round_label ?? `R${row.round_number ?? 0}`,
+      match_date: row.match_date ?? null,
+      match_time: row.match_time ?? null,
+      game_time: row.game_time ?? null,
+      venue: row.venue ?? "TBC",
+      home_team: row.home_team ?? "Home",
+      home_team_abbr: row.home_team_abbr ?? undefined,
+      home_team_color: safeColor(row.home_team_color),
+      home_team_id: row.home_team_id ?? undefined,
+      away_team: row.away_team ?? "Away",
+      away_team_abbr: row.away_team_abbr ?? undefined,
+      away_team_color: safeColor(row.away_team_color),
+      away_team_id: row.away_team_id ?? undefined,
+      home_score: row.home_score ?? null,
+      away_score: row.away_score ?? null,
+      status: row.status ?? "Scheduled",
+    };
+  });
 }
 
 export async function resolveMatchIndex(params: {
@@ -80,16 +62,13 @@ export async function resolveMatchIndex(params: {
   home_team: string;
   away_team: string;
 }): Promise<number | undefined> {
-  const homeCanonical = toCanonical(params.home_team);
-  const awayCanonical = toCanonical(params.away_team);
-
   const { data, error } = await supabase
     .schema("afl")
-    .from("v_match_center_players_canonical")
-    .select("match_index, canonical_team_name")
+    .from("v_match_center_players_2025_canonical")
+    .select("match_index, team_name")
     .eq("season", params.season)
     .eq("round_number", params.round_number)
-    .in("canonical_team_name", [homeCanonical, awayCanonical]);
+    .in("team_name", [params.home_team, params.away_team]);
 
   if (error) {
     console.error("[resolveMatchIndex] Error:", error);
@@ -97,6 +76,7 @@ export async function resolveMatchIndex(params: {
   }
 
   if (!data || data.length === 0) {
+    console.debug("[resolveMatchIndex] No rows for", params.home_team, "vs", params.away_team);
     return undefined;
   }
 
@@ -122,7 +102,7 @@ export async function fetchMatchPlayers(
 ): Promise<MatchPlayer[]> {
   const { data, error } = await supabase
     .schema("afl")
-    .from("v_match_center_players_canonical")
+    .from("v_match_center_players_2025_canonical")
     .select("*")
     .eq("season", season)
     .eq("round_number", roundNumber)
@@ -134,6 +114,7 @@ export async function fetchMatchPlayers(
   }
 
   if (!data || data.length === 0) {
+    console.debug("[fetchMatchPlayers] No players for", { season, roundNumber, matchIndex });
     return [];
   }
 
@@ -141,13 +122,16 @@ export async function fetchMatchPlayers(
     season: row.season ?? season,
     round_number: row.round_number ?? roundNumber,
     match_index: row.match_index ?? matchIndex,
+    team_id: row.team_id ?? undefined,
     team_name: row.team_name ?? "Unknown",
+    team_abbr: row.team_abbr ?? undefined,
     team_color: safeColor(row.team_color),
     player_name: row.player_name ?? "Unknown Player",
-    player_role: row.position ?? "Unknown",
+    player_role: row.player_role ?? "Unknown",
     fantasy_points: Number(row.fantasy_points ?? 0),
     disposals: Number(row.disposals ?? 0),
     goals: Number(row.goals ?? 0),
+    efficiency: row.efficiency ?? undefined,
     opponent_name: row.opponent_name ?? "Unknown",
   }));
 }
@@ -156,31 +140,8 @@ export async function fetchMatchTeamTotals(
   season: number,
   vendorGameId: string
 ): Promise<MatchTeamTotal[]> {
-  const { data, error } = await supabase
-    .schema("afl")
-    .from("v_match_center_team_stats")
-    .select("*")
-    .eq("season", season)
-    .eq("vendor_game_id", vendorGameId);
-
-  if (error) {
-    console.error("[fetchMatchTeamTotals] Error:", error);
-    return [];
-  }
-
-  if (!data || data.length === 0) {
-    return [];
-  }
-
-  return data.map((row): MatchTeamTotal => ({
-    season: row.season ?? season,
-    vendor_game_id: row.vendor_game_id ?? vendorGameId,
-    team_name: row.team_name ?? "Unknown",
-    team_color: safeColor(row.team_color),
-    total_disposals: row.total_disposals ?? 0,
-    total_goals: row.total_goals ?? 0,
-    total_fantasy_points: row.total_fantasy_points ?? 0,
-  }));
+  console.debug("[fetchMatchTeamTotals] v_match_center_team_stats view does not exist yet; returning empty");
+  return [];
 }
 
 export function computeTop3(players: MatchPlayer[]): MatchPlayer[] {
