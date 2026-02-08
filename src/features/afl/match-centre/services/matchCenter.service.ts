@@ -1,7 +1,6 @@
 import { supabase } from "@/lib/supabaseClient";
 import type {
   MatchSummary,
-  MatchHeader,
   MatchPlayerStats,
   MatchScatterPoint,
   MomentumPoint,
@@ -15,120 +14,66 @@ import type {
 const NEUTRAL_COLOR = "var(--neutral-500)";
 
 export async function fetchMatches(season: number): Promise<MatchSummary[]> {
-  const [gamesResult, headerResult] = await Promise.all([
-    supabase
-      .schema("afl")
-      .from("v_match_center_games")
-      .select(`
-        vendor_game_id,
-        season,
-        round_number,
-        round_label,
-        match_index,
-        match_date,
-        match_time,
-        game_time,
-        venue,
-        home_team,
-        home_team_abbr,
-        home_team_color,
-        home_team_id,
-        away_team,
-        away_team_abbr,
-        away_team_color,
-        away_team_id,
-        home_score,
-        away_score,
-        status
-      `)
-      .eq("season", 2025)
-      .order("round_number", { ascending: true })
-      .order("match_date", { ascending: true })
-      .order("match_time", { ascending: true }),
-    supabase
-      .schema("afl")
-      .from("v_match_center_round_days")
-      .select("match_id, match_day")
-      .eq("season", 2025),
-  ]);
+  const { data, error } = await supabase
+    .schema("afl")
+    .from("v_match_center_games")
+    .select(`
+      vendor_game_id,
+      season,
+      round_number,
+      round_label,
+      match_index,
+      match_date,
+      match_time,
+      game_time,
+      venue,
+      home_team,
+      home_team_abbr,
+      home_team_color,
+      home_team_id,
+      away_team,
+      away_team_abbr,
+      away_team_color,
+      away_team_id,
+      home_score,
+      away_score,
+      status
+    `)
+    .eq("season", 2025)
+    .order("round_number", { ascending: true })
+    .order("match_date", { ascending: true })
+    .order("match_time", { ascending: true });
 
-  if (gamesResult.error) {
-    console.error("[fetchMatches]", gamesResult.error);
-    throw gamesResult.error;
+  if (error) {
+    console.error("[fetchMatches]", error);
+    throw error;
   }
 
-  if (!gamesResult.data || gamesResult.data.length === 0) {
+  if (!data || data.length === 0) {
     return [];
   }
 
-  const dayMap = new Map<string, string>();
-  if (headerResult.data) {
-    for (const h of headerResult.data) {
-      if (h.match_id && h.match_day) {
-        dayMap.set(String(h.match_id), String(h.match_day));
-      }
-    }
-  }
-
-  return gamesResult.data.map((row): MatchSummary => {
-    const id = String(row.vendor_game_id ?? "");
-    const fixtureDate = dayMap.get(id);
-
-    return {
-      match_id: id,
-      season: row.season ?? season,
-      round_number: row.round_number ?? 0,
-      round_label: row.round_label ?? `R${row.round_number ?? 0}`,
-      match_date: fixtureDate ?? (row.match_date ? String(row.match_date) : undefined),
-      match_time: row.match_time ? String(row.match_time) : undefined,
-      game_time: row.game_time ? String(row.game_time) : undefined,
-      venue: row.venue ?? undefined,
-      home_team: row.home_team ?? "Home",
-      home_team_abbr: row.home_team_abbr ?? undefined,
-      home_team_color: row.home_team_color ?? NEUTRAL_COLOR,
-      home_team_id: row.home_team_id ? String(row.home_team_id) : undefined,
-      away_team: row.away_team ?? "Away",
-      away_team_abbr: row.away_team_abbr ?? undefined,
-      away_team_color: row.away_team_color ?? NEUTRAL_COLOR,
-      away_team_id: row.away_team_id ? String(row.away_team_id) : undefined,
-      home_score: row.home_score ?? null,
-      away_score: row.away_score ?? null,
-      status: row.status ?? "Scheduled",
-    };
-  });
-}
-
-export async function fetchMatchHeader(params: {
-  match_id: string;
-}): Promise<MatchHeader | null> {
-  if (!params.match_id) return null;
-
-  const { data, error } = await supabase
-    .schema("afl")
-    .from("v_match_center_round_days")
-    .select(
-      "match_id, venue, status, round_label, home_team, away_team, home_score, away_score"
-    )
-    .eq("match_id", params.match_id)
-    .maybeSingle();
-
-  if (error) {
-    console.debug("[fetchMatchHeader]", error.message);
-    return null;
-  }
-
-  if (!data) return null;
-
-  return {
-    match_id: String(data.match_id),
-    venue: data.venue ?? null,
-    status: data.status ?? null,
-    round_label: data.round_label ?? null,
-    home_team: data.home_team ?? null,
-    away_team: data.away_team ?? null,
-    home_score: data.home_score ?? null,
-    away_score: data.away_score ?? null,
-  };
+  return data.map((row): MatchSummary => ({
+    match_id: String(row.vendor_game_id ?? ""),
+    season: row.season ?? season,
+    round_number: row.round_number ?? 0,
+    round_label: row.round_label ?? `R${row.round_number ?? 0}`,
+    match_date: row.match_date ? String(row.match_date) : undefined,
+    match_time: row.match_time ? String(row.match_time) : undefined,
+    game_time: row.game_time ? String(row.game_time) : undefined,
+    venue: row.venue ?? undefined,
+    home_team: row.home_team ?? "Home",
+    home_team_abbr: row.home_team_abbr ?? undefined,
+    home_team_color: row.home_team_color ?? NEUTRAL_COLOR,
+    home_team_id: row.home_team_id ? String(row.home_team_id) : undefined,
+    away_team: row.away_team ?? "Away",
+    away_team_abbr: row.away_team_abbr ?? undefined,
+    away_team_color: row.away_team_color ?? NEUTRAL_COLOR,
+    away_team_id: row.away_team_id ? String(row.away_team_id) : undefined,
+    home_score: row.home_score ?? null,
+    away_score: row.away_score ?? null,
+    status: row.status ?? "Scheduled",
+  }));
 }
 
 export async function fetchMatchPlayerStats(params: {

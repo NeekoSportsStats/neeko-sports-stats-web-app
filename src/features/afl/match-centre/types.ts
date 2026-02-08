@@ -132,17 +132,6 @@ export type QuarterScore = {
   away_points: number;
 };
 
-export type MatchHeader = {
-  match_id: string;
-  venue: string | null;
-  status: string | null;
-  round_label: string | null;
-  home_team: string | null;
-  away_team: string | null;
-  home_score: number | null;
-  away_score: number | null;
-};
-
 export type DayGroup = {
   season: number;
   round_number: number;

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Calendar } from "lucide-react";
-import { fetchMatches, fetchMatchHeader, fetchMatchOverlayTimeline, fetchMatchPlayerStats, fetchMatchScatterData, fetchQuarterScores } from "./services/matchCenter.service";
+import { fetchMatches, fetchMatchOverlayTimeline, fetchMatchPlayerStats, fetchMatchScatterData, fetchQuarterScores } from "./services/matchCenter.service";
 import { groupMatchesByDay } from "./utils";
-import type { DayGroup, MatchSummary, MatchHeader, MatchTimeline, MatchPlayerStats, MatchScatterPoint, QuarterScore } from "./types";
+import type { DayGroup, MatchSummary, MatchTimeline, MatchPlayerStats, MatchScatterPoint, QuarterScore } from "./types";
 import MatchList from "./MatchList";
 import MatchOverlay from "./MatchOverlay";
 
@@ -16,7 +16,6 @@ export default function AFLMatchCentrePage() {
   const [matchPlayerStats, setMatchPlayerStats] = useState<MatchPlayerStats[]>([]);
   const [scatterData, setScatterData] = useState<MatchScatterPoint[]>([]);
   const [quarterScores, setQuarterScores] = useState<QuarterScore[]>([]);
-  const [matchHeader, setMatchHeader] = useState<MatchHeader | null>(null);
   const [season, setSeason] = useState(2025);
   const [round, setRound] = useState(1);
 
@@ -78,11 +77,6 @@ export default function AFLMatchCentrePage() {
       setMatchPlayerStats([]);
       setScatterData([]);
       setQuarterScores([]);
-      setMatchHeader(null);
-
-      fetchMatchHeader({ match_id: id })
-        .then((h) => setMatchHeader(h))
-        .catch(() => setMatchHeader(null));
 
       fetchMatchOverlayTimeline({ match_id: id })
         .then((data) => setTimeline(data))
@@ -209,14 +203,12 @@ export default function AFLMatchCentrePage() {
       {selectedMatch && (
         <MatchOverlay
           match={selectedMatch}
-          header={matchHeader}
           timeline={timeline}
           matchPlayerStats={matchPlayerStats}
           scatterData={scatterData}
           quarterScores={quarterScores}
           onClose={() => {
             setSelectedMatch(null);
-            setMatchHeader(null);
             setTimeline(null);
             setMatchPlayerStats([]);
             setScatterData([]);
