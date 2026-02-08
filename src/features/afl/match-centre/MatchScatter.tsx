@@ -30,7 +30,10 @@ function round2(n: number) {
 }
 
 export default function MatchScatter({ players }: Props) {
+  // Guard: filter out null/undefined entries that would crash the
+  // `"disposals" in p` checks below (TypeError on `in` operator).
   const data = (players ?? [])
+    .filter((p): p is NonNullable<typeof p> => p != null)
     .map((p) => {
       const disp = ("disposals" in p ? p.disposals : 0) ?? 0;
       const fp = ("fantasy_points" in p ? p.fantasy_points : "fantasyPoints" in p ? (p as any).fantasyPoints : 0) ?? 0;

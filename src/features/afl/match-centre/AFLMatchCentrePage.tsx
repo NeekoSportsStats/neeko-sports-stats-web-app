@@ -51,7 +51,9 @@ export default function AFLMatchCentrePage() {
   }, [season, loadMatches]);
 
   useEffect(() => {
-    const filtered = allMatches.filter((m) => m.round_number === round);
+    // Guard: allMatches should always be an array but ?? [] prevents a
+    // crash if a concurrent setState race yields null/undefined.
+    const filtered = (allMatches ?? []).filter((m) => m.round_number === round);
     const grouped = groupMatchesByDay(filtered);
     setGroups(grouped);
   }, [allMatches, round]);

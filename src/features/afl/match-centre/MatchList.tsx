@@ -25,18 +25,27 @@ export default function MatchList({ groups, onSelectMatch }: Props) {
   return (
     <div className="space-y-8">
       {groups.map((g, idx) => {
-        const dayLabel = new Date(g.match_date).toLocaleDateString(undefined, {
-          weekday: "long",
-          month: "short",
-          day: "numeric",
-        });
+        // Guard: new Date() on a missing/malformed match_date produces
+        // Invalid Date — fall back to the raw string so the UI never
+        // shows "Invalid Date".
+        const parsed = new Date(g.match_date);
+        const dayLabel = Number.isNaN(parsed.getTime())
+          ? (g.match_date || "Date TBC")
+          : parsed.toLocaleDateString(undefined, {
+              weekday: "long",
+              month: "short",
+              day: "numeric",
+            });
+
+        // Guard: matches array may be undefined if upstream data is sparse.
+        const matches = g.matches ?? [];
 
         return (
           <div key={idx} className="space-y-4">
             <div className="text-white/80 font-semibold">{dayLabel}</div>
 
             <div className="space-y-4">
-              {g.matches.map((m) => {
+              {matches.map((m) => {
                 const homeTeam = m.home_team ?? "Home";
                 const awayTeam = m.away_team ?? "Away";
                 const venue = m.venue ?? "TBC";

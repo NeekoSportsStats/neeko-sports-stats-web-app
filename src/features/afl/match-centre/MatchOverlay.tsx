@@ -97,10 +97,15 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
     const homeKey = normaliseTeamName(match.home_team);
     const awayKey = normaliseTeamName(match.away_team);
 
-    const scopedPlayers = players.filter(p => {
-      const teamKey = normaliseTeamName(p.team_name);
-      return teamKey === homeKey || teamKey === awayKey;
-    });
+    // Guard: tolerate players being null/non-array, and filter out any
+    // null/undefined entries so p.team_name never throws TypeError.
+    const safePlayers = Array.isArray(players) ? players : [];
+    const scopedPlayers = safePlayers
+      .filter((p): p is MatchPlayer => p != null)
+      .filter(p => {
+        const teamKey = normaliseTeamName(p.team_name);
+        return teamKey === homeKey || teamKey === awayKey;
+      });
 
     const teamMap = new Map<string, MatchPlayer[]>();
 
