@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
-import type { MatchSummary, MatchPlayer, MatchTeamTotal } from "../types";
+import type { MatchSummary, MatchPlayer, MatchTeamTotal, MomentumPoint } from "../types";
 
 const NEUTRAL_COLOR = "var(--neutral-500)";
 
@@ -232,6 +232,36 @@ export async function fetchMatchTeamTotals(
 ): Promise<MatchTeamTotal[]> {
   console.debug("[fetchMatchTeamTotals] v_match_center_team_stats view does not exist yet; returning empty");
   return [];
+}
+
+// Fetches per-minute momentum data for a single match from
+// afl.v_match_team_momentum_2025.  The view may not exist yet —
+// the catch block ensures the overlay never crashes.
+export async function fetchMatchMomentum(matchId: string): Promise<MomentumPoint[]> {
+  const { data, error } = await supabase
+    .schema("afl")
+    .from("v_match_team_momentum_2025")
+    .select("match_id, season, quarter, minute, momentum")
+    .eq("match_id", matchId)
+    .order("quarter", { ascending: true })
+    .order("minute", { ascending: true });
+
+  if (error) {
+    // View may not be deployed yet — log but never throw so overlay
+    // rendering is unaffected.
+    console.debug("[fetchMatchMomentum] Query failed (view may not exist):", error.message);
+    return [];
+  }
+
+  if (!data || data.length === 0) return [];
+
+  return data.map((row): MomentumPoint => ({
+    match_id: String(row.match_id ?? matchId),
+    season: Number(row.season ?? 2025),
+    quarter: Number(row.quarter ?? 1),
+    minute: Number(row.minute ?? 0),
+    momentum: Number(row.momentum ?? 0),
+  }));
 }
 
 export function computeTop3(players: MatchPlayer[]): MatchPlayer[] {

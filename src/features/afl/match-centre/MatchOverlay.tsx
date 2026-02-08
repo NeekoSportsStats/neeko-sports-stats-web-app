@@ -3,6 +3,7 @@ import { X, MapPin, Clock } from "lucide-react";
 import { fetchMatchPlayers } from "./services/matchCenter.service";
 import type { MatchSummary, MatchPlayer } from "./types";
 import MatchScatter from "./MatchScatter";
+import MomentumTimeline from "./MomentumTimeline";
 
 interface MatchOverlayProps {
   match: MatchSummary;
@@ -260,6 +261,15 @@ export default function MatchOverlay({ match, onClose }: MatchOverlayProps) {
               </div>
 
               <MatchScatter players={players} />
+
+              {/* Momentum chart loads independently — never blocks
+                  the overlay and silently shows an empty state if
+                  the backend view isn't deployed yet. */}
+              <MomentumTimeline
+                vendorGameId={match.vendor_game_id}
+                homeTeam={match.home_team ?? "Home"}
+                awayTeam={match.away_team ?? "Away"}
+              />
 
               <div className="rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-r from-[#F5C84C]/20 to-transparent p-6">
                 <div className="text-white font-semibold mb-1">AI Match Preview</div>

@@ -51,6 +51,14 @@ export type MatchTeamTotal = {
   [key: string]: unknown;
 };
 
+export type MomentumPoint = {
+  match_id: string;
+  season: number;
+  quarter: number;
+  minute: number;
+  momentum: number;
+};
+
 export type DayGroup = {
   season: number;
   round_number: number;
