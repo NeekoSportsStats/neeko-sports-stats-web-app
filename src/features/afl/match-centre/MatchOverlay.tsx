@@ -109,6 +109,58 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
     };
   }, [players, match.home_team, match.away_team]);
 
+  const insightSentences = useMemo(() => {
+    if (!matchPlayerStats || matchPlayerStats.length === 0) return null;
+
+    const sentences: string[] = [];
+    const hScore = match.home_score ?? null;
+    const aScore = match.away_score ?? null;
+    const home = match.home_team ?? "Home";
+    const away = match.away_team ?? "Away";
+
+    if (hScore != null && aScore != null) {
+      const margin = Math.abs(hScore - aScore);
+      const winner = hScore >= aScore ? home : away;
+      const winScore = Math.max(hScore, aScore);
+      const loseScore = Math.min(hScore, aScore);
+      if (margin === 0) {
+        sentences.push(`${home} and ${away} drew ${hScore}-${aScore}.`);
+      } else {
+        sentences.push(`${winner} won by ${margin} points, ${winScore}-${loseScore}.`);
+      }
+    }
+
+    const sorted = [...matchPlayerStats].sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0));
+    const bog = sorted[0];
+    if (bog) {
+      sentences.push(
+        `Best on ground was ${bog.player} (${bog.player_team}) with ${bog.fantasy_points} fantasy points from ${bog.disposals} disposals.`
+      );
+    }
+
+    if (timeline?.margin && timeline.margin.length > 0) {
+      let biggest = timeline.margin[0];
+      for (const m of timeline.margin) {
+        if (Math.abs(m.margin_delta) > Math.abs(biggest.margin_delta)) biggest = m;
+      }
+      if (Math.abs(biggest.margin_delta) > 0) {
+        sentences.push(
+          `The biggest momentum swing was ${Math.abs(biggest.margin_delta)} points around Q${biggest.quarter} ${biggest.minute}\u2032.`
+        );
+      }
+    }
+
+    const homeTop = team1Top3[0];
+    const awayTop = team2Top3[0];
+    if (homeTop && awayTop) {
+      sentences.push(
+        `${homeTop.player_name} led ${home} (${homeTop.fantasy_points} FP) while ${awayTop.player_name} was best for ${away} (${awayTop.fantasy_points} FP).`
+      );
+    }
+
+    return sentences;
+  }, [matchPlayerStats, match.home_score, match.away_score, match.home_team, match.away_team, timeline, team1Top3, team2Top3]);
+
   const roundLabel = match.round_label ?? "AFL";
   const season = match.season ?? 2025;
   const status = match.status ?? "";
@@ -252,9 +304,13 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
               <MatchScatter scatterData={scatterData ?? []} />
 
               <div className="rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-r from-[#F5C84C]/20 to-transparent p-6">
-                <div className="text-white font-semibold mb-1">AI Match Preview</div>
-                <div className="text-white/70 text-sm">
-                  Coming soon — will use player efficiency/volume and team context.
+                <div className="text-white font-semibold mb-1">Finished Game Insights</div>
+                <div className="text-white/70 text-sm space-y-1">
+                  {insightSentences ? (
+                    insightSentences.map((s, i) => <p key={i}>{s}</p>)
+                  ) : (
+                    <p>Insights will appear once player stats load.</p>
+                  )}
                 </div>
               </div>
             </>
