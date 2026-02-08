@@ -23,20 +23,14 @@ export type QuarterScoreRow = {
 };
 
 // ⚠️ CONTRACT LOCK:
-// afl.match_center_games_base has NO match_date or match_time.
-// Do NOT introduce date-based selection or ordering.
-// Ordering must remain round_number + match_id only.
-//
-// AUTHORITATIVE SCHEMA (DO NOT DEVIATE):
+// afl.match_center_games_base schema:
 // - match_id, season, round_number, round_label, round_instance
-// - home_team_vendor, away_team_vendor
+// - home_team_vendor, away_team_vendor (NOT home_team/away_team)
 // - home_score, away_score, home_goals, home_behinds, away_goals, away_behinds
-// - venue, status, updated_at
+// - venue, status, updated_at (ONLY datetime field - use as match date)
 //
-// DOES NOT CONTAIN:
-// - match_date, match_time
-// - home_team, away_team
-// - team colours, abbreviations, or IDs
+// Date handling: updated_at is the match datetime. Convert to YYYY-MM-DD for grouping.
+// Ordering: round_number + match_id in query, then by updated_at locally for display.
 export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   const { data, error } = await supabase
     .schema("afl")
@@ -64,7 +58,7 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
     .order("match_id", { ascending: true });
 
   if (error) {
-    console.error("[fetchMatches] Supabase error:", error);
+    console.error("[fetchMatches]", error);
     throw error;
   }
 
@@ -72,24 +66,30 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
     return [];
   }
 
-  return data.map((row): MatchSummary => ({
-    match_id: String(row.match_id ?? ""),
-    season: row.season ?? season,
-    round_number: row.round_number ?? 0,
-    round_label: row.round_label ?? `R${row.round_number ?? 0}`,
-    round_instance: row.round_instance ?? undefined,
-    home_team_vendor: String(row.home_team_vendor ?? "Home"),
-    away_team_vendor: String(row.away_team_vendor ?? "Away"),
-    home_score: row.home_score ?? null,
-    away_score: row.away_score ?? null,
-    home_goals: row.home_goals ?? null,
-    home_behinds: row.home_behinds ?? null,
-    away_goals: row.away_goals ?? null,
-    away_behinds: row.away_behinds ?? null,
-    venue: row.venue ?? undefined,
-    status: row.status ?? "Scheduled",
-    updated_at: row.updated_at ?? undefined,
-  }));
+  return data.map((row): MatchSummary => {
+    const updatedAt = row.updated_at ? new Date(row.updated_at) : null;
+    const matchDate = updatedAt ? updatedAt.toISOString().split('T')[0] : undefined;
+
+    return {
+      match_id: String(row.match_id ?? ""),
+      season: row.season ?? season,
+      round_number: row.round_number ?? 0,
+      round_label: row.round_label ?? `R${row.round_number ?? 0}`,
+      round_instance: row.round_instance ?? undefined,
+      home_team_vendor: String(row.home_team_vendor ?? "Home"),
+      away_team_vendor: String(row.away_team_vendor ?? "Away"),
+      home_score: row.home_score ?? null,
+      away_score: row.away_score ?? null,
+      home_goals: row.home_goals ?? null,
+      home_behinds: row.home_behinds ?? null,
+      away_goals: row.away_goals ?? null,
+      away_behinds: row.away_behinds ?? null,
+      venue: row.venue ?? undefined,
+      status: row.status ?? "Scheduled",
+      updated_at: row.updated_at ?? undefined,
+      date: matchDate,
+    };
+  });
 }
 
 export async function fetchMatchPlayerStats(params: {

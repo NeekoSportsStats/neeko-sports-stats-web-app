@@ -1,16 +1,33 @@
 // ⚠️ CONTRACT LOCK:
-// afl.match_center_games_base has NO match_date or match_time.
-// Do NOT introduce date-based selection or ordering.
-// Display is round-based only using round_label and round_instance.
+// afl.match_center_games_base has updated_at as the ONLY datetime field.
+// Use date (derived from updated_at) for display.
+// Format dates as: Thu 15 Aug, Fri 16 Aug, etc.
 
 import React from "react";
-import type { RoundGroup, MatchSummary } from "./types";
+import type { DayGroup, MatchSummary } from "./types";
 import type { QuarterScoreRow } from "./services/matchCenter.service";
 
 interface Props {
-  groups: RoundGroup[];
+  groups: DayGroup[];
   onSelectMatch: (m: MatchSummary) => void;
   quarterScoresMap?: Map<string, QuarterScoreRow[]>;
+}
+
+function formatDayLabel(dateStr: string): string {
+  if (dateStr === "Unknown") return "Date TBC";
+
+  try {
+    const date = new Date(`${dateStr}T00:00:00`);
+    if (isNaN(date.getTime())) return dateStr;
+
+    return date.toLocaleDateString(undefined, {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+  } catch {
+    return dateStr;
+  }
 }
 
 function computeWonBy(m: MatchSummary): string | null {
@@ -36,13 +53,14 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
   return (
     <div className="space-y-8">
       {groups.map((g, idx) => {
-        const roundLabel = g.round_label || `Round ${g.round_number}`;
+        const dayLabel = formatDayLabel(g.date);
         const matches = g.matches ?? [];
 
         return (
           <div key={idx} className="space-y-4">
             <div className="flex items-baseline gap-3">
-              <span className="text-white/90 font-semibold text-lg">{roundLabel}</span>
+              <span className="text-white/90 font-semibold text-lg">{dayLabel}</span>
+              <span className="text-white/40 text-sm">{g.round_label}</span>
             </div>
 
             <div className="space-y-4">

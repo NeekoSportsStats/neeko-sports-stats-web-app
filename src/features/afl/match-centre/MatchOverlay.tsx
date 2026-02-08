@@ -1,10 +1,10 @@
 // ⚠️ CONTRACT LOCK:
-// afl.match_center_games_base has NO match_date or match_time.
-// Do NOT introduce date-based display or formatting.
+// afl.match_center_games_base has updated_at as the ONLY datetime field.
+// Use date (derived from updated_at) for display.
 // Use home_team_vendor and away_team_vendor only.
 
 import React, { useEffect, useRef, useMemo } from "react";
-import { X, MapPin } from "lucide-react";
+import { X, MapPin, Clock } from "lucide-react";
 import type { MatchSummary, MatchPlayer, MatchPlayerStats, MatchScatterPoint, MatchTimeline } from "./types";
 import MatchScatter from "./MatchScatter";
 import MomentumTimeline from "./MomentumTimeline";
@@ -16,6 +16,17 @@ interface MatchOverlayProps {
   scatterData?: MatchScatterPoint[];
   quarterSummary?: string | null;
   onClose: () => void;
+}
+
+function formatMatchDate(dateStr: string | null | undefined) {
+  if (!dateStr) return null;
+  try {
+    const parsed = new Date(`${dateStr}T00:00:00`);
+    if (isNaN(parsed.getTime())) return null;
+    return parsed.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  } catch {
+    return null;
+  }
 }
 
 function normaliseTeamName(name?: string | null) {
@@ -199,6 +210,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
   const season = match.season ?? 2025;
   const isFinished = match.status === "FT";
   const venue = match.venue && match.venue !== "TBC" ? match.venue : null;
+  const formattedDate = formatMatchDate(match.date);
   const homeScore = match.home_score ?? null;
   const awayScore = match.away_score ?? null;
   const homeColor = "#F5C84C";
@@ -283,6 +295,12 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                 <div className={`flex items-center gap-2 ${isFinished ? "text-white/30" : "text-white/70"}`}>
                   <MapPin className="h-4 w-4" />
                   <span>{venue}</span>
+                </div>
+              )}
+              {formattedDate && (
+                <div className="flex items-center gap-2 text-white/50">
+                  <Clock className="h-4 w-4" />
+                  <span>{formattedDate}</span>
                 </div>
               )}
               {isFinished && (

@@ -1,11 +1,9 @@
 // ⚠️ CONTRACT LOCK:
-// afl.match_center_games_base has NO match_date or match_time.
-// Do NOT introduce date-based selection or ordering.
-// Ordering must remain round_number + match_id only.
-//
-// Grouping is done by round_instance (for double-header rounds) or round_label.
+// afl.match_center_games_base has updated_at as the ONLY datetime field.
+// Use date (derived from updated_at) for grouping matches by day.
+// Format: Thu 15 Aug, Fri 16 Aug, Sat 17 Aug, etc.
 
-import type { MatchPlayer, MatchSummary, RoundGroup } from "./types";
+import type { MatchPlayer, MatchSummary, DayGroup } from "./types";
 
 export function computeTop3(players: MatchPlayer[]): MatchPlayer[] {
   if (!players || players.length === 0) {
@@ -28,37 +26,33 @@ export function computeTop3(players: MatchPlayer[]): MatchPlayer[] {
   return sorted.slice(0, 3);
 }
 
-export function groupMatchesByRound(matches: MatchSummary[]): RoundGroup[] {
+export function groupMatchesByDay(matches: MatchSummary[]): DayGroup[] {
   if (!matches || matches.length === 0) {
     return [];
   }
 
-  const grouped = new Map<string, RoundGroup>();
+  const grouped = new Map<string, DayGroup>();
 
   for (const match of matches) {
-    const groupKey = match.round_instance
-      ? `${match.round_label}-${match.round_instance}`
-      : match.round_label ?? `R${match.round_number ?? 0}`;
+    const matchDate = match.date ?? "Unknown";
 
-    if (!grouped.has(groupKey)) {
-      grouped.set(groupKey, {
+    if (!grouped.has(matchDate)) {
+      grouped.set(matchDate, {
         season: match.season ?? 2025,
         round_number: match.round_number ?? 0,
         round_label: match.round_label ?? `R${match.round_number ?? 0}`,
-        round_instance: match.round_instance,
+        date: matchDate,
         matches: [],
       });
     }
 
-    grouped.get(groupKey)!.matches.push(match);
+    grouped.get(matchDate)!.matches.push(match);
   }
 
   return Array.from(grouped.values()).sort((a, b) => {
-    if (a.round_number !== b.round_number) {
-      return a.round_number - b.round_number;
-    }
-    const aInstance = a.round_instance ?? 0;
-    const bInstance = b.round_instance ?? 0;
-    return aInstance - bInstance;
+    if (a.date === "Unknown" && b.date !== "Unknown") return 1;
+    if (a.date !== "Unknown" && b.date === "Unknown") return -1;
+    if (a.date === "Unknown" && b.date === "Unknown") return 0;
+    return a.date.localeCompare(b.date);
   });
 }
