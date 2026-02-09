@@ -22,13 +22,15 @@ type ChartRow = {
   label: string;
   momentum: number;
   quarter: number;
+  minute: number;
 };
 
 function toChartData(points: MomentumPoint[]): ChartRow[] {
   return points.map((p) => ({
-    label: `Q${p.quarter}`,
+    label: `Q${p.quarter} ${p.minute}'`,
     momentum: p.momentum,
     quarter: p.quarter,
+    minute: p.minute,
   }));
 }
 
@@ -81,6 +83,18 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
     );
   }
 
+  const quarterStarts = useMemo(() => {
+    const starts: number[] = [];
+    let prevQ = -1;
+    for (let i = 0; i < data.length; i++) {
+      if (data[i].quarter !== prevQ) {
+        starts.push(i);
+        prevQ = data[i].quarter;
+      }
+    }
+    return starts;
+  }, [data]);
+
   const dominantQuarter = useMemo(() => {
     if (data.length === 0) return null;
     const sorted = [...data].sort((a, b) => Math.abs(b.momentum) - Math.abs(a.momentum));
@@ -88,7 +102,6 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
     if (Math.abs(strongest.momentum) < 5) return null;
 
     const team = strongest.momentum > 0 ? homeTeam : awayTeam;
-    const qLabel = `Q${strongest.quarter}`;
 
     if (strongest.quarter === 1) return `${team} seized control in the opening quarter.`;
     if (strongest.quarter === 2) return `${team} dominated the second term with sustained pressure.`;
@@ -99,9 +112,9 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
   return (
     <div className="rounded-xl border border-white/[0.08] bg-black/40 backdrop-blur-xl p-5 md:p-6">
       <div className="mb-4 md:mb-5">
-        <h3 className="text-base md:text-lg font-semibold text-white mb-2">Quarter Momentum</h3>
+        <h3 className="text-base md:text-lg font-semibold text-white mb-2">Match Momentum</h3>
         <p className="text-xs md:text-sm text-white/60 leading-[1.6]">
-          Quarter-by-quarter dominance. <span className="text-[#F5C84C]">{homeTeam}</span> positive, <span className="text-white/80">{awayTeam}</span> negative.
+          Tracking the ebb and flow throughout the contest. <span className="text-[#F5C84C]">{homeTeam}</span> positive, <span className="text-white/80">{awayTeam}</span> negative.
         </p>
         {dominantQuarter && (
           <p className="text-xs md:text-sm text-white/80 mt-2 italic leading-[1.6]">
@@ -110,9 +123,9 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
         )}
       </div>
 
-      <div className="min-h-[280px] h-[280px] md:h-[300px] w-full">
+      <div className="min-h-[280px] h-[280px] md:h-[300px] w-full overflow-x-auto">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 10, right: 20, bottom: 25, left: 20 }}>
+          <AreaChart data={data} margin={{ top: 10, right: 10, bottom: 25, left: 10 }}>
             <defs>
               <linearGradient id="momentumPos" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#F5C84C" stopOpacity={0.5} />
@@ -129,15 +142,32 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
             <XAxis
               dataKey="label"
               stroke="#666"
-              tick={{ fill: "#999", fontSize: 11 }}
+              tick={{ fill: "#666", fontSize: 9 }}
+              interval={50}
+              minTickGap={30}
             />
             <YAxis
               stroke="#666"
-              tick={{ fill: "#999", fontSize: 11 }}
+              tick={{ fill: "#666", fontSize: 9 }}
               tickFormatter={(v: number) => (v > 0 ? `+${v}` : String(v))}
             />
 
             <ReferenceLine y={0} stroke="#555" strokeWidth={1.5} />
+
+            {quarterStarts.map((idx) => (
+              <ReferenceLine
+                key={`q-${data[idx].quarter}`}
+                x={data[idx].label}
+                stroke="#555"
+                strokeDasharray="4 4"
+                label={{
+                  value: `Q${data[idx].quarter}`,
+                  position: "top",
+                  fill: "#888",
+                  fontSize: 10,
+                }}
+              />
+            ))}
 
             <Tooltip
               cursor={{ stroke: "#F5C84C", strokeWidth: 1 }}
@@ -150,7 +180,7 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
                   <div className="rounded-lg border border-white/20 bg-black/90 backdrop-blur-xl p-3 shadow-xl">
                     <div className="text-xs text-white/60 mb-1">{row.label}</div>
                     <div className="text-sm font-medium text-white">
-                      {team} {Math.abs(val) > 0 ? "dominated" : "held"}
+                      {team}: {val > 0 ? "+" : ""}{val}
                     </div>
                   </div>
                 );
@@ -163,7 +193,7 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
               stroke="#F5C84C"
               strokeWidth={2}
               fill="url(#momentumPos)"
-              activeDot={{ r: 5, fill: "#F5C84C", stroke: "#000", strokeWidth: 1 }}
+              activeDot={{ r: 4, fill: "#F5C84C", stroke: "#000", strokeWidth: 1 }}
             />
           </AreaChart>
         </ResponsiveContainer>
