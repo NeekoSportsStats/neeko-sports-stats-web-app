@@ -41,7 +41,7 @@ function computeWonBy(m: MatchSummary): string | null {
   return `${winner} won by ${margin} pts`;
 }
 
-export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: Props) {
+export default function MatchList({ groups, onSelectMatch }: Props) {
   if (!groups || groups.length === 0) {
     return (
       <div className="rounded-2xl border border-white/10 bg-black/30 p-10 text-center text-white/50">
@@ -51,19 +51,19 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
   }
 
   return (
-    <div className="space-y-8 md:space-y-10">
+    <div className="space-y-6 md:space-y-10">
       {groups.map((g, idx) => {
         const dayLabel = formatDayLabel(g.date);
         const matches = g.matches ?? [];
 
         return (
-          <div key={idx} className="space-y-4 md:space-y-5">
-            <div className="flex items-baseline gap-3 py-2">
+          <div key={idx} className="space-y-3 md:space-y-5">
+            <div className="flex items-baseline gap-3 py-1.5 md:py-2">
               <span className="text-white/90 font-semibold text-base md:text-lg">{dayLabel}</span>
               <span className="text-white/40 text-xs md:text-sm">{g.round_label}</span>
             </div>
 
-            <div className="space-y-4 md:space-y-5">
+            <div className="space-y-3 md:space-y-5">
               {matches.map((m, mIdx) => {
                 const homeTeam = m.home_team_vendor ?? "Home";
                 const awayTeam = m.away_team_vendor ?? "Away";
@@ -75,37 +75,25 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                 const homeWon = homeScore != null && awayScore != null && homeScore > awayScore;
                 const awayWon = homeScore != null && awayScore != null && awayScore > homeScore;
 
-                const quarters = quarterScoresMap?.get(m.match_id ?? "") ?? [];
-                const hasQuarters = quarters.length > 0 && isFinished;
-
                 return (
                   <button
                     key={m.match_id ?? mIdx}
                     onClick={() => onSelectMatch(m)}
-                    className="w-full text-left rounded-2xl border border-white/[0.08] bg-black/30 hover:bg-black/40 active:bg-black/50 transition-all p-5 md:p-6"
+                    className="w-full text-left rounded-2xl border border-white/[0.08] bg-black/30 hover:bg-black/40 active:bg-black/50 transition-all p-4 md:p-6"
                   >
-                    <div className="grid grid-cols-3 items-start gap-4 md:gap-6">
+                    <div className="grid grid-cols-3 items-start gap-3 md:gap-6">
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full bg-[#F5C84C]" />
                           <div className="text-white font-semibold text-sm md:text-base leading-tight break-words line-clamp-2">{homeTeam}</div>
                         </div>
-                        <div className={`text-xl md:text-2xl font-bold ${homeWon ? 'text-[#F5C84C]' : 'text-[#F5C84C]/85'}`}>{homeScore ?? "—"}</div>
-                        {hasQuarters && (
-                          <div className="space-y-0.5 mt-2">
-                            {quarters.map(q => (
-                              <div key={q.quarter} className="text-xs text-white/40">
-                                Q{q.quarter} {q.home_goals}.{q.home_behinds}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        <div className={`text-2xl md:text-3xl font-bold ${homeWon ? 'text-[#F5C84C]' : 'text-[#F5C84C]/85'}`}>{homeScore ?? "—"}</div>
                       </div>
 
-                      <div className="text-center pt-2">
+                      <div className="text-center pt-1.5 md:pt-2">
                         <div className="text-white/30 font-black text-lg md:text-xl">VS</div>
                         {wonBy && (
-                          <div className="mt-3 text-xs text-white/50 leading-snug">{wonBy}</div>
+                          <div className="mt-2 md:mt-3 text-xs text-white/50 leading-snug px-1">{wonBy}</div>
                         )}
                       </div>
 
@@ -114,20 +102,11 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                           <div className="text-white font-semibold text-sm md:text-base leading-tight break-words line-clamp-2 text-right">{awayTeam}</div>
                           <div className="w-2 h-2 rounded-full bg-[#60A5FA]" />
                         </div>
-                        <div className={`text-xl md:text-2xl font-bold ${awayWon ? 'text-[#F5C84C]' : 'text-[#F5C84C]/85'}`}>{awayScore ?? "—"}</div>
-                        {hasQuarters && (
-                          <div className="space-y-0.5 mt-2">
-                            {quarters.map(q => (
-                              <div key={q.quarter} className="text-xs text-white/40">
-                                Q{q.quarter} {q.away_goals}.{q.away_behinds}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        <div className={`text-2xl md:text-3xl font-bold ${awayWon ? 'text-[#F5C84C]' : 'text-[#F5C84C]/85'}`}>{awayScore ?? "—"}</div>
                       </div>
                     </div>
 
-                    <div className="mt-5 pt-4 border-t border-white/[0.06] flex flex-wrap items-center gap-4 text-sm">
+                    <div className="mt-4 md:mt-5 pt-3 md:pt-4 border-t border-white/[0.06] flex flex-wrap items-center gap-3 md:gap-4 text-sm">
                       {venue && (
                         <div className={isFinished ? "text-white/30" : "text-white/60"}>{venue}</div>
                       )}
@@ -136,7 +115,7 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                           FT
                         </div>
                       )}
-                      <div className="ml-auto text-white/50 text-sm flex items-center gap-2 hover:text-[#F5C84C] transition-colors min-h-[48px] py-2">
+                      <div className="ml-auto text-white/50 text-sm flex items-center gap-2 hover:text-[#F5C84C] transition-colors min-h-[44px] md:min-h-[48px] py-2 -mr-1">
                         <span className="font-medium">View Details</span>
                         <span className="text-lg">›</span>
                       </div>

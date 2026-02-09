@@ -56,16 +56,16 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
   const hasTwoTeams = awayData.length > 0;
 
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-black/40 backdrop-blur-xl p-5 md:p-6">
-      <div className="mb-5 md:mb-6">
-        <h3 className="text-base md:text-lg font-semibold text-white mb-2">
+    <div className="rounded-xl md:rounded-xl border border-white/[0.08] bg-black/40 backdrop-blur-xl p-4 md:p-6">
+      <div className="mb-4 md:mb-6">
+        <h3 className="text-base md:text-lg font-semibold text-white mb-1.5 md:mb-2">
           Player Impact vs Average
         </h3>
         <p className="text-xs md:text-sm text-white/60 leading-relaxed">
           Disposals and fantasy points compared to season average
         </p>
         {hasTwoTeams && (
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-5 mt-4">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-2.5 md:gap-5 mt-3 md:mt-4">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 md:w-3.5 md:h-3.5 rounded-full shadow-lg" style={{ backgroundColor: resolvedHomeColor, boxShadow: `0 0 8px ${resolvedHomeColor}80` }} />
               <span className="text-xs md:text-sm text-white/70 font-medium">{homeTeam}</span>
@@ -78,9 +78,9 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
         )}
       </div>
 
-      <div className="min-h-[400px] h-[400px] md:h-[440px] w-full overflow-x-auto">
+      <div className="min-h-[380px] h-[380px] md:h-[440px] w-full overflow-x-auto pb-2">
         <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 15, right: 15, bottom: 45, left: 25 }}>
+          <ScatterChart margin={{ top: 15, right: 15, bottom: 50, left: 25 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#333" />
             <XAxis
               type="number"
