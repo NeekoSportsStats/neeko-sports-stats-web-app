@@ -270,47 +270,47 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
           </button>
         </div>
 
-        <div className="p-4 md:p-6 space-y-5 md:space-y-6">
-          <div className="rounded-2xl border border-white/10 bg-black/40 p-5 md:p-6">
-            <div className="grid grid-cols-3 items-center gap-4">
+        <div className="p-4 md:p-6 space-y-6 md:space-y-6">
+          <div className="rounded-2xl border border-white/[0.08] bg-black/40 p-6 md:p-6">
+            <div className="grid grid-cols-3 items-center gap-4 mb-5">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mb-3">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: homeColor }} />
-                  <div className="text-white font-semibold text-xl">{match.home_team_vendor ?? "Home"}</div>
+                  <div className="text-white font-semibold text-lg md:text-xl leading-tight">{match.home_team_vendor ?? "Home"}</div>
                 </div>
-                <div className="text-[#F5C84C] text-2xl font-bold mt-1">
+                <div className="text-[#F5C84C] text-3xl md:text-4xl font-bold">
                   {homeScore ?? "—"}
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-white/30 text-3xl font-black">VS</div>
+                <div className="text-white/30 text-2xl md:text-3xl font-black">VS</div>
                 {wonByLabel && (
-                  <div className="mt-1 text-xs text-[#F5C84C]/70">{wonByLabel}</div>
+                  <div className="mt-2 text-xs text-[#F5C84C]/70 leading-relaxed">{wonByLabel}</div>
                 )}
               </div>
               <div className="text-right">
-                <div className="flex items-center gap-2 justify-end">
-                  <div className="text-white font-semibold text-xl">{match.away_team_vendor ?? "Away"}</div>
+                <div className="flex items-center gap-2 justify-end mb-3">
+                  <div className="text-white font-semibold text-lg md:text-xl leading-tight">{match.away_team_vendor ?? "Away"}</div>
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: awayColor }} />
                 </div>
-                <div className="text-[#F5C84C] text-2xl font-bold mt-1">
+                <div className="text-[#F5C84C] text-3xl md:text-4xl font-bold">
                   {awayScore ?? "—"}
                 </div>
               </div>
             </div>
 
             {formattedQuarterSummary && formattedQuarterSummary.length > 0 && (
-              <div className="mt-5 pt-5 border-t border-white/10">
-                <div className="text-xs uppercase tracking-wider text-white/50 mb-3">Quarter Scores</div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-white/70">
+              <div className="mt-6 pt-6 border-t border-white/[0.06]">
+                <div className="text-xs uppercase tracking-wider text-white/50 mb-4">Quarter Scores</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-white/70 leading-relaxed">
                   {formattedQuarterSummary.map((quarter, idx) => (
-                    <div key={idx} className="text-center py-1">{quarter}</div>
+                    <div key={idx} className="text-center py-2">{quarter}</div>
                   ))}
                 </div>
               </div>
             )}
 
-            <div className="mt-5 pt-5 border-t border-white/10 flex flex-wrap items-center gap-5 text-sm">
+            <div className="mt-6 pt-6 border-t border-white/[0.06] flex flex-wrap items-center gap-5 text-sm">
               {venue && (
                 <div className={`flex items-center gap-2 ${isFinished ? "text-white/30" : "text-white/70"}`}>
                   <MapPin className="h-4 w-4" />
@@ -324,31 +324,33 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                 </div>
               )}
               {isFinished && (
-                <div className="px-2 py-0.5 rounded-md border border-white/10 bg-white/5 text-xs uppercase tracking-wider text-white/40">
+                <div className="px-2 py-1 rounded-md border border-white/10 bg-white/5 text-xs uppercase tracking-wider text-white/40">
                   FT
                 </div>
               )}
             </div>
           </div>
 
-          <MomentumTimeline
-            matchId={match.match_id}
-            homeTeam={match.home_team_vendor ?? "Home"}
-            awayTeam={match.away_team_vendor ?? "Away"}
-          />
+          <div className="py-2">
+            <MomentumTimeline
+              matchId={match.match_id}
+              homeTeam={match.home_team_vendor ?? "Home"}
+              awayTeam={match.away_team_vendor ?? "Away"}
+            />
+          </div>
 
           {statsReady ? (
             <>
-              <div className="rounded-2xl border border-white/10 bg-black/40 p-5 md:p-6">
-                <div className="text-xs uppercase tracking-wider text-white/60 mb-4">
+              <div className="rounded-2xl border border-white/[0.08] bg-black/40 p-6 md:p-6">
+                <div className="text-xs uppercase tracking-wider text-white/60 mb-5">
                   Top Performers
                 </div>
                 {team1Top3.length === 0 && team2Top3.length === 0 ? (
                   <div className="text-white/50">Player data unavailable for this match</div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-6">
                     <div>
-                      <div className="flex items-center gap-2 mb-3">
+                      <div className="flex items-center gap-2 mb-4">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: homeColor }} />
                         <div className="text-sm font-semibold text-white">{team1Name || match.home_team_vendor}</div>
                       </div>
@@ -359,7 +361,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                           {team1Top3.map((p, idx) => (
                             <div
                               key={idx}
-                              className="rounded-xl border border-white/10 bg-black/50 px-4 py-3"
+                              className="rounded-xl border border-white/[0.08] bg-black/50 px-4 py-3"
                             >
                               <div className="flex items-center justify-between mb-2">
                                 <div className="text-white font-medium">{p.player_name ?? "Unknown"}</div>
@@ -375,7 +377,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                       )}
                     </div>
                     <div>
-                      <div className="flex items-center gap-2 mb-3">
+                      <div className="flex items-center gap-2 mb-4">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: awayColor }} />
                         <div className="text-sm font-semibold text-white">{team2Name || match.away_team_vendor}</div>
                       </div>
@@ -386,7 +388,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                           {team2Top3.map((p, idx) => (
                             <div
                               key={idx}
-                              className="rounded-xl border border-white/10 bg-black/50 px-4 py-3"
+                              className="rounded-xl border border-white/[0.08] bg-black/50 px-4 py-3"
                             >
                               <div className="flex items-center justify-between mb-2">
                                 <div className="text-white font-medium">{p.player_name ?? "Unknown"}</div>
@@ -405,19 +407,21 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                 )}
               </div>
 
-              <MatchScatter
-                scatterData={scatterData ?? []}
-                homeTeam={match.home_team_vendor ?? "Home"}
-                awayTeam={match.away_team_vendor ?? "Away"}
-                homeColor={homeColor}
-                awayColor={awayColor}
-              />
+              <div className="py-2">
+                <MatchScatter
+                  scatterData={scatterData ?? []}
+                  homeTeam={match.home_team_vendor ?? "Home"}
+                  awayTeam={match.away_team_vendor ?? "Away"}
+                  homeColor={homeColor}
+                  awayColor={awayColor}
+                />
+              </div>
 
-              <div className="rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-r from-[#F5C84C]/20 to-transparent p-6">
-                <div className="text-white font-semibold mb-2">Finished Game Insights</div>
-                <div className="text-white/70 text-sm leading-relaxed space-y-2">
+              <div className="rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-r from-[#F5C84C]/20 to-transparent p-6 md:p-7">
+                <div className="text-white font-semibold text-base mb-4">Finished Game Insights</div>
+                <div className="text-white/70 text-sm md:text-base leading-[1.7] space-y-3">
                   {insightSentences && insightSentences.length > 0 ? (
-                    insightSentences.map((s, i) => <p key={i}>{s}</p>)
+                    insightSentences.map((s, i) => <p key={i} className={i === 0 ? "text-white/80 font-medium" : "text-white/70"}>{s}</p>)
                   ) : (
                     <p>Insights unavailable for this match.</p>
                   )}
@@ -425,8 +429,8 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
               </div>
             </>
           ) : (
-            <div className="flex items-center justify-center py-10">
-              <div className="flex flex-col items-center gap-3">
+            <div className="flex items-center justify-center py-12">
+              <div className="flex flex-col items-center gap-4">
                 <div className="w-10 h-10 border-4 border-yellow-400/20 border-t-yellow-400 rounded-full animate-spin" />
                 <p className="text-white/50 text-sm">Loading match data...</p>
               </div>

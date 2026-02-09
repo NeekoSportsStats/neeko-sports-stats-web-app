@@ -51,19 +51,19 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       {groups.map((g, idx) => {
         const dayLabel = formatDayLabel(g.date);
         const matches = g.matches ?? [];
 
         return (
-          <div key={idx} className="space-y-4">
-            <div className="flex items-baseline gap-3">
-              <span className="text-white/90 font-semibold text-lg">{dayLabel}</span>
-              <span className="text-white/40 text-sm">{g.round_label}</span>
+          <div key={idx} className="space-y-5">
+            <div className="flex items-baseline gap-3 py-2">
+              <span className="text-white/90 font-semibold text-base md:text-lg">{dayLabel}</span>
+              <span className="text-white/40 text-xs md:text-sm">{g.round_label}</span>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-5">
               {matches.map((m, mIdx) => {
                 const homeTeam = m.home_team_vendor ?? "Home";
                 const awayTeam = m.away_team_vendor ?? "Away";
@@ -72,6 +72,8 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                 const homeScore = m.home_score ?? null;
                 const awayScore = m.away_score ?? null;
                 const wonBy = computeWonBy(m);
+                const homeWon = homeScore != null && awayScore != null && homeScore > awayScore;
+                const awayWon = homeScore != null && awayScore != null && awayScore > homeScore;
 
                 const quarters = quarterScoresMap?.get(m.match_id ?? "") ?? [];
                 const hasQuarters = quarters.length > 0 && isFinished;
@@ -80,15 +82,15 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                   <button
                     key={m.match_id ?? mIdx}
                     onClick={() => onSelectMatch(m)}
-                    className="w-full text-left rounded-2xl border border-white/10 bg-black/30 hover:bg-black/40 transition p-6"
+                    className="w-full text-left rounded-2xl border border-white/[0.08] bg-black/30 hover:bg-black/40 transition p-5 md:p-6 min-h-[44px]"
                   >
-                    <div className="grid grid-cols-3 items-start gap-4">
-                      <div className="space-y-1">
+                    <div className="grid grid-cols-3 items-start gap-4 md:gap-6">
+                      <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full bg-[#F5C84C]" />
-                          <div className="text-white font-semibold">{homeTeam}</div>
+                          <div className="text-white font-semibold text-sm md:text-base leading-tight break-words line-clamp-2">{homeTeam}</div>
                         </div>
-                        <div className="text-[#F5C84C] text-xl font-bold">{homeScore ?? "—"}</div>
+                        <div className={`text-xl md:text-2xl font-bold ${homeWon ? 'text-[#F5C84C]' : 'text-[#F5C84C]/85'}`}>{homeScore ?? "—"}</div>
                         {hasQuarters && (
                           <div className="space-y-0.5 mt-2">
                             {quarters.map(q => (
@@ -101,18 +103,18 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                       </div>
 
                       <div className="text-center pt-2">
-                        <div className="text-white/30 font-black text-xl">VS</div>
+                        <div className="text-white/30 font-black text-lg md:text-xl">VS</div>
                         {wonBy && (
-                          <div className="mt-2 text-xs text-white/50">{wonBy}</div>
+                          <div className="mt-3 text-xs text-white/50 leading-snug">{wonBy}</div>
                         )}
                       </div>
 
-                      <div className="text-right space-y-1">
+                      <div className="text-right space-y-1.5">
                         <div className="flex items-center gap-2 justify-end">
-                          <div className="text-white font-semibold">{awayTeam}</div>
+                          <div className="text-white font-semibold text-sm md:text-base leading-tight break-words line-clamp-2 text-right">{awayTeam}</div>
                           <div className="w-2 h-2 rounded-full bg-[#60A5FA]" />
                         </div>
-                        <div className="text-[#F5C84C] text-xl font-bold">{awayScore ?? "—"}</div>
+                        <div className={`text-xl md:text-2xl font-bold ${awayWon ? 'text-[#F5C84C]' : 'text-[#F5C84C]/85'}`}>{awayScore ?? "—"}</div>
                         {hasQuarters && (
                           <div className="space-y-0.5 mt-2">
                             {quarters.map(q => (
@@ -125,16 +127,16 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                       </div>
                     </div>
 
-                    <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
+                    <div className="mt-5 pt-4 border-t border-white/[0.06] flex flex-wrap items-center gap-4 text-sm">
                       {venue && (
                         <div className={isFinished ? "text-white/30" : "text-white/60"}>{venue}</div>
                       )}
                       {isFinished && (
-                        <div className="px-2 py-0.5 rounded-md border border-white/10 bg-white/5 text-xs uppercase tracking-wider text-white/40">
+                        <div className="px-2 py-1 rounded-md border border-white/10 bg-white/5 text-xs uppercase tracking-wider text-white/40">
                           FT
                         </div>
                       )}
-                      <div className="ml-auto text-white/40 text-sm flex items-center gap-2 hover:text-white/60 transition">
+                      <div className="ml-auto text-white/40 text-sm flex items-center gap-2 hover:text-white/60 transition min-h-[44px]">
                         <span>View Details</span>
                         <span>›</span>
                       </div>

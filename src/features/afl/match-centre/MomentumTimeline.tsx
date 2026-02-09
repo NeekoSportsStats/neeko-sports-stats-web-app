@@ -65,18 +65,18 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-white/10 bg-black/40 p-4 md:p-6">
-        <div className="h-5 md:h-6 w-40 md:w-48 rounded bg-white/5 animate-pulse mb-3 md:mb-4" />
-        <div className="h-[240px] md:h-[260px] rounded bg-white/5 animate-pulse" />
+      <div className="rounded-xl border border-white/[0.08] bg-black/40 p-5 md:p-6">
+        <div className="h-5 md:h-6 w-40 md:w-48 rounded bg-white/5 animate-pulse mb-4 md:mb-5" />
+        <div className="h-[280px] md:h-[300px] rounded bg-white/5 animate-pulse" />
       </div>
     );
   }
 
   if (data.length === 0) {
     return (
-      <div className="rounded-xl border border-white/10 bg-black/40 p-5 md:p-6">
-        <h3 className="text-base md:text-lg font-semibold text-white mb-1">Match Momentum</h3>
-        <p className="text-xs md:text-sm text-white/40">Momentum data not available for this match.</p>
+      <div className="rounded-xl border border-white/[0.08] bg-black/40 p-6 md:p-6 min-h-[200px] flex flex-col justify-center">
+        <h3 className="text-base md:text-lg font-semibold text-white mb-2">Match Momentum</h3>
+        <p className="text-sm text-white/50 leading-relaxed">Momentum data not available for this match.</p>
       </div>
     );
   }
@@ -93,17 +93,17 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-5 md:p-6">
-      <div className="mb-3 md:mb-4">
-        <h3 className="text-base md:text-lg font-semibold text-white mb-1">Match Momentum</h3>
-        <p className="text-xs md:text-sm text-white/60 leading-relaxed">
+    <div className="rounded-xl border border-white/[0.08] bg-black/40 backdrop-blur-xl p-5 md:p-6">
+      <div className="mb-4 md:mb-5">
+        <h3 className="text-base md:text-lg font-semibold text-white mb-2">Match Momentum</h3>
+        <p className="text-xs md:text-sm text-white/60 leading-[1.6]">
           Tracking the ebb and flow throughout the contest. <span className="text-[#F5C84C]">{homeTeam}</span> positive, <span className="text-white/80">{awayTeam}</span> negative.
         </p>
       </div>
 
-      <div className="min-h-[240px] h-[240px] md:h-[260px] w-full overflow-x-auto">
+      <div className="min-h-[280px] h-[280px] md:h-[300px] w-full overflow-x-auto">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 10, right: 10, bottom: 20, left: 10 }}>
+          <AreaChart data={data} margin={{ top: 10, right: 10, bottom: 25, left: 10 }}>
             <defs>
               <linearGradient id="momentumPos" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#F5C84C" stopOpacity={0.5} />
