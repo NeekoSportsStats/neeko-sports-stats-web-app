@@ -17,6 +17,8 @@ export type QuarterScoreRow = {
   away_qtr_points: number;
   home_points: number;
   away_points: number;
+  quarter_margin?: number;
+  quarter_winner?: string;
 };
 
 // ⚠️ CONTRACT LOCK:
@@ -200,10 +202,9 @@ export async function fetchMatchMomentum(matchId: string): Promise<MomentumPoint
   const { data, error } = await supabase
     .schema("afl")
     .from("v_match_quarter_momentum_2025")
-    .select("match_id, quarter, minute, momentum")
+    .select("match_id, quarter, momentum")
     .eq("match_id", matchId)
-    .order("quarter", { ascending: true })
-    .order("minute", { ascending: true });
+    .order("quarter", { ascending: true });
 
   if (error) {
     console.warn("[fetchMatchMomentum] Query failed:", error.message);
@@ -216,7 +217,7 @@ export async function fetchMatchMomentum(matchId: string): Promise<MomentumPoint
     match_id: String(row.match_id ?? matchId),
     season: 2025,
     quarter: Number(row.quarter ?? 1),
-    minute: Number(row.minute ?? 0),
+    minute: 0,
     momentum: Number(row.momentum ?? 0),
   }));
 }
@@ -305,7 +306,7 @@ export async function fetchQuarterSummary(params: {
   const { data, error } = await supabase
     .schema("afl")
     .from("v_match_quarter_summary_2025")
-    .select("match_id, quarter, home_qtr_points, away_qtr_points, home_points, away_points")
+    .select("match_id, quarter, home_points, away_points, home_qtr_points, away_qtr_points, quarter_margin, quarter_winner")
     .eq("match_id", params.match_id)
     .order("quarter", { ascending: true });
 
@@ -323,6 +324,8 @@ export async function fetchQuarterSummary(params: {
     away_qtr_points: Number(row.away_qtr_points ?? 0),
     home_points: Number(row.home_points ?? 0),
     away_points: Number(row.away_points ?? 0),
+    quarter_margin: row.quarter_margin != null ? Number(row.quarter_margin) : undefined,
+    quarter_winner: row.quarter_winner ? String(row.quarter_winner) : undefined,
   }));
 }
 
@@ -332,7 +335,7 @@ export async function fetchRoundQuarterScores(matchIds: string[]): Promise<Quart
   const { data, error } = await supabase
     .schema("afl")
     .from("v_match_quarter_summary_2025")
-    .select("match_id, quarter, home_qtr_points, away_qtr_points, home_points, away_points")
+    .select("match_id, quarter, home_points, away_points, home_qtr_points, away_qtr_points, quarter_margin, quarter_winner")
     .in("match_id", matchIds)
     .order("match_id", { ascending: true })
     .order("quarter", { ascending: true });
@@ -351,5 +354,7 @@ export async function fetchRoundQuarterScores(matchIds: string[]): Promise<Quart
     away_qtr_points: Number(row.away_qtr_points ?? 0),
     home_points: Number(row.home_points ?? 0),
     away_points: Number(row.away_points ?? 0),
+    quarter_margin: row.quarter_margin != null ? Number(row.quarter_margin) : undefined,
+    quarter_winner: row.quarter_winner ? String(row.quarter_winner) : undefined,
   }));
 }
