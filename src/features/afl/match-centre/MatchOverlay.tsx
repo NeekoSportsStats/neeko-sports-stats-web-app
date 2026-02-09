@@ -179,25 +179,33 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
 
     if (timeline?.margin && timeline.margin.length > 0) {
       const swing = computeBiggestSwing(timeline.margin);
-      if (swing && swing.swing > 12) {
+      if (swing && swing.swing > 18) {
         const quarterText = swing.quarter
           ? swing.quarter === 1
-            ? " midway through the opening term"
+            ? " early in the opening term"
             : swing.quarter === 2
               ? " late in the second quarter"
               : swing.quarter === 3
-                ? " after the main break"
-                : " heading into the final term"
+                ? " in a dominant third quarter"
+                : " in the final term"
           : "";
         const teamName = swing.direction === "positive" ? home : away;
         const phrases = [
-          `${teamName} seized control${quarterText}, producing a dominant scoring burst.`,
-          `A sharp momentum shift${quarterText} saw ${teamName} wrestle back control of the contest.`,
-          `${teamName} applied sustained pressure${quarterText}, extending their lead with consecutive scoring.`
+          `${teamName} took control of the contest${quarterText}.`,
+          `A sustained period of pressure${quarterText} proved decisive for ${teamName}.`,
+          `${teamName} broke the game open${quarterText} with a match-defining burst.`
+        ];
+        sentences.push(phrases[Math.floor(Math.random() * phrases.length)]);
+      } else if (swing && swing.swing > 12) {
+        const teamName = swing.direction === "positive" ? home : away;
+        const phrases = [
+          `${teamName} wrestled back control at a crucial stage of the match.`,
+          `The momentum shifted decisively in favour of ${teamName}.`,
+          `${teamName} seized the ascendancy when it mattered most.`
         ];
         sentences.push(phrases[Math.floor(Math.random() * phrases.length)]);
       } else if (swing && swing.swing > 6) {
-        sentences.push("Both teams traded momentum throughout the contest with no extended periods of dominance.");
+        sentences.push("Both teams traded momentum throughout, with neither able to establish sustained control.");
       }
     }
 
@@ -248,31 +256,31 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-start justify-center p-4 md:p-8 overflow-y-auto"
+      className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-start justify-center p-3 md:p-8 overflow-y-auto"
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
     >
-      <div className="w-full max-w-5xl rounded-2xl border border-white/10 bg-black/70 backdrop-blur-xl shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
+      <div className="w-full max-w-5xl rounded-2xl border border-white/10 bg-black/70 backdrop-blur-xl shadow-2xl overflow-hidden my-4 md:my-0">
+        <div className="flex items-center justify-between p-4 md:p-5 border-b border-white/10">
           <div>
             <div className="text-xs uppercase tracking-wider text-white/60">
               {roundLabel} • {season}
               {isFinished && <span className="ml-2 text-white/40">Full Time</span>}
             </div>
-            <div className="text-2xl font-bold text-white">Match Detail</div>
+            <div className="text-xl md:text-2xl font-bold text-white">Match Detail</div>
           </div>
           <button
             onClick={onClose}
-            className="h-10 w-10 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 flex items-center justify-center"
+            className="h-10 w-10 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 active:bg-white/20 flex items-center justify-center transition-colors"
           >
             <X className="h-5 w-5 text-white/80" />
           </button>
         </div>
 
-        <div className="p-4 md:p-6 space-y-6 md:space-y-6">
-          <div className="rounded-2xl border border-white/[0.08] bg-black/40 p-6 md:p-6">
-            <div className="grid grid-cols-3 items-center gap-4 mb-5">
+        <div className="p-4 md:p-6 space-y-5 md:space-y-6">
+          <div className="rounded-2xl border border-white/[0.08] bg-black/40 p-5 md:p-6">
+            <div className="grid grid-cols-3 items-center gap-3 md:gap-4 mb-4 md:mb-5">
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: homeColor }} />
@@ -300,17 +308,17 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
             </div>
 
             {formattedQuarterSummary && formattedQuarterSummary.length > 0 && (
-              <div className="mt-6 pt-6 border-t border-white/[0.06]">
-                <div className="text-xs uppercase tracking-wider text-white/50 mb-4">Quarter Scores</div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-white/70 leading-relaxed">
+              <div className="mt-5 md:mt-6 pt-5 md:pt-6 border-t border-white/[0.06]">
+                <div className="text-xs uppercase tracking-wider text-white/50 mb-3 md:mb-4">Quarter Scores</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 text-sm text-white/70 leading-relaxed">
                   {formattedQuarterSummary.map((quarter, idx) => (
-                    <div key={idx} className="text-center py-2">{quarter}</div>
+                    <div key={idx} className="text-center py-2 rounded-lg bg-white/[0.02]">{quarter}</div>
                   ))}
                 </div>
               </div>
             )}
 
-            <div className="mt-6 pt-6 border-t border-white/[0.06] flex flex-wrap items-center gap-5 text-sm">
+            <div className="mt-5 md:mt-6 pt-5 md:pt-6 border-t border-white/[0.06] flex flex-wrap items-center gap-4 md:gap-5 text-sm">
               {venue && (
                 <div className={`flex items-center gap-2 ${isFinished ? "text-white/30" : "text-white/70"}`}>
                   <MapPin className="h-4 w-4" />
@@ -331,24 +339,22 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
             </div>
           </div>
 
-          <div className="py-2">
-            <MomentumTimeline
-              matchId={match.match_id}
-              homeTeam={match.home_team_vendor ?? "Home"}
-              awayTeam={match.away_team_vendor ?? "Away"}
-            />
-          </div>
+          <MomentumTimeline
+            matchId={match.match_id}
+            homeTeam={match.home_team_vendor ?? "Home"}
+            awayTeam={match.away_team_vendor ?? "Away"}
+          />
 
           {statsReady ? (
             <>
-              <div className="rounded-2xl border border-white/[0.08] bg-black/40 p-6 md:p-6">
-                <div className="text-xs uppercase tracking-wider text-white/60 mb-5">
+              <div className="rounded-2xl border border-white/[0.08] bg-black/40 p-5 md:p-6">
+                <div className="text-xs uppercase tracking-wider text-white/60 mb-4 md:mb-5">
                   Top Performers
                 </div>
                 {team1Top3.length === 0 && team2Top3.length === 0 ? (
                   <div className="text-white/50">Player data unavailable for this match</div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
                     <div>
                       <div className="flex items-center gap-2 mb-4">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: homeColor }} />
@@ -407,17 +413,15 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                 )}
               </div>
 
-              <div className="py-2">
-                <MatchScatter
-                  scatterData={scatterData ?? []}
-                  homeTeam={match.home_team_vendor ?? "Home"}
-                  awayTeam={match.away_team_vendor ?? "Away"}
-                  homeColor={homeColor}
-                  awayColor={awayColor}
-                />
-              </div>
+              <MatchScatter
+                scatterData={scatterData ?? []}
+                homeTeam={match.home_team_vendor ?? "Home"}
+                awayTeam={match.away_team_vendor ?? "Away"}
+                homeColor={homeColor}
+                awayColor={awayColor}
+              />
 
-              <div className="rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-r from-[#F5C84C]/20 to-transparent p-6 md:p-7">
+              <div className="rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-r from-[#F5C84C]/20 to-transparent p-5 md:p-7">
                 <div className="text-white font-semibold text-base mb-4">Finished Game Insights</div>
                 <div className="text-white/70 text-sm md:text-base leading-[1.7] space-y-3">
                   {insightSentences && insightSentences.length > 0 ? (

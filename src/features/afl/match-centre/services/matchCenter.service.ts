@@ -202,8 +202,8 @@ export async function fetchMatchScatterData(params: {
 export async function fetchMatchMomentum(matchId: string): Promise<MomentumPoint[]> {
   const { data, error } = await supabase
     .schema("afl")
-    .from("v_match_team_momentum_2025")
-    .select("match_id, team, minute, momentum_value")
+    .from("v_match_quarter_momentum_2025")
+    .select("match_id, quarter, minute, momentum_value")
     .eq("match_id", matchId)
     .order("minute", { ascending: true });
 
@@ -217,7 +217,7 @@ export async function fetchMatchMomentum(matchId: string): Promise<MomentumPoint
   return data.map((row): MomentumPoint => ({
     match_id: String(row.match_id ?? matchId),
     season: 2025,
-    quarter: Math.floor(Number(row.minute ?? 0) / 25) + 1,
+    quarter: Number(row.quarter ?? 1),
     minute: Number(row.minute ?? 0),
     momentum: Number(row.momentum_value ?? 0),
   }));

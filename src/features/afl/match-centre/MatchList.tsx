@@ -51,19 +51,19 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8 md:space-y-10">
       {groups.map((g, idx) => {
         const dayLabel = formatDayLabel(g.date);
         const matches = g.matches ?? [];
 
         return (
-          <div key={idx} className="space-y-5">
+          <div key={idx} className="space-y-4 md:space-y-5">
             <div className="flex items-baseline gap-3 py-2">
               <span className="text-white/90 font-semibold text-base md:text-lg">{dayLabel}</span>
               <span className="text-white/40 text-xs md:text-sm">{g.round_label}</span>
             </div>
 
-            <div className="space-y-5">
+            <div className="space-y-4 md:space-y-5">
               {matches.map((m, mIdx) => {
                 const homeTeam = m.home_team_vendor ?? "Home";
                 const awayTeam = m.away_team_vendor ?? "Away";
@@ -82,7 +82,7 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                   <button
                     key={m.match_id ?? mIdx}
                     onClick={() => onSelectMatch(m)}
-                    className="w-full text-left rounded-2xl border border-white/[0.08] bg-black/30 hover:bg-black/40 transition p-5 md:p-6 min-h-[44px]"
+                    className="w-full text-left rounded-2xl border border-white/[0.08] bg-black/30 hover:bg-black/40 active:bg-black/50 transition-all p-5 md:p-6"
                   >
                     <div className="grid grid-cols-3 items-start gap-4 md:gap-6">
                       <div className="space-y-1.5">
@@ -136,9 +136,9 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                           FT
                         </div>
                       )}
-                      <div className="ml-auto text-white/40 text-sm flex items-center gap-2 hover:text-white/60 transition min-h-[44px]">
-                        <span>View Details</span>
-                        <span>›</span>
+                      <div className="ml-auto text-white/50 text-sm flex items-center gap-2 hover:text-[#F5C84C] transition-colors min-h-[48px] py-2">
+                        <span className="font-medium">View Details</span>
+                        <span className="text-lg">›</span>
                       </div>
                     </div>
                   </button>

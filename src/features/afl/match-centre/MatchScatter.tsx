@@ -51,13 +51,13 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
 
   if (data.length === 0) return null;
 
-  const resolvedHomeColor = homeColor || "#3B82F6";
-  const resolvedAwayColor = awayColor || "#EF4444";
+  const resolvedHomeColor = homeColor || "#F5C84C";
+  const resolvedAwayColor = awayColor || "#60A5FA";
   const hasTwoTeams = awayData.length > 0;
 
   return (
     <div className="rounded-xl border border-white/[0.08] bg-black/40 backdrop-blur-xl p-5 md:p-6">
-      <div className="mb-4 md:mb-5">
+      <div className="mb-5 md:mb-6">
         <h3 className="text-base md:text-lg font-semibold text-white mb-2">
           Player Impact vs Average
         </h3>
@@ -67,8 +67,8 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
         {hasTwoTeams && (
           <div className="flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-5 mt-4">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 md:w-3.5 md:h-3.5 rounded-full" style={{ backgroundColor: resolvedHomeColor }} />
-              <span className="text-xs md:text-sm text-white/60">{homeTeam}</span>
+              <div className="w-3 h-3 md:w-3.5 md:h-3.5 rounded-full shadow-lg" style={{ backgroundColor: resolvedHomeColor, boxShadow: `0 0 8px ${resolvedHomeColor}80` }} />
+              <span className="text-xs md:text-sm text-white/70 font-medium">{homeTeam}</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 md:w-3.5 md:h-3.5 rounded-full" style={{ backgroundColor: resolvedAwayColor }} />
@@ -78,9 +78,9 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
         )}
       </div>
 
-      <div className="min-h-[380px] h-[380px] md:h-[400px] w-full overflow-x-auto">
+      <div className="min-h-[400px] h-[400px] md:h-[440px] w-full overflow-x-auto">
         <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 10, right: 10, bottom: 30, left: 20 }}>
+          <ScatterChart margin={{ top: 15, right: 15, bottom: 45, left: 25 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#333" />
             <XAxis
               type="number"
@@ -142,15 +142,25 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                   shape={(props: Record<string, unknown>) => {
                     const { cx, cy } = props as { cx: number; cy: number };
                     return (
-                      <circle
-                        cx={cx}
-                        cy={cy}
-                        r={6}
-                        fill={resolvedHomeColor}
-                        fillOpacity={0.85}
-                        stroke="rgba(255,255,255,0.4)"
-                        strokeWidth={1.5}
-                      />
+                      <g>
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={9}
+                          fill={resolvedHomeColor}
+                          fillOpacity={0.2}
+                        />
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={6}
+                          fill={resolvedHomeColor}
+                          fillOpacity={0.95}
+                          stroke={resolvedHomeColor}
+                          strokeWidth={2}
+                          strokeOpacity={0.6}
+                        />
+                      </g>
                     );
                   }}
                 />
@@ -164,11 +174,11 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                       <circle
                         cx={cx}
                         cy={cy}
-                        r={6}
-                        fill={resolvedAwayColor}
-                        fillOpacity={0.75}
-                        stroke="rgba(255,255,255,0.3)"
-                        strokeWidth={1.5}
+                        r={5}
+                        fill="transparent"
+                        stroke={resolvedAwayColor}
+                        strokeWidth={2}
+                        strokeOpacity={0.8}
                       />
                     );
                   }}
@@ -177,7 +187,7 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
             ) : (
               <Scatter
                 data={data}
-                fill="#3B82F6"
+                fill={resolvedHomeColor}
                 opacity={1}
                 shape={(props: Record<string, unknown>) => {
                   const { cx, cy } = props as { cx: number; cy: number };
@@ -186,9 +196,9 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                       cx={cx}
                       cy={cy}
                       r={6}
-                      fill="#3B82F6"
-                      fillOpacity={0.8}
-                      stroke="rgba(255,255,255,0.3)"
+                      fill={resolvedHomeColor}
+                      fillOpacity={0.9}
+                      stroke="rgba(255,255,255,0.4)"
                       strokeWidth={1.5}
                     />
                   );
