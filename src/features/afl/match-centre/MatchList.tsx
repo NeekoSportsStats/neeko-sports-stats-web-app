@@ -110,7 +110,7 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                       <div className="text-right space-y-1">
                         <div className="flex items-center gap-2 justify-end">
                           <div className="text-white font-semibold">{awayTeam}</div>
-                          <div className="w-2 h-2 rounded-full bg-white/40" />
+                          <div className="w-2 h-2 rounded-full bg-[#60A5FA]" />
                         </div>
                         <div className="text-[#F5C84C] text-xl font-bold">{awayScore ?? "—"}</div>
                         {hasQuarters && (

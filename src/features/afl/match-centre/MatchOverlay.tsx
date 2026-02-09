@@ -227,7 +227,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
   const homeScore = match.home_score ?? null;
   const awayScore = match.away_score ?? null;
   const homeColor = "#F5C84C";
-  const awayColor = "#999";
+  const awayColor = "#60A5FA";
 
   const wonByLabel = useMemo(() => {
     if (homeScore == null || awayScore == null || !isFinished) return null;
@@ -270,8 +270,8 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
           </button>
         </div>
 
-        <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-          <div className="rounded-2xl border border-white/10 bg-black/40 p-6">
+        <div className="p-4 md:p-6 space-y-5 md:space-y-6">
+          <div className="rounded-2xl border border-white/10 bg-black/40 p-5 md:p-6">
             <div className="grid grid-cols-3 items-center gap-4">
               <div>
                 <div className="flex items-center gap-2">
