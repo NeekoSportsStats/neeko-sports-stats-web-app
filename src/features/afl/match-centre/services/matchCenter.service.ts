@@ -305,7 +305,7 @@ export async function fetchQuarterSummary(params: {
 
   const { data, error } = await supabase
     .schema("afl")
-    .from("v_match_quarter_summary_2025")
+    .from("v_match_quarter_momentum_2025")
     .select("match_id, quarter, home_points, away_points, home_qtr_points, away_qtr_points, quarter_margin, quarter_winner")
     .eq("match_id", params.match_id)
     .order("quarter", { ascending: true });
@@ -334,7 +334,7 @@ export async function fetchRoundQuarterScores(matchIds: string[]): Promise<Quart
 
   const { data, error } = await supabase
     .schema("afl")
-    .from("v_match_quarter_summary_2025")
+    .from("v_match_quarter_momentum_2025")
     .select("match_id, quarter, home_points, away_points, home_qtr_points, away_qtr_points, quarter_margin, quarter_winner")
     .in("match_id", matchIds)
     .order("match_id", { ascending: true })
