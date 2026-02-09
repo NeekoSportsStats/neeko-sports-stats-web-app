@@ -28,7 +28,7 @@ export default function AFLMatchCentrePage() {
   const [timeline, setTimeline] = useState<MatchTimeline | null>(null);
   const [matchPlayerStats, setMatchPlayerStats] = useState<MatchPlayerStats[]>([]);
   const [scatterData, setScatterData] = useState<MatchScatterPoint[]>([]);
-  const [quarterSummary, setQuarterSummary] = useState<string | null>(null);
+  const [quarterScores, setQuarterScores] = useState<QuarterScoreRow[]>([]);
   const [quarterScoresMap, setQuarterScoresMap] = useState<Map<string, QuarterScoreRow[]>>(new Map());
   const [season, setSeason] = useState(2025);
   const [round, setRound] = useState(1);
@@ -110,7 +110,7 @@ export default function AFLMatchCentrePage() {
       setTimeline(null);
       setMatchPlayerStats([]);
       setScatterData([]);
-      setQuarterSummary(null);
+      setQuarterScores([]);
 
       fetchMatchOverlayTimeline({ match_id: id })
         .then((data) => setTimeline(data))
@@ -125,8 +125,8 @@ export default function AFLMatchCentrePage() {
         .catch(() => setScatterData([]));
 
       fetchQuarterSummary({ match_id: id })
-        .then((result) => setQuarterSummary(result?.quarter_summary || null))
-        .catch(() => setQuarterSummary(null));
+        .then((scores) => setQuarterScores(scores))
+        .catch(() => setQuarterScores([]));
     },
     []
   );
@@ -244,13 +244,13 @@ export default function AFLMatchCentrePage() {
           timeline={timeline}
           matchPlayerStats={matchPlayerStats}
           scatterData={scatterData}
-          quarterSummary={quarterSummary}
+          quarterScores={quarterScores}
           onClose={() => {
             setSelectedMatch(null);
             setTimeline(null);
             setMatchPlayerStats([]);
             setScatterData([]);
-            setQuarterSummary(null);
+            setQuarterScores([]);
           }}
         />
       )}

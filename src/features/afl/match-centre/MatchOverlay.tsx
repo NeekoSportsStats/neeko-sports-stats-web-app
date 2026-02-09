@@ -6,6 +6,7 @@
 import React, { useEffect, useRef, useMemo } from "react";
 import { X, MapPin, Clock } from "lucide-react";
 import type { MatchSummary, MatchPlayer, MatchPlayerStats, MatchScatterPoint, MatchTimeline } from "./types";
+import type { QuarterScoreRow } from "./services/matchCenter.service";
 import MatchScatter from "./MatchScatter";
 import MomentumTimeline from "./MomentumTimeline";
 
@@ -14,7 +15,7 @@ interface MatchOverlayProps {
   timeline?: MatchTimeline | null;
   matchPlayerStats?: MatchPlayerStats[];
   scatterData?: MatchScatterPoint[];
-  quarterSummary?: string | null;
+  quarterScores?: QuarterScoreRow[];
   onClose: () => void;
 }
 
@@ -89,7 +90,7 @@ function computeBiggestSwing(margin: { quarter: number; minute: number; margin_d
   return { swing: Math.abs(bestSwing), quarter: bestQuarter, direction: bestDirection };
 }
 
-export default function MatchOverlay({ match, timeline, matchPlayerStats, scatterData, quarterSummary, onClose }: MatchOverlayProps) {
+export default function MatchOverlay({ match, timeline, matchPlayerStats, scatterData, quarterScores, onClose }: MatchOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -251,13 +252,10 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
     return `${winner} won by ${margin} points`;
   }, [homeScore, awayScore, isFinished, match.home_team_vendor, match.away_team_vendor]);
 
-  const formattedQuarterSummary = useMemo(() => {
-    if (!quarterSummary) return null;
-    return quarterSummary
-      .split(/\s{2,}/)
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-  }, [quarterSummary]);
+  const sortedQuarterScores = useMemo(() => {
+    if (!quarterScores || quarterScores.length === 0) return [];
+    return [...quarterScores].sort((a, b) => a.quarter - b.quarter);
+  }, [quarterScores]);
 
   return (
     <div
@@ -313,12 +311,19 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
               </div>
             </div>
 
-            {formattedQuarterSummary && formattedQuarterSummary.length > 0 && (
+            {sortedQuarterScores && sortedQuarterScores.length > 0 && (
               <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-white/[0.06]">
                 <div className="text-xs uppercase tracking-wider text-white/50 mb-3">Quarter Scores</div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 text-sm text-white/70 leading-relaxed">
-                  {formattedQuarterSummary.map((quarter, idx) => (
-                    <div key={idx} className="text-center py-2 md:py-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">{quarter}</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+                  {sortedQuarterScores.map((qScore) => (
+                    <div key={qScore.quarter} className="rounded-lg bg-white/[0.02] border border-white/[0.04] p-2 md:p-3">
+                      <div className="text-xs text-white/40 uppercase mb-1.5">Q{qScore.quarter}</div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-white/70">{qScore.home_qtr_points}</span>
+                        <span className="text-white/30 text-xs">–</span>
+                        <span className="text-white/70">{qScore.away_qtr_points}</span>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
