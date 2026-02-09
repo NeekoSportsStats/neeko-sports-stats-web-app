@@ -93,11 +93,17 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    document.body.style.overflow = "hidden";
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [onClose]);
 
   const statsReady = matchPlayerStats && matchPlayerStats.length > 0;

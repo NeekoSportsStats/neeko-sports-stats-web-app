@@ -78,7 +78,7 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
         )}
       </div>
 
-      <div className="min-h-[380px] h-[380px] md:h-[440px] w-full overflow-x-auto pb-2">
+      <div className="min-h-[300px] h-[300px] md:h-[440px] w-full overflow-x-auto pb-2">
         <ResponsiveContainer width="100%" height="100%">
           <ScatterChart margin={{ top: 15, right: 15, bottom: 50, left: 25 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#333" />
