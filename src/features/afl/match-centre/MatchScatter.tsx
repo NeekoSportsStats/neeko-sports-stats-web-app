@@ -142,25 +142,15 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                   shape={(props: Record<string, unknown>) => {
                     const { cx, cy } = props as { cx: number; cy: number };
                     return (
-                      <g>
-                        <circle
-                          cx={cx}
-                          cy={cy}
-                          r={9}
-                          fill={resolvedHomeColor}
-                          fillOpacity={0.2}
-                        />
-                        <circle
-                          cx={cx}
-                          cy={cy}
-                          r={6}
-                          fill={resolvedHomeColor}
-                          fillOpacity={0.95}
-                          stroke={resolvedHomeColor}
-                          strokeWidth={2}
-                          strokeOpacity={0.6}
-                        />
-                      </g>
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={7}
+                        fill={resolvedHomeColor}
+                        fillOpacity={1}
+                        stroke="rgba(0,0,0,0.4)"
+                        strokeWidth={1.5}
+                      />
                     );
                   }}
                 />
@@ -174,11 +164,11 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                       <circle
                         cx={cx}
                         cy={cy}
-                        r={5}
-                        fill="transparent"
-                        stroke={resolvedAwayColor}
-                        strokeWidth={2}
-                        strokeOpacity={0.8}
+                        r={7}
+                        fill={resolvedAwayColor}
+                        fillOpacity={0.7}
+                        stroke="rgba(0,0,0,0.3)"
+                        strokeWidth={1.5}
                       />
                     );
                   }}
@@ -195,10 +185,10 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                     <circle
                       cx={cx}
                       cy={cy}
-                      r={6}
+                      r={7}
                       fill={resolvedHomeColor}
-                      fillOpacity={0.9}
-                      stroke="rgba(255,255,255,0.4)"
+                      fillOpacity={0.95}
+                      stroke="rgba(0,0,0,0.3)"
                       strokeWidth={1.5}
                     />
                   );

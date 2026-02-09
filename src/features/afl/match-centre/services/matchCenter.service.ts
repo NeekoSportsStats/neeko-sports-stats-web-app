@@ -202,10 +202,9 @@ export async function fetchMatchMomentum(matchId: string): Promise<MomentumPoint
   const { data, error } = await supabase
     .schema("afl")
     .from("v_match_quarter_momentum_2025")
-    .select("match_id, quarter, minute, momentum")
+    .select("match_id, quarter, momentum")
     .eq("match_id", matchId)
-    .order("quarter", { ascending: true })
-    .order("minute", { ascending: true });
+    .order("quarter", { ascending: true });
 
   if (error) {
     console.warn("[fetchMatchMomentum] Query failed:", error.message);
@@ -218,7 +217,7 @@ export async function fetchMatchMomentum(matchId: string): Promise<MomentumPoint
     match_id: String(row.match_id ?? matchId),
     season: 2025,
     quarter: Number(row.quarter ?? 1),
-    minute: Number(row.minute ?? 0),
+    minute: 0,
     momentum: Number(row.momentum ?? 0),
   }));
 }
