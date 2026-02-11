@@ -166,3 +166,5 @@ LIMIT 3;
 ---
 
 **FINAL STATUS**: Match Centre permanently locked to canonical schema with deterministic ordering. All date-based sorting eliminated. Contract guards in place to prevent regression.
+
+<!-- test update -->
