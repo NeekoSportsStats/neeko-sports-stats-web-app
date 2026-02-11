@@ -159,9 +159,18 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
 
   if (data.length === 0) {
     return (
-      <div className="rounded-xl border border-white/[0.08] bg-black/40 p-6 md:p-6 min-h-[200px] flex flex-col justify-center">
-        <h3 className="text-base md:text-lg font-semibold text-white mb-2">Match Momentum</h3>
-        <p className="text-sm text-white/50 leading-relaxed">Momentum data not available for this match.</p>
+      <div className="rounded-xl border border-white/[0.08] bg-black/40 p-5 md:p-6">
+        <div className="mb-4 md:mb-5">
+          <h3 className="text-base md:text-lg font-semibold text-white mb-2">Match Momentum</h3>
+          <p className="text-xs md:text-sm text-white/60 leading-[1.6]">
+            Momentum data not available
+          </p>
+        </div>
+        <div className="h-[280px] md:h-[300px] rounded-lg border border-white/[0.06] bg-white/[0.02] flex items-center justify-center">
+          <p className="text-xs md:text-sm text-white/40 max-w-[280px] text-center leading-relaxed">
+            This can occur for older matches or incomplete tracking
+          </p>
+        </div>
       </div>
     );
   }
