@@ -316,18 +316,26 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
 
             {sortedQuarterScores && sortedQuarterScores.length > 0 && (
               <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-white/[0.06]">
-                <div className="mb-4">
-                  <div className="text-xs uppercase tracking-wider text-white/50 mb-1">Quarter by Quarter</div>
-                  <div className="text-xs text-white/30">Total points per quarter</div>
+                <div className="mb-3 md:mb-4">
+                  <div className="text-xs uppercase tracking-wider text-white/50">Quarter by Quarter</div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                  {sortedQuarterScores.map((qScore) => (
-                    <div key={qScore.quarter} className="rounded-lg bg-white/[0.02] border border-white/[0.04] p-3 md:p-4">
-                      <div className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2.5">Q{qScore.quarter}</div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-white/80 font-medium text-base">{qScore.home_qtr_points}</span>
-                        <span className="text-white/20 text-xs font-light">–</span>
-                        <span className="text-white/80 font-medium text-base">{qScore.away_qtr_points}</span>
+                <div className="space-y-0">
+                  {sortedQuarterScores.map((qScore, idx) => (
+                    <div
+                      key={qScore.quarter}
+                      className={`flex items-center gap-3 md:gap-4 py-2.5 md:py-3 ${idx !== sortedQuarterScores.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
+                    >
+                      <div className="text-xs font-semibold text-white/40 uppercase tracking-wider w-8">Q{qScore.quarter}</div>
+                      <div className="flex-1 flex items-center justify-between gap-2 md:gap-4">
+                        <div className="flex items-center gap-2 md:gap-3 flex-1">
+                          <span className="text-xs text-white/30 truncate">{match.home_team_vendor}</span>
+                          <span className="text-lg md:text-xl font-bold text-white/90 min-w-[2rem] text-center">{qScore.home_qtr_points}</span>
+                        </div>
+                        <span className="text-white/20 text-sm px-2">–</span>
+                        <div className="flex items-center gap-2 md:gap-3 flex-1 justify-end">
+                          <span className="text-lg md:text-xl font-bold text-white/90 min-w-[2rem] text-center">{qScore.away_qtr_points}</span>
+                          <span className="text-xs text-white/30 truncate">{match.away_team_vendor}</span>
+                        </div>
                       </div>
                     </div>
                   ))}
