@@ -58,9 +58,9 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
 
         return (
           <div key={idx} className="space-y-3 md:space-y-5">
-            <div className="flex items-baseline gap-3 py-1.5 md:py-2">
-              <span className="text-white/90 font-semibold text-base md:text-lg">{dayLabel}</span>
-              <span className="text-white/40 text-xs md:text-sm">{g.round_label}</span>
+            <div className="flex items-baseline gap-3 py-1.5 md:py-2 border-b border-[#F5C84C]/10 pb-2 md:pb-3">
+              <span className="text-white font-semibold text-base md:text-lg">{dayLabel}</span>
+              <span className="text-[#F5C84C]/50 text-xs md:text-sm font-medium">{g.round_label}</span>
             </div>
 
             <div className="space-y-3 md:space-y-5">
@@ -71,12 +71,12 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                 const venue = m.venue && m.venue !== "TBC" ? m.venue : null;
                 const homeScoreNum = m.home_score ?? null;
                 const awayScoreNum = m.away_score ?? null;
-                const homeScore = m.home_goals != null && m.home_behinds != null && m.home_score != null
-                  ? `${m.home_goals}.${m.home_behinds}.${m.home_score}`
-                  : homeScoreNum;
-                const awayScore = m.away_goals != null && m.away_behinds != null && m.away_score != null
-                  ? `${m.away_goals}.${m.away_behinds}.${m.away_score}`
-                  : awayScoreNum;
+                const homeGoalsBehinds = m.home_goals != null && m.home_behinds != null
+                  ? `${m.home_goals}.${m.home_behinds}`
+                  : null;
+                const awayGoalsBehinds = m.away_goals != null && m.away_behinds != null
+                  ? `${m.away_goals}.${m.away_behinds}`
+                  : null;
                 const wonBy = computeWonBy(m);
                 const homeWon = homeScoreNum != null && awayScoreNum != null && homeScoreNum > awayScoreNum;
                 const awayWon = homeScoreNum != null && awayScoreNum != null && awayScoreNum > homeScoreNum;
@@ -86,7 +86,7 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                   <button
                     key={m.match_id ?? mIdx}
                     onClick={() => onSelectMatch(m)}
-                    className="w-full text-left rounded-2xl border border-white/[0.08] bg-black/30 hover:bg-black/40 active:bg-black/50 transition-all p-4 md:p-6"
+                    className="w-full text-left rounded-2xl border border-[#F5C84C]/20 bg-black/30 hover:bg-black/40 hover:border-[#F5C84C]/40 hover:shadow-[0_0_20px_rgba(245,200,76,0.15)] active:bg-black/50 transition-all p-4 md:p-6"
                   >
                     <div className="grid grid-cols-3 items-start gap-3 md:gap-6">
                       <div className="space-y-1.5">
@@ -94,13 +94,20 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                           <div className="w-2 h-2 rounded-full bg-[#F5C84C]" />
                           <div className="text-white font-semibold text-sm md:text-base leading-tight break-words line-clamp-2">{homeTeam}</div>
                         </div>
-                        <div className={`text-2xl md:text-3xl font-bold ${homeWon ? 'text-[#F5C84C]' : 'text-[#F5C84C]/85'}`}>{homeScore ?? "—"}</div>
+                        <div className="flex items-baseline gap-2">
+                          {homeGoalsBehinds && (
+                            <div className="text-sm md:text-base text-white/40 font-medium">{homeGoalsBehinds}</div>
+                          )}
+                          <div className={`text-3xl md:text-4xl font-bold ${homeWon ? 'text-[#F5C84C]' : 'text-white/90'}`}>
+                            {homeScoreNum ?? "—"}
+                          </div>
+                        </div>
                       </div>
 
                       <div className="text-center pt-1.5 md:pt-2">
-                        <div className="text-white/30 font-black text-lg md:text-xl">VS</div>
+                        <div className="text-[#F5C84C]/60 font-black text-lg md:text-xl">VS</div>
                         {wonBy && (
-                          <div className="mt-2 md:mt-3 text-xs text-white/50 leading-snug px-1">{wonBy}</div>
+                          <div className="mt-2 md:mt-3 text-xs text-[#F5C84C]/70 leading-snug px-1 font-medium">{wonBy}</div>
                         )}
                       </div>
 
@@ -109,7 +116,14 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                           <div className="text-white font-semibold text-sm md:text-base leading-tight break-words line-clamp-2 text-right">{awayTeam}</div>
                           <div className="w-2 h-2 rounded-full bg-[#60A5FA]" />
                         </div>
-                        <div className={`text-2xl md:text-3xl font-bold ${awayWon ? 'text-[#F5C84C]' : 'text-[#F5C84C]/85'}`}>{awayScore ?? "—"}</div>
+                        <div className="flex items-baseline gap-2 justify-end">
+                          <div className={`text-3xl md:text-4xl font-bold ${awayWon ? 'text-[#F5C84C]' : 'text-white/90'}`}>
+                            {awayScoreNum ?? "—"}
+                          </div>
+                          {awayGoalsBehinds && (
+                            <div className="text-sm md:text-base text-white/40 font-medium">{awayGoalsBehinds}</div>
+                          )}
+                        </div>
                       </div>
                     </div>
 

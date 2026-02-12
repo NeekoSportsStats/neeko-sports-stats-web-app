@@ -118,15 +118,36 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null;
                 const d = payload[0].payload as MatchScatterPoint;
+                const disposalDiff = d.disposals - d.avg_disposals;
+                const fantasyDiff = d.fantasy_points - d.avg_fantasy;
                 return (
-                  <div className="rounded-lg border border-white/20 bg-black/90 backdrop-blur-xl p-3 shadow-xl">
-                    <div className="font-semibold text-white mb-1">{d.player}</div>
-                    <div className="text-sm text-white/70">{d.player_team}</div>
-                    <div className="text-sm text-white/70">
-                      Disposals: {d.disposals} (avg {round2(d.avg_disposals)})
+                  <div className="rounded-lg border border-[#F5C84C]/30 bg-black/95 backdrop-blur-xl p-3.5 shadow-2xl min-w-[200px]">
+                    <div className="font-bold text-white text-base mb-1.5">{d.player}</div>
+                    <div className="text-xs text-[#F5C84C]/80 font-medium mb-2 pb-2 border-b border-white/10">{d.player_team}</div>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-white/50">Disposals:</span>
+                        <span className="text-sm font-semibold text-white">{d.disposals}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-white/40">vs Avg:</span>
+                        <span className={`text-xs font-medium ${disposalDiff > 0 ? 'text-green-400' : disposalDiff < 0 ? 'text-red-400' : 'text-white/60'}`}>
+                          {disposalDiff > 0 ? '+' : ''}{round2(disposalDiff)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-sm text-white/70">
-                      Fantasy: {d.fantasy_points} (avg {round2(d.avg_fantasy)})
+                    <div className="h-px bg-white/10 my-2" />
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-white/50">Fantasy Pts:</span>
+                        <span className="text-sm font-semibold text-[#F5C84C]">{d.fantasy_points}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-white/40">vs Avg:</span>
+                        <span className={`text-xs font-medium ${fantasyDiff > 0 ? 'text-green-400' : fantasyDiff < 0 ? 'text-red-400' : 'text-white/60'}`}>
+                          {fantasyDiff > 0 ? '+' : ''}{round2(fantasyDiff)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -140,17 +161,31 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                   fill={resolvedHomeColor}
                   opacity={1}
                   shape={(props: Record<string, unknown>) => {
-                    const { cx, cy } = props as { cx: number; cy: number };
+                    const { cx, cy, payload } = props as { cx: number; cy: number; payload: MatchScatterPoint };
+                    const fantasyDiff = payload.y_fantasy_vs_avg;
+                    const isStandout = fantasyDiff > 20;
+                    const opacity = isStandout ? 1 : Math.max(0.75, Math.min(1, 0.75 + fantasyDiff / 100));
                     return (
-                      <circle
-                        cx={cx}
-                        cy={cy}
-                        r={7}
-                        fill={resolvedHomeColor}
-                        fillOpacity={1}
-                        stroke="rgba(0,0,0,0.4)"
-                        strokeWidth={1.5}
-                      />
+                      <>
+                        {isStandout && (
+                          <circle
+                            cx={cx}
+                            cy={cy}
+                            r={12}
+                            fill={resolvedHomeColor}
+                            fillOpacity={0.15}
+                          />
+                        )}
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={7}
+                          fill={resolvedHomeColor}
+                          fillOpacity={opacity}
+                          stroke="rgba(0,0,0,0.5)"
+                          strokeWidth={1.5}
+                        />
+                      </>
                     );
                   }}
                 />
@@ -159,17 +194,31 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                   fill={resolvedAwayColor}
                   opacity={1}
                   shape={(props: Record<string, unknown>) => {
-                    const { cx, cy } = props as { cx: number; cy: number };
+                    const { cx, cy, payload } = props as { cx: number; cy: number; payload: MatchScatterPoint };
+                    const fantasyDiff = payload.y_fantasy_vs_avg;
+                    const isStandout = fantasyDiff > 20;
+                    const opacity = isStandout ? 0.95 : Math.max(0.65, Math.min(0.85, 0.65 + fantasyDiff / 100));
                     return (
-                      <circle
-                        cx={cx}
-                        cy={cy}
-                        r={7}
-                        fill={resolvedAwayColor}
-                        fillOpacity={0.7}
-                        stroke="rgba(0,0,0,0.3)"
-                        strokeWidth={1.5}
-                      />
+                      <>
+                        {isStandout && (
+                          <circle
+                            cx={cx}
+                            cy={cy}
+                            r={12}
+                            fill={resolvedAwayColor}
+                            fillOpacity={0.12}
+                          />
+                        )}
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={7}
+                          fill={resolvedAwayColor}
+                          fillOpacity={opacity}
+                          stroke="rgba(0,0,0,0.4)"
+                          strokeWidth={1.5}
+                        />
+                      </>
                     );
                   }}
                 />
@@ -180,17 +229,31 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                 fill={resolvedHomeColor}
                 opacity={1}
                 shape={(props: Record<string, unknown>) => {
-                  const { cx, cy } = props as { cx: number; cy: number };
+                  const { cx, cy, payload } = props as { cx: number; cy: number; payload: MatchScatterPoint };
+                  const fantasyDiff = payload.y_fantasy_vs_avg;
+                  const isStandout = fantasyDiff > 20;
+                  const opacity = isStandout ? 1 : Math.max(0.75, Math.min(1, 0.75 + fantasyDiff / 100));
                   return (
-                    <circle
-                      cx={cx}
-                      cy={cy}
-                      r={7}
-                      fill={resolvedHomeColor}
-                      fillOpacity={0.95}
-                      stroke="rgba(0,0,0,0.3)"
-                      strokeWidth={1.5}
-                    />
+                    <>
+                      {isStandout && (
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={12}
+                          fill={resolvedHomeColor}
+                          fillOpacity={0.15}
+                        />
+                      )}
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={7}
+                        fill={resolvedHomeColor}
+                        fillOpacity={opacity}
+                        stroke="rgba(0,0,0,0.4)"
+                        strokeWidth={1.5}
+                      />
+                    </>
                   );
                 }}
               />

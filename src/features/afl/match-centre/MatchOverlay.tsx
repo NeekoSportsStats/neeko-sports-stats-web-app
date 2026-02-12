@@ -303,11 +303,11 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
       }}
     >
       <div className="w-full max-w-5xl rounded-xl md:rounded-2xl border border-white/10 bg-black/70 backdrop-blur-xl shadow-2xl overflow-hidden my-2 md:my-0">
-        <div className="flex items-center justify-between p-3 md:p-5 border-b border-white/10">
+        <div className="flex items-center justify-between p-3 md:p-5 border-b border-[#F5C84C]/20">
           <div>
-            <div className="text-xs uppercase tracking-wider text-white/60">
+            <div className="text-xs uppercase tracking-wider text-[#F5C84C]/70 font-medium">
               {roundLabel} • {season}
-              {isFinished && <span className="ml-2 text-white/40">Full Time</span>}
+              {isFinished && <span className="ml-2 text-white/50">Full Time</span>}
             </div>
             <div className="text-lg md:text-2xl font-bold text-white">Match Detail</div>
           </div>
@@ -332,9 +332,9 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-white/30 text-xl md:text-3xl font-black">VS</div>
+                <div className="text-[#F5C84C]/50 text-xl md:text-3xl font-black">VS</div>
                 {wonByLabel && (
-                  <div className="mt-1.5 md:mt-2 text-xs text-[#F5C84C]/70 leading-relaxed px-1">{wonByLabel}</div>
+                  <div className="mt-1.5 md:mt-2 text-xs text-[#F5C84C] leading-relaxed px-1 font-semibold">{wonByLabel}</div>
                 )}
               </div>
               <div className="text-right">
@@ -505,13 +505,33 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                 />
               </div>
 
-              <div className="rounded-xl md:rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-r from-[#F5C84C]/20 to-transparent p-4 md:p-7">
-                <div className="text-white font-semibold text-base mb-3 md:mb-4">Match Insights</div>
-                <div className="text-white/70 text-sm md:text-base leading-[1.65] md:leading-[1.7] space-y-2.5 md:space-y-3">
+              <div className="rounded-xl md:rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-br from-[#F5C84C]/20 via-[#F5C84C]/5 to-transparent p-5 md:p-8">
+                <div className="flex items-center gap-2 mb-4 md:mb-6">
+                  <div className="w-1 h-5 md:h-6 bg-[#F5C84C] rounded-full" />
+                  <div className="text-white font-bold text-lg md:text-xl tracking-tight">Match Report</div>
+                </div>
+                <div className="text-white/75 text-sm md:text-base leading-[1.75] md:leading-[1.85] space-y-3.5 md:space-y-4">
                   {insightSentences && insightSentences.length > 0 ? (
-                    insightSentences.map((s, i) => <p key={i} className={i === 0 ? "text-white/85 font-medium" : "text-white/70"}>{s}</p>)
+                    insightSentences.map((s, i) => {
+                      const isOpening = i === 0;
+                      const isClosing = i === insightSentences.length - 1;
+                      return (
+                        <p
+                          key={i}
+                          className={
+                            isOpening
+                              ? "text-white font-medium text-base md:text-lg"
+                              : isClosing
+                                ? "text-white/70 italic"
+                                : "text-white/75"
+                          }
+                        >
+                          {s}
+                        </p>
+                      );
+                    })
                   ) : (
-                    <p>Insights unavailable for this match.</p>
+                    <p className="text-white/60 italic">Match insights are currently unavailable for this fixture.</p>
                   )}
                 </div>
               </div>
