@@ -329,19 +329,13 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                   {sortedQuarterScores.map((qScore, idx) => (
                     <div
                       key={qScore.quarter}
-                      className={`flex items-center gap-3 md:gap-4 py-2.5 md:py-3 ${idx !== sortedQuarterScores.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
+                      className={`flex items-center gap-4 md:gap-6 py-2.5 md:py-3 ${idx !== sortedQuarterScores.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
                     >
-                      <div className="text-xs font-semibold text-white/40 uppercase tracking-wider w-8">Q{qScore.quarter}</div>
-                      <div className="flex-1 flex items-center justify-between gap-2 md:gap-4">
-                        <div className="flex items-center gap-2 md:gap-3 flex-1">
-                          <span className="text-xs text-white/30 truncate">{match.home_team_vendor}</span>
-                          <span className="text-lg md:text-xl font-bold text-white/90 min-w-[2rem] text-center">{qScore.home_qtr_points}</span>
-                        </div>
-                        <span className="text-white/20 text-sm px-2">–</span>
-                        <div className="flex items-center gap-2 md:gap-3 flex-1 justify-end">
-                          <span className="text-lg md:text-xl font-bold text-white/90 min-w-[2rem] text-center">{qScore.away_qtr_points}</span>
-                          <span className="text-xs text-white/30 truncate">{match.away_team_vendor}</span>
-                        </div>
+                      <div className="text-xs font-semibold text-white/40 uppercase tracking-wider w-6">Q{qScore.quarter}</div>
+                      <div className="flex items-center justify-center gap-4 md:gap-6 flex-1">
+                        <span className="text-lg md:text-xl font-bold text-white/90 min-w-[3rem] text-right">{qScore.home_qtr_points}</span>
+                        <span className="text-white/20 text-sm">—</span>
+                        <span className="text-lg md:text-xl font-bold text-white/90 min-w-[3rem] text-left">{qScore.away_qtr_points}</span>
                       </div>
                     </div>
                   ))}
