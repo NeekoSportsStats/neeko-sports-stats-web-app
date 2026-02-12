@@ -56,98 +56,100 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
   const hasTwoTeams = awayData.length > 0;
 
   return (
-    <div className="rounded-xl md:rounded-2xl border border-white/[0.08] bg-black/40 backdrop-blur-xl p-4 md:p-6 hover:border-white/[0.12] transition-colors duration-300">
-      <div className="mb-4 md:mb-6">
-        <div className="flex items-center gap-2 mb-1.5 md:mb-2">
-          <div className="w-1 h-5 md:h-6 bg-[#F5C84C] rounded-full" />
-          <h3 className="text-base md:text-lg font-bold text-white">
+    <div className="rounded-xl md:rounded-2xl border border-white/[0.08] bg-black/40 backdrop-blur-xl p-5 md:p-6 hover:border-white/[0.12] transition-colors duration-300">
+      <div className="mb-5 md:mb-6">
+        <div className="flex items-center gap-2 mb-2.5 md:mb-2">
+          <div className="w-1 h-6 md:h-6 bg-[#F5C84C] rounded-full" />
+          <h3 className="text-lg md:text-lg font-bold text-white">
             Player Impact vs Average
           </h3>
         </div>
-        <p className="text-xs md:text-sm text-white/60 leading-relaxed">
+        <p className="text-sm md:text-sm text-white/60 leading-[1.7]">
           Disposals and fantasy points compared to season average
         </p>
         {hasTwoTeams && (
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-2.5 md:gap-5 mt-3 md:mt-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 md:w-3.5 md:h-3.5 rounded-full shadow-lg" style={{ backgroundColor: resolvedHomeColor, boxShadow: `0 0 8px ${resolvedHomeColor}80` }} />
-              <span className="text-xs md:text-sm text-white/70 font-medium">{homeTeam}</span>
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-3 md:gap-5 mt-4 md:mt-4">
+            <div className="flex items-center gap-2.5 md:gap-2">
+              <div className="w-4 h-4 md:w-3.5 md:h-3.5 rounded-full shadow-lg" style={{ backgroundColor: resolvedHomeColor, boxShadow: `0 0 10px ${resolvedHomeColor}80` }} />
+              <span className="text-sm md:text-sm text-white/70 font-semibold">{homeTeam}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 md:w-3.5 md:h-3.5 rounded-full" style={{ backgroundColor: resolvedAwayColor }} />
-              <span className="text-xs md:text-sm text-white/60">{awayTeam}</span>
+            <div className="flex items-center gap-2.5 md:gap-2">
+              <div className="w-4 h-4 md:w-3.5 md:h-3.5 rounded-full" style={{ backgroundColor: resolvedAwayColor }} />
+              <span className="text-sm md:text-sm text-white/60 font-medium">{awayTeam}</span>
             </div>
           </div>
         )}
       </div>
 
-      <div className="min-h-[300px] h-[300px] md:h-[440px] w-full overflow-x-auto pb-2">
+      <div className="min-h-[380px] h-[380px] md:h-[440px] w-full overflow-x-auto pb-2">
         <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 15, right: 15, bottom: 50, left: 25 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+          <ScatterChart margin={{ top: 20, right: 15, bottom: 55, left: 20 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.5} />
             <XAxis
               type="number"
               dataKey="x_disposals_vs_avg"
               name="Disposals vs Avg"
               stroke="#999"
-              tick={{ fontSize: 10 }}
+              tick={{ fontSize: 11 }}
               label={{
                 value: "Disposals vs Avg",
                 position: "bottom",
-                offset: 10,
-                style: { fill: "#999", fontSize: "10px" },
+                offset: 15,
+                style: { fill: "#999", fontSize: "12px" },
               }}
+              height={50}
             />
             <YAxis
               type="number"
               dataKey="y_fantasy_vs_avg"
               name="Fantasy vs Avg"
               stroke="#999"
-              tick={{ fontSize: 10 }}
+              tick={{ fontSize: 11 }}
               label={{
                 value: "Fantasy vs Avg",
                 angle: -90,
                 position: "left",
-                offset: 5,
-                style: { fill: "#999", fontSize: "10px" },
+                offset: 0,
+                style: { fill: "#999", fontSize: "12px" },
               }}
+              width={45}
             />
 
             <ReferenceLine x={0} stroke="#555" strokeDasharray="3 3" />
             <ReferenceLine y={0} stroke="#555" strokeDasharray="3 3" />
 
             <Tooltip
-              cursor={{ strokeDasharray: "3 3" }}
+              cursor={{ strokeDasharray: "3 3", strokeWidth: 2 }}
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null;
                 const d = payload[0].payload as MatchScatterPoint;
                 const disposalDiff = d.disposals - d.avg_disposals;
                 const fantasyDiff = d.fantasy_points - d.avg_fantasy;
                 return (
-                  <div className="rounded-lg border border-[#F5C84C]/30 bg-black/95 backdrop-blur-xl p-3.5 shadow-2xl min-w-[200px]">
-                    <div className="font-bold text-white text-base mb-1.5">{d.player}</div>
-                    <div className="text-xs text-[#F5C84C]/80 font-medium mb-2 pb-2 border-b border-white/10">{d.player_team}</div>
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-xs text-white/50">Disposals:</span>
-                        <span className="text-sm font-semibold text-white">{d.disposals}</span>
+                  <div className="rounded-lg border border-[#F5C84C]/40 bg-black/98 backdrop-blur-xl p-4 md:p-3.5 shadow-2xl min-w-[220px] md:min-w-[200px]">
+                    <div className="font-bold text-white text-lg md:text-base mb-2 md:mb-1.5">{d.player}</div>
+                    <div className="text-sm md:text-xs text-[#F5C84C]/80 font-semibold mb-3 md:mb-2 pb-3 md:pb-2 border-b border-white/10">{d.player_team}</div>
+                    <div className="space-y-2 md:space-y-1.5">
+                      <div className="flex items-center justify-between gap-4 md:gap-3">
+                        <span className="text-sm md:text-xs text-white/50 font-medium">Disposals:</span>
+                        <span className="text-base md:text-sm font-bold text-white">{d.disposals}</span>
                       </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-xs text-white/40">vs Avg:</span>
-                        <span className={`text-xs font-medium ${disposalDiff > 0 ? 'text-green-400' : disposalDiff < 0 ? 'text-red-400' : 'text-white/60'}`}>
+                      <div className="flex items-center justify-between gap-4 md:gap-3">
+                        <span className="text-sm md:text-xs text-white/40">vs Avg:</span>
+                        <span className={`text-sm md:text-xs font-semibold ${disposalDiff > 0 ? 'text-green-400' : disposalDiff < 0 ? 'text-red-400' : 'text-white/60'}`}>
                           {disposalDiff > 0 ? '+' : ''}{round2(disposalDiff)}
                         </span>
                       </div>
                     </div>
-                    <div className="h-px bg-white/10 my-2" />
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-xs text-white/50">Fantasy Pts:</span>
-                        <span className="text-sm font-semibold text-[#F5C84C]">{d.fantasy_points}</span>
+                    <div className="h-px bg-white/10 my-3 md:my-2" />
+                    <div className="space-y-2 md:space-y-1.5">
+                      <div className="flex items-center justify-between gap-4 md:gap-3">
+                        <span className="text-sm md:text-xs text-white/50 font-medium">Fantasy Pts:</span>
+                        <span className="text-base md:text-sm font-bold text-[#F5C84C]">{d.fantasy_points}</span>
                       </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-xs text-white/40">vs Avg:</span>
-                        <span className={`text-xs font-medium ${fantasyDiff > 0 ? 'text-green-400' : fantasyDiff < 0 ? 'text-red-400' : 'text-white/60'}`}>
+                      <div className="flex items-center justify-between gap-4 md:gap-3">
+                        <span className="text-sm md:text-xs text-white/40">vs Avg:</span>
+                        <span className={`text-sm md:text-xs font-semibold ${fantasyDiff > 0 ? 'text-green-400' : fantasyDiff < 0 ? 'text-red-400' : 'text-white/60'}`}>
                           {fantasyDiff > 0 ? '+' : ''}{round2(fantasyDiff)}
                         </span>
                       </div>
@@ -174,7 +176,7 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                           <circle
                             cx={cx}
                             cy={cy}
-                            r={12}
+                            r={15}
                             fill={resolvedHomeColor}
                             fillOpacity={0.15}
                           />
@@ -182,11 +184,11 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                         <circle
                           cx={cx}
                           cy={cy}
-                          r={7}
+                          r={8}
                           fill={resolvedHomeColor}
                           fillOpacity={opacity}
                           stroke="rgba(0,0,0,0.5)"
-                          strokeWidth={1.5}
+                          strokeWidth={2}
                         />
                       </>
                     );
@@ -207,7 +209,7 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                           <circle
                             cx={cx}
                             cy={cy}
-                            r={12}
+                            r={15}
                             fill={resolvedAwayColor}
                             fillOpacity={0.12}
                           />
@@ -215,11 +217,11 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                         <circle
                           cx={cx}
                           cy={cy}
-                          r={7}
+                          r={8}
                           fill={resolvedAwayColor}
                           fillOpacity={opacity}
                           stroke="rgba(0,0,0,0.4)"
-                          strokeWidth={1.5}
+                          strokeWidth={2}
                         />
                       </>
                     );
@@ -242,7 +244,7 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                         <circle
                           cx={cx}
                           cy={cy}
-                          r={12}
+                          r={15}
                           fill={resolvedHomeColor}
                           fillOpacity={0.15}
                         />
@@ -250,11 +252,11 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                       <circle
                         cx={cx}
                         cy={cy}
-                        r={7}
+                        r={8}
                         fill={resolvedHomeColor}
                         fillOpacity={opacity}
                         stroke="rgba(0,0,0,0.4)"
-                        strokeWidth={1.5}
+                        strokeWidth={2}
                       />
                     </>
                   );

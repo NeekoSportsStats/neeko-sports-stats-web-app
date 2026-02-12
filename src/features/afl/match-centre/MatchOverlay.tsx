@@ -99,6 +99,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
   const [quarters, setQuarters] = useState<MatchQuarter[]>([]);
   const [quartersLoading, setQuartersLoading] = useState(false);
   const [quartersError, setQuartersError] = useState<string | null>(null);
+  const [showQuarters, setShowQuarters] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -386,41 +387,50 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
           </button>
         </div>
 
-        <div className="p-3 md:p-6 space-y-5 md:space-y-8">
-          <div className="rounded-xl md:rounded-2xl border border-[#F5C84C]/15 bg-black/50 p-4 md:p-6 shadow-lg shadow-[#F5C84C]/5">
-            <div className="grid grid-cols-3 items-center gap-2 md:gap-4 mb-4">
+        <div className="p-4 md:p-6 space-y-6 md:space-y-8">
+          <div className="rounded-xl md:rounded-2xl border border-[#F5C84C]/15 bg-black/50 p-5 md:p-6 shadow-lg shadow-[#F5C84C]/5">
+            <div className="grid grid-cols-3 items-center gap-3 md:gap-4 mb-5 md:mb-4">
               <div>
-                <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3">
-                  <div className="w-2 h-2 md:w-2.5 md:h-2.5 rounded-full" style={{ backgroundColor: homeColor }} />
-                  <div className="text-white font-semibold text-base md:text-xl leading-tight">{match.home_team_vendor ?? "Home"}</div>
+                <div className="flex items-center gap-2 md:gap-2 mb-3 md:mb-3">
+                  <div className="w-2.5 h-2.5 md:w-2.5 md:h-2.5 rounded-full" style={{ backgroundColor: homeColor }} />
+                  <div className="text-white font-semibold text-base md:text-xl leading-tight line-clamp-2">{match.home_team_vendor ?? "Home"}</div>
                 </div>
-                <div className="text-[#F5C84C] text-3xl md:text-4xl font-bold">
+                <div className="text-[#F5C84C] text-4xl md:text-4xl font-bold">
                   {homeScore ?? "—"}
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-[#F5C84C]/50 text-xl md:text-3xl font-black">VS</div>
+                <div className="text-[#F5C84C]/50 text-2xl md:text-3xl font-black">VS</div>
                 {wonByLabel && (
-                  <div className="mt-1.5 md:mt-2 text-xs text-[#F5C84C] leading-relaxed px-1 font-semibold">{wonByLabel}</div>
+                  <div className="mt-2 md:mt-2 text-xs text-[#F5C84C] leading-relaxed px-1 font-semibold">{wonByLabel}</div>
                 )}
               </div>
               <div className="text-right">
-                <div className="flex items-center gap-1.5 md:gap-2 justify-end mb-2 md:mb-3">
-                  <div className="text-white font-semibold text-base md:text-xl leading-tight">{match.away_team_vendor ?? "Away"}</div>
-                  <div className="w-2 h-2 md:w-2.5 md:h-2.5 rounded-full" style={{ backgroundColor: awayColor }} />
+                <div className="flex items-center gap-2 md:gap-2 justify-end mb-3 md:mb-3">
+                  <div className="text-white font-semibold text-base md:text-xl leading-tight line-clamp-2 text-right">{match.away_team_vendor ?? "Away"}</div>
+                  <div className="w-2.5 h-2.5 md:w-2.5 md:h-2.5 rounded-full" style={{ backgroundColor: awayColor }} />
                 </div>
-                <div className="text-[#F5C84C] text-3xl md:text-4xl font-bold">
+                <div className="text-[#F5C84C] text-4xl md:text-4xl font-bold">
                   {awayScore ?? "—"}
                 </div>
               </div>
             </div>
 
             {(quarters.length > 0 || (sortedQuarterScores && sortedQuarterScores.length > 0)) && (
-              <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-[#F5C84C]/10">
-                <div className="mb-3 md:mb-4">
-                  <div className="text-xs uppercase tracking-wider text-[#F5C84C]/60 font-semibold">Quarter by Quarter</div>
-                </div>
-                <div className="space-y-0">
+              <div className="mt-5 md:mt-6 pt-5 md:pt-6 border-t border-[#F5C84C]/10">
+                <button
+                  onClick={() => setShowQuarters(!showQuarters)}
+                  className="w-full flex items-center justify-between mb-3 md:mb-4 touch-manipulation min-h-[48px] md:min-h-0 -my-2 md:my-0 py-2 md:py-0"
+                >
+                  <div className="text-xs md:text-xs uppercase tracking-wider text-[#F5C84C]/70 font-bold flex items-center gap-2">
+                    <span>Quarter by Quarter</span>
+                    <span className="md:hidden text-[#F5C84C]/50 text-xs">({showQuarters ? 'Hide' : 'Show'})</span>
+                  </div>
+                  <span className="md:hidden text-[#F5C84C] text-xl font-bold transition-transform duration-200" style={{ transform: showQuarters ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                    ▼
+                  </span>
+                </button>
+                <div className={`space-y-0 overflow-hidden transition-all duration-300 ${showQuarters ? 'max-h-[500px] opacity-100 md:max-h-none md:opacity-100' : 'max-h-0 opacity-0 md:max-h-none md:opacity-100'}`}>
                   {quarters.length > 0 ? (
                     quarters.map((q, idx) => {
                       const homeDisplay = q.home_goals != null && q.home_behinds != null && q.home_points != null
@@ -432,17 +442,17 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                       return (
                         <div
                           key={q.quarter}
-                          className={`flex items-center gap-4 md:gap-6 py-2.5 md:py-3 hover:bg-white/[0.02] transition-colors duration-150 rounded-lg px-2 -mx-2 ${idx !== quarters.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
+                          className={`flex items-center gap-5 md:gap-6 py-3.5 md:py-3 hover:bg-white/[0.02] transition-colors duration-150 rounded-lg px-3 md:px-2 -mx-3 md:-mx-2 ${idx !== quarters.length - 1 ? 'border-b border-white/[0.06]' : ''}`}
                         >
-                          <div className="text-xs font-semibold text-white/40 uppercase tracking-wider w-6">Q{q.quarter}</div>
-                          <div className="flex items-center justify-between gap-4 md:gap-6 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-white/50">H:</span>
-                              <span className="text-base md:text-lg font-bold text-white/90">{homeDisplay}</span>
+                          <div className="text-sm md:text-xs font-bold md:font-semibold text-[#F5C84C]/80 md:text-white/40 uppercase tracking-wider w-8 md:w-6">Q{q.quarter}</div>
+                          <div className="flex items-center justify-between gap-6 md:gap-6 flex-1">
+                            <div className="flex items-center gap-2.5 md:gap-2">
+                              <span className="text-sm md:text-xs text-white/50 font-medium">H:</span>
+                              <span className="text-lg md:text-lg font-bold text-white/90">{homeDisplay}</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-white/50">A:</span>
-                              <span className="text-base md:text-lg font-bold text-white/90">{awayDisplay}</span>
+                            <div className="flex items-center gap-2.5 md:gap-2">
+                              <span className="text-sm md:text-xs text-white/50 font-medium">A:</span>
+                              <span className="text-lg md:text-lg font-bold text-white/90">{awayDisplay}</span>
                             </div>
                           </div>
                         </div>
@@ -452,13 +462,13 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                     sortedQuarterScores.map((qScore, idx) => (
                       <div
                         key={qScore.quarter}
-                        className={`flex items-center gap-4 md:gap-6 py-2.5 md:py-3 hover:bg-white/[0.02] transition-colors duration-150 rounded-lg px-2 -mx-2 ${idx !== sortedQuarterScores.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
+                        className={`flex items-center gap-5 md:gap-6 py-3.5 md:py-3 hover:bg-white/[0.02] transition-colors duration-150 rounded-lg px-3 md:px-2 -mx-3 md:-mx-2 ${idx !== sortedQuarterScores.length - 1 ? 'border-b border-white/[0.06]' : ''}`}
                       >
-                        <div className="text-xs font-semibold text-white/40 uppercase tracking-wider w-6">Q{qScore.quarter}</div>
-                        <div className="flex items-center justify-center gap-4 md:gap-6 flex-1">
-                          <span className="text-lg md:text-xl font-bold text-white/90 min-w-[3rem] text-right">{qScore.home_qtr_points}</span>
-                          <span className="text-white/20 text-sm">—</span>
-                          <span className="text-lg md:text-xl font-bold text-white/90 min-w-[3rem] text-left">{qScore.away_qtr_points}</span>
+                        <div className="text-sm md:text-xs font-bold md:font-semibold text-[#F5C84C]/80 md:text-white/40 uppercase tracking-wider w-8 md:w-6">Q{qScore.quarter}</div>
+                        <div className="flex items-center justify-center gap-6 md:gap-6 flex-1">
+                          <span className="text-xl md:text-xl font-bold text-white/90 min-w-[3.5rem] md:min-w-[3rem] text-right">{qScore.home_qtr_points}</span>
+                          <span className="text-white/30 text-base md:text-sm font-bold">—</span>
+                          <span className="text-xl md:text-xl font-bold text-white/90 min-w-[3.5rem] md:min-w-[3rem] text-left">{qScore.away_qtr_points}</span>
                         </div>
                       </div>
                     ))
@@ -573,12 +583,12 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                 />
               </div>
 
-              <div className="rounded-xl md:rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-br from-[#F5C84C]/20 via-[#F5C84C]/5 to-transparent p-5 md:p-8">
-                <div className="flex items-center gap-2 mb-4 md:mb-6">
-                  <div className="w-1 h-5 md:h-6 bg-[#F5C84C] rounded-full" />
-                  <div className="text-white font-bold text-lg md:text-xl tracking-tight">Match Report</div>
+              <div className="rounded-xl md:rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-br from-[#F5C84C]/20 via-[#F5C84C]/5 to-transparent p-6 md:p-8">
+                <div className="flex items-center gap-2 mb-5 md:mb-6">
+                  <div className="w-1 h-6 md:h-6 bg-[#F5C84C] rounded-full" />
+                  <div className="text-white font-bold text-xl md:text-xl tracking-tight">Match Report</div>
                 </div>
-                <div className="text-white/75 text-sm md:text-base leading-[1.75] md:leading-[1.85] space-y-3.5 md:space-y-4">
+                <div className="text-white/75 text-base md:text-base leading-[1.85] md:leading-[1.85] space-y-4 md:space-y-4 max-w-3xl">
                   {insightSentences && insightSentences.length > 0 ? (
                     insightSentences.map((s, i) => {
                       const isOpening = i === 0;
@@ -588,7 +598,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                           key={i}
                           className={
                             isOpening
-                              ? "text-white font-medium text-base md:text-lg"
+                              ? "text-white font-medium text-lg md:text-lg"
                               : isClosing
                                 ? "text-white/70 italic"
                                 : "text-white/75"

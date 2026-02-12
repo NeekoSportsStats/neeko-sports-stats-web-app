@@ -235,24 +235,24 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
 
   return (
     <div className="rounded-xl md:rounded-2xl border border-white/[0.08] bg-black/40 backdrop-blur-xl p-5 md:p-7 hover:border-white/[0.12] transition-colors duration-300">
-      <div className="mb-4 md:mb-6">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-1 h-5 md:h-6 bg-[#F5C84C] rounded-full" />
-          <h3 className="text-base md:text-lg font-bold text-white">Match Momentum</h3>
+      <div className="mb-5 md:mb-6">
+        <div className="flex items-center gap-2 mb-2.5 md:mb-2">
+          <div className="w-1 h-6 md:h-6 bg-[#F5C84C] rounded-full" />
+          <h3 className="text-lg md:text-lg font-bold text-white">Match Momentum</h3>
         </div>
-        <p className="text-xs md:text-sm text-white/60 leading-[1.6]">
+        <p className="text-sm md:text-sm text-white/60 leading-[1.7]">
           Territory control throughout the match. <span className="text-[#F5C84C]">{homeTeam}</span> positive, <span className="text-white/80">{awayTeam}</span> negative.
         </p>
         {narrative && (
-          <p className="text-xs md:text-sm text-white/80 mt-2 italic leading-[1.6]">
+          <p className="text-sm md:text-sm text-white/80 mt-3 md:mt-2 italic leading-[1.7]">
             {narrative}
           </p>
         )}
       </div>
 
-      <div className="min-h-[280px] h-[280px] md:h-[320px] w-full">
+      <div className="min-h-[340px] h-[340px] md:h-[320px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 10, right: 20, bottom: 25, left: 20 }}>
+          <AreaChart data={data} margin={{ top: 10, right: 10, bottom: 30, left: 10 }}>
             <defs>
               <linearGradient id="momentumPos" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#F5C84C" stopOpacity={0.6} />
@@ -266,24 +266,26 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
               </linearGradient>
             </defs>
 
-            <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.5} />
 
             <XAxis
               dataKey="label"
               stroke="#666"
-              tick={{ fill: "#999", fontSize: 10 }}
+              tick={{ fill: "#999", fontSize: 11 }}
               interval="preserveStartEnd"
+              height={35}
             />
             <YAxis
               stroke="#666"
-              tick={{ fill: "#999", fontSize: 10 }}
+              tick={{ fill: "#999", fontSize: 11 }}
               tickFormatter={(v: number) => (v > 0 ? `+${v}` : String(v))}
+              width={35}
             />
 
-            <ReferenceLine y={0} stroke="#555" strokeWidth={1.5} />
+            <ReferenceLine y={0} stroke="#666" strokeWidth={2} />
 
             <Tooltip
-              cursor={{ stroke: "#F5C84C", strokeWidth: 1 }}
+              cursor={{ stroke: "#F5C84C", strokeWidth: 2 }}
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null;
                 const row = payload[0].payload as ChartRow;
@@ -315,12 +317,12 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
                   : "Final Term";
 
                 return (
-                  <div className="rounded-lg border border-[#F5C84C]/30 bg-black/95 backdrop-blur-xl p-3.5 shadow-2xl min-w-[180px]">
-                    <div className="text-xs text-[#F5C84C]/80 font-medium mb-1.5">{qtrLabel}</div>
-                    <div className="text-base font-bold text-white mb-2 pb-2 border-b border-white/10">
+                  <div className="rounded-lg border border-[#F5C84C]/40 bg-black/98 backdrop-blur-xl p-4 md:p-3.5 shadow-2xl min-w-[200px] md:min-w-[180px]">
+                    <div className="text-sm md:text-xs text-[#F5C84C]/80 font-semibold mb-2 md:mb-1.5">{qtrLabel}</div>
+                    <div className="text-lg md:text-base font-bold text-white mb-3 md:mb-2 pb-3 md:pb-2 border-b border-white/10">
                       {margin !== 0 ? `${team} ${displayValue}` : displayValue}
                     </div>
-                    <div className="text-xs text-white/60 italic">{context}</div>
+                    <div className="text-sm md:text-xs text-white/70 italic">{context}</div>
                   </div>
                 );
               }}
@@ -330,9 +332,9 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
               type="monotone"
               dataKey="momentum"
               stroke="#F5C84C"
-              strokeWidth={2}
+              strokeWidth={3}
               fill="url(#momentumPos)"
-              activeDot={{ r: 5, fill: "#F5C84C", stroke: "#000", strokeWidth: 1 }}
+              activeDot={{ r: 6, fill: "#F5C84C", stroke: "#000", strokeWidth: 2 }}
             />
           </AreaChart>
         </ResponsiveContainer>

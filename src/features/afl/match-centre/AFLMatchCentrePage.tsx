@@ -150,10 +150,10 @@ export default function AFLMatchCentrePage() {
           </div>
         </header>
 
-        <div className="mb-8 rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4">
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <div className="space-y-1">
-              <div className="text-xs font-semibold uppercase tracking-wider text-yellow-200/80">
+        <div className="mb-6 md:mb-8 rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4 md:p-4 sticky top-0 z-10 md:static">
+          <div className="flex flex-col gap-4 md:flex-row md:gap-4 md:items-center md:justify-between">
+            <div className="space-y-1 md:space-y-1">
+              <div className="text-xs font-bold uppercase tracking-wider text-yellow-200/80">
                 Filters
               </div>
               <p className="text-xs text-white/60">
@@ -161,7 +161,7 @@ export default function AFLMatchCentrePage() {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:gap-3">
               <div className="flex flex-col gap-2">
                 <label className="text-xs text-white/50 uppercase tracking-wider font-semibold">
                   Season
@@ -169,7 +169,7 @@ export default function AFLMatchCentrePage() {
                 <select
                   value={season}
                   onChange={(e) => setSeason(Number(e.target.value))}
-                  className="px-4 py-2.5 rounded-lg border border-white/10 bg-black/60 text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#F5C84C]/50 focus:border-[#F5C84C]/50 hover:border-white/20 transition-all cursor-pointer"
+                  className="w-full md:w-auto px-4 py-3 md:py-2.5 rounded-lg border border-white/10 bg-black/60 text-white text-base md:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#F5C84C]/50 focus:border-[#F5C84C]/50 hover:border-white/20 transition-all cursor-pointer touch-manipulation min-h-[48px] md:min-h-0"
                   title="Select season to view match data"
                 >
                   <option value={2025} className="bg-black text-white">2025 Season</option>
@@ -187,7 +187,7 @@ export default function AFLMatchCentrePage() {
                   value={round}
                   onChange={(e) => setRound(Number(e.target.value))}
                   disabled={is2026}
-                  className="px-4 py-2.5 rounded-lg border border-white/10 bg-black/60 text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#F5C84C]/50 focus:border-[#F5C84C]/50 hover:border-white/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+                  className="w-full md:w-auto px-4 py-3 md:py-2.5 rounded-lg border border-white/10 bg-black/60 text-white text-base md:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#F5C84C]/50 focus:border-[#F5C84C]/50 hover:border-white/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10 touch-manipulation min-h-[48px] md:min-h-0"
                   title={is2026 ? "Round selection unavailable for 2026" : "Select round to view matches"}
                 >
                   {roundOptions.map((r) => (
@@ -200,7 +200,7 @@ export default function AFLMatchCentrePage() {
 
               {is2026 && (
                 <div className="flex items-end">
-                  <div className="px-3 py-2.5 rounded-lg border border-[#F5C84C]/30 bg-[#F5C84C]/10 text-[#F5C84C] text-xs font-bold uppercase tracking-wider shadow-lg shadow-[#F5C84C]/5">
+                  <div className="px-4 py-3 md:px-3 md:py-2.5 rounded-lg border border-[#F5C84C]/30 bg-[#F5C84C]/10 text-[#F5C84C] text-sm md:text-xs font-bold uppercase tracking-wider shadow-lg shadow-[#F5C84C]/5">
                     Coming Soon
                   </div>
                 </div>
