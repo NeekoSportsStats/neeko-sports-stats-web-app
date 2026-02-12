@@ -163,33 +163,35 @@ export default function AFLMatchCentrePage() {
 
             <div className="flex flex-wrap gap-3">
               <div className="flex flex-col gap-2">
-                <label className="text-xs text-white/50 uppercase tracking-wider">
+                <label className="text-xs text-white/50 uppercase tracking-wider font-semibold">
                   Season
                 </label>
                 <select
                   value={season}
                   onChange={(e) => setSeason(Number(e.target.value))}
-                  className="px-4 py-2 rounded-lg border border-white/10 bg-black/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
+                  className="px-4 py-2.5 rounded-lg border border-white/10 bg-black/60 text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#F5C84C]/50 focus:border-[#F5C84C]/50 hover:border-white/20 transition-all cursor-pointer"
+                  title="Select season to view match data"
                 >
-                  <option value={2025}>2025</option>
-                  <option value={2026} disabled>
-                    2026
+                  <option value={2025} className="bg-black text-white">2025 Season</option>
+                  <option value={2026} disabled className="bg-black text-white/40 cursor-not-allowed">
+                    2026 (Coming Soon)
                   </option>
                 </select>
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-xs text-white/50 uppercase tracking-wider">
+                <label className="text-xs text-white/50 uppercase tracking-wider font-semibold">
                   Round
                 </label>
                 <select
                   value={round}
                   onChange={(e) => setRound(Number(e.target.value))}
                   disabled={is2026}
-                  className="px-4 py-2 rounded-lg border border-white/10 bg-black/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2.5 rounded-lg border border-white/10 bg-black/60 text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#F5C84C]/50 focus:border-[#F5C84C]/50 hover:border-white/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10"
+                  title={is2026 ? "Round selection unavailable for 2026" : "Select round to view matches"}
                 >
                   {roundOptions.map((r) => (
-                    <option key={r.value} value={r.value}>
+                    <option key={r.value} value={r.value} className="bg-black text-white">
                       {r.label}
                     </option>
                   ))}
@@ -198,7 +200,7 @@ export default function AFLMatchCentrePage() {
 
               {is2026 && (
                 <div className="flex items-end">
-                  <div className="px-3 py-2 rounded-lg bg-yellow-500/20 text-yellow-400 text-xs font-semibold uppercase tracking-wider">
+                  <div className="px-3 py-2.5 rounded-lg border border-[#F5C84C]/30 bg-[#F5C84C]/10 text-[#F5C84C] text-xs font-bold uppercase tracking-wider shadow-lg shadow-[#F5C84C]/5">
                     Coming Soon
                   </div>
                 </div>
@@ -208,10 +210,20 @@ export default function AFLMatchCentrePage() {
         </div>
 
         {is2026 ? (
-          <div className="rounded-xl border border-yellow-400/40 bg-gradient-to-br from-yellow-500/10 to-amber-500/10 backdrop-blur-xl p-12 text-center">
-            <div className="max-w-md mx-auto space-y-4">
-              <h2 className="text-3xl font-bold text-white">2026 Season</h2>
-              <p className="text-lg text-white/70">Coming Soon</p>
+          <div className="rounded-2xl border border-[#F5C84C]/20 bg-gradient-to-br from-[#F5C84C]/5 to-[#E6B84A]/5 backdrop-blur-xl p-12 md:p-16 text-center shadow-2xl shadow-[#F5C84C]/5">
+            <div className="max-w-lg mx-auto space-y-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#F5C84C]/10 border border-[#F5C84C]/30 mb-4">
+                <Calendar className="w-8 h-8 text-[#F5C84C]" />
+              </div>
+              <h2 className="text-4xl md:text-5xl font-bold text-white tracking-tight">2026 Season</h2>
+              <p className="text-lg md:text-xl text-white/60 leading-relaxed">
+                Match data and performance analysis will be available when the 2026 AFL season begins.
+              </p>
+              <div className="pt-4">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#F5C84C]/30 bg-[#F5C84C]/10 text-[#F5C84C] text-sm font-bold uppercase tracking-wider">
+                  Coming Soon
+                </div>
+              </div>
             </div>
           </div>
         ) : loading ? (
