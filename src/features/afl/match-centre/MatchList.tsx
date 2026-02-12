@@ -95,19 +95,6 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                           <div className="text-white font-semibold text-sm md:text-base leading-tight break-words line-clamp-2">{homeTeam}</div>
                         </div>
                         <div className={`text-2xl md:text-3xl font-bold ${homeWon ? 'text-[#F5C84C]' : 'text-[#F5C84C]/85'}`}>{homeScore ?? "—"}</div>
-                        {quarters.length > 0 && (
-                          <div className="mt-2 space-y-0.5">
-                            {[1, 2, 3, 4].map(q => {
-                              const qData = quarters.find(qs => qs.quarter === q);
-                              return (
-                                <div key={q} className="text-xs text-white/40 flex items-center gap-1.5">
-                                  <span className="font-medium w-5">Q{q}</span>
-                                  <span>{qData?.home_qtr_points ?? "—"}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
                       </div>
 
                       <div className="text-center pt-1.5 md:pt-2">
@@ -123,19 +110,6 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                           <div className="w-2 h-2 rounded-full bg-[#60A5FA]" />
                         </div>
                         <div className={`text-2xl md:text-3xl font-bold ${awayWon ? 'text-[#F5C84C]' : 'text-[#F5C84C]/85'}`}>{awayScore ?? "—"}</div>
-                        {quarters.length > 0 && (
-                          <div className="mt-2 space-y-0.5">
-                            {[1, 2, 3, 4].map(q => {
-                              const qData = quarters.find(qs => qs.quarter === q);
-                              return (
-                                <div key={q} className="text-xs text-white/40 flex items-center gap-1.5 justify-end">
-                                  <span>{qData?.away_qtr_points ?? "—"}</span>
-                                  <span className="font-medium w-5 text-left">Q{q}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
                       </div>
                     </div>
 
