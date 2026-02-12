@@ -168,12 +168,17 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
     if (hScore != null && aScore != null) {
       const margin = Math.abs(hScore - aScore);
       const winner = hScore >= aScore ? home : away;
+      const loser = hScore >= aScore ? away : home;
       const winScore = Math.max(hScore, aScore);
       const loseScore = Math.min(hScore, aScore);
       if (margin === 0) {
-        sentences.push(`${home} and ${away} drew ${hScore}-${aScore}.`);
+        sentences.push(`In a tightly contested affair, ${home} and ${away} couldn't be separated, finishing locked at ${hScore} points apiece.`);
+      } else if (margin <= 12) {
+        sentences.push(`${winner} held off a determined ${loser} to claim victory by ${margin} points in a thriller, ${winScore} to ${loseScore}.`);
+      } else if (margin <= 30) {
+        sentences.push(`${winner} secured a ${margin}-point victory over ${loser}, running out ${winScore} to ${loseScore} winners.`);
       } else {
-        sentences.push(`${winner} won by ${margin} points, ${winScore}-${loseScore}.`);
+        sentences.push(`${winner} dominated from start to finish, cruising to a comprehensive ${margin}-point victory, ${winScore} to ${loseScore}.`);
       }
     }
 
@@ -181,8 +186,9 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
       const sorted = [...matchPlayerStats].sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0));
       const bog = sorted[0];
       if (bog) {
+        const disposalText = bog.disposals && bog.disposals > 30 ? `a dominant ${bog.disposals}` : bog.disposals;
         sentences.push(
-          `Best on ground was ${bog.player} (${bog.player_team}) with ${bog.fantasy_points} fantasy points from ${bog.disposals} disposals.`
+          `${bog.player} was the standout performer for ${bog.player_team}, collecting ${disposalText} disposals and posting ${bog.fantasy_points} fantasy points to take best on ground honours.`
         );
       }
     }
@@ -192,30 +198,30 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
       if (swing && swing.swing > 18) {
         const quarterText = swing.quarter
           ? swing.quarter === 1
-            ? " early in the opening term"
+            ? "early in the opening term"
             : swing.quarter === 2
-              ? " late in the second quarter"
+              ? "late in the second quarter"
               : swing.quarter === 3
-                ? " in a dominant third quarter"
-                : " in the final term"
+                ? "during a dominant third-quarter blitz"
+                : "in the final term"
           : "";
         const teamName = swing.direction === "positive" ? home : away;
         const phrases = [
-          `${teamName} took control of the contest${quarterText}.`,
-          `A sustained period of pressure${quarterText} proved decisive for ${teamName}.`,
-          `${teamName} broke the game open${quarterText} with a match-defining burst.`
+          `The match turned ${quarterText}, when ${teamName} seized control with a decisive burst.`,
+          `${teamName} broke the contest wide open ${quarterText}, piling on unanswered goals to establish an unassailable lead.`,
+          `A period of sustained dominance ${quarterText} saw ${teamName} assert their authority and effectively seal the result.`
         ];
         sentences.push(phrases[Math.floor(Math.random() * phrases.length)]);
       } else if (swing && swing.swing > 12) {
         const teamName = swing.direction === "positive" ? home : away;
         const phrases = [
-          `${teamName} wrestled back control at a crucial stage of the match.`,
-          `The momentum shifted decisively in favour of ${teamName}.`,
-          `${teamName} seized the ascendancy when it mattered most.`
+          `${teamName} wrestled back momentum at a pivotal moment, shifting the balance of play in their favour.`,
+          `When it mattered most, ${teamName} found another gear to seize control of the contest.`,
+          `The decisive moment came when ${teamName} strung together a match-changing run of goals.`
         ];
         sentences.push(phrases[Math.floor(Math.random() * phrases.length)]);
       } else if (swing && swing.swing > 6) {
-        sentences.push("Both teams traded momentum throughout, with neither able to establish sustained control.");
+        sentences.push("Neither side could stamp their authority on proceedings, with momentum swinging back and forth throughout a tightly contested battle.");
       }
     }
 
@@ -229,7 +235,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
       const awayDisplay = awayTop.player_name === bogName ? team2Top3[1] : awayTop;
       if (homeDisplay && awayDisplay) {
         sentences.push(
-          `${homeDisplay.player_name} led ${home} (${homeDisplay.fantasy_points} FP) while ${awayDisplay.player_name} was best for ${away} (${awayDisplay.fantasy_points} FP).`
+          `Among the best afield, ${homeDisplay.player_name} led the way for ${home} with ${homeDisplay.fantasy_points} fantasy points, while ${awayDisplay.player_name} was a lone hand for ${away}, finishing with ${awayDisplay.fantasy_points}.`
         );
       }
     }
