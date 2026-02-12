@@ -26,10 +26,11 @@ export type QuarterScoreRow = {
 // - match_id, season, round_number, round_label, round_instance
 // - home_team_vendor, away_team_vendor (NOT home_team/away_team)
 // - home_score, away_score, home_goals, home_behinds, away_goals, away_behinds
-// - venue, status, updated_at (ONLY datetime field - use as match date)
+// - venue, status, match_datetime, updated_at
 //
-// Date handling: updated_at is the match datetime. Convert to YYYY-MM-DD for grouping.
-// Ordering: round_number + match_id in query, then by updated_at locally for display.
+// Date handling: match_datetime is the primary match date source, with updated_at as fallback.
+// Convert to YYYY-MM-DD for grouping/display.
+// Ordering: round_number + match_id in query, then by date locally for display.
 export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   const { data, error } = await supabase
     .schema("afl")
@@ -50,6 +51,7 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
       away_behinds,
       venue,
       status,
+      match_datetime,
       updated_at
     `)
     .eq("season", 2025)
@@ -66,8 +68,10 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
   }
 
   return data.map((row): MatchSummary => {
-    const updatedAt = row.updated_at ? new Date(row.updated_at) : null;
-    const matchDate = updatedAt ? updatedAt.toISOString().split('T')[0] : undefined;
+    const matchDatetime = row.match_datetime ? new Date(row.match_datetime) : null;
+    const fallbackDate = row.updated_at ? new Date(row.updated_at) : null;
+    const sourceDate = matchDatetime || fallbackDate;
+    const matchDate = sourceDate ? sourceDate.toISOString().split('T')[0] : undefined;
 
     return {
       match_id: String(row.match_id ?? ""),
