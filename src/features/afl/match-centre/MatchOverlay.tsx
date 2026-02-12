@@ -19,14 +19,17 @@ interface MatchOverlayProps {
   onClose: () => void;
 }
 
-function formatMatchDate(dateStr: string | null | undefined) {
-  if (!dateStr) return null;
+function formatMatchDate(dateStr: string | null | undefined, updatedAt?: string | null) {
+  const source = dateStr || updatedAt;
+  if (!source) return "—";
   try {
-    const parsed = new Date(`${dateStr}T00:00:00`);
-    if (isNaN(parsed.getTime())) return null;
+    const parsed = dateStr
+      ? new Date(`${dateStr}T00:00:00`)
+      : new Date(updatedAt!);
+    if (isNaN(parsed.getTime())) return "—";
     return parsed.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
   } catch {
-    return null;
+    return "—";
   }
 }
 
@@ -238,7 +241,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
   const season = match.season ?? 2025;
   const isFinished = match.status === "FT";
   const venue = match.venue && match.venue !== "TBC" ? match.venue : null;
-  const formattedDate = formatMatchDate(match.date);
+  const formattedDate = formatMatchDate(match.date, match.updated_at);
   const homeScore = match.home_score ?? null;
   const awayScore = match.away_score ?? null;
   const homeColor = "#F5C84C";
