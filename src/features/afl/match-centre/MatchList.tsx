@@ -69,11 +69,17 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                 const awayTeam = m.away_team_vendor ?? "Away";
                 const isFinished = m.status === "FT";
                 const venue = m.venue && m.venue !== "TBC" ? m.venue : null;
-                const homeScore = m.home_score ?? null;
-                const awayScore = m.away_score ?? null;
+                const homeScoreNum = m.home_score ?? null;
+                const awayScoreNum = m.away_score ?? null;
+                const homeScore = m.home_goals != null && m.home_behinds != null && m.home_score != null
+                  ? `${m.home_goals}.${m.home_behinds}.${m.home_score}`
+                  : homeScoreNum;
+                const awayScore = m.away_goals != null && m.away_behinds != null && m.away_score != null
+                  ? `${m.away_goals}.${m.away_behinds}.${m.away_score}`
+                  : awayScoreNum;
                 const wonBy = computeWonBy(m);
-                const homeWon = homeScore != null && awayScore != null && homeScore > awayScore;
-                const awayWon = homeScore != null && awayScore != null && awayScore > homeScore;
+                const homeWon = homeScoreNum != null && awayScoreNum != null && homeScoreNum > awayScoreNum;
+                const awayWon = homeScoreNum != null && awayScoreNum != null && awayScoreNum > homeScoreNum;
                 const quarters = quarterScoresMap?.get(m.match_id ?? "") ?? [];
 
                 return (
