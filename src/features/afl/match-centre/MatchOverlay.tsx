@@ -313,15 +313,18 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
 
             {sortedQuarterScores && sortedQuarterScores.length > 0 && (
               <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-white/[0.06]">
-                <div className="text-xs uppercase tracking-wider text-white/50 mb-3">Quarter Scores</div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+                <div className="mb-4">
+                  <div className="text-xs uppercase tracking-wider text-white/50 mb-1">Quarter by Quarter</div>
+                  <div className="text-xs text-white/30">Total points per quarter</div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                   {sortedQuarterScores.map((qScore) => (
-                    <div key={qScore.quarter} className="rounded-lg bg-white/[0.02] border border-white/[0.04] p-2 md:p-3">
-                      <div className="text-xs text-white/40 uppercase mb-1.5">Q{qScore.quarter}</div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-white/70">{qScore.home_qtr_points}</span>
-                        <span className="text-white/30 text-xs">–</span>
-                        <span className="text-white/70">{qScore.away_qtr_points}</span>
+                    <div key={qScore.quarter} className="rounded-lg bg-white/[0.02] border border-white/[0.04] p-3 md:p-4">
+                      <div className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2.5">Q{qScore.quarter}</div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-white/80 font-medium text-base">{qScore.home_qtr_points}</span>
+                        <span className="text-white/20 text-xs font-light">–</span>
+                        <span className="text-white/80 font-medium text-base">{qScore.away_qtr_points}</span>
                       </div>
                     </div>
                   ))}
