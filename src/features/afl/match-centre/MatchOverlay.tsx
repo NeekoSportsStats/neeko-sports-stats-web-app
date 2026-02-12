@@ -321,25 +321,54 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
               </div>
             </div>
 
-            {sortedQuarterScores && sortedQuarterScores.length > 0 && (
+            {(quarters.length > 0 || (sortedQuarterScores && sortedQuarterScores.length > 0)) && (
               <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-white/[0.06]">
                 <div className="mb-3 md:mb-4">
                   <div className="text-xs uppercase tracking-wider text-white/50">Quarter by Quarter</div>
                 </div>
                 <div className="space-y-0">
-                  {sortedQuarterScores.map((qScore, idx) => (
-                    <div
-                      key={qScore.quarter}
-                      className={`flex items-center gap-4 md:gap-6 py-2.5 md:py-3 ${idx !== sortedQuarterScores.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
-                    >
-                      <div className="text-xs font-semibold text-white/40 uppercase tracking-wider w-6">Q{qScore.quarter}</div>
-                      <div className="flex items-center justify-center gap-4 md:gap-6 flex-1">
-                        <span className="text-lg md:text-xl font-bold text-white/90 min-w-[3rem] text-right">{qScore.home_qtr_points}</span>
-                        <span className="text-white/20 text-sm">—</span>
-                        <span className="text-lg md:text-xl font-bold text-white/90 min-w-[3rem] text-left">{qScore.away_qtr_points}</span>
+                  {quarters.length > 0 ? (
+                    quarters.map((q, idx) => {
+                      const homeDisplay = q.home_goals != null && q.home_behinds != null && q.home_points != null
+                        ? `${q.home_goals}.${q.home_behinds} (${q.home_points})`
+                        : q.home_points != null ? `${q.home_points}` : '—';
+                      const awayDisplay = q.away_goals != null && q.away_behinds != null && q.away_points != null
+                        ? `${q.away_goals}.${q.away_behinds} (${q.away_points})`
+                        : q.away_points != null ? `${q.away_points}` : '—';
+                      return (
+                        <div
+                          key={q.quarter}
+                          className={`flex items-center gap-4 md:gap-6 py-2.5 md:py-3 ${idx !== quarters.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
+                        >
+                          <div className="text-xs font-semibold text-white/40 uppercase tracking-wider w-6">Q{q.quarter}</div>
+                          <div className="flex items-center justify-between gap-4 md:gap-6 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-white/50">H:</span>
+                              <span className="text-base md:text-lg font-bold text-white/90">{homeDisplay}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-white/50">A:</span>
+                              <span className="text-base md:text-lg font-bold text-white/90">{awayDisplay}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    sortedQuarterScores.map((qScore, idx) => (
+                      <div
+                        key={qScore.quarter}
+                        className={`flex items-center gap-4 md:gap-6 py-2.5 md:py-3 ${idx !== sortedQuarterScores.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
+                      >
+                        <div className="text-xs font-semibold text-white/40 uppercase tracking-wider w-6">Q{qScore.quarter}</div>
+                        <div className="flex items-center justify-center gap-4 md:gap-6 flex-1">
+                          <span className="text-lg md:text-xl font-bold text-white/90 min-w-[3rem] text-right">{qScore.home_qtr_points}</span>
+                          <span className="text-white/20 text-sm">—</span>
+                          <span className="text-lg md:text-xl font-bold text-white/90 min-w-[3rem] text-left">{qScore.away_qtr_points}</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             )}
