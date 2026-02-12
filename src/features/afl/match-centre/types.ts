@@ -4,6 +4,16 @@
 // updated_at is the ONLY datetime field - use it as the match datetime.
 // date field is derived from updated_at for display/grouping (YYYY-MM-DD format).
 
+export type MatchQuarter = {
+  quarter: number;
+  home_goals: number | null;
+  home_behinds: number | null;
+  home_points: number | null;
+  away_goals: number | null;
+  away_behinds: number | null;
+  away_points: number | null;
+};
+
 export type MatchSummary = {
   match_id?: string;
   season?: number;
@@ -22,6 +32,7 @@ export type MatchSummary = {
   status?: string;
   updated_at?: string;
   date?: string;
+  quarters?: MatchQuarter[];
   [key: string]: unknown;
 };
 

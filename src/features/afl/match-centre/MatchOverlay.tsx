@@ -111,6 +111,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
   }, [onClose]);
 
   const statsReady = matchPlayerStats && matchPlayerStats.length > 0;
+  const quarters = match.quarters ?? [];
 
   const players: MatchPlayer[] = useMemo(() => {
     if (!matchPlayerStats || matchPlayerStats.length === 0) return [];

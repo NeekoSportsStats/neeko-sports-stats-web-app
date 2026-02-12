@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabaseClient";
 import type {
   MatchSummary,
+  MatchQuarter,
   MatchPlayerStats,
   MatchScatterPoint,
   MomentumPoint,
@@ -361,5 +362,33 @@ export async function fetchRoundQuarterScores(matchIds: string[]): Promise<Quart
     away_points: Number(row.away_points ?? 0),
     quarter_margin: row.quarter_margin != null ? Number(row.quarter_margin) : undefined,
     quarter_winner: row.quarter_winner ? String(row.quarter_winner) : undefined,
+  }));
+}
+
+export async function fetchMatchQuarters(matchId: string): Promise<MatchQuarter[]> {
+  if (!matchId) return [];
+
+  const { data, error } = await supabase
+    .schema("afl")
+    .from("v_match_quarters_2025")
+    .select("quarter, home_goals, home_behinds, home_points, away_goals, away_behinds, away_points")
+    .eq("match_id", matchId)
+    .order("quarter", { ascending: true });
+
+  if (error) {
+    console.debug("[fetchMatchQuarters] Error:", error.message);
+    return [];
+  }
+
+  if (!data || data.length === 0) return [];
+
+  return data.map((row): MatchQuarter => ({
+    quarter: Number(row.quarter ?? 0),
+    home_goals: row.home_goals != null ? Number(row.home_goals) : null,
+    home_behinds: row.home_behinds != null ? Number(row.home_behinds) : null,
+    home_points: row.home_points != null ? Number(row.home_points) : null,
+    away_goals: row.away_goals != null ? Number(row.away_goals) : null,
+    away_behinds: row.away_behinds != null ? Number(row.away_behinds) : null,
+    away_points: row.away_points != null ? Number(row.away_points) : null,
   }));
 }
