@@ -9,7 +9,7 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { fetchMatchMomentum } from "./services/matchCenter.service";
+import { fetchMatchMomentum, fetchQuarterSummary, type QuarterScoreRow } from "./services/matchCenter.service";
 import type { MomentumPoint } from "./types";
 
 interface Props {
@@ -23,6 +23,7 @@ type ChartRow = {
   minute: number;
   momentum: number;
   quarter: number;
+  quarter_margin?: number;
 };
 
 function toChartData(points: MomentumPoint[]): ChartRow[] {
@@ -36,6 +37,48 @@ function toChartData(points: MomentumPoint[]): ChartRow[] {
       quarter: p.quarter,
     };
   });
+}
+
+function quarterDataToChartData(quarters: QuarterScoreRow[]): ChartRow[] {
+  if (!quarters || quarters.length === 0) return [];
+
+  const chartRows: ChartRow[] = [];
+  let cumulativeMargin = 0;
+
+  quarters.forEach((q) => {
+    const margin = q.quarter_margin ?? 0;
+    cumulativeMargin += margin;
+
+    const startMinute = (q.quarter - 1) * 30;
+    const midMinute = startMinute + 15;
+    const endMinute = q.quarter * 30;
+
+    chartRows.push({
+      label: `Q${q.quarter}`,
+      minute: startMinute,
+      momentum: cumulativeMargin,
+      quarter: q.quarter,
+      quarter_margin: margin,
+    });
+
+    chartRows.push({
+      label: "",
+      minute: midMinute,
+      momentum: cumulativeMargin,
+      quarter: q.quarter,
+      quarter_margin: margin,
+    });
+
+    chartRows.push({
+      label: `Q${q.quarter} 30'`,
+      minute: endMinute,
+      momentum: cumulativeMargin,
+      quarter: q.quarter,
+      quarter_margin: margin,
+    });
+  });
+
+  return chartRows;
 }
 
 function detectSustainedRun(points: MomentumPoint[], homeTeam: string, awayTeam: string): string | null {
@@ -111,6 +154,7 @@ function detectSustainedRun(points: MomentumPoint[], homeTeam: string, awayTeam:
 export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props) {
   const [data, setData] = useState<ChartRow[]>([]);
   const [rawPoints, setRawPoints] = useState<MomentumPoint[]>([]);
+  const [quarterData, setQuarterData] = useState<QuarterScoreRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -120,20 +164,34 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
       if (!matchId) {
         setData([]);
         setRawPoints([]);
+        setQuarterData([]);
         setLoading(false);
         return;
       }
 
       try {
-        const raw = await fetchMatchMomentum(matchId);
+        const [momentumRaw, quarterRaw] = await Promise.all([
+          fetchMatchMomentum(matchId),
+          fetchQuarterSummary({ match_id: matchId }),
+        ]);
+
         if (!cancelled) {
-          setRawPoints(raw);
-          setData(toChartData(raw));
+          setRawPoints(momentumRaw);
+          setQuarterData(quarterRaw);
+
+          if (momentumRaw.length > 0) {
+            setData(toChartData(momentumRaw));
+          } else if (quarterRaw.length > 0) {
+            setData(quarterDataToChartData(quarterRaw));
+          } else {
+            setData([]);
+          }
         }
       } catch {
         if (!cancelled) {
           setData([]);
           setRawPoints([]);
+          setQuarterData([]);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -225,13 +283,16 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
                 if (!active || !payload?.length) return null;
                 const row = payload[0].payload as ChartRow;
                 const val = row.momentum;
-                const team = val >= 0 ? homeTeam : awayTeam;
-                const descriptor = Math.abs(val) > 10 ? "dominated" : Math.abs(val) > 5 ? "controlled" : "contested";
+                const margin = row.quarter_margin ?? val;
+                const team = margin >= 0 ? homeTeam : awayTeam;
+                const sign = margin > 0 ? "+" : "";
+                const displayValue = margin !== 0 ? `${sign}${Math.round(margin)}` : "Even";
+
                 return (
                   <div className="rounded-lg border border-white/20 bg-black/90 backdrop-blur-xl p-3 shadow-xl">
-                    <div className="text-xs text-white/60 mb-1">Q{row.quarter} {row.minute % 30 || 30}'</div>
+                    <div className="text-xs text-white/60 mb-1">Q{row.quarter}</div>
                     <div className="text-sm font-medium text-white">
-                      {team} {descriptor}
+                      {margin !== 0 ? `${team} ${displayValue}` : displayValue}
                     </div>
                   </div>
                 );
