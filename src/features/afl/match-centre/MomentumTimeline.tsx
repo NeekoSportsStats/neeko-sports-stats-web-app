@@ -234,9 +234,12 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
   }
 
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-black/40 backdrop-blur-xl p-5 md:p-6">
-      <div className="mb-4 md:mb-5">
-        <h3 className="text-base md:text-lg font-semibold text-white mb-2">Match Momentum</h3>
+    <div className="rounded-xl md:rounded-2xl border border-white/[0.08] bg-black/40 backdrop-blur-xl p-5 md:p-7 hover:border-white/[0.12] transition-colors duration-300">
+      <div className="mb-4 md:mb-6">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-1 h-5 md:h-6 bg-[#F5C84C] rounded-full" />
+          <h3 className="text-base md:text-lg font-bold text-white">Match Momentum</h3>
+        </div>
         <p className="text-xs md:text-sm text-white/60 leading-[1.6]">
           Territory control throughout the match. <span className="text-[#F5C84C]">{homeTeam}</span> positive, <span className="text-white/80">{awayTeam}</span> negative.
         </p>
@@ -252,12 +255,14 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
           <AreaChart data={data} margin={{ top: 10, right: 20, bottom: 25, left: 20 }}>
             <defs>
               <linearGradient id="momentumPos" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#F5C84C" stopOpacity={0.5} />
-                <stop offset="100%" stopColor="#F5C84C" stopOpacity={0} />
+                <stop offset="0%" stopColor="#F5C84C" stopOpacity={0.6} />
+                <stop offset="40%" stopColor="#E6B84A" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#D4A647" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="momentumNeg" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0%" stopColor="#666" stopOpacity={0.4} />
-                <stop offset="100%" stopColor="#666" stopOpacity={0} />
+                <stop offset="0%" stopColor="#60A5FA" stopOpacity={0.35} />
+                <stop offset="40%" stopColor="#4B8FD8" stopOpacity={0.2} />
+                <stop offset="100%" stopColor="#3B7AC2" stopOpacity={0} />
               </linearGradient>
             </defs>
 
@@ -284,16 +289,38 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
                 const row = payload[0].payload as ChartRow;
                 const val = row.momentum;
                 const margin = row.quarter_margin ?? val;
+                const absMargin = Math.abs(margin);
                 const team = margin >= 0 ? homeTeam : awayTeam;
                 const sign = margin > 0 ? "+" : "";
                 const displayValue = margin !== 0 ? `${sign}${Math.round(margin)}` : "Even";
 
+                let context = "";
+                if (absMargin === 0) {
+                  context = "Deadlocked";
+                } else if (absMargin < 6) {
+                  context = "Tight contest";
+                } else if (absMargin < 12) {
+                  context = "Building pressure";
+                } else if (absMargin < 24) {
+                  context = "Control established";
+                } else if (absMargin < 36) {
+                  context = "Dominant period";
+                } else {
+                  context = "Complete control";
+                }
+
+                const qtrLabel = row.quarter === 1 ? "Opening Term"
+                  : row.quarter === 2 ? "Second Quarter"
+                  : row.quarter === 3 ? "Third Quarter"
+                  : "Final Term";
+
                 return (
-                  <div className="rounded-lg border border-white/20 bg-black/90 backdrop-blur-xl p-3 shadow-xl">
-                    <div className="text-xs text-white/60 mb-1">Q{row.quarter}</div>
-                    <div className="text-sm font-medium text-white">
+                  <div className="rounded-lg border border-[#F5C84C]/30 bg-black/95 backdrop-blur-xl p-3.5 shadow-2xl min-w-[180px]">
+                    <div className="text-xs text-[#F5C84C]/80 font-medium mb-1.5">{qtrLabel}</div>
+                    <div className="text-base font-bold text-white mb-2 pb-2 border-b border-white/10">
                       {margin !== 0 ? `${team} ${displayValue}` : displayValue}
                     </div>
+                    <div className="text-xs text-white/60 italic">{context}</div>
                   </div>
                 );
               }}

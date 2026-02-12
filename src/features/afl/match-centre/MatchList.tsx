@@ -86,7 +86,7 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                   <button
                     key={m.match_id ?? mIdx}
                     onClick={() => onSelectMatch(m)}
-                    className="w-full text-left rounded-2xl border border-[#F5C84C]/20 bg-black/30 hover:bg-black/40 hover:border-[#F5C84C]/40 hover:shadow-[0_0_20px_rgba(245,200,76,0.15)] active:bg-black/50 transition-all p-4 md:p-6"
+                    className="w-full text-left rounded-2xl border border-[#F5C84C]/20 bg-black/30 hover:bg-black/40 hover:border-[#F5C84C]/40 hover:shadow-[0_0_20px_rgba(245,200,76,0.15)] hover:scale-[1.01] active:bg-black/50 active:scale-[0.99] transition-all duration-200 p-4 md:p-6 group"
                   >
                     <div className="grid grid-cols-3 items-start gap-3 md:gap-6">
                       <div className="space-y-1.5">
@@ -136,9 +136,9 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                           FT
                         </div>
                       )}
-                      <div className="ml-auto text-white/50 text-sm flex items-center gap-2 hover:text-[#F5C84C] transition-colors min-h-[44px] md:min-h-[48px] py-2 -mr-1">
+                      <div className="ml-auto text-white/50 text-sm flex items-center gap-2 group-hover:text-[#F5C84C] transition-all min-h-[44px] md:min-h-[48px] py-2 -mr-1">
                         <span className="font-medium">View Details</span>
-                        <span className="text-lg">›</span>
+                        <span className="text-lg group-hover:translate-x-1 transition-transform duration-200">›</span>
                       </div>
                     </div>
                   </button>

@@ -56,11 +56,14 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
   const hasTwoTeams = awayData.length > 0;
 
   return (
-    <div className="rounded-xl md:rounded-xl border border-white/[0.08] bg-black/40 backdrop-blur-xl p-4 md:p-6">
+    <div className="rounded-xl md:rounded-2xl border border-white/[0.08] bg-black/40 backdrop-blur-xl p-4 md:p-6 hover:border-white/[0.12] transition-colors duration-300">
       <div className="mb-4 md:mb-6">
-        <h3 className="text-base md:text-lg font-semibold text-white mb-1.5 md:mb-2">
-          Player Impact vs Average
-        </h3>
+        <div className="flex items-center gap-2 mb-1.5 md:mb-2">
+          <div className="w-1 h-5 md:h-6 bg-[#F5C84C] rounded-full" />
+          <h3 className="text-base md:text-lg font-bold text-white">
+            Player Impact vs Average
+          </h3>
+        </div>
         <p className="text-xs md:text-sm text-white/60 leading-relaxed">
           Disposals and fantasy points compared to season average
         </p>

@@ -199,14 +199,44 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
       const loser = hScore >= aScore ? away : home;
       const winScore = Math.max(hScore, aScore);
       const loseScore = Math.min(hScore, aScore);
+
+      const seed = (hScore + aScore + margin) % 3;
+
       if (margin === 0) {
-        sentences.push(`In a tightly contested affair, ${home} and ${away} couldn't be separated, finishing locked at ${hScore} points apiece.`);
-      } else if (margin <= 12) {
-        sentences.push(`${winner} held off a determined ${loser} to claim victory by ${margin} points in a thriller, ${winScore} to ${loseScore}.`);
-      } else if (margin <= 30) {
-        sentences.push(`${winner} secured a ${margin}-point victory over ${loser}, running out ${winScore} to ${loseScore} winners.`);
+        const drawPhrases = [
+          `In a pulsating encounter, neither ${home} nor ${away} could land the knockout blow, finishing deadlocked at ${hScore} points each.`,
+          `${home} and ${away} couldn't be separated in an absorbing contest that ebbed and flowed throughout, ending all square at ${hScore} apiece.`,
+          `Honours even as ${home} and ${away} fought out a thrilling ${hScore}-all draw, with neither side able to gain the decisive edge.`
+        ];
+        sentences.push(drawPhrases[seed]);
+      } else if (margin <= 6) {
+        const closePhrases = [
+          `${winner} emerged victorious by the barest of margins, surviving a last-gasp challenge from ${loser} to prevail by ${margin} points, ${winScore} to ${loseScore}.`,
+          `In a nail-biting finish, ${winner} held their nerve to edge out ${loser} by just ${margin} points in a classic encounter, ${winScore} to ${loseScore}.`,
+          `${winner} snatched victory from the jaws of defeat, outlasting ${loser} by a heart-stopping ${margin} points, ${winScore} to ${loseScore}.`
+        ];
+        sentences.push(closePhrases[seed]);
+      } else if (margin <= 18) {
+        const tightPhrases = [
+          `${winner} proved too strong when it mattered, overcoming a resilient ${loser} by ${margin} points to secure the four points, ${winScore} to ${loseScore}.`,
+          `After an arm-wrestle that went the distance, ${winner} emerged with a hard-fought ${margin}-point victory over ${loser}, ${winScore} to ${loseScore}.`,
+          `${winner} found the answers when challenged, grinding out a ${margin}-point triumph against a gallant ${loser}, ${winScore} to ${loseScore}.`
+        ];
+        sentences.push(tightPhrases[seed]);
+      } else if (margin <= 39) {
+        const solidPhrases = [
+          `${winner} stamped their authority on proceedings, pulling away in the crucial moments to claim a ${margin}-point victory, ${winScore} to ${loseScore}.`,
+          `A polished performance from ${winner} yielded a commanding ${margin}-point win over ${loser}, who battled hard but were ultimately outclassed, ${winScore} to ${loseScore}.`,
+          `${winner} asserted their dominance across the four quarters, running out comfortable ${margin}-point victors against ${loser}, ${winScore} to ${loseScore}.`
+        ];
+        sentences.push(solidPhrases[seed]);
       } else {
-        sentences.push(`${winner} dominated from start to finish, cruising to a comprehensive ${margin}-point victory, ${winScore} to ${loseScore}.`);
+        const blowoutPhrases = [
+          `${winner} delivered a ruthless display of attacking football, dismantling ${loser} by ${margin} points in a one-sided affair, ${winScore} to ${loseScore}.`,
+          `It was all ${winner} in a comprehensive demolition job, with ${loser} unable to match the intensity as the margin blew out to ${margin} points, ${winScore} to ${loseScore}.`,
+          `${winner} turned on the style in a clinical performance, overwhelming ${loser} from the opening bounce to record a ${margin}-point rout, ${winScore} to ${loseScore}.`
+        ];
+        sentences.push(blowoutPhrases[seed]);
       }
     }
 
@@ -214,10 +244,34 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
       const sorted = [...matchPlayerStats].sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0));
       const bog = sorted[0];
       if (bog) {
-        const disposalText = bog.disposals && bog.disposals > 30 ? `a dominant ${bog.disposals}` : bog.disposals;
-        sentences.push(
-          `${bog.player} was the standout performer for ${bog.player_team}, collecting ${disposalText} disposals and posting ${bog.fantasy_points} fantasy points to take best on ground honours.`
-        );
+        const disposals = bog.disposals ?? 0;
+        const fantasy = bog.fantasy_points ?? 0;
+        const bogSeed = (disposals + fantasy) % 3;
+
+        let bogPhrase = "";
+        if (disposals > 35) {
+          const phrases = [
+            `${bog.player} was a one-man wrecking crew for ${bog.player_team}, amassing a game-high ${disposals} disposals en route to ${fantasy} fantasy points and best on ground honours.`,
+            `In a dominant individual display, ${bog.player} racked up ${disposals} touches for ${bog.player_team}, his ${fantasy} fantasy points underlining his influence on the contest.`,
+            `${bog.player} stood head and shoulders above the rest, pilaging ${disposals} disposals and ${fantasy} fantasy points in a virtuoso performance for ${bog.player_team}.`
+          ];
+          bogPhrase = phrases[bogSeed];
+        } else if (disposals > 28) {
+          const phrases = [
+            `${bog.player} proved the difference for ${bog.player_team}, his ${disposals} disposals and ${fantasy} fantasy points earning best afield accolades.`,
+            `The class of ${bog.player} shone through with ${disposals} touches and ${fantasy} fantasy points, spearheading ${bog.player_team}'s efforts throughout.`,
+            `${bog.player} was instrumental for ${bog.player_team}, collecting ${disposals} disposals and posting ${fantasy} fantasy points in a match-winning performance.`
+          ];
+          bogPhrase = phrases[bogSeed];
+        } else {
+          const phrases = [
+            `${bog.player} was named best on ground for ${bog.player_team}, his ${disposals} disposals and ${fantasy} fantasy points highlighting an impactful display.`,
+            `Despite modest possession numbers (${disposals} disposals), ${bog.player}'s quality shone through for ${bog.player_team}, his ${fantasy} fantasy points reflecting his game-breaking moments.`,
+            `${bog.player} took the honours with ${disposals} disposals and ${fantasy} fantasy points, his efficiency and decision-making proving crucial for ${bog.player_team}.`
+          ];
+          bogPhrase = phrases[bogSeed];
+        }
+        sentences.push(bogPhrase);
       }
     }
 
@@ -234,22 +288,31 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                 : "in the final term"
           : "";
         const teamName = swing.direction === "positive" ? home : away;
-        const phrases = [
-          `The match turned ${quarterText}, when ${teamName} seized control with a decisive burst.`,
-          `${teamName} broke the contest wide open ${quarterText}, piling on unanswered goals to establish an unassailable lead.`,
-          `A period of sustained dominance ${quarterText} saw ${teamName} assert their authority and effectively seal the result.`
+        const swingSeed = swing.swing % 4;
+        const bigSwingPhrases = [
+          `The complexion of the match changed ${quarterText}, as ${teamName} unleashed a devastating burst that broke the contest open.`,
+          `${teamName}'s ruthless efficiency ${quarterText} proved the difference, with a match-defining surge putting the result beyond doubt.`,
+          `It was ${quarterText} where ${teamName} seized the initiative, piling on unanswered majors in a spell that turned the game on its head.`,
+          `The turning point arrived ${quarterText}, when ${teamName} hit the afterburners and established an unassailable advantage.`
         ];
-        sentences.push(phrases[Math.floor(Math.random() * phrases.length)]);
+        sentences.push(bigSwingPhrases[swingSeed]);
       } else if (swing && swing.swing > 12) {
         const teamName = swing.direction === "positive" ? home : away;
-        const phrases = [
-          `${teamName} wrestled back momentum at a pivotal moment, shifting the balance of play in their favour.`,
-          `When it mattered most, ${teamName} found another gear to seize control of the contest.`,
-          `The decisive moment came when ${teamName} strung together a match-changing run of goals.`
+        const swingSeed = swing.swing % 4;
+        const mediumSwingPhrases = [
+          `${teamName} produced the decisive moment when the game hung in the balance, wresting control at a critical juncture.`,
+          `The momentum shift proved crucial, with ${teamName} stringing together a match-changing passage of play that tilted the scales.`,
+          `When the heat was on, ${teamName} lifted to another level, their surge in intensity proving the difference between the sides.`,
+          `${teamName}'s ability to seize the ascendancy at key moments ultimately separated the two teams in a fiercely contested battle.`
         ];
-        sentences.push(phrases[Math.floor(Math.random() * phrases.length)]);
+        sentences.push(mediumSwingPhrases[swingSeed]);
       } else if (swing && swing.swing > 6) {
-        sentences.push("Neither side could stamp their authority on proceedings, with momentum swinging back and forth throughout a tightly contested battle.");
+        const evenPhrases = [
+          "Neither side could break the deadlock for sustained periods, with the lead changing hands repeatedly in an absorbing contest.",
+          "The match ebbed and flowed throughout, with neither team able to assert prolonged dominance in a see-sawing encounter.",
+          "Momentum was fleeting for both sides, as the contest remained on a knife's edge from first bounce to final siren."
+        ];
+        sentences.push(evenPhrases[swing.swing % 3]);
       }
     }
 
@@ -262,9 +325,13 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
       const homeDisplay = homeTop.player_name === bogName ? team1Top3[1] : homeTop;
       const awayDisplay = awayTop.player_name === bogName ? team2Top3[1] : awayTop;
       if (homeDisplay && awayDisplay) {
-        sentences.push(
-          `Among the best afield, ${homeDisplay.player_name} led the way for ${home} with ${homeDisplay.fantasy_points} fantasy points, while ${awayDisplay.player_name} was a lone hand for ${away}, finishing with ${awayDisplay.fantasy_points}.`
-        );
+        const supportSeed = ((homeDisplay.fantasy_points ?? 0) + (awayDisplay.fantasy_points ?? 0)) % 3;
+        const supportPhrases = [
+          `${homeDisplay.player_name} was a key contributor for ${home} with ${homeDisplay.fantasy_points} fantasy points, while ${awayDisplay.player_name} fought valiantly in a losing cause for ${away}, tallying ${awayDisplay.fantasy_points}.`,
+          `Among the other standouts, ${homeDisplay.player_name} (${homeDisplay.fantasy_points} pts) provided excellent support for ${home}, and ${awayDisplay.player_name} (${awayDisplay.fantasy_points} pts) battled hard for ${away} despite the result.`,
+          `${homeDisplay.player_name} impressed with ${homeDisplay.fantasy_points} fantasy points for ${home}, while ${awayDisplay.player_name} was a shining light for ${away} with ${awayDisplay.fantasy_points} in a determined individual effort.`
+        ];
+        sentences.push(supportPhrases[supportSeed]);
       }
     }
 
@@ -297,12 +364,12 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-start justify-center p-2 md:p-8 overflow-y-auto"
+      className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-start justify-center p-2 md:p-8 overflow-y-auto animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
     >
-      <div className="w-full max-w-5xl rounded-xl md:rounded-2xl border border-white/10 bg-black/70 backdrop-blur-xl shadow-2xl overflow-hidden my-2 md:my-0">
+      <div className="w-full max-w-5xl rounded-xl md:rounded-2xl border border-white/10 bg-black/70 backdrop-blur-xl shadow-2xl overflow-hidden my-2 md:my-0 animate-in slide-in-from-bottom-4 duration-300">
         <div className="flex items-center justify-between p-3 md:p-5 border-b border-[#F5C84C]/20">
           <div>
             <div className="text-xs uppercase tracking-wider text-[#F5C84C]/70 font-medium">
@@ -319,8 +386,8 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
           </button>
         </div>
 
-        <div className="p-3 md:p-6 space-y-4 md:space-y-6">
-          <div className="rounded-xl md:rounded-2xl border border-white/[0.08] bg-black/40 p-4 md:p-6">
+        <div className="p-3 md:p-6 space-y-5 md:space-y-8">
+          <div className="rounded-xl md:rounded-2xl border border-[#F5C84C]/15 bg-black/50 p-4 md:p-6 shadow-lg shadow-[#F5C84C]/5">
             <div className="grid grid-cols-3 items-center gap-2 md:gap-4 mb-4">
               <div>
                 <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3">
@@ -349,9 +416,9 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
             </div>
 
             {(quarters.length > 0 || (sortedQuarterScores && sortedQuarterScores.length > 0)) && (
-              <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-white/[0.06]">
+              <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-[#F5C84C]/10">
                 <div className="mb-3 md:mb-4">
-                  <div className="text-xs uppercase tracking-wider text-white/50">Quarter by Quarter</div>
+                  <div className="text-xs uppercase tracking-wider text-[#F5C84C]/60 font-semibold">Quarter by Quarter</div>
                 </div>
                 <div className="space-y-0">
                   {quarters.length > 0 ? (
@@ -365,7 +432,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                       return (
                         <div
                           key={q.quarter}
-                          className={`flex items-center gap-4 md:gap-6 py-2.5 md:py-3 ${idx !== quarters.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
+                          className={`flex items-center gap-4 md:gap-6 py-2.5 md:py-3 hover:bg-white/[0.02] transition-colors duration-150 rounded-lg px-2 -mx-2 ${idx !== quarters.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
                         >
                           <div className="text-xs font-semibold text-white/40 uppercase tracking-wider w-6">Q{q.quarter}</div>
                           <div className="flex items-center justify-between gap-4 md:gap-6 flex-1">
@@ -385,7 +452,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                     sortedQuarterScores.map((qScore, idx) => (
                       <div
                         key={qScore.quarter}
-                        className={`flex items-center gap-4 md:gap-6 py-2.5 md:py-3 ${idx !== sortedQuarterScores.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
+                        className={`flex items-center gap-4 md:gap-6 py-2.5 md:py-3 hover:bg-white/[0.02] transition-colors duration-150 rounded-lg px-2 -mx-2 ${idx !== sortedQuarterScores.length - 1 ? 'border-b border-white/[0.04]' : ''}`}
                       >
                         <div className="text-xs font-semibold text-white/40 uppercase tracking-wider w-6">Q{qScore.quarter}</div>
                         <div className="flex items-center justify-center gap-4 md:gap-6 flex-1">
@@ -429,9 +496,10 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
 
           {statsReady ? (
             <>
-              <div className="rounded-xl md:rounded-2xl border border-white/[0.08] bg-black/40 p-4 md:p-6">
-                <div className="text-xs uppercase tracking-wider text-white/60 mb-3 md:mb-5">
-                  Top Performers
+              <div className="rounded-xl md:rounded-2xl border border-white/[0.08] bg-black/40 p-4 md:p-6 hover:border-white/[0.12] transition-colors duration-300">
+                <div className="flex items-center gap-2 mb-3 md:mb-5">
+                  <div className="w-1 h-5 md:h-6 bg-[#F5C84C] rounded-full" />
+                  <div className="text-sm md:text-base font-bold text-white">Top Performers</div>
                 </div>
                 {team1Top3.length === 0 && team2Top3.length === 0 ? (
                   <div className="text-white/50 text-sm">Player data unavailable for this match</div>
@@ -449,7 +517,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                           {team1Top3.map((p, idx) => (
                             <div
                               key={idx}
-                              className="rounded-lg md:rounded-xl border border-white/[0.08] bg-black/50 px-3 md:px-4 py-2.5 md:py-3"
+                              className="rounded-lg md:rounded-xl border border-white/[0.08] bg-black/50 px-3 md:px-4 py-2.5 md:py-3 hover:border-[#F5C84C]/20 hover:bg-black/60 transition-all duration-200"
                             >
                               <div className="flex items-center justify-between mb-1.5 md:mb-2">
                                 <div className="text-white font-medium text-sm md:text-base">{p.player_name ?? "Unknown"}</div>
@@ -476,7 +544,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                           {team2Top3.map((p, idx) => (
                             <div
                               key={idx}
-                              className="rounded-lg md:rounded-xl border border-white/[0.08] bg-black/50 px-3 md:px-4 py-2.5 md:py-3"
+                              className="rounded-lg md:rounded-xl border border-white/[0.08] bg-black/50 px-3 md:px-4 py-2.5 md:py-3 hover:border-[#60A5FA]/20 hover:bg-black/60 transition-all duration-200"
                             >
                               <div className="flex items-center justify-between mb-1.5 md:mb-2">
                                 <div className="text-white font-medium text-sm md:text-base">{p.player_name ?? "Unknown"}</div>
