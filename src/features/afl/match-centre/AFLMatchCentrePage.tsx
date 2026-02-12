@@ -150,7 +150,7 @@ export default function AFLMatchCentrePage() {
           </div>
         </header>
 
-        <div className="mb-6 md:mb-8 rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4 md:p-4 sticky top-0 z-10 md:static">
+        <div className="mb-6 md:mb-8 rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4 md:p-4 sticky top-0 z-10 shadow-[0_4px_12px_rgba(0,0,0,0.5)] md:shadow-none md:static">
           <div className="flex flex-col gap-4 md:flex-row md:gap-4 md:items-center md:justify-between">
             <div className="space-y-1 md:space-y-1">
               <div className="text-xs font-bold uppercase tracking-wider text-yellow-200/80">

@@ -86,46 +86,42 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                   <button
                     key={m.match_id ?? mIdx}
                     onClick={() => onSelectMatch(m)}
-                    className="w-full text-left rounded-2xl border border-[#F5C84C]/20 bg-black/30 hover:bg-black/40 hover:border-[#F5C84C]/40 hover:shadow-[0_0_20px_rgba(245,200,76,0.15)] md:hover:scale-[1.01] active:bg-black/50 active:scale-[0.99] transition-all duration-200 p-5 md:p-6 group min-h-[72px] touch-manipulation"
+                    className="w-full text-left rounded-2xl border border-[#F5C84C]/20 bg-black/30 hover:bg-black/40 hover:border-[#F5C84C]/40 hover:shadow-[0_0_20px_rgba(245,200,76,0.15)] md:hover:scale-[1.01] active:bg-black/50 active:scale-[0.99] transition-all duration-200 p-4 md:p-6 group min-h-[64px] touch-manipulation"
                   >
-                    <div className="md:grid md:grid-cols-3 md:items-start md:gap-6 space-y-4 md:space-y-0">
-                      <div className="flex items-center justify-between md:block md:space-y-1.5">
-                        <div className="flex items-center gap-2 md:mb-0">
-                          <div className="w-2.5 h-2.5 md:w-2 md:h-2 rounded-full bg-[#F5C84C]" />
-                          <div className="text-white font-semibold text-base md:text-base leading-tight break-words line-clamp-2">{homeTeam}</div>
+                    <div className="grid grid-cols-[1fr_auto_1fr] md:grid-cols-3 items-center gap-3 md:gap-6">
+                      <div className="space-y-2 md:space-y-1.5">
+                        <div className="flex items-center gap-1.5 md:gap-2">
+                          <div className="w-2 h-2 rounded-full bg-[#F5C84C]" />
+                          <div className="text-white font-semibold text-sm md:text-base leading-tight line-clamp-1">{homeTeam}</div>
                         </div>
-                        <div className="flex items-baseline gap-2.5 md:gap-2 md:mt-1.5">
+                        <div className="flex items-baseline gap-2">
                           {homeGoalsBehinds && (
-                            <div className="text-sm text-white/50 font-medium">{homeGoalsBehinds}</div>
+                            <div className="text-xs text-white/40 font-medium">{homeGoalsBehinds}</div>
                           )}
-                          <div className={`text-4xl md:text-4xl font-bold ${homeWon ? 'text-[#F5C84C]' : 'text-white/90'}`}>
+                          <div className={`text-3xl md:text-4xl font-bold ${homeWon ? 'text-[#F5C84C]' : 'text-white/90'}`}>
                             {homeScoreNum ?? "—"}
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-center md:text-center md:pt-2 py-2 md:py-0">
-                        <div className="flex-1 h-px bg-white/10 md:hidden" />
-                        <div className="px-4 md:px-0">
-                          <div className="text-[#F5C84C]/60 font-black text-base md:text-xl">VS</div>
-                          {wonBy && (
-                            <div className="mt-1.5 md:mt-3 text-xs text-[#F5C84C]/70 leading-snug font-medium whitespace-nowrap">{wonBy}</div>
-                          )}
-                        </div>
-                        <div className="flex-1 h-px bg-white/10 md:hidden" />
+                      <div className="flex flex-col items-center justify-center text-center py-1 md:pt-2">
+                        <div className="text-[#F5C84C]/50 font-black text-sm md:text-xl">VS</div>
+                        {wonBy && (
+                          <div className="mt-1 md:mt-3 text-[10px] md:text-xs text-[#F5C84C]/60 leading-tight font-medium whitespace-nowrap">{wonBy}</div>
+                        )}
                       </div>
 
-                      <div className="flex items-center justify-between md:block md:text-right md:space-y-1.5">
-                        <div className="flex items-center gap-2 md:justify-end md:mb-0">
-                          <div className="text-white font-semibold text-base md:text-base leading-tight break-words line-clamp-2 md:text-right">{awayTeam}</div>
-                          <div className="w-2.5 h-2.5 md:w-2 md:h-2 rounded-full bg-[#60A5FA]" />
+                      <div className="space-y-2 md:space-y-1.5 text-right">
+                        <div className="flex items-center gap-1.5 md:gap-2 justify-end">
+                          <div className="text-white font-semibold text-sm md:text-base leading-tight line-clamp-1 text-right">{awayTeam}</div>
+                          <div className="w-2 h-2 rounded-full bg-[#60A5FA]" />
                         </div>
-                        <div className="flex items-baseline gap-2.5 md:gap-2 md:justify-end md:mt-1.5">
-                          <div className={`text-4xl md:text-4xl font-bold ${awayWon ? 'text-[#F5C84C]' : 'text-white/90'}`}>
+                        <div className="flex items-baseline gap-2 justify-end">
+                          <div className={`text-3xl md:text-4xl font-bold ${awayWon ? 'text-[#F5C84C]' : 'text-white/90'}`}>
                             {awayScoreNum ?? "—"}
                           </div>
                           {awayGoalsBehinds && (
-                            <div className="text-sm text-white/50 font-medium">{awayGoalsBehinds}</div>
+                            <div className="text-xs text-white/40 font-medium">{awayGoalsBehinds}</div>
                           )}
                         </div>
                       </div>

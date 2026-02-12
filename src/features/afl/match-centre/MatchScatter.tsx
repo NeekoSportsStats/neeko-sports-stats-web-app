@@ -126,30 +126,30 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                 const disposalDiff = d.disposals - d.avg_disposals;
                 const fantasyDiff = d.fantasy_points - d.avg_fantasy;
                 return (
-                  <div className="rounded-lg border border-[#F5C84C]/40 bg-black/98 backdrop-blur-xl p-4 md:p-3.5 shadow-2xl min-w-[220px] md:min-w-[200px]">
-                    <div className="font-bold text-white text-lg md:text-base mb-2 md:mb-1.5">{d.player}</div>
-                    <div className="text-sm md:text-xs text-[#F5C84C]/80 font-semibold mb-3 md:mb-2 pb-3 md:pb-2 border-b border-white/10">{d.player_team}</div>
-                    <div className="space-y-2 md:space-y-1.5">
-                      <div className="flex items-center justify-between gap-4 md:gap-3">
-                        <span className="text-sm md:text-xs text-white/50 font-medium">Disposals:</span>
-                        <span className="text-base md:text-sm font-bold text-white">{d.disposals}</span>
+                  <div className="rounded-lg border border-[#F5C84C]/40 bg-black/98 backdrop-blur-xl p-3 md:p-3.5 shadow-2xl w-[200px] md:min-w-[200px] max-w-[calc(100vw-32px)]">
+                    <div className="font-bold text-white text-base mb-1.5 truncate">{d.player}</div>
+                    <div className="text-xs text-[#F5C84C]/80 font-semibold mb-2 pb-2 border-b border-white/10 truncate">{d.player_team}</div>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-white/50 font-medium">Disposals:</span>
+                        <span className="text-sm font-bold text-white">{d.disposals}</span>
                       </div>
-                      <div className="flex items-center justify-between gap-4 md:gap-3">
-                        <span className="text-sm md:text-xs text-white/40">vs Avg:</span>
-                        <span className={`text-sm md:text-xs font-semibold ${disposalDiff > 0 ? 'text-green-400' : disposalDiff < 0 ? 'text-red-400' : 'text-white/60'}`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-white/40">vs Avg:</span>
+                        <span className={`text-xs font-semibold ${disposalDiff > 0 ? 'text-green-400' : disposalDiff < 0 ? 'text-red-400' : 'text-white/60'}`}>
                           {disposalDiff > 0 ? '+' : ''}{round2(disposalDiff)}
                         </span>
                       </div>
                     </div>
-                    <div className="h-px bg-white/10 my-3 md:my-2" />
-                    <div className="space-y-2 md:space-y-1.5">
-                      <div className="flex items-center justify-between gap-4 md:gap-3">
-                        <span className="text-sm md:text-xs text-white/50 font-medium">Fantasy Pts:</span>
-                        <span className="text-base md:text-sm font-bold text-[#F5C84C]">{d.fantasy_points}</span>
+                    <div className="h-px bg-white/10 my-2" />
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-white/50 font-medium">Fantasy Pts:</span>
+                        <span className="text-sm font-bold text-[#F5C84C]">{d.fantasy_points}</span>
                       </div>
-                      <div className="flex items-center justify-between gap-4 md:gap-3">
-                        <span className="text-sm md:text-xs text-white/40">vs Avg:</span>
-                        <span className={`text-sm md:text-xs font-semibold ${fantasyDiff > 0 ? 'text-green-400' : fantasyDiff < 0 ? 'text-red-400' : 'text-white/60'}`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-white/40">vs Avg:</span>
+                        <span className={`text-xs font-semibold ${fantasyDiff > 0 ? 'text-green-400' : fantasyDiff < 0 ? 'text-red-400' : 'text-white/60'}`}>
                           {fantasyDiff > 0 ? '+' : ''}{round2(fantasyDiff)}
                         </span>
                       </div>

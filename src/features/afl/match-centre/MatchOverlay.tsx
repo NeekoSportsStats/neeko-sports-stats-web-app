@@ -387,9 +387,9 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
           </button>
         </div>
 
-        <div className="p-4 md:p-6 space-y-6 md:space-y-8">
-          <div className="rounded-xl md:rounded-2xl border border-[#F5C84C]/15 bg-black/50 p-5 md:p-6 shadow-lg shadow-[#F5C84C]/5">
-            <div className="grid grid-cols-3 items-center gap-3 md:gap-4 mb-5 md:mb-4">
+        <div className="p-4 md:p-6 space-y-5 md:space-y-8">
+          <div className="rounded-xl md:rounded-2xl border border-[#F5C84C]/15 bg-black/50 p-4 md:p-6 shadow-lg shadow-[#F5C84C]/5">
+            <div className="grid grid-cols-3 items-center gap-3 md:gap-4 mb-4 md:mb-4">
               <div>
                 <div className="flex items-center gap-2 md:gap-2 mb-3 md:mb-3">
                   <div className="w-2.5 h-2.5 md:w-2.5 md:h-2.5 rounded-full" style={{ backgroundColor: homeColor }} />
@@ -417,16 +417,16 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
             </div>
 
             {(quarters.length > 0 || (sortedQuarterScores && sortedQuarterScores.length > 0)) && (
-              <div className="mt-5 md:mt-6 pt-5 md:pt-6 border-t border-[#F5C84C]/10">
+              <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-[#F5C84C]/10">
                 <button
                   onClick={() => setShowQuarters(!showQuarters)}
-                  className="w-full flex items-center justify-between mb-3 md:mb-4 touch-manipulation min-h-[48px] md:min-h-0 -my-2 md:my-0 py-2 md:py-0"
+                  className="w-full flex items-center justify-between mb-3 md:mb-4 touch-manipulation min-h-[48px] md:min-h-0 -my-2 md:my-0 py-2 md:py-0 hover:opacity-80 transition-opacity"
                 >
-                  <div className="text-xs md:text-xs uppercase tracking-wider text-[#F5C84C]/70 font-bold flex items-center gap-2">
-                    <span>Quarter by Quarter</span>
-                    <span className="md:hidden text-[#F5C84C]/50 text-xs">({showQuarters ? 'Hide' : 'Show'})</span>
+                  <div className="text-xs uppercase tracking-wider font-bold flex items-center gap-2.5">
+                    <span className={showQuarters ? 'text-[#F5C84C]' : 'text-[#F5C84C]/70'}>Quarter by Quarter</span>
+                    <span className="md:hidden text-[#F5C84C]/60 text-[10px] font-semibold">({showQuarters ? 'Hide' : 'Tap to show'})</span>
                   </div>
-                  <span className="md:hidden text-[#F5C84C] text-xl font-bold transition-transform duration-200" style={{ transform: showQuarters ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                  <span className="md:hidden text-[#F5C84C] text-base font-bold transition-transform duration-300" style={{ transform: showQuarters ? 'rotate(180deg)' : 'rotate(0deg)' }}>
                     ▼
                   </span>
                 </button>
@@ -477,21 +477,21 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
               </div>
             )}
 
-            <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-white/[0.06] flex flex-wrap items-center gap-3 md:gap-5 text-sm">
+            <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-white/[0.06] flex flex-wrap items-center gap-2.5 md:gap-5 text-sm">
               {venue && (
-                <div className={`flex items-center gap-1.5 md:gap-2 ${isFinished ? "text-white/30" : "text-white/70"}`}>
+                <div className={`flex items-center gap-1.5 ${isFinished ? "text-white/30" : "text-white/60"}`}>
                   <MapPin className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                  <span>{venue}</span>
+                  <span className="text-xs md:text-sm">{venue}</span>
                 </div>
               )}
               {formattedDate && (
-                <div className="flex items-center gap-1.5 md:gap-2 text-white/50">
+                <div className="flex items-center gap-1.5 text-white/50">
                   <Clock className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                  <span>{formattedDate}</span>
+                  <span className="text-xs md:text-sm">{formattedDate}</span>
                 </div>
               )}
               {isFinished && (
-                <div className="px-2 py-1 rounded-md border border-white/10 bg-white/5 text-xs uppercase tracking-wider text-white/40">
+                <div className="px-2 py-1 rounded-md border border-white/10 bg-white/5 text-[10px] md:text-xs uppercase tracking-wider text-white/40 font-semibold">
                   FT
                 </div>
               )}
@@ -583,12 +583,12 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                 />
               </div>
 
-              <div className="rounded-xl md:rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-br from-[#F5C84C]/20 via-[#F5C84C]/5 to-transparent p-6 md:p-8">
-                <div className="flex items-center gap-2 mb-5 md:mb-6">
-                  <div className="w-1 h-6 md:h-6 bg-[#F5C84C] rounded-full" />
-                  <div className="text-white font-bold text-xl md:text-xl tracking-tight">Match Report</div>
+              <div className="rounded-xl md:rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-br from-[#F5C84C]/15 via-[#F5C84C]/5 to-transparent p-5 md:p-8">
+                <div className="flex items-center gap-2 mb-4 md:mb-6">
+                  <div className="w-1 h-6 bg-[#F5C84C] rounded-full" />
+                  <div className="text-white font-bold text-lg md:text-xl tracking-tight">Match Report</div>
                 </div>
-                <div className="text-white/75 text-base md:text-base leading-[1.85] md:leading-[1.85] space-y-4 md:space-y-4 max-w-3xl">
+                <div className="text-white/75 text-[15px] md:text-base leading-[1.8] md:leading-[1.85] space-y-3.5 md:space-y-4 max-w-3xl">
                   {insightSentences && insightSentences.length > 0 ? (
                     insightSentences.map((s, i) => {
                       const isOpening = i === 0;

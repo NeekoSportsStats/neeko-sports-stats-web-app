@@ -266,7 +266,7 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
               </linearGradient>
             </defs>
 
-            <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.5} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} className="md:opacity-50" />
 
             <XAxis
               dataKey="label"
@@ -317,12 +317,12 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
                   : "Final Term";
 
                 return (
-                  <div className="rounded-lg border border-[#F5C84C]/40 bg-black/98 backdrop-blur-xl p-4 md:p-3.5 shadow-2xl min-w-[200px] md:min-w-[180px]">
-                    <div className="text-sm md:text-xs text-[#F5C84C]/80 font-semibold mb-2 md:mb-1.5">{qtrLabel}</div>
-                    <div className="text-lg md:text-base font-bold text-white mb-3 md:mb-2 pb-3 md:pb-2 border-b border-white/10">
+                  <div className="rounded-lg border border-[#F5C84C]/40 bg-black/98 backdrop-blur-xl p-3 md:p-3.5 shadow-2xl w-[180px] md:min-w-[180px] max-w-[calc(100vw-32px)]">
+                    <div className="text-xs text-[#F5C84C]/80 font-semibold mb-1.5">{qtrLabel}</div>
+                    <div className="text-base md:text-base font-bold text-white mb-2 pb-2 border-b border-white/10 truncate">
                       {margin !== 0 ? `${team} ${displayValue}` : displayValue}
                     </div>
-                    <div className="text-sm md:text-xs text-white/70 italic">{context}</div>
+                    <div className="text-xs text-white/70 italic">{context}</div>
                   </div>
                 );
               }}
