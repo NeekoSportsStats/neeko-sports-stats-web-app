@@ -3,10 +3,11 @@
 // Use date (derived from updated_at) for display.
 // Use home_team_vendor and away_team_vendor only.
 
-import React, { useEffect, useRef, useMemo } from "react";
+import React, { useEffect, useRef, useMemo, useState } from "react";
 import { X, MapPin, Clock } from "lucide-react";
-import type { MatchSummary, MatchPlayer, MatchPlayerStats, MatchScatterPoint, MatchTimeline } from "./types";
+import type { MatchSummary, MatchPlayer, MatchPlayerStats, MatchScatterPoint, MatchTimeline, MatchQuarter } from "./types";
 import type { QuarterScoreRow } from "./services/matchCenter.service";
+import { fetchMatchQuarters } from "./services/matchCenter.service";
 import MatchScatter from "./MatchScatter";
 import MomentumTimeline from "./MomentumTimeline";
 
@@ -95,6 +96,9 @@ function computeBiggestSwing(margin: { quarter: number; minute: number; margin_d
 
 export default function MatchOverlay({ match, timeline, matchPlayerStats, scatterData, quarterScores, onClose }: MatchOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const [quarters, setQuarters] = useState<MatchQuarter[]>([]);
+  const [quartersLoading, setQuartersLoading] = useState(false);
+  const [quartersError, setQuartersError] = useState<string | null>(null);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -110,8 +114,31 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
     };
   }, [onClose]);
 
+  useEffect(() => {
+    const matchId = match?.match_id ?? match?.vendor_game_id;
+    if (!matchId) {
+      setQuarters([]);
+      return;
+    }
+
+    setQuartersLoading(true);
+    setQuartersError(null);
+
+    fetchMatchQuarters(matchId)
+      .then((data) => {
+        const sorted = [...data].sort((a, b) => a.quarter - b.quarter);
+        setQuarters(sorted);
+        setQuartersLoading(false);
+      })
+      .catch((err) => {
+        console.debug("[MatchOverlay] Failed to fetch quarters:", err);
+        setQuarters([]);
+        setQuartersError(err?.message ?? "Failed to load quarters");
+        setQuartersLoading(false);
+      });
+  }, [match?.match_id, match?.vendor_game_id]);
+
   const statsReady = matchPlayerStats && matchPlayerStats.length > 0;
-  const quarters = match.quarters ?? [];
 
   const players: MatchPlayer[] = useMemo(() => {
     if (!matchPlayerStats || matchPlayerStats.length === 0) return [];
