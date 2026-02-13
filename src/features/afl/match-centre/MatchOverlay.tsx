@@ -8,6 +8,7 @@ import { X, MapPin, Clock } from "lucide-react";
 import type { MatchSummary, MatchPlayer, MatchPlayerStats, MatchScatterPoint, MatchTimeline, MatchQuarter } from "./types";
 import type { QuarterScoreRow } from "./services/matchCenter.service";
 import { fetchMatchQuarters } from "./services/matchCenter.service";
+import { getTeamPair } from "./utils/teamColors";
 import MatchScatter from "./MatchScatter";
 import MomentumTimeline from "./MomentumTimeline";
 
@@ -346,8 +347,9 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
   const formattedDate = formatMatchDate(match.date, match.updated_at);
   const homeScore = match.home_score ?? null;
   const awayScore = match.away_score ?? null;
-  const homeColor = "#F5C84C";
-  const awayColor = "#60A5FA";
+  const teamColors = getTeamPair(match.home_team_vendor, match.away_team_vendor);
+  const homeColor = teamColors.home.primary;
+  const awayColor = teamColors.away.primary;
 
   const wonByLabel = useMemo(() => {
     if (homeScore == null || awayScore == null || !isFinished) return null;
