@@ -365,66 +365,68 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-start justify-center p-2 md:p-8 overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 z-[80] bg-gradient-to-b from-black/80 via-slate-950/75 to-black/80 backdrop-blur-sm flex items-start justify-center p-2 md:p-8 overflow-y-auto animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
     >
-      <div className="w-full max-w-5xl rounded-xl md:rounded-2xl border border-white/10 bg-black/70 backdrop-blur-xl shadow-2xl overflow-hidden my-2 md:my-0 animate-in slide-in-from-bottom-4 duration-300">
-        <div className="flex items-center justify-between p-3 md:p-5 border-b border-[#F5C84C]/20">
+      <div className="w-full max-w-5xl rounded-xl md:rounded-2xl border border-slate-700/30 bg-gradient-to-b from-slate-950/80 via-black/70 to-slate-950/80 backdrop-blur-xl shadow-2xl overflow-hidden my-2 md:my-0 animate-in slide-in-from-bottom-4 duration-300">
+        <div className="flex items-center justify-between p-3 md:p-5 border-b border-gradient-to-r from-[#F5C84C]/20 via-slate-700/20 to-transparent">
           <div>
-            <div className="text-xs uppercase tracking-wider text-[#F5C84C]/70 font-medium">
+            <div className="text-xs uppercase tracking-wider bg-gradient-to-r from-[#F5C84C] to-[#E6B84A] bg-clip-text text-transparent font-medium">
               {roundLabel} • {season}
-              {isFinished && <span className="ml-2 text-white/50">Full Time</span>}
+              {isFinished && <span className="ml-2 text-slate-400">Full Time</span>}
             </div>
             <div className="text-lg md:text-2xl font-bold text-white">Match Detail</div>
           </div>
           <button
             onClick={onClose}
-            className="h-10 w-10 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 active:bg-white/20 flex items-center justify-center transition-colors touch-manipulation"
+            className="h-10 w-10 rounded-xl border border-slate-700/40 bg-slate-900/50 hover:bg-slate-800/60 active:bg-slate-700/70 flex items-center justify-center transition-colors touch-manipulation"
           >
-            <X className="h-5 w-5 text-white/80" />
+            <X className="h-5 w-5 text-slate-300" />
           </button>
         </div>
 
         <div className="p-4 md:p-6 space-y-5 md:space-y-8">
-          <div className="rounded-xl md:rounded-2xl border border-[#F5C84C]/15 bg-black/50 p-4 md:p-6 shadow-lg shadow-[#F5C84C]/5">
-            <div className="grid grid-cols-3 items-center gap-3 md:gap-4 mb-4 md:mb-4">
-              <div>
-                <div className="flex items-center gap-2 md:gap-2 mb-3 md:mb-3">
-                  <div className="w-2.5 h-2.5 md:w-2.5 md:h-2.5 rounded-full" style={{ backgroundColor: homeColor }} />
-                  <div className="text-white font-semibold text-base md:text-xl leading-tight line-clamp-2">{match.home_team_vendor ?? "Home"}</div>
+          <div className="rounded-xl md:rounded-2xl border border-gradient-to-r from-[#F5C84C]/15 via-slate-700/10 to-[#60A5FA]/10 bg-gradient-to-br from-slate-950/60 via-black/50 to-slate-900/60 p-4 md:p-6 shadow-lg shadow-[#F5C84C]/5 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#F5C84C]/[0.03] via-transparent to-[#60A5FA]/[0.03]" />
+            <div className="relative">
+              <div className="grid grid-cols-3 items-center gap-3 md:gap-4 mb-4 md:mb-4">
+                <div>
+                  <div className="flex items-center gap-2 md:gap-2 mb-3 md:mb-3">
+                    <div className="w-2.5 h-2.5 md:w-2.5 md:h-2.5 rounded-full bg-gradient-to-br from-[#F5C84C] to-[#E6B84A] shadow-[0_0_8px_rgba(245,200,76,0.5)]" />
+                    <div className="text-white font-semibold text-base md:text-xl leading-tight line-clamp-2">{match.home_team_vendor ?? "Home"}</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-[#F5C84C] to-[#E6B84A] bg-clip-text text-transparent text-4xl md:text-4xl font-bold">
+                    {homeScore ?? "—"}
+                  </div>
                 </div>
-                <div className="text-[#F5C84C] text-4xl md:text-4xl font-bold">
-                  {homeScore ?? "—"}
+                <div className="text-center">
+                  <div className="bg-gradient-to-r from-[#F5C84C]/60 via-slate-400/50 to-[#60A5FA]/60 bg-clip-text text-transparent text-2xl md:text-3xl font-black">VS</div>
+                  {wonByLabel && (
+                    <div className="mt-2 md:mt-2 text-xs text-[#F5C84C] leading-relaxed px-1 font-semibold">{wonByLabel}</div>
+                  )}
+                </div>
+                <div className="text-right">
+                  <div className="flex items-center gap-2 md:gap-2 justify-end mb-3 md:mb-3">
+                    <div className="text-white font-semibold text-base md:text-xl leading-tight line-clamp-2 text-right">{match.away_team_vendor ?? "Away"}</div>
+                    <div className="w-2.5 h-2.5 md:w-2.5 md:h-2.5 rounded-full bg-gradient-to-br from-[#60A5FA] to-[#4B8FD8] shadow-[0_0_8px_rgba(96,165,250,0.5)]" />
+                  </div>
+                  <div className="bg-gradient-to-br from-[#60A5FA] via-[#5B9FE6] to-[#4B8FD8] bg-clip-text text-transparent text-4xl md:text-4xl font-bold">
+                    {awayScore ?? "—"}
+                  </div>
                 </div>
               </div>
-              <div className="text-center">
-                <div className="text-[#F5C84C]/50 text-2xl md:text-3xl font-black">VS</div>
-                {wonByLabel && (
-                  <div className="mt-2 md:mt-2 text-xs text-[#F5C84C] leading-relaxed px-1 font-semibold">{wonByLabel}</div>
-                )}
-              </div>
-              <div className="text-right">
-                <div className="flex items-center gap-2 md:gap-2 justify-end mb-3 md:mb-3">
-                  <div className="text-white font-semibold text-base md:text-xl leading-tight line-clamp-2 text-right">{match.away_team_vendor ?? "Away"}</div>
-                  <div className="w-2.5 h-2.5 md:w-2.5 md:h-2.5 rounded-full" style={{ backgroundColor: awayColor }} />
-                </div>
-                <div className="text-[#F5C84C] text-4xl md:text-4xl font-bold">
-                  {awayScore ?? "—"}
-                </div>
-              </div>
-            </div>
 
             {(quarters.length > 0 || (sortedQuarterScores && sortedQuarterScores.length > 0)) && (
-              <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-[#F5C84C]/10">
+              <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-gradient-to-r from-[#F5C84C]/10 via-slate-700/10 to-[#60A5FA]/10">
                 <button
                   onClick={() => setShowQuarters(!showQuarters)}
                   className="w-full flex items-center justify-between mb-3 md:mb-4 touch-manipulation min-h-[48px] md:min-h-0 -my-2 md:my-0 py-2 md:py-0 hover:opacity-80 transition-opacity"
                 >
                   <div className="text-xs uppercase tracking-wider font-bold flex items-center gap-2.5">
-                    <span className={showQuarters ? 'text-[#F5C84C]' : 'text-[#F5C84C]/70'}>Quarter by Quarter</span>
-                    <span className="md:hidden text-[#F5C84C]/60 text-[10px] font-semibold">({showQuarters ? 'Hide' : 'Tap to show'})</span>
+                    <span className={showQuarters ? 'bg-gradient-to-r from-[#F5C84C] to-[#E6B84A] bg-clip-text text-transparent' : 'text-[#F5C84C]/70'}>Quarter by Quarter</span>
+                    <span className="md:hidden text-slate-500 text-[10px] font-semibold">({showQuarters ? 'Hide' : 'Tap to show'})</span>
                   </div>
                   <span className="md:hidden text-[#F5C84C] text-base font-bold transition-transform duration-300" style={{ transform: showQuarters ? 'rotate(180deg)' : 'rotate(0deg)' }}>
                     ▼
@@ -477,24 +479,25 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
               </div>
             )}
 
-            <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-white/[0.06] flex flex-wrap items-center gap-2.5 md:gap-5 text-sm">
+            <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-slate-800/30 flex flex-wrap items-center gap-2.5 md:gap-5 text-sm">
               {venue && (
-                <div className={`flex items-center gap-1.5 ${isFinished ? "text-white/30" : "text-white/60"}`}>
+                <div className={`flex items-center gap-1.5 ${isFinished ? "text-slate-600" : "text-slate-400"}`}>
                   <MapPin className="h-3.5 w-3.5 md:h-4 md:w-4" />
                   <span className="text-xs md:text-sm">{venue}</span>
                 </div>
               )}
               {formattedDate && (
-                <div className="flex items-center gap-1.5 text-white/50">
+                <div className="flex items-center gap-1.5 text-slate-500">
                   <Clock className="h-3.5 w-3.5 md:h-4 md:w-4" />
                   <span className="text-xs md:text-sm">{formattedDate}</span>
                 </div>
               )}
               {isFinished && (
-                <div className="px-2 py-1 rounded-md border border-white/10 bg-white/5 text-[10px] md:text-xs uppercase tracking-wider text-white/40 font-semibold">
+                <div className="px-2 py-1 rounded-md border border-slate-700/30 bg-slate-900/50 text-[10px] md:text-xs uppercase tracking-wider text-slate-500 font-semibold">
                   FT
                 </div>
               )}
+            </div>
             </div>
           </div>
 
@@ -506,71 +509,80 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
 
           {statsReady ? (
             <>
-              <div className="rounded-xl md:rounded-2xl border border-white/[0.08] bg-black/40 p-4 md:p-6 hover:border-white/[0.12] transition-colors duration-300">
-                <div className="flex items-center gap-2 mb-3 md:mb-5">
-                  <div className="w-1 h-5 md:h-6 bg-[#F5C84C] rounded-full" />
-                  <div className="text-sm md:text-base font-bold text-white">Top Performers</div>
-                </div>
-                {team1Top3.length === 0 && team2Top3.length === 0 ? (
-                  <div className="text-white/50 text-sm">Player data unavailable for this match</div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                    <div>
-                      <div className="flex items-center gap-1.5 md:gap-2 mb-3 md:mb-4">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: homeColor }} />
-                        <div className="text-sm font-semibold text-white">{team1Name || match.home_team_vendor}</div>
-                      </div>
-                      {team1Top3.length === 0 ? (
-                        <div className="text-white/50 text-sm">No data</div>
-                      ) : (
-                        <div className="space-y-2 md:space-y-3">
-                          {team1Top3.map((p, idx) => (
-                            <div
-                              key={idx}
-                              className="rounded-lg md:rounded-xl border border-white/[0.08] bg-black/50 px-3 md:px-4 py-2.5 md:py-3 hover:border-[#F5C84C]/20 hover:bg-black/60 transition-all duration-200"
-                            >
-                              <div className="flex items-center justify-between mb-1.5 md:mb-2">
-                                <div className="text-white font-medium text-sm md:text-base">{p.player_name ?? "Unknown"}</div>
-                                <div className="text-[#F5C84C] font-bold text-sm md:text-base">{p.fantasy_points ?? 0}</div>
-                              </div>
-                              <div className="flex items-center gap-3 md:gap-4 text-xs text-white/60">
-                                <span>Disposals: {p.disposals ?? 0}</span>
-                                <span>Goals: {p.goals ?? 0}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5 md:gap-2 mb-3 md:mb-4">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: awayColor }} />
-                        <div className="text-sm font-semibold text-white">{team2Name || match.away_team_vendor}</div>
-                      </div>
-                      {team2Top3.length === 0 ? (
-                        <div className="text-white/50 text-sm">No data</div>
-                      ) : (
-                        <div className="space-y-2 md:space-y-3">
-                          {team2Top3.map((p, idx) => (
-                            <div
-                              key={idx}
-                              className="rounded-lg md:rounded-xl border border-white/[0.08] bg-black/50 px-3 md:px-4 py-2.5 md:py-3 hover:border-[#60A5FA]/20 hover:bg-black/60 transition-all duration-200"
-                            >
-                              <div className="flex items-center justify-between mb-1.5 md:mb-2">
-                                <div className="text-white font-medium text-sm md:text-base">{p.player_name ?? "Unknown"}</div>
-                                <div className="text-[#F5C84C] font-bold text-sm md:text-base">{p.fantasy_points ?? 0}</div>
-                              </div>
-                              <div className="flex items-center gap-3 md:gap-4 text-xs text-white/60">
-                                <span>Disposals: {p.disposals ?? 0}</span>
-                                <span>Goals: {p.goals ?? 0}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+              <div className="rounded-xl md:rounded-2xl border border-slate-700/30 bg-gradient-to-br from-slate-950/50 via-black/40 to-slate-900/50 p-4 md:p-6 hover:border-slate-600/40 transition-colors duration-300 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-[#F5C84C]/[0.02] via-transparent to-[#60A5FA]/[0.02]" />
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-3 md:mb-5">
+                    <div className="w-1 h-5 md:h-6 bg-gradient-to-b from-[#F5C84C] to-[#E6B84A] rounded-full shadow-[0_0_8px_rgba(245,200,76,0.4)]" />
+                    <div className="text-sm md:text-base font-bold text-white">Top Performers</div>
                   </div>
-                )}
+                  {team1Top3.length === 0 && team2Top3.length === 0 ? (
+                    <div className="text-slate-400 text-sm">Player data unavailable for this match</div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                      <div>
+                        <div className="flex items-center gap-1.5 md:gap-2 mb-3 md:mb-4">
+                          <div className="w-2 h-2 rounded-full bg-gradient-to-br from-[#F5C84C] to-[#E6B84A] shadow-[0_0_6px_rgba(245,200,76,0.4)]" />
+                          <div className="text-sm font-semibold text-white">{team1Name || match.home_team_vendor}</div>
+                        </div>
+                        {team1Top3.length === 0 ? (
+                          <div className="text-slate-400 text-sm">No data</div>
+                        ) : (
+                          <div className="space-y-2 md:space-y-3">
+                            {team1Top3.map((p, idx) => (
+                              <div
+                                key={idx}
+                                className="rounded-lg md:rounded-xl border border-slate-800/40 bg-gradient-to-br from-slate-950/60 via-black/50 to-slate-900/60 px-3 md:px-4 py-2.5 md:py-3 hover:border-[#F5C84C]/30 hover:shadow-[0_0_12px_rgba(245,200,76,0.08)] transition-all duration-200 relative overflow-hidden group"
+                              >
+                                <div className="absolute inset-0 bg-gradient-to-r from-[#F5C84C]/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                <div className="relative">
+                                  <div className="flex items-center justify-between mb-1.5 md:mb-2">
+                                    <div className="text-white font-medium text-sm md:text-base">{p.player_name ?? "Unknown"}</div>
+                                    <div className="bg-gradient-to-r from-[#F5C84C] to-[#E6B84A] bg-clip-text text-transparent font-bold text-sm md:text-base">{p.fantasy_points ?? 0}</div>
+                                  </div>
+                                  <div className="flex items-center gap-3 md:gap-4 text-xs text-slate-500">
+                                    <span>Disposals: {p.disposals ?? 0}</span>
+                                    <span>Goals: {p.goals ?? 0}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5 md:gap-2 mb-3 md:mb-4">
+                          <div className="w-2 h-2 rounded-full bg-gradient-to-br from-[#60A5FA] to-[#4B8FD8] shadow-[0_0_6px_rgba(96,165,250,0.4)]" />
+                          <div className="text-sm font-semibold text-white">{team2Name || match.away_team_vendor}</div>
+                        </div>
+                        {team2Top3.length === 0 ? (
+                          <div className="text-slate-400 text-sm">No data</div>
+                        ) : (
+                          <div className="space-y-2 md:space-y-3">
+                            {team2Top3.map((p, idx) => (
+                              <div
+                                key={idx}
+                                className="rounded-lg md:rounded-xl border border-slate-800/40 bg-gradient-to-br from-slate-950/60 via-black/50 to-slate-900/60 px-3 md:px-4 py-2.5 md:py-3 hover:border-[#60A5FA]/30 hover:shadow-[0_0_12px_rgba(96,165,250,0.08)] transition-all duration-200 relative overflow-hidden group"
+                              >
+                                <div className="absolute inset-0 bg-gradient-to-l from-[#60A5FA]/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                <div className="relative">
+                                  <div className="flex items-center justify-between mb-1.5 md:mb-2">
+                                    <div className="text-white font-medium text-sm md:text-base">{p.player_name ?? "Unknown"}</div>
+                                    <div className="bg-gradient-to-r from-[#F5C84C] to-[#E6B84A] bg-clip-text text-transparent font-bold text-sm md:text-base">{p.fantasy_points ?? 0}</div>
+                                  </div>
+                                  <div className="flex items-center gap-3 md:gap-4 text-xs text-slate-500">
+                                    <span>Disposals: {p.disposals ?? 0}</span>
+                                    <span>Goals: {p.goals ?? 0}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="pb-1">
@@ -583,34 +595,37 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                 />
               </div>
 
-              <div className="rounded-xl md:rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-br from-[#F5C84C]/15 via-[#F5C84C]/5 to-transparent p-5 md:p-8">
-                <div className="flex items-center gap-2 mb-4 md:mb-6">
-                  <div className="w-1 h-6 bg-[#F5C84C] rounded-full" />
-                  <div className="text-white font-bold text-lg md:text-xl tracking-tight">Match Report</div>
-                </div>
-                <div className="text-white/75 text-[15px] md:text-base leading-[1.8] md:leading-[1.85] space-y-3.5 md:space-y-4 max-w-3xl">
-                  {insightSentences && insightSentences.length > 0 ? (
-                    insightSentences.map((s, i) => {
-                      const isOpening = i === 0;
-                      const isClosing = i === insightSentences.length - 1;
-                      return (
-                        <p
-                          key={i}
-                          className={
-                            isOpening
-                              ? "text-white font-medium text-lg md:text-lg"
-                              : isClosing
-                                ? "text-white/70 italic"
-                                : "text-white/75"
-                          }
-                        >
-                          {s}
-                        </p>
-                      );
-                    })
-                  ) : (
-                    <p className="text-white/60 italic">Match insights are currently unavailable for this fixture.</p>
-                  )}
+              <div className="rounded-xl md:rounded-2xl border border-amber-600/20 bg-gradient-to-br from-amber-950/20 via-[#F5C84C]/5 to-transparent backdrop-blur-sm p-5 md:p-8 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-950/10 via-[#E6B84A]/5 to-transparent" />
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-4 md:mb-6">
+                    <div className="w-1 h-6 bg-gradient-to-b from-amber-400 via-[#F5C84C] to-[#E6B84A] rounded-full shadow-[0_0_10px_rgba(245,200,76,0.5)]" />
+                    <div className="bg-gradient-to-r from-white via-amber-50 to-amber-100 bg-clip-text text-transparent font-bold text-lg md:text-xl tracking-tight">Match Report</div>
+                  </div>
+                  <div className="text-white/75 text-[15px] md:text-base leading-[1.8] md:leading-[1.85] space-y-3.5 md:space-y-4 max-w-3xl">
+                    {insightSentences && insightSentences.length > 0 ? (
+                      insightSentences.map((s, i) => {
+                        const isOpening = i === 0;
+                        const isClosing = i === insightSentences.length - 1;
+                        return (
+                          <p
+                            key={i}
+                            className={
+                              isOpening
+                                ? "text-white font-medium text-lg md:text-lg"
+                                : isClosing
+                                  ? "text-amber-200/60 italic"
+                                  : "text-white/75"
+                            }
+                          >
+                            {s}
+                          </p>
+                        );
+                      })
+                    ) : (
+                      <p className="text-slate-400 italic">Match insights are currently unavailable for this fixture.</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </>

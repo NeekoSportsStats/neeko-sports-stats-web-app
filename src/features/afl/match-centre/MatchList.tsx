@@ -58,9 +58,9 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
 
         return (
           <div key={idx} className="space-y-3 md:space-y-5">
-            <div className="flex items-baseline gap-3 py-1.5 md:py-2 border-b border-[#F5C84C]/10 pb-2 md:pb-3">
+            <div className="flex items-baseline gap-3 py-1.5 md:py-2 border-b border-gradient-to-r from-[#F5C84C]/15 via-slate-700/20 to-transparent pb-2 md:pb-3">
               <span className="text-white font-semibold text-base md:text-lg">{dayLabel}</span>
-              <span className="text-[#F5C84C]/50 text-xs md:text-sm font-medium">{g.round_label}</span>
+              <span className="bg-gradient-to-r from-[#F5C84C] to-[#E6B84A] bg-clip-text text-transparent text-xs md:text-sm font-medium">{g.round_label}</span>
             </div>
 
             <div className="space-y-3 md:space-y-5">
@@ -86,59 +86,62 @@ export default function MatchList({ groups, onSelectMatch, quarterScoresMap }: P
                   <button
                     key={m.match_id ?? mIdx}
                     onClick={() => onSelectMatch(m)}
-                    className="w-full text-left rounded-2xl border border-[#F5C84C]/20 bg-black/30 hover:bg-black/40 hover:border-[#F5C84C]/40 hover:shadow-[0_0_20px_rgba(245,200,76,0.15)] md:hover:scale-[1.01] active:bg-black/50 active:scale-[0.99] transition-all duration-200 p-4 md:p-6 group min-h-[64px] touch-manipulation"
+                    className="w-full text-left rounded-2xl border border-slate-700/30 bg-gradient-to-br from-slate-950/40 via-black/30 to-slate-900/40 hover:from-slate-900/50 hover:via-black/40 hover:to-slate-800/50 hover:border-[#F5C84C]/30 hover:shadow-[0_0_24px_rgba(245,200,76,0.12),0_0_48px_rgba(96,165,250,0.08)] md:hover:scale-[1.01] active:bg-black/50 active:scale-[0.99] transition-all duration-200 p-4 md:p-6 group min-h-[64px] touch-manipulation relative overflow-hidden"
                   >
-                    <div className="grid grid-cols-[1fr_auto_1fr] md:grid-cols-3 items-center gap-3 md:gap-6">
-                      <div className="space-y-2 md:space-y-1.5">
-                        <div className="flex items-center gap-1.5 md:gap-2">
-                          <div className="w-2 h-2 rounded-full bg-[#F5C84C]" />
-                          <div className="text-white font-semibold text-sm md:text-base leading-tight line-clamp-1">{homeTeam}</div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#F5C84C]/[0.02] via-transparent to-[#60A5FA]/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="relative">
+                      <div className="grid grid-cols-[1fr_auto_1fr] md:grid-cols-3 items-center gap-3 md:gap-6">
+                        <div className="space-y-2 md:space-y-1.5">
+                          <div className="flex items-center gap-1.5 md:gap-2">
+                            <div className="w-2 h-2 rounded-full bg-gradient-to-br from-[#F5C84C] to-[#E6B84A] shadow-[0_0_8px_rgba(245,200,76,0.4)]" />
+                            <div className="text-white font-semibold text-sm md:text-base leading-tight line-clamp-1">{homeTeam}</div>
+                          </div>
+                          <div className="flex items-baseline gap-2">
+                            {homeGoalsBehinds && (
+                              <div className="text-xs text-slate-500 font-medium">{homeGoalsBehinds}</div>
+                            )}
+                            <div className={`text-3xl md:text-4xl font-bold ${homeWon ? 'bg-gradient-to-br from-[#F5C84C] to-[#E6B84A] bg-clip-text text-transparent' : 'text-white/90'}`}>
+                              {homeScoreNum ?? "—"}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-baseline gap-2">
-                          {homeGoalsBehinds && (
-                            <div className="text-xs text-white/40 font-medium">{homeGoalsBehinds}</div>
+
+                        <div className="flex flex-col items-center justify-center text-center py-1 md:pt-2">
+                          <div className="bg-gradient-to-r from-[#F5C84C]/60 via-slate-400/50 to-[#60A5FA]/60 bg-clip-text text-transparent font-black text-sm md:text-xl">VS</div>
+                          {wonBy && (
+                            <div className="mt-1 md:mt-3 text-[10px] md:text-xs text-[#F5C84C]/70 leading-tight font-medium whitespace-nowrap">{wonBy}</div>
                           )}
-                          <div className={`text-3xl md:text-4xl font-bold ${homeWon ? 'text-[#F5C84C]' : 'text-white/90'}`}>
-                            {homeScoreNum ?? "—"}
+                        </div>
+
+                        <div className="space-y-2 md:space-y-1.5 text-right">
+                          <div className="flex items-center gap-1.5 md:gap-2 justify-end">
+                            <div className="text-white font-semibold text-sm md:text-base leading-tight line-clamp-1 text-right">{awayTeam}</div>
+                            <div className="w-2 h-2 rounded-full bg-gradient-to-br from-[#60A5FA] to-[#4B8FD8] shadow-[0_0_8px_rgba(96,165,250,0.4)]" />
+                          </div>
+                          <div className="flex items-baseline gap-2 justify-end">
+                            <div className={`text-3xl md:text-4xl font-bold ${awayWon ? 'bg-gradient-to-br from-[#F5C84C] to-[#E6B84A] bg-clip-text text-transparent' : 'text-white/90'}`}>
+                              {awayScoreNum ?? "—"}
+                            </div>
+                            {awayGoalsBehinds && (
+                              <div className="text-xs text-slate-500 font-medium">{awayGoalsBehinds}</div>
+                            )}
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex flex-col items-center justify-center text-center py-1 md:pt-2">
-                        <div className="text-[#F5C84C]/50 font-black text-sm md:text-xl">VS</div>
-                        {wonBy && (
-                          <div className="mt-1 md:mt-3 text-[10px] md:text-xs text-[#F5C84C]/60 leading-tight font-medium whitespace-nowrap">{wonBy}</div>
+                      <div className="mt-5 md:mt-5 pt-4 md:pt-4 border-t border-gradient-to-r from-transparent via-slate-700/20 to-transparent flex flex-wrap items-center gap-3 md:gap-4 text-sm">
+                        {venue && (
+                          <div className={`text-sm ${isFinished ? "text-slate-600" : "text-slate-400"}`}>{venue}</div>
                         )}
-                      </div>
-
-                      <div className="space-y-2 md:space-y-1.5 text-right">
-                        <div className="flex items-center gap-1.5 md:gap-2 justify-end">
-                          <div className="text-white font-semibold text-sm md:text-base leading-tight line-clamp-1 text-right">{awayTeam}</div>
-                          <div className="w-2 h-2 rounded-full bg-[#60A5FA]" />
-                        </div>
-                        <div className="flex items-baseline gap-2 justify-end">
-                          <div className={`text-3xl md:text-4xl font-bold ${awayWon ? 'text-[#F5C84C]' : 'text-white/90'}`}>
-                            {awayScoreNum ?? "—"}
+                        {isFinished && (
+                          <div className="px-2.5 py-1.5 md:px-2 md:py-1 rounded-md border border-slate-700/30 bg-slate-900/50 text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                            FT
                           </div>
-                          {awayGoalsBehinds && (
-                            <div className="text-xs text-white/40 font-medium">{awayGoalsBehinds}</div>
-                          )}
+                        )}
+                        <div className="ml-auto text-slate-400 text-sm flex items-center gap-2 group-hover:text-[#F5C84C] transition-all min-h-[48px] md:min-h-[48px] py-2 -mr-1 touch-manipulation">
+                          <span className="font-medium">View Details</span>
+                          <span className="text-lg group-hover:translate-x-1 transition-transform duration-200">›</span>
                         </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 md:mt-5 pt-4 md:pt-4 border-t border-white/[0.08] flex flex-wrap items-center gap-3 md:gap-4 text-sm">
-                      {venue && (
-                        <div className={`text-sm ${isFinished ? "text-white/30" : "text-white/60"}`}>{venue}</div>
-                      )}
-                      {isFinished && (
-                        <div className="px-2.5 py-1.5 md:px-2 md:py-1 rounded-md border border-white/10 bg-white/5 text-xs uppercase tracking-wider text-white/40 font-semibold">
-                          FT
-                        </div>
-                      )}
-                      <div className="ml-auto text-white/50 text-sm flex items-center gap-2 group-hover:text-[#F5C84C] transition-all min-h-[48px] md:min-h-[48px] py-2 -mr-1 touch-manipulation">
-                        <span className="font-medium">View Details</span>
-                        <span className="text-lg group-hover:translate-x-1 transition-transform duration-200">›</span>
                       </div>
                     </div>
                   </button>

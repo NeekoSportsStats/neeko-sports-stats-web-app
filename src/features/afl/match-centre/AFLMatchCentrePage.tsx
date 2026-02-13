@@ -132,16 +132,16 @@ export default function AFLMatchCentrePage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#070707] text-white">
+    <div className="min-h-screen bg-gradient-to-b from-[#070707] via-[#0a0a0a] to-[#070707] text-white">
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-12">
         <header className="mb-8 space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-yellow-400/40 bg-yellow-400/10 text-yellow-200 text-xs font-semibold uppercase tracking-wider">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#F5C84C]/40 bg-gradient-to-r from-[#F5C84C]/10 to-[#E6B84A]/5 text-[#F5C84C] text-xs font-semibold uppercase tracking-wider shadow-lg shadow-[#F5C84C]/5">
             <Calendar className="h-3.5 w-3.5" />
             Match Centre
           </div>
 
           <div>
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white">
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-gradient-to-r from-white via-white/95 to-white/85 bg-clip-text text-transparent">
               AFL Match Centre
             </h1>
             <p className="mt-3 text-lg text-white/60 max-w-3xl">
@@ -150,10 +150,10 @@ export default function AFLMatchCentrePage() {
           </div>
         </header>
 
-        <div className="mb-6 md:mb-8 rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4 md:p-4 sticky top-0 z-10 shadow-[0_4px_12px_rgba(0,0,0,0.5)] md:shadow-none md:static">
+        <div className="mb-6 md:mb-8 rounded-xl border border-slate-700/30 bg-gradient-to-br from-slate-900/40 via-black/40 to-slate-900/30 backdrop-blur-xl p-4 md:p-4 sticky top-0 z-10 shadow-[0_4px_12px_rgba(0,0,0,0.5)] md:shadow-none md:static">
           <div className="flex flex-col gap-4 md:flex-row md:gap-4 md:items-center md:justify-between">
             <div className="space-y-1 md:space-y-1">
-              <div className="text-xs font-bold uppercase tracking-wider text-yellow-200/80">
+              <div className="text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-[#F5C84C] to-[#E6B84A] bg-clip-text text-transparent">
                 Filters
               </div>
               <p className="text-xs text-white/60">
@@ -163,35 +163,35 @@ export default function AFLMatchCentrePage() {
 
             <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:gap-3">
               <div className="flex flex-col gap-2">
-                <label className="text-xs text-white/50 uppercase tracking-wider font-semibold">
+                <label className="text-xs text-slate-400 uppercase tracking-wider font-semibold">
                   Season
                 </label>
                 <select
                   value={season}
                   onChange={(e) => setSeason(Number(e.target.value))}
-                  className="w-full md:w-auto px-4 py-3 md:py-2.5 rounded-lg border border-white/10 bg-black/60 text-white text-base md:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#F5C84C]/50 focus:border-[#F5C84C]/50 hover:border-white/20 transition-all cursor-pointer touch-manipulation min-h-[48px] md:min-h-0"
+                  className="w-full md:w-auto px-4 py-3 md:py-2.5 rounded-lg border border-slate-700/40 bg-slate-950/60 text-white text-base md:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#F5C84C]/50 focus:border-[#F5C84C]/50 hover:border-slate-600/50 transition-all cursor-pointer touch-manipulation min-h-[48px] md:min-h-0 shadow-inner"
                   title="Select season to view match data"
                 >
-                  <option value={2025} className="bg-black text-white">2025 Season</option>
-                  <option value={2026} disabled className="bg-black text-white/40 cursor-not-allowed">
+                  <option value={2025} className="bg-slate-950 text-white">2025 Season</option>
+                  <option value={2026} disabled className="bg-slate-950 text-white/40 cursor-not-allowed">
                     2026 (Coming Soon)
                   </option>
                 </select>
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-xs text-white/50 uppercase tracking-wider font-semibold">
+                <label className="text-xs text-slate-400 uppercase tracking-wider font-semibold">
                   Round
                 </label>
                 <select
                   value={round}
                   onChange={(e) => setRound(Number(e.target.value))}
                   disabled={is2026}
-                  className="w-full md:w-auto px-4 py-3 md:py-2.5 rounded-lg border border-white/10 bg-black/60 text-white text-base md:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#F5C84C]/50 focus:border-[#F5C84C]/50 hover:border-white/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10 touch-manipulation min-h-[48px] md:min-h-0"
+                  className="w-full md:w-auto px-4 py-3 md:py-2.5 rounded-lg border border-slate-700/40 bg-slate-950/60 text-white text-base md:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#F5C84C]/50 focus:border-[#F5C84C]/50 hover:border-slate-600/50 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-slate-700/40 touch-manipulation min-h-[48px] md:min-h-0 shadow-inner"
                   title={is2026 ? "Round selection unavailable for 2026" : "Select round to view matches"}
                 >
                   {roundOptions.map((r) => (
-                    <option key={r.value} value={r.value} className="bg-black text-white">
+                    <option key={r.value} value={r.value} className="bg-slate-950 text-white">
                       {r.label}
                     </option>
                   ))}
@@ -200,7 +200,7 @@ export default function AFLMatchCentrePage() {
 
               {is2026 && (
                 <div className="flex items-end">
-                  <div className="px-4 py-3 md:px-3 md:py-2.5 rounded-lg border border-[#F5C84C]/30 bg-[#F5C84C]/10 text-[#F5C84C] text-sm md:text-xs font-bold uppercase tracking-wider shadow-lg shadow-[#F5C84C]/5">
+                  <div className="px-4 py-3 md:px-3 md:py-2.5 rounded-lg border border-[#F5C84C]/30 bg-gradient-to-r from-[#F5C84C]/10 to-[#E6B84A]/5 text-[#F5C84C] text-sm md:text-xs font-bold uppercase tracking-wider shadow-lg shadow-[#F5C84C]/10">
                     Coming Soon
                   </div>
                 </div>
