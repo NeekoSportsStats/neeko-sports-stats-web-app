@@ -26,6 +26,7 @@ type ChartRow = {
   momentum: number;
   quarter: number;
   quarter_margin?: number;
+  is_event_data?: boolean;
 };
 
 function toChartData(points: MomentumPoint[]): ChartRow[] {
@@ -37,6 +38,7 @@ function toChartData(points: MomentumPoint[]): ChartRow[] {
       minute: p.minute,
       momentum: p.momentum,
       quarter: p.quarter,
+      is_event_data: true,
     };
   });
 }
@@ -270,20 +272,22 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
           <AreaChart data={data} margin={{ top: 10, right: 10, bottom: 30, left: 10 }}>
             <defs>
               <linearGradient id="momentumPos" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={teamColors.home.primary} stopOpacity={0.65} />
-                <stop offset="40%" stopColor={teamColors.home.primary} stopOpacity={0.35} />
+                <stop offset="0%" stopColor={teamColors.home.primary} stopOpacity={0.85} />
+                <stop offset="50%" stopColor={teamColors.home.primary} stopOpacity={0.45} />
                 <stop offset="100%" stopColor={teamColors.home.primary} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="momentumNeg" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0%" stopColor={teamColors.away.primary} stopOpacity={0.4} />
-                <stop offset="40%" stopColor={teamColors.away.primary} stopOpacity={0.25} />
+                <stop offset="0%" stopColor={teamColors.away.primary} stopOpacity={0.85} />
+                <stop offset="50%" stopColor={teamColors.away.primary} stopOpacity={0.45} />
                 <stop offset="100%" stopColor={teamColors.away.primary} stopOpacity={0} />
               </linearGradient>
-              <linearGradient id="momentumPosIntense" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={teamColors.home.primary} stopOpacity={0.8} />
-                <stop offset="30%" stopColor={teamColors.home.primary} stopOpacity={0.5} />
-                <stop offset="100%" stopColor={teamColors.home.primary} stopOpacity={0} />
-              </linearGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                <feMerge>
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
             </defs>
 
             <ReferenceArea x1={0} x2={30} fill="#ffffff" fillOpacity={0.02} />
@@ -291,7 +295,7 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
             <ReferenceArea x1={60} x2={90} fill="#ffffff" fillOpacity={0.02} />
             <ReferenceArea x1={90} x2={120} fill="#ffffff" fillOpacity={0.04} />
 
-            <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.25} className="md:opacity-50" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.15} className="md:opacity-30" />
 
             <XAxis
               dataKey="label"
@@ -309,20 +313,21 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
 
             <ReferenceLine
               y={0}
-              stroke="#888"
-              strokeWidth={2.5}
-              strokeDasharray="5 5"
+              stroke="#666"
+              strokeWidth={2}
+              strokeDasharray="6 4"
+              opacity={0.6}
               label={{
                 value: "Even Contest",
                 position: "insideLeft",
-                fill: "#666",
+                fill: "#555",
                 fontSize: 10,
                 offset: 5
               }}
             />
 
             <Tooltip
-              cursor={{ stroke: "#F5C84C", strokeWidth: 2.5 }}
+              cursor={{ stroke: teamColors.home.primary, strokeWidth: 3, opacity: 0.5 }}
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null;
                 const row = payload[0].payload as ChartRow;
@@ -342,15 +347,19 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
                   interpretation = "Momentum balanced";
                 } else if (absMargin < 6) {
                   interpretation = "Slight edge";
-                } else if (absMargin < 13) {
+                } else if (absMargin < 10) {
                   interpretation = "Building pressure";
-                } else if (absMargin < 25) {
-                  interpretation = "Control established";
-                } else if (absMargin < 40) {
+                } else if (absMargin < 18) {
+                  interpretation = "Strong control";
+                } else if (absMargin < 30) {
                   interpretation = "Dominant period";
-                } else {
+                } else if (absMargin < 50) {
                   interpretation = "Match-defining run";
+                } else {
+                  interpretation = "Total control";
                 }
+
+                const dataSource = row.is_event_data ? "" : "Quarter trend";
 
                 let scoreImpact = "";
                 if (row.quarter_margin !== undefined && Math.abs(row.quarter_margin) > 6) {
@@ -365,17 +374,30 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
 
                 return (
                   <div
-                    className="rounded-lg border bg-black/98 backdrop-blur-xl p-3 shadow-2xl w-[240px] md:w-[260px] max-w-[calc(100vw-32px)]"
-                    style={{ borderColor: `${teamColor}50` }}
+                    className="rounded-lg border bg-black/98 backdrop-blur-xl p-3.5 shadow-2xl w-[240px] md:w-[260px] max-w-[calc(100vw-32px)]"
+                    style={{ borderColor: `${teamColor}70` }}
                   >
-                    <div className="text-[10px] font-semibold mb-1 uppercase tracking-wide" style={{ color: `${teamColor}99` }}>{timeContext}</div>
-                    <div className="text-xs text-white/50 mb-2">{qtrLabel}</div>
-                    <div className="text-lg font-bold mb-2.5 pb-2.5 border-b border-white/10" style={{ color: margin !== 0 ? teamColor : '#FFFFFF' }}>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: `${teamColor}BB` }}>
+                        {timeContext}
+                      </div>
+                      {dataSource && (
+                        <div className="text-[9px] text-white/40 italic">{dataSource}</div>
+                      )}
+                    </div>
+                    <div className="text-xs text-white/50 mb-2.5">{qtrLabel}</div>
+                    <div
+                      className="text-xl font-bold mb-3 pb-3 border-b"
+                      style={{
+                        color: margin !== 0 ? teamColor : '#FFFFFF',
+                        borderColor: `${teamColor}20`
+                      }}
+                    >
                       {margin !== 0 ? `${team} ${displayValue}` : displayValue}
                     </div>
-                    <div className="text-xs text-white/70 italic mb-2">{interpretation}</div>
+                    <div className="text-xs text-white/80 italic mb-2 font-medium">{interpretation}</div>
                     {scoreImpact && (
-                      <div className="text-[10px] font-medium pt-2 border-t border-white/5" style={{ color: `${teamColor}BB` }}>
+                      <div className="text-[10px] font-medium pt-2.5 border-t border-white/5" style={{ color: `${teamColor}CC` }}>
                         {scoreImpact}
                       </div>
                     )}
@@ -385,16 +407,36 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
             />
 
             <Area
-              type="monotone"
+              type={data[0]?.is_event_data ? "natural" : "monotone"}
+              dataKey={(entry: ChartRow) => entry.momentum >= 0 ? entry.momentum : 0}
+              stroke="#F5C84C"
+              strokeWidth={0}
+              fill="url(#momentumPos)"
+              isAnimationActive={false}
+            />
+            <Area
+              type={data[0]?.is_event_data ? "natural" : "monotone"}
+              dataKey={(entry: ChartRow) => entry.momentum < 0 ? entry.momentum : 0}
+              stroke="#F5C84C"
+              strokeWidth={0}
+              fill="url(#momentumNeg)"
+              isAnimationActive={false}
+            />
+            <Area
+              type={data[0]?.is_event_data ? "natural" : "monotone"}
               dataKey="momentum"
               stroke="#F5C84C"
-              strokeWidth={3}
-              fill="url(#momentumPos)"
+              strokeWidth={3.5}
+              fill="none"
+              filter="url(#glow)"
               activeDot={{
-                r: 7,
+                r: 8,
                 fill: "#F5C84C",
                 stroke: "#000",
-                strokeWidth: 2.5,
+                strokeWidth: 3,
+                style: {
+                  filter: "drop-shadow(0 0 8px rgba(245, 196, 76, 0.7))"
+                }
               }}
             />
           </AreaChart>
