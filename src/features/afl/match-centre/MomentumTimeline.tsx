@@ -7,6 +7,7 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceLine,
+  ReferenceArea,
   ResponsiveContainer,
 } from "recharts";
 import { fetchMatchMomentum, fetchQuarterSummary, type QuarterScoreRow } from "./services/matchCenter.service";
@@ -156,6 +157,7 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
   const [rawPoints, setRawPoints] = useState<MomentumPoint[]>([]);
   const [quarterData, setQuarterData] = useState<QuarterScoreRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -236,9 +238,16 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
   return (
     <div className="rounded-xl md:rounded-2xl border border-white/[0.08] bg-black/40 backdrop-blur-xl p-5 md:p-7 hover:border-white/[0.12] transition-colors duration-300">
       <div className="mb-5 md:mb-6">
-        <div className="flex items-center gap-2 mb-2.5 md:mb-2">
-          <div className="w-1 h-6 md:h-6 bg-[#F5C84C] rounded-full" />
-          <h3 className="text-lg md:text-lg font-bold text-white">Match Momentum</h3>
+        <div className="flex items-center justify-between gap-2 mb-2.5 md:mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-6 md:h-6 bg-[#F5C84C] rounded-full" />
+            <h3 className="text-lg md:text-lg font-bold text-white">Match Momentum</h3>
+          </div>
+          {!hasInteracted && (
+            <div className="md:hidden text-[10px] text-white/40 italic animate-pulse">
+              Tap to explore
+            </div>
+          )}
         </div>
         <p className="text-sm md:text-sm text-white/60 leading-[1.7]">
           Territory control throughout the match. <span className="text-[#F5C84C]">{homeTeam}</span> positive, <span className="text-white/80">{awayTeam}</span> negative.
@@ -250,23 +259,37 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
         )}
       </div>
 
-      <div className="min-h-[340px] h-[340px] md:h-[320px] w-full">
+      <div
+        className="min-h-[340px] h-[340px] md:h-[320px] w-full"
+        onTouchStart={() => setHasInteracted(true)}
+        onClick={() => setHasInteracted(true)}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 10, right: 10, bottom: 30, left: 10 }}>
             <defs>
               <linearGradient id="momentumPos" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#F5C84C" stopOpacity={0.6} />
-                <stop offset="40%" stopColor="#E6B84A" stopOpacity={0.3} />
+                <stop offset="0%" stopColor="#F5C84C" stopOpacity={0.65} />
+                <stop offset="40%" stopColor="#E6B84A" stopOpacity={0.35} />
                 <stop offset="100%" stopColor="#D4A647" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="momentumNeg" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0%" stopColor="#60A5FA" stopOpacity={0.35} />
-                <stop offset="40%" stopColor="#4B8FD8" stopOpacity={0.2} />
+                <stop offset="0%" stopColor="#60A5FA" stopOpacity={0.4} />
+                <stop offset="40%" stopColor="#4B8FD8" stopOpacity={0.25} />
                 <stop offset="100%" stopColor="#3B7AC2" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="momentumPosIntense" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#F5C84C" stopOpacity={0.8} />
+                <stop offset="30%" stopColor="#E6B84A" stopOpacity={0.5} />
+                <stop offset="100%" stopColor="#D4A647" stopOpacity={0} />
               </linearGradient>
             </defs>
 
-            <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} className="md:opacity-50" />
+            <ReferenceArea x1={0} x2={30} fill="#ffffff" fillOpacity={0.02} />
+            <ReferenceArea x1={30} x2={60} fill="#ffffff" fillOpacity={0.04} />
+            <ReferenceArea x1={60} x2={90} fill="#ffffff" fillOpacity={0.02} />
+            <ReferenceArea x1={90} x2={120} fill="#ffffff" fillOpacity={0.04} />
+
+            <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.25} className="md:opacity-50" />
 
             <XAxis
               dataKey="label"
@@ -282,10 +305,22 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
               width={35}
             />
 
-            <ReferenceLine y={0} stroke="#666" strokeWidth={2} />
+            <ReferenceLine
+              y={0}
+              stroke="#888"
+              strokeWidth={2.5}
+              strokeDasharray="5 5"
+              label={{
+                value: "Even Contest",
+                position: "insideLeft",
+                fill: "#666",
+                fontSize: 10,
+                offset: 5
+              }}
+            />
 
             <Tooltip
-              cursor={{ stroke: "#F5C84C", strokeWidth: 2 }}
+              cursor={{ stroke: "#F5C84C", strokeWidth: 2.5 }}
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null;
                 const row = payload[0].payload as ChartRow;
@@ -296,19 +331,28 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
                 const sign = margin > 0 ? "+" : "";
                 const displayValue = margin !== 0 ? `${sign}${Math.round(margin)}` : "Even";
 
-                let context = "";
+                const qMin = ((row.minute % 30) || 30);
+                const timeContext = `Q${row.quarter} — ${qMin}'`;
+
+                let interpretation = "";
                 if (absMargin === 0) {
-                  context = "Deadlocked";
+                  interpretation = "Momentum balanced";
                 } else if (absMargin < 6) {
-                  context = "Tight contest";
-                } else if (absMargin < 12) {
-                  context = "Building pressure";
-                } else if (absMargin < 24) {
-                  context = "Control established";
-                } else if (absMargin < 36) {
-                  context = "Dominant period";
+                  interpretation = "Momentum balanced";
+                } else if (absMargin < 13) {
+                  interpretation = "Edge building";
+                } else if (absMargin < 25) {
+                  interpretation = "Control established";
+                } else if (absMargin < 40) {
+                  interpretation = "Strong control";
                 } else {
-                  context = "Complete control";
+                  interpretation = "Match-defining run";
+                }
+
+                let scoreImpact = "";
+                if (row.quarter_margin !== undefined && Math.abs(row.quarter_margin) > 6) {
+                  const impactSign = row.quarter_margin > 0 ? "+" : "";
+                  scoreImpact = `Quarter impact: ${impactSign}${row.quarter_margin} pts`;
                 }
 
                 const qtrLabel = row.quarter === 1 ? "Opening Term"
@@ -317,12 +361,18 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
                   : "Final Term";
 
                 return (
-                  <div className="rounded-lg border border-[#F5C84C]/40 bg-black/98 backdrop-blur-xl p-3 md:p-3.5 shadow-2xl w-[180px] md:min-w-[180px] max-w-[calc(100vw-32px)]">
-                    <div className="text-xs text-[#F5C84C]/80 font-semibold mb-1.5">{qtrLabel}</div>
-                    <div className="text-base md:text-base font-bold text-white mb-2 pb-2 border-b border-white/10 truncate">
+                  <div className="rounded-lg border border-[#F5C84C]/50 bg-black/98 backdrop-blur-xl p-3 shadow-2xl w-[240px] md:w-[260px] max-w-[calc(100vw-32px)]">
+                    <div className="text-[10px] text-[#F5C84C]/60 font-semibold mb-1 uppercase tracking-wide">{timeContext}</div>
+                    <div className="text-xs text-white/50 mb-2">{qtrLabel}</div>
+                    <div className="text-lg font-bold text-white mb-2.5 pb-2.5 border-b border-white/10">
                       {margin !== 0 ? `${team} ${displayValue}` : displayValue}
                     </div>
-                    <div className="text-xs text-white/70 italic">{context}</div>
+                    <div className="text-xs text-white/70 italic mb-2">{interpretation}</div>
+                    {scoreImpact && (
+                      <div className="text-[10px] text-[#F5C84C]/70 font-medium pt-2 border-t border-white/5">
+                        {scoreImpact}
+                      </div>
+                    )}
                   </div>
                 );
               }}
@@ -334,7 +384,7 @@ export default function MomentumTimeline({ matchId, homeTeam, awayTeam }: Props)
               stroke="#F5C84C"
               strokeWidth={3}
               fill="url(#momentumPos)"
-              activeDot={{ r: 6, fill: "#F5C84C", stroke: "#000", strokeWidth: 2 }}
+              activeDot={{ r: 7, fill: "#F5C84C", stroke: "#000", strokeWidth: 2.5 }}
             />
           </AreaChart>
         </ResponsiveContainer>
