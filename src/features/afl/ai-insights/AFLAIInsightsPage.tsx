@@ -16,7 +16,15 @@ interface AIPlayerSummary {
   updated_at: string | null;
 }
 
-type Section = "player" | "match" | "team";
+interface AITeamSummary {
+  team: string;
+  season: number;
+  round_number: number;
+  ai_summary: string | null;
+  updated_at: string | null;
+}
+
+type Section = "player" | "team" | "match";
 
 export default function AFLAIInsightsPage() {
   const [activeSection, setActiveSection] = useState<Section>("player");
@@ -30,14 +38,17 @@ export default function AFLAIInsightsPage() {
   const [filteredPlayers, setFilteredPlayers] = useState<AIPlayerSummary[]>([]);
   const [teamFilter, setTeamFilter] = useState<string>("All Teams");
 
+  const [teams, setTeams] = useState<string[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<string>("");
+  const [teamSummary, setTeamSummary] = useState<AITeamSummary | null>(null);
+  const [teamSummaryLoading, setTeamSummaryLoading] = useState(false);
+
   const [selectedRound, setSelectedRound] = useState("R1");
   const [selectedMatch, setSelectedMatch] = useState("");
 
-  const [selectedTeam, setSelectedTeam] = useState("");
-
   const playerSectionRef = useRef<HTMLDivElement>(null);
-  const matchSectionRef = useRef<HTMLDivElement>(null);
   const teamSectionRef = useRef<HTMLDivElement>(null);
+  const matchSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function fetchAIPlayers() {
@@ -58,6 +69,48 @@ export default function AFLAIInsightsPage() {
   }, []);
 
   useEffect(() => {
+    async function fetchTeams() {
+      const { data, error } = await supabase
+        .schema("afl")
+        .from("ai_team_summaries")
+        .select("team")
+        .eq("season", 2026)
+        .order("team", { ascending: true });
+      if (!error && data) {
+        const distinct = Array.from(new Set(data.map((r: { team: string }) => r.team))).sort() as string[];
+        setTeams(distinct);
+      }
+    }
+    fetchTeams();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedTeam) {
+      setTeamSummary(null);
+      return;
+    }
+    async function fetchTeamSummary() {
+      setTeamSummaryLoading(true);
+      const { data, error } = await supabase
+        .schema("afl")
+        .from("ai_team_summaries")
+        .select("team, season, round_number, ai_summary, updated_at")
+        .eq("team", selectedTeam)
+        .eq("season", 2026)
+        .order("round_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!error && data) {
+        setTeamSummary(data as AITeamSummary);
+      } else {
+        setTeamSummary(null);
+      }
+      setTeamSummaryLoading(false);
+    }
+    fetchTeamSummary();
+  }, [selectedTeam]);
+
+  useEffect(() => {
     const filtered = players.filter((p) => {
       const matchesSearch = p.player.toLowerCase().includes(playerSearch.toLowerCase());
       const matchesTeam = teamFilter === "All Teams" || p.team === teamFilter;
@@ -70,23 +123,13 @@ export default function AFLAIInsightsPage() {
     setActiveSection(section);
     const refs = {
       player: playerSectionRef,
-      match: matchSectionRef,
       team: teamSectionRef,
+      match: matchSectionRef,
     };
     refs[section].current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const uniqueTeams = Array.from(new Set(players.map((p) => p.team))).sort();
-
-  const selectedTeamPlayers = players.filter((p) => p.team === selectedTeam);
-  const selectedTeamValidAvg = selectedTeamPlayers.filter((p) => p.season_avg != null);
-  const selectedTeamAvg = selectedTeamValidAvg.length > 0
-    ? selectedTeamValidAvg.reduce((sum, p) => sum + (p.season_avg ?? 0), 0) / selectedTeamValidAvg.length
-    : null;
-  const selectedTeamTopPlayers = [...selectedTeamPlayers]
-    .filter((p) => p.season_avg != null)
-    .sort((a, b) => (b.season_avg ?? 0) - (a.season_avg ?? 0))
-    .slice(0, 3);
 
   const mockMatches = [
     "Adelaide vs Brisbane",
@@ -142,18 +185,6 @@ export default function AFLAIInsightsPage() {
               </button>
 
               <button
-                onClick={() => scrollToSection("match")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
-                  activeSection === "match"
-                    ? "bg-yellow-400/20 text-yellow-200 border border-yellow-400/40"
-                    : "text-white/60 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                <TrendingUp className="h-4 w-4" />
-                Match Predictions
-              </button>
-
-              <button
                 onClick={() => scrollToSection("team")}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
                   activeSection === "team"
@@ -163,6 +194,18 @@ export default function AFLAIInsightsPage() {
               >
                 <Users className="h-4 w-4" />
                 Team Analysis
+              </button>
+
+              <button
+                onClick={() => scrollToSection("match")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                  activeSection === "match"
+                    ? "bg-yellow-400/20 text-yellow-200 border border-yellow-400/40"
+                    : "text-white/60 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <TrendingUp className="h-4 w-4" />
+                Match Predictions
               </button>
             </nav>
           </div>
@@ -179,6 +222,7 @@ export default function AFLAIInsightsPage() {
           </p>
         </header>
 
+        {/* SECTION 1: Player Deep Dive */}
         <div ref={playerSectionRef} className="scroll-mt-24 space-y-8">
           <div className="flex items-center gap-3 pb-4 border-b border-white/10">
             <Target className="h-6 w-6 text-yellow-400" />
@@ -316,6 +360,73 @@ export default function AFLAIInsightsPage() {
           )}
         </div>
 
+        {/* SECTION 2: Team Analysis */}
+        <div ref={teamSectionRef} className="scroll-mt-24 space-y-8">
+          <div className="flex items-center gap-3 pb-4 border-b border-white/10">
+            <Users className="h-6 w-6 text-yellow-400" />
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold">Team Analysis</h2>
+              <p className="text-sm text-white/60 mt-1">
+                Select any AFL team to explore season trends, tactical insights, and performance projections
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {teams.map((team) => (
+              <button
+                key={team}
+                onClick={() => setSelectedTeam(team)}
+                className={`p-4 rounded-lg border text-left transition-all ${
+                  selectedTeam === team
+                    ? "bg-yellow-400/20 border-yellow-400/60"
+                    : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
+                }`}
+              >
+                <div className="font-semibold text-white">{team}</div>
+              </button>
+            ))}
+          </div>
+
+          {selectedTeam ? (
+            <div className="rounded-xl border border-yellow-400/40 bg-gradient-to-br from-yellow-500/10 to-amber-500/10 backdrop-blur-xl p-8 space-y-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-yellow-200 uppercase tracking-wider mb-2">
+                    Team Profile
+                  </div>
+                  <h3 className="text-3xl font-bold text-white">{selectedTeam}</h3>
+                </div>
+                <button
+                  onClick={() => setSelectedTeam("")}
+                  className="text-sm text-white/60 hover:text-white"
+                >
+                  Clear
+                </button>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-yellow-400/20">
+                <h4 className="font-semibold text-white">AI Team Summary</h4>
+                <div className="text-sm text-white/80 leading-relaxed">
+                  {teamSummaryLoading ? (
+                    <p className="text-yellow-400 animate-pulse">Loading...</p>
+                  ) : teamSummary?.ai_summary ? (
+                    <p>{teamSummary.ai_summary}</p>
+                  ) : (
+                    <p className="text-white/40 italic">No AI summary available yet.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-12 text-center">
+              <Users className="h-12 w-12 text-white/20 mx-auto mb-4" />
+              <p className="text-white/50">Select a team to view comprehensive AI analysis</p>
+            </div>
+          )}
+        </div>
+
+        {/* SECTION 3: Match Predictions */}
         <div ref={matchSectionRef} className="scroll-mt-24 space-y-8">
           <div className="flex items-center gap-3 pb-4 border-b border-white/10">
             <TrendingUp className="h-6 w-6 text-yellow-400" />
@@ -430,116 +541,6 @@ export default function AFLAIInsightsPage() {
             <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-12 text-center">
               <TrendingUp className="h-12 w-12 text-white/20 mx-auto mb-4" />
               <p className="text-white/50">Select a match to view AI predictions and analysis</p>
-            </div>
-          )}
-        </div>
-
-        <div ref={teamSectionRef} className="scroll-mt-24 space-y-8">
-          <div className="flex items-center gap-3 pb-4 border-b border-white/10">
-            <Users className="h-6 w-6 text-yellow-400" />
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold">Team Analysis</h2>
-              <p className="text-sm text-white/60 mt-1">
-                Select any AFL team to explore season trends, tactical insights, and performance projections
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {uniqueTeams.map((team) => {
-              const teamPlayers = players.filter((p) => p.team === team);
-              const avgScore = teamPlayers.length > 0
-                ? teamPlayers.reduce((sum, p) => sum + (p.season_avg ?? 0), 0) / teamPlayers.filter((p) => p.season_avg != null).length
-                : null;
-              return (
-                <button
-                  key={team}
-                  onClick={() => setSelectedTeam(team)}
-                  className={`p-4 rounded-lg border text-left transition-all ${
-                    selectedTeam === team
-                      ? "bg-yellow-400/20 border-yellow-400/60"
-                      : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
-                  }`}
-                >
-                  <div className="font-semibold text-white">{team}</div>
-                  <div className="text-xs text-white/50 mt-1">
-                    {teamPlayers.length} players · avg {avgScore != null ? avgScore.toFixed(1) : "—"} pts
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {selectedTeam ? (
-            <div className="rounded-xl border border-yellow-400/40 bg-gradient-to-br from-yellow-500/10 to-amber-500/10 backdrop-blur-xl p-8 space-y-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-yellow-200 uppercase tracking-wider mb-2">
-                    Team Profile
-                  </div>
-                  <h3 className="text-3xl font-bold text-white">{selectedTeam}</h3>
-                </div>
-                <button
-                  onClick={() => setSelectedTeam("")}
-                  className="text-sm text-white/60 hover:text-white"
-                >
-                  Clear
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">Squad Size</div>
-                  <div className="text-3xl font-bold text-yellow-400">{selectedTeamPlayers.length}</div>
-                  <div className="text-xs text-white/50">players tracked</div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">Team Fantasy Avg</div>
-                  <div className="text-3xl font-bold text-yellow-400">
-                    {selectedTeamAvg != null ? selectedTeamAvg.toFixed(1) : "—"}
-                  </div>
-                  <div className="text-xs text-white/50">2026 season</div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">Top Performers</div>
-                  <div className="space-y-1 mt-1">
-                    {selectedTeamTopPlayers.map((p) => (
-                      <div key={p.player_id} className="flex items-center justify-between">
-                        <span className="text-xs text-white/70 truncate">{p.player}</span>
-                        <span className="text-xs font-semibold text-yellow-400 ml-2">{Number(p.season_avg).toFixed(0)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {selectedTeamTopPlayers.length > 0 && selectedTeamTopPlayers[0].ai_summary && (
-                <div className="space-y-4 pt-4 border-t border-yellow-400/20">
-                  <h4 className="font-semibold text-white">AI Player Summaries</h4>
-                  <div className="space-y-4">
-                    {selectedTeamTopPlayers.map((p) => p.ai_summary && (
-                      <div key={p.player_id} className="space-y-1">
-                        <div className="text-sm font-semibold text-yellow-200">{p.player}</div>
-                        <p className="text-sm text-white/80 leading-relaxed">{p.ai_summary}</p>
-                      </div>
-                    ))}
-                  </div>
-                  {premiumMode && (
-                    <div className="pt-4 border-t border-yellow-400/20">
-                      <p className="text-sm text-amber-200">
-                        <strong>Neeko+ Exclusive:</strong> Team fantasy average of {selectedTeamAvg != null ? selectedTeamAvg.toFixed(1) : "—"} across {selectedTeamPlayers.length} tracked players. Monitor top performers for ceiling game potential in upcoming fixtures.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-12 text-center">
-              <Users className="h-12 w-12 text-white/20 mx-auto mb-4" />
-              <p className="text-white/50">Select a team to view comprehensive AI analysis</p>
             </div>
           )}
         </div>
