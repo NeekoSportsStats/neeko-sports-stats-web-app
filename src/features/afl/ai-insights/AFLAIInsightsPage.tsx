@@ -28,6 +28,7 @@ export default function AFLAIInsightsPage() {
   const [playerSearch, setPlayerSearch] = useState("");
   const [selectedPlayer, setSelectedPlayer] = useState<AIPlayerSummary | null>(null);
   const [filteredPlayers, setFilteredPlayers] = useState<AIPlayerSummary[]>([]);
+  const [teamFilter, setTeamFilter] = useState<string>("All Teams");
 
   const [selectedRound, setSelectedRound] = useState("R1");
   const [selectedMatch, setSelectedMatch] = useState("");
@@ -57,11 +58,13 @@ export default function AFLAIInsightsPage() {
   }, []);
 
   useEffect(() => {
-    const filtered = players.filter((p) =>
-      p.player.toLowerCase().includes(playerSearch.toLowerCase())
-    );
+    const filtered = players.filter((p) => {
+      const matchesSearch = p.player.toLowerCase().includes(playerSearch.toLowerCase());
+      const matchesTeam = teamFilter === "All Teams" || p.team === teamFilter;
+      return matchesSearch && matchesTeam;
+    });
     setFilteredPlayers(filtered);
-  }, [playerSearch, players]);
+  }, [playerSearch, players, teamFilter]);
 
   const scrollToSection = (section: Section) => {
     setActiveSection(section);
@@ -197,6 +200,22 @@ export default function AFLAIInsightsPage() {
                 onChange={(e) => setPlayerSearch(e.target.value)}
                 className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
               />
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {["All Teams", ...uniqueTeams].map((team) => (
+                <button
+                  key={team}
+                  onClick={() => setTeamFilter(team)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border whitespace-nowrap ${
+                    teamFilter === team
+                      ? "bg-yellow-400/20 border-yellow-400/60 text-yellow-200"
+                      : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:border-white/20 hover:text-white/80"
+                  }`}
+                >
+                  {team}
+                </button>
+              ))}
             </div>
 
             {playerSearch && filteredPlayers.length > 0 && (
