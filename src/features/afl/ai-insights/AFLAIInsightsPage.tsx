@@ -89,35 +89,72 @@ export default function AFLAIInsightsPage() {
       setTeamSummary(null);
       return;
     }
-    async function fetchTeamSummary() {
+
+    async function fetchTeamContext() {
       setTeamSummaryLoading(true);
-      const { data, error } = await supabase
-        .schema("afl")
-        .from("ai_team_summaries")
-        .select("team, season, round_number, ai_summary, updated_at")
-        .eq("team", selectedTeam)
-        .eq("season", 2026)
-        .order("round_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (!error && data) {
-        setTeamSummary(data as AITeamSummary);
+
+      const [summaryResult, projectionResult] = await Promise.all([
+        supabase
+          .schema("afl")
+          .from("ai_team_summaries")
+          .select("team, season, round_number, ai_summary, updated_at")
+          .eq("team", selectedTeam)
+          .eq("season", 2026)
+          .order("round_number", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .schema("afl")
+          .from("v_neeko_player_projection")
+          .select("player_id, player_name, team, final_projection")
+          .eq("team", selectedTeam)
+          .order("final_projection", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      if (!summaryResult.error && summaryResult.data) {
+        setTeamSummary(summaryResult.data as AITeamSummary);
       } else {
         setTeamSummary(null);
       }
+
+      if (!projectionResult.error && projectionResult.data) {
+        const topPlayerId = projectionResult.data.player_id;
+        const match = players.find((p) => p.player_id === topPlayerId);
+        if (match) {
+          setSelectedPlayer(match);
+        } else {
+          const { data: playerData, error: playerError } = await supabase
+            .schema("afl")
+            .from("ai_player_summaries")
+            .select(`player_id, player, team, round_number, season_avg, consistency_score, ceiling_fantasy, floor_fantasy, ai_summary, trend_direction, updated_at`)
+            .eq("player_id", topPlayerId)
+            .eq("season", 2026)
+            .order("round_number", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (!playerError && playerData) {
+            setSelectedPlayer(playerData as AIPlayerSummary);
+          }
+        }
+      }
+
       setTeamSummaryLoading(false);
     }
-    fetchTeamSummary();
+
+    fetchTeamContext();
   }, [selectedTeam]);
 
   useEffect(() => {
+    const activeTeam = selectedTeam !== "" ? selectedTeam : teamFilter !== "All Teams" ? teamFilter : null;
     const filtered = players.filter((p) => {
       const matchesSearch = p.player.toLowerCase().includes(playerSearch.toLowerCase());
-      const matchesTeam = teamFilter === "All Teams" || p.team === teamFilter;
+      const matchesTeam = activeTeam ? p.team === activeTeam : true;
       return matchesSearch && matchesTeam;
     });
     setFilteredPlayers(filtered);
-  }, [playerSearch, players, teamFilter]);
+  }, [playerSearch, players, teamFilter, selectedTeam]);
 
   const scrollToSection = (section: Section) => {
     setActiveSection(section);
@@ -127,6 +164,21 @@ export default function AFLAIInsightsPage() {
       match: matchSectionRef,
     };
     refs[section].current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const handleTeamPillClick = (team: string) => {
+    setTeamFilter(team === "All Teams" ? "All Teams" : team);
+    if (team !== "All Teams") {
+      setSelectedTeam(team);
+    } else {
+      setSelectedTeam("");
+      setSelectedPlayer(null);
+    }
+  };
+
+  const handleTeamCardClick = (team: string) => {
+    setSelectedTeam(team);
+    setTeamFilter(team);
   };
 
   const uniqueTeams = Array.from(new Set(players.map((p) => p.team))).sort();
@@ -250,9 +302,9 @@ export default function AFLAIInsightsPage() {
               {["All Teams", ...uniqueTeams].map((team) => (
                 <button
                   key={team}
-                  onClick={() => setTeamFilter(team)}
+                  onClick={() => handleTeamPillClick(team)}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border whitespace-nowrap ${
-                    teamFilter === team
+                    (team === "All Teams" ? teamFilter === "All Teams" && !selectedTeam : selectedTeam === team || (teamFilter === team && !selectedTeam))
                       ? "bg-yellow-400/20 border-yellow-400/60 text-yellow-200"
                       : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:border-white/20 hover:text-white/80"
                   }`}
@@ -376,7 +428,7 @@ export default function AFLAIInsightsPage() {
             {teams.map((team) => (
               <button
                 key={team}
-                onClick={() => setSelectedTeam(team)}
+                onClick={() => handleTeamCardClick(team)}
                 className={`p-4 rounded-lg border text-left transition-all ${
                   selectedTeam === team
                     ? "bg-yellow-400/20 border-yellow-400/60"
@@ -398,7 +450,11 @@ export default function AFLAIInsightsPage() {
                   <h3 className="text-3xl font-bold text-white">{selectedTeam}</h3>
                 </div>
                 <button
-                  onClick={() => setSelectedTeam("")}
+                  onClick={() => {
+                    setSelectedTeam("");
+                    setTeamFilter("All Teams");
+                    setSelectedPlayer(null);
+                  }}
                   className="text-sm text-white/60 hover:text-white"
                 >
                   Clear
