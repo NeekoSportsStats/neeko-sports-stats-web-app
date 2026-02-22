@@ -7,6 +7,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+const BATCH_LIMIT = 10;
+const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -21,22 +24,51 @@ Deno.serve(async (req: Request) => {
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey) throw new Error("OPENAI_API_KEY not set");
 
-    const { data: rows, error: fetchError } = await supabase
+    const { data: viewRows, error: viewError } = await supabase
       .schema("afl")
       .from("v_ai_match_openai_inputs_2026_next_round")
-      .select("season, round_number, match_id, home_team, away_team, final_openai_input");
+      .select("season, round_number, match_id, home_team, away_team, final_openai_input")
+      .limit(BATCH_LIMIT);
 
-    if (fetchError) throw fetchError;
-    if (!rows || rows.length === 0) {
-      return new Response(JSON.stringify({ message: "No match rows to process", processed: 0 }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (viewError) throw viewError;
+    if (!viewRows || viewRows.length === 0) {
+      return new Response(
+        JSON.stringify({ message: "No match rows in view", processed: 0, skipped: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Build freshness lookup keyed by match_id
+    const matchIds = viewRows.map((r) => r.match_id);
+
+    const { data: existingRows } = await supabase
+      .schema("afl")
+      .from("ai_match_predictions")
+      .select("match_id, updated_at")
+      .in("match_id", matchIds);
+
+    const freshSet = new Set<number>();
+    const now = Date.now();
+
+    for (const row of existingRows ?? []) {
+      if (row.updated_at) {
+        const age = now - new Date(row.updated_at).getTime();
+        if (age < THREE_DAYS_MS) {
+          freshSet.add(row.match_id);
+        }
+      }
     }
 
     let processed = 0;
+    let skipped = 0;
     let errors = 0;
 
-    for (const row of rows) {
+    for (const row of viewRows) {
+      if (freshSet.has(row.match_id)) {
+        skipped++;
+        continue;
+      }
+
       try {
         const input = row.final_openai_input as { system: string; user: string };
 
@@ -57,15 +89,15 @@ Deno.serve(async (req: Request) => {
         });
 
         if (!openaiRes.ok) {
-          const errText = await openaiRes.text();
-          console.error(`OpenAI error for match ${row.match_id}: ${errText}`);
+          console.error(`OpenAI error for match ${row.match_id}: ${await openaiRes.text()}`);
           errors++;
           continue;
         }
 
         const openaiData = await openaiRes.json();
-        const summary = openaiData.choices?.[0]?.message?.content ?? "";
+        const aiSummary = openaiData.choices?.[0]?.message?.content ?? "";
 
+        // Upsert on the UNIQUE(match_id) constraint — safe, no duplicate key errors
         const { error: upsertError } = await supabase
           .schema("afl")
           .from("ai_match_predictions")
@@ -76,7 +108,8 @@ Deno.serve(async (req: Request) => {
               away_team: row.away_team,
               round_number: row.round_number,
               season: row.season,
-              ai_summary: summary,
+              ai_summary: aiSummary,
+              updated_at: new Date().toISOString(),
             },
             { onConflict: "match_id" }
           );
@@ -95,11 +128,17 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ message: "Match summaries complete", processed, errors, total: rows.length }),
+      JSON.stringify({
+        message: "generate-match-summary complete",
+        total: viewRows.length,
+        processed,
+        skipped,
+        errors,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("generate-match-summary fatal error:", err);
+    console.error("generate-match-summary fatal:", err);
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

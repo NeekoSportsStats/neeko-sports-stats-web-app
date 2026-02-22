@@ -7,6 +7,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+const BATCH_LIMIT = 10;
+const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -21,22 +24,55 @@ Deno.serve(async (req: Request) => {
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey) throw new Error("OPENAI_API_KEY not set");
 
-    const { data: rows, error: fetchError } = await supabase
+    const { data: viewRows, error: viewError } = await supabase
       .schema("afl")
       .from("v_ai_team_openai_inputs_2026_next_round")
-      .select("match_id, round_number, team, opponent, final_openai_input");
+      .select("match_id, round_number, team, opponent, final_openai_input")
+      .limit(BATCH_LIMIT);
 
-    if (fetchError) throw fetchError;
-    if (!rows || rows.length === 0) {
-      return new Response(JSON.stringify({ message: "No team rows to process", processed: 0 }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (viewError) throw viewError;
+    if (!viewRows || viewRows.length === 0) {
+      return new Response(
+        JSON.stringify({ message: "No team rows in view", processed: 0, skipped: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Build freshness lookup keyed by team__round_number
+    const { data: existingRows } = await supabase
+      .schema("afl")
+      .from("ai_team_summaries")
+      .select("team, round_number, updated_at")
+      .eq("season", 2026)
+      .in(
+        "team",
+        viewRows.map((r) => r.team)
+      );
+
+    const freshSet = new Set<string>();
+    const now = Date.now();
+
+    for (const row of existingRows ?? []) {
+      if (row.updated_at) {
+        const age = now - new Date(row.updated_at).getTime();
+        if (age < THREE_DAYS_MS) {
+          freshSet.add(`${row.team}__${row.round_number}`);
+        }
+      }
     }
 
     let processed = 0;
+    let skipped = 0;
     let errors = 0;
 
-    for (const row of rows) {
+    for (const row of viewRows) {
+      const key = `${row.team}__${row.round_number}`;
+
+      if (freshSet.has(key)) {
+        skipped++;
+        continue;
+      }
+
       try {
         const input = row.final_openai_input as { system: string; user: string };
 
@@ -57,8 +93,7 @@ Deno.serve(async (req: Request) => {
         });
 
         if (!openaiRes.ok) {
-          const errText = await openaiRes.text();
-          console.error(`OpenAI error for team ${row.team}: ${errText}`);
+          console.error(`OpenAI error for team ${row.team}: ${await openaiRes.text()}`);
           errors++;
           continue;
         }
@@ -73,10 +108,11 @@ Deno.serve(async (req: Request) => {
             {
               team: row.team,
               season: 2026,
+              round_number: row.round_number,
               summary,
               updated_at: new Date().toISOString(),
             },
-            { onConflict: "team,season" }
+            { onConflict: "team,season,round_number" }
           );
 
         if (upsertError) {
@@ -93,11 +129,17 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ message: "Team summaries complete", processed, errors, total: rows.length }),
+      JSON.stringify({
+        message: "generate-team-ai-summaries complete",
+        total: viewRows.length,
+        processed,
+        skipped,
+        errors,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("generate-team-ai-summaries fatal error:", err);
+    console.error("generate-team-ai-summaries fatal:", err);
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
