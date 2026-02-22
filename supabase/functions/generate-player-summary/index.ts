@@ -24,12 +24,29 @@ Deno.serve(async (req: Request) => {
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey) throw new Error("OPENAI_API_KEY not set");
 
-    // Fetch the next batch from the view
-    const { data: viewRows, error: viewError } = await supabase
-      .schema("afl")
-      .from("v_ai_player_openai_inputs_2026_next_round")
-      .select("match_id, round_number, player, team, opponent, final_openai_input")
-      .limit(BATCH_LIMIT);
+    // Fetch next batch ordered: NULL summaries first, then oldest updated_at
+    // This ensures sequential progress through the full roster each cron cycle
+    const { data: viewRows, error: viewError } = await supabase.rpc("exec_sql", {
+      sql: `
+        SELECT
+          v.match_id,
+          v.round_number,
+          v.player,
+          v.team,
+          v.opponent,
+          v.final_openai_input,
+          s.updated_at AS summary_updated_at
+        FROM afl.v_ai_player_openai_inputs_2026_next_round v
+        LEFT JOIN afl.ai_player_summaries s
+          ON v.player = s.player
+          AND v.round_number = s.round_number
+          AND s.season = 2026
+        ORDER BY
+          (s.updated_at IS NULL) DESC,
+          s.updated_at ASC
+        LIMIT ${BATCH_LIMIT}
+      `
+    });
 
     if (viewError) throw viewError;
     if (!viewRows || viewRows.length === 0) {
@@ -40,25 +57,13 @@ Deno.serve(async (req: Request) => {
     }
 
     // Build a lookup of existing fresh summaries to skip
-    const playerKeys = viewRows.map((r) => `${r.player}__${r.round_number}`);
-
-    const { data: existingRows } = await supabase
-      .schema("afl")
-      .from("ai_player_summaries")
-      .select("player, round_number, updated_at")
-      .eq("season", 2026)
-      .in(
-        "player",
-        viewRows.map((r) => r.player)
-      );
-
     const freshSet = new Set<string>();
     const now = Date.now();
     const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
 
-    for (const row of existingRows ?? []) {
-      if (row.updated_at) {
-        const age = now - new Date(row.updated_at).getTime();
+    for (const row of viewRows) {
+      if (row.summary_updated_at) {
+        const age = now - new Date(row.summary_updated_at).getTime();
         if (age < threeDaysMs) {
           freshSet.add(`${row.player}__${row.round_number}`);
         }
