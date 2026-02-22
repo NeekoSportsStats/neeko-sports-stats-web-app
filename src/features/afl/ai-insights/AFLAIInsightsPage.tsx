@@ -1,21 +1,20 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Search, TrendingUp, Target, Users, ChevronRight, Sparkles, Crown } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
-const AFL_PLAYERS = [
-  "Marcus Bontempelli", "Patrick Cripps", "Christian Petracca", "Lachie Neale",
-  "Clayton Oliver", "Jack Steele", "Touk Miller", "Andrew Brayshaw",
-  "Zach Merrett", "Callum Mills", "Max Gawn", "Brodie Grundy",
-  "Nick Daicos", "Isaac Heeney", "Chad Warner", "Errol Gulden",
-  "Jordan Dawson", "Sam Walsh", "Travis Boak", "Jeremy Cameron",
-];
-
-const AFL_TEAMS = [
-  "Adelaide Crows", "Brisbane Lions", "Carlton Blues", "Collingwood Magpies",
-  "Essendon Bombers", "Fremantle Dockers", "Geelong Cats", "Gold Coast Suns",
-  "GWS Giants", "Hawthorn Hawks", "Melbourne Demons", "North Melbourne Kangaroos",
-  "Port Adelaide Power", "Richmond Tigers", "St Kilda Saints", "Sydney Swans",
-  "West Coast Eagles", "Western Bulldogs",
-];
+interface AIPlayerSummary {
+  player_id: number;
+  player: string;
+  team: string;
+  round_number: number;
+  season_avg: number | null;
+  consistency_score: number | null;
+  ceiling_fantasy: number | null;
+  floor_fantasy: number | null;
+  ai_summary: string | null;
+  trend_direction: string | null;
+  updated_at: string | null;
+}
 
 type Section = "player" | "match" | "team";
 
@@ -23,9 +22,12 @@ export default function AFLAIInsightsPage() {
   const [activeSection, setActiveSection] = useState<Section>("player");
   const [premiumMode, setPremiumMode] = useState(false);
 
+  const [players, setPlayers] = useState<AIPlayerSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [playerSearch, setPlayerSearch] = useState("");
-  const [selectedPlayer, setSelectedPlayer] = useState("");
-  const [filteredPlayers, setFilteredPlayers] = useState(AFL_PLAYERS);
+  const [selectedPlayer, setSelectedPlayer] = useState<AIPlayerSummary | null>(null);
+  const [filteredPlayers, setFilteredPlayers] = useState<AIPlayerSummary[]>([]);
 
   const [selectedRound, setSelectedRound] = useState("R1");
   const [selectedMatch, setSelectedMatch] = useState("");
@@ -37,11 +39,29 @@ export default function AFLAIInsightsPage() {
   const teamSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const filtered = AFL_PLAYERS.filter((player) =>
-      player.toLowerCase().includes(playerSearch.toLowerCase())
+    async function fetchAIPlayers() {
+      setLoading(true);
+      const { data, error } = await supabase
+        .schema("afl")
+        .from("ai_player_summaries")
+        .select(`player_id, player, team, round_number, season_avg, consistency_score, ceiling_fantasy, floor_fantasy, ai_summary, trend_direction, updated_at`)
+        .eq("season", 2026)
+        .eq("round_number", 0)
+        .order("player", { ascending: true });
+      if (!error && data) {
+        setPlayers(data as AIPlayerSummary[]);
+      }
+      setLoading(false);
+    }
+    fetchAIPlayers();
+  }, []);
+
+  useEffect(() => {
+    const filtered = players.filter((p) =>
+      p.player.toLowerCase().includes(playerSearch.toLowerCase())
     );
     setFilteredPlayers(filtered);
-  }, [playerSearch]);
+  }, [playerSearch, players]);
 
   const scrollToSection = (section: Section) => {
     setActiveSection(section);
@@ -53,11 +73,33 @@ export default function AFLAIInsightsPage() {
     refs[section].current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const uniqueTeams = Array.from(new Set(players.map((p) => p.team))).sort();
+
+  const selectedTeamPlayers = players.filter((p) => p.team === selectedTeam);
+  const selectedTeamValidAvg = selectedTeamPlayers.filter((p) => p.season_avg != null);
+  const selectedTeamAvg = selectedTeamValidAvg.length > 0
+    ? selectedTeamValidAvg.reduce((sum, p) => sum + (p.season_avg ?? 0), 0) / selectedTeamValidAvg.length
+    : null;
+  const selectedTeamTopPlayers = [...selectedTeamPlayers]
+    .filter((p) => p.season_avg != null)
+    .sort((a, b) => (b.season_avg ?? 0) - (a.season_avg ?? 0))
+    .slice(0, 3);
+
   const mockMatches = [
-    "Adelaide Crows vs Brisbane Lions",
-    "Carlton Blues vs Collingwood Magpies",
-    "Geelong Cats vs Sydney Swans",
+    "Adelaide vs Brisbane",
+    "Carlton vs Collingwood",
+    "Geelong vs Sydney",
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#070707] flex items-center justify-center">
+        <div className="text-center text-yellow-400 animate-pulse text-lg font-semibold tracking-wider">
+          Loading AI Insights...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
@@ -161,14 +203,17 @@ export default function AFLAIInsightsPage() {
               <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
                 {filteredPlayers.slice(0, 8).map((player) => (
                   <button
-                    key={player}
+                    key={player.player_id}
                     onClick={() => {
                       setSelectedPlayer(player);
                       setPlayerSearch("");
                     }}
                     className="w-full flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-yellow-400/10 hover:border-yellow-400/40 border border-transparent transition-all text-left"
                   >
-                    <span className="font-medium text-white">{player}</span>
+                    <div>
+                      <span className="font-medium text-white">{player.player}</span>
+                      <span className="ml-2 text-xs text-white/40">{player.team}</span>
+                    </div>
                     <ChevronRight className="h-4 w-4 text-white/40" />
                   </button>
                 ))}
@@ -183,10 +228,11 @@ export default function AFLAIInsightsPage() {
                   <div className="text-sm font-semibold text-yellow-200 uppercase tracking-wider mb-2">
                     Player Analysis
                   </div>
-                  <h3 className="text-3xl font-bold text-white">{selectedPlayer}</h3>
+                  <h3 className="text-3xl font-bold text-white">{selectedPlayer.player}</h3>
+                  <div className="text-sm text-white/50 mt-1">{selectedPlayer.team}</div>
                 </div>
                 <button
-                  onClick={() => setSelectedPlayer("")}
+                  onClick={() => setSelectedPlayer(null)}
                   className="text-sm text-white/60 hover:text-white"
                 >
                   Clear
@@ -196,39 +242,47 @@ export default function AFLAIInsightsPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
                   <div className="text-sm text-white/60">Season Average</div>
-                  <div className="text-3xl font-bold text-yellow-400">98.5</div>
-                  <div className="text-xs text-emerald-400">↑ 12% from last year</div>
+                  <div className="text-3xl font-bold text-yellow-400">
+                    {selectedPlayer.season_avg != null ? Number(selectedPlayer.season_avg).toFixed(1) : "—"}
+                  </div>
+                  {selectedPlayer.trend_direction && (
+                    <div className={`text-xs ${selectedPlayer.trend_direction === "up" ? "text-emerald-400" : selectedPlayer.trend_direction === "down" ? "text-red-400" : "text-white/50"}`}>
+                      {selectedPlayer.trend_direction === "up" ? "↑ Trending up" : selectedPlayer.trend_direction === "down" ? "↓ Trending down" : "→ Stable"}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   <div className="text-sm text-white/60">Consistency Score</div>
-                  <div className="text-3xl font-bold text-yellow-400">8.2/10</div>
-                  <div className="text-xs text-white/50">Top 15% in league</div>
+                  <div className="text-3xl font-bold text-yellow-400">
+                    {selectedPlayer.consistency_score != null ? `${selectedPlayer.consistency_score}/10` : "—"}
+                  </div>
+                  <div className="text-xs text-white/50">2026 season</div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="text-sm text-white/60">Ceiling Potential</div>
-                  <div className="text-3xl font-bold text-yellow-400">125+</div>
-                  <div className="text-xs text-white/50">Elite performer</div>
+                  <div className="text-3xl font-bold text-yellow-400">
+                    {selectedPlayer.ceiling_fantasy != null ? `${Number(selectedPlayer.ceiling_fantasy).toFixed(0)}+` : "—"}
+                  </div>
+                  <div className="text-xs text-white/50">
+                    Floor: {selectedPlayer.floor_fantasy != null ? Number(selectedPlayer.floor_fantasy).toFixed(0) : "—"}
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-4 pt-4 border-t border-yellow-400/20">
                 <h4 className="font-semibold text-white">AI Insights Summary</h4>
                 <div className="space-y-3 text-sm text-white/80 leading-relaxed">
-                  <p>
-                    <strong className="text-yellow-200">Form Trajectory:</strong> {selectedPlayer} has demonstrated exceptional consistency over the last 6 rounds, with an average score of 102.3 and minimal variance. Current form suggests sustained high performance.
-                  </p>
-                  <p>
-                    <strong className="text-yellow-200">Matchup Impact:</strong> Historical data shows strong performance against defensive-minded opponents (+8.5 pts avg). Upcoming fixtures present favorable conditions for ceiling games.
-                  </p>
-                  <p>
-                    <strong className="text-yellow-200">Predictability Index:</strong> High predictability rating (8.7/10) indicates reliable scoring patterns. Minimal risk of dramatic downside variance in standard game conditions.
-                  </p>
-                  {premiumMode && (
+                  {selectedPlayer.ai_summary ? (
+                    <p>{selectedPlayer.ai_summary}</p>
+                  ) : (
+                    <p className="text-white/40 italic">No AI summary available for this player yet.</p>
+                  )}
+                  {premiumMode && selectedPlayer.ai_summary && (
                     <div className="pt-4 border-t border-yellow-400/20">
                       <p className="text-amber-200">
-                        <strong>Neeko+ Exclusive:</strong> Advanced modeling suggests 68% probability of 100+ score in next match. Key performance indicators align with historical ceiling game patterns. Monitor injury reports 24h pre-game.
+                        <strong>Neeko+ Exclusive:</strong> Monitor injury reports and team selection in the 24h window before game day. Floor of {selectedPlayer.floor_fantasy != null ? Number(selectedPlayer.floor_fantasy).toFixed(0) : "N/A"} provides strong downside protection.
                       </p>
                     </div>
                   )}
@@ -373,20 +427,28 @@ export default function AFLAIInsightsPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {AFL_TEAMS.map((team) => (
-              <button
-                key={team}
-                onClick={() => setSelectedTeam(team)}
-                className={`p-4 rounded-lg border text-left transition-all ${
-                  selectedTeam === team
-                    ? "bg-yellow-400/20 border-yellow-400/60"
-                    : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
-                }`}
-              >
-                <div className="font-semibold text-white">{team}</div>
-                <div className="text-xs text-white/50 mt-1">View analysis</div>
-              </button>
-            ))}
+            {uniqueTeams.map((team) => {
+              const teamPlayers = players.filter((p) => p.team === team);
+              const avgScore = teamPlayers.length > 0
+                ? teamPlayers.reduce((sum, p) => sum + (p.season_avg ?? 0), 0) / teamPlayers.filter((p) => p.season_avg != null).length
+                : null;
+              return (
+                <button
+                  key={team}
+                  onClick={() => setSelectedTeam(team)}
+                  className={`p-4 rounded-lg border text-left transition-all ${
+                    selectedTeam === team
+                      ? "bg-yellow-400/20 border-yellow-400/60"
+                      : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
+                  }`}
+                >
+                  <div className="font-semibold text-white">{team}</div>
+                  <div className="text-xs text-white/50 mt-1">
+                    {teamPlayers.length} players · avg {avgScore != null ? avgScore.toFixed(1) : "—"} pts
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           {selectedTeam ? (
@@ -408,57 +470,52 @@ export default function AFLAIInsightsPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <div className="text-sm text-white/60">Season Record</div>
-                  <div className="text-3xl font-bold text-yellow-400">12-3-1</div>
-                  <div className="text-xs text-emerald-400">2nd on ladder</div>
+                  <div className="text-sm text-white/60">Squad Size</div>
+                  <div className="text-3xl font-bold text-yellow-400">{selectedTeamPlayers.length}</div>
+                  <div className="text-xs text-white/50">players tracked</div>
                 </div>
 
                 <div className="space-y-2">
-                  <div className="text-sm text-white/60">Avg Score For</div>
-                  <div className="text-3xl font-bold text-yellow-400">95.8</div>
-                  <div className="text-xs text-white/50">3rd in competition</div>
+                  <div className="text-sm text-white/60">Team Fantasy Avg</div>
+                  <div className="text-3xl font-bold text-yellow-400">
+                    {selectedTeamAvg != null ? selectedTeamAvg.toFixed(1) : "—"}
+                  </div>
+                  <div className="text-xs text-white/50">2026 season</div>
                 </div>
 
                 <div className="space-y-2">
-                  <div className="text-sm text-white/60">Form (Last 5)</div>
-                  <div className="flex gap-1 mt-2">
-                    {["W", "W", "W", "L", "W"].map((result, idx) => (
-                      <span
-                        key={idx}
-                        className={`w-8 h-8 rounded flex items-center justify-center font-semibold text-xs ${
-                          result === "W"
-                            ? "bg-emerald-500/20 text-emerald-400"
-                            : "bg-red-500/20 text-red-400"
-                        }`}
-                      >
-                        {result}
-                      </span>
+                  <div className="text-sm text-white/60">Top Performers</div>
+                  <div className="space-y-1 mt-1">
+                    {selectedTeamTopPlayers.map((p) => (
+                      <div key={p.player_id} className="flex items-center justify-between">
+                        <span className="text-xs text-white/70 truncate">{p.player}</span>
+                        <span className="text-xs font-semibold text-yellow-400 ml-2">{Number(p.season_avg).toFixed(0)}</span>
+                      </div>
                     ))}
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-4 pt-4 border-t border-yellow-400/20">
-                <h4 className="font-semibold text-white">AI Team Analysis</h4>
-                <div className="space-y-3 text-sm text-white/80 leading-relaxed">
-                  <p>
-                    <strong className="text-yellow-200">Offensive Profile:</strong> {selectedTeam} demonstrates a balanced offensive approach with strong midfield dominance. Average inside 50 entries of 54 per game ranks in the top tier of the competition.
-                  </p>
-                  <p>
-                    <strong className="text-yellow-200">Defensive Stability:</strong> Conceding an average of 82.4 points per game indicates solid defensive structure. Intercept marking and transition defense are key strengths.
-                  </p>
-                  <p>
-                    <strong className="text-yellow-200">Season Outlook:</strong> Current trajectory suggests strong finals contention. Injury management and fixture difficulty in coming rounds will be critical factors in maintaining ladder position.
-                  </p>
+              {selectedTeamTopPlayers.length > 0 && selectedTeamTopPlayers[0].ai_summary && (
+                <div className="space-y-4 pt-4 border-t border-yellow-400/20">
+                  <h4 className="font-semibold text-white">AI Player Summaries</h4>
+                  <div className="space-y-4">
+                    {selectedTeamTopPlayers.map((p) => p.ai_summary && (
+                      <div key={p.player_id} className="space-y-1">
+                        <div className="text-sm font-semibold text-yellow-200">{p.player}</div>
+                        <p className="text-sm text-white/80 leading-relaxed">{p.ai_summary}</p>
+                      </div>
+                    ))}
+                  </div>
                   {premiumMode && (
                     <div className="pt-4 border-t border-yellow-400/20">
-                      <p className="text-amber-200">
-                        <strong>Neeko+ Exclusive:</strong> Advanced tactical analysis reveals 72% contested possession efficiency in winning games vs 58% in losses. Key performance indicator to monitor. Expected to finish top 4 with 85% confidence based on current form and remaining fixture difficulty.
+                      <p className="text-sm text-amber-200">
+                        <strong>Neeko+ Exclusive:</strong> Team fantasy average of {selectedTeamAvg != null ? selectedTeamAvg.toFixed(1) : "—"} across {selectedTeamPlayers.length} tracked players. Monitor top performers for ceiling game potential in upcoming fixtures.
                       </p>
                     </div>
                   )}
                 </div>
-              </div>
+              )}
             </div>
           ) : (
             <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-12 text-center">
