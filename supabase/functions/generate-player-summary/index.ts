@@ -123,7 +123,7 @@ Deno.serve(async (req: Request) => {
               ai_summary: aiSummary,
               updated_at: new Date().toISOString(),
             },
-            { onConflict: "player,season,round_number" }
+            { onConflict: "player,season,round_number", ignoreDuplicates: false }
           );
 
         if (upsertError) {
