@@ -25,6 +25,17 @@ interface AITeamSummary {
   updated_at: string | null;
 }
 
+interface AITeamFeatures {
+  team: string;
+  season_avg: number | null;
+  last_5_avg: number | null;
+  predicted_score: number | null;
+  floor: number | null;
+  ceiling: number | null;
+  stdev_last_10: number | null;
+  confidence_bucket: string | null;
+}
+
 interface PlayerProjection {
   player_id: number;
   player_name: string;
@@ -62,6 +73,7 @@ export default function AFLAIInsightsPage() {
   const [teams, setTeams] = useState<string[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<string>("");
   const [teamSummary, setTeamSummary] = useState<AITeamSummary | null>(null);
+  const [teamFeatures, setTeamFeatures] = useState<AITeamFeatures | null>(null);
   const [teamSummaryError, setTeamSummaryError] = useState(false);
   const [loadingTeam, setLoadingTeam] = useState(false);
   const [showTeamTransparency, setShowTeamTransparency] = useState(false);
@@ -93,6 +105,7 @@ export default function AFLAIInsightsPage() {
   useEffect(() => {
     if (!selectedTeam) {
       setTeamSummary(null);
+      setTeamFeatures(null);
       setTeamSummaryError(false);
       return;
     }
@@ -130,6 +143,21 @@ export default function AFLAIInsightsPage() {
           if (result2025.error) throw result2025.error;
 
           setTeamSummary(result2025.data ? (result2025.data as AITeamSummary) : null);
+        }
+
+        const featuresResult = await supabase
+          .schema("afl")
+          .from("v_ai_team_features_2026_next_round")
+          .select("team, season_avg, last_5_avg, predicted_score, floor, ceiling, stdev_last_10, confidence_bucket")
+          .eq("team", selectedTeam)
+          .order("round_number", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!featuresResult.error && featuresResult.data) {
+          setTeamFeatures(featuresResult.data as AITeamFeatures);
+        } else {
+          setTeamFeatures(null);
         }
       } catch (err) {
         console.error("Failed to load team summary:", err);
@@ -815,81 +843,126 @@ export default function AFLAIInsightsPage() {
                 {/* Intelligence Header Row */}
                 {teamSummary && !loadingTeam && (() => {
                   const rnd = teamSummary.round_number ?? 0;
-                  const confLabel = rnd >= 15 ? "HIGH" : rnd >= 7 ? "MEDIUM" : "LOW";
+
+                  const confRaw = teamFeatures?.confidence_bucket ?? null;
+                  const confLabel = confRaw === "HIGH" || confRaw === "MEDIUM" || confRaw === "LOW"
+                    ? confRaw
+                    : rnd >= 15 ? "HIGH" : rnd >= 7 ? "MEDIUM" : "LOW";
                   const confBadgeClass = confLabel === "HIGH"
                     ? "bg-emerald-500/10 text-emerald-400 border border-emerald-400/30"
                     : confLabel === "MEDIUM"
                       ? "bg-yellow-500/10 text-yellow-400 border border-yellow-400/30"
                       : "bg-red-500/10 text-red-400 border border-red-400/30";
-                  const volLabel = rnd >= 15 ? "Low" : rnd >= 7 ? "Medium" : "High";
+
+                  const seasonAvg = teamFeatures?.season_avg ?? null;
+                  const recentAvg = teamFeatures?.last_5_avg ?? null;
+                  const projectedScore = teamFeatures?.predicted_score ?? null;
+                  const floorVal = teamFeatures?.floor ?? null;
+                  const ceilingVal = teamFeatures?.ceiling ?? null;
+                  const stdev = teamFeatures?.stdev_last_10 ?? null;
+
+                  const trendingUp = recentAvg !== null && seasonAvg !== null && recentAvg > seasonAvg;
+                  const volLabel = stdev !== null
+                    ? stdev < 15 ? "Low" : stdev < 30 ? "Medium" : "High"
+                    : rnd >= 15 ? "Low" : rnd >= 7 ? "Medium" : "High";
                   const volColor = volLabel === "Low" ? "text-emerald-400" : volLabel === "Medium" ? "text-yellow-400" : "text-red-400";
-                  const offStrength = Math.min(95, 40 + rnd * 3.5);
-                  const defStrength = Math.min(92, 35 + rnd * 3.8);
+
+                  const fmt = (v: number | null) => v !== null ? Math.round(v).toString() : "—";
+
+                  const offMax = 120;
+                  const defMax = 120;
+                  const offStrength = seasonAvg !== null ? Math.min(100, (seasonAvg / offMax) * 100) : null;
+                  const defStrength = teamFeatures?.stdev_last_10 !== null && teamFeatures?.stdev_last_10 !== undefined
+                    ? Math.max(5, Math.min(100, 100 - ((teamFeatures.stdev_last_10 / 40) * 100)))
+                    : null;
 
                   return (
                     <>
-                      <div className="grid grid-cols-5 gap-8 mt-6 items-start">
-                        {/* Projected Score */}
+                      <div className="grid grid-cols-6 gap-6 mt-6 items-start">
+                        {/* Season Average */}
                         <div className="flex flex-col gap-1">
-                          <div className="text-xs text-neutral-500">Projected Score</div>
-                          <div className="text-lg font-semibold text-[#F5C84C] transition-all duration-300">
-                            —
-                          </div>
+                          <div className="text-xs text-neutral-500">Season Average</div>
+                          <div className="text-lg font-semibold text-white">{fmt(seasonAvg)}</div>
                           <div className="text-xs text-neutral-600 mt-0.5">pts</div>
                         </div>
 
-                        {/* Confidence */}
+                        {/* Recent Average */}
                         <div className="flex flex-col gap-1">
-                          <div className="text-xs text-neutral-500">Confidence</div>
-                          <span className={`self-start px-2 py-1 rounded text-xs font-semibold mt-0.5 ${confBadgeClass}`}>
-                            {confLabel}
-                          </span>
-                          <div className="text-xs text-neutral-600 mt-0.5">data sample</div>
+                          <div className="text-xs text-neutral-500">Recent Average</div>
+                          <div className="text-lg font-semibold text-white">{fmt(recentAvg)}</div>
+                          {recentAvg !== null && seasonAvg !== null ? (
+                            <div className={`text-xs font-medium mt-0.5 ${trendingUp ? "text-emerald-400" : "text-red-400"}`}>
+                              {trendingUp ? "↑ Trending up" : "↓ Trending down"}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-neutral-600 mt-0.5">pts</div>
+                          )}
+                        </div>
+
+                        {/* Projected Score */}
+                        <div className="flex flex-col gap-1">
+                          <div className="text-xs text-neutral-500">Projected Score</div>
+                          <div className="text-lg font-semibold text-[#F5C84C]">{fmt(projectedScore)}</div>
+                          <div className="text-xs text-neutral-600 mt-0.5">pts</div>
                         </div>
 
                         {/* Floor */}
                         <div className="flex flex-col gap-1">
                           <div className="text-xs text-neutral-500">Floor</div>
-                          <div className="text-lg font-semibold text-white">—</div>
+                          <div className="text-lg font-semibold text-white">{fmt(floorVal)}</div>
                           <div className="text-xs text-neutral-600 mt-0.5">pts</div>
                         </div>
 
                         {/* Ceiling */}
                         <div className="flex flex-col gap-1">
                           <div className="text-xs text-neutral-500">Ceiling</div>
-                          <div className="text-lg font-semibold text-white">—</div>
+                          <div className="text-lg font-semibold text-white">{fmt(ceilingVal)}</div>
                           <div className="text-xs text-neutral-600 mt-0.5">pts</div>
                         </div>
 
                         {/* Volatility */}
                         <div className="flex flex-col gap-1">
                           <div className="text-xs text-neutral-500">Volatility</div>
-                          <div className="text-lg font-semibold text-white">—</div>
+                          <div className="text-lg font-semibold text-white">
+                            {stdev !== null ? stdev.toFixed(1) : "—"}
+                          </div>
                           <div className={`text-xs mt-0.5 ${volColor}`}>{volLabel}</div>
                         </div>
                       </div>
 
+                      {/* Confidence badge row */}
+                      <div className="flex items-center gap-3 mt-1">
+                        <div className="text-xs text-neutral-500">Confidence</div>
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${confBadgeClass}`}>
+                          {confLabel}
+                        </span>
+                      </div>
+
                       {/* Strength bars */}
-                      <div className="space-y-3 pt-2">
+                      <div className="space-y-3 pt-1">
                         <div className="flex items-center gap-4">
                           <div className="text-xs text-neutral-500 w-[120px] shrink-0">Offensive Strength</div>
                           <div className="w-[220px] h-[6px] bg-neutral-800 rounded-full overflow-hidden">
                             <div
                               className="h-full rounded-full bg-gradient-to-r from-[#F5C84C] to-yellow-400 transition-all duration-500"
-                              style={{ width: `${offStrength}%` }}
+                              style={{ width: offStrength !== null ? `${offStrength}%` : "0%" }}
                             />
                           </div>
-                          <div className="text-xs text-neutral-500">{Math.round(offStrength)}%</div>
+                          <div className="text-xs text-neutral-500">
+                            {offStrength !== null ? `${Math.round(offStrength)}%` : "—"}
+                          </div>
                         </div>
                         <div className="flex items-center gap-4">
                           <div className="text-xs text-neutral-500 w-[120px] shrink-0">Defensive Strength</div>
                           <div className="w-[220px] h-[6px] bg-neutral-800 rounded-full overflow-hidden">
                             <div
                               className="h-full rounded-full bg-gradient-to-r from-[#F5C84C] to-yellow-400 transition-all duration-500"
-                              style={{ width: `${defStrength}%` }}
+                              style={{ width: defStrength !== null ? `${defStrength}%` : "0%" }}
                             />
                           </div>
-                          <div className="text-xs text-neutral-500">{Math.round(defStrength)}%</div>
+                          <div className="text-xs text-neutral-500">
+                            {defStrength !== null ? `${Math.round(defStrength)}%` : "—"}
+                          </div>
                         </div>
                       </div>
 
@@ -927,12 +1000,32 @@ export default function AFLAIInsightsPage() {
                           </p>
                           <ul className="space-y-2 text-xs text-neutral-400">
                             {[
-                              { label: "Season Average", value: "—" },
-                              { label: "Recent Average", value: "—" },
-                              { label: "Volatility", value: teamSummary ? (teamSummary.round_number ?? 0) >= 15 ? "Low" : (teamSummary.round_number ?? 0) >= 7 ? "Medium" : "High" : "—" },
-                              { label: "Floor", value: "—" },
-                              { label: "Ceiling", value: "—" },
-                              { label: "Confidence", value: teamSummary ? (teamSummary.round_number ?? 0) >= 15 ? "HIGH" : (teamSummary.round_number ?? 0) >= 7 ? "MEDIUM" : "LOW" : "—" },
+                              {
+                                label: "Season Average",
+                                value: teamFeatures?.season_avg != null ? `${Math.round(teamFeatures.season_avg)} pts` : "—",
+                              },
+                              {
+                                label: "Recent Average",
+                                value: teamFeatures?.last_5_avg != null ? `${Math.round(teamFeatures.last_5_avg)} pts` : "—",
+                              },
+                              {
+                                label: "Volatility",
+                                value: teamFeatures?.stdev_last_10 != null
+                                  ? `${teamFeatures.stdev_last_10.toFixed(1)} (${teamFeatures.stdev_last_10 < 15 ? "Low" : teamFeatures.stdev_last_10 < 30 ? "Medium" : "High"})`
+                                  : "—",
+                              },
+                              {
+                                label: "Floor",
+                                value: teamFeatures?.floor != null ? `${Math.round(teamFeatures.floor)} pts` : "—",
+                              },
+                              {
+                                label: "Ceiling",
+                                value: teamFeatures?.ceiling != null ? `${Math.round(teamFeatures.ceiling)} pts` : "—",
+                              },
+                              {
+                                label: "Confidence",
+                                value: teamFeatures?.confidence_bucket ?? (teamSummary ? (teamSummary.round_number ?? 0) >= 15 ? "HIGH" : (teamSummary.round_number ?? 0) >= 7 ? "MEDIUM" : "LOW" : "—"),
+                              },
                               { label: "Opponent Difficulty", value: "—" },
                               { label: "Venue Adjustment", value: "—" },
                             ].map(({ label, value }) => (
