@@ -161,6 +161,13 @@ Deno.serve(async (req: Request) => {
           ? String(match.home_team)
           : String(match.away_team);
 
+        const predictionExplanation =
+          `Projected score calculated using: season average match scoring (${r1(match.home_points_for_avg)} vs ${r1(match.away_points_for_avg)} pts), ` +
+          `opponent defensive average (${r1(match.home_points_against_avg)} vs ${r1(match.away_points_against_avg)} pts conceded), ` +
+          `home ground advantage (+8 pts), recent form adjustment, and team strength index. ` +
+          `Win probability derived from logistic model on strength differential. ` +
+          `Confidence reflects margin size: larger projected margins produce higher confidence.`;
+
         const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -204,6 +211,7 @@ Deno.serve(async (req: Request) => {
               prediction:           predictedMargin,
               confidence:           confidence,
               ai_summary:           aiSummary,
+              prediction_explanation: predictionExplanation,
               updated_at:           new Date().toISOString(),
             },
             { onConflict: "match_id" }
