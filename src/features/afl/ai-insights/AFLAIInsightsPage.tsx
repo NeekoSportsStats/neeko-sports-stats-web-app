@@ -335,12 +335,20 @@ export default function AFLAIInsightsPage() {
         .from("ai_match_predictions")
         .select("match_id, home_team, away_team, round_number, season, ai_summary, updated_at")
         .eq("season", 2026)
-        .order("round_number", { ascending: false })
+        .order("match_id", { ascending: true })
         .limit(10);
       setMatchSummaries((data as AIMatchPrediction[]) || []);
     }
     loadMatchSummaries();
   }, []);
+
+  const cleanSummary = (summary: string | null): string => {
+    if (!summary) return "";
+    return summary
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+  };
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
@@ -1335,7 +1343,7 @@ export default function AFLAIInsightsPage() {
                     <h4 className="font-semibold text-white text-sm">AI Match Analysis</h4>
                     <div className="text-sm text-white/80 leading-relaxed">
                       {match.ai_summary ? (
-                        <p>{match.ai_summary}</p>
+                        <p>{cleanSummary(match.ai_summary)}</p>
                       ) : (
                         <p className="text-neutral-600 italic">No AI summary available for this match yet.</p>
                       )}
