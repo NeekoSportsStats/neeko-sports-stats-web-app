@@ -7,8 +7,35 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const BATCH_LIMIT = 10;
+const BATCH_LIMIT = 18;
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+
+function fmt(v: unknown): string {
+  if (v === null || v === undefined) return "N/A";
+  if (typeof v === "number") return isFinite(v) ? v.toFixed(1) : "N/A";
+  return String(v);
+}
+
+function buildUserPrompt(template: string, row: Record<string, unknown>): string {
+  const vars: Record<string, string> = {
+    "{{team}}": String(row.team ?? ""),
+    "{{season_avg}}": fmt(row.season_avg),
+    "{{last_5_avg}}": fmt(row.last_5_avg),
+    "{{last_10_avg}}": fmt(row.last_10_avg),
+    "{{weighted_form}}": fmt(row.weighted_form),
+    "{{predicted_score}}": fmt(row.predicted_score),
+    "{{floor}}": fmt(row.floor),
+    "{{ceiling}}": fmt(row.ceiling),
+    "{{stdev}}": fmt(row.stdev_last_10),
+    "{{confidence}}": String(row.confidence_bucket ?? "N/A"),
+  };
+
+  let prompt = template;
+  for (const [key, val] of Object.entries(vars)) {
+    prompt = prompt.replaceAll(key, val);
+  }
+  return prompt;
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -24,30 +51,42 @@ Deno.serve(async (req: Request) => {
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey) throw new Error("OPENAI_API_KEY not set");
 
-    const { data: viewRows, error: viewError } = await supabase
+    const { data: promptRow, error: promptError } = await supabase
       .schema("afl")
-      .from("v_ai_team_openai_inputs_2026_next_round")
-      .select("match_id, round_number, team, opponent, final_openai_input")
+      .from("ai_prompts")
+      .select("system_prompt, user_prompt_template")
+      .eq("prompt_key", "team_season_summary")
+      .eq("is_active", true)
+      .order("version", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (promptError) throw promptError;
+    if (!promptRow) throw new Error("No active prompt found for team_season_summary");
+
+    const systemPrompt = promptRow.system_prompt as string;
+    const userTemplate = promptRow.user_prompt_template as string;
+
+    const { data: teamRows, error: teamError } = await supabase
+      .schema("afl")
+      .from("v_ai_team_features_2026_next_round")
+      .select("team, round_number, season_avg, last_5_avg, last_10_avg, weighted_form, predicted_score, floor, ceiling, stdev_last_10, confidence_bucket")
       .limit(BATCH_LIMIT);
 
-    if (viewError) throw viewError;
-    if (!viewRows || viewRows.length === 0) {
+    if (teamError) throw teamError;
+    if (!teamRows || teamRows.length === 0) {
       return new Response(
         JSON.stringify({ message: "No team rows in view", processed: 0, skipped: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Build freshness lookup keyed by team__round_number
     const { data: existingRows } = await supabase
       .schema("afl")
       .from("ai_team_summaries")
       .select("team, round_number, updated_at")
       .eq("season", 2026)
-      .in(
-        "team",
-        viewRows.map((r) => r.team)
-      );
+      .in("team", teamRows.map((r) => r.team));
 
     const freshSet = new Set<string>();
     const now = Date.now();
@@ -65,8 +104,9 @@ Deno.serve(async (req: Request) => {
     let skipped = 0;
     let errors = 0;
 
-    for (const row of viewRows) {
-      const key = `${row.team}__${row.round_number}`;
+    for (const row of teamRows) {
+      const roundNum = row.round_number ?? 1;
+      const key = `${row.team}__${roundNum}`;
 
       if (freshSet.has(key)) {
         skipped++;
@@ -74,7 +114,7 @@ Deno.serve(async (req: Request) => {
       }
 
       try {
-        const input = row.final_openai_input as { system: string; user: string };
+        const userPrompt = buildUserPrompt(userTemplate, row as Record<string, unknown>);
 
         const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
@@ -85,9 +125,10 @@ Deno.serve(async (req: Request) => {
           body: JSON.stringify({
             model: "gpt-4o",
             temperature: 0.4,
+            max_tokens: 350,
             messages: [
-              { role: "system", content: input.system },
-              { role: "user", content: input.user },
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
             ],
           }),
         });
@@ -108,7 +149,7 @@ Deno.serve(async (req: Request) => {
             {
               team: row.team,
               season: 2026,
-              round_number: row.round_number,
+              round_number: roundNum,
               summary,
               updated_at: new Date().toISOString(),
             },
@@ -131,7 +172,7 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         message: "generate-team-ai-summaries complete",
-        total: viewRows.length,
+        total: teamRows.length,
         processed,
         skipped,
         errors,

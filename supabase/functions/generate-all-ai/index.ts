@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,7 +16,7 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const headers = {
+    const fnHeaders = {
       "Authorization": `Bearer ${serviceRoleKey}`,
       "Content-Type": "application/json",
     };
@@ -32,10 +33,9 @@ Deno.serve(async (req: Request) => {
       try {
         const res = await fetch(`${supabaseUrl}/functions/v1/${fn}`, {
           method: "POST",
-          headers,
+          headers: fnHeaders,
           body: JSON.stringify({}),
         });
-
         const body = await res.json();
         results[fn] = { status: res.status, body };
       } catch (err) {
@@ -43,8 +43,36 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    const { count: playerCount } = await supabase
+      .schema("afl")
+      .from("ai_player_summaries")
+      .select("*", { count: "exact", head: true })
+      .eq("season", 2026);
+
+    const { count: teamCount } = await supabase
+      .schema("afl")
+      .from("ai_team_summaries")
+      .select("*", { count: "exact", head: true })
+      .eq("season", 2026);
+
+    const { count: matchCount } = await supabase
+      .schema("afl")
+      .from("ai_match_predictions")
+      .select("*", { count: "exact", head: true })
+      .eq("season", 2026);
+
     return new Response(
-      JSON.stringify({ message: "generate-all-ai complete", results }),
+      JSON.stringify({
+        message: "generate-all-ai complete",
+        summary: {
+          player_summaries_written: playerCount ?? 0,
+          team_summaries_written: teamCount ?? 0,
+          match_predictions_written: matchCount ?? 0,
+        },
+        results,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
