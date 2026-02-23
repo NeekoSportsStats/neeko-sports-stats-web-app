@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Search, TrendingUp, Target, Users, ChevronRight, Sparkles, Crown, ArrowLeft, TrendingDown, Minus, Info } from "lucide-react";
+import { Search, TrendingUp, Target, Users, ChevronRight, Sparkles, Crown, ArrowLeft, Info } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 interface AIPlayerSummary {
@@ -62,7 +62,7 @@ export default function AFLAIInsightsPage() {
   const [teams, setTeams] = useState<string[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<string>("");
   const [teamSummary, setTeamSummary] = useState<AITeamSummary | null>(null);
-  const [teamPlayers, setTeamPlayers] = useState<PlayerProjection[]>([]);
+  const [teamSummaryError, setTeamSummaryError] = useState(false);
   const [loadingTeam, setLoadingTeam] = useState(false);
 
   // Match Predictions state
@@ -92,15 +92,16 @@ export default function AFLAIInsightsPage() {
   useEffect(() => {
     if (!selectedTeam) {
       setTeamSummary(null);
-      setTeamPlayers([]);
+      setTeamSummaryError(false);
       return;
     }
 
-    async function fetchTeamContext() {
+    async function fetchTeamSummary() {
       setLoadingTeam(true);
+      setTeamSummaryError(false);
 
-      const [summaryResult, playersResult] = await Promise.all([
-        supabase
+      try {
+        const result2026 = await supabase
           .schema("afl")
           .from("ai_team_summaries")
           .select("team, season, round_number, ai_summary, updated_at")
@@ -108,40 +109,37 @@ export default function AFLAIInsightsPage() {
           .eq("season", 2026)
           .order("round_number", { ascending: false })
           .limit(1)
-          .maybeSingle(),
-        supabase
-          .schema("afl")
-          .from("v_neeko_player_projection")
-          .select("player_id, player_name, team, final_projection, ceiling_estimate, floor_estimate, season_avg_current, avg_last_5, trend_3_vs_10, prob_100_plus, season_context")
-          .eq("team", selectedTeam)
-          .order("final_projection", { ascending: false }),
-      ]);
-
-      if (!summaryResult.error && summaryResult.data) {
-        setTeamSummary(summaryResult.data as AITeamSummary);
-      } else {
-        const fallback2025 = await supabase
-          .schema("afl")
-          .from("ai_team_summaries")
-          .select("team, season, round_number, ai_summary, updated_at")
-          .eq("team", selectedTeam)
-          .eq("season", 2025)
-          .order("round_number", { ascending: false })
-          .limit(1)
           .maybeSingle();
-        setTeamSummary((!fallback2025.error && fallback2025.data) ? fallback2025.data as AITeamSummary : null);
-      }
 
-      if (!playersResult.error && playersResult.data) {
-        setTeamPlayers(playersResult.data as PlayerProjection[]);
-      } else {
-        setTeamPlayers([]);
-      }
+        if (result2026.error) throw result2026.error;
 
-      setLoadingTeam(false);
+        if (result2026.data) {
+          setTeamSummary(result2026.data as AITeamSummary);
+        } else {
+          const result2025 = await supabase
+            .schema("afl")
+            .from("ai_team_summaries")
+            .select("team, season, round_number, ai_summary, updated_at")
+            .eq("team", selectedTeam)
+            .eq("season", 2025)
+            .order("round_number", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (result2025.error) throw result2025.error;
+
+          setTeamSummary(result2025.data ? (result2025.data as AITeamSummary) : null);
+        }
+      } catch (err) {
+        console.error("Failed to load team summary:", err);
+        setTeamSummaryError(true);
+        setTeamSummary(null);
+      } finally {
+        setLoadingTeam(false);
+      }
     }
 
-    fetchTeamContext();
+    fetchTeamSummary();
   }, [selectedTeam]);
 
   useEffect(() => {
@@ -237,42 +235,6 @@ export default function AFLAIInsightsPage() {
     }
   };
 
-  const handleTeamPlayerCardClick = async (proj: PlayerProjection) => {
-    const { data, error } = await supabase
-      .schema("afl")
-      .from("ai_player_summaries")
-      .select(`player_id, player, team, round_number, season_avg, consistency_score, ceiling_fantasy, floor_fantasy, ai_summary, trend_direction, updated_at`)
-      .eq("player_id", proj.player_id)
-      .eq("season", 2026)
-      .order("round_number", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const enriched: AIPlayerSummary = data
-      ? { ...(data as AIPlayerSummary), season_context: proj.season_context }
-      : {
-          player_id: proj.player_id,
-          player: proj.player_name,
-          team: proj.team,
-          round_number: 0,
-          season_avg: proj.season_avg_current,
-          consistency_score: null,
-          ceiling_fantasy: proj.ceiling_estimate,
-          floor_fantasy: proj.floor_estimate,
-          ai_summary: null,
-          trend_direction: null,
-          updated_at: null,
-          season_context: proj.season_context,
-        };
-
-    if (!error) {
-      setSelectedPlayer(enriched);
-      setTimeout(() => {
-        playerSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 50);
-    }
-  };
-
   useEffect(() => {
     if (selectedPlayer) {
       setCardVisible(false);
@@ -308,20 +270,6 @@ export default function AFLAIInsightsPage() {
   const calcPercentile = (avg: number | null) => {
     if (avg == null) return null;
     return Math.min(99, Math.round((avg / 140) * 100));
-  };
-
-  const getTrendIcon = (trend: number | null) => {
-    if (trend === null) return <Minus className="h-3.5 w-3.5 text-white/40" />;
-    if (trend > 3) return <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />;
-    if (trend < -3) return <TrendingDown className="h-3.5 w-3.5 text-red-400" />;
-    return <Minus className="h-3.5 w-3.5 text-white/40" />;
-  };
-
-  const getTrendLabel = (trend: number | null) => {
-    if (trend === null) return { label: "Stable", color: "text-white/40" };
-    if (trend > 3) return { label: "Trending Up", color: "text-emerald-400" };
-    if (trend < -3) return { label: "Trending Down", color: "text-red-400" };
-    return { label: "Stable", color: "text-white/40" };
   };
 
   const isPreseason = (ctx: string | null | undefined) =>
@@ -794,7 +742,7 @@ export default function AFLAIInsightsPage() {
             <div className="flex-1">
               <h2 className="text-2xl font-bold">Team Analysis</h2>
               <p className="text-sm text-white/60 mt-1">
-                Select any AFL team to explore season trends, tactical insights, and player projections
+                Select any AFL team to explore season trends, tactical insights, and projections
               </p>
             </div>
             {selectedTeam && (
@@ -828,121 +776,67 @@ export default function AFLAIInsightsPage() {
             ))}
           </div>
 
-          {/* Team Summary + Player Grid */}
+          {/* Team AI Summary Card */}
           {selectedTeam && (
-            <div className="space-y-6">
-              {/* Team Summary Card */}
-              <div className="rounded-xl border border-yellow-400/40 bg-gradient-to-br from-yellow-500/10 to-amber-500/10 backdrop-blur-xl p-8 space-y-4">
+            <div
+              className="relative rounded-xl border border-yellow-400/30 transition-all duration-300 hover:shadow-[0_0_30px_rgba(245,200,76,0.15)]"
+              style={{
+                background: "radial-gradient(circle at 50% 25%, rgba(245,200,76,0.08), transparent 70%), linear-gradient(135deg, rgba(245,200,76,0.07) 0%, rgba(245,150,30,0.05) 100%)",
+                backdropFilter: "blur(20px)",
+              }}
+            >
+              <div
+                className="absolute top-0 left-0 right-0 h-[2px] rounded-t-xl"
+                style={{ background: "linear-gradient(90deg, transparent, #F5C84C, transparent)" }}
+              />
+              <div className="pt-8 px-8 pb-6 space-y-5">
                 <div className="flex items-start justify-between">
                   <div>
-                    <div className="text-xs font-semibold text-yellow-400/70 uppercase tracking-widest mb-2">
+                    <div className="text-xs font-semibold text-[#F5C84C]/70 uppercase tracking-widest mb-2">
                       Team AI Summary
                     </div>
                     <h3 className="text-2xl font-bold text-white">{selectedTeam}</h3>
+                    {teamSummary?.updated_at && (
+                      <div className="text-xs text-neutral-500 mt-1">
+                        Updated {new Date(teamSummary.updated_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
+                        {" · "}2026 Season
+                      </div>
+                    )}
                   </div>
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-yellow-400/30 bg-yellow-400/10 text-yellow-300 text-xs font-semibold">
                     <Sparkles className="h-3 w-3" />
                     AI Generated
                   </div>
                 </div>
-                <div className="pt-4 border-t border-yellow-400/20 text-sm text-white/80 leading-relaxed">
+
+                <div className="pt-4 border-t border-[#F5C84C]/15 text-sm text-white/80 leading-relaxed space-y-3">
                   {loadingTeam ? (
-                    <p className="text-yellow-400 animate-pulse">Loading team intelligence...</p>
+                    <p className="text-yellow-400/70 animate-pulse">Loading team intelligence...</p>
+                  ) : teamSummaryError ? (
+                    <p className="text-neutral-500 italic">Unable to load team summary right now.</p>
                   ) : teamSummary?.ai_summary ? (
                     <>
                       <p>{teamSummary.ai_summary}</p>
                       {teamSummary.season === 2025 && (
-                        <p className="mt-2 text-xs text-yellow-400/50 italic">Based on 2025 season data — will update after Opening Round.</p>
+                        <p className="text-xs text-yellow-400/50 italic">Showing 2025 baseline summary (pre-season).</p>
                       )}
                     </>
                   ) : (
-                    <p className="text-white/40 italic">AI team summary will be generated after Opening Round.</p>
+                    <p className="text-neutral-500 italic">AI team summary will be generated after Opening Round.</p>
                   )}
                 </div>
+
+                <div className="flex justify-end pt-1">
+                  <span className="text-xs text-neutral-700">Powered by Neeko AI</span>
+                </div>
               </div>
-
-              {/* Player Grid */}
-              {loadingTeam ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="h-36 rounded-xl border border-white/10 bg-white/5 animate-pulse" />
-                  ))}
-                </div>
-              ) : teamPlayers.length > 0 ? (
-                <>
-                  <div className="flex items-center justify-between">
-                    <p className="text-lg font-semibold text-yellow-400">
-                      {selectedTeam} — Opening Round Player Projections
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-yellow-400/70" />
-                      <span className="text-sm text-white/50 font-medium">
-                        {teamPlayers.length} players
-                      </span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {teamPlayers.map((proj) => {
-                      const trendInfo = getTrendLabel(proj.trend_3_vs_10);
-                      const isSelected = selectedPlayer?.player_id === proj.player_id;
-                      return (
-                        <button
-                          key={proj.player_id}
-                          onClick={() => handleTeamPlayerCardClick(proj)}
-                          className={`text-left p-5 rounded-xl border transition-all group ${
-                            isSelected
-                              ? "bg-yellow-400/20 border-yellow-400/60 shadow-[0_0_20px_rgba(250,204,21,0.15)]"
-                              : "bg-white/5 border-white/10 hover:bg-yellow-400/10 hover:border-yellow-400/40"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-3">
-                            <div className="font-semibold text-white text-sm leading-tight">
-                              {proj.player_name}
-                            </div>
-                            {getTrendIcon(proj.trend_3_vs_10)}
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-white/40">Projection</span>
-                              <span className="text-sm font-bold text-yellow-400">
-                                {proj.final_projection != null ? Number(proj.final_projection).toFixed(0) : "—"}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-white/40">Ceiling</span>
-                              <span className="text-xs font-semibold text-white/70">
-                                {proj.ceiling_estimate != null ? Number(proj.ceiling_estimate).toFixed(0) : "—"}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-white/40">Avg L5</span>
-                              <span className="text-xs font-semibold text-white/70">
-                                {proj.avg_last_5 != null ? Number(proj.avg_last_5).toFixed(1) : "—"}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className={`mt-3 text-xs font-medium ${trendInfo.color}`}>
-                            {trendInfo.label}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              ) : (
-                <div className="rounded-xl border border-white/10 bg-black/40 p-8 text-center">
-                  <p className="text-white/40 text-sm">No projection data available for this team.</p>
-                </div>
-              )}
             </div>
           )}
 
           {!selectedTeam && (
             <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-12 text-center">
               <Users className="h-12 w-12 text-white/20 mx-auto mb-4" />
-              <p className="text-white/50">Select a team above to view their AI summary and player projections</p>
+              <p className="text-white/50">Select a team above to view their AI summary</p>
             </div>
           )}
         </div>
