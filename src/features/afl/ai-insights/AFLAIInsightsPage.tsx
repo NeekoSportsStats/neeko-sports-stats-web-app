@@ -21,7 +21,7 @@ interface AITeamSummary {
   team: string;
   season: number;
   round_number: number;
-  ai_summary: string | null;
+  summary: string | null;
   updated_at: string | null;
 }
 
@@ -104,7 +104,7 @@ export default function AFLAIInsightsPage() {
         const result2026 = await supabase
           .schema("afl")
           .from("ai_team_summaries")
-          .select("team, season, round_number, ai_summary, updated_at")
+          .select("team, season, round_number, summary, updated_at")
           .eq("team", selectedTeam)
           .eq("season", 2026)
           .order("round_number", { ascending: false })
@@ -814,9 +814,9 @@ export default function AFLAIInsightsPage() {
                     <p className="text-yellow-400/70 animate-pulse">Loading team intelligence...</p>
                   ) : teamSummaryError ? (
                     <p className="text-neutral-500 italic">Unable to load team summary right now.</p>
-                  ) : teamSummary?.ai_summary ? (
+                  ) : teamSummary?.summary ? (
                     <>
-                      <p>{teamSummary.ai_summary}</p>
+                      <p>{teamSummary.summary}</p>
                       {teamSummary.season === 2025 && (
                         <p className="text-xs text-yellow-400/50 italic">Showing 2025 baseline summary (pre-season).</p>
                       )}
