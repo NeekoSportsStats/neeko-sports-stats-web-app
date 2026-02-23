@@ -9,75 +9,10 @@ const corsHeaders = {
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
-function fmt(v: unknown): string {
-  if (v === null || v === undefined) return "N/A";
-  if (typeof v === "number") return isFinite(v) ? v.toFixed(1) : "N/A";
-  return String(v);
-}
-
 function toNum(v: unknown): number | null {
   if (v === null || v === undefined) return null;
   const n = Number(v);
   return isFinite(n) ? n : null;
-}
-
-function extractNumericPredictions(row: Record<string, unknown>): {
-  predicted_home_score: number | null;
-  predicted_away_score: number | null;
-  predicted_margin: number | null;
-  predicted_total: number | null;
-  confidence: string | null;
-} {
-  const outerInput = (row.final_openai_input as Record<string, unknown> ?? {});
-  const payload = (outerInput.payload as Record<string, unknown> ?? {});
-  const predictions = (payload.predictions as Record<string, unknown> ?? {});
-  const homeBlock = (payload.home_team as Record<string, unknown> ?? {});
-
-  return {
-    predicted_home_score: toNum(predictions.home_score),
-    predicted_away_score: toNum(predictions.away_score),
-    predicted_margin:     toNum(predictions.margin),
-    predicted_total:      toNum(predictions.total),
-    confidence:           homeBlock.confidence != null ? String(homeBlock.confidence) : null,
-  };
-}
-
-function buildUserPrompt(template: string, row: Record<string, unknown>): string {
-  const outerInput = (row.final_openai_input as Record<string, unknown> ?? {});
-  const payload = (outerInput.payload as Record<string, unknown> ?? {});
-  const homeBlock = (payload.home_team as Record<string, unknown> ?? {});
-  const awayBlock = (payload.away_team as Record<string, unknown> ?? {});
-  const context = (payload.match as Record<string, unknown> ?? {});
-  const predictions = (payload.predictions as Record<string, unknown> ?? {});
-
-  const vars: Record<string, string> = {
-    "{{home_team}}": String(row.home_team ?? ""),
-    "{{away_team}}": String(row.away_team ?? ""),
-    "{{venue}}": String(context.venue ?? predictions.venue ?? "N/A"),
-    "{{home_predicted_score}}": fmt(homeBlock.predicted_score ?? homeBlock.predicted_fantasy_score),
-    "{{home_season_avg}}": fmt(homeBlock.season_avg),
-    "{{home_last_5_avg}}": fmt(homeBlock.last_5_avg),
-    "{{home_floor}}": fmt(homeBlock.floor),
-    "{{home_ceiling}}": fmt(homeBlock.ceiling),
-    "{{home_stdev}}": fmt(homeBlock.stdev ?? homeBlock.volatility),
-    "{{home_confidence}}": String(homeBlock.confidence ?? homeBlock.confidence_bucket ?? "N/A"),
-    "{{home_days_rest}}": fmt(homeBlock.days_rest),
-    "{{home_ground_advantage}}": homeBlock.home_ground_advantage ? "Yes" : "No",
-    "{{away_predicted_score}}": fmt(awayBlock.predicted_score ?? awayBlock.predicted_fantasy_score),
-    "{{away_season_avg}}": fmt(awayBlock.season_avg),
-    "{{away_last_5_avg}}": fmt(awayBlock.last_5_avg),
-    "{{away_floor}}": fmt(awayBlock.floor),
-    "{{away_ceiling}}": fmt(awayBlock.ceiling),
-    "{{away_stdev}}": fmt(awayBlock.stdev ?? awayBlock.volatility),
-    "{{away_confidence}}": String(awayBlock.confidence ?? awayBlock.confidence_bucket ?? "N/A"),
-    "{{away_days_rest}}": fmt(awayBlock.days_rest),
-  };
-
-  let prompt = template;
-  for (const [key, val] of Object.entries(vars)) {
-    prompt = prompt.replaceAll(key, val);
-  }
-  return prompt;
 }
 
 Deno.serve(async (req: Request) => {
@@ -97,22 +32,6 @@ Deno.serve(async (req: Request) => {
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch { /* no body */ }
     const forceRegenerate = body.force === true;
-
-    const { data: promptRow, error: promptError } = await supabase
-      .schema("afl")
-      .from("ai_prompts")
-      .select("system_prompt, user_prompt_template")
-      .eq("prompt_key", "match_prediction")
-      .eq("is_active", true)
-      .order("version", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (promptError) throw promptError;
-    if (!promptRow) throw new Error("No active prompt found for match_prediction");
-
-    const systemPrompt = promptRow.system_prompt as string;
-    const userTemplate = promptRow.user_prompt_template as string;
 
     const { data: viewRows, error: viewError } = await supabase
       .schema("afl")
@@ -135,14 +54,15 @@ Deno.serve(async (req: Request) => {
       const { data: existingRows } = await supabase
         .schema("afl")
         .from("ai_match_predictions")
-        .select("match_id, updated_at, predicted_home_score")
+        .select("match_id, updated_at, ai_summary")
         .in("match_id", matchIds);
 
       const now = Date.now();
       for (const row of existingRows ?? []) {
-        if (row.updated_at && row.predicted_home_score != null) {
-          const age = now - new Date(row.updated_at).getTime();
-          if (age < THREE_DAYS_MS) {
+        if (row.updated_at && row.ai_summary) {
+          const updatedTime = new Date(row.updated_at).getTime();
+          const age = now - updatedTime;
+          if (age < THREE_DAYS_MS && updatedTime > new Date("2001-01-01").getTime()) {
             freshSet.add(row.match_id);
           }
         }
@@ -160,8 +80,20 @@ Deno.serve(async (req: Request) => {
       }
 
       try {
-        const numerics = extractNumericPredictions(row as Record<string, unknown>);
-        const userPrompt = buildUserPrompt(userTemplate, row as Record<string, unknown>);
+        const input = row.final_openai_input as Record<string, unknown>;
+        const systemPrompt = String(input.system ?? "");
+        const userPrompt = String(input.user ?? "");
+
+        if (!systemPrompt || !userPrompt) {
+          console.error(`Missing prompt for match ${row.match_id}`);
+          errors++;
+          continue;
+        }
+
+        const payload = (input.payload ?? {}) as Record<string, unknown>;
+        const predictions = (payload.predictions ?? {}) as Record<string, unknown>;
+        const homeBlock = (payload.home_team ?? {}) as Record<string, unknown>;
+        const awayBlock = (payload.away_team ?? {}) as Record<string, unknown>;
 
         const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
@@ -189,6 +121,12 @@ Deno.serve(async (req: Request) => {
         const openaiData = await openaiRes.json();
         const aiSummary = openaiData.choices?.[0]?.message?.content ?? "";
 
+        const predictedHomeScore = toNum(predictions.home_score ?? homeBlock.predicted_score);
+        const predictedAwayScore = toNum(predictions.away_score ?? awayBlock.predicted_score);
+        const predictedMargin    = toNum(predictions.margin);
+        const predictedTotal     = toNum(predictions.total);
+        const confidence         = homeBlock.confidence != null ? String(homeBlock.confidence) : null;
+
         const { error: upsertError } = await supabase
           .schema("afl")
           .from("ai_match_predictions")
@@ -199,12 +137,12 @@ Deno.serve(async (req: Request) => {
               away_team:            row.away_team,
               round_number:         row.round_number,
               season:               row.season,
-              predicted_home_score: numerics.predicted_home_score,
-              predicted_away_score: numerics.predicted_away_score,
-              predicted_margin:     numerics.predicted_margin,
-              predicted_total:      numerics.predicted_total,
-              prediction:           numerics.predicted_margin,
-              confidence:           numerics.confidence,
+              predicted_home_score: predictedHomeScore,
+              predicted_away_score: predictedAwayScore,
+              predicted_margin:     predictedMargin,
+              predicted_total:      predictedTotal,
+              prediction:           predictedMargin,
+              confidence:           confidence,
               ai_summary:           aiSummary,
               updated_at:           new Date().toISOString(),
             },
