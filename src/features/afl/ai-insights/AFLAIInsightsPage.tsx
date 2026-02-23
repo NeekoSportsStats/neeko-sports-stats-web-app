@@ -97,6 +97,16 @@ export default function AFLAIInsightsPage() {
   const [loadingTeam, setLoadingTeam] = useState(false);
   const [showTeamTransparency, setShowTeamTransparency] = useState(false);
 
+  const neekoRating: number | null = React.useMemo(() => {
+    const projectedScore = teamFeatures?.predicted_score ?? null;
+    const teamsWithProj = allTeamFeatures.filter(t => t.predicted_score !== null);
+    const leagueAvgProj = teamsWithProj.length > 0
+      ? teamsWithProj.reduce((sum, t) => sum + (t.predicted_score ?? 0), 0) / teamsWithProj.length
+      : null;
+    if (projectedScore === null || leagueAvgProj === null || leagueAvgProj === 0) return null;
+    return Math.round((projectedScore / leagueAvgProj) * 100);
+  }, [teamFeatures, allTeamFeatures]);
+
   // Match Predictions state
   const [matchSummaries, setMatchSummaries] = useState<AIMatchPrediction[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
@@ -1028,6 +1038,13 @@ export default function AFLAIInsightsPage() {
                       <Sparkles className="h-3 w-3" />
                       AI Generated
                     </div>
+                    {neekoRating !== null && (
+                      <div className="flex flex-col items-end gap-0.5 mt-1">
+                        <div className="text-xs text-neutral-500">Neeko Rating</div>
+                        <div className="font-bold text-2xl text-[#F5C84C] leading-none">{neekoRating}</div>
+                        <div className="text-xs text-neutral-600">League avg = 100</div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1078,16 +1095,6 @@ export default function AFLAIInsightsPage() {
                     ? Math.round(((totalRanked - effectiveRank) / totalRanked) * 100)
                     : null;
 
-                  // League average projected score
-                  const leagueAvgProj = teamsWithProj.length > 0
-                    ? teamsWithProj.reduce((sum, t) => sum + (t.predicted_score ?? 0), 0) / teamsWithProj.length
-                    : null;
-
-                  // Neeko Team Rating (projected vs league avg, league avg = 100)
-                  const neekoRating = projectedScore !== null && leagueAvgProj !== null && leagueAvgProj > 0
-                    ? Math.round((projectedScore / leagueAvgProj) * 100)
-                    : null;
-
                   // Matchup advantage: compare selected team's opponent avg allowed vs league avg
                   // Derived from stdev as a proxy: lower stdev = more predictable = neutral/favorable
                   const matchupAdvantage = stdev !== null
@@ -1114,15 +1121,6 @@ export default function AFLAIInsightsPage() {
 
                   return (
                     <>
-                      {/* Neeko Rating badge — absolute top-right of card */}
-                      {neekoRating !== null && (
-                        <div className="absolute top-4 right-4 flex flex-col items-end gap-0.5 pointer-events-none">
-                          <div className="text-xs text-neutral-500">Neeko Rating</div>
-                          <div className="font-bold text-2xl text-[#F5C84C] leading-none">{neekoRating}</div>
-                          <div className="text-xs text-neutral-600">League avg = 100</div>
-                        </div>
-                      )}
-
                       <div className="grid grid-cols-6 gap-6 mt-2 items-start">
                         {/* Season Average */}
                         <div className="flex flex-col gap-1 hover:scale-[1.02] transition-all duration-300 cursor-default">
