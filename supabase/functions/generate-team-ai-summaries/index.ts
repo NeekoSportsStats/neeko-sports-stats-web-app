@@ -7,7 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const BATCH_LIMIT = 18;
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
 Deno.serve(async (req: Request) => {
@@ -24,11 +23,15 @@ Deno.serve(async (req: Request) => {
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey) throw new Error("OPENAI_API_KEY not set");
 
+    let body: Record<string, unknown> = {};
+    try { body = await req.json(); } catch { /* no body */ }
+    const forceRegenerate = body.force === true;
+
     const { data: teamRows, error: teamError } = await supabase
       .schema("afl")
       .from("v_ai_team_openai_inputs_2026_next_round")
-      .select("team, season, round_number, final_openai_input")
-      .limit(BATCH_LIMIT);
+      .select("match_id, round_number, team, opponent, final_openai_input")
+      .order("team", { ascending: true });
 
     if (teamError) throw teamError;
     if (!teamRows || teamRows.length === 0) {
@@ -38,21 +41,23 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: existingRows } = await supabase
-      .schema("afl")
-      .from("ai_team_summaries")
-      .select("team, round_number, updated_at")
-      .eq("season", 2026)
-      .in("team", teamRows.map((r) => r.team));
+    let freshSet = new Set<string>();
 
-    const freshSet = new Set<string>();
-    const now = Date.now();
+    if (!forceRegenerate) {
+      const { data: existingRows } = await supabase
+        .schema("afl")
+        .from("ai_team_summaries")
+        .select("team, round_number, updated_at")
+        .eq("season", 2026)
+        .in("team", teamRows.map((r) => r.team));
 
-    for (const row of existingRows ?? []) {
-      if (row.updated_at) {
-        const age = now - new Date(row.updated_at).getTime();
-        if (age < SIX_HOURS_MS) {
-          freshSet.add(`${row.team}__${row.round_number}`);
+      const now = Date.now();
+      for (const row of existingRows ?? []) {
+        if (row.updated_at) {
+          const age = now - new Date(row.updated_at).getTime();
+          if (age < SIX_HOURS_MS) {
+            freshSet.add(`${row.team}__${row.round_number}`);
+          }
         }
       }
     }

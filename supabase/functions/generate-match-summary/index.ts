@@ -7,7 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const BATCH_LIMIT = 10;
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
 function fmt(v: unknown): string {
@@ -95,6 +94,10 @@ Deno.serve(async (req: Request) => {
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey) throw new Error("OPENAI_API_KEY not set");
 
+    let body: Record<string, unknown> = {};
+    try { body = await req.json(); } catch { /* no body */ }
+    const forceRegenerate = body.force === true;
+
     const { data: promptRow, error: promptError } = await supabase
       .schema("afl")
       .from("ai_prompts")
@@ -115,7 +118,7 @@ Deno.serve(async (req: Request) => {
       .schema("afl")
       .from("v_ai_match_openai_inputs_2026_next_round")
       .select("season, round_number, match_id, home_team, away_team, final_openai_input")
-      .limit(BATCH_LIMIT);
+      .order("match_id", { ascending: true });
 
     if (viewError) throw viewError;
     if (!viewRows || viewRows.length === 0) {
@@ -125,22 +128,23 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const matchIds = viewRows.map((r) => r.match_id);
+    let freshSet = new Set<number>();
 
-    const { data: existingRows } = await supabase
-      .schema("afl")
-      .from("ai_match_predictions")
-      .select("match_id, updated_at, predicted_home_score")
-      .in("match_id", matchIds);
+    if (!forceRegenerate) {
+      const matchIds = viewRows.map((r) => r.match_id);
+      const { data: existingRows } = await supabase
+        .schema("afl")
+        .from("ai_match_predictions")
+        .select("match_id, updated_at, predicted_home_score")
+        .in("match_id", matchIds);
 
-    const freshSet = new Set<number>();
-    const now = Date.now();
-
-    for (const row of existingRows ?? []) {
-      if (row.updated_at && row.predicted_home_score != null) {
-        const age = now - new Date(row.updated_at).getTime();
-        if (age < THREE_DAYS_MS) {
-          freshSet.add(row.match_id);
+      const now = Date.now();
+      for (const row of existingRows ?? []) {
+        if (row.updated_at && row.predicted_home_score != null) {
+          const age = now - new Date(row.updated_at).getTime();
+          if (age < THREE_DAYS_MS) {
+            freshSet.add(row.match_id);
+          }
         }
       }
     }
