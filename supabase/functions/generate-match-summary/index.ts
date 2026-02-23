@@ -16,6 +16,33 @@ function fmt(v: unknown): string {
   return String(v);
 }
 
+function toNum(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  return isFinite(n) ? n : null;
+}
+
+function extractNumericPredictions(row: Record<string, unknown>): {
+  predicted_home_score: number | null;
+  predicted_away_score: number | null;
+  predicted_margin: number | null;
+  predicted_total: number | null;
+  confidence: string | null;
+} {
+  const outerInput = (row.final_openai_input as Record<string, unknown> ?? {});
+  const payload = (outerInput.payload as Record<string, unknown> ?? {});
+  const predictions = (payload.predictions as Record<string, unknown> ?? {});
+  const homeBlock = (payload.home_team as Record<string, unknown> ?? {});
+
+  return {
+    predicted_home_score: toNum(predictions.home_score),
+    predicted_away_score: toNum(predictions.away_score),
+    predicted_margin:     toNum(predictions.margin),
+    predicted_total:      toNum(predictions.total),
+    confidence:           homeBlock.confidence != null ? String(homeBlock.confidence) : null,
+  };
+}
+
 function buildUserPrompt(template: string, row: Record<string, unknown>): string {
   const outerInput = (row.final_openai_input as Record<string, unknown> ?? {});
   const payload = (outerInput.payload as Record<string, unknown> ?? {});
@@ -103,14 +130,14 @@ Deno.serve(async (req: Request) => {
     const { data: existingRows } = await supabase
       .schema("afl")
       .from("ai_match_predictions")
-      .select("match_id, updated_at")
+      .select("match_id, updated_at, predicted_home_score")
       .in("match_id", matchIds);
 
     const freshSet = new Set<number>();
     const now = Date.now();
 
     for (const row of existingRows ?? []) {
-      if (row.updated_at) {
+      if (row.updated_at && row.predicted_home_score != null) {
         const age = now - new Date(row.updated_at).getTime();
         if (age < THREE_DAYS_MS) {
           freshSet.add(row.match_id);
@@ -129,6 +156,7 @@ Deno.serve(async (req: Request) => {
       }
 
       try {
+        const numerics = extractNumericPredictions(row as Record<string, unknown>);
         const userPrompt = buildUserPrompt(userTemplate, row as Record<string, unknown>);
 
         const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -162,13 +190,19 @@ Deno.serve(async (req: Request) => {
           .from("ai_match_predictions")
           .upsert(
             {
-              match_id: row.match_id,
-              home_team: row.home_team,
-              away_team: row.away_team,
-              round_number: row.round_number,
-              season: row.season,
-              ai_summary: aiSummary,
-              updated_at: new Date().toISOString(),
+              match_id:             row.match_id,
+              home_team:            row.home_team,
+              away_team:            row.away_team,
+              round_number:         row.round_number,
+              season:               row.season,
+              predicted_home_score: numerics.predicted_home_score,
+              predicted_away_score: numerics.predicted_away_score,
+              predicted_margin:     numerics.predicted_margin,
+              predicted_total:      numerics.predicted_total,
+              prediction:           numerics.predicted_margin,
+              confidence:           numerics.confidence,
+              ai_summary:           aiSummary,
+              updated_at:           new Date().toISOString(),
             },
             { onConflict: "match_id" }
           );
