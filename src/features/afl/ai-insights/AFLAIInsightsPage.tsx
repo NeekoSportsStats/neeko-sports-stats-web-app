@@ -30,6 +30,10 @@ interface AIMatchPrediction {
   away_team: string;
   round_number: number;
   season: number;
+  predicted_home_score: number | null;
+  predicted_away_score: number | null;
+  predicted_margin: number | null;
+  confidence: string | null;
   ai_summary: string | null;
   updated_at: string | null;
 }
@@ -434,7 +438,7 @@ export default function AFLAIInsightsPage() {
       const { data } = await supabase
         .schema("afl")
         .from("ai_match_predictions")
-        .select("match_id, home_team, away_team, round_number, season, ai_summary, updated_at")
+        .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, ai_summary, updated_at")
         .eq("season", 2026)
         .order("match_id", { ascending: true })
         .limit(10);
@@ -1440,28 +1444,30 @@ export default function AFLAIInsightsPage() {
 
             const summary = cleanSummary(match.ai_summary);
 
-            const homeScore = 1543 + (match.match_id % 40) - 20;
-            const awayScore = 1520 + (match.match_id % 35) - 17;
-            const total = homeScore + awayScore;
-            const homeWinPct = Math.round((homeScore / total) * 100);
+            const homeScore = Math.round(match.predicted_home_score ?? 0);
+            const awayScore = Math.round(match.predicted_away_score ?? 0);
+            const combinedScore = homeScore + awayScore;
+            const homeWinPct = combinedScore > 0
+              ? Math.round((1.0 / (1.0 + Math.exp(-(homeScore - awayScore) / 15.0))) * 100)
+              : 50;
             const awayWinPct = 100 - homeWinPct;
-            const homeBarPct = Math.round((homeScore / Math.max(homeScore, awayScore)) * 100);
-            const awayBarPct = Math.round((awayScore / Math.max(homeScore, awayScore)) * 100);
+            const homeBarPct = Math.round((homeScore / Math.max(homeScore, awayScore, 1)) * 100);
+            const awayBarPct = Math.round((awayScore / Math.max(homeScore, awayScore, 1)) * 100);
 
             const scoreDiff = Math.abs(homeScore - awayScore);
-            const volatility = scoreDiff < 20 ? "Low" : scoreDiff < 50 ? "Medium" : "High";
+            const volatility = scoreDiff <= 6 ? "Low" : scoreDiff <= 18 ? "Medium" : "High";
             const volatilityColor = volatility === "Low" ? "text-emerald-400" : volatility === "Medium" ? "text-yellow-400" : "text-red-400";
 
-            const matchRating = homeScore + awayScore > 3080 ? "Elite" : homeScore + awayScore > 3040 ? "High Quality" : "Competitive";
+            const matchRating = combinedScore >= 200 ? "Elite" : combinedScore >= 170 ? "High Quality" : "Competitive";
             const ratingColor = matchRating === "Elite" ? "text-[#F5C84C]" : matchRating === "High Quality" ? "text-emerald-400" : "text-neutral-300";
 
-            const confidence = 70 + (match.match_id % 25);
+            const confidence = match.confidence ? parseInt(match.confidence, 10) : 60;
 
             const tooltips: Record<string, string> = {
-              projectedScore: "Neeko projected fantasy score based on team scoring trends, opposition difficulty and form.",
-              winProbability: "Likelihood of each team winning based on projected scoring and matchup strength.",
-              matchVolatility: "Measures unpredictability. Higher volatility means wider scoring range.",
-              matchRating: "Overall match quality based on projected scoring competitiveness and performance level.",
+              projectedScore: "Projected match score derived from each team's average points scored versus the opponent's average points conceded, adjusted for recent form and home advantage.",
+              winProbability: "Likelihood of each team winning based on projected scoring differential and matchup strength.",
+              matchVolatility: "Measures unpredictability. Higher volatility means a closer, harder-to-call contest.",
+              matchRating: "Overall match quality based on projected combined scoring and competitive balance.",
             };
 
             const FeatureLabel = ({ id, label }: { id: string; label: string }) => (
@@ -1595,14 +1601,14 @@ export default function AFLAIInsightsPage() {
                     <div className="flex flex-col">
                       <FeatureLabel id="matchVolatility" label="Match Volatility" />
                       <div className={`text-lg font-bold ${volatilityColor}`}>{volatility}</div>
-                      <div className="text-xs text-neutral-600 mt-1">Score diff: {scoreDiff} pts</div>
+                      <div className="text-xs text-neutral-600 mt-1">Margin: {scoreDiff} pts</div>
                     </div>
 
                     {/* Match Rating */}
                     <div className="flex flex-col">
                       <FeatureLabel id="matchRating" label="Match Rating" />
                       <div className={`text-lg font-bold ${ratingColor}`}>{matchRating}</div>
-                      <div className="text-xs text-neutral-600 mt-1">Combined: {homeScore + awayScore}</div>
+                      <div className="text-xs text-neutral-600 mt-1">Combined: {combinedScore} pts</div>
                     </div>
 
                   </div>
