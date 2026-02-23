@@ -536,7 +536,7 @@ export default function AFLAIInsightsPage() {
               <div
                 className="relative rounded-xl border border-yellow-400/30 transition-all duration-300 hover:shadow-[0_0_30px_rgba(245,200,76,0.15)]"
                 style={{
-                  background: "radial-gradient(circle at top, rgba(245,200,76,0.08), transparent 70%), linear-gradient(135deg, rgba(245,200,76,0.07) 0%, rgba(245,150,30,0.05) 100%)",
+                  background: "radial-gradient(circle at 50% 25%, rgba(245,200,76,0.08), transparent 70%), linear-gradient(135deg, rgba(245,200,76,0.07) 0%, rgba(245,150,30,0.05) 100%)",
                   backdropFilter: "blur(20px)",
                   opacity: cardVisible ? 1 : 0,
                   transform: cardVisible ? "translateY(0)" : "translateY(10px)",
@@ -557,22 +557,22 @@ export default function AFLAIInsightsPage() {
                         Player Analysis
                       </div>
                       <h3 className="text-3xl font-bold text-white">{selectedPlayer.player}</h3>
-                      <div className="text-sm text-neutral-400 mt-1">{selectedPlayer.team}</div>
+                      <div className="text-sm text-neutral-300 mt-1">{selectedPlayer.team}</div>
                     </div>
                     <button
                       onClick={() => setSelectedPlayer(null)}
-                      className="text-xs text-neutral-500 hover:text-white transition-colors mt-1"
+                      className="text-xs text-neutral-500 hover:text-white transition-colors mt-[6px]"
                     >
                       Clear
                     </button>
                   </div>
 
                   {/* Stats Grid */}
-                  <div className="relative flex items-start justify-between">
+                  <div className="relative flex items-start justify-between mt-6">
                     {/* Season Average — left edge */}
                     <div className="flex flex-col items-start w-[33%]">
                       <div className="text-xs text-neutral-400">Season Average</div>
-                      <div className="flex items-baseline gap-3 flex-wrap mt-1">
+                      <div className="flex items-baseline gap-3 flex-wrap mt-1 w-[220px]">
                         <div
                           className="text-4xl font-bold text-[#F5C84C]"
                           style={{ transition: "transform 300ms ease", transform: projScaled ? "scale(1.05)" : "scale(1)" }}
@@ -601,7 +601,7 @@ export default function AFLAIInsightsPage() {
                       {percentile != null && (
                         <>
                           <div className="text-xs text-neutral-400 mt-1">{percentile}th percentile</div>
-                          <div className="w-[220px] mt-2 h-[6px] rounded-full bg-neutral-800 overflow-hidden">
+                          <div className="w-[220px] mt-2 h-[7px] rounded-full bg-neutral-800 overflow-hidden">
                             <div
                               className="h-full rounded-full bg-[#F5C84C] transition-all duration-500"
                               style={{ width: `${percentile}%` }}
@@ -620,13 +620,13 @@ export default function AFLAIInsightsPage() {
                     <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center w-[33%]">
                       <div className="text-xs text-neutral-400">Consistency Score</div>
                       <div
-                        className={`text-4xl font-bold mt-1 ${consistencyColor}`}
+                        className={`text-[2.75rem] font-bold mt-1 ${consistencyColor}`}
                         style={{ transition: "transform 300ms ease", transform: projScaled ? "scale(1.05)" : "scale(1)" }}
                       >
                         {selectedPlayer.consistency_score != null ? `${selectedPlayer.consistency_score}/10` : "—"}
                       </div>
                       {selectedPlayer.consistency_score != null && (
-                        <div className="w-[220px] mt-2 h-[6px] rounded-full bg-neutral-800 overflow-hidden">
+                        <div className="w-[220px] mt-2 h-[7px] rounded-full bg-neutral-800 overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
                               selectedPlayer.consistency_score >= 7
@@ -649,7 +649,7 @@ export default function AFLAIInsightsPage() {
                     </div>
 
                     {/* Ceiling Potential — right edge */}
-                    <div className="flex flex-col items-end text-right w-[33%]">
+                    <div className="flex flex-col items-end text-right w-[33%] mt-[2px]">
                       <div className="text-xs text-neutral-400">Ceiling Potential</div>
                       <div
                         className="text-4xl font-bold text-[#F5C84C] mt-1"
