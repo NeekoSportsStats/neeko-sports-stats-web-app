@@ -568,9 +568,9 @@ export default function AFLAIInsightsPage() {
                   </div>
 
                   {/* Stats Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Season Average + percentile + confidence badge */}
-                    <div className="space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-x-12 items-start">
+                    {/* Season Average — left aligned */}
+                    <div className="flex flex-col items-start">
                       <div className="text-xs text-neutral-400">Season Average</div>
                       <div className="flex items-baseline gap-3 flex-wrap mt-1">
                         <div
@@ -599,25 +599,25 @@ export default function AFLAIInsightsPage() {
                         )}
                       </div>
                       {percentile != null && (
-                        <div className="space-y-1">
-                          <div className="text-xs text-neutral-400">{percentile}th percentile</div>
-                          <div className="h-1.5 w-full rounded-full bg-neutral-800 overflow-hidden transition-all duration-300">
+                        <>
+                          <div className="text-xs text-neutral-400 mt-1">{percentile}th percentile</div>
+                          <div className="w-full mt-2 h-[6px] rounded-full bg-neutral-800 overflow-hidden">
                             <div
-                              className="h-full rounded-full bg-[#F5C84C] transition-all duration-300"
+                              className="h-full rounded-full bg-[#F5C84C] transition-all duration-500"
                               style={{ width: `${percentile}%` }}
                             />
                           </div>
-                        </div>
+                        </>
                       )}
                       {selectedPlayer.trend_direction && (
-                        <div className={`text-xs ${selectedPlayer.trend_direction === "up" ? "text-emerald-400" : selectedPlayer.trend_direction === "down" ? "text-red-400" : "text-neutral-500"}`}>
+                        <div className={`text-xs mt-2 ${selectedPlayer.trend_direction === "up" ? "text-emerald-400" : selectedPlayer.trend_direction === "down" ? "text-red-400" : "text-neutral-500"}`}>
                           {selectedPlayer.trend_direction === "up" ? "↑ Trending up" : selectedPlayer.trend_direction === "down" ? "↓ Trending down" : "→ Stable"}
                         </div>
                       )}
                     </div>
 
-                    {/* Consistency + matchup difficulty */}
-                    <div className="space-y-2">
+                    {/* Consistency Score — center aligned */}
+                    <div className="flex flex-col items-center text-center">
                       <div className="text-xs text-neutral-400">Consistency Score</div>
                       <div
                         className={`text-4xl font-bold mt-1 ${consistencyColor}`}
@@ -626,9 +626,9 @@ export default function AFLAIInsightsPage() {
                         {selectedPlayer.consistency_score != null ? `${selectedPlayer.consistency_score}/10` : "—"}
                       </div>
                       {selectedPlayer.consistency_score != null && (
-                        <div className="mt-2 h-1 w-full rounded-full bg-neutral-800">
+                        <div className="w-full mt-2 h-[6px] rounded-full bg-neutral-800 overflow-hidden">
                           <div
-                            className={`h-1 rounded-full transition-all duration-500 ${
+                            className={`h-full rounded-full transition-all duration-500 ${
                               selectedPlayer.consistency_score >= 7
                                 ? "bg-green-400"
                                 : selectedPlayer.consistency_score >= 4
@@ -639,17 +639,17 @@ export default function AFLAIInsightsPage() {
                           />
                         </div>
                       )}
-                      <div className="text-xs text-neutral-500">
+                      <div className="text-xs text-neutral-500 mt-2">
                         {isPreseason(selectedPlayer.season_context) ? "Pre-season projection" : "2026 season"}
                       </div>
-                      <div className="flex items-center gap-2 pt-1">
+                      <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-neutral-500">Matchup:</span>
                         <span className={`text-sm font-semibold ${diff.color}`}>{diff.label}</span>
                       </div>
                     </div>
 
-                    {/* Ceiling */}
-                    <div className="space-y-2">
+                    {/* Ceiling Potential — right aligned */}
+                    <div className="flex flex-col items-end text-right">
                       <div className="text-xs text-neutral-400">Ceiling Potential</div>
                       <div
                         className="text-4xl font-bold text-[#F5C84C] mt-1"
@@ -657,7 +657,7 @@ export default function AFLAIInsightsPage() {
                       >
                         {selectedPlayer.ceiling_fantasy != null ? `${Number(selectedPlayer.ceiling_fantasy).toFixed(0)}+` : "—"}
                       </div>
-                      <div className="text-xs text-neutral-500">
+                      <div className="text-xs text-neutral-500 mt-1">
                         Floor: {selectedPlayer.floor_fantasy != null ? Number(selectedPlayer.floor_fantasy).toFixed(0) : "—"}
                       </div>
                     </div>
