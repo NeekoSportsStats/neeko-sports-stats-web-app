@@ -435,11 +435,22 @@ export default function AFLAIInsightsPage() {
 
   useEffect(() => {
     async function loadMatchSummaries() {
+      const { data: roundData } = await supabase
+        .schema("afl")
+        .from("ai_match_predictions")
+        .select("round_number")
+        .eq("season", 2026)
+        .order("round_number", { ascending: true })
+        .limit(1);
+
+      const currentRound = roundData?.[0]?.round_number ?? 0;
+
       const { data } = await supabase
         .schema("afl")
         .from("ai_match_predictions")
         .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, ai_summary, updated_at")
         .eq("season", 2026)
+        .eq("round_number", currentRound)
         .order("match_id", { ascending: true })
         .limit(10);
       setMatchSummaries((data as AIMatchPrediction[]) || []);
