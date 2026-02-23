@@ -568,9 +568,9 @@ export default function AFLAIInsightsPage() {
                   </div>
 
                   {/* Stats Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-x-12 items-start">
-                    {/* Season Average — left aligned */}
-                    <div className="flex flex-col items-start">
+                  <div className="relative flex items-start justify-between">
+                    {/* Season Average — left edge */}
+                    <div className="flex flex-col items-start w-[33%]">
                       <div className="text-xs text-neutral-400">Season Average</div>
                       <div className="flex items-baseline gap-3 flex-wrap mt-1">
                         <div
@@ -601,7 +601,7 @@ export default function AFLAIInsightsPage() {
                       {percentile != null && (
                         <>
                           <div className="text-xs text-neutral-400 mt-1">{percentile}th percentile</div>
-                          <div className="w-full mt-2 h-[6px] rounded-full bg-neutral-800 overflow-hidden">
+                          <div className="w-[220px] mt-2 h-[6px] rounded-full bg-neutral-800 overflow-hidden">
                             <div
                               className="h-full rounded-full bg-[#F5C84C] transition-all duration-500"
                               style={{ width: `${percentile}%` }}
@@ -616,8 +616,8 @@ export default function AFLAIInsightsPage() {
                       )}
                     </div>
 
-                    {/* Consistency Score — center aligned */}
-                    <div className="flex flex-col items-center text-center">
+                    {/* Consistency Score — true center anchor */}
+                    <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center w-[33%]">
                       <div className="text-xs text-neutral-400">Consistency Score</div>
                       <div
                         className={`text-4xl font-bold mt-1 ${consistencyColor}`}
@@ -626,7 +626,7 @@ export default function AFLAIInsightsPage() {
                         {selectedPlayer.consistency_score != null ? `${selectedPlayer.consistency_score}/10` : "—"}
                       </div>
                       {selectedPlayer.consistency_score != null && (
-                        <div className="w-full mt-2 h-[6px] rounded-full bg-neutral-800 overflow-hidden">
+                        <div className="w-[220px] mt-2 h-[6px] rounded-full bg-neutral-800 overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
                               selectedPlayer.consistency_score >= 7
@@ -648,8 +648,8 @@ export default function AFLAIInsightsPage() {
                       </div>
                     </div>
 
-                    {/* Ceiling Potential — right aligned */}
-                    <div className="flex flex-col items-end text-right">
+                    {/* Ceiling Potential — right edge */}
+                    <div className="flex flex-col items-end text-right w-[33%]">
                       <div className="text-xs text-neutral-400">Ceiling Potential</div>
                       <div
                         className="text-4xl font-bold text-[#F5C84C] mt-1"
@@ -657,7 +657,7 @@ export default function AFLAIInsightsPage() {
                       >
                         {selectedPlayer.ceiling_fantasy != null ? `${Number(selectedPlayer.ceiling_fantasy).toFixed(0)}+` : "—"}
                       </div>
-                      <div className="text-xs text-neutral-500 mt-1">
+                      <div className="text-xs text-neutral-500 mt-2">
                         Floor: {selectedPlayer.floor_fantasy != null ? Number(selectedPlayer.floor_fantasy).toFixed(0) : "—"}
                       </div>
                     </div>
