@@ -10,33 +10,6 @@ const corsHeaders = {
 const BATCH_LIMIT = 18;
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
-function fmt(v: unknown): string {
-  if (v === null || v === undefined) return "N/A";
-  if (typeof v === "number") return isFinite(v) ? v.toFixed(1) : "N/A";
-  return String(v);
-}
-
-function buildUserPrompt(template: string, row: Record<string, unknown>): string {
-  const vars: Record<string, string> = {
-    "{{team}}": String(row.team ?? ""),
-    "{{season_avg}}": fmt(row.season_avg),
-    "{{last_5_avg}}": fmt(row.last_5_avg),
-    "{{last_10_avg}}": fmt(row.last_10_avg),
-    "{{weighted_form}}": fmt(row.weighted_form),
-    "{{predicted_score}}": fmt(row.predicted_score),
-    "{{floor}}": fmt(row.floor),
-    "{{ceiling}}": fmt(row.ceiling),
-    "{{stdev}}": fmt(row.stdev_last_10),
-    "{{confidence}}": String(row.confidence_bucket ?? "N/A"),
-  };
-
-  let prompt = template;
-  for (const [key, val] of Object.entries(vars)) {
-    prompt = prompt.replaceAll(key, val);
-  }
-  return prompt;
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -51,26 +24,10 @@ Deno.serve(async (req: Request) => {
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey) throw new Error("OPENAI_API_KEY not set");
 
-    const { data: promptRow, error: promptError } = await supabase
-      .schema("afl")
-      .from("ai_prompts")
-      .select("system_prompt, user_prompt_template")
-      .eq("prompt_key", "team_season_summary")
-      .eq("is_active", true)
-      .order("version", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (promptError) throw promptError;
-    if (!promptRow) throw new Error("No active prompt found for team_season_summary");
-
-    const systemPrompt = promptRow.system_prompt as string;
-    const userTemplate = promptRow.user_prompt_template as string;
-
     const { data: teamRows, error: teamError } = await supabase
       .schema("afl")
-      .from("v_ai_team_features_2026_next_round")
-      .select("team, round_number, season_avg, last_5_avg, last_10_avg, weighted_form, predicted_score, floor, ceiling, stdev_last_10, confidence_bucket")
+      .from("v_ai_team_openai_inputs_2026_all_teams")
+      .select("team, season, round_number, final_openai_input")
       .limit(BATCH_LIMIT);
 
     if (teamError) throw teamError;
@@ -105,7 +62,7 @@ Deno.serve(async (req: Request) => {
     let errors = 0;
 
     for (const row of teamRows) {
-      const roundNum = row.round_number ?? 1;
+      const roundNum = row.round_number ?? 0;
       const key = `${row.team}__${roundNum}`;
 
       if (freshSet.has(key)) {
@@ -114,7 +71,15 @@ Deno.serve(async (req: Request) => {
       }
 
       try {
-        const userPrompt = buildUserPrompt(userTemplate, row as Record<string, unknown>);
+        const input = row.final_openai_input as Record<string, string>;
+        const systemPrompt = input.system ?? "";
+        const userPrompt = input.user ?? "";
+
+        if (!systemPrompt || !userPrompt) {
+          console.error(`Missing prompt for team ${row.team}`);
+          errors++;
+          continue;
+        }
 
         const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
