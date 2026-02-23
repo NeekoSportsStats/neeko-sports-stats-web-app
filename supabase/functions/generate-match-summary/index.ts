@@ -7,6 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+const BATCH_SIZE = 10;
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
 function toNum(v: unknown): number | null {
@@ -33,29 +34,13 @@ Deno.serve(async (req: Request) => {
     try { body = await req.json(); } catch { /* no body */ }
     const forceRegenerate = body.force === true;
 
-    const { data: viewRows, error: viewError } = await supabase
-      .schema("afl")
-      .from("v_ai_match_openai_inputs_2026_next_round")
-      .select("season, round_number, match_id, home_team, away_team, final_openai_input")
-      .order("match_id", { ascending: true });
-
-    if (viewError) throw viewError;
-    if (!viewRows || viewRows.length === 0) {
-      return new Response(
-        JSON.stringify({ message: "No match rows in view", processed: 0, skipped: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     let freshSet = new Set<number>();
 
     if (!forceRegenerate) {
-      const matchIds = viewRows.map((r) => r.match_id);
       const { data: existingRows } = await supabase
         .schema("afl")
         .from("ai_match_predictions")
-        .select("match_id, updated_at, ai_summary")
-        .in("match_id", matchIds);
+        .select("match_id, updated_at, ai_summary");
 
       const now = Date.now();
       for (const row of existingRows ?? []) {
@@ -72,100 +57,115 @@ Deno.serve(async (req: Request) => {
     let processed = 0;
     let skipped = 0;
     let errors = 0;
+    let lastMatchId = 0;
 
-    for (const row of viewRows) {
-      if (freshSet.has(row.match_id)) {
-        skipped++;
-        continue;
-      }
+    while (true) {
+      const { data: rows, error } = await supabase
+        .schema("afl")
+        .from("v_ai_match_openai_inputs_2026_next_round")
+        .select("season, round_number, match_id, home_team, away_team, final_openai_input")
+        .gt("match_id", lastMatchId)
+        .order("match_id", { ascending: true })
+        .limit(BATCH_SIZE);
 
-      try {
-        const input = row.final_openai_input as Record<string, unknown>;
-        const systemPrompt = String(input.system ?? "");
-        const userPrompt = String(input.user ?? "");
+      if (error) throw error;
+      if (!rows || rows.length === 0) break;
 
-        if (!systemPrompt || !userPrompt) {
-          console.error(`Missing prompt for match ${row.match_id}`);
-          errors++;
+      for (const row of rows) {
+        lastMatchId = row.match_id;
+
+        if (freshSet.has(row.match_id)) {
+          skipped++;
           continue;
         }
 
-        const payload = (input.payload ?? {}) as Record<string, unknown>;
-        const predictions = (payload.predictions ?? {}) as Record<string, unknown>;
-        const homeBlock = (payload.home_team ?? {}) as Record<string, unknown>;
-        const awayBlock = (payload.away_team ?? {}) as Record<string, unknown>;
+        try {
+          const input = row.final_openai_input as Record<string, unknown>;
+          const systemPrompt = String(input.system ?? "");
+          const userPrompt = String(input.user ?? "");
 
-        const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${openaiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gpt-4o",
-            temperature: 0.4,
-            max_tokens: 400,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
-          }),
-        });
+          if (!systemPrompt || !userPrompt) {
+            console.error(`Missing prompt for match ${row.match_id}`);
+            errors++;
+            continue;
+          }
 
-        if (!openaiRes.ok) {
-          console.error(`OpenAI error for match ${row.match_id}: ${await openaiRes.text()}`);
-          errors++;
-          continue;
-        }
+          const payload = (input.payload ?? {}) as Record<string, unknown>;
+          const predictions = (payload.predictions ?? {}) as Record<string, unknown>;
+          const homeBlock = (payload.home_team ?? {}) as Record<string, unknown>;
+          const awayBlock = (payload.away_team ?? {}) as Record<string, unknown>;
 
-        const openaiData = await openaiRes.json();
-        const aiSummary = openaiData.choices?.[0]?.message?.content ?? "";
-
-        const predictedHomeScore = toNum(predictions.home_score ?? homeBlock.predicted_score);
-        const predictedAwayScore = toNum(predictions.away_score ?? awayBlock.predicted_score);
-        const predictedMargin    = toNum(predictions.margin);
-        const predictedTotal     = toNum(predictions.total);
-        const confidence         = homeBlock.confidence != null ? String(homeBlock.confidence) : null;
-
-        const { error: upsertError } = await supabase
-          .schema("afl")
-          .from("ai_match_predictions")
-          .upsert(
-            {
-              match_id:             row.match_id,
-              home_team:            row.home_team,
-              away_team:            row.away_team,
-              round_number:         row.round_number,
-              season:               row.season,
-              predicted_home_score: predictedHomeScore,
-              predicted_away_score: predictedAwayScore,
-              predicted_margin:     predictedMargin,
-              predicted_total:      predictedTotal,
-              prediction:           predictedMargin,
-              confidence:           confidence,
-              ai_summary:           aiSummary,
-              updated_at:           new Date().toISOString(),
+          const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${openaiKey}`,
+              "Content-Type": "application/json",
             },
-            { onConflict: "match_id" }
-          );
+            body: JSON.stringify({
+              model: "gpt-4o",
+              temperature: 0.4,
+              max_tokens: 400,
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+            }),
+          });
 
-        if (upsertError) {
-          console.error(`Upsert error for match ${row.match_id}: ${upsertError.message}`);
+          if (!openaiRes.ok) {
+            console.error(`OpenAI error for match ${row.match_id}: ${await openaiRes.text()}`);
+            errors++;
+            continue;
+          }
+
+          const openaiData = await openaiRes.json();
+          const aiSummary = openaiData.choices?.[0]?.message?.content ?? "";
+
+          const predictedHomeScore = toNum(predictions.home_score ?? homeBlock.predicted_score);
+          const predictedAwayScore = toNum(predictions.away_score ?? awayBlock.predicted_score);
+          const predictedMargin    = toNum(predictions.margin);
+          const predictedTotal     = toNum(predictions.total);
+          const confidence         = homeBlock.confidence != null ? String(homeBlock.confidence) : null;
+
+          const { error: upsertError } = await supabase
+            .schema("afl")
+            .from("ai_match_predictions")
+            .upsert(
+              {
+                match_id:             row.match_id,
+                home_team:            row.home_team,
+                away_team:            row.away_team,
+                round_number:         row.round_number,
+                season:               row.season,
+                predicted_home_score: predictedHomeScore,
+                predicted_away_score: predictedAwayScore,
+                predicted_margin:     predictedMargin,
+                predicted_total:      predictedTotal,
+                prediction:           predictedMargin,
+                confidence:           confidence,
+                ai_summary:           aiSummary,
+                updated_at:           new Date().toISOString(),
+              },
+              { onConflict: "match_id" }
+            );
+
+          if (upsertError) {
+            console.error(`Upsert error for match ${row.match_id}: ${upsertError.message}`);
+            errors++;
+            continue;
+          }
+
+          processed++;
+        } catch (rowErr) {
+          console.error(`Row error for match ${row.match_id}:`, rowErr);
           errors++;
-          continue;
         }
-
-        processed++;
-      } catch (rowErr) {
-        console.error(`Row error for match ${row.match_id}:`, rowErr);
-        errors++;
       }
     }
 
     return new Response(
       JSON.stringify({
         message: "generate-match-summary complete",
-        total: viewRows.length,
         processed,
         skipped,
         errors,

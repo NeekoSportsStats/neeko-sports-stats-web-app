@@ -7,6 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+const BATCH_SIZE = 10;
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
 Deno.serve(async (req: Request) => {
@@ -27,20 +28,6 @@ Deno.serve(async (req: Request) => {
     try { body = await req.json(); } catch { /* no body */ }
     const forceRegenerate = body.force === true;
 
-    const { data: teamRows, error: teamError } = await supabase
-      .schema("afl")
-      .from("v_ai_team_openai_inputs_2026_next_round")
-      .select("match_id, round_number, team, opponent, final_openai_input")
-      .order("team", { ascending: true });
-
-    if (teamError) throw teamError;
-    if (!teamRows || teamRows.length === 0) {
-      return new Response(
-        JSON.stringify({ message: "No team rows in view", processed: 0, skipped: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     let freshSet = new Set<string>();
 
     if (!forceRegenerate) {
@@ -48,14 +35,14 @@ Deno.serve(async (req: Request) => {
         .schema("afl")
         .from("ai_team_summaries")
         .select("team, round_number, updated_at")
-        .eq("season", 2026)
-        .in("team", teamRows.map((r) => r.team));
+        .eq("season", 2026);
 
       const now = Date.now();
       for (const row of existingRows ?? []) {
         if (row.updated_at) {
-          const age = now - new Date(row.updated_at).getTime();
-          if (age < SIX_HOURS_MS) {
+          const updatedTime = new Date(row.updated_at).getTime();
+          const age = now - updatedTime;
+          if (age < SIX_HOURS_MS && updatedTime > new Date("2001-01-01").getTime()) {
             freshSet.add(`${row.team}__${row.round_number}`);
           }
         }
@@ -65,84 +52,99 @@ Deno.serve(async (req: Request) => {
     let processed = 0;
     let skipped = 0;
     let errors = 0;
+    let lastTeam = "";
 
-    for (const row of teamRows) {
-      const roundNum = row.round_number ?? 0;
-      const key = `${row.team}__${roundNum}`;
+    while (true) {
+      const { data: rows, error } = await supabase
+        .schema("afl")
+        .from("v_ai_team_openai_inputs_2026_next_round")
+        .select("match_id, round_number, team, opponent, final_openai_input")
+        .gt("team", lastTeam)
+        .order("team", { ascending: true })
+        .limit(BATCH_SIZE);
 
-      if (freshSet.has(key)) {
-        skipped++;
-        continue;
-      }
+      if (error) throw error;
+      if (!rows || rows.length === 0) break;
 
-      try {
-        const input = row.final_openai_input as Record<string, string>;
-        const systemPrompt = input.system ?? "";
-        const userPrompt = input.user ?? "";
+      for (const row of rows) {
+        lastTeam = row.team;
 
-        if (!systemPrompt || !userPrompt) {
-          console.error(`Missing prompt for team ${row.team}`);
-          errors++;
+        const roundNum = row.round_number ?? 0;
+        const key = `${row.team}__${roundNum}`;
+
+        if (freshSet.has(key)) {
+          skipped++;
           continue;
         }
 
-        const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${openaiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gpt-4o",
-            temperature: 0.4,
-            max_tokens: 350,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
-          }),
-        });
+        try {
+          const input = row.final_openai_input as Record<string, string>;
+          const systemPrompt = input.system ?? "";
+          const userPrompt = input.user ?? "";
 
-        if (!openaiRes.ok) {
-          console.error(`OpenAI error for team ${row.team}: ${await openaiRes.text()}`);
-          errors++;
-          continue;
-        }
+          if (!systemPrompt || !userPrompt) {
+            console.error(`Missing prompt for team ${row.team}`);
+            errors++;
+            continue;
+          }
 
-        const openaiData = await openaiRes.json();
-        const summary = openaiData.choices?.[0]?.message?.content ?? "";
-
-        const { error: upsertError } = await supabase
-          .schema("afl")
-          .from("ai_team_summaries")
-          .upsert(
-            {
-              team: row.team,
-              season: 2026,
-              round_number: roundNum,
-              summary,
-              updated_at: new Date().toISOString(),
+          const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${openaiKey}`,
+              "Content-Type": "application/json",
             },
-            { onConflict: "team,season,round_number" }
-          );
+            body: JSON.stringify({
+              model: "gpt-4o",
+              temperature: 0.4,
+              max_tokens: 350,
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+            }),
+          });
 
-        if (upsertError) {
-          console.error(`Upsert error for team ${row.team}: ${upsertError.message}`);
+          if (!openaiRes.ok) {
+            console.error(`OpenAI error for team ${row.team}: ${await openaiRes.text()}`);
+            errors++;
+            continue;
+          }
+
+          const openaiData = await openaiRes.json();
+          const summary = openaiData.choices?.[0]?.message?.content ?? "";
+
+          const { error: upsertError } = await supabase
+            .schema("afl")
+            .from("ai_team_summaries")
+            .upsert(
+              {
+                team: row.team,
+                season: 2026,
+                round_number: roundNum,
+                summary,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "team,season,round_number" }
+            );
+
+          if (upsertError) {
+            console.error(`Upsert error for team ${row.team}: ${upsertError.message}`);
+            errors++;
+            continue;
+          }
+
+          processed++;
+        } catch (rowErr) {
+          console.error(`Row error for team ${row.team}:`, rowErr);
           errors++;
-          continue;
         }
-
-        processed++;
-      } catch (rowErr) {
-        console.error(`Row error for team ${row.team}:`, rowErr);
-        errors++;
       }
     }
 
     return new Response(
       JSON.stringify({
         message: "generate-team-ai-summaries complete",
-        total: teamRows.length,
         processed,
         skipped,
         errors,
