@@ -395,7 +395,7 @@ export default function AFLAIInsightsPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 py-12 space-y-16">
+      <div className="mx-auto max-w-[1400px] px-6 py-12 space-y-16">
         <header className="text-center max-w-3xl mx-auto space-y-4">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">AFL AI Insights</h1>
           <p className="text-lg text-white/60">
@@ -511,6 +511,7 @@ export default function AFLAIInsightsPage() {
           </div>
 
           {/* Player Analysis Card */}
+          <div className={selectedPlayer ? "-mt-2" : ""}>
           {selectedPlayer ? (() => {
             const conf = getConfidenceLevel(selectedPlayer.consistency_score);
             const diff = getMatchupDifficulty(selectedPlayer.consistency_score, selectedPlayer.trend_direction);
@@ -533,7 +534,7 @@ export default function AFLAIInsightsPage() {
             return (
               /* Card outer wrapper — NO overflow-hidden so panel can float outside */
               <div
-                className="relative rounded-xl border border-yellow-400/40 transition-all duration-300 hover:shadow-[0_0_25px_rgba(245,200,76,0.15)]"
+                className="relative rounded-xl border border-yellow-400/30 transition-all duration-300 hover:shadow-[0_0_30px_rgba(245,200,76,0.15)]"
                 style={{
                   background: "radial-gradient(circle at top, rgba(245,200,76,0.08), transparent 70%), linear-gradient(135deg, rgba(245,200,76,0.07) 0%, rgba(245,150,30,0.05) 100%)",
                   backdropFilter: "blur(20px)",
@@ -548,7 +549,7 @@ export default function AFLAIInsightsPage() {
                   style={{ background: "linear-gradient(90deg, transparent, #F5C84C, transparent)" }}
                 />
 
-                <div className="p-8 space-y-6">
+                <div className="pt-8 px-8 pb-6 space-y-6">
                   {/* Card Header */}
                   <div className="flex items-start justify-between">
                     <div>
@@ -571,7 +572,7 @@ export default function AFLAIInsightsPage() {
                     {/* Season Average + percentile + confidence badge */}
                     <div className="space-y-2">
                       <div className="text-xs text-neutral-400">Season Average</div>
-                      <div className="flex items-baseline gap-3 flex-wrap">
+                      <div className="flex items-baseline gap-3 flex-wrap mt-1">
                         <div
                           className="text-4xl font-bold text-[#F5C84C]"
                           style={{ transition: "transform 300ms ease", transform: projScaled ? "scale(1.05)" : "scale(1)" }}
@@ -600,10 +601,10 @@ export default function AFLAIInsightsPage() {
                       {percentile != null && (
                         <div className="space-y-1">
                           <div className="text-xs text-neutral-400">{percentile}th percentile</div>
-                          <div className="h-1.5 w-full rounded-full bg-neutral-800 overflow-hidden">
+                          <div className="h-1.5 w-full rounded-full bg-neutral-800 overflow-hidden transition-all duration-300">
                             <div
-                              className="h-full rounded-full bg-[#F5C84C]"
-                              style={{ width: `${percentile}%`, transition: "width 600ms ease" }}
+                              className="h-full rounded-full bg-[#F5C84C] transition-all duration-300"
+                              style={{ width: `${percentile}%` }}
                             />
                           </div>
                         </div>
@@ -619,11 +620,25 @@ export default function AFLAIInsightsPage() {
                     <div className="space-y-2">
                       <div className="text-xs text-neutral-400">Consistency Score</div>
                       <div
-                        className={`text-4xl font-bold ${consistencyColor}`}
+                        className={`text-4xl font-bold mt-1 ${consistencyColor}`}
                         style={{ transition: "transform 300ms ease", transform: projScaled ? "scale(1.05)" : "scale(1)" }}
                       >
                         {selectedPlayer.consistency_score != null ? `${selectedPlayer.consistency_score}/10` : "—"}
                       </div>
+                      {selectedPlayer.consistency_score != null && (
+                        <div className="mt-2 h-1 w-full rounded-full bg-neutral-800">
+                          <div
+                            className={`h-1 rounded-full transition-all duration-500 ${
+                              selectedPlayer.consistency_score >= 7
+                                ? "bg-green-400"
+                                : selectedPlayer.consistency_score >= 4
+                                  ? "bg-yellow-400"
+                                  : "bg-red-400"
+                            }`}
+                            style={{ width: `${selectedPlayer.consistency_score * 10}%` }}
+                          />
+                        </div>
+                      )}
                       <div className="text-xs text-neutral-500">
                         {isPreseason(selectedPlayer.season_context) ? "Pre-season projection" : "2026 season"}
                       </div>
@@ -637,7 +652,7 @@ export default function AFLAIInsightsPage() {
                     <div className="space-y-2">
                       <div className="text-xs text-neutral-400">Ceiling Potential</div>
                       <div
-                        className="text-4xl font-bold text-[#F5C84C]"
+                        className="text-4xl font-bold text-[#F5C84C] mt-1"
                         style={{ transition: "transform 300ms ease", transform: projScaled ? "scale(1.05)" : "scale(1)" }}
                       >
                         {selectedPlayer.ceiling_fantasy != null ? `${Number(selectedPlayer.ceiling_fantasy).toFixed(0)}+` : "—"}
@@ -769,6 +784,7 @@ export default function AFLAIInsightsPage() {
               <p className="text-sm text-neutral-500">Search any AFL player above to unlock AI analysis</p>
             </div>
           )}
+          </div>
         </div>
 
         {/* SECTION 2: Team Analysis */}
