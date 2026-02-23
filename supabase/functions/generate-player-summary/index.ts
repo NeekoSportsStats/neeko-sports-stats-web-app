@@ -7,19 +7,63 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const BATCH_SIZE = 50;
+const BATCH_SIZE = 25;
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+const TIME_GUARD_MS = 240_000;
+const OPENAI_RETRY_DELAYS = [1000, 3000];
 
-function fmt(v: unknown): string {
-  if (v === null || v === undefined) return "N/A";
-  if (typeof v === "number") return isFinite(v) ? v.toFixed(1) : "N/A";
-  return String(v);
+async function callOpenAI(
+  apiKey: string,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<string> {
+  let lastErr: Error | null = null;
+
+  for (let attempt = 0; attempt <= OPENAI_RETRY_DELAYS.length; attempt++) {
+    if (attempt > 0) {
+      await new Promise((r) => setTimeout(r, OPENAI_RETRY_DELAYS[attempt - 1]));
+    }
+
+    try {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          temperature: 0.4,
+          max_tokens: 300,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+        }),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        lastErr = new Error(`HTTP ${res.status}: ${txt}`);
+        continue;
+      }
+
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content ?? "";
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+
+  throw lastErr ?? new Error("OpenAI call failed after retries");
 }
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
+
+  console.log("PLAYER_FN_VERSION: opening-round-players-v1");
 
   try {
     const supabase = createClient(
@@ -34,12 +78,22 @@ Deno.serve(async (req: Request) => {
     try { body = await req.json(); } catch { /* no body */ }
     const forceRegenerate = body.force === true;
 
+    const startTime = Date.now();
     let lastPlayerId = 0;
     let totalProcessed = 0;
     let totalSkipped = 0;
     let totalErrors = 0;
+    let timedOut = false;
 
     while (true) {
+      if (Date.now() - startTime > TIME_GUARD_MS) {
+        timedOut = true;
+        console.log("PLAYER_FN_TIMEOUT: 240s guard hit, stopping safely");
+        break;
+      }
+
+      console.log("PLAYER_BATCH", { lastPlayerId });
+
       const { data: rows, error: viewError } = await supabase
         .schema("afl")
         .from("v_ai_player_openai_inputs_2026_next_round")
@@ -53,7 +107,7 @@ Deno.serve(async (req: Request) => {
 
       const playerIds = rows.map((r: Record<string, unknown>) => r.player_id).filter(Boolean);
 
-      let freshSet = new Set<string>();
+      const freshSet = new Set<string>();
 
       if (!forceRegenerate) {
         const { data: existingSummaries } = await supabase
@@ -64,7 +118,7 @@ Deno.serve(async (req: Request) => {
           .eq("season", 2026);
 
         const now = Date.now();
-        for (const s of (existingSummaries ?? [])) {
+        for (const s of existingSummaries ?? []) {
           if (s.updated_at) {
             const age = now - new Date(s.updated_at).getTime();
             if (age < SIX_HOURS_MS) {
@@ -91,36 +145,23 @@ Deno.serve(async (req: Request) => {
           const userPrompt = String(input.user ?? "");
 
           if (!systemPrompt || !userPrompt) {
-            console.error(`Missing prompt for player ${row.player}`);
+            console.error(`PLAYER_MISSING_PROMPT player_id=${row.player_id} player=${row.player}`);
             totalErrors++;
             continue;
           }
 
-          const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${openaiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: "gpt-4o",
-              temperature: 0.4,
-              max_tokens: 300,
-              messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt },
-              ],
-            }),
-          });
-
-          if (!openaiRes.ok) {
-            console.error(`OpenAI error for ${row.player}: ${await openaiRes.text()}`);
+          let aiSummary: string;
+          try {
+            aiSummary = await callOpenAI(openaiKey, systemPrompt, userPrompt);
+          } catch (openaiErr) {
+            console.error("PLAYER_OPENAI_ERR", {
+              player_id: row.player_id,
+              player: row.player,
+              err: openaiErr instanceof Error ? openaiErr.message : String(openaiErr),
+            });
             totalErrors++;
             continue;
           }
-
-          const openaiData = await openaiRes.json();
-          const aiSummary = openaiData.choices?.[0]?.message?.content ?? "";
 
           const form = (payload.form ?? {}) as Record<string, unknown>;
           const volatility = (payload.volatility ?? {}) as Record<string, unknown>;
@@ -156,14 +197,19 @@ Deno.serve(async (req: Request) => {
             );
 
           if (upsertError) {
-            console.error(`Upsert error for ${row.player}: ${upsertError.message}`);
+            console.error(`PLAYER_UPSERT_ERR player_id=${row.player_id}: ${upsertError.message}`);
             totalErrors++;
             continue;
           }
 
+          console.log("PLAYER_UPSERT_OK", { player_id: row.player_id, player: row.player });
           totalProcessed++;
         } catch (rowErr) {
-          console.error(`Row error for ${row.player}:`, rowErr);
+          console.error("PLAYER_ROW_ERR", {
+            player_id: row.player_id,
+            player: row.player,
+            err: rowErr instanceof Error ? rowErr.message : String(rowErr),
+          });
           totalErrors++;
         }
       }
@@ -175,11 +221,13 @@ Deno.serve(async (req: Request) => {
         processed: totalProcessed,
         skipped: totalSkipped,
         errors: totalErrors,
+        timed_out: timedOut,
+        resume_from_player_id: lastPlayerId,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("generate-player-summary fatal:", err);
+    console.error("PLAYER_FN_FATAL:", err);
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
