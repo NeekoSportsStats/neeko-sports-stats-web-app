@@ -97,7 +97,7 @@ Deno.serve(async (req: Request) => {
             body: JSON.stringify({
               model: "gpt-4o",
               temperature: 0.4,
-              max_tokens: 350,
+              max_tokens: 1200,
               messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt },
