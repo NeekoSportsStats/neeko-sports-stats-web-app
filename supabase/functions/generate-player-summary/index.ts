@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const BATCH_LIMIT = 50;
+const BATCH_LIMIT = 10;
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
 function fmt(v: unknown): string {
@@ -37,6 +37,8 @@ function buildUserPrompt(template: string, row: Record<string, unknown>, payload
     "{{stdev}}": fmt(volatility.stdev ?? volatility.volatility_last_15),
     "{{trend_direction}}": fmt(prediction.trend_direction),
     "{{opponent}}": opponent,
+    "{{risk_tier}}": fmt(prediction.risk_tier ?? role.risk_tier),
+    "{{matchup_label}}": fmt(prediction.matchup_label),
   };
 
   let prompt = template;
@@ -76,29 +78,11 @@ Deno.serve(async (req: Request) => {
     const systemPrompt = promptRow.system_prompt as string;
     const userTemplate = promptRow.user_prompt_template as string;
 
-    const { data: viewRows, error: viewError } = await supabase.rpc("exec_sql", {
-      sql: `
-        SELECT
-          v.match_id,
-          v.round_number,
-          v.player,
-          v.team,
-          v.opponent,
-          v.player_id,
-          v.season_context_label,
-          v.final_openai_input,
-          s.updated_at AS summary_updated_at
-        FROM afl.v_ai_player_openai_inputs_2026_next_round v
-        LEFT JOIN afl.ai_player_summaries s
-          ON v.player_id = s.player_id
-          AND v.round_number = s.round_number
-          AND s.season = 2026
-        ORDER BY
-          (s.updated_at IS NULL) DESC,
-          s.updated_at ASC
-        LIMIT ${BATCH_LIMIT}
-      `
-    });
+    const { data: viewRows, error: viewError } = await supabase
+      .schema("afl")
+      .from("v_ai_player_openai_inputs_2026_next_round")
+      .select("match_id, round_number, player, team, opponent, player_id, season_context_label, final_openai_input")
+      .limit(BATCH_LIMIT);
 
     if (viewError) throw viewError;
     if (!viewRows || viewRows.length === 0) {
@@ -108,14 +92,23 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const playerIds = viewRows.map((r: Record<string, unknown>) => r.player_id).filter(Boolean);
+
+    const { data: existingSummaries } = await supabase
+      .schema("afl")
+      .from("ai_player_summaries")
+      .select("player_id, round_number, updated_at")
+      .in("player_id", playerIds)
+      .eq("season", 2026);
+
     const freshSet = new Set<string>();
     const now = Date.now();
 
-    for (const row of viewRows) {
-      if (row.summary_updated_at) {
-        const age = now - new Date(row.summary_updated_at).getTime();
+    for (const s of (existingSummaries ?? [])) {
+      if (s.updated_at) {
+        const age = now - new Date(s.updated_at).getTime();
         if (age < THREE_DAYS_MS) {
-          freshSet.add(`${row.player_id}__${row.round_number}`);
+          freshSet.add(`${s.player_id}__${s.round_number}`);
         }
       }
     }

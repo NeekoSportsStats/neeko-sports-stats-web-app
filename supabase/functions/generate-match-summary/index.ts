@@ -17,10 +17,11 @@ function fmt(v: unknown): string {
 }
 
 function buildUserPrompt(template: string, row: Record<string, unknown>): string {
-  const payload = (row.final_openai_input as Record<string, unknown> ?? {});
+  const outerInput = (row.final_openai_input as Record<string, unknown> ?? {});
+  const payload = (outerInput.payload as Record<string, unknown> ?? {});
   const homeBlock = (payload.home_team as Record<string, unknown> ?? {});
   const awayBlock = (payload.away_team as Record<string, unknown> ?? {});
-  const context = (payload.context as Record<string, unknown> ?? {});
+  const context = (payload.match as Record<string, unknown> ?? {});
   const predictions = (payload.predictions as Record<string, unknown> ?? {});
 
   const vars: Record<string, string> = {
