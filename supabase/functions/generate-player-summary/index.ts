@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 const BATCH_LIMIT = 50;
-const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
 function fmt(v: unknown): string {
   if (v === null || v === undefined) return "N/A";
@@ -95,7 +95,7 @@ Deno.serve(async (req: Request) => {
     for (const s of (existingSummaries ?? [])) {
       if (s.updated_at) {
         const age = now - new Date(s.updated_at).getTime();
-        if (age < THREE_DAYS_MS) {
+        if (age < SIX_HOURS_MS) {
           freshSet.add(`${s.player_id}__${s.round_number}`);
         }
       }

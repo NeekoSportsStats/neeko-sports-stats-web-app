@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 const BATCH_LIMIT = 18;
-const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -26,7 +26,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: teamRows, error: teamError } = await supabase
       .schema("afl")
-      .from("v_ai_team_openai_inputs_2026_all_teams")
+      .from("v_ai_team_openai_inputs_2026_next_round")
       .select("team, season, round_number, final_openai_input")
       .limit(BATCH_LIMIT);
 
@@ -51,7 +51,7 @@ Deno.serve(async (req: Request) => {
     for (const row of existingRows ?? []) {
       if (row.updated_at) {
         const age = now - new Date(row.updated_at).getTime();
-        if (age < THREE_DAYS_MS) {
+        if (age < SIX_HOURS_MS) {
           freshSet.add(`${row.team}__${row.round_number}`);
         }
       }
