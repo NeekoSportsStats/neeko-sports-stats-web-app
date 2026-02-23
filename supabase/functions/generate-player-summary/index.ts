@@ -62,22 +62,6 @@ Deno.serve(async (req: Request) => {
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey) throw new Error("OPENAI_API_KEY not set");
 
-    const { data: promptRow, error: promptError } = await supabase
-      .schema("afl")
-      .from("ai_prompts")
-      .select("system_prompt, user_prompt_template")
-      .eq("prompt_key", "player_round_summary")
-      .eq("is_active", true)
-      .order("version", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (promptError) throw promptError;
-    if (!promptRow) throw new Error("No active prompt found for player_round_summary");
-
-    const systemPrompt = promptRow.system_prompt as string;
-    const userTemplate = promptRow.user_prompt_template as string;
-
     const { data: viewRows, error: viewError } = await supabase
       .schema("afl")
       .from("v_ai_player_openai_inputs_2026_next_round")
@@ -126,12 +110,11 @@ Deno.serve(async (req: Request) => {
       }
 
       try {
-        const input = (row.final_openai_input ?? {}) as {
-          payload?: Record<string, Record<string, unknown>>;
-        };
+        const input = (row.final_openai_input ?? {}) as Record<string, unknown>;
         const payload = (input.payload ?? {}) as Record<string, Record<string, unknown>>;
 
-        const userPrompt = buildUserPrompt(userTemplate, row as Record<string, unknown>, payload);
+        const systemPrompt = String(input.system ?? "");
+        const userPrompt = String(input.user ?? "");
 
         const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
