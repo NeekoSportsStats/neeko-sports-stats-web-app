@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Search, TrendingUp, Target, Users, ChevronRight, Sparkles, Crown, ArrowLeft, TrendingDown, Minus } from "lucide-react";
+import { Search, TrendingUp, Target, Users, ChevronRight, Sparkles, Crown, ArrowLeft, TrendingDown, Minus, Info } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 interface AIPlayerSummary {
@@ -54,6 +54,9 @@ export default function AFLAIInsightsPage() {
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [cardVisible, setCardVisible] = useState(false);
+  const [showTransparency, setShowTransparency] = useState(false);
+  const [projScaled, setProjScaled] = useState(false);
 
   // Team Analysis state
   const [teams, setTeams] = useState<string[]>([]);
@@ -270,6 +273,31 @@ export default function AFLAIInsightsPage() {
     }
   };
 
+  useEffect(() => {
+    if (selectedPlayer) {
+      setCardVisible(false);
+      setShowTransparency(false);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setCardVisible(true);
+          setTimeout(() => {
+            setProjScaled(true);
+            setTimeout(() => setProjScaled(false), 200);
+          }, 100);
+        });
+      });
+    } else {
+      setCardVisible(false);
+    }
+  }, [selectedPlayer]);
+
+  const getConfidenceLevel = (consistency: number | null) => {
+    if (consistency == null) return null;
+    if (consistency >= 7) return { label: "High", color: "text-emerald-400" };
+    if (consistency >= 4) return { label: "Medium", color: "text-yellow-400" };
+    return { label: "Low", color: "text-red-400" };
+  };
+
   const getTrendIcon = (trend: number | null) => {
     if (trend === null) return <Minus className="h-3.5 w-3.5 text-white/40" />;
     if (trend > 3) return <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />;
@@ -471,72 +499,174 @@ export default function AFLAIInsightsPage() {
 
           {/* Player Analysis Card */}
           {selectedPlayer ? (
-            <div className="rounded-xl border border-yellow-400/40 bg-gradient-to-br from-yellow-500/10 to-amber-500/10 backdrop-blur-xl p-8 space-y-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-yellow-200 uppercase tracking-wider mb-2">
-                    Player Analysis
-                  </div>
-                  <h3 className="text-3xl font-bold text-white">{selectedPlayer.player}</h3>
-                  <div className="text-sm text-white/50 mt-1">{selectedPlayer.team}</div>
-                </div>
-                <button
-                  onClick={() => setSelectedPlayer(null)}
-                  className="text-sm text-white/60 hover:text-white"
-                >
-                  Clear
-                </button>
-              </div>
+            <div
+              className="relative rounded-xl border border-yellow-400/40 overflow-hidden"
+              style={{
+                background: "radial-gradient(circle at top, rgba(245,200,76,0.08), transparent 70%), linear-gradient(135deg, rgba(245,200,76,0.07) 0%, rgba(245,150,30,0.05) 100%)",
+                backdropFilter: "blur(20px)",
+                opacity: cardVisible ? 1 : 0,
+                transform: cardVisible ? "translateY(0)" : "translateY(10px)",
+                transition: "opacity 300ms ease, transform 300ms ease",
+              }}
+            >
+              {/* Gold top accent line */}
+              <div
+                className="absolute top-0 left-0 right-0 h-[2px]"
+                style={{ background: "linear-gradient(90deg, transparent, #F5C84C, transparent)" }}
+              />
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">Season Average</div>
-                  <div className="text-3xl font-bold text-yellow-400">
-                    {selectedPlayer.season_avg != null ? Number(selectedPlayer.season_avg).toFixed(1) : "—"}
-                  </div>
-                  {selectedPlayer.trend_direction && (
-                    <div className={`text-xs ${selectedPlayer.trend_direction === "up" ? "text-emerald-400" : selectedPlayer.trend_direction === "down" ? "text-red-400" : "text-white/50"}`}>
-                      {selectedPlayer.trend_direction === "up" ? "↑ Trending up" : selectedPlayer.trend_direction === "down" ? "↓ Trending down" : "→ Stable"}
+              <div className="p-8 space-y-6">
+                {/* Header */}
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-xs font-semibold text-[#F5C84C]/70 uppercase tracking-widest mb-2">
+                      Player Analysis
                     </div>
-                  )}
+                    <h3 className="text-3xl font-bold text-white">{selectedPlayer.player}</h3>
+                    <div className="text-sm text-neutral-400 mt-1">{selectedPlayer.team}</div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedPlayer(null)}
+                    className="text-xs text-neutral-500 hover:text-white transition-colors mt-1"
+                  >
+                    Clear
+                  </button>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">Consistency Score</div>
-                  <div className="text-3xl font-bold text-yellow-400">
-                    {selectedPlayer.consistency_score != null ? `${selectedPlayer.consistency_score}/10` : "—"}
-                  </div>
-                  <div className="text-xs text-white/50">
-                    {isPreseason(selectedPlayer.season_context) ? "Pre-season projection" : "2026 season"}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">Ceiling Potential</div>
-                  <div className="text-3xl font-bold text-yellow-400">
-                    {selectedPlayer.ceiling_fantasy != null ? `${Number(selectedPlayer.ceiling_fantasy).toFixed(0)}+` : "—"}
-                  </div>
-                  <div className="text-xs text-white/50">
-                    Floor: {selectedPlayer.floor_fantasy != null ? Number(selectedPlayer.floor_fantasy).toFixed(0) : "—"}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4 pt-4 border-t border-yellow-400/20">
-                <h4 className="font-semibold text-white">AI Insights Summary</h4>
-                <div className="space-y-3 text-sm text-white/80 leading-relaxed">
-                  {selectedPlayer.ai_summary ? (
-                    <p>{selectedPlayer.ai_summary}</p>
-                  ) : (
-                    <p className="text-white/40 italic">No AI summary available for this player yet.</p>
-                  )}
-                  {premiumMode && selectedPlayer.ai_summary && (
-                    <div className="pt-4 border-t border-yellow-400/20">
-                      <p className="text-amber-200">
-                        <strong>Neeko+ Exclusive:</strong> Monitor injury reports and team selection in the 24h window before game day. Floor of {selectedPlayer.floor_fantasy != null ? Number(selectedPlayer.floor_fantasy).toFixed(0) : "N/A"} provides strong downside protection.
-                      </p>
+                {/* Stats Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-1">
+                    <div className="text-xs text-neutral-400">Season Average</div>
+                    <div className="text-4xl font-bold text-[#F5C84C]" style={{ transition: "transform 200ms ease", transform: projScaled ? "scale(1.05)" : "scale(1)" }}>
+                      {selectedPlayer.season_avg != null ? Number(selectedPlayer.season_avg).toFixed(1) : "—"}
                     </div>
-                  )}
+                    {selectedPlayer.trend_direction && (
+                      <div className={`text-xs ${selectedPlayer.trend_direction === "up" ? "text-emerald-400" : selectedPlayer.trend_direction === "down" ? "text-red-400" : "text-neutral-500"}`}>
+                        {selectedPlayer.trend_direction === "up" ? "↑ Trending up" : selectedPlayer.trend_direction === "down" ? "↓ Trending down" : "→ Stable"}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="text-xs text-neutral-400">Consistency Score</div>
+                    <div className="text-4xl font-bold text-[#F5C84C]" style={{ transition: "transform 200ms ease", transform: projScaled ? "scale(1.05)" : "scale(1)" }}>
+                      {selectedPlayer.consistency_score != null ? `${selectedPlayer.consistency_score}/10` : "—"}
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                      {isPreseason(selectedPlayer.season_context) ? "Pre-season projection" : "2026 season"}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="text-xs text-neutral-400">Ceiling Potential</div>
+                    <div className="text-4xl font-bold text-[#F5C84C]" style={{ transition: "transform 200ms ease", transform: projScaled ? "scale(1.05)" : "scale(1)" }}>
+                      {selectedPlayer.ceiling_fantasy != null ? `${Number(selectedPlayer.ceiling_fantasy).toFixed(0)}+` : "—"}
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                      Floor: {selectedPlayer.floor_fantasy != null ? Number(selectedPlayer.floor_fantasy).toFixed(0) : "—"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Summary Section */}
+                <div className="space-y-4 pt-4 border-t border-[#F5C84C]/15">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-white">AI Insights Summary</h4>
+                    <div className="relative">
+                      <button
+                        onMouseEnter={() => setShowTransparency(true)}
+                        onMouseLeave={() => setShowTransparency(false)}
+                        className="p-1 text-neutral-600 hover:text-[#F5C84C] transition-colors duration-150"
+                        aria-label="How this projection was generated"
+                      >
+                        <Info className="h-4 w-4" />
+                      </button>
+
+                      {/* Transparency hover panel */}
+                      {showTransparency && (
+                        <div
+                          className="absolute right-0 top-7 z-50 w-80 rounded-xl p-4 border border-[#2a2a2a]"
+                          style={{
+                            background: "#0b0b0b",
+                            boxShadow: "0 0 0 1px rgba(245,200,76,0.2), 0 20px 60px rgba(0,0,0,0.9)",
+                          }}
+                        >
+                          <p className="text-sm font-semibold text-[#F5C84C] mb-3">
+                            How Neeko AI generated this projection
+                          </p>
+                          <ul className="space-y-2 text-xs text-neutral-400">
+                            {selectedPlayer.season_avg != null && (
+                              <li className="flex items-start gap-2">
+                                <span className="text-[#F5C84C]/60 mt-0.5">•</span>
+                                <span>Season average: <span className="text-white">{Number(selectedPlayer.season_avg).toFixed(1)}</span></span>
+                              </li>
+                            )}
+                            {selectedPlayer.ceiling_fantasy != null && (
+                              <li className="flex items-start gap-2">
+                                <span className="text-[#F5C84C]/60 mt-0.5">•</span>
+                                <span>Ceiling score: <span className="text-white">{Number(selectedPlayer.ceiling_fantasy).toFixed(0)}</span></span>
+                              </li>
+                            )}
+                            {selectedPlayer.floor_fantasy != null && (
+                              <li className="flex items-start gap-2">
+                                <span className="text-[#F5C84C]/60 mt-0.5">•</span>
+                                <span>Floor score: <span className="text-white">{Number(selectedPlayer.floor_fantasy).toFixed(0)}</span></span>
+                              </li>
+                            )}
+                            {selectedPlayer.consistency_score != null && (
+                              <li className="flex items-start gap-2">
+                                <span className="text-[#F5C84C]/60 mt-0.5">•</span>
+                                <span>Consistency rating: <span className="text-white">{selectedPlayer.consistency_score}/10</span></span>
+                              </li>
+                            )}
+                            {selectedPlayer.trend_direction && (
+                              <li className="flex items-start gap-2">
+                                <span className="text-[#F5C84C]/60 mt-0.5">•</span>
+                                <span>Trend: <span className={`${selectedPlayer.trend_direction === "up" ? "text-emerald-400" : selectedPlayer.trend_direction === "down" ? "text-red-400" : "text-white"}`}>
+                                  {selectedPlayer.trend_direction === "up" ? "Improving" : selectedPlayer.trend_direction === "down" ? "Declining" : "Stable"}
+                                </span></span>
+                              </li>
+                            )}
+                            {isPreseason(selectedPlayer.season_context) && (
+                              <li className="flex items-start gap-2">
+                                <span className="text-[#F5C84C]/60 mt-0.5">•</span>
+                                <span>Based on <span className="text-white">2025 baseline data</span></span>
+                              </li>
+                            )}
+                          </ul>
+                          {(() => {
+                            const conf = getConfidenceLevel(selectedPlayer.consistency_score);
+                            return conf ? (
+                              <div className="mt-3 pt-3 border-t border-[#1e1e1e] flex items-center gap-2">
+                                <span className="text-xs text-neutral-500">AI Confidence:</span>
+                                <span className={`text-xs font-semibold ${conf.color}`}>{conf.label}</span>
+                              </div>
+                            ) : null;
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 text-sm text-white/80 leading-relaxed">
+                    {selectedPlayer.ai_summary ? (
+                      <p>{selectedPlayer.ai_summary}</p>
+                    ) : (
+                      <p className="text-neutral-600 italic">No AI summary available for this player yet.</p>
+                    )}
+                    {premiumMode && selectedPlayer.ai_summary && (
+                      <div className="pt-4 border-t border-[#F5C84C]/15">
+                        <p className="text-amber-200 text-sm leading-relaxed">
+                          <strong>Neeko+ Exclusive:</strong> Monitor injury reports and team selection in the 24h window before game day. Floor of {selectedPlayer.floor_fantasy != null ? Number(selectedPlayer.floor_fantasy).toFixed(0) : "N/A"} provides strong downside protection.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="flex justify-end pt-2">
+                  <span className="text-xs text-neutral-700">Powered by Neeko AI</span>
                 </div>
               </div>
             </div>
