@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Search, TrendingUp, Target, Users, ChevronRight, Sparkles, Crown, ArrowLeft, Info } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import FantasyVerdictBadge from "@/components/FantasyVerdictBadge";
 
 interface AIPlayerSummary {
   player_id: number;
@@ -38,6 +39,7 @@ interface AITeamSummary {
   season: number;
   round_number: number;
   summary: string | null;
+  fantasy_verdict: string | null;
   updated_at: string | null;
 }
 
@@ -149,7 +151,7 @@ export default function AFLAIInsightsPage() {
         const result2026 = await supabase
           .schema("afl")
           .from("ai_team_summaries")
-          .select("team, season, round_number, summary, updated_at")
+          .select("team, season, round_number, summary, fantasy_verdict, updated_at")
           .eq("team", selectedTeam)
           .eq("season", 2026)
           .order("round_number", { ascending: false })
@@ -164,7 +166,7 @@ export default function AFLAIInsightsPage() {
           const result2025 = await supabase
             .schema("afl")
             .from("ai_team_summaries")
-            .select("team, season, round_number, summary, updated_at")
+            .select("team, season, round_number, summary, fantasy_verdict, updated_at")
             .eq("team", selectedTeam)
             .eq("season", 2025)
             .order("round_number", { ascending: false })
@@ -1018,9 +1020,14 @@ export default function AFLAIInsightsPage() {
                       </div>
                     )}
                   </div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-yellow-400/30 bg-yellow-400/10 text-yellow-300 text-xs font-semibold">
-                    <Sparkles className="h-3 w-3" />
-                    AI Generated
+                  <div className="flex flex-col items-end gap-2">
+                    {teamSummary?.fantasy_verdict && (
+                      <FantasyVerdictBadge verdict={teamSummary.fantasy_verdict} />
+                    )}
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-yellow-400/30 bg-yellow-400/10 text-yellow-300 text-xs font-semibold">
+                      <Sparkles className="h-3 w-3" />
+                      AI Generated
+                    </div>
                   </div>
                 </div>
 
@@ -1306,12 +1313,55 @@ export default function AFLAIInsightsPage() {
                     ) : teamSummaryError ? (
                       <p className="text-neutral-500 italic">Unable to load team summary right now.</p>
                     ) : teamSummary?.summary ? (
-                      <>
-                        <p>{teamSummary.summary}</p>
-                        {teamSummary.season === 2025 && (
-                          <p className="text-xs text-yellow-400/50 italic">Showing 2025 baseline summary (pre-season).</p>
-                        )}
-                      </>
+                      (() => {
+                        const lines = parseSummaryLines(teamSummary.summary);
+                        return lines ? (
+                          <div className="space-y-4">
+                            {lines.paragraph && (
+                              <p className="text-white/80 leading-relaxed">{lines.paragraph}</p>
+                            )}
+                            <div className="space-y-3 pt-1">
+                              {lines.outlook && (
+                                <div
+                                  className="rounded-lg px-4 py-3"
+                                  style={{ background: "rgba(245,200,76,0.06)", border: "1px solid rgba(245,200,76,0.15)" }}
+                                >
+                                  <div className="text-[10px] font-bold uppercase tracking-widest text-[#F5C84C]/70 mb-1">Outlook</div>
+                                  <p className="text-white/80 text-sm leading-relaxed">{lines.outlook}</p>
+                                </div>
+                              )}
+                              {lines.upside && (
+                                <div
+                                  className="rounded-lg px-4 py-3"
+                                  style={{ background: "rgba(52,211,153,0.05)", border: "1px solid rgba(52,211,153,0.15)" }}
+                                >
+                                  <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70 mb-1">Upside</div>
+                                  <p className="text-white/80 text-sm leading-relaxed">{lines.upside}</p>
+                                </div>
+                              )}
+                              {lines.risk && (
+                                <div
+                                  className="rounded-lg px-4 py-3"
+                                  style={{ background: "rgba(248,113,113,0.05)", border: "1px solid rgba(248,113,113,0.15)" }}
+                                >
+                                  <div className="text-[10px] font-bold uppercase tracking-widest text-red-400/70 mb-1">Risk</div>
+                                  <p className="text-white/80 text-sm leading-relaxed">{lines.risk}</p>
+                                </div>
+                              )}
+                            </div>
+                            {teamSummary.season === 2025 && (
+                              <p className="text-xs text-yellow-400/50 italic">Showing 2025 baseline summary (pre-season).</p>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <p>{teamSummary.summary}</p>
+                            {teamSummary.season === 2025 && (
+                              <p className="text-xs text-yellow-400/50 italic">Showing 2025 baseline summary (pre-season).</p>
+                            )}
+                          </>
+                        );
+                      })()
                     ) : (
                       <p className="text-neutral-500 italic">AI team summary will be generated after Opening Round.</p>
                     )}

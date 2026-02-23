@@ -114,6 +114,14 @@ Deno.serve(async (req: Request) => {
           const openaiData = await openaiRes.json();
           const summary = openaiData.choices?.[0]?.message?.content ?? "";
 
+          let fantasy_verdict = "NEUTRAL";
+          if (summary.includes("Elite fantasy team")) fantasy_verdict = "ELITE";
+          else if (summary.includes("Strong fantasy team")) fantasy_verdict = "STRONG";
+          else if (summary.includes("Reliable fantasy team")) fantasy_verdict = "RELIABLE";
+          else if (summary.includes("Volatile fantasy team")) fantasy_verdict = "VOLATILE";
+          else if (summary.includes("Risky fantasy team")) fantasy_verdict = "RISKY";
+          else if (summary.includes("Avoid fantasy team")) fantasy_verdict = "AVOID";
+
           const { error: upsertError } = await supabase
             .schema("afl")
             .from("ai_team_summaries")
@@ -123,6 +131,7 @@ Deno.serve(async (req: Request) => {
                 season: 2026,
                 round_number: roundNum,
                 summary,
+                fantasy_verdict,
                 updated_at: new Date().toISOString(),
               },
               { onConflict: "team,season,round_number" }
