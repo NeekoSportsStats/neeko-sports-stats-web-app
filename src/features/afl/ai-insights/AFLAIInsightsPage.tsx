@@ -380,21 +380,17 @@ export default function AFLAIInsightsPage() {
 
   const parseSummaryLines = (summary: string | null): { outlook: string; upside: string; risk: string } | null => {
     if (!summary) return null;
+    const hasOutlook = /Outlook\s*:/i.test(summary);
+    const hasUpside = /Upside\s*:/i.test(summary);
+    const hasRisk = /Risk\s*:/i.test(summary);
+    if (!hasOutlook && !hasUpside && !hasRisk) return null;
     const outlookMatch = summary.match(/Outlook[:\s–-]+([^.!]+[.!]?)/i);
     const upsideMatch = summary.match(/Upside[:\s–-]+([^.!]+[.!]?)/i);
     const riskMatch = summary.match(/Risk[:\s–-]+([^.!]+[.!]?)/i);
-    if (outlookMatch || upsideMatch || riskMatch) {
-      return {
-        outlook: outlookMatch?.[1]?.trim() ?? "",
-        upside: upsideMatch?.[1]?.trim() ?? "",
-        risk: riskMatch?.[1]?.trim() ?? "",
-      };
-    }
-    const sentences = summary.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 10);
     return {
-      outlook: sentences[0] ?? "",
-      upside: sentences[1] ?? "",
-      risk: sentences[2] ?? "",
+      outlook: outlookMatch?.[1]?.trim() ?? "",
+      upside: upsideMatch?.[1]?.trim() ?? "",
+      risk: riskMatch?.[1]?.trim() ?? "",
     };
   };
 
