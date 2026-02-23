@@ -92,6 +92,7 @@ export default function AFLAIInsightsPage() {
   // Match Predictions state
   const [matchSummaries, setMatchSummaries] = useState<AIMatchPrediction[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
+  const [activeMatchTooltip, setActiveMatchTooltip] = useState<string | null>(null);
 
   const playerSectionRef = useRef<HTMLDivElement>(null);
   const teamSectionRef = useRef<HTMLDivElement>(null);
@@ -1264,8 +1265,6 @@ export default function AFLAIInsightsPage() {
 
             const confidence = 70 + (match.match_id % 25);
 
-            const [activeTooltip, setActiveTooltip] = React.useState<string | null>(null);
-
             const tooltips: Record<string, string> = {
               projectedScore: "Neeko projected fantasy score based on team scoring trends, opposition difficulty and form.",
               winProbability: "Likelihood of each team winning based on projected scoring and matchup strength.",
@@ -1278,11 +1277,11 @@ export default function AFLAIInsightsPage() {
                 <span className="text-xs text-neutral-500">{label}</span>
                 <div
                   className="relative cursor-default"
-                  onMouseEnter={() => setActiveTooltip(id)}
-                  onMouseLeave={() => setActiveTooltip(null)}
+                  onMouseEnter={() => setActiveMatchTooltip(id)}
+                  onMouseLeave={() => setActiveMatchTooltip(null)}
                 >
                   <Info className="h-3 w-3 text-neutral-600 hover:text-[#F5C84C] transition-colors duration-150" />
-                  {activeTooltip === id && (
+                  {activeMatchTooltip === id && (
                     <div
                       className="absolute left-0 top-full mt-1.5 z-[999] w-[220px] rounded-md border border-[#F5C84C]/25 p-2.5 text-xs text-neutral-300 leading-relaxed pointer-events-none"
                       style={{
