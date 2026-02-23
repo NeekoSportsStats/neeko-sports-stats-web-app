@@ -97,6 +97,9 @@ Deno.serve(async (req: Request) => {
         const openaiData = await openaiRes.json();
         const aiSummary = openaiData.choices?.[0]?.message?.content ?? "";
 
+        console.log("AI PAYLOAD:", JSON.stringify(input));
+        console.log("AI RESPONSE:", aiSummary.slice(0, 120));
+
         // Upsert on the UNIQUE(match_id) constraint — safe, no duplicate key errors
         const { error: upsertError } = await supabase
           .schema("afl")

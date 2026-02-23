@@ -17,6 +17,16 @@ interface AIPlayerSummary {
   season_context?: string | null;
 }
 
+interface AIMatchPrediction {
+  match_id: number;
+  home_team: string;
+  away_team: string;
+  round_number: number;
+  season: number;
+  ai_summary: string | null;
+  updated_at: string | null;
+}
+
 interface AITeamSummary {
   team: string;
   season: number;
@@ -80,8 +90,8 @@ export default function AFLAIInsightsPage() {
   const [showTeamTransparency, setShowTeamTransparency] = useState(false);
 
   // Match Predictions state
-  const [selectedRound, setSelectedRound] = useState("R1");
-  const [selectedMatch, setSelectedMatch] = useState("");
+  const [matchSummaries, setMatchSummaries] = useState<AIMatchPrediction[]>([]);
+  const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
 
   const playerSectionRef = useRef<HTMLDivElement>(null);
   const teamSectionRef = useRef<HTMLDivElement>(null);
@@ -318,11 +328,19 @@ export default function AFLAIInsightsPage() {
   const isPreseason = (ctx: string | null | undefined) =>
     ctx === "PRESEASON_2025_BASELINE" || (!!ctx && ctx.includes("2025"));
 
-  const mockMatches = [
-    "Adelaide vs Brisbane",
-    "Carlton vs Collingwood",
-    "Geelong vs Sydney",
-  ];
+  useEffect(() => {
+    async function loadMatchSummaries() {
+      const { data } = await supabase
+        .schema("afl")
+        .from("ai_match_predictions")
+        .select("match_id, home_team, away_team, round_number, season, ai_summary, updated_at")
+        .eq("season", 2026)
+        .order("round_number", { ascending: false })
+        .limit(10);
+      setMatchSummaries((data as AIMatchPrediction[]) || []);
+    }
+    loadMatchSummaries();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
@@ -1232,116 +1250,105 @@ export default function AFLAIInsightsPage() {
             <div className="flex-1">
               <h2 className="text-2xl font-bold">Match Predictions</h2>
               <p className="text-sm text-white/60 mt-1">
-                Select a round and match to access AI-powered predictions, win probability analysis, and key player projections
+                Select a match to access AI-powered predictions and analysis
               </p>
             </div>
+            {selectedMatchId !== null && (
+              <button
+                onClick={() => setSelectedMatchId(null)}
+                className="flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Clear
+              </button>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4">
-              <label className="text-sm text-white/60 mb-2 block">Round</label>
-              <select
-                value={selectedRound}
-                onChange={(e) => setSelectedRound(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-white/10 bg-black/60 text-white focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
-              >
-                {["R1", "R2", "R3", "R4", "R5"].map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4">
-              <label className="text-sm text-white/60 mb-2 block">Match</label>
-              <select
-                value={selectedMatch}
-                onChange={(e) => setSelectedMatch(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-white/10 bg-black/60 text-white focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
-              >
-                <option value="">Select a match...</option>
-                {mockMatches.map((match) => (
-                  <option key={match} value={match}>{match}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {selectedMatch ? (
-            <div className="rounded-xl border border-yellow-400/40 bg-gradient-to-br from-yellow-500/10 to-amber-500/10 backdrop-blur-xl p-8 space-y-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-yellow-200 uppercase tracking-wider mb-2">
-                    {selectedRound} Match Preview
+          {matchSummaries.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {matchSummaries.map((match) => (
+                <button
+                  key={match.match_id}
+                  onClick={() => setSelectedMatchId(selectedMatchId === match.match_id ? null : match.match_id)}
+                  className={`p-4 rounded-lg border text-left transition-all ${
+                    selectedMatchId === match.match_id
+                      ? "bg-yellow-400/20 border-yellow-400/60 text-yellow-200"
+                      : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 text-white"
+                  }`}
+                >
+                  <div className="text-xs text-white/50 mb-1">Round {match.round_number}</div>
+                  <div className="font-semibold text-sm leading-tight">
+                    {match.home_team} vs {match.away_team}
                   </div>
-                  <h3 className="text-2xl font-bold text-white">{selectedMatch}</h3>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-white/60">Win Probability</span>
-                    <span className="text-white font-semibold">65% - 35%</span>
-                  </div>
-                  <div className="h-2 bg-white/10 rounded-full overflow-hidden flex">
-                    <div className="bg-gradient-to-r from-yellow-400 to-yellow-500" style={{ width: "65%" }} />
-                    <div className="bg-gradient-to-r from-red-400 to-red-500" style={{ width: "35%" }} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-yellow-200">Key Players</h4>
-                    <div className="space-y-2">
-                      {["Marcus Bontempelli", "Patrick Cripps", "Clayton Oliver"].map((player) => (
-                        <div key={player} className="flex items-center justify-between p-3 rounded-lg bg-white/5">
-                          <span className="text-sm text-white">{player}</span>
-                          <span className="text-sm font-semibold text-yellow-400">105 proj.</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-yellow-200">Match Factors</h4>
-                    <div className="space-y-2 text-sm text-white/80">
-                      <div className="flex items-start gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 mt-1.5" />
-                        <div>Home ground advantage: +12 pts</div>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 mt-1.5" />
-                        <div>Recent form: 4-1 last 5 games</div>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 mt-1.5" />
-                        <div>Head-to-head record favors home</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-yellow-400/20">
-                  <h4 className="font-semibold text-white mb-3">AI Prediction Summary</h4>
-                  <p className="text-sm text-white/80 leading-relaxed">
-                    Advanced modeling indicates a strong likelihood of home team victory based on recent form, historical matchup data, and venue advantage. Key midfield battles will determine margin. Expected total score: 165-180 combined.
-                  </p>
-                  {premiumMode && (
-                    <div className="mt-4 pt-4 border-t border-yellow-400/20">
-                      <p className="text-sm text-amber-200 leading-relaxed">
-                        <strong>Neeko+ Exclusive:</strong> Margin prediction: 18-24 points. Weather conditions favorable. Monitor team news for late changes which could impact 15% of predicted variance.
-                      </p>
+                  {match.updated_at && (
+                    <div className="text-xs text-white/30 mt-1">
+                      {new Date(match.updated_at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
                     </div>
                   )}
-                </div>
-              </div>
+                </button>
+              ))}
             </div>
           ) : (
-            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-12 text-center">
-              <TrendingUp className="h-12 w-12 text-white/20 mx-auto mb-4" />
-              <p className="text-white/50">Select a match to view AI predictions and analysis</p>
+            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-8 text-center">
+              <TrendingUp className="h-10 w-10 text-white/20 mx-auto mb-3" />
+              <p className="text-white/50 text-sm">Match predictions will appear here once generated</p>
             </div>
           )}
+
+          {(() => {
+            const match = matchSummaries.find((m) => m.match_id === selectedMatchId);
+            if (!match) return null;
+            return (
+              <div
+                className="relative rounded-xl border border-yellow-400/30 transition-all duration-300 hover:shadow-[0_0_30px_rgba(245,200,76,0.15)]"
+                style={{
+                  background: "radial-gradient(circle at 50% 25%, rgba(245,200,76,0.08), transparent 70%), linear-gradient(135deg, rgba(245,200,76,0.07) 0%, rgba(245,150,30,0.05) 100%)",
+                  backdropFilter: "blur(20px)",
+                }}
+              >
+                <div
+                  className="absolute top-0 left-0 right-0 h-[2px] rounded-t-xl"
+                  style={{ background: "linear-gradient(90deg, transparent, #F5C84C, transparent)" }}
+                />
+                <div className="pt-8 px-8 pb-6 space-y-6">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="text-xs font-semibold text-[#F5C84C]/70 uppercase tracking-widest mb-2">
+                        Round {match.round_number} · {match.season}
+                      </div>
+                      <h3 className="text-2xl font-bold text-white">
+                        {match.home_team} vs {match.away_team}
+                      </h3>
+                      {match.updated_at && (
+                        <div className="text-xs text-neutral-500 mt-1">
+                          Updated {new Date(match.updated_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
+                        </div>
+                      )}
+                    </div>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-yellow-400/30 bg-yellow-400/10 text-yellow-300 text-xs font-semibold">
+                      <Sparkles className="h-3 w-3" />
+                      AI Generated
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-[#F5C84C]/15 space-y-3">
+                    <h4 className="font-semibold text-white text-sm">AI Match Analysis</h4>
+                    <div className="text-sm text-white/80 leading-relaxed">
+                      {match.ai_summary ? (
+                        <p>{match.ai_summary}</p>
+                      ) : (
+                        <p className="text-neutral-600 italic">No AI summary available for this match yet.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <span className="text-xs text-neutral-700">Powered by Neeko AI</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-8 text-center">
