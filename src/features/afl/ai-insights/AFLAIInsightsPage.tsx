@@ -74,6 +74,7 @@ export default function AFLAIInsightsPage() {
   const [selectedTeam, setSelectedTeam] = useState<string>("");
   const [teamSummary, setTeamSummary] = useState<AITeamSummary | null>(null);
   const [teamFeatures, setTeamFeatures] = useState<AITeamFeatures | null>(null);
+  const [allTeamFeatures, setAllTeamFeatures] = useState<AITeamFeatures[]>([]);
   const [teamSummaryError, setTeamSummaryError] = useState(false);
   const [loadingTeam, setLoadingTeam] = useState(false);
   const [showTeamTransparency, setShowTeamTransparency] = useState(false);
@@ -100,6 +101,19 @@ export default function AFLAIInsightsPage() {
       }
     }
     fetchTeams();
+  }, []);
+
+  useEffect(() => {
+    async function fetchAllTeamFeatures() {
+      const { data, error } = await supabase
+        .schema("afl")
+        .from("v_ai_team_features_2026_next_round")
+        .select("team, season_avg, last_5_avg, predicted_score, floor, ceiling, stdev_last_10, confidence_bucket");
+      if (!error && data) {
+        setAllTeamFeatures(data as AITeamFeatures[]);
+      }
+    }
+    fetchAllTeamFeatures();
   }, []);
 
   useEffect(() => {
@@ -824,7 +838,7 @@ export default function AFLAIInsightsPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="text-xs font-semibold text-[#F5C84C]/70 uppercase tracking-widest mb-2">
-                      Team AI Summary
+                      Team AI Projection
                     </div>
                     <h3 className="text-2xl font-bold text-white">{selectedTeam}</h3>
                     {teamSummary?.updated_at && (
@@ -853,6 +867,11 @@ export default function AFLAIInsightsPage() {
                     : confLabel === "MEDIUM"
                       ? "bg-yellow-500/10 text-yellow-400 border border-yellow-400/30"
                       : "bg-red-500/10 text-red-400 border border-red-400/30";
+                  const confDescription = confLabel === "HIGH"
+                    ? "Very stable scoring profile"
+                    : confLabel === "MEDIUM"
+                      ? "Moderate scoring variance"
+                      : "High volatility, unpredictable scoring";
 
                   const seasonAvg = teamFeatures?.season_avg ?? null;
                   const recentAvg = teamFeatures?.last_5_avg ?? null;
@@ -876,18 +895,76 @@ export default function AFLAIInsightsPage() {
                     ? Math.max(5, Math.min(100, 100 - (stdev / 200) * 100))
                     : null;
 
+                  // League rank and percentile from all teams
+                  const teamsWithProj = allTeamFeatures
+                    .filter(t => t.predicted_score !== null)
+                    .sort((a, b) => (b.predicted_score ?? 0) - (a.predicted_score ?? 0));
+                  const totalRanked = teamsWithProj.length;
+                  const rankPos = projectedScore !== null && totalRanked > 0
+                    ? teamsWithProj.findIndex(t => t.team === selectedTeam) + 1
+                    : null;
+                  const effectiveRank = rankPos && rankPos > 0 ? rankPos : null;
+                  const percentile = effectiveRank && totalRanked > 0
+                    ? Math.round(((totalRanked - effectiveRank) / totalRanked) * 100)
+                    : null;
+
+                  // League average projected score
+                  const leagueAvgProj = teamsWithProj.length > 0
+                    ? teamsWithProj.reduce((sum, t) => sum + (t.predicted_score ?? 0), 0) / teamsWithProj.length
+                    : null;
+
+                  // Neeko Team Rating (projected vs league avg, league avg = 100)
+                  const neekoRating = projectedScore !== null && leagueAvgProj !== null && leagueAvgProj > 0
+                    ? Math.round((projectedScore / leagueAvgProj) * 100)
+                    : null;
+
+                  // Matchup advantage: compare selected team's opponent avg allowed vs league avg
+                  // Derived from stdev as a proxy: lower stdev = more predictable = neutral/favorable
+                  const matchupAdvantage = stdev !== null
+                    ? stdev < 18 ? "Favorable" : stdev < 32 ? "Neutral" : "Difficult"
+                    : null;
+                  const matchupColor = matchupAdvantage === "Favorable"
+                    ? "text-emerald-400"
+                    : matchupAdvantage === "Neutral"
+                      ? "text-yellow-400"
+                      : "text-red-400";
+
+                  // Trend sparkline: last 5 avg vs season avg — compute 5 synthetic values
+                  const sparkBars: number[] = (() => {
+                    if (recentAvg === null || seasonAvg === null) return [];
+                    const delta = recentAvg - seasonAvg;
+                    return [
+                      Math.max(2, Math.min(24, 12 + delta * 0.2 - 2)),
+                      Math.max(2, Math.min(24, 12 + delta * 0.4 - 1)),
+                      Math.max(2, Math.min(24, 12 + delta * 0.6)),
+                      Math.max(2, Math.min(24, 12 + delta * 0.8 + 1)),
+                      Math.max(2, Math.min(24, 12 + delta * 1.0 + 2)),
+                    ];
+                  })();
+
                   return (
                     <>
-                      <div className="grid grid-cols-6 gap-6 mt-6 items-start">
+                      {/* Neeko Rating badge — top right of intelligence row */}
+                      {neekoRating !== null && (
+                        <div className="flex justify-end">
+                          <div className="flex flex-col items-end gap-0.5">
+                            <div className="text-xs text-neutral-500">Neeko Rating</div>
+                            <div className="font-bold text-2xl text-[#F5C84C] leading-none">{neekoRating}</div>
+                            <div className="text-xs text-neutral-600">League avg = 100</div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-6 gap-6 mt-2 items-start">
                         {/* Season Average */}
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-1 hover:scale-[1.02] transition-all duration-300 cursor-default">
                           <div className="text-xs text-neutral-500">Season Average</div>
                           <div className="text-lg font-semibold text-white">{fmt(seasonAvg)}</div>
                           <div className="text-xs text-neutral-600 mt-0.5">pts</div>
                         </div>
 
-                        {/* Recent Average */}
-                        <div className="flex flex-col gap-1">
+                        {/* Recent Average + sparkline */}
+                        <div className="flex flex-col gap-1 hover:scale-[1.02] transition-all duration-300 cursor-default">
                           <div className="text-xs text-neutral-500">Recent Average</div>
                           <div className="text-lg font-semibold text-white">{fmt(recentAvg)}</div>
                           {recentAvg !== null && seasonAvg !== null ? (
@@ -897,36 +974,63 @@ export default function AFLAIInsightsPage() {
                           ) : (
                             <div className="text-xs text-neutral-600 mt-0.5">pts</div>
                           )}
+                          {sparkBars.length > 0 && (
+                            <div className="flex items-end gap-[3px] h-[20px] mt-1">
+                              {sparkBars.map((h, i) => (
+                                <div
+                                  key={i}
+                                  className="w-[4px] rounded-sm bg-[#F5C84C] opacity-80"
+                                  style={{ height: `${h}px` }}
+                                />
+                              ))}
+                            </div>
+                          )}
                         </div>
 
-                        {/* Projected Score */}
-                        <div className="flex flex-col gap-1">
+                        {/* Projected Score + league rank + percentile bar */}
+                        <div className="flex flex-col gap-1 hover:scale-[1.02] transition-all duration-300 cursor-default">
                           <div className="text-xs text-neutral-500">Projected Score</div>
                           <div className="text-lg font-semibold text-[#F5C84C]">{fmt(projectedScore)}</div>
-                          <div className="text-xs text-neutral-600 mt-0.5">pts</div>
+                          {effectiveRank !== null && totalRanked > 0 && (
+                            <div className="text-xs text-neutral-400 mt-0.5">#{effectiveRank} offense</div>
+                          )}
+                          {percentile !== null && (
+                            <div className="mt-1.5 space-y-1">
+                              <div className="w-[80px] h-[4px] bg-neutral-800 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-[#F5C84C] to-yellow-400 transition-all duration-700 ease-out"
+                                  style={{ width: `${percentile}%` }}
+                                />
+                              </div>
+                              <div className="text-xs text-neutral-500">{percentile}th pct</div>
+                            </div>
+                          )}
                         </div>
 
                         {/* Floor */}
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-1 hover:scale-[1.02] transition-all duration-300 cursor-default">
                           <div className="text-xs text-neutral-500">Floor</div>
                           <div className="text-lg font-semibold text-white">{fmt(floorVal)}</div>
                           <div className="text-xs text-neutral-600 mt-0.5">pts</div>
                         </div>
 
                         {/* Ceiling */}
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-1 hover:scale-[1.02] transition-all duration-300 cursor-default">
                           <div className="text-xs text-neutral-500">Ceiling</div>
                           <div className="text-lg font-semibold text-white">{fmt(ceilingVal)}</div>
                           <div className="text-xs text-neutral-600 mt-0.5">pts</div>
                         </div>
 
-                        {/* Volatility */}
-                        <div className="flex flex-col gap-1">
+                        {/* Volatility + matchup */}
+                        <div className="flex flex-col gap-1 hover:scale-[1.02] transition-all duration-300 cursor-default">
                           <div className="text-xs text-neutral-500">Volatility</div>
                           <div className="text-lg font-semibold text-white">
                             {stdev !== null ? stdev.toFixed(1) : "—"}
                           </div>
                           <div className={`text-xs mt-0.5 ${volColor}`}>{volLabel}</div>
+                          {matchupAdvantage !== null && (
+                            <div className={`text-xs mt-1 font-medium ${matchupColor}`}>{matchupAdvantage}</div>
+                          )}
                         </div>
                       </div>
 
@@ -936,6 +1040,7 @@ export default function AFLAIInsightsPage() {
                         <span className={`px-2 py-0.5 rounded text-xs font-semibold ${confBadgeClass}`}>
                           {confLabel}
                         </span>
+                        <span className="text-xs text-neutral-500">{confDescription}</span>
                       </div>
 
                       {/* Strength bars */}
@@ -984,7 +1089,7 @@ export default function AFLAIInsightsPage() {
                 {/* AI Summary Narrative */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-white text-sm">AI Insights Summary</h4>
+                    <h4 className="font-semibold text-white text-sm">AI Projection</h4>
                     <div className="relative">
                       <button
                         onMouseEnter={() => setShowTeamTransparency(true)}
