@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Search, TrendingUp, Target, Users, ChevronRight, Sparkles, Crown, ArrowLeft, TrendingDown, Minus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -50,6 +50,10 @@ export default function AFLAIInsightsPage() {
   const [searchResults, setSearchResults] = useState<PlayerProjection[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<AIPlayerSummary | null>(null);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Team Analysis state
   const [teams, setTeams] = useState<string[]>([]);
@@ -139,6 +143,7 @@ export default function AFLAIInsightsPage() {
 
   useEffect(() => {
     const query = playerSearch.trim();
+    setHighlightedIndex(-1);
     if (!query) {
       setSearchResults([]);
       return;
@@ -159,10 +164,30 @@ export default function AFLAIInsightsPage() {
         setSearchResults([]);
       }
       setSearchLoading(false);
-    }, 250);
+    }, 200);
 
     return () => clearTimeout(timer);
   }, [playerSearch]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!searchResults.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((i) => Math.min(i + 1, searchResults.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const target = highlightedIndex >= 0 ? searchResults[highlightedIndex] : searchResults[0];
+      if (target) handleSearchResultClick(target);
+    } else if (e.key === "Escape") {
+      setPlayerSearch("");
+      setSearchResults([]);
+      setHighlightedIndex(-1);
+      searchInputRef.current?.blur();
+    }
+  }, [searchResults, highlightedIndex]);
 
   const scrollToSection = (section: Section) => {
     setActiveSection(section);
@@ -371,41 +396,74 @@ export default function AFLAIInsightsPage() {
           {/* Player Search */}
           <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-500 pointer-events-none" />
               <input
+                ref={searchInputRef}
                 type="text"
-                placeholder="Search any AFL player..."
+                placeholder="Search any AFL player (eg Marcus Bontempelli, Patrick Cripps, Nick Daicos)"
                 value={playerSearch}
                 onChange={(e) => setPlayerSearch(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+                onKeyDown={handleKeyDown}
+                className={`w-full pl-12 pr-4 py-4 bg-white/5 border rounded-lg text-white text-sm placeholder:text-neutral-600 focus:outline-none transition-all duration-150 ${
+                  searchFocused
+                    ? "border-[#F5C84C]/60 ring-1 ring-[#F5C84C]/40 shadow-[0_0_0_1px_rgba(245,200,76,0.25)]"
+                    : "border-white/10"
+                }`}
               />
             </div>
+            <p className="text-xs text-neutral-500 mt-2 ml-1">
+              Search across all AFL players using Neeko AI projections
+            </p>
 
             {playerSearch && (
-              <div className="mt-4 space-y-2 max-h-64 overflow-y-auto">
+              <div
+                ref={dropdownRef}
+                className="mt-2 rounded-xl overflow-hidden border border-[#2a2a2a] bg-[#0b0b0b] shadow-2xl"
+                style={{ boxShadow: "0 0 0 1px rgba(245,200,76,0.15), 0 20px 60px rgba(0,0,0,0.8)" }}
+              >
                 {searchLoading ? (
-                  <div className="py-4 text-center text-sm text-yellow-400/60 animate-pulse">Searching...</div>
+                  <div className="px-4 py-5 text-center text-xs text-neutral-500 animate-pulse tracking-wide">
+                    Loading players...
+                  </div>
                 ) : searchResults.length > 0 ? (
-                  searchResults.map((proj) => (
-                    <button
-                      key={proj.player_id}
-                      onClick={() => handleSearchResultClick(proj)}
-                      className="w-full flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-yellow-400/10 hover:border-yellow-400/40 border border-transparent transition-all text-left"
-                    >
-                      <div>
-                        <span className="font-medium text-white">{proj.player_name}</span>
-                        <span className="ml-2 text-xs text-white/40">{proj.team}</span>
-                        {proj.final_projection != null && (
-                          <span className="ml-2 text-xs text-yellow-400/70 font-semibold">
-                            {Number(proj.final_projection).toFixed(0)} proj.
-                          </span>
-                        )}
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-white/40" />
-                    </button>
-                  ))
+                  <div>
+                    {searchResults.map((proj, idx) => {
+                      const isHighlighted = idx === highlightedIndex;
+                      return (
+                        <button
+                          key={proj.player_id}
+                          onMouseEnter={() => setHighlightedIndex(idx)}
+                          onClick={() => handleSearchResultClick(proj)}
+                          className={`w-full flex items-center justify-between px-4 py-3 cursor-pointer transition-all duration-150 text-left border-l-2 ${
+                            isHighlighted
+                              ? "bg-[#1a1a1a] border-[#F5C84C]"
+                              : "bg-transparent border-transparent hover:bg-[#151515] hover:border-[#F5C84C]/40"
+                          }`}
+                        >
+                          <div className="flex items-center flex-wrap gap-x-1">
+                            <span className="text-sm font-semibold text-white">{proj.player_name}</span>
+                            <span className="text-xs text-neutral-400 ml-1">{proj.team}</span>
+                            {proj.final_projection != null && (
+                              <span className="text-xs text-[#F5C84C] font-medium ml-1">
+                                · {Number(proj.final_projection).toFixed(0)} proj.
+                              </span>
+                            )}
+                          </div>
+                          <ChevronRight
+                            className={`h-4 w-4 flex-shrink-0 ml-3 transition-colors duration-150 ${
+                              isHighlighted ? "text-[#F5C84C]" : "text-neutral-600"
+                            }`}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
                 ) : (
-                  <div className="py-4 text-center text-sm text-white/40">No players found</div>
+                  <div className="px-4 py-5 text-center text-sm text-neutral-500">
+                    No players found
+                  </div>
                 )}
               </div>
             )}
@@ -483,9 +541,9 @@ export default function AFLAIInsightsPage() {
               </div>
             </div>
           ) : (
-            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-12 text-center">
-              <Target className="h-12 w-12 text-white/20 mx-auto mb-4" />
-              <p className="text-white/50">Search for any AFL player above to view detailed AI analysis</p>
+            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl py-12 text-center">
+              <Target className="h-10 w-10 text-neutral-700 mx-auto mb-4" />
+              <p className="text-sm text-neutral-500">Search any AFL player above to unlock AI analysis</p>
             </div>
           )}
         </div>
