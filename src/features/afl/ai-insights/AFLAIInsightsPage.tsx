@@ -1061,11 +1061,12 @@ export default function AFLAIInsightsPage() {
                     : confLabel === "MEDIUM"
                       ? "bg-yellow-500/10 text-yellow-400 border border-yellow-400/30"
                       : "bg-red-500/10 text-red-400 border border-red-400/30";
-                  const confDescription = confLabel === "HIGH"
-                    ? "Very stable scoring profile"
-                    : confLabel === "MEDIUM"
-                      ? "Moderate scoring variance"
-                      : "High volatility, unpredictable scoring";
+                  const confidenceDescriptions: Record<string, string> = {
+                    LOW: "High volatility creates unreliable fantasy output.",
+                    MEDIUM: "Moderate volatility creates some scoring uncertainty.",
+                    HIGH: "Consistent scoring profile with strong reliability.",
+                  };
+                  const confDescription = confidenceDescriptions[confLabel] ?? confidenceDescriptions["MEDIUM"];
 
                   const seasonAvg = teamFeatures?.season_avg ?? null;
                   const recentAvg = teamFeatures?.last_5_avg ?? null;
