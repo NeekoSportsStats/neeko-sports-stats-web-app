@@ -64,6 +64,7 @@ export default function AFLAIInsightsPage() {
   const [teamSummary, setTeamSummary] = useState<AITeamSummary | null>(null);
   const [teamSummaryError, setTeamSummaryError] = useState(false);
   const [loadingTeam, setLoadingTeam] = useState(false);
+  const [showTeamTransparency, setShowTeamTransparency] = useState(false);
 
   // Match Predictions state
   const [selectedRound, setSelectedRound] = useState("R1");
@@ -119,7 +120,7 @@ export default function AFLAIInsightsPage() {
           const result2025 = await supabase
             .schema("afl")
             .from("ai_team_summaries")
-            .select("team, season, round_number, ai_summary, updated_at")
+            .select("team, season, round_number, summary, updated_at")
             .eq("team", selectedTeam)
             .eq("season", 2025)
             .order("round_number", { ascending: false })
@@ -790,6 +791,7 @@ export default function AFLAIInsightsPage() {
                 style={{ background: "linear-gradient(90deg, transparent, #F5C84C, transparent)" }}
               />
               <div className="pt-8 px-8 pb-6 space-y-5">
+                {/* Card Header */}
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="text-xs font-semibold text-[#F5C84C]/70 uppercase tracking-widest mb-2">
@@ -799,7 +801,7 @@ export default function AFLAIInsightsPage() {
                     {teamSummary?.updated_at && (
                       <div className="text-xs text-neutral-500 mt-1">
                         Updated {new Date(teamSummary.updated_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
-                        {" · "}2026 Season
+                        {" · "}{teamSummary.season} Season · Round {teamSummary.round_number}
                       </div>
                     )}
                   </div>
@@ -809,21 +811,142 @@ export default function AFLAIInsightsPage() {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-[#F5C84C]/15 text-sm text-white/80 leading-relaxed space-y-3">
-                  {loadingTeam ? (
-                    <p className="text-yellow-400/70 animate-pulse">Loading team intelligence...</p>
-                  ) : teamSummaryError ? (
-                    <p className="text-neutral-500 italic">Unable to load team summary right now.</p>
-                  ) : teamSummary?.summary ? (
-                    <>
-                      <p>{teamSummary.summary}</p>
-                      {teamSummary.season === 2025 && (
-                        <p className="text-xs text-yellow-400/50 italic">Showing 2025 baseline summary (pre-season).</p>
+                {/* Intelligence Header Row */}
+                {teamSummary && !loadingTeam && (
+                  <>
+                    <div className="grid grid-cols-5 gap-6 mt-6 mb-6">
+                      {/* Projected Score */}
+                      <div className="flex flex-col gap-1">
+                        <div className="text-xs text-neutral-400">Projected Score</div>
+                        <div
+                          className="text-2xl font-bold text-[#F5C84C] transition-all duration-300 group-hover:scale-105"
+                        >
+                          —
+                        </div>
+                        <div className="text-xs text-neutral-600">pts</div>
+                      </div>
+
+                      {/* Confidence */}
+                      <div className="flex flex-col gap-1">
+                        <div className="text-xs text-neutral-400">Confidence</div>
+                        {(() => {
+                          const rnd = teamSummary.round_number ?? 0;
+                          const label = rnd >= 15 ? "HIGH" : rnd >= 7 ? "MEDIUM" : "LOW";
+                          const badgeClass = label === "HIGH"
+                            ? "bg-green-500/15 text-green-400 border border-green-400/30"
+                            : label === "MEDIUM"
+                              ? "bg-yellow-500/15 text-yellow-400 border border-yellow-400/30"
+                              : "bg-red-500/15 text-red-400 border border-red-400/30";
+                          return (
+                            <span className={`self-start px-2 py-1 rounded text-xs font-semibold ${badgeClass}`}>
+                              {label}
+                            </span>
+                          );
+                        })()}
+                        <div className="text-xs text-neutral-600">based on sample</div>
+                      </div>
+
+                      {/* Floor */}
+                      <div className="flex flex-col gap-1">
+                        <div className="text-xs text-neutral-400">Floor</div>
+                        <div className="text-lg font-semibold text-white">—</div>
+                        <div className="text-xs text-neutral-600">pts</div>
+                      </div>
+
+                      {/* Ceiling */}
+                      <div className="flex flex-col gap-1">
+                        <div className="text-xs text-neutral-400">Ceiling</div>
+                        <div className="text-lg font-semibold text-white">—</div>
+                        <div className="text-xs text-neutral-600">pts</div>
+                      </div>
+
+                      {/* Volatility */}
+                      <div className="flex flex-col gap-1">
+                        <div className="text-xs text-neutral-400">Volatility</div>
+                        <div className="text-lg font-semibold text-white">—</div>
+                        {(() => {
+                          const rnd = teamSummary.round_number ?? 0;
+                          const label = rnd >= 15 ? "Low" : rnd >= 7 ? "Medium" : "High";
+                          const color = label === "Low" ? "text-green-400" : label === "Medium" ? "text-yellow-400" : "text-red-400";
+                          return <div className={`text-xs ${color}`}>{label}</div>;
+                        })()}
+                      </div>
+                    </div>
+
+                    <div className="border-t border-neutral-800 my-6" />
+                  </>
+                )}
+
+                {/* AI Summary Narrative */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-white text-sm">AI Insights Summary</h4>
+                    <div className="relative">
+                      <button
+                        onMouseEnter={() => setShowTeamTransparency(true)}
+                        onMouseLeave={() => setShowTeamTransparency(false)}
+                        className="p-1.5 text-neutral-500 hover:text-[#F5C84C] transition-colors duration-150"
+                        aria-label="How this projection was generated"
+                      >
+                        <Info className="h-[18px] w-[18px]" />
+                      </button>
+
+                      {showTeamTransparency && (
+                        <div
+                          className="absolute right-0 top-7 z-50 w-[320px] rounded-xl p-4 border border-[#F5C84C]/30"
+                          style={{
+                            background: "#0b0b0b",
+                            boxShadow: "0 0 0 1px rgba(245,200,76,0.2), 0 20px 60px rgba(0,0,0,0.95)",
+                          }}
+                          onMouseEnter={() => setShowTeamTransparency(true)}
+                          onMouseLeave={() => setShowTeamTransparency(false)}
+                        >
+                          <p className="text-sm font-semibold text-[#F5C84C] mb-3">
+                            Neeko AI Projection Engine — Team Inputs
+                          </p>
+                          <ul className="space-y-2 text-xs text-neutral-400">
+                            {[
+                              "Season Average",
+                              "Recent Average",
+                              "Weighted Form",
+                              "Volatility",
+                              "Projected Score",
+                              "Floor",
+                              "Ceiling",
+                              "Opponent Difficulty",
+                              "Venue Adjustment",
+                            ].map((field) => (
+                              <li key={field} className="flex items-start gap-2">
+                                <span className="text-[#F5C84C]/50 mt-0.5">•</span>
+                                <span>{field}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <div className="mt-3 pt-3 border-t border-[#1e1e1e]">
+                            <span className="text-xs text-neutral-500">Data Source: </span>
+                            <span className="text-xs text-white">Official AFL Stats</span>
+                          </div>
+                        </div>
                       )}
-                    </>
-                  ) : (
-                    <p className="text-neutral-500 italic">AI team summary will be generated after Opening Round.</p>
-                  )}
+                    </div>
+                  </div>
+
+                  <div className="text-sm text-white/80 leading-relaxed space-y-3">
+                    {loadingTeam ? (
+                      <p className="text-yellow-400/70 animate-pulse">Loading team intelligence...</p>
+                    ) : teamSummaryError ? (
+                      <p className="text-neutral-500 italic">Unable to load team summary right now.</p>
+                    ) : teamSummary?.summary ? (
+                      <>
+                        <p>{teamSummary.summary}</p>
+                        {teamSummary.season === 2025 && (
+                          <p className="text-xs text-yellow-400/50 italic">Showing 2025 baseline summary (pre-season).</p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-neutral-500 italic">AI team summary will be generated after Opening Round.</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex justify-end pt-1">
