@@ -14,6 +14,7 @@ interface AIPlayerSummary {
   ai_summary: string | null;
   trend_direction: string | null;
   updated_at: string | null;
+  season_context?: string | null;
 }
 
 interface AITeamSummary {
@@ -35,6 +36,7 @@ interface PlayerProjection {
   avg_last_5: number | null;
   trend_3_vs_10: number | null;
   prob_100_plus: number | null;
+  season_context: string | null;
 }
 
 type Section = "player" | "team" | "match";
@@ -120,7 +122,7 @@ export default function AFLAIInsightsPage() {
         supabase
           .schema("afl")
           .from("v_neeko_player_projection")
-          .select("player_id, player_name, team, final_projection, ceiling_estimate, floor_estimate, season_avg_current, avg_last_5, trend_3_vs_10, prob_100_plus")
+          .select("player_id, player_name, team, final_projection, ceiling_estimate, floor_estimate, season_avg_current, avg_last_5, trend_3_vs_10, prob_100_plus, season_context")
           .eq("team", selectedTeam)
           .order("final_projection", { ascending: false }),
       ]);
@@ -128,7 +130,16 @@ export default function AFLAIInsightsPage() {
       if (!summaryResult.error && summaryResult.data) {
         setTeamSummary(summaryResult.data as AITeamSummary);
       } else {
-        setTeamSummary(null);
+        const fallback2025 = await supabase
+          .schema("afl")
+          .from("ai_team_summaries")
+          .select("team, season, round_number, ai_summary, updated_at")
+          .eq("team", selectedTeam)
+          .eq("season", 2025)
+          .order("round_number", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        setTeamSummary((!fallback2025.error && fallback2025.data) ? fallback2025.data as AITeamSummary : null);
       }
 
       if (!playersResult.error && playersResult.data) {
@@ -179,8 +190,12 @@ export default function AFLAIInsightsPage() {
 
   const handlePlayerCardClick = async (proj: PlayerProjection) => {
     const match = players.find((p) => p.player_id === proj.player_id);
+    const enriched = (base: AIPlayerSummary): AIPlayerSummary => ({
+      ...base,
+      season_context: proj.season_context,
+    });
     if (match) {
-      setSelectedPlayer(match);
+      setSelectedPlayer(enriched(match));
       setTimeout(() => {
         playerSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 50);
@@ -196,7 +211,7 @@ export default function AFLAIInsightsPage() {
       .limit(1)
       .maybeSingle();
     if (!error && data) {
-      setSelectedPlayer(data as AIPlayerSummary);
+      setSelectedPlayer(enriched(data as AIPlayerSummary));
       setTimeout(() => {
         playerSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 50);
@@ -222,6 +237,9 @@ export default function AFLAIInsightsPage() {
     if (trend < -3) return { label: "Trending Down", color: "text-red-400" };
     return { label: "Stable", color: "text-white/40" };
   };
+
+  const isPreseason = (ctx: string | null | undefined) =>
+    ctx === "PRESEASON_2025_BASELINE" || (!!ctx && ctx.includes("2025"));
 
   const uniqueTeams = Array.from(new Set(players.map((p) => p.team))).sort();
 
@@ -332,6 +350,15 @@ export default function AFLAIInsightsPage() {
             )}
           </div>
 
+          {/* Opening Round context banner */}
+          <div className="rounded-lg border border-yellow-400/20 bg-[#0B0B0B] px-4 py-3">
+            <p className="text-sm font-semibold text-yellow-200/80 mb-0.5">Opening Round Projections</p>
+            <p className="text-xs text-white/50 leading-relaxed">
+              These projections are based on 2025 performance and automatically update as 2026 games are played.
+              Only Opening Round teams are currently shown.
+            </p>
+          </div>
+
           {/* Search + Team Pills */}
           <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6">
             <div className="relative">
@@ -407,9 +434,14 @@ export default function AFLAIInsightsPage() {
                   {loadingTeam ? (
                     <p className="text-yellow-400 animate-pulse">Loading team intelligence...</p>
                   ) : teamSummary?.ai_summary ? (
-                    <p>{teamSummary.ai_summary}</p>
+                    <>
+                      <p>{teamSummary.ai_summary}</p>
+                      {teamSummary.season === 2025 && (
+                        <p className="mt-2 text-xs text-yellow-400/50 italic">Based on 2025 season data — will update after Opening Round.</p>
+                      )}
+                    </>
                   ) : (
-                    <p className="text-white/40 italic">No AI summary available for this team yet.</p>
+                    <p className="text-white/40 italic">AI team summary will be generated after Opening Round.</p>
                   )}
                 </div>
               </div>
@@ -423,11 +455,16 @@ export default function AFLAIInsightsPage() {
                 </div>
               ) : teamPlayers.length > 0 ? (
                 <>
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-yellow-400/70" />
-                    <span className="text-sm text-white/50 font-medium">
-                      {teamPlayers.length} players — ordered by projection
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <p className="text-lg font-semibold text-yellow-400 mb-4">
+                      {selectedTeam} — Opening Round Player Projections
+                    </p>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Users className="h-4 w-4 text-yellow-400/70" />
+                      <span className="text-sm text-white/50 font-medium">
+                        {teamPlayers.length} players
+                      </span>
+                    </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {teamPlayers.map((proj) => {
@@ -506,37 +543,43 @@ export default function AFLAIInsightsPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">Season Average</div>
-                  <div className="text-3xl font-bold text-yellow-400">
-                    {selectedPlayer.season_avg != null ? Number(selectedPlayer.season_avg).toFixed(1) : "—"}
-                  </div>
-                  {selectedPlayer.trend_direction && (
-                    <div className={`text-xs ${selectedPlayer.trend_direction === "up" ? "text-emerald-400" : selectedPlayer.trend_direction === "down" ? "text-red-400" : "text-white/50"}`}>
-                      {selectedPlayer.trend_direction === "up" ? "↑ Trending up" : selectedPlayer.trend_direction === "down" ? "↓ Trending down" : "→ Stable"}
+              {(() => {
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                      <div className="text-sm text-white/60">Season Average</div>
+                      <div className="text-3xl font-bold text-yellow-400">
+                        {selectedPlayer.season_avg != null ? Number(selectedPlayer.season_avg).toFixed(1) : "—"}
+                      </div>
+                      {selectedPlayer.trend_direction && (
+                        <div className={`text-xs ${selectedPlayer.trend_direction === "up" ? "text-emerald-400" : selectedPlayer.trend_direction === "down" ? "text-red-400" : "text-white/50"}`}>
+                          {selectedPlayer.trend_direction === "up" ? "↑ Trending up" : selectedPlayer.trend_direction === "down" ? "↓ Trending down" : "→ Stable"}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">Consistency Score</div>
-                  <div className="text-3xl font-bold text-yellow-400">
-                    {selectedPlayer.consistency_score != null ? `${selectedPlayer.consistency_score}/10` : "—"}
-                  </div>
-                  <div className="text-xs text-white/50">2026 season</div>
-                </div>
+                    <div className="space-y-2">
+                      <div className="text-sm text-white/60">Consistency Score</div>
+                      <div className="text-3xl font-bold text-yellow-400">
+                        {selectedPlayer.consistency_score != null ? `${selectedPlayer.consistency_score}/10` : "—"}
+                      </div>
+                      <div className="text-xs text-white/50">
+                        {isPreseason(selectedPlayer.season_context) ? "Pre-season projection" : "2026 season"}
+                      </div>
+                    </div>
 
-                <div className="space-y-2">
-                  <div className="text-sm text-white/60">Ceiling Potential</div>
-                  <div className="text-3xl font-bold text-yellow-400">
-                    {selectedPlayer.ceiling_fantasy != null ? `${Number(selectedPlayer.ceiling_fantasy).toFixed(0)}+` : "—"}
+                    <div className="space-y-2">
+                      <div className="text-sm text-white/60">Ceiling Potential</div>
+                      <div className="text-3xl font-bold text-yellow-400">
+                        {selectedPlayer.ceiling_fantasy != null ? `${Number(selectedPlayer.ceiling_fantasy).toFixed(0)}+` : "—"}
+                      </div>
+                      <div className="text-xs text-white/50">
+                        Floor: {selectedPlayer.floor_fantasy != null ? Number(selectedPlayer.floor_fantasy).toFixed(0) : "—"}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-xs text-white/50">
-                    Floor: {selectedPlayer.floor_fantasy != null ? Number(selectedPlayer.floor_fantasy).toFixed(0) : "—"}
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
 
               <div className="space-y-4 pt-4 border-t border-yellow-400/20">
                 <h4 className="font-semibold text-white">AI Insights Summary</h4>
