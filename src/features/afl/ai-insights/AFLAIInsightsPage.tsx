@@ -869,11 +869,11 @@ export default function AFLAIInsightsPage() {
 
                   const fmt = (v: number | null) => v !== null ? Math.round(v).toString() : "—";
 
-                  const offMax = 120;
-                  const defMax = 120;
-                  const offStrength = seasonAvg !== null ? Math.min(100, (seasonAvg / offMax) * 100) : null;
-                  const defStrength = teamFeatures?.stdev_last_10 !== null && teamFeatures?.stdev_last_10 !== undefined
-                    ? Math.max(5, Math.min(100, 100 - ((teamFeatures.stdev_last_10 / 40) * 100)))
+                  const offStrength = projectedScore !== null && seasonAvg !== null && seasonAvg > 0
+                    ? Math.max(5, Math.min(100, (projectedScore / seasonAvg) * 100))
+                    : null;
+                  const defStrength = stdev !== null
+                    ? Math.max(5, Math.min(100, 100 - (stdev / 200) * 100))
                     : null;
 
                   return (
@@ -939,29 +939,39 @@ export default function AFLAIInsightsPage() {
                       </div>
 
                       {/* Strength bars */}
-                      <div className="space-y-3 pt-1">
-                        <div className="flex items-center gap-4">
-                          <div className="text-xs text-neutral-500 w-[120px] shrink-0">Offensive Strength</div>
-                          <div className="w-[220px] h-[6px] bg-neutral-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-gradient-to-r from-[#F5C84C] to-yellow-400 transition-all duration-500"
-                              style={{ width: offStrength !== null ? `${offStrength}%` : "0%" }}
-                            />
+                      <div className="space-y-4 pt-1">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-4">
+                            <div className="text-xs text-neutral-500 w-[120px] shrink-0">Offensive Strength</div>
+                            <div className="w-[220px] h-[6px] bg-neutral-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-[#F5C84C] to-yellow-400 transition-all duration-700 ease-out"
+                                style={{ width: offStrength !== null ? `${offStrength}%` : "0%" }}
+                              />
+                            </div>
+                            <div className="text-xs text-neutral-500">
+                              {offStrength !== null ? `${Math.round(offStrength)}%` : "—"}
+                            </div>
                           </div>
-                          <div className="text-xs text-neutral-500">
-                            {offStrength !== null ? `${Math.round(offStrength)}%` : "—"}
+                          <div className="text-xs text-neutral-600 ml-[136px] mt-0.5">
+                            Based on projected score vs season average
                           </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-xs text-neutral-500 w-[120px] shrink-0">Defensive Strength</div>
-                          <div className="w-[220px] h-[6px] bg-neutral-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-gradient-to-r from-[#F5C84C] to-yellow-400 transition-all duration-500"
-                              style={{ width: defStrength !== null ? `${defStrength}%` : "0%" }}
-                            />
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-4">
+                            <div className="text-xs text-neutral-500 w-[120px] shrink-0">Defensive Strength</div>
+                            <div className="w-[220px] h-[6px] bg-neutral-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-[#F5C84C] to-yellow-400 transition-all duration-700 ease-out"
+                                style={{ width: defStrength !== null ? `${defStrength}%` : "0%" }}
+                              />
+                            </div>
+                            <div className="text-xs text-neutral-500">
+                              {defStrength !== null ? `${Math.round(defStrength)}%` : "—"}
+                            </div>
                           </div>
-                          <div className="text-xs text-neutral-500">
-                            {defStrength !== null ? `${Math.round(defStrength)}%` : "—"}
+                          <div className="text-xs text-neutral-600 ml-[136px] mt-0.5">
+                            Based on scoring stability (volatility)
                           </div>
                         </div>
                       </div>
@@ -985,65 +995,95 @@ export default function AFLAIInsightsPage() {
                         <Info className="h-[18px] w-[18px]" />
                       </button>
 
-                      {showTeamTransparency && (
-                        <div
-                          className="absolute right-0 top-7 z-50 w-[320px] rounded-xl p-4 border border-[#F5C84C]/30"
-                          style={{
-                            background: "#0b0b0b",
-                            boxShadow: "0 0 0 1px rgba(245,200,76,0.2), 0 20px 60px rgba(0,0,0,0.95)",
-                          }}
-                          onMouseEnter={() => setShowTeamTransparency(true)}
-                          onMouseLeave={() => setShowTeamTransparency(false)}
-                        >
-                          <p className="text-sm font-semibold text-[#F5C84C] mb-3">
-                            Neeko AI Projection Engine — Team Inputs
-                          </p>
-                          <ul className="space-y-2 text-xs text-neutral-400">
-                            {[
-                              {
-                                label: "Season Average",
-                                value: teamFeatures?.season_avg != null ? `${Math.round(teamFeatures.season_avg)} pts` : "—",
-                              },
-                              {
-                                label: "Recent Average",
-                                value: teamFeatures?.last_5_avg != null ? `${Math.round(teamFeatures.last_5_avg)} pts` : "—",
-                              },
-                              {
-                                label: "Volatility",
-                                value: teamFeatures?.stdev_last_10 != null
-                                  ? `${teamFeatures.stdev_last_10.toFixed(1)} (${teamFeatures.stdev_last_10 < 15 ? "Low" : teamFeatures.stdev_last_10 < 30 ? "Medium" : "High"})`
-                                  : "—",
-                              },
-                              {
-                                label: "Floor",
-                                value: teamFeatures?.floor != null ? `${Math.round(teamFeatures.floor)} pts` : "—",
-                              },
-                              {
-                                label: "Ceiling",
-                                value: teamFeatures?.ceiling != null ? `${Math.round(teamFeatures.ceiling)} pts` : "—",
-                              },
-                              {
-                                label: "Confidence",
-                                value: teamFeatures?.confidence_bucket ?? (teamSummary ? (teamSummary.round_number ?? 0) >= 15 ? "HIGH" : (teamSummary.round_number ?? 0) >= 7 ? "MEDIUM" : "LOW" : "—"),
-                              },
-                              { label: "Opponent Difficulty", value: "—" },
-                              { label: "Venue Adjustment", value: "—" },
-                            ].map(({ label, value }) => (
-                              <li key={label} className="flex items-start justify-between gap-2">
-                                <span className="flex items-start gap-2">
-                                  <span className="text-[#F5C84C]/50 mt-0.5">•</span>
-                                  <span>{label}</span>
-                                </span>
-                                <span className="text-white">{value}</span>
-                              </li>
-                            ))}
-                          </ul>
-                          <div className="mt-3 pt-3 border-t border-[#1e1e1e]">
-                            <span className="text-xs text-neutral-500">Data Source: </span>
-                            <span className="text-xs text-white">Official AFL Stats</span>
+                      {showTeamTransparency && (() => {
+                        const _rnd2 = teamSummary?.round_number ?? 0;
+                        const _confLabel2 = teamFeatures?.confidence_bucket ?? (_rnd2 >= 15 ? "HIGH" : _rnd2 >= 7 ? "MEDIUM" : "LOW");
+                        const _seasonAvg2 = teamFeatures?.season_avg ?? null;
+                        const _recentAvg2 = teamFeatures?.last_5_avg ?? null;
+                        const _proj2 = teamFeatures?.predicted_score ?? null;
+                        const _floor2 = teamFeatures?.floor ?? null;
+                        const _ceil2 = teamFeatures?.ceiling ?? null;
+                        const _stdev2 = teamFeatures?.stdev_last_10 ?? null;
+                        const _volLabel2 = _stdev2 !== null
+                          ? _stdev2 < 15 ? "Low" : _stdev2 < 30 ? "Medium" : "High"
+                          : "—";
+                        const _offStr2 = _proj2 !== null && _seasonAvg2 !== null && _seasonAvg2 > 0
+                          ? Math.max(5, Math.min(100, (_proj2 / _seasonAvg2) * 100))
+                          : null;
+                        const _defStr2 = _stdev2 !== null
+                          ? Math.max(5, Math.min(100, 100 - (_stdev2 / 200) * 100))
+                          : null;
+
+                        return (
+                          <div
+                            className="absolute right-0 top-full mt-2 z-50 w-[320px] rounded-xl p-4 border border-[#F5C84C]/30"
+                            style={{
+                              background: "#0b0b0b",
+                              boxShadow: "0 0 0 1px rgba(245,200,76,0.2), 0 20px 60px rgba(0,0,0,0.95)",
+                            }}
+                            onMouseEnter={() => setShowTeamTransparency(true)}
+                            onMouseLeave={() => setShowTeamTransparency(false)}
+                          >
+                            <p className="text-sm font-semibold text-[#F5C84C] mb-3">
+                              Neeko AI Team Projection Engine
+                            </p>
+                            <ul className="space-y-2 text-xs text-neutral-400">
+                              {[
+                                {
+                                  label: "Season Average",
+                                  value: _seasonAvg2 != null ? `${Math.round(_seasonAvg2)} pts` : "—",
+                                },
+                                {
+                                  label: "Recent Average",
+                                  value: _recentAvg2 != null ? `${Math.round(_recentAvg2)} pts` : "—",
+                                },
+                                {
+                                  label: "Projected Score",
+                                  value: _proj2 != null ? `${Math.round(_proj2)} pts` : "—",
+                                },
+                                {
+                                  label: "Floor",
+                                  value: _floor2 != null ? `${Math.round(_floor2)} pts` : "—",
+                                },
+                                {
+                                  label: "Ceiling",
+                                  value: _ceil2 != null ? `${Math.round(_ceil2)} pts` : "—",
+                                },
+                                {
+                                  label: "Volatility",
+                                  value: _stdev2 != null
+                                    ? `${_stdev2.toFixed(1)} pts — ${_volLabel2}`
+                                    : "—",
+                                },
+                                {
+                                  label: "Confidence",
+                                  value: _confLabel2,
+                                },
+                                {
+                                  label: "Offensive Strength",
+                                  value: _offStr2 != null ? `${Math.round(_offStr2)}%` : "—",
+                                },
+                                {
+                                  label: "Defensive Strength",
+                                  value: _defStr2 != null ? `${Math.round(_defStr2)}%` : "—",
+                                },
+                              ].map(({ label, value }) => (
+                                <li key={label} className="flex items-start justify-between gap-2">
+                                  <span className="flex items-start gap-2">
+                                    <span className="text-[#F5C84C]/50 mt-0.5">•</span>
+                                    <span>{label}</span>
+                                  </span>
+                                  <span className="text-white">{value}</span>
+                                </li>
+                              ))}
+                            </ul>
+                            <div className="mt-3 pt-3 border-t border-[#1e1e1e] flex flex-col gap-0.5">
+                              <span className="text-xs text-neutral-300 font-medium">Powered by Neeko AI</span>
+                              <span className="text-xs text-neutral-600">Using official AFL statistics</span>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   </div>
 
