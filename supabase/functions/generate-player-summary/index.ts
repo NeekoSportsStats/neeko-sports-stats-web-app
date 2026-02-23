@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const BATCH_LIMIT = 10;
+const BATCH_LIMIT = 50;
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
 function fmt(v: unknown): string {
@@ -62,11 +62,15 @@ Deno.serve(async (req: Request) => {
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey) throw new Error("OPENAI_API_KEY not set");
 
+    let body: Record<string, unknown> = {};
+    try { body = await req.json(); } catch { /* no body */ }
+    const offset = typeof body.offset === "number" ? body.offset : 0;
+
     const { data: viewRows, error: viewError } = await supabase
       .schema("afl")
       .from("v_ai_player_openai_inputs_2026_next_round")
       .select("match_id, round_number, player, team, opponent, player_id, season_context_label, final_openai_input")
-      .limit(BATCH_LIMIT);
+      .range(offset, offset + BATCH_LIMIT - 1);
 
     if (viewError) throw viewError;
     if (!viewRows || viewRows.length === 0) {
@@ -191,10 +195,12 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         message: "generate-player-summary complete",
+        offset,
         total: viewRows.length,
         processed,
         skipped,
         errors,
+        next_offset: offset + viewRows.length,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
