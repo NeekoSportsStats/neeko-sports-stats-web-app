@@ -790,7 +790,8 @@ export default function AFLAIInsightsPage() {
                 className="absolute top-0 left-0 right-0 h-[2px] rounded-t-xl"
                 style={{ background: "linear-gradient(90deg, transparent, #F5C84C, transparent)" }}
               />
-              <div className="pt-8 px-8 pb-6 space-y-5">
+              <div className="pt-8 px-8 pb-6 space-y-6">
+
                 {/* Card Header */}
                 <div className="flex items-start justify-between">
                   <div>
@@ -812,70 +813,90 @@ export default function AFLAIInsightsPage() {
                 </div>
 
                 {/* Intelligence Header Row */}
-                {teamSummary && !loadingTeam && (
-                  <>
-                    <div className="grid grid-cols-5 gap-6 mt-6 mb-6">
-                      {/* Projected Score */}
-                      <div className="flex flex-col gap-1">
-                        <div className="text-xs text-neutral-400">Projected Score</div>
-                        <div
-                          className="text-2xl font-bold text-[#F5C84C] transition-all duration-300 group-hover:scale-105"
-                        >
-                          —
+                {teamSummary && !loadingTeam && (() => {
+                  const rnd = teamSummary.round_number ?? 0;
+                  const confLabel = rnd >= 15 ? "HIGH" : rnd >= 7 ? "MEDIUM" : "LOW";
+                  const confBadgeClass = confLabel === "HIGH"
+                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-400/30"
+                    : confLabel === "MEDIUM"
+                      ? "bg-yellow-500/10 text-yellow-400 border border-yellow-400/30"
+                      : "bg-red-500/10 text-red-400 border border-red-400/30";
+                  const volLabel = rnd >= 15 ? "Low" : rnd >= 7 ? "Medium" : "High";
+                  const volColor = volLabel === "Low" ? "text-emerald-400" : volLabel === "Medium" ? "text-yellow-400" : "text-red-400";
+                  const offStrength = Math.min(95, 40 + rnd * 3.5);
+                  const defStrength = Math.min(92, 35 + rnd * 3.8);
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-5 gap-8 mt-6 items-start">
+                        {/* Projected Score */}
+                        <div className="flex flex-col gap-1">
+                          <div className="text-xs text-neutral-500">Projected Score</div>
+                          <div className="text-lg font-semibold text-[#F5C84C] transition-all duration-300">
+                            —
+                          </div>
+                          <div className="text-xs text-neutral-600 mt-0.5">pts</div>
                         </div>
-                        <div className="text-xs text-neutral-600">pts</div>
+
+                        {/* Confidence */}
+                        <div className="flex flex-col gap-1">
+                          <div className="text-xs text-neutral-500">Confidence</div>
+                          <span className={`self-start px-2 py-1 rounded text-xs font-semibold mt-0.5 ${confBadgeClass}`}>
+                            {confLabel}
+                          </span>
+                          <div className="text-xs text-neutral-600 mt-0.5">data sample</div>
+                        </div>
+
+                        {/* Floor */}
+                        <div className="flex flex-col gap-1">
+                          <div className="text-xs text-neutral-500">Floor</div>
+                          <div className="text-lg font-semibold text-white">—</div>
+                          <div className="text-xs text-neutral-600 mt-0.5">pts</div>
+                        </div>
+
+                        {/* Ceiling */}
+                        <div className="flex flex-col gap-1">
+                          <div className="text-xs text-neutral-500">Ceiling</div>
+                          <div className="text-lg font-semibold text-white">—</div>
+                          <div className="text-xs text-neutral-600 mt-0.5">pts</div>
+                        </div>
+
+                        {/* Volatility */}
+                        <div className="flex flex-col gap-1">
+                          <div className="text-xs text-neutral-500">Volatility</div>
+                          <div className="text-lg font-semibold text-white">—</div>
+                          <div className={`text-xs mt-0.5 ${volColor}`}>{volLabel}</div>
+                        </div>
                       </div>
 
-                      {/* Confidence */}
-                      <div className="flex flex-col gap-1">
-                        <div className="text-xs text-neutral-400">Confidence</div>
-                        {(() => {
-                          const rnd = teamSummary.round_number ?? 0;
-                          const label = rnd >= 15 ? "HIGH" : rnd >= 7 ? "MEDIUM" : "LOW";
-                          const badgeClass = label === "HIGH"
-                            ? "bg-green-500/15 text-green-400 border border-green-400/30"
-                            : label === "MEDIUM"
-                              ? "bg-yellow-500/15 text-yellow-400 border border-yellow-400/30"
-                              : "bg-red-500/15 text-red-400 border border-red-400/30";
-                          return (
-                            <span className={`self-start px-2 py-1 rounded text-xs font-semibold ${badgeClass}`}>
-                              {label}
-                            </span>
-                          );
-                        })()}
-                        <div className="text-xs text-neutral-600">based on sample</div>
+                      {/* Strength bars */}
+                      <div className="space-y-3 pt-2">
+                        <div className="flex items-center gap-4">
+                          <div className="text-xs text-neutral-500 w-[120px] shrink-0">Offensive Strength</div>
+                          <div className="w-[220px] h-[6px] bg-neutral-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-[#F5C84C] to-yellow-400 transition-all duration-500"
+                              style={{ width: `${offStrength}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-neutral-500">{Math.round(offStrength)}%</div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-xs text-neutral-500 w-[120px] shrink-0">Defensive Strength</div>
+                          <div className="w-[220px] h-[6px] bg-neutral-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-[#F5C84C] to-yellow-400 transition-all duration-500"
+                              style={{ width: `${defStrength}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-neutral-500">{Math.round(defStrength)}%</div>
+                        </div>
                       </div>
 
-                      {/* Floor */}
-                      <div className="flex flex-col gap-1">
-                        <div className="text-xs text-neutral-400">Floor</div>
-                        <div className="text-lg font-semibold text-white">—</div>
-                        <div className="text-xs text-neutral-600">pts</div>
-                      </div>
-
-                      {/* Ceiling */}
-                      <div className="flex flex-col gap-1">
-                        <div className="text-xs text-neutral-400">Ceiling</div>
-                        <div className="text-lg font-semibold text-white">—</div>
-                        <div className="text-xs text-neutral-600">pts</div>
-                      </div>
-
-                      {/* Volatility */}
-                      <div className="flex flex-col gap-1">
-                        <div className="text-xs text-neutral-400">Volatility</div>
-                        <div className="text-lg font-semibold text-white">—</div>
-                        {(() => {
-                          const rnd = teamSummary.round_number ?? 0;
-                          const label = rnd >= 15 ? "Low" : rnd >= 7 ? "Medium" : "High";
-                          const color = label === "Low" ? "text-green-400" : label === "Medium" ? "text-yellow-400" : "text-red-400";
-                          return <div className={`text-xs ${color}`}>{label}</div>;
-                        })()}
-                      </div>
-                    </div>
-
-                    <div className="border-t border-neutral-800 my-6" />
-                  </>
-                )}
+                      <div className="border-t border-neutral-800" />
+                    </>
+                  );
+                })()}
 
                 {/* AI Summary Narrative */}
                 <div className="space-y-4">
@@ -906,19 +927,21 @@ export default function AFLAIInsightsPage() {
                           </p>
                           <ul className="space-y-2 text-xs text-neutral-400">
                             {[
-                              "Season Average",
-                              "Recent Average",
-                              "Weighted Form",
-                              "Volatility",
-                              "Projected Score",
-                              "Floor",
-                              "Ceiling",
-                              "Opponent Difficulty",
-                              "Venue Adjustment",
-                            ].map((field) => (
-                              <li key={field} className="flex items-start gap-2">
-                                <span className="text-[#F5C84C]/50 mt-0.5">•</span>
-                                <span>{field}</span>
+                              { label: "Season Average", value: "—" },
+                              { label: "Recent Average", value: "—" },
+                              { label: "Volatility", value: teamSummary ? (teamSummary.round_number ?? 0) >= 15 ? "Low" : (teamSummary.round_number ?? 0) >= 7 ? "Medium" : "High" : "—" },
+                              { label: "Floor", value: "—" },
+                              { label: "Ceiling", value: "—" },
+                              { label: "Confidence", value: teamSummary ? (teamSummary.round_number ?? 0) >= 15 ? "HIGH" : (teamSummary.round_number ?? 0) >= 7 ? "MEDIUM" : "LOW" : "—" },
+                              { label: "Opponent Difficulty", value: "—" },
+                              { label: "Venue Adjustment", value: "—" },
+                            ].map(({ label, value }) => (
+                              <li key={label} className="flex items-start justify-between gap-2">
+                                <span className="flex items-start gap-2">
+                                  <span className="text-[#F5C84C]/50 mt-0.5">•</span>
+                                  <span>{label}</span>
+                                </span>
+                                <span className="text-white">{value}</span>
                               </li>
                             ))}
                           </ul>
