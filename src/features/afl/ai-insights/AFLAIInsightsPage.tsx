@@ -378,19 +378,27 @@ export default function AFLAIInsightsPage() {
     };
   };
 
-  const parseSummaryLines = (summary: string | null): { outlook: string; upside: string; risk: string } | null => {
+  const parseSummaryLines = (summary: string | null): { paragraph: string; outlook: string; upside: string; risk: string } | null => {
     if (!summary) return null;
     const hasOutlook = /Outlook\s*:/i.test(summary);
     const hasUpside = /Upside\s*:/i.test(summary);
     const hasRisk = /Risk\s*:/i.test(summary);
     if (!hasOutlook && !hasUpside && !hasRisk) return null;
-    const outlookMatch = summary.match(/Outlook[:\s–-]+([^.!]+[.!]?)/i);
-    const upsideMatch = summary.match(/Upside[:\s–-]+([^.!]+[.!]?)/i);
-    const riskMatch = summary.match(/Risk[:\s–-]+([^.!]+[.!]?)/i);
+
+    const firstSectionIdx = summary.search(/(?:Outlook|Upside|Risk)\s*:/i);
+    const paragraph = firstSectionIdx > 0 ? summary.slice(0, firstSectionIdx).trim() : "";
+
+    const extractSection = (key: string): string => {
+      const pattern = new RegExp(`${key}\\s*:\\s*([\\s\\S]*?)(?=(?:Outlook|Upside|Risk)\\s*:|$)`, "i");
+      const match = summary.match(pattern);
+      return match?.[1]?.trim() ?? "";
+    };
+
     return {
-      outlook: outlookMatch?.[1]?.trim() ?? "",
-      upside: upsideMatch?.[1]?.trim() ?? "",
-      risk: riskMatch?.[1]?.trim() ?? "",
+      paragraph,
+      outlook: extractSection("Outlook"),
+      upside: extractSection("Upside"),
+      risk: extractSection("Risk"),
     };
   };
 
@@ -874,25 +882,39 @@ export default function AFLAIInsightsPage() {
                     <div className="space-y-3 text-sm leading-relaxed">
                       {selectedPlayer.ai_summary ? (
                         summaryLines ? (
-                          <div className="space-y-2">
-                            {summaryLines.outlook && (
-                              <div className="flex gap-2">
-                                <span className="text-[#F5C84C]/60 font-semibold text-xs w-14 pt-0.5 flex-shrink-0">Outlook</span>
-                                <span className="text-white/80">{summaryLines.outlook}</span>
-                              </div>
+                          <div className="space-y-4">
+                            {summaryLines.paragraph && (
+                              <p className="text-white/80 leading-relaxed">{summaryLines.paragraph}</p>
                             )}
-                            {summaryLines.upside && (
-                              <div className="flex gap-2">
-                                <span className="text-emerald-400/70 font-semibold text-xs w-14 pt-0.5 flex-shrink-0">Upside</span>
-                                <span className="text-white/80">{summaryLines.upside}</span>
-                              </div>
-                            )}
-                            {summaryLines.risk && (
-                              <div className="flex gap-2">
-                                <span className="text-red-400/70 font-semibold text-xs w-14 pt-0.5 flex-shrink-0">Risk</span>
-                                <span className="text-white/80">{summaryLines.risk}</span>
-                              </div>
-                            )}
+                            <div className="space-y-3 pt-1">
+                              {summaryLines.outlook && (
+                                <div
+                                  className="rounded-lg px-4 py-3"
+                                  style={{ background: "rgba(245,200,76,0.06)", border: "1px solid rgba(245,200,76,0.15)" }}
+                                >
+                                  <div className="text-[10px] font-bold uppercase tracking-widest text-[#F5C84C]/70 mb-1">Outlook</div>
+                                  <p className="text-white/80 text-sm leading-relaxed">{summaryLines.outlook}</p>
+                                </div>
+                              )}
+                              {summaryLines.upside && (
+                                <div
+                                  className="rounded-lg px-4 py-3"
+                                  style={{ background: "rgba(52,211,153,0.05)", border: "1px solid rgba(52,211,153,0.15)" }}
+                                >
+                                  <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70 mb-1">Upside</div>
+                                  <p className="text-white/80 text-sm leading-relaxed">{summaryLines.upside}</p>
+                                </div>
+                              )}
+                              {summaryLines.risk && (
+                                <div
+                                  className="rounded-lg px-4 py-3"
+                                  style={{ background: "rgba(248,113,113,0.05)", border: "1px solid rgba(248,113,113,0.15)" }}
+                                >
+                                  <div className="text-[10px] font-bold uppercase tracking-widest text-red-400/70 mb-1">Risk</div>
+                                  <p className="text-white/80 text-sm leading-relaxed">{summaryLines.risk}</p>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ) : (
                           <p className="text-white/80">{selectedPlayer.ai_summary}</p>
