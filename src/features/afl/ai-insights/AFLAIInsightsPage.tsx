@@ -914,13 +914,6 @@ export default function AFLAIInsightsPage() {
 
                   const fmt = (v: number | null) => v !== null ? Math.round(v).toString() : "—";
 
-                  const offStrength = projectedScore !== null && seasonAvg !== null && seasonAvg > 0
-                    ? Math.max(5, Math.min(100, (projectedScore / seasonAvg) * 100))
-                    : null;
-                  const defStrength = stdev !== null
-                    ? Math.max(5, Math.min(100, 100 - (stdev / 200) * 100))
-                    : null;
-
                   // League rank and percentile from all teams
                   const teamsWithProj = allTeamFeatures
                     .filter(t => t.predicted_score !== null)
@@ -970,14 +963,12 @@ export default function AFLAIInsightsPage() {
 
                   return (
                     <>
-                      {/* Neeko Rating badge — top right of intelligence row */}
+                      {/* Neeko Rating badge — absolute top-right of card */}
                       {neekoRating !== null && (
-                        <div className="flex justify-end">
-                          <div className="flex flex-col items-end gap-0.5">
-                            <div className="text-xs text-neutral-500">Neeko Rating</div>
-                            <div className="font-bold text-2xl text-[#F5C84C] leading-none">{neekoRating}</div>
-                            <div className="text-xs text-neutral-600">League avg = 100</div>
-                          </div>
+                        <div className="absolute top-4 right-4 flex flex-col items-end gap-0.5 pointer-events-none">
+                          <div className="text-xs text-neutral-500">Neeko Rating</div>
+                          <div className="font-bold text-2xl text-[#F5C84C] leading-none">{neekoRating}</div>
+                          <div className="text-xs text-neutral-600">League avg = 100</div>
                         </div>
                       )}
 
@@ -1069,44 +1060,6 @@ export default function AFLAIInsightsPage() {
                         <span className="text-xs text-neutral-500">{confDescription}</span>
                       </div>
 
-                      {/* Strength bars */}
-                      <div className="space-y-4 pt-1">
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center gap-4">
-                            <div className="text-xs text-neutral-500 w-[120px] shrink-0">Offensive Strength</div>
-                            <div className="w-[220px] h-[6px] bg-neutral-800 rounded-full overflow-hidden">
-                              <div
-                                className="h-full rounded-full bg-gradient-to-r from-[#F5C84C] to-yellow-400 transition-all duration-700 ease-out"
-                                style={{ width: offStrength !== null ? `${offStrength}%` : "0%" }}
-                              />
-                            </div>
-                            <div className="text-xs text-neutral-500">
-                              {offStrength !== null ? `${Math.round(offStrength)}%` : "—"}
-                            </div>
-                          </div>
-                          <div className="text-xs text-neutral-600 ml-[136px] mt-0.5">
-                            Based on projected score vs season average
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center gap-4">
-                            <div className="text-xs text-neutral-500 w-[120px] shrink-0">Defensive Strength</div>
-                            <div className="w-[220px] h-[6px] bg-neutral-800 rounded-full overflow-hidden">
-                              <div
-                                className="h-full rounded-full bg-gradient-to-r from-[#F5C84C] to-yellow-400 transition-all duration-700 ease-out"
-                                style={{ width: defStrength !== null ? `${defStrength}%` : "0%" }}
-                              />
-                            </div>
-                            <div className="text-xs text-neutral-500">
-                              {defStrength !== null ? `${Math.round(defStrength)}%` : "—"}
-                            </div>
-                          </div>
-                          <div className="text-xs text-neutral-600 ml-[136px] mt-0.5">
-                            Based on scoring stability (volatility)
-                          </div>
-                        </div>
-                      </div>
-
                       <div className="border-t border-neutral-800" />
                     </>
                   );
@@ -1138,13 +1091,6 @@ export default function AFLAIInsightsPage() {
                         const _volLabel2 = _stdev2 !== null
                           ? _stdev2 < 15 ? "Low" : _stdev2 < 30 ? "Medium" : "High"
                           : "—";
-                        const _offStr2 = _proj2 !== null && _seasonAvg2 !== null && _seasonAvg2 > 0
-                          ? Math.max(5, Math.min(100, (_proj2 / _seasonAvg2) * 100))
-                          : null;
-                        const _defStr2 = _stdev2 !== null
-                          ? Math.max(5, Math.min(100, 100 - (_stdev2 / 200) * 100))
-                          : null;
-
                         return (
                           <div
                             className="absolute right-0 top-full mt-2 z-50 w-[320px] rounded-xl p-4 border border-[#F5C84C]/30"
@@ -1189,14 +1135,6 @@ export default function AFLAIInsightsPage() {
                                 {
                                   label: "Confidence",
                                   value: _confLabel2,
-                                },
-                                {
-                                  label: "Offensive Strength",
-                                  value: _offStr2 != null ? `${Math.round(_offStr2)}%` : "—",
-                                },
-                                {
-                                  label: "Defensive Strength",
-                                  value: _defStr2 != null ? `${Math.round(_defStr2)}%` : "—",
                                 },
                               ].map(({ label, value }) => (
                                 <li key={label} className="flex items-start justify-between gap-2">
