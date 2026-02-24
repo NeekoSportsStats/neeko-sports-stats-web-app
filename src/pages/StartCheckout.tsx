@@ -41,16 +41,20 @@ const StartCheckout = () => {
 
       // 🎉 Session ready → Call edge function
       try {
+        const origin = window.location.origin;
         const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`,
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`, // ⬅️ critical fix
+              Authorization: `Bearer ${session.access_token}`,
             },
             body: JSON.stringify({
-              priceId: import.meta.env.VITE_STRIPE_PRICE_ID,
+              price_id:    import.meta.env.VITE_STRIPE_PRICE_ID,
+              success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
+              cancel_url:  `${origin}/cancel`,
+              mode:        "subscription",
             }),
           }
         );

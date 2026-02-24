@@ -30,14 +30,43 @@ const Billing = () => {
 
   const loadSubscription = async () => {
     try {
+      // Resolve the stripe customer for this user
+      const { data: customer } = await supabase
+        .from("stripe_customers")
+        .select("customer_id, stripe_id")
+        .or(`profile_id.eq.${user?.id},user_id.eq.${user?.id}`)
+        .maybeSingle();
+
+      const customerId = customer?.customer_id || customer?.stripe_id;
+
+      if (!customerId) {
+        setSubscription(null);
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
-        .from("subscriptions")
+        .from("stripe_subscriptions")
         .select("*")
-        .eq("user_id", user?.id)
+        .eq("customer_id", customerId)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) throw error;
-      setSubscription(data);
+
+      if (data) {
+        setSubscription({
+          id: data.id,
+          status: data.status,
+          current_period_end: data.current_period_end
+            ? new Date(data.current_period_end * 1000).toISOString()
+            : "",
+          cancel_at_period_end: data.cancel_at_period_end ?? false,
+        });
+      } else {
+        setSubscription(null);
+      }
     } catch (error: any) {
       console.error("Error loading subscription:", error);
       toast({
