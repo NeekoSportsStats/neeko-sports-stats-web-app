@@ -50,4 +50,4 @@ export const FREE_MATCH_IDS: number[] = [
 export const FREE_PLAYER_ROWS = 10;
 export const FREE_TEAM_ROWS = 8;
 
-export const FREE_MATCH_ROUNDS_VISIBLE = 2;
+export const FREE_MATCH_ROUNDS_VISIBLE = 5;
