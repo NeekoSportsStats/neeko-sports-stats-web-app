@@ -7,7 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const BATCH_SIZE = 10;
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
 Deno.serve(async (req: Request) => {
@@ -64,7 +63,7 @@ Deno.serve(async (req: Request) => {
     try { body = await req.json(); } catch { /* no body */ }
     const forceRegenerate = body.force === true;
 
-    let freshSet = new Set<string>();
+    const freshSet = new Set<string>();
 
     if (!forceRegenerate) {
       const { data: existingRows } = await supabase
@@ -85,108 +84,107 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    let processed = 0;
-    let skipped = 0;
-    let errors = 0;
-    let lastTeam = "";
+    const { data: rows, error: fetchError } = await supabase
+      .schema("afl")
+      .from("v_ai_team_openai_inputs_2026_next_round")
+      .select("match_id, round_number, team, opponent, final_openai_input")
+      .order("team", { ascending: true })
+      .limit(100);
 
-    while (true) {
-      const { data: rows, error } = await supabase
-        .schema("afl")
-        .from("v_ai_team_openai_inputs_2026_next_round")
-        .select("match_id, round_number, team, opponent, final_openai_input")
-        .gt("team", lastTeam)
-        .order("team", { ascending: true })
-        .limit(BATCH_SIZE);
+    if (fetchError) {
+      await updateLog("error", 0, fetchError.message);
+      throw fetchError;
+    }
 
-      if (error) {
-        await updateLog("error", processed, error.message);
-        throw error;
-      }
-      if (!rows || rows.length === 0) break;
+    if (!rows || rows.length === 0) {
+      await updateLog("success", 0);
+      return new Response(
+        JSON.stringify({ message: "generate-team-ai-summaries complete", processed: 0, skipped: 0, errors: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-      for (const row of rows) {
-        lastTeam = row.team;
+    const toProcess = rows.filter(row => {
+      const roundNum = row.round_number ?? 0;
+      const key = `${row.team}__${roundNum}`;
+      return !freshSet.has(key);
+    });
 
+    const skipped = rows.length - toProcess.length;
+
+    const results = await Promise.allSettled(
+      toProcess.map(async (row) => {
         const roundNum = row.round_number ?? 0;
-        const key = `${row.team}__${roundNum}`;
+        const input = row.final_openai_input as Record<string, string>;
+        const systemPrompt = input.system ?? "";
+        const userPrompt = input.user ?? "";
 
-        if (freshSet.has(key)) {
-          skipped++;
-          continue;
+        if (!systemPrompt || !userPrompt) {
+          throw new Error(`Missing prompt for team ${row.team}`);
         }
 
-        try {
-          const input = row.final_openai_input as Record<string, string>;
-          const systemPrompt = input.system ?? "";
-          const userPrompt = input.user ?? "";
+        const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${openaiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            temperature: 0.4,
+            max_tokens: 1200,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+          }),
+        });
 
-          if (!systemPrompt || !userPrompt) {
-            console.error(`Missing prompt for team ${row.team}`);
-            errors++;
-            continue;
-          }
+        if (!openaiRes.ok) {
+          const errText = await openaiRes.text();
+          throw new Error(`OpenAI error for ${row.team}: ${errText}`);
+        }
 
-          const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${openaiKey}`,
-              "Content-Type": "application/json",
+        const openaiData = await openaiRes.json();
+        const summary = openaiData.choices?.[0]?.message?.content ?? "";
+
+        let fantasy_verdict = "NEUTRAL";
+        if (summary.includes("Elite fantasy team")) fantasy_verdict = "ELITE";
+        else if (summary.includes("Strong fantasy team")) fantasy_verdict = "STRONG";
+        else if (summary.includes("Reliable fantasy team")) fantasy_verdict = "RELIABLE";
+        else if (summary.includes("Volatile fantasy team")) fantasy_verdict = "VOLATILE";
+        else if (summary.includes("Risky fantasy team")) fantasy_verdict = "RISKY";
+        else if (summary.includes("Avoid fantasy team")) fantasy_verdict = "AVOID";
+
+        const { error: upsertError } = await supabase
+          .schema("afl")
+          .from("ai_team_summaries")
+          .upsert(
+            {
+              team: row.team,
+              season: 2026,
+              round_number: roundNum,
+              summary,
+              fantasy_verdict,
+              updated_at: new Date().toISOString(),
             },
-            body: JSON.stringify({
-              model: "gpt-4o",
-              temperature: 0.4,
-              max_tokens: 1200,
-              messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt },
-              ],
-            }),
-          });
+            { onConflict: "team,season,round_number" }
+          );
 
-          if (!openaiRes.ok) {
-            console.error(`OpenAI error for team ${row.team}: ${await openaiRes.text()}`);
-            errors++;
-            continue;
-          }
-
-          const openaiData = await openaiRes.json();
-          const summary = openaiData.choices?.[0]?.message?.content ?? "";
-
-          let fantasy_verdict = "NEUTRAL";
-          if (summary.includes("Elite fantasy team")) fantasy_verdict = "ELITE";
-          else if (summary.includes("Strong fantasy team")) fantasy_verdict = "STRONG";
-          else if (summary.includes("Reliable fantasy team")) fantasy_verdict = "RELIABLE";
-          else if (summary.includes("Volatile fantasy team")) fantasy_verdict = "VOLATILE";
-          else if (summary.includes("Risky fantasy team")) fantasy_verdict = "RISKY";
-          else if (summary.includes("Avoid fantasy team")) fantasy_verdict = "AVOID";
-
-          const { error: upsertError } = await supabase
-            .schema("afl")
-            .from("ai_team_summaries")
-            .upsert(
-              {
-                team: row.team,
-                season: 2026,
-                round_number: roundNum,
-                summary,
-                fantasy_verdict,
-                updated_at: new Date().toISOString(),
-              },
-              { onConflict: "team,season,round_number" }
-            );
-
-          if (upsertError) {
-            console.error(`Upsert error for team ${row.team}: ${upsertError.message}`);
-            errors++;
-            continue;
-          }
-
-          processed++;
-        } catch (rowErr) {
-          console.error(`Row error for team ${row.team}:`, rowErr);
-          errors++;
+        if (upsertError) {
+          throw new Error(`Upsert error for ${row.team}: ${upsertError.message}`);
         }
+
+        return row.team;
+      })
+    );
+
+    const processed = results.filter(r => r.status === "fulfilled").length;
+    const errors = results.filter(r => r.status === "rejected").length;
+
+    for (const r of results) {
+      if (r.status === "rejected") {
+        console.error("Team summary error:", r.reason);
       }
     }
 
