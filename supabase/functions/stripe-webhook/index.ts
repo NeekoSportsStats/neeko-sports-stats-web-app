@@ -170,22 +170,25 @@ async function syncCustomerFromStripe(customerId: string) {
 
   const { error: profileError } = await supabase
     .from('profiles')
-    .update({
-      is_active: isActive,
-      plan: isActive ? 'premium' : 'free',
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscription.id,
-      subscription_status: subscription.status,
-      subscription_tier: isActive ? 'premium' : 'free',
-      current_period_end: periodEnd,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', userId);
+    .upsert(
+      {
+        id: userId,
+        is_active: isActive,
+        plan: isActive ? 'premium' : 'free',
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subscription.id,
+        subscription_status: subscription.status,
+        subscription_tier: isActive ? 'premium' : 'free',
+        current_period_end: periodEnd,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' }
+    );
 
   if (profileError) {
-    console.error('profiles update error:', profileError);
+    console.error('profiles upsert error:', profileError);
   } else {
-    console.log(`profiles updated: user=${userId}, is_active=${isActive}, plan=${isActive ? 'premium' : 'free'}`);
+    console.log(`profiles upserted: user=${userId}, is_active=${isActive}, plan=${isActive ? 'premium' : 'free'}`);
   }
 
   const { error: subTableError } = await supabase.from('subscriptions').upsert(
