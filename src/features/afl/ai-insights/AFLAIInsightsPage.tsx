@@ -40,14 +40,6 @@ interface AIMatchPrediction {
   ai_summary: string | null;
   prediction_explanation: string | null;
   updated_at: string | null;
-  match_date?: string | null;
-}
-
-function formatMatchDate(dateString: string | null | undefined): string | null {
-  if (!dateString) return null;
-  const d = new Date(dateString);
-  if (isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
 }
 
 interface AITeamSummary {
@@ -502,7 +494,7 @@ export default function AFLAIInsightsPage() {
         const { data } = await supabase
           .schema("afl")
           .from("ai_match_predictions")
-          .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, ai_summary, prediction_explanation, updated_at, match_date")
+          .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, ai_summary, prediction_explanation, updated_at")
           .eq("season", 2026)
           .eq("round_number", currentRound)
           .order("match_id", { ascending: true })
@@ -511,7 +503,7 @@ export default function AFLAIInsightsPage() {
       } else {
         const { data: previewData } = await supabase
           .from("v_ai_match_predictions_preview")
-          .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, updated_at, match_date")
+          .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, updated_at")
           .eq("round_number", currentRound)
           .order("match_id", { ascending: true })
           .limit(10);
@@ -698,6 +690,7 @@ export default function AFLAIInsightsPage() {
                   <div>
                     {searchResults.map((proj, idx) => {
                       const isHighlighted = idx === highlightedIndex;
+                      const isResultLocked = !isPremium && !FREE_PLAYER_IDS.includes(proj.player_id);
                       return (
                         <button
                           key={proj.player_id}
@@ -712,9 +705,15 @@ export default function AFLAIInsightsPage() {
                           <div className="flex items-center flex-wrap gap-x-1">
                             <span className="text-sm font-semibold text-white">{proj.player_name}</span>
                             <span className="text-xs text-neutral-400 ml-1">{proj.team}</span>
-                            {proj.final_projection != null && (
+                            {!isResultLocked && proj.final_projection != null && (
                               <span className="text-xs text-[#F5C84C] font-medium ml-1">
                                 · {Number(proj.final_projection).toFixed(0)} proj.
+                              </span>
+                            )}
+                            {isResultLocked && (
+                              <span className="inline-flex items-center gap-1 text-xs text-[#F5C84C]/70 ml-1 font-medium">
+                                <Lock className="h-3 w-3" />
+                                Neeko+
                               </span>
                             )}
                           </div>
@@ -786,7 +785,7 @@ export default function AFLAIInsightsPage() {
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2 text-xs font-semibold text-[#F5C84C]/70 uppercase tracking-widest mb-2">
-                        Player Analysis
+                        Player Fantasy Analysis
                         {isLockedPlayer && <Lock className="h-3 w-3 text-[#F5C84C]" />}
                       </div>
                       <h3 className="text-3xl font-bold text-white">{selectedPlayer.player}</h3>
@@ -798,10 +797,11 @@ export default function AFLAIInsightsPage() {
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      {/* Recommendation badge */}
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${recommendation.color} ${recommendation.bg} ${recommendation.border}`}>
-                        {recommendation.label}
-                      </span>
+                      {!isLockedPlayer && (
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${recommendation.color} ${recommendation.bg} ${recommendation.border}`}>
+                          {recommendation.label}
+                        </span>
+                      )}
                       <button
                         onClick={() => setSelectedPlayer(null)}
                         className="text-xs text-neutral-500 hover:text-white transition-colors"
@@ -811,6 +811,12 @@ export default function AFLAIInsightsPage() {
                     </div>
                   </div>
 
+                  {isLockedPlayer ? (
+                    <div className="rounded-xl p-8" style={{ background: "rgba(245,200,76,0.04)", border: "1px solid rgba(245,200,76,0.12)" }}>
+                      <PremiumGateCTA />
+                    </div>
+                  ) : (
+                  <>
                   {/* Stats Grid */}
                   <div className="relative flex items-start justify-between mt-6">
                     {/* Season Average — left */}
@@ -1053,6 +1059,8 @@ export default function AFLAIInsightsPage() {
                   <div className="flex justify-end pt-2">
                     <span className="text-xs text-neutral-700">Powered by Neeko AI</span>
                   </div>
+                  </>
+                  )}
                 </div>
               </div>
             );
@@ -1128,36 +1136,54 @@ export default function AFLAIInsightsPage() {
               <div className="pt-8 px-8 pb-6 space-y-6">
 
                 {/* Card Header */}
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="text-xs font-semibold text-[#F5C84C]/70 uppercase tracking-widest mb-2">
-                      Team AI Projection
-                    </div>
-                    <h3 className="text-2xl font-bold text-white">{selectedTeam}</h3>
-                    {teamSummary && (
-                      <div className="text-xs text-neutral-500 mt-1">
-                        {teamSummary.season} Season · Round {teamSummary.round_number}
+                {(() => {
+                  const isLockedTeam = !isPremium && !FREE_TEAM_NAMES.includes(selectedTeam);
+                  return (
+                    <>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 text-xs font-semibold text-[#F5C84C]/70 uppercase tracking-widest mb-2">
+                          Team Fantasy Projection
+                          {isLockedTeam && <Lock className="h-3 w-3 text-[#F5C84C]" />}
+                        </div>
+                        <h3 className="text-2xl font-bold text-white">{selectedTeam}</h3>
+                        {!isLockedTeam && teamSummary && (
+                          <div className="text-xs text-neutral-500 mt-1">
+                            {teamSummary.season} Season · Round {teamSummary.round_number}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    {teamSummary?.fantasy_verdict && (
-                      <FantasyVerdictBadge verdict={teamSummary.fantasy_verdict} />
-                    )}
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-yellow-400/30 bg-yellow-400/10 text-yellow-300 text-xs font-semibold">
-                      <Sparkles className="h-3 w-3" />
-                      AI Generated
-                    </div>
-                    {neekoRating !== null && (
-                      <div className="flex flex-col items-end gap-0.5 mt-1">
-                        <div className="text-xs text-neutral-500">Neeko Rating</div>
-                        <div className="font-bold text-2xl text-[#F5C84C] leading-none">{neekoRating}</div>
-                        <div className="text-xs text-neutral-600">League avg = 100</div>
+                      <div className="flex flex-col items-end gap-2">
+                        {!isLockedTeam && teamSummary?.fantasy_verdict && (
+                          <FantasyVerdictBadge verdict={teamSummary.fantasy_verdict} />
+                        )}
+                        {!isLockedTeam && (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-yellow-400/30 bg-yellow-400/10 text-yellow-300 text-xs font-semibold">
+                            <Sparkles className="h-3 w-3" />
+                            AI Generated
+                          </div>
+                        )}
+                        {!isLockedTeam && neekoRating !== null && (
+                          <div className="flex flex-col items-end gap-0.5 mt-1">
+                            <div className="text-xs text-neutral-500">Neeko Rating</div>
+                            <div className="font-bold text-2xl text-[#F5C84C] leading-none">{neekoRating}</div>
+                            <div className="text-xs text-neutral-600">League avg = 100</div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
 
+                    {isLockedTeam ? (
+                      <div className="rounded-xl p-8" style={{ background: "rgba(245,200,76,0.04)", border: "1px solid rgba(245,200,76,0.12)" }}>
+                        <PremiumGateCTA />
+                      </div>
+                    ) : null}
+                    </>
+                  );
+                })()}
+
+                {/* Intelligence Header Row — only for unlocked teams */}
+                {(!isPremium && !FREE_TEAM_NAMES.includes(selectedTeam)) ? null : (<>
                 {/* Intelligence Header Row */}
                 {teamSummary && !loadingTeam && (() => {
                   const rnd = teamSummary.round_number ?? 0;
@@ -1487,6 +1513,7 @@ export default function AFLAIInsightsPage() {
                 <div className="flex justify-end pt-1">
                   <span className="text-xs text-neutral-700">Powered by Neeko AI</span>
                 </div>
+                </>)}
               </div>
             </div>
           )}
@@ -1525,7 +1552,6 @@ export default function AFLAIInsightsPage() {
               {matchSummaries.map((match) => {
                 const isSelected = selectedMatchId === match.match_id;
                 const isLocked = !isPremium && !FREE_MATCH_IDS.includes(match.match_id);
-                const dateLabel = formatMatchDate(match.match_date);
                 return (
                   <div key={match.match_id}>
                     <button
@@ -1544,9 +1570,6 @@ export default function AFLAIInsightsPage() {
                         <div className="font-semibold text-sm leading-tight">
                           {match.home_team} vs {match.away_team}
                         </div>
-                        {dateLabel && (
-                          <div className="text-xs text-white/30 mt-1">{dateLabel}</div>
-                        )}
                       </div>
                     </button>
                   </div>
@@ -1564,6 +1587,7 @@ export default function AFLAIInsightsPage() {
             const match = matchSummaries.find((m) => m.match_id === selectedMatchId);
             if (!match) return null;
 
+            const isLockedMatch = !isPremium && !FREE_MATCH_IDS.includes(match.match_id);
             const summary = cleanSummary(match.ai_summary);
 
             const homeScore = Math.round(match.predicted_home_score ?? 0);
@@ -1635,17 +1659,13 @@ export default function AFLAIInsightsPage() {
                   {/* SECTION 1 — Match Header */}
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <div className="text-xs font-semibold text-[#F5C84C]/70 uppercase tracking-widest mb-2">
-                        Round {match.round_number} · {match.season} Season
+                      <div className="flex items-center gap-2 text-xs font-semibold text-[#F5C84C]/70 uppercase tracking-widest mb-2">
+                        Match Fantasy Prediction · Round {match.round_number}
+                        {isLockedMatch && <Lock className="h-3 w-3 text-[#F5C84C]" />}
                       </div>
                       <h3 className="text-2xl font-bold text-white">
                         {match.home_team} vs {match.away_team}
                       </h3>
-                      {formatMatchDate(match.match_date) && (
-                        <div className="text-xs text-neutral-500 mt-1">
-                          {formatMatchDate(match.match_date)}
-                        </div>
-                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <div
@@ -1690,6 +1710,12 @@ export default function AFLAIInsightsPage() {
                       )}
                     </div>
                   </div>
+
+                  {isLockedMatch ? (
+                    <div className="rounded-xl p-8" style={{ background: "rgba(245,200,76,0.04)", border: "1px solid rgba(245,200,76,0.12)" }}>
+                      <PremiumGateCTA />
+                    </div>
+                  ) : (<>
 
                   {/* SECTION 2 — Feature Grid */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-[18px]">
@@ -1790,6 +1816,7 @@ export default function AFLAIInsightsPage() {
                   <div className="flex justify-end pt-4">
                     <span className="text-xs text-neutral-700">Powered by Neeko AI</span>
                   </div>
+                  </>)}
 
                 </div>
               </div>
