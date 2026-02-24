@@ -5,7 +5,7 @@ import TeamOverlay from "./TeamOverlay";
 import { getTeams, TeamData, StatLens } from "./getTeams";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
-import { FREE_TEAM_NAMES, FREE_TOTAL_TEAMS } from "@/config/freemiumConfig";
+import { FREE_TOTAL_TEAMS } from "@/config/freemiumConfig";
 import {
   Tooltip,
   TooltipContent,
@@ -43,14 +43,7 @@ export default function AFLTeamsPage() {
 
   const visibleTeams = useMemo(() => {
     if (isPremium) return allTeams;
-    return allTeams
-      .filter((t) => FREE_TEAM_NAMES.includes(t.name))
-      .slice(0, FREE_TOTAL_TEAMS);
-  }, [allTeams, isPremium]);
-
-  const lockedTeams = useMemo(() => {
-    if (isPremium) return [];
-    return allTeams.filter((t) => !FREE_TEAM_NAMES.includes(t.name));
+    return allTeams.slice(0, FREE_TOTAL_TEAMS);
   }, [allTeams, isPremium]);
 
   const selected = useMemo(() => {
@@ -187,13 +180,12 @@ export default function AFLTeamsPage() {
             <div className="space-y-0">
               <TeamGrid
                 teams={visibleTeams}
-                lockedTeams={lockedTeams}
                 lens={lens}
                 minRound={minRound}
                 maxRound={maxRound}
                 onTeamSelect={(t) => setSelectedId(t.id)}
               />
-              {!isPremium && lockedTeams.length > 0 && (
+              {!isPremium && allTeams.length > FREE_TOTAL_TEAMS && (
                 <div
                   className="rounded-b-2xl px-8 py-10 flex flex-col items-center gap-4 text-center border border-t-0 border-white/10"
                   style={{ background: "linear-gradient(180deg, rgba(7,7,7,0.7) 0%, rgba(7,7,7,0.97) 100%)" }}
@@ -206,7 +198,7 @@ export default function AFLTeamsPage() {
                   </div>
                   <div>
                     <p className="text-base font-bold text-white">
-                      {lockedTeams.length} more team{lockedTeams.length !== 1 ? "s" : ""} locked
+                      {allTeams.length - FREE_TOTAL_TEAMS} more team{allTeams.length - FREE_TOTAL_TEAMS !== 1 ? "s" : ""} locked
                     </p>
                     <p className="text-sm text-white/50 mt-1 max-w-sm">
                       Upgrade to Neeko+ to unlock all 18 AFL teams.
