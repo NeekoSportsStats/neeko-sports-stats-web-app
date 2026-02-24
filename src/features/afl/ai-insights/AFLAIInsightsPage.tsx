@@ -1424,7 +1424,7 @@ export default function AFLAIInsightsPage() {
               {matchSummaries.map((match) => {
                 const isSelected = selectedMatchId === match.match_id;
                 return (
-                  <div key={match.match_id} className="group relative">
+                  <div key={match.match_id}>
                     <button
                       onClick={() => setSelectedMatchId(isSelected ? null : match.match_id)}
                       className={`w-full p-4 rounded-lg border text-left transition-all duration-300 ${
@@ -1433,49 +1433,18 @@ export default function AFLAIInsightsPage() {
                           : "bg-white/5 border-white/10 hover:border-[#F5C84C] hover:shadow-[0_0_25px_rgba(245,200,76,0.25)] text-white"
                       }`}
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs text-white/50 mb-1">Round {match.round_number}</div>
-                          <div className="font-semibold text-sm leading-tight">
-                            {match.home_team} vs {match.away_team}
-                          </div>
-                          {match.updated_at && (
-                            <div className="text-xs text-white/30 mt-1">
-                              {new Date(match.updated_at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
-                            </div>
-                          )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-white/50 mb-1">Round {match.round_number}</div>
+                        <div className="font-semibold text-sm leading-tight">
+                          {match.home_team} vs {match.away_team}
                         </div>
-                        <Brain className={`w-4 h-4 flex-shrink-0 ml-2 mt-0.5 transition-colors duration-200 ${
-                          isSelected ? "text-[#F5C84C]" : "text-[#F5C84C]/40 group-hover:text-[#F5C84C]"
-                        }`} />
+                        {match.updated_at && (
+                          <div className="text-xs text-white/30 mt-1">
+                            {new Date(match.updated_at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+                          </div>
+                        )}
                       </div>
                     </button>
-
-                    {match.prediction_explanation && (
-                      <div
-                        className="absolute left-0 right-0 bottom-full mb-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-300 z-50"
-                        style={{ filter: "drop-shadow(0 0 30px rgba(245,200,76,0.15))" }}
-                      >
-                        <div
-                          className="rounded-xl p-4"
-                          style={{
-                            background: "#0B0B0B",
-                            border: "1px solid rgba(245,200,76,0.30)",
-                            boxShadow: "0 0 30px rgba(245,200,76,0.15), 0 20px 60px rgba(0,0,0,0.9)",
-                          }}
-                        >
-                          <div className="flex items-center gap-2 mb-2">
-                            <Brain className="w-3.5 h-3.5 text-[#F5C84C]" />
-                            <span className="text-[#F5C84C] text-xs font-semibold uppercase tracking-wider">
-                              AI Engine Explanation
-                            </span>
-                          </div>
-                          <p className="text-white/80 text-xs leading-relaxed">
-                            {match.prediction_explanation}
-                          </p>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -1574,17 +1543,47 @@ export default function AFLAIInsightsPage() {
                         </div>
                       )}
                     </div>
-                    <div
-                      className="flex flex-col items-end gap-1 px-3 py-2 rounded-lg"
-                      style={{
-                        background: "rgba(245,200,76,0.08)",
-                        border: "1px solid rgba(245,200,76,0.25)",
-                        borderRadius: "8px",
-                        padding: "6px 10px",
-                      }}
-                    >
-                      <span className="text-xs text-neutral-500">Neeko Confidence</span>
-                      <span className="text-xl font-bold text-[#F5C84C] leading-none">{confidence}%</span>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="flex flex-col items-end gap-1 px-3 py-2 rounded-lg"
+                        style={{
+                          background: "rgba(245,200,76,0.08)",
+                          border: "1px solid rgba(245,200,76,0.25)",
+                          borderRadius: "8px",
+                          padding: "6px 10px",
+                        }}
+                      >
+                        <span className="text-xs text-neutral-500">Neeko Confidence</span>
+                        <span className="text-xl font-bold text-[#F5C84C] leading-none">{confidence}%</span>
+                      </div>
+                      {match.prediction_explanation && (
+                        <div className="relative"
+                          onMouseEnter={() => setActiveMatchTooltip("predictionExplanation")}
+                          onMouseLeave={() => setActiveMatchTooltip(null)}
+                        >
+                          <Info className="w-4 h-4 text-[#F5C84C]/50 hover:text-[#F5C84C] cursor-pointer transition-colors duration-200" />
+                          {activeMatchTooltip === "predictionExplanation" && (
+                            <div
+                              className="absolute right-0 top-full mt-2 z-50 max-w-[380px] w-[380px] rounded-lg p-4 text-sm opacity-0 animate-[fadeIn_0.2s_ease_forwards] pointer-events-none"
+                              style={{
+                                background: "#0b0b0b",
+                                border: "1px solid rgba(245,200,76,0.30)",
+                                boxShadow: "0 8px 32px rgba(0,0,0,0.9)",
+                              }}
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                <Brain className="w-3.5 h-3.5 text-[#F5C84C]" />
+                                <span className="text-[#F5C84C] text-xs font-semibold uppercase tracking-wider">
+                                  AI Engine Explanation
+                                </span>
+                              </div>
+                              <p className="text-white/80 text-xs leading-relaxed">
+                                {match.prediction_explanation}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
