@@ -6,7 +6,6 @@ import { getAvailableTeams, getPlayers, PlayerData, StatLens } from "./getPlayer
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import {
-  FREE_PLAYER_NAMES,
   FREE_TOTAL_PLAYERS,
   FREE_PLAYERS_PER_TEAM,
 } from "@/config/freemiumConfig";
@@ -40,18 +39,14 @@ export default function AFLPlayersPage() {
     const fetchPlayers = async () => {
       setLoading(true);
       const seasonNum = parseInt(season);
-      const response = await getPlayers(
-        lens,
-        seasonNum,
-        isPremium ? undefined : FREE_PLAYER_NAMES
-      );
+      const response = await getPlayers(lens, seasonNum);
       setAllPlayers(response.players);
       setMinRound(response.minRound);
       setMaxRound(response.maxRound);
       setLoading(false);
     };
     fetchPlayers();
-  }, [lens, season, isPremium]);
+  }, [lens, season]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
