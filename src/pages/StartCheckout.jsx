@@ -47,8 +47,8 @@ export default function StartCheckout() {
               Authorization: `Bearer ${session.access_token}`,
             },
             body: JSON.stringify({
-              price_id:    import.meta.env.VITE_STRIPE_PRICE_ID,
-              success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
+              price_id:    import.meta.env.VITE_STRIPE_PRICE_ID || "price_1SRKQUEKV8332a9YamiWbA5L",
+              success_url: `${origin}/success`,
               cancel_url:  `${origin}/neeko-plus`,
               mode:        "subscription",
             }),
