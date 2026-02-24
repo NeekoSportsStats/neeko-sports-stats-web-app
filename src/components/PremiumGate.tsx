@@ -6,9 +6,10 @@ interface PremiumGateProps {
   children?: ReactNode;
   blur?: boolean;
   isLocked?: boolean;
+  mode?: "blur" | "solid";
 }
 
-export function PremiumGate({ children, blur = true, isLocked }: PremiumGateProps) {
+export function PremiumGate({ children, blur = true, isLocked, mode = "blur" }: PremiumGateProps) {
   const { isPremium } = useAuth();
 
   const locked = isLocked !== undefined ? isLocked : !isPremium;
@@ -23,12 +24,23 @@ export function PremiumGate({ children, blur = true, isLocked }: PremiumGateProp
 
   return (
     <div className="relative">
-      {blur && (
+      {mode === "blur" && blur ? (
         <div className="blur-sm pointer-events-none select-none">
           {children}
         </div>
+      ) : (
+        <div className="invisible pointer-events-none select-none">
+          {children}
+        </div>
       )}
-      <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md rounded-xl">
+      <div
+        className="absolute inset-0 flex items-center justify-center rounded-xl"
+        style={
+          mode === "solid"
+            ? { background: "rgba(7,7,7,0.92)" }
+            : { background: "rgba(0,0,0,0.6)", backdropFilter: "blur(12px)" }
+        }
+      >
         <PremiumGateCTA />
       </div>
     </div>

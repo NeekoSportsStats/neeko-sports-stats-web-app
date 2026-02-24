@@ -747,7 +747,7 @@ export default function AFLAIInsightsPage() {
               {teamPlayersLoading ? (
                 <div className="px-5 py-6 text-center text-xs text-neutral-500 animate-pulse">Loading players...</div>
               ) : (
-                <div className="divide-y divide-white/5">
+                <div className="divide-y divide-white/5 max-h-[320px] overflow-y-auto">
                   {teamPlayers.map((proj) => {
                     const isResultLocked = !isPremium && !FREE_PLAYER_IDS.includes(proj.player_id);
                     return (
@@ -908,15 +908,15 @@ export default function AFLAIInsightsPage() {
                   style={{ background: "linear-gradient(90deg, transparent, #F5C84C, transparent)" }}
                 />
 
-                <div className="pt-8 px-8 pb-6 space-y-6">
+                <div className="pt-4 md:pt-8 px-4 md:px-8 pb-4 md:pb-6 space-y-4 md:space-y-6">
                   {/* Card Header */}
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2 text-xs font-semibold text-[#F5C84C]/70 uppercase tracking-widest mb-2">
-                        Player Fantasy Analysis
+                        Player Fantasy Projection
                         {isLockedPlayer && <Lock className="h-3 w-3 text-[#F5C84C]" />}
                       </div>
-                      <h3 className="text-3xl font-bold text-white">{selectedPlayer.player}</h3>
+                      <h3 className="text-2xl md:text-3xl font-bold text-white">{selectedPlayer.player}</h3>
                       <div className="text-sm text-neutral-300 mt-0.5">{selectedPlayer.team}</div>
                       {selectedPlayer.opponent && (
                         <div className="text-sm font-semibold text-[#F5C84C]/80 mt-1">
@@ -939,15 +939,15 @@ export default function AFLAIInsightsPage() {
                     </div>
                   </div>
 
-                  <PremiumGate isLocked={isLockedPlayer}>
+                  <PremiumGate isLocked={isLockedPlayer} mode="solid">
                   <>
                   {/* Stats Grid */}
-                  <div className="relative flex items-start justify-between mt-6">
-                    {/* Season Average — left */}
-                    <div className="flex flex-col items-start w-[33%]">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    {/* Season Average */}
+                    <div className="flex flex-col items-start">
                       <div className="text-xs text-neutral-400">Season Average</div>
                       <div
-                        className="text-4xl font-bold text-[#F5C84C] mt-1"
+                        className="text-2xl md:text-4xl font-bold text-[#F5C84C] mt-1"
                         style={{ transition: "transform 300ms ease", transform: projScaled ? "scale(1.05)" : "scale(1)" }}
                       >
                         {selectedPlayer.season_avg != null ? Number(selectedPlayer.season_avg).toFixed(1) : "—"}
@@ -960,7 +960,7 @@ export default function AFLAIInsightsPage() {
                       {percentile != null && (
                         <>
                           <div className="text-xs text-neutral-500 mt-1">{percentile}th percentile</div>
-                          <div className="w-[180px] mt-1.5 h-[5px] rounded-full bg-neutral-800 overflow-hidden">
+                          <div className="w-full max-w-[180px] mt-1.5 h-[5px] rounded-full bg-neutral-800 overflow-hidden">
                             <div
                               className="h-full rounded-full bg-[#F5C84C] transition-all duration-500"
                               style={{ width: `${percentile}%` }}
@@ -976,10 +976,10 @@ export default function AFLAIInsightsPage() {
                     </div>
 
                     {/* Consistency Score — centre */}
-                    <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center w-[33%]">
+                    <div className="flex flex-col items-start md:items-center">
                       <div className="text-xs text-neutral-400">Consistency Score</div>
                       <div
-                        className={`text-[2.75rem] font-bold mt-1 ${consistencyColor}`}
+                        className={`text-2xl md:text-[2.75rem] font-bold mt-1 ${consistencyColor}`}
                         style={{ transition: "transform 300ms ease", transform: projScaled ? "scale(1.05)" : "scale(1)" }}
                       >
                         {selectedPlayer.consistency_score != null ? `${selectedPlayer.consistency_score}/10` : "—"}
@@ -990,7 +990,7 @@ export default function AFLAIInsightsPage() {
                         </div>
                       )}
                       {selectedPlayer.consistency_score != null && (
-                        <div className="w-[180px] mt-1.5 h-[5px] rounded-full bg-neutral-800 overflow-hidden">
+                        <div className="w-full max-w-[180px] mt-1.5 h-[5px] rounded-full bg-neutral-800 overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
                               selectedPlayer.consistency_score >= 7
@@ -1011,11 +1011,11 @@ export default function AFLAIInsightsPage() {
                       </div>
                     </div>
 
-                    {/* Ceiling Potential — right */}
-                    <div className="flex flex-col items-end text-right w-[33%] mt-[2px]">
+                    {/* Ceiling Potential */}
+                    <div className="flex flex-col items-start md:items-end md:text-right">
                       <div className="text-xs text-neutral-400">Ceiling Potential</div>
                       <div
-                        className="text-4xl font-bold text-[#F5C84C] mt-1"
+                        className="text-2xl md:text-4xl font-bold text-[#F5C84C] mt-1"
                         style={{ transition: "transform 300ms ease", transform: projScaled ? "scale(1.05)" : "scale(1)" }}
                       >
                         {selectedPlayer.ceiling_fantasy != null ? `${Number(selectedPlayer.ceiling_fantasy).toFixed(0)}+` : "—"}
