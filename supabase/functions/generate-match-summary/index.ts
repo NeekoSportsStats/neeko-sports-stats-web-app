@@ -25,6 +25,126 @@ function r0(v: unknown): string {
   return n !== null ? Math.round(n).toString() : "N/A";
 }
 
+function ladderLabel(pos: number | null): string {
+  if (pos === null) return "mid-table";
+  if (pos <= 4) return `ladder position ${pos} (top 4)`;
+  if (pos <= 8) return `ladder position ${pos} (top 8)`;
+  if (pos <= 12) return `ladder position ${pos} (mid-table)`;
+  if (pos <= 16) return `ladder position ${pos} (lower tier)`;
+  return `ladder position ${pos} (bottom tier)`;
+}
+
+function ladderBonusLabel(adj: number | null): string {
+  const a = toNum(adj);
+  if (a === null) return "neutral";
+  if (a >= 10) return `+${a} strength (elite)`;
+  if (a >= 6)  return `+${a} strength (finals contender)`;
+  if (a >= 2)  return `+${a} strength (mid-table)`;
+  if (a <= -4) return `${a} strength (below-average)`;
+  return "neutral";
+}
+
+function formLabel(adj: number | null): string {
+  const a = toNum(adj);
+  if (a === null) return "neutral";
+  if (a >= 4)  return `improving (+${a.toFixed(1)} recent form)`;
+  if (a >= 1)  return `slightly up (+${a.toFixed(1)} recent form)`;
+  if (a <= -4) return `declining (${a.toFixed(1)} recent form)`;
+  if (a <= -1) return `slightly down (${a.toFixed(1)} recent form)`;
+  return "stable form";
+}
+
+function winRateBonusLabel(bonus: number | null, winRate: number | null): string {
+  const b = toNum(bonus);
+  const w = toNum(winRate);
+  if (b === null || w === null) return "average win rate";
+  const pct = Math.round(w * 100);
+  if (b >= 5)  return `strong win rate ${pct}% (+${b.toFixed(0)} bonus)`;
+  if (b >= 2)  return `above-average win rate ${pct}%`;
+  if (b <= -5) return `poor win rate ${pct}% (${b.toFixed(0)} penalty)`;
+  if (b <= -2) return `below-average win rate ${pct}%`;
+  return `average win rate ${pct}%`;
+}
+
+function buildPredictionExplanation(match: Record<string, unknown>): string {
+  const homeTeam = String(match.home_team ?? "Home");
+  const awayTeam = String(match.away_team ?? "Away");
+
+  const homeScore   = toNum(match.projected_home_score);
+  const awayScore   = toNum(match.projected_away_score);
+  const margin      = toNum(match.projected_margin);
+  const conf        = toNum(match.model_confidence);
+  const homeProbPct = Math.round((toNum(match.win_probability_home) ?? 0.5) * 100);
+  const awayProbPct = 100 - homeProbPct;
+
+  const homeLadder   = toNum(match.home_ladder_position);
+  const awayLadder   = toNum(match.away_ladder_position);
+  const homeLadderAdj = toNum(match.home_ladder_adj);
+  const awayLadderAdj = toNum(match.away_ladder_adj);
+  const homeFormAdj  = toNum(match.home_form_adj ?? match.home_momentum);
+  const awayFormAdj  = toNum(match.away_form_adj ?? match.away_momentum);
+  const homeWRBonus  = toNum(match.home_win_rate_bonus);
+  const awayWRBonus  = toNum(match.away_win_rate_bonus);
+  const homeWR       = toNum(match.home_win_rate);
+  const awayWR       = toNum(match.away_win_rate);
+  const strengthDiff = toNum(match.strength_diff);
+
+  const favourite = (homeScore ?? 0) >= (awayScore ?? 0) ? homeTeam : awayTeam;
+  const marginAbs = Math.abs(margin ?? 0);
+  const matchType =
+    marginAbs <= 6  ? "coin-flip contest" :
+    marginAbs <= 15 ? "moderate advantage" :
+    marginAbs <= 28 ? "clear favourite scenario" :
+                      "dominant favourite scenario";
+
+  const lines: string[] = [];
+
+  lines.push(
+    `${favourite} favoured by ${r1(marginAbs)} pts (${matchType}). ` +
+    `Win probability: ${homeTeam} ${homeProbPct}% · ${awayTeam} ${awayProbPct}%.`
+  );
+
+  lines.push(
+    `Scoring model: ${homeTeam} ${r1(match.home_points_for_avg)} pts avg ` +
+    `vs ${awayTeam} defence conceding ${r1(match.home_points_against_avg)} avg. ` +
+    `${awayTeam} ${r1(match.away_points_for_avg)} pts avg ` +
+    `vs ${homeTeam} defence conceding ${r1(match.away_points_against_avg)} avg.`
+  );
+
+  lines.push(
+    `Ladder strength: ${homeTeam} ${ladderLabel(homeLadder)} → ${ladderBonusLabel(homeLadderAdj)}. ` +
+    `${awayTeam} ${ladderLabel(awayLadder)} → ${ladderBonusLabel(awayLadderAdj)}.`
+  );
+
+  lines.push(
+    `Recent form: ${homeTeam} ${formLabel(homeFormAdj)} · ${awayTeam} ${formLabel(awayFormAdj)}.`
+  );
+
+  lines.push(
+    `Win rate: ${homeTeam} ${winRateBonusLabel(homeWRBonus, homeWR)} · ` +
+    `${awayTeam} ${winRateBonusLabel(awayWRBonus, awayWR)}.`
+  );
+
+  if (strengthDiff !== null) {
+    const absSD = Math.abs(strengthDiff);
+    lines.push(
+      `Strength differential: ${r1(absSD)} pts in favour of ${favourite}. ` +
+      `Confidence: ${r0(conf)}% — ${
+        conf !== null && conf >= 80 ? "high (clear edge detected)" :
+        conf !== null && conf >= 65 ? "moderate (competitive matchup)" :
+        "low (near-even contest)"
+      }.`
+    );
+  }
+
+  lines.push(
+    `Home ground bonus: +6 pts applied to ${homeTeam}. ` +
+    `Model: V6 Elite (season avg 55% + opponent defence 45% + home + form + win rate + ladder + logistic probability).`
+  );
+
+  return lines.join(" ");
+}
+
 function buildPrompt(template: string, match: Record<string, unknown>, venue: string): string {
   const homeWinPct = r0((toNum(match.win_probability_home) ?? 0.5) * 100);
   const awayWinPct = r0((toNum(match.win_probability_away) ?? 0.5) * 100);
@@ -77,7 +197,6 @@ Deno.serve(async (req: Request) => {
     try { body = await req.json(); } catch { /* no body */ }
     const forceRegenerate = body.force === true;
 
-    // Fetch the prompt template once
     const { data: promptRows, error: promptErr } = await supabase
       .schema("afl")
       .from("ai_prompts")
@@ -92,7 +211,6 @@ Deno.serve(async (req: Request) => {
     const systemPrompt = promptRows[0].system_prompt as string;
     const userTemplate = promptRows[0].user_prompt_template as string;
 
-    // Fetch venue info from payloads view
     const { data: payloadRows } = await supabase
       .schema("afl")
       .from("v_ai_match_payloads_2026_next_round")
@@ -104,7 +222,6 @@ Deno.serve(async (req: Request) => {
       if (venue) venueMap[p.match_id] = venue;
     }
 
-    // Build fresh set if not forcing
     const freshSet = new Set<number>();
     if (!forceRegenerate) {
       const { data: existingRows } = await supabase
@@ -121,7 +238,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Fetch match features — lightweight view, no heavy CTE
     const { data: matches, error: matchErr } = await supabase
       .schema("afl")
       .from("v_match_prediction_features_true_game")
@@ -157,16 +273,8 @@ Deno.serve(async (req: Request) => {
           : null;
         const modelConf          = toNum(match.model_confidence);
         const confidence         = modelConf !== null ? String(Math.round(modelConf)) : null;
-        const predictedWinner    = (predictedHomeScore ?? 0) >= (predictedAwayScore ?? 0)
-          ? String(match.home_team)
-          : String(match.away_team);
 
-        const predictionExplanation =
-          `Projected score calculated using: season average match scoring (${r1(match.home_points_for_avg)} vs ${r1(match.away_points_for_avg)} pts), ` +
-          `opponent defensive average (${r1(match.home_points_against_avg)} vs ${r1(match.away_points_against_avg)} pts conceded), ` +
-          `home ground advantage (+8 pts), recent form adjustment, and team strength index. ` +
-          `Win probability derived from logistic model on strength differential. ` +
-          `Confidence reflects margin size: larger projected margins produce higher confidence.`;
+        const predictionExplanation = buildPredictionExplanation(match as Record<string, unknown>);
 
         const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
@@ -199,20 +307,20 @@ Deno.serve(async (req: Request) => {
           .from("ai_match_predictions")
           .upsert(
             {
-              match_id:             match.match_id,
-              home_team:            match.home_team,
-              away_team:            match.away_team,
-              round_number:         match.round_number,
-              season:               match.season,
-              predicted_home_score: predictedHomeScore,
-              predicted_away_score: predictedAwayScore,
-              predicted_margin:     predictedMargin,
-              predicted_total:      predictedTotal,
-              prediction:           predictedMargin,
-              confidence:           confidence,
-              ai_summary:           aiSummary,
+              match_id:               match.match_id,
+              home_team:              match.home_team,
+              away_team:              match.away_team,
+              round_number:           match.round_number,
+              season:                 match.season,
+              predicted_home_score:   predictedHomeScore,
+              predicted_away_score:   predictedAwayScore,
+              predicted_margin:       predictedMargin,
+              predicted_total:        predictedTotal,
+              prediction:             predictedMargin,
+              confidence:             confidence,
+              ai_summary:             aiSummary,
               prediction_explanation: predictionExplanation,
-              updated_at:           new Date().toISOString(),
+              updated_at:             new Date().toISOString(),
             },
             { onConflict: "match_id" }
           );
