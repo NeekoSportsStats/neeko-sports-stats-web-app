@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { TeamData, StatLens } from "./getTeams";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock, Sparkles } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const fmt1 = (v: any): string => {
@@ -14,6 +14,7 @@ function formatRoundLabel(label: string): string {
 
 interface TeamGridProps {
   teams: TeamData[];
+  lockedTeams?: TeamData[];
   lens: StatLens;
   minRound: number;
   maxRound: number;
@@ -62,7 +63,7 @@ function getHitRateBarColor(percentage: number, threshold: number, lens: StatLen
   return percentage >= 50 ? "bg-red-400" : "bg-red-400/50";
 }
 
-export default function TeamGrid({ teams, lens, minRound, maxRound, onTeamSelect }: TeamGridProps) {
+export default function TeamGrid({ teams, lockedTeams = [], lens, minRound, maxRound, onTeamSelect }: TeamGridProps) {
   const isMobile = useIsMobile();
   const [scrollPos, setScrollPos] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -117,7 +118,7 @@ export default function TeamGrid({ teams, lens, minRound, maxRound, onTeamSelect
   const allGameColumns = useMemo(() => {
     const gameColumnsMap = new Map<string, { round_sort_key: number; display_label: string; round_number: number; match_index: number }>();
 
-    for (const team of teams) {
+    for (const team of [...teams, ...lockedTeams]) {
       for (const game of team.games) {
         const columnKey = `${game.round_number}-${game.match_index}`;
         if (!gameColumnsMap.has(columnKey)) {
@@ -135,7 +136,7 @@ export default function TeamGrid({ teams, lens, minRound, maxRound, onTeamSelect
     columns.sort((a, b) => a.round_sort_key - b.round_sort_key);
 
     return columns;
-  }, [teams]);
+  }, [teams, lockedTeams]);
 
   return (
     <div>
@@ -289,6 +290,71 @@ export default function TeamGrid({ teams, lens, minRound, maxRound, onTeamSelect
                     )}
                   </tr>
                 ))}
+
+                {lockedTeams.map((team, idx) => (
+                  <tr
+                    key={`locked-${team.id}`}
+                    className={`border-b border-white/5 cursor-pointer transition-colors relative ${
+                      (sortedTeams.length + idx) % 2 === 0 ? "bg-white/[0.015]" : ""
+                    }`}
+                    onClick={() => onTeamSelect(team)}
+                    style={{ filter: "blur(3px)", opacity: 0.35, pointerEvents: "auto" }}
+                  >
+                    <td className="sticky left-0 z-20 bg-black/85 backdrop-blur-xl px-3 py-3 border-r border-white/5 shadow-[2px_0_8px_rgba(0,0,0,0.2)]">
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className="w-0.5 h-9 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: team.teamColor || "#666" }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          {isMobile ? (
+                            <div className="text-white text-[13px] font-bold uppercase truncate leading-tight">
+                              {team.name}
+                            </div>
+                          ) : (
+                            <div className="text-white text-[14.5px] font-semibold truncate leading-tight">
+                              {team.name}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+
+                    {allGameColumns.map((col) => {
+                      const game = team.games.find(g => g.round_number === col.round_number && g.match_index === col.match_index);
+                      const score = game?.score ?? null;
+                      const columnKey = `${col.round_number}-${col.match_index}`;
+                      return (
+                        <td key={columnKey} className={isMobile ? 'px-1 py-3 text-center' : 'px-2 py-3 text-center'}>
+                          <div
+                            className={`inline-flex items-center justify-center rounded-md border font-bold tabular-nums ${
+                              isMobile
+                                ? 'min-w-[36px] px-[5px] py-[5.5px] text-[11px]'
+                                : 'min-w-[42px] px-2 py-2 text-[12.5px]'
+                            } ${getColorClass(score, lens)}`}
+                          >
+                            {score == null ? "—" : lens === "goals" ? fmt1(score) : Math.round(score)}
+                          </div>
+                        </td>
+                      );
+                    })}
+
+                    {!isMobile && (
+                      <td className="sticky right-0 z-20 bg-black/85 backdrop-blur-xl px-3 py-3 border-l border-white/5 shadow-[-2px_0_8px_rgba(0,0,0,0.2)] ledger-summary-column">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2 whitespace-nowrap">
+                            <span className="text-[9px] text-white/40 uppercase tracking-wider font-medium">AVG</span>
+                            <span className="text-lg font-bold text-yellow-400 tabular-nums">
+                              {lens === "goals" ? fmt1(team.stats.avg) : Math.round(team.stats.avg)}
+                            </span>
+                            <span className="text-white/25">•</span>
+                            <span className="text-[11px] text-white/55 font-medium tabular-nums">{team.stats.games}g</span>
+                          </div>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -297,7 +363,11 @@ export default function TeamGrid({ teams, lens, minRound, maxRound, onTeamSelect
 
       {sortedTeams.length > 0 && (
         <div className="text-[11px] text-white/45 font-medium">
-          Showing all <span className="text-white/70 font-semibold">{sortedTeams.length}</span> AFL teams
+          {lockedTeams.length > 0 ? (
+            <>Showing <span className="text-white/70 font-semibold">{sortedTeams.length}</span> of <span className="text-white/70 font-semibold">{sortedTeams.length + lockedTeams.length}</span> AFL teams</>
+          ) : (
+            <>Showing all <span className="text-white/70 font-semibold">{sortedTeams.length}</span> AFL teams</>
+          )}
         </div>
       )}
     </div>

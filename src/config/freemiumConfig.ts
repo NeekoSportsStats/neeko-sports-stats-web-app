@@ -29,11 +29,17 @@ export const FREE_PLAYER_NAMES: string[] = [
   "Callum Mills",
 ];
 
+export const FREE_TOTAL_TEAMS = 8;
+
 export const FREE_TEAM_NAMES: string[] = [
   "Adelaide",
   "Brisbane",
   "Carlton",
   "Collingwood",
+  "Essendon",
+  "Fremantle",
+  "Geelong",
+  "Gold Coast Suns",
 ];
 
 export const FREE_MATCH_IDS: number[] = [
