@@ -5,12 +5,15 @@ import { Lock } from "lucide-react";
 interface PremiumGateProps {
   children?: ReactNode;
   blur?: boolean;
+  isLocked?: boolean;
 }
 
-export function PremiumGate({ children, blur = true }: PremiumGateProps) {
+export function PremiumGate({ children, blur = true, isLocked }: PremiumGateProps) {
   const { isPremium } = useAuth();
 
-  if (isPremium) {
+  const locked = isLocked !== undefined ? isLocked : !isPremium;
+
+  if (!locked) {
     return <>{children}</>;
   }
 

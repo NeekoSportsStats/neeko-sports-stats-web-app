@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Search, TrendingUp, Target, Users, ChevronRight, Sparkles, Lock, ArrowLeft, Info, Brain } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import FantasyVerdictBadge from "@/components/FantasyVerdictBadge";
-import { PremiumGateCTA } from "@/components/PremiumGate";
+import { PremiumGate, PremiumGateCTA } from "@/components/PremiumGate";
 import { useAuth } from "@/lib/auth";
 import { FREE_PLAYER_IDS, FREE_TEAM_NAMES, FREE_MATCH_IDS } from "@/config/freemiumConfig";
 
@@ -94,6 +94,10 @@ export default function AFLAIInsightsPage() {
   const [cardVisible, setCardVisible] = useState(false);
   const [showTransparency, setShowTransparency] = useState(false);
   const [projScaled, setProjScaled] = useState(false);
+  const [selectedPlayerTeam, setSelectedPlayerTeam] = useState<string | null>(null);
+  const [allPlayerTeams, setAllPlayerTeams] = useState<string[]>([]);
+  const [teamPlayers, setTeamPlayers] = useState<PlayerProjection[]>([]);
+  const [teamPlayersLoading, setTeamPlayersLoading] = useState(false);
 
   // Team Analysis state
   const [teams, setTeams] = useState<string[]>([]);
@@ -243,6 +247,45 @@ export default function AFLAIInsightsPage() {
   }, [selectedTeam, isPremium]);
 
   useEffect(() => {
+    async function loadPlayerTeams() {
+      const { data, error } = await supabase
+        .schema("afl")
+        .from("v_neeko_player_projection")
+        .select("team")
+        .order("team", { ascending: true });
+      if (!error && data) {
+        const distinct = Array.from(new Set((data as { team: string }[]).map(r => r.team))).sort() as string[];
+        setAllPlayerTeams(distinct);
+      }
+    }
+    loadPlayerTeams();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedPlayerTeam) {
+      setTeamPlayers([]);
+      return;
+    }
+    async function loadTeamPlayers() {
+      setTeamPlayersLoading(true);
+      const { data, error } = await supabase
+        .schema("afl")
+        .from("v_neeko_player_projection")
+        .select("player_id, player_name, team, final_projection, ceiling_estimate, floor_estimate, season_avg_current, avg_last_5, trend_3_vs_10, prob_100_plus, season_context")
+        .eq("team", selectedPlayerTeam)
+        .order("final_projection", { ascending: false })
+        .limit(40);
+      if (!error && data) {
+        setTeamPlayers(data as PlayerProjection[]);
+      } else {
+        setTeamPlayers([]);
+      }
+      setTeamPlayersLoading(false);
+    }
+    loadTeamPlayers();
+  }, [selectedPlayerTeam]);
+
+  useEffect(() => {
     const query = playerSearch.trim();
     setHighlightedIndex(-1);
     if (!query) {
@@ -252,13 +295,17 @@ export default function AFLAIInsightsPage() {
 
     const timer = setTimeout(async () => {
       setSearchLoading(true);
-      const { data, error } = await supabase
+      let q = supabase
         .schema("afl")
         .from("v_neeko_player_projection")
         .select("player_id, player_name, team, final_projection, ceiling_estimate, floor_estimate, season_avg_current, avg_last_5, trend_3_vs_10, prob_100_plus, season_context")
         .ilike("player_name", `%${query}%`)
         .order("final_projection", { ascending: false })
         .limit(10);
+      if (selectedPlayerTeam) {
+        q = q.eq("team", selectedPlayerTeam);
+      }
+      const { data, error } = await q;
       if (!error && data) {
         setSearchResults(data as PlayerProjection[]);
       } else {
@@ -268,7 +315,7 @@ export default function AFLAIInsightsPage() {
     }, 200);
 
     return () => clearTimeout(timer);
-  }, [playerSearch]);
+  }, [playerSearch, selectedPlayerTeam]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!searchResults.length) return;
@@ -592,7 +639,7 @@ export default function AFLAIInsightsPage() {
                 }`}
               >
                 <TrendingUp className="h-4 w-4" />
-                Match Predictions
+                Match Projections
               </button>
             </nav>
           </div>
@@ -652,6 +699,87 @@ export default function AFLAIInsightsPage() {
             </div>
           </div>
 
+          {/* Team Filter Pills */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-neutral-500" />
+              <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Filter by Team</span>
+              {selectedPlayerTeam && (
+                <button
+                  onClick={() => { setSelectedPlayerTeam(null); setPlayerSearch(""); }}
+                  className="ml-auto text-xs text-neutral-500 hover:text-white transition-colors"
+                >
+                  Clear filter
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {allPlayerTeams.map((team) => {
+                const isSelected = selectedPlayerTeam === team;
+                return (
+                  <button
+                    key={team}
+                    onClick={() => {
+                      setSelectedPlayerTeam(isSelected ? null : team);
+                      setPlayerSearch("");
+                      setSelectedPlayer(null);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all duration-150 ${
+                      isSelected
+                        ? "bg-yellow-400/20 border-yellow-400/60 text-yellow-200"
+                        : "bg-white/5 border-white/10 hover:border-white/25 text-white/70 hover:text-white"
+                    }`}
+                  >
+                    {team}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Team Player List — shown when a team filter is active and no search query */}
+          {selectedPlayerTeam && !playerSearch && (
+            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-white/10 flex items-center justify-between">
+                <span className="text-sm font-semibold text-white">{selectedPlayerTeam} — Players</span>
+                <span className="text-xs text-neutral-500">Click to view projection</span>
+              </div>
+              {teamPlayersLoading ? (
+                <div className="px-5 py-6 text-center text-xs text-neutral-500 animate-pulse">Loading players...</div>
+              ) : (
+                <div className="divide-y divide-white/5">
+                  {teamPlayers.map((proj) => {
+                    const isResultLocked = !isPremium && !FREE_PLAYER_IDS.includes(proj.player_id);
+                    return (
+                      <button
+                        key={proj.player_id}
+                        onClick={() => handleSearchResultClick(proj)}
+                        className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-white/5 transition-colors border-l-2 border-transparent hover:border-[#F5C84C]/40"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-semibold text-white">{proj.player_name}</span>
+                          {isResultLocked ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-[#F5C84C]/70 font-medium">
+                              <Lock className="h-3 w-3" />
+                              Neeko+
+                            </span>
+                          ) : (
+                            proj.final_projection != null && (
+                              <span className="text-xs text-[#F5C84C] font-medium">
+                                {Number(proj.final_projection).toFixed(0)} proj.
+                              </span>
+                            )
+                          )}
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-neutral-600 flex-shrink-0" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Player Search */}
           <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6">
             <div className="relative">
@@ -659,7 +787,7 @@ export default function AFLAIInsightsPage() {
               <input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Search any AFL player (eg Marcus Bontempelli, Patrick Cripps, Nick Daicos)"
+                placeholder={selectedPlayerTeam ? `Search ${selectedPlayerTeam} players...` : "Search any AFL player (eg Marcus Bontempelli, Patrick Cripps, Nick Daicos)"}
                 value={playerSearch}
                 onChange={(e) => setPlayerSearch(e.target.value)}
                 onFocus={() => setSearchFocused(true)}
@@ -673,7 +801,7 @@ export default function AFLAIInsightsPage() {
               />
             </div>
             <p className="text-xs text-neutral-500 mt-2 ml-1">
-              Search across all AFL players using Neeko AI projections
+              {selectedPlayerTeam ? `Searching within ${selectedPlayerTeam}` : "Search across all AFL players using Neeko AI projections"}
             </p>
 
             {playerSearch && (
@@ -811,11 +939,7 @@ export default function AFLAIInsightsPage() {
                     </div>
                   </div>
 
-                  {isLockedPlayer ? (
-                    <div className="rounded-xl p-8" style={{ background: "rgba(245,200,76,0.04)", border: "1px solid rgba(245,200,76,0.12)" }}>
-                      <PremiumGateCTA />
-                    </div>
-                  ) : (
+                  <PremiumGate isLocked={isLockedPlayer}>
                   <>
                   {/* Stats Grid */}
                   <div className="relative flex items-start justify-between mt-6">
@@ -1060,7 +1184,7 @@ export default function AFLAIInsightsPage() {
                     <span className="text-xs text-neutral-700">Powered by Neeko AI</span>
                   </div>
                   </>
-                  )}
+                  </PremiumGate>
                 </div>
               </div>
             );
@@ -1173,17 +1297,13 @@ export default function AFLAIInsightsPage() {
                       </div>
                     </div>
 
-                    {isLockedTeam ? (
-                      <div className="rounded-xl p-8" style={{ background: "rgba(245,200,76,0.04)", border: "1px solid rgba(245,200,76,0.12)" }}>
-                        <PremiumGateCTA />
-                      </div>
-                    ) : null}
                     </>
                   );
                 })()}
 
-                {/* Intelligence Header Row — only for unlocked teams */}
-                {(!isPremium && !FREE_TEAM_NAMES.includes(selectedTeam)) ? null : (<>
+                {/* Intelligence stats — blurred when locked */}
+                <PremiumGate isLocked={!isPremium && !FREE_TEAM_NAMES.includes(selectedTeam)}>
+                <>
                 {/* Intelligence Header Row */}
                 {teamSummary && !loadingTeam && (() => {
                   const rnd = teamSummary.round_number ?? 0;
@@ -1513,7 +1633,8 @@ export default function AFLAIInsightsPage() {
                 <div className="flex justify-end pt-1">
                   <span className="text-xs text-neutral-700">Powered by Neeko AI</span>
                 </div>
-                </>)}
+                </>
+                </PremiumGate>
               </div>
             </div>
           )}
@@ -1531,7 +1652,7 @@ export default function AFLAIInsightsPage() {
           <div className="flex items-center gap-3 pb-4 border-b border-white/10">
             <TrendingUp className="h-6 w-6 text-yellow-400" />
             <div className="flex-1">
-              <h2 className="text-2xl font-bold">Match Predictions</h2>
+              <h2 className="text-2xl font-bold">Match Fantasy Projections</h2>
               <p className="text-sm text-white/60 mt-1">
                 Select a match to access AI-powered predictions and analysis
               </p>
@@ -1711,11 +1832,8 @@ export default function AFLAIInsightsPage() {
                     </div>
                   </div>
 
-                  {isLockedMatch ? (
-                    <div className="rounded-xl p-8" style={{ background: "rgba(245,200,76,0.04)", border: "1px solid rgba(245,200,76,0.12)" }}>
-                      <PremiumGateCTA />
-                    </div>
-                  ) : (<>
+                  <PremiumGate isLocked={isLockedMatch}>
+                  <>
 
                   {/* SECTION 2 — Feature Grid */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-[18px]">
@@ -1816,7 +1934,8 @@ export default function AFLAIInsightsPage() {
                   <div className="flex justify-end pt-4">
                     <span className="text-xs text-neutral-700">Powered by Neeko AI</span>
                   </div>
-                  </>)}
+                  </>
+                  </PremiumGate>
 
                 </div>
               </div>
