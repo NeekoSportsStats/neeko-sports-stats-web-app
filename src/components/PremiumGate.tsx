@@ -1,83 +1,53 @@
 import { ReactNode } from "react";
 import { useAuth } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
-import { Crown, Lock } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Lock } from "lucide-react";
 
 interface PremiumGateProps {
-  children: ReactNode;
+  children?: ReactNode;
   blur?: boolean;
 }
 
 export function PremiumGate({ children, blur = true }: PremiumGateProps) {
   const { isPremium } = useAuth();
-  const navigate = useNavigate();
 
   if (isPremium) {
     return <>{children}</>;
   }
 
+  if (!children) {
+    return <PremiumGateCTA />;
+  }
+
   return (
     <div className="relative">
-      <div className={blur ? "blur-sm pointer-events-none select-none" : ""}>
-        {children}
+      {blur && (
+        <div className="blur-sm pointer-events-none select-none">
+          {children}
+        </div>
+      )}
+      <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md rounded-xl">
+        <PremiumGateCTA />
       </div>
-      <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button size="lg" className="shadow-lg">
-              <Crown className="mr-2 h-5 w-5" />
-              Unlock with Neeko+
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-2xl">
-                <Lock className="h-6 w-6 text-primary" />
-                Premium Content
-              </DialogTitle>
-              <DialogDescription className="space-y-4 pt-4">
-                <p className="text-base">
-                  This content is exclusive to Neeko+ subscribers.
-                </p>
-                <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
-                  <h4 className="font-semibold text-foreground mb-2">
-                    With Neeko+ you get:
-                  </h4>
-                  <ul className="space-y-2 text-sm text-muted-foreground">
-                    <li>✓ Unlimited access to all player stats</li>
-                    <li>✓ AI-powered insights and predictions</li>
-                    <li>✓ Advanced team analytics</li>
-                    <li>✓ No content restrictions</li>
-                    <li>✓ Premium features across all sports</li>
-                  </ul>
-                </div>
-                <div className="flex flex-col gap-2 pt-2">
-                  <Button
-                    onClick={() => { window.location.href = "https://www.neekostats.com.au/neeko-plus"; }}
-                    size="lg"
-                    className="w-full"
-                  >
-                    <Crown className="mr-2 h-5 w-5" />
-                    Subscribe to Neeko+
-                  </Button>
-                  <p className="text-xs text-center text-muted-foreground">
-                    $5.99/week • Cancel anytime
-                  </p>
-                </div>
-              </DialogDescription>
-            </DialogHeader>
-          </DialogContent>
-        </Dialog>
+    </div>
+  );
+}
+
+export function PremiumGateCTA() {
+  return (
+    <div className="flex flex-col items-center gap-3 text-center px-4 py-2">
+      <Lock className="h-5 w-5 text-[#F5C84C]/70" />
+      <div>
+        <p className="text-sm font-semibold text-white/80 mb-1">Neeko+ Exclusive</p>
+        <p className="text-xs text-neutral-500 mb-3">Unlock full AI analysis for all players, teams and matches.</p>
       </div>
+      <a
+        href="https://www.neekostats.com.au/neeko-plus"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-black bg-gradient-to-r from-[#F5C84C] to-[#D4A017] hover:brightness-110 transition text-sm"
+      >
+        Upgrade to Neeko+
+      </a>
     </div>
   );
 }

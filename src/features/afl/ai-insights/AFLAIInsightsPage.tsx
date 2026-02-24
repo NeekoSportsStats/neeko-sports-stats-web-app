@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Search, TrendingUp, Target, Users, ChevronRight, Sparkles, Lock, ArrowLeft, Info, Brain } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import FantasyVerdictBadge from "@/components/FantasyVerdictBadge";
+import { PremiumGateCTA } from "@/components/PremiumGate";
 import { useAuth } from "@/lib/auth";
 import { FREE_PLAYER_IDS, FREE_TEAM_NAMES, FREE_MATCH_IDS } from "@/config/freemiumConfig";
 
@@ -39,6 +40,14 @@ interface AIMatchPrediction {
   ai_summary: string | null;
   prediction_explanation: string | null;
   updated_at: string | null;
+  match_date?: string | null;
+}
+
+function formatMatchDate(dateString: string | null | undefined): string | null {
+  if (!dateString) return null;
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
 }
 
 interface AITeamSummary {
@@ -493,7 +502,7 @@ export default function AFLAIInsightsPage() {
         const { data } = await supabase
           .schema("afl")
           .from("ai_match_predictions")
-          .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, ai_summary, prediction_explanation, updated_at")
+          .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, ai_summary, prediction_explanation, updated_at, match_date")
           .eq("season", 2026)
           .eq("round_number", currentRound)
           .order("match_id", { ascending: true })
@@ -502,7 +511,7 @@ export default function AFLAIInsightsPage() {
       } else {
         const { data: previewData } = await supabase
           .from("v_ai_match_predictions_preview")
-          .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, updated_at")
+          .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, updated_at, match_date")
           .eq("round_number", currentRound)
           .order("match_id", { ascending: true })
           .limit(10);
@@ -730,6 +739,7 @@ export default function AFLAIInsightsPage() {
           {/* Player Analysis Card */}
           <div className={selectedPlayer ? "-mt-2" : ""}>
           {selectedPlayer ? (() => {
+            const isLockedPlayer = !isPremium && !FREE_PLAYER_IDS.includes(selectedPlayer.player_id);
             const conf = getConfidenceLevel(selectedPlayer.consistency_score);
             const matchup = getMatchupDisplay(selectedPlayer);
             const consistencyPct = getConsistencyPercentile(selectedPlayer.consistency_score);
@@ -775,8 +785,9 @@ export default function AFLAIInsightsPage() {
                   {/* Card Header */}
                   <div className="flex items-start justify-between">
                     <div>
-                      <div className="text-xs font-semibold text-[#F5C84C]/70 uppercase tracking-widest mb-2">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-[#F5C84C]/70 uppercase tracking-widest mb-2">
                         Player Analysis
+                        {isLockedPlayer && <Lock className="h-3 w-3 text-[#F5C84C]" />}
                       </div>
                       <h3 className="text-3xl font-bold text-white">{selectedPlayer.player}</h3>
                       <div className="text-sm text-neutral-300 mt-0.5">{selectedPlayer.team}</div>
@@ -1029,16 +1040,10 @@ export default function AFLAIInsightsPage() {
                         </>
                       ) : (
                         <div
-                          className="rounded-xl p-5 flex flex-col items-center gap-3 text-center"
+                          className="rounded-xl p-5"
                           style={{ background: "rgba(245,200,76,0.04)", border: "1px solid rgba(245,200,76,0.12)" }}
                         >
-                          <Lock className="h-5 w-5 text-[#F5C84C]/50" />
-                          <div>
-                            <p className="text-sm font-semibold text-white/80">Neeko+ Exclusive</p>
-                            <p className="text-xs text-neutral-500 mt-1">
-                              Upgrade to Neeko+ to unlock full AI analysis for all 780 AFL players including Outlook, Upside, and Risk breakdowns.
-                            </p>
-                          </div>
+                          <PremiumGateCTA />
                         </div>
                       )}
                     </div>
@@ -1083,22 +1088,28 @@ export default function AFLAIInsightsPage() {
 
           {/* Team Pills */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
-            {teams.map((team) => (
-              <button
-                key={team}
-                onClick={() => setSelectedTeam(selectedTeam === team ? "" : team)}
-                className={`p-3 rounded-lg border text-left transition-all ${
-                  selectedTeam === team
-                    ? "bg-yellow-400/20 border-yellow-400/60 text-yellow-200"
-                    : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 text-white"
-                }`}
-              >
-                <div className="font-semibold text-sm leading-tight">{team}</div>
-                {selectedTeam === team && (
-                  <div className="text-xs text-yellow-400/70 mt-0.5">Viewing</div>
-                )}
-              </button>
-            ))}
+            {teams.map((team) => {
+              const isLocked = !isPremium && !FREE_TEAM_NAMES.includes(team);
+              return (
+                <button
+                  key={team}
+                  onClick={() => setSelectedTeam(selectedTeam === team ? "" : team)}
+                  className={`p-3 rounded-lg border text-left transition-all ${
+                    selectedTeam === team
+                      ? "bg-yellow-400/20 border-yellow-400/60 text-yellow-200"
+                      : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 text-white"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="font-semibold text-sm leading-tight">{team}</span>
+                    {isLocked && <Lock className="h-3 w-3 text-[#F5C84C] flex-shrink-0" />}
+                  </div>
+                  {selectedTeam === team && (
+                    <div className="text-xs text-yellow-400/70 mt-0.5">Viewing</div>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Team AI Summary Card */}
@@ -1123,10 +1134,9 @@ export default function AFLAIInsightsPage() {
                       Team AI Projection
                     </div>
                     <h3 className="text-2xl font-bold text-white">{selectedTeam}</h3>
-                    {teamSummary?.updated_at && (
+                    {teamSummary && (
                       <div className="text-xs text-neutral-500 mt-1">
-                        Updated {new Date(teamSummary.updated_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
-                        {" · "}{teamSummary.season} Season · Round {teamSummary.round_number}
+                        {teamSummary.season} Season · Round {teamSummary.round_number}
                       </div>
                     )}
                   </div>
@@ -1463,16 +1473,10 @@ export default function AFLAIInsightsPage() {
                       })()
                     ) : !FREE_TEAM_NAMES.includes(selectedTeam) && !isPremium ? (
                       <div
-                        className="rounded-xl p-5 flex flex-col items-center gap-3 text-center"
+                        className="rounded-xl p-5"
                         style={{ background: "rgba(245,200,76,0.04)", border: "1px solid rgba(245,200,76,0.12)" }}
                       >
-                        <Lock className="h-5 w-5 text-[#F5C84C]/50" />
-                        <div>
-                          <p className="text-sm font-semibold text-white/80">Neeko+ Exclusive</p>
-                          <p className="text-xs text-neutral-500 mt-1">
-                            Upgrade to Neeko+ to unlock full AI season summaries for all 18 AFL teams.
-                          </p>
-                        </div>
+                        <PremiumGateCTA />
                       </div>
                     ) : (
                       <p className="text-neutral-500 italic">AI team summary will be generated after Opening Round.</p>
@@ -1520,6 +1524,8 @@ export default function AFLAIInsightsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {matchSummaries.map((match) => {
                 const isSelected = selectedMatchId === match.match_id;
+                const isLocked = !isPremium && !FREE_MATCH_IDS.includes(match.match_id);
+                const dateLabel = formatMatchDate(match.match_date);
                 return (
                   <div key={match.match_id}>
                     <button
@@ -1531,14 +1537,15 @@ export default function AFLAIInsightsPage() {
                       }`}
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs text-white/50 mb-1">Round {match.round_number}</div>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="text-xs text-white/50">Round {match.round_number}</div>
+                          {isLocked && <Lock className="h-3 w-3 text-[#F5C84C] flex-shrink-0" />}
+                        </div>
                         <div className="font-semibold text-sm leading-tight">
                           {match.home_team} vs {match.away_team}
                         </div>
-                        {match.updated_at && (
-                          <div className="text-xs text-white/30 mt-1">
-                            {new Date(match.updated_at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
-                          </div>
+                        {dateLabel && (
+                          <div className="text-xs text-white/30 mt-1">{dateLabel}</div>
                         )}
                       </div>
                     </button>
@@ -1634,9 +1641,9 @@ export default function AFLAIInsightsPage() {
                       <h3 className="text-2xl font-bold text-white">
                         {match.home_team} vs {match.away_team}
                       </h3>
-                      {match.updated_at && (
+                      {formatMatchDate(match.match_date) && (
                         <div className="text-xs text-neutral-500 mt-1">
-                          Updated {new Date(match.updated_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
+                          {formatMatchDate(match.match_date)}
                         </div>
                       )}
                     </div>
@@ -1769,16 +1776,10 @@ export default function AFLAIInsightsPage() {
                         <p>{summary}</p>
                       ) : !FREE_MATCH_IDS.includes(match.match_id) && !isPremium ? (
                         <div
-                          className="rounded-xl p-5 flex flex-col items-center gap-3 text-center"
+                          className="rounded-xl p-5"
                           style={{ background: "rgba(245,200,76,0.04)", border: "1px solid rgba(245,200,76,0.12)" }}
                         >
-                          <Lock className="h-5 w-5 text-[#F5C84C]/50" />
-                          <div>
-                            <p className="text-sm font-semibold text-white/80">Neeko+ Exclusive</p>
-                            <p className="text-xs text-neutral-500 mt-1">
-                              Upgrade to Neeko+ to unlock full AI match analysis and prediction explanations.
-                            </p>
-                          </div>
+                          <PremiumGateCTA />
                         </div>
                       ) : (
                         <p className="text-neutral-600 italic">No AI summary available for this match yet.</p>
@@ -1802,9 +1803,14 @@ export default function AFLAIInsightsPage() {
           <p className="text-white/60 mb-6 max-w-2xl mx-auto">
             Upgrade to Neeko+ for advanced predictive modeling, exclusive metrics, and real-time AI analysis across all players, matches, and teams.
           </p>
-          <button className="px-6 py-3 rounded-lg bg-yellow-400 text-black font-semibold hover:bg-yellow-300 transition-all shadow-[0_0_30px_rgba(250,204,21,0.5)]">
+          <a
+            href="https://www.neekostats.com.au/neeko-plus"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-[#F5C84C] to-[#D4A017] text-black font-semibold hover:brightness-110 transition-all shadow-[0_0_30px_rgba(250,204,21,0.5)]"
+          >
             Upgrade to Neeko+
-          </button>
+          </a>
         </div>
       </div>
     </div>
