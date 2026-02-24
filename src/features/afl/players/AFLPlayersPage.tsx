@@ -5,7 +5,7 @@ import PlayerOverlay from "./PlayerOverlay";
 import { getAvailableTeams, getPlayers, PlayerData, StatLens } from "./getPlayers";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
-import { FREE_PLAYER_ROWS } from "@/config/freemiumConfig";
+import { FREE_PLAYER_NAMES } from "@/config/freemiumConfig";
 import {
   Tooltip,
   TooltipContent,
@@ -228,13 +228,13 @@ export default function AFLPlayersPage() {
           ) : (
             <div className="relative">
               <PlayerGrid
-                players={isPremium ? filtered : filtered.slice(0, FREE_PLAYER_ROWS)}
+                players={isPremium ? filtered : filtered.filter(p => FREE_PLAYER_NAMES.includes(p.name))}
                 lens={lens}
                 minRound={minRound}
                 maxRound={maxRound}
                 onPlayerSelect={(p) => setSelectedId(p.id)}
               />
-              {!isPremium && filtered.length > FREE_PLAYER_ROWS && (
+              {!isPremium && (
                 <div
                   className="rounded-b-2xl px-8 py-10 flex flex-col items-center gap-4 text-center border border-t-0 border-white/10"
                   style={{ background: "linear-gradient(180deg, rgba(7,7,7,0.7) 0%, rgba(7,7,7,0.97) 100%)" }}
@@ -247,10 +247,10 @@ export default function AFLPlayersPage() {
                   </div>
                   <div>
                     <p className="text-base font-bold text-white">
-                      {filtered.length - FREE_PLAYER_ROWS} more players locked
+                      {allPlayers.length - FREE_PLAYER_NAMES.length} more players locked
                     </p>
                     <p className="text-sm text-white/50 mt-1 max-w-sm">
-                      Upgrade to Neeko+ to view all {filtered.length} players in full.
+                      Upgrade to Neeko+ to view all {allPlayers.length} players in full.
                     </p>
                   </div>
                   <a

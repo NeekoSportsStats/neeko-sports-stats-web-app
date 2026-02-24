@@ -11,6 +11,19 @@ export const FREE_PLAYER_IDS: number[] = [
   355,  // Andrew Brayshaw - Fremantle
 ];
 
+export const FREE_PLAYER_NAMES: string[] = [
+  "Bailey Smith",
+  "Max Gawn",
+  "Marcus Bontempelli",
+  "Nick Daicos",
+  "Harry Sheezel",
+  "Jordan Dawson",
+  "Josh Dunkley",
+  "Connor Rozee",
+  "Zach Merrett",
+  "Andrew Brayshaw",
+];
+
 export const FREE_TEAM_NAMES: string[] = [
   "Adelaide",
   "Brisbane",

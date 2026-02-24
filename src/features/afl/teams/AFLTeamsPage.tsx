@@ -5,7 +5,7 @@ import TeamOverlay from "./TeamOverlay";
 import { getTeams, TeamData, StatLens } from "./getTeams";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
-import { FREE_TEAM_ROWS } from "@/config/freemiumConfig";
+import { FREE_TEAM_NAMES } from "@/config/freemiumConfig";
 import {
   Tooltip,
   TooltipContent,
@@ -174,13 +174,13 @@ export default function AFLTeamsPage() {
           ) : (
             <div className="relative">
               <TeamGrid
-                teams={isPremium ? allTeams : allTeams.slice(0, FREE_TEAM_ROWS)}
+                teams={isPremium ? allTeams : allTeams.filter(t => FREE_TEAM_NAMES.includes(t.id))}
                 lens={lens}
                 minRound={minRound}
                 maxRound={maxRound}
                 onTeamSelect={(t) => setSelectedId(t.id)}
               />
-              {!isPremium && allTeams.length > FREE_TEAM_ROWS && (
+              {!isPremium && (
                 <div
                   className="rounded-b-2xl px-8 py-10 flex flex-col items-center gap-4 text-center border border-t-0 border-white/10"
                   style={{ background: "linear-gradient(180deg, rgba(7,7,7,0.7) 0%, rgba(7,7,7,0.97) 100%)" }}
@@ -193,7 +193,7 @@ export default function AFLTeamsPage() {
                   </div>
                   <div>
                     <p className="text-base font-bold text-white">
-                      {allTeams.length - FREE_TEAM_ROWS} more teams locked
+                      {allTeams.length - FREE_TEAM_NAMES.length} more teams locked
                     </p>
                     <p className="text-sm text-white/50 mt-1 max-w-sm">
                       Upgrade to Neeko+ to view all {allTeams.length} teams in full.

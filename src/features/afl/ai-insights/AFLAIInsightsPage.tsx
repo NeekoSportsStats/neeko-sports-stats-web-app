@@ -500,18 +500,34 @@ export default function AFLAIInsightsPage() {
           .limit(10);
         setMatchSummaries((data as AIMatchPrediction[]) || []);
       } else {
-        const { data } = await supabase
+        const { data: previewData } = await supabase
           .from("v_ai_match_predictions_preview")
           .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, updated_at")
           .eq("round_number", currentRound)
           .order("match_id", { ascending: true })
           .limit(10);
-        const withNulls = (data || []).map((m: Partial<AIMatchPrediction>) => ({
-          ...m,
-          ai_summary: null,
-          prediction_explanation: null,
-        })) as AIMatchPrediction[];
-        setMatchSummaries(withNulls);
+
+        const { data: freeData } = await supabase
+          .schema("afl")
+          .from("ai_match_predictions")
+          .select("match_id, ai_summary, prediction_explanation")
+          .eq("season", 2026)
+          .in("match_id", FREE_MATCH_IDS);
+
+        const freeMap = new Map<number, { ai_summary: string | null; prediction_explanation: string | null }>(
+          (freeData || []).map((m: { match_id: number; ai_summary: string | null; prediction_explanation: string | null }) => [m.match_id, m])
+        );
+
+        const merged = (previewData || []).map((m: Partial<AIMatchPrediction>) => {
+          const free = freeMap.get(m.match_id!);
+          return {
+            ...m,
+            ai_summary: free?.ai_summary ?? null,
+            prediction_explanation: free?.prediction_explanation ?? null,
+          };
+        }) as AIMatchPrediction[];
+
+        setMatchSummaries(merged);
       }
     }
     loadMatchSummaries();
