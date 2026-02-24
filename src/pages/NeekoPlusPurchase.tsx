@@ -69,7 +69,6 @@ const NeekoPlusPurchase = () => {
   }, [isPremium]);
 
   const handleSubscribe = async () => {
-    // 🔹 Block premium users from starting checkout
     if (isPremium) {
       toast({
         title: "Already subscribed",
@@ -86,21 +85,19 @@ const NeekoPlusPurchase = () => {
         data: { session },
       } = await supabase.auth.getSession();
 
-      // 🔹 NOT LOGGED IN → go to Auth with redirect
       if (!session) {
         toast({
           title: "Please log in first",
           description: "You need to be logged in to subscribe.",
           variant: "destructive",
         });
-        setLoading(false);
         navigate("/auth?redirect=checkout");
         return;
       }
 
-      // 🔹 LOGGED IN → go to checkout
+      const origin = window.location.origin;
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`,
         {
           method: "POST",
           headers: {
@@ -108,25 +105,30 @@ const NeekoPlusPurchase = () => {
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
-            priceId: import.meta.env.VITE_STRIPE_PRICE_ID,
+            price_id:    import.meta.env.VITE_STRIPE_PRICE_ID,
+            success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url:  `${origin}/neeko-plus`,
+            mode:        "subscription",
           }),
         }
       );
 
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-        return;
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => null);
+        throw new Error(errorBody?.error || `Checkout request failed (${res.status})`);
       }
 
-      throw new Error("Failed to create checkout session");
+      const data = await res.json();
+
+      if (!data.url) throw new Error("No checkout URL returned");
+
+      window.location.assign(data.url);
     } catch (err: any) {
       toast({
         title: "Checkout failed",
-        description: err.message,
+        description: err.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };

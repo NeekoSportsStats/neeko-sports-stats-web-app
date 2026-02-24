@@ -1,45 +1,48 @@
-// src/pages/StartCheckout.tsx
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+
+type State =
+  | { status: "loading" }
+  | { status: "ready"; url: string }
+  | { status: "error"; message: string };
 
 const StartCheckout = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [state, setState] = useState<State>({ status: "loading" });
+  const didRun = useRef(false);
 
   useEffect(() => {
+    if (didRun.current) return;
+    didRun.current = true;
+
     let attempts = 0;
 
     const go = async () => {
       attempts++;
 
-      // 🔥 Fix PKCE issue — wait for client to hydrate session
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
-      console.log("StartCheckout session attempt", attempts, session);
-
       if (!session) {
-        // ⏳ Retry while Supabase initializes (max ~2 seconds)
         if (attempts < 12) {
-          return setTimeout(go, 200);
+          setTimeout(go, 200);
+          return;
         }
-
-        // ❌ Still no session → treat user as logged out
         toast({
           title: "Please log in",
           description: "You must be signed in to continue to checkout.",
           variant: "destructive",
         });
-
         navigate("/auth?redirect=checkout");
         return;
       }
 
-      // 🎉 Session ready → Call edge function
       try {
         const origin = window.location.origin;
         const response = await fetch(
@@ -53,7 +56,7 @@ const StartCheckout = () => {
             body: JSON.stringify({
               price_id:    import.meta.env.VITE_STRIPE_PRICE_ID,
               success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
-              cancel_url:  `${origin}/billing`,
+              cancel_url:  `${origin}/neeko-plus`,
               mode:        "subscription",
             }),
           }
@@ -61,39 +64,62 @@ const StartCheckout = () => {
 
         if (!response.ok) {
           const errorBody = await response.json().catch(() => null);
-          console.error("Checkout failed", response.status, errorBody);
-
-          throw new Error(
-            errorBody?.error ||
-              `Checkout request failed (${response.status})`
-          );
+          throw new Error(errorBody?.error || `Checkout request failed (${response.status})`);
         }
 
         const data = await response.json();
-
         if (!data.url) throw new Error("No checkout URL returned");
 
-        // 🚀 Send user to Stripe Checkout
-        window.location.href = data.url;
+        setState({ status: "ready", url: data.url });
+
+        window.location.assign(data.url);
       } catch (err: any) {
-        console.error("StartCheckout error:", err);
-
-        toast({
-          title: "Checkout Error",
-          description: err?.message || "Something went wrong.",
-          variant: "destructive",
-        });
-
-        navigate("/neeko-plus");
+        setState({ status: "error", message: err?.message || "Something went wrong." });
       }
     };
 
     go();
   }, [navigate, toast]);
 
+  if (state.status === "loading") {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <Loader2 className="h-10 w-10 text-primary animate-spin" />
+        <p className="text-muted-foreground text-sm">Preparing secure checkout…</p>
+      </div>
+    );
+  }
+
+  if (state.status === "ready") {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-4">
+        <p className="text-muted-foreground text-sm">Ready to continue</p>
+        <Button
+          size="lg"
+          className="w-full max-w-xs text-base font-semibold"
+          onClick={() => window.location.assign(state.url)}
+        >
+          <ExternalLink className="h-4 w-4 mr-2" />
+          Continue to Stripe
+        </Button>
+        <Link
+          to="/neeko-plus"
+          className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+        >
+          <ArrowLeft className="h-3 w-3" />
+          Back to Neeko+
+        </Link>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 className="h-10 w-10 text-primary animate-spin" />
+    <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-4">
+      <p className="text-destructive font-medium">{state.message}</p>
+      <Button variant="outline" onClick={() => navigate("/neeko-plus")}>
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back to Neeko+
+      </Button>
     </div>
   );
 };

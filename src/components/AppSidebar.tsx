@@ -266,16 +266,15 @@ export function AppSidebar() {
               {!isPremium && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild className="py-1.5">
-                    <a
-                      href="https://www.neekostats.com.au/neeko-plus"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <NavLink
+                      to="/neeko-plus"
                       className="hover:bg-muted/50"
+                      activeClassName="bg-muted text-primary font-medium"
                       onClick={handleLinkClick}
                     >
                       <Crown className="h-4 w-4" />
                       <span>Neeko+</span>
-                    </a>
+                    </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
