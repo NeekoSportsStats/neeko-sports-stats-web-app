@@ -89,8 +89,10 @@ function buildPredictionExplanation(match: Record<string, unknown>): string {
   const awayWR       = toNum(match.away_win_rate);
   const strengthDiff = toNum(match.strength_diff);
 
-  const favourite = (homeScore ?? 0) >= (awayScore ?? 0) ? homeTeam : awayTeam;
-  const marginAbs = Math.abs(margin ?? 0);
+  const winningTeam = (homeScore ?? 0) >= (awayScore ?? 0) ? homeTeam : awayTeam;
+  const losingTeam  = (homeScore ?? 0) >= (awayScore ?? 0) ? awayTeam : homeTeam;
+  const favourite   = winningTeam;
+  const marginAbs   = Math.abs(margin ?? 0);
   const matchType =
     marginAbs <= 6  ? "coin-flip contest" :
     marginAbs <= 15 ? "moderate advantage" :
@@ -140,6 +142,10 @@ function buildPredictionExplanation(match: Record<string, unknown>): string {
   lines.push(
     `Home ground bonus: +6 pts applied to ${homeTeam}. ` +
     `Model: V6 Elite (season avg 55% + opponent defence 45% + home + form + win rate + ladder + logistic probability).`
+  );
+
+  lines.push(
+    `Predicted outcome: ${winningTeam} to WIN · ${losingTeam} projected to lose by ${r1(marginAbs)} pts.`
   );
 
   return lines.join(" ");
