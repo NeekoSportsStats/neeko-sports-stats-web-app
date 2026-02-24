@@ -385,19 +385,19 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[80] bg-gradient-to-b from-black/80 via-slate-950/75 to-black/80 backdrop-blur-sm flex items-start justify-center p-2 md:p-8 overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 bg-gradient-to-b from-[#070707] to-black overflow-y-auto px-4 pb-10 pt-6 sm:max-w-4xl sm:mx-auto sm:mt-10 sm:rounded-xl animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
     >
-      <div className="w-full max-w-5xl rounded-xl md:rounded-2xl border border-slate-700/30 bg-gradient-to-b from-slate-950/80 via-black/70 to-slate-950/80 backdrop-blur-xl shadow-2xl overflow-hidden my-2 md:my-0 animate-in slide-in-from-bottom-4 duration-300">
+      <div className="w-full rounded-xl border border-slate-700/30 bg-gradient-to-b from-slate-950/80 via-black/70 to-slate-950/80 backdrop-blur-xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
         <div className="flex items-center justify-between p-3 md:p-5 border-b border-gradient-to-r from-[#F5C84C]/20 via-slate-700/20 to-transparent">
           <div>
             <div className="text-xs uppercase tracking-wider bg-gradient-to-r from-[#F5C84C] to-[#E6B84A] bg-clip-text text-transparent font-medium">
               {roundLabel} • {season}
               {isFinished && <span className="ml-2 text-slate-400">Full Time</span>}
             </div>
-            <div className="text-lg md:text-2xl font-bold text-white">Match Detail</div>
+            <div className="text-lg sm:text-xl font-semibold text-white">Match Detail</div>
           </div>
           <button
             onClick={onClose}
@@ -407,7 +407,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
           </button>
         </div>
 
-        <div className="p-4 md:p-6 space-y-5 md:space-y-8">
+        <div className="p-4 md:p-6 space-y-6 sm:space-y-10">
           <div className="rounded-xl md:rounded-2xl border border-gradient-to-r from-[#F5C84C]/15 via-slate-700/10 to-[#60A5FA]/10 bg-gradient-to-br from-slate-950/60 via-black/50 to-slate-900/60 p-4 md:p-6 shadow-lg shadow-[#F5C84C]/5 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-[#F5C84C]/[0.03] via-transparent to-[#60A5FA]/[0.03]" />
             <div className="relative">
@@ -622,7 +622,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
                     <div className="w-1 h-6 bg-gradient-to-b from-amber-400 via-[#F5C84C] to-[#E6B84A] rounded-full shadow-[0_0_10px_rgba(245,200,76,0.5)]" />
                     <div className="bg-gradient-to-r from-white via-amber-50 to-amber-100 bg-clip-text text-transparent font-bold text-lg md:text-xl tracking-tight">Match Report</div>
                   </div>
-                  <div className="text-white/75 text-[15px] md:text-base leading-[1.8] md:leading-[1.85] space-y-3.5 md:space-y-4 max-w-3xl">
+                  <div className="text-sm sm:text-base text-neutral-300 leading-relaxed space-y-3.5 md:space-y-4 max-w-3xl">
                     {insightSentences && insightSentences.length > 0 ? (
                       insightSentences.map((s, i) => {
                         const isOpening = i === 0;
