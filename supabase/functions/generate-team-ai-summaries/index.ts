@@ -15,14 +15,50 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  const executionStarted = new Date().toISOString();
+
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    const { data: logRow } = await supabase
+      .schema("afl")
+      .from("ai_generation_logs")
+      .insert({
+        job_name: "generate-team-ai-summaries",
+        job_type: "team_summary",
+        status: "running",
+        execution_started: executionStarted,
+      })
+      .select("id")
+      .single();
+
+    const logId: string | null = logRow?.id ?? null;
+
+    const updateLog = async (status: string, recordsProcessed?: number, errorMessage?: string) => {
+      if (!logId) return;
+      const completedAt = new Date().toISOString();
+      const durationMs = Math.round(new Date(completedAt).getTime() - new Date(executionStarted).getTime());
+      await supabase
+        .schema("afl")
+        .from("ai_generation_logs")
+        .update({
+          status,
+          records_processed: recordsProcessed ?? null,
+          error_message: errorMessage ?? null,
+          execution_completed: completedAt,
+          duration_ms: durationMs,
+        })
+        .eq("id", logId);
+    };
+
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiKey) throw new Error("OPENAI_API_KEY not set");
+    if (!openaiKey) {
+      await updateLog("error", 0, "OPENAI_API_KEY not set");
+      throw new Error("OPENAI_API_KEY not set");
+    }
 
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch { /* no body */ }
@@ -63,7 +99,10 @@ Deno.serve(async (req: Request) => {
         .order("team", { ascending: true })
         .limit(BATCH_SIZE);
 
-      if (error) throw error;
+      if (error) {
+        await updateLog("error", processed, error.message);
+        throw error;
+      }
       if (!rows || rows.length === 0) break;
 
       for (const row of rows) {
@@ -150,6 +189,8 @@ Deno.serve(async (req: Request) => {
         }
       }
     }
+
+    await updateLog("success", processed);
 
     return new Response(
       JSON.stringify({

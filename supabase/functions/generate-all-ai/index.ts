@@ -12,9 +12,44 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  const executionStarted = new Date().toISOString();
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    const { data: logRow } = await supabase
+      .schema("afl")
+      .from("ai_generation_logs")
+      .insert({
+        job_name: "generate-all-ai",
+        job_type: "master_run",
+        status: "running",
+        execution_started: executionStarted,
+      })
+      .select("id")
+      .single();
+
+    const logId: string | null = logRow?.id ?? null;
+
+    const updateLog = async (status: string, recordsProcessed?: number, errorMessage?: string) => {
+      if (!logId) return;
+      const completedAt = new Date().toISOString();
+      const durationMs = Math.round(new Date(completedAt).getTime() - new Date(executionStarted).getTime());
+      await supabase
+        .schema("afl")
+        .from("ai_generation_logs")
+        .update({
+          status,
+          records_processed: recordsProcessed ?? null,
+          error_message: errorMessage ?? null,
+          execution_completed: completedAt,
+          duration_ms: durationMs,
+        })
+        .eq("id", logId);
+    };
 
     const fnHeaders = {
       "Authorization": `Bearer ${serviceRoleKey}`,
@@ -43,8 +78,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-
     const { count: playerCount } = await supabase
       .schema("afl")
       .from("ai_player_summaries")
@@ -62,6 +95,9 @@ Deno.serve(async (req: Request) => {
       .from("ai_match_predictions")
       .select("*", { count: "exact", head: true })
       .eq("season", 2026);
+
+    const totalRecords = (playerCount ?? 0) + (teamCount ?? 0) + (matchCount ?? 0);
+    await updateLog("success", totalRecords);
 
     return new Response(
       JSON.stringify({

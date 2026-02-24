@@ -190,14 +190,50 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  const executionStarted = new Date().toISOString();
+
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    const { data: logRow } = await supabase
+      .schema("afl")
+      .from("ai_generation_logs")
+      .insert({
+        job_name: "generate-match-summary",
+        job_type: "match_summary",
+        status: "running",
+        execution_started: executionStarted,
+      })
+      .select("id")
+      .single();
+
+    const logId: string | null = logRow?.id ?? null;
+
+    const updateLog = async (status: string, recordsProcessed?: number, errorMessage?: string) => {
+      if (!logId) return;
+      const completedAt = new Date().toISOString();
+      const durationMs = Math.round(new Date(completedAt).getTime() - new Date(executionStarted).getTime());
+      await supabase
+        .schema("afl")
+        .from("ai_generation_logs")
+        .update({
+          status,
+          records_processed: recordsProcessed ?? null,
+          error_message: errorMessage ?? null,
+          execution_completed: completedAt,
+          duration_ms: durationMs,
+        })
+        .eq("id", logId);
+    };
+
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiKey) throw new Error("OPENAI_API_KEY not set");
+    if (!openaiKey) {
+      await updateLog("error", 0, "OPENAI_API_KEY not set");
+      throw new Error("OPENAI_API_KEY not set");
+    }
 
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch { /* no body */ }
@@ -211,8 +247,14 @@ Deno.serve(async (req: Request) => {
       .eq("is_active", true)
       .limit(1);
 
-    if (promptErr) throw new Error(`Prompt fetch failed: ${promptErr.message}`);
-    if (!promptRows || promptRows.length === 0) throw new Error("No active match_prediction prompt found");
+    if (promptErr) {
+      await updateLog("error", 0, `Prompt fetch failed: ${promptErr.message}`);
+      throw new Error(`Prompt fetch failed: ${promptErr.message}`);
+    }
+    if (!promptRows || promptRows.length === 0) {
+      await updateLog("error", 0, "No active match_prediction prompt found");
+      throw new Error("No active match_prediction prompt found");
+    }
 
     const systemPrompt = promptRows[0].system_prompt as string;
     const userTemplate = promptRows[0].user_prompt_template as string;
@@ -249,8 +291,12 @@ Deno.serve(async (req: Request) => {
       .from("v_match_prediction_features_true_game")
       .select("*");
 
-    if (matchErr) throw new Error(`Features fetch failed: ${matchErr.message}`);
+    if (matchErr) {
+      await updateLog("error", 0, `Features fetch failed: ${matchErr.message}`);
+      throw new Error(`Features fetch failed: ${matchErr.message}`);
+    }
     if (!matches || matches.length === 0) {
+      await updateLog("success", 0);
       return new Response(
         JSON.stringify({ message: "No matches to process", processed: 0, skipped: 0, errors: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -343,6 +389,8 @@ Deno.serve(async (req: Request) => {
         errors++;
       }
     }
+
+    await updateLog("success", processed);
 
     return new Response(
       JSON.stringify({ message: "generate-match-summary complete", processed, skipped, errors }),
