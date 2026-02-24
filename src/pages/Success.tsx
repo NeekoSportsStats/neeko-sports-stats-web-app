@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { CheckCircle2, Crown, ArrowRight, Loader2, Home } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function Success() {
   const [params] = useSearchParams();
@@ -42,12 +43,18 @@ export default function Success() {
       return;
     }
 
-    console.log("🔄 Triggering premium status refresh...");
+    console.log("🔄 Triggering session + premium status refresh...");
     refreshTriggeredRef.current = true;
 
-    refreshPremiumStatus().catch((e) => {
-      console.error("❌ refreshPremiumStatus error on Success page:", e);
-    });
+    // Force Supabase to refresh the JWT so any DB changes from the webhook
+    // are reflected in the next profile fetch without a manual page reload.
+    supabase.auth.refreshSession()
+      .then(() => refreshPremiumStatus())
+      .catch((e) => {
+        console.error("❌ Session/premium refresh error on Success page:", e);
+        // Still attempt profile refresh even if session refresh failed
+        refreshPremiumStatus().catch(() => {});
+      });
   }, [loading, user, refreshPremiumStatus]);
 
   if (loading) {

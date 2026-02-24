@@ -132,7 +132,7 @@ export default function Account() {
 
     try {
       const res = await fetch(
-        "https://zbomenuickrogthnsozb.supabase.co/functions/v1/portal",
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal`,
         {
           method: "POST",
           headers: {

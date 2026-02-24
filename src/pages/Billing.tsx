@@ -64,7 +64,7 @@ const Billing = () => {
       }
 
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-portal-session`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal`,
         {
           method: "POST",
           headers: {

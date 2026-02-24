@@ -92,6 +92,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   /**
    * Initialise auth state and listen for changes.
+   * Strategy: onAuthStateChange is the single source of truth.
+   * INITIAL_SESSION fires synchronously before any getSession call resolves,
+   * so we rely solely on the listener and skip the redundant getSession hydrate.
    */
   useEffect(() => {
     let isMounted = true;
@@ -113,42 +116,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         setIsPremium(false);
       }
+
+      if (isMounted) setLoading(false);
     };
 
-    // 1️⃣ Initial session hydrate
-    (async () => {
-      try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-
-        if (!isMounted) return;
-
-        if (error) {
-          console.error("❌ Initial getSession error:", error);
-          setUser(null);
-          setIsPremium(false);
-          setLoading(false);
-          return;
-        }
-
-        await applySession(session, "getSession");
-      } catch (err) {
-        console.error("❌ Initial getSession exception:", err);
-        if (isMounted) {
-          setUser(null);
-          setIsPremium(false);
-        }
-      } finally {
-        if (isMounted) {
-          console.log("✅ Initial auth state resolved");
-          setLoading(false);
-        }
-      }
-    })();
-
-    // 2️⃣ Auth listener
+    // Single source of truth: the auth state change listener.
+    // INITIAL_SESSION fires first and resolves the initial loading state.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -156,35 +129,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       console.log("🟣 AUTH EVENT:", event, "| hasSession:", !!session);
 
-      // NEW: Ignore premature SIGNED_IN before INITIAL_SESSION
-      if (event === "SIGNED_IN" && !initialSessionSeenRef.current) {
-        console.log("⛔ Ignoring premature SIGNED_IN before INITIAL_SESSION");
-        return;
-      }
-
       switch (event) {
         case "INITIAL_SESSION":
           initialSessionSeenRef.current = true;
           await applySession(session, event);
-          setLoading(false);
           break;
 
         case "SIGNED_IN":
         case "TOKEN_REFRESHED":
           await applySession(session, event);
-          setLoading(false);
           break;
 
         case "USER_UPDATED":
-          // 🚫 Do NOT reapply session during password recovery
           if (typeof window !== "undefined" && window.location.pathname === "/reset-password") {
             console.log("🛑 USER_UPDATED ignored on reset-password");
             return;
           }
-
-          console.log("📥 applySession from USER_UPDATED");
           await applySession(session, event);
-          setLoading(false);
           break;
 
         case "SIGNED_OUT":
@@ -199,9 +160,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
 
+    // Safety net: if INITIAL_SESSION never fires within 3s, unblock loading
+    const safetyTimer = setTimeout(() => {
+      if (isMounted && !initialSessionSeenRef.current) {
+        console.warn("⚠️ INITIAL_SESSION timeout — forcing loading=false");
+        setLoading(false);
+      }
+    }, 3000);
+
     return () => {
       console.log("🧹 AuthProvider: cleanup");
       isMounted = false;
+      clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, [fetchPremiumStatus]);

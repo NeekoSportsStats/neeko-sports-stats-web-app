@@ -18,8 +18,10 @@ export function useSubscriptionStatus() {
 
     fetchSubscriptionStatus();
 
+    // Listen on both subscriptions (user_id AND profile_id columns) plus profiles
+    // The webhook trigger may populate either column depending on event type
     const channel = supabase
-      .channel('subscription-changes')
+      .channel(`subscription-changes-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -28,16 +30,34 @@ export function useSubscriptionStatus() {
           table: 'subscriptions',
           filter: `user_id=eq.${user.id}`
         },
-        () => {
-          fetchSubscriptionStatus();
-        }
+        () => { fetchSubscriptionStatus(); }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'subscriptions',
+          filter: `profile_id=eq.${user.id}`
+        },
+        () => { fetchSubscriptionStatus(); }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`
+        },
+        () => { fetchSubscriptionStatus(); }
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user?.id]);
 
   const fetchSubscriptionStatus = async () => {
     if (!user) {
@@ -46,25 +66,42 @@ export function useSubscriptionStatus() {
     }
 
     try {
-      const { data: subscription, error } = await supabase
+      // Check subscriptions table — match on either user_id or profile_id
+      const { data: subscriptions, error } = await supabase
         .from('subscriptions')
         .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
+        .or(`user_id.eq.${user.id},profile_id.eq.${user.id}`)
+        .order('current_period_end', { ascending: false })
+        .limit(1);
 
       if (error) throw error;
 
+      const subscription = subscriptions?.[0] ?? null;
+
       if (!subscription) {
-        setStatus("free");
-        setSubscriptionData(null);
+        // Fall back to profiles.subscription_status
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('subscription_status')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (profile?.subscription_status === 'active' || profile?.subscription_status === 'trialing') {
+          setStatus(profile.subscription_status as SubscriptionStatus);
+        } else {
+          setStatus("free");
+          setSubscriptionData(null);
+        }
         return;
       }
 
       setSubscriptionData(subscription);
 
       if (subscription.status === 'active' || subscription.status === 'trialing') {
-        const periodEnd = new Date(subscription.current_period_end);
-        if (periodEnd > new Date()) {
+        const periodEnd = subscription.current_period_end
+          ? new Date(subscription.current_period_end)
+          : null;
+        if (!periodEnd || periodEnd > new Date()) {
           setStatus(subscription.status);
         } else {
           setStatus("canceled");
