@@ -114,15 +114,20 @@ export default function PlayerOverlay({ player, lens, onLensChange, onClose }: P
   };
 
   const performanceSummary = useMemo(() => {
+    const hit80 = recalculatedHitRates.find(h => h.threshold === 80)?.percentage ?? 0;
+    const hit100 = recalculatedHitRates.find(h => h.threshold === 100)?.percentage ?? 0;
     return getPerformanceSummaryText({
       lens,
+      playerName: player.name,
       avg: player.stats.avg,
       min: player.stats.min,
       max: player.stats.max,
       gamesPlayed: player.stats.games,
       volatility: player.stats.volatility,
+      hitRate80: hit80,
+      hitRate100: hit100,
     });
-  }, [lens, player.stats]);
+  }, [lens, player.stats, player.name, recalculatedHitRates]);
 
   return (
     <div
