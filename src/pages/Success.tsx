@@ -1,5 +1,5 @@
 import { useSearchParams } from "react-router-dom";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -18,46 +18,36 @@ export default function Success() {
 
   const { loading, isPremium, refreshPremiumStatus, user } = useAuth();
   const refreshTriggeredRef = useRef(false);
+  const [authTimedOut, setAuthTimedOut] = useState(false);
+
+  // Safety escape: if auth is still loading after 4s, stop blocking the page
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (loading) {
+        console.warn("⚠️ Success page: auth loading timeout — unblocking");
+        setAuthTimedOut(true);
+      }
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [loading]);
 
   useEffect(() => {
-    console.log("🔵 SUCCESS PAGE MOUNTED");
-    console.log("🔵 Session ID:", sessionId);
-    console.log("🔵 Auth state:", { loading, hasUser: !!user, isPremium });
-  }, []);
+    const authReady = !loading || authTimedOut;
+    if (!authReady) return;
+    if (!user) return;
+    if (refreshTriggeredRef.current) return;
 
-  useEffect(() => {
-    if (loading) {
-      console.log("⏳ Auth still loading...");
-      return;
-    }
-
-    console.log("✅ Auth loaded. User:", !!user);
-
-    if (!user) {
-      console.log("⚠️ No user found after auth loaded");
-      return;
-    }
-
-    if (refreshTriggeredRef.current) {
-      console.log("✅ Premium refresh already triggered, skipping");
-      return;
-    }
-
-    console.log("🔄 Triggering session + premium status refresh...");
     refreshTriggeredRef.current = true;
 
-    // Force Supabase to refresh the JWT so any DB changes from the webhook
-    // are reflected in the next profile fetch without a manual page reload.
     supabase.auth.refreshSession()
       .then(() => refreshPremiumStatus())
       .catch((e) => {
         console.error("❌ Session/premium refresh error on Success page:", e);
-        // Still attempt profile refresh even if session refresh failed
         refreshPremiumStatus().catch(() => {});
       });
-  }, [loading, user, refreshPremiumStatus]);
+  }, [loading, authTimedOut, user, refreshPremiumStatus]);
 
-  if (loading) {
+  if (loading && !authTimedOut) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/10 via-background to-background">
         <Card className="max-w-2xl w-full">

@@ -20,6 +20,7 @@ const Billing = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [portalLoading, setPortalLoading] = useState(false);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
 
   useEffect(() => {
@@ -80,6 +81,8 @@ const Billing = () => {
   };
 
   const handleManageBilling = async () => {
+    if (portalLoading) return;
+    setPortalLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
 
@@ -105,11 +108,11 @@ const Billing = () => {
 
       const data = await res.json();
 
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error("Failed to create portal session");
+      if (!res.ok || !data.url) {
+        throw new Error(data.error || "Failed to create portal session");
       }
+
+      window.location.href = data.url;
     } catch (error: any) {
       console.error("Error creating portal session:", error);
       toast({
@@ -117,6 +120,8 @@ const Billing = () => {
         description: error.message || "Unable to access billing portal",
         variant: "destructive",
       });
+    } finally {
+      setPortalLoading(false);
     }
   };
 
@@ -197,8 +202,15 @@ const Billing = () => {
               )}
 
               <div className="pt-4">
-                <Button onClick={handleManageBilling} className="w-full">
-                  Manage Billing
+                <Button onClick={handleManageBilling} disabled={portalLoading} className="w-full">
+                  {portalLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Opening portal...
+                    </>
+                  ) : (
+                    "Manage Billing"
+                  )}
                 </Button>
               </div>
             </CardContent>

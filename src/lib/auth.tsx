@@ -92,15 +92,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   /**
    * Initialise auth state and listen for changes.
-   * Strategy: onAuthStateChange is the single source of truth.
-   * INITIAL_SESSION fires synchronously before any getSession call resolves,
-   * so we rely solely on the listener and skip the redundant getSession hydrate.
+   *
+   * CRITICAL: The onAuthStateChange callback MUST return synchronously.
+   * Awaiting any Supabase call (e.g. supabase.from) inside the callback
+   * creates a session-lock deadlock that freezes auth, tables, and logout.
+   * All async work is deferred into a non-awaited IIFE so the callback
+   * returns immediately.
    */
   useEffect(() => {
     let isMounted = true;
     console.log("⚡ AuthProvider: init");
 
-    const applySession = async (session: any, source: string) => {
+    const applySession = (session: any, source: string) => {
       if (!isMounted) return;
 
       const currentUser = session?.user ?? null;
@@ -111,20 +114,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       setUser(currentUser);
 
-      if (currentUser?.id) {
-        await fetchPremiumStatus(currentUser.id);
-      } else {
-        setIsPremium(false);
-      }
-
-      if (isMounted) setLoading(false);
+      // Defer async premium fetch — must NOT be awaited inside onAuthStateChange
+      (async () => {
+        if (currentUser?.id) {
+          await fetchPremiumStatus(currentUser.id);
+        } else {
+          setIsPremium(false);
+        }
+        if (isMounted) setLoading(false);
+      })();
     };
 
     // Single source of truth: the auth state change listener.
-    // INITIAL_SESSION fires first and resolves the initial loading state.
+    // The callback is synchronous — async work runs in a detached IIFE.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
 
       console.log("🟣 AUTH EVENT:", event, "| hasSession:", !!session);
@@ -132,12 +137,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       switch (event) {
         case "INITIAL_SESSION":
           initialSessionSeenRef.current = true;
-          await applySession(session, event);
+          applySession(session, event);
           break;
 
         case "SIGNED_IN":
         case "TOKEN_REFRESHED":
-          await applySession(session, event);
+          applySession(session, event);
           break;
 
         case "USER_UPDATED":
@@ -145,7 +150,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             console.log("🛑 USER_UPDATED ignored on reset-password");
             return;
           }
-          await applySession(session, event);
+          applySession(session, event);
           break;
 
         case "SIGNED_OUT":
