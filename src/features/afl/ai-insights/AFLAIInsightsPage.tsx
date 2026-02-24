@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Search, TrendingUp, Target, Users, ChevronRight, Sparkles, Crown, ArrowLeft, Info, Brain } from "lucide-react";
+import { Search, TrendingUp, Target, Users, ChevronRight, Sparkles, Lock, ArrowLeft, Info, Brain } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import FantasyVerdictBadge from "@/components/FantasyVerdictBadge";
+import { useAuth } from "@/lib/auth";
+import { FREE_PLAYER_IDS, FREE_TEAM_NAMES, FREE_MATCH_IDS } from "@/config/freemiumConfig";
 
 interface AIPlayerSummary {
   player_id: number;
@@ -76,8 +78,8 @@ interface PlayerProjection {
 type Section = "player" | "team" | "match";
 
 export default function AFLAIInsightsPage() {
+  const { isPremium } = useAuth();
   const [activeSection, setActiveSection] = useState<Section>("player");
-  const [premiumMode, setPremiumMode] = useState(false);
 
   // Player Deep Dive state
   const [playerSearch, setPlayerSearch] = useState("");
@@ -123,19 +125,24 @@ export default function AFLAIInsightsPage() {
 
   useEffect(() => {
     async function fetchTeams() {
-      const { data, error } = await supabase
-        .schema("afl")
-        .from("ai_team_summaries")
-        .select("team")
-        .eq("season", 2026)
-        .order("team", { ascending: true });
+      const { data, error } = isPremium
+        ? await supabase
+            .schema("afl")
+            .from("ai_team_summaries")
+            .select("team")
+            .eq("season", 2026)
+            .order("team", { ascending: true })
+        : await supabase
+            .from("v_ai_team_summaries_preview")
+            .select("team")
+            .order("team", { ascending: true });
       if (!error && data) {
         const distinct = Array.from(new Set(data.map((r: { team: string }) => r.team))).sort() as string[];
         setTeams(distinct);
       }
     }
     fetchTeams();
-  }, []);
+  }, [isPremium]);
 
   useEffect(() => {
     async function fetchAllTeamFeatures() {
@@ -162,35 +169,50 @@ export default function AFLAIInsightsPage() {
       setLoadingTeam(true);
       setTeamSummaryError(false);
 
+      const isFreeTeam = FREE_TEAM_NAMES.includes(selectedTeam);
+      const canReadAI = isPremium || isFreeTeam;
+
       try {
-        const result2026 = await supabase
-          .schema("afl")
-          .from("ai_team_summaries")
-          .select("team, season, round_number, summary, fantasy_verdict, updated_at")
-          .eq("team", selectedTeam)
-          .eq("season", 2026)
-          .order("round_number", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (result2026.error) throw result2026.error;
-
-        if (result2026.data) {
-          setTeamSummary(result2026.data as AITeamSummary);
-        } else {
-          const result2025 = await supabase
+        if (canReadAI) {
+          const result2026 = await supabase
             .schema("afl")
             .from("ai_team_summaries")
             .select("team, season, round_number, summary, fantasy_verdict, updated_at")
             .eq("team", selectedTeam)
-            .eq("season", 2025)
+            .eq("season", 2026)
             .order("round_number", { ascending: false })
             .limit(1)
             .maybeSingle();
 
-          if (result2025.error) throw result2025.error;
+          if (result2026.error) throw result2026.error;
 
-          setTeamSummary(result2025.data ? (result2025.data as AITeamSummary) : null);
+          if (result2026.data) {
+            setTeamSummary(result2026.data as AITeamSummary);
+          } else {
+            const result2025 = await supabase
+              .schema("afl")
+              .from("ai_team_summaries")
+              .select("team, season, round_number, summary, fantasy_verdict, updated_at")
+              .eq("team", selectedTeam)
+              .eq("season", 2025)
+              .order("round_number", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (result2025.error) throw result2025.error;
+            setTeamSummary(result2025.data ? (result2025.data as AITeamSummary) : null);
+          }
+        } else {
+          const result = await supabase
+            .from("v_ai_team_summaries_preview")
+            .select("team, season, round_number, fantasy_verdict, updated_at")
+            .eq("team", selectedTeam)
+            .order("round_number", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (result.error) throw result.error;
+          setTeamSummary(result.data ? { ...(result.data as AITeamSummary), summary: null } : null);
         }
 
         const featuresResult = await supabase
@@ -217,7 +239,7 @@ export default function AFLAIInsightsPage() {
     }
 
     fetchTeamSummary();
-  }, [selectedTeam]);
+  }, [selectedTeam, isPremium]);
 
   useEffect(() => {
     const query = playerSearch.trim();
@@ -277,15 +299,38 @@ export default function AFLAIInsightsPage() {
     setPlayerSearch("");
     setSearchResults([]);
 
-    const { data, error } = await supabase
-      .schema("afl")
-      .from("ai_player_summaries")
-      .select(`player_id, player, team, round_number, season_avg, consistency_score, ceiling_fantasy, floor_fantasy, ai_summary, trend_direction, updated_at, opponent, volatility, matchup_delta, matchup_label, expected_fantasy, risk_tier`)
-      .eq("player_id", proj.player_id)
-      .eq("season", 2026)
-      .order("round_number", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const isFreePlayer = FREE_PLAYER_IDS.includes(proj.player_id);
+    const canReadAI = isPremium || isFreePlayer;
+
+    const selectFields = `player_id, player, team, round_number, season_avg, consistency_score, ceiling_fantasy, floor_fantasy, ai_summary, trend_direction, updated_at, opponent, volatility, matchup_delta, matchup_label, expected_fantasy, risk_tier`;
+    const previewFields = `player_id, player, team, round_number, season_avg, consistency_score, ceiling_fantasy, floor_fantasy, trend_direction, updated_at, opponent, volatility, matchup_delta, matchup_label, expected_fantasy, risk_tier`;
+
+    let data: AIPlayerSummary | null = null;
+    let error: unknown = null;
+
+    if (canReadAI) {
+      const result = await supabase
+        .schema("afl")
+        .from("ai_player_summaries")
+        .select(selectFields)
+        .eq("player_id", proj.player_id)
+        .eq("season", 2026)
+        .order("round_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      data = result.data as AIPlayerSummary | null;
+      error = result.error;
+    } else {
+      const result = await supabase
+        .from("v_ai_player_summaries_preview")
+        .select(previewFields)
+        .eq("player_id", proj.player_id)
+        .order("round_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      data = result.data ? { ...(result.data as AIPlayerSummary), ai_summary: null } : null;
+      error = result.error;
+    }
 
     const enriched: AIPlayerSummary = data
       ? { ...(data as AIPlayerSummary), season_context: proj.season_context }
@@ -437,27 +482,40 @@ export default function AFLAIInsightsPage() {
   useEffect(() => {
     async function loadMatchSummaries() {
       const { data: roundData } = await supabase
-        .schema("afl")
-        .from("ai_match_predictions")
+        .from("v_ai_match_predictions_preview")
         .select("round_number")
-        .eq("season", 2026)
         .order("round_number", { ascending: true })
         .limit(1);
 
-      const currentRound = roundData?.[0]?.round_number ?? 0;
+      const currentRound = (roundData as Array<{ round_number: number }>)?.[0]?.round_number ?? 0;
 
-      const { data } = await supabase
-        .schema("afl")
-        .from("ai_match_predictions")
-        .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, ai_summary, prediction_explanation, updated_at")
-        .eq("season", 2026)
-        .eq("round_number", currentRound)
-        .order("match_id", { ascending: true })
-        .limit(10);
-      setMatchSummaries((data as AIMatchPrediction[]) || []);
+      if (isPremium) {
+        const { data } = await supabase
+          .schema("afl")
+          .from("ai_match_predictions")
+          .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, ai_summary, prediction_explanation, updated_at")
+          .eq("season", 2026)
+          .eq("round_number", currentRound)
+          .order("match_id", { ascending: true })
+          .limit(10);
+        setMatchSummaries((data as AIMatchPrediction[]) || []);
+      } else {
+        const { data } = await supabase
+          .from("v_ai_match_predictions_preview")
+          .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, updated_at")
+          .eq("round_number", currentRound)
+          .order("match_id", { ascending: true })
+          .limit(10);
+        const withNulls = (data || []).map((m: Partial<AIMatchPrediction>) => ({
+          ...m,
+          ai_summary: null,
+          prediction_explanation: null,
+        })) as AIMatchPrediction[];
+        setMatchSummaries(withNulls);
+      }
     }
     loadMatchSummaries();
-  }, []);
+  }, [isPremium]);
 
   const cleanSummary = (summary: string | null): string => {
     if (!summary) return "";
@@ -477,17 +535,12 @@ export default function AFLAIInsightsPage() {
                 <Sparkles className="h-3.5 w-3.5" />
                 AI Insights
               </div>
-              <button
-                onClick={() => setPremiumMode(!premiumMode)}
-                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold uppercase tracking-wider transition-all ${
-                  premiumMode
-                    ? "border-amber-400/60 bg-amber-400/20 text-amber-200"
-                    : "border-white/20 bg-white/5 text-white/60 hover:bg-white/10"
-                }`}
-              >
-                <Crown className="h-3.5 w-3.5" />
-                {premiumMode ? "Premium ON" : "Premium OFF"}
-              </button>
+              {isPremium && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-amber-400/60 bg-amber-400/20 text-amber-200 text-xs font-semibold uppercase tracking-wider">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Neeko+ Active
+                </div>
+              )}
             </div>
 
             <nav className="flex gap-2 overflow-x-auto">
@@ -850,6 +903,7 @@ export default function AFLAIInsightsPage() {
                     <div className="flex items-center justify-between">
                       <h4 className="font-semibold text-white">AI Insights Summary</h4>
                       <div className="relative">
+                        {selectedPlayer.ai_summary && (
                         <button
                           onMouseEnter={() => setShowTransparency(true)}
                           onMouseLeave={() => setShowTransparency(false)}
@@ -858,6 +912,7 @@ export default function AFLAIInsightsPage() {
                         >
                           <Info className="h-[18px] w-[18px]" />
                         </button>
+                        )}
                         {showTransparency && (
                           <div
                             className="absolute right-0 top-7 z-50 w-80 rounded-xl p-4 border border-[#F5C84C]/40"
@@ -909,52 +964,65 @@ export default function AFLAIInsightsPage() {
                     {/* Structured AI Summary */}
                     <div className="space-y-3 text-sm leading-relaxed">
                       {selectedPlayer.ai_summary ? (
-                        summaryLines ? (
-                          <div className="space-y-4">
-                            {summaryLines.paragraph && (
-                              <p className="text-white/80 leading-relaxed">{summaryLines.paragraph}</p>
-                            )}
-                            <div className="space-y-3 pt-1">
-                              {summaryLines.outlook && (
-                                <div
-                                  className="rounded-lg px-4 py-3"
-                                  style={{ background: "rgba(245,200,76,0.06)", border: "1px solid rgba(245,200,76,0.15)" }}
-                                >
-                                  <div className="text-[10px] font-bold uppercase tracking-widest text-[#F5C84C]/70 mb-1">Outlook</div>
-                                  <p className="text-white/80 text-sm leading-relaxed">{summaryLines.outlook}</p>
-                                </div>
+                        <>
+                          {summaryLines ? (
+                            <div className="space-y-4">
+                              {summaryLines.paragraph && (
+                                <p className="text-white/80 leading-relaxed">{summaryLines.paragraph}</p>
                               )}
-                              {summaryLines.upside && (
-                                <div
-                                  className="rounded-lg px-4 py-3"
-                                  style={{ background: "rgba(52,211,153,0.05)", border: "1px solid rgba(52,211,153,0.15)" }}
-                                >
-                                  <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70 mb-1">Upside</div>
-                                  <p className="text-white/80 text-sm leading-relaxed">{summaryLines.upside}</p>
-                                </div>
-                              )}
-                              {summaryLines.risk && (
-                                <div
-                                  className="rounded-lg px-4 py-3"
-                                  style={{ background: "rgba(248,113,113,0.05)", border: "1px solid rgba(248,113,113,0.15)" }}
-                                >
-                                  <div className="text-[10px] font-bold uppercase tracking-widest text-red-400/70 mb-1">Risk</div>
-                                  <p className="text-white/80 text-sm leading-relaxed">{summaryLines.risk}</p>
-                                </div>
-                              )}
+                              <div className="space-y-3 pt-1">
+                                {summaryLines.outlook && (
+                                  <div
+                                    className="rounded-lg px-4 py-3"
+                                    style={{ background: "rgba(245,200,76,0.06)", border: "1px solid rgba(245,200,76,0.15)" }}
+                                  >
+                                    <div className="text-[10px] font-bold uppercase tracking-widest text-[#F5C84C]/70 mb-1">Outlook</div>
+                                    <p className="text-white/80 text-sm leading-relaxed">{summaryLines.outlook}</p>
+                                  </div>
+                                )}
+                                {summaryLines.upside && (
+                                  <div
+                                    className="rounded-lg px-4 py-3"
+                                    style={{ background: "rgba(52,211,153,0.05)", border: "1px solid rgba(52,211,153,0.15)" }}
+                                  >
+                                    <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70 mb-1">Upside</div>
+                                    <p className="text-white/80 text-sm leading-relaxed">{summaryLines.upside}</p>
+                                  </div>
+                                )}
+                                {summaryLines.risk && (
+                                  <div
+                                    className="rounded-lg px-4 py-3"
+                                    style={{ background: "rgba(248,113,113,0.05)", border: "1px solid rgba(248,113,113,0.15)" }}
+                                  >
+                                    <div className="text-[10px] font-bold uppercase tracking-widest text-red-400/70 mb-1">Risk</div>
+                                    <p className="text-white/80 text-sm leading-relaxed">{summaryLines.risk}</p>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ) : (
-                          <p className="text-white/80">{selectedPlayer.ai_summary}</p>
-                        )
+                          ) : (
+                            <p className="text-white/80">{selectedPlayer.ai_summary}</p>
+                          )}
+                          {isPremium && (
+                            <div className="pt-4 border-t border-[#F5C84C]/15">
+                              <p className="text-amber-200 text-sm leading-relaxed">
+                                <strong>Neeko+ Exclusive:</strong> Monitor injury reports and team selection in the 24h window before game day. Floor of {selectedPlayer.floor_fantasy != null ? Number(selectedPlayer.floor_fantasy).toFixed(0) : "N/A"} provides strong downside protection.
+                              </p>
+                            </div>
+                          )}
+                        </>
                       ) : (
-                        <p className="text-neutral-600 italic">No AI summary available for this player yet.</p>
-                      )}
-                      {premiumMode && selectedPlayer.ai_summary && (
-                        <div className="pt-4 border-t border-[#F5C84C]/15">
-                          <p className="text-amber-200 text-sm leading-relaxed">
-                            <strong>Neeko+ Exclusive:</strong> Monitor injury reports and team selection in the 24h window before game day. Floor of {selectedPlayer.floor_fantasy != null ? Number(selectedPlayer.floor_fantasy).toFixed(0) : "N/A"} provides strong downside protection.
-                          </p>
+                        <div
+                          className="rounded-xl p-5 flex flex-col items-center gap-3 text-center"
+                          style={{ background: "rgba(245,200,76,0.04)", border: "1px solid rgba(245,200,76,0.12)" }}
+                        >
+                          <Lock className="h-5 w-5 text-[#F5C84C]/50" />
+                          <div>
+                            <p className="text-sm font-semibold text-white/80">Neeko+ Exclusive</p>
+                            <p className="text-xs text-neutral-500 mt-1">
+                              Upgrade to Neeko+ to unlock full AI analysis for all 780 AFL players including Outlook, Upside, and Risk breakdowns.
+                            </p>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1377,6 +1445,19 @@ export default function AFLAIInsightsPage() {
                           </>
                         );
                       })()
+                    ) : !FREE_TEAM_NAMES.includes(selectedTeam) && !isPremium ? (
+                      <div
+                        className="rounded-xl p-5 flex flex-col items-center gap-3 text-center"
+                        style={{ background: "rgba(245,200,76,0.04)", border: "1px solid rgba(245,200,76,0.12)" }}
+                      >
+                        <Lock className="h-5 w-5 text-[#F5C84C]/50" />
+                        <div>
+                          <p className="text-sm font-semibold text-white/80">Neeko+ Exclusive</p>
+                          <p className="text-xs text-neutral-500 mt-1">
+                            Upgrade to Neeko+ to unlock full AI season summaries for all 18 AFL teams.
+                          </p>
+                        </div>
+                      </div>
                     ) : (
                       <p className="text-neutral-500 italic">AI team summary will be generated after Opening Round.</p>
                     )}
@@ -1556,7 +1637,7 @@ export default function AFLAIInsightsPage() {
                         <span className="text-xs text-neutral-500">Neeko Confidence</span>
                         <span className="text-xl font-bold text-[#F5C84C] leading-none">{confidence}%</span>
                       </div>
-                      {match.prediction_explanation && (
+                      {match.prediction_explanation && (isPremium || FREE_MATCH_IDS.includes(match.match_id)) && (
                         <div className="relative"
                           onMouseEnter={() => setActiveMatchTooltip("predictionExplanation")}
                           onMouseLeave={() => setActiveMatchTooltip(null)}
@@ -1670,6 +1751,19 @@ export default function AFLAIInsightsPage() {
                     <div className="text-sm text-white/80 leading-relaxed">
                       {summary ? (
                         <p>{summary}</p>
+                      ) : !FREE_MATCH_IDS.includes(match.match_id) && !isPremium ? (
+                        <div
+                          className="rounded-xl p-5 flex flex-col items-center gap-3 text-center"
+                          style={{ background: "rgba(245,200,76,0.04)", border: "1px solid rgba(245,200,76,0.12)" }}
+                        >
+                          <Lock className="h-5 w-5 text-[#F5C84C]/50" />
+                          <div>
+                            <p className="text-sm font-semibold text-white/80">Neeko+ Exclusive</p>
+                            <p className="text-xs text-neutral-500 mt-1">
+                              Upgrade to Neeko+ to unlock full AI match analysis and prediction explanations.
+                            </p>
+                          </div>
+                        </div>
                       ) : (
                         <p className="text-neutral-600 italic">No AI summary available for this match yet.</p>
                       )}

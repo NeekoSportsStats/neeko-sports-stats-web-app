@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Grid3X3, Calendar, Info } from "lucide-react";
+import { Grid3X3, Calendar, Info, Lock, Sparkles } from "lucide-react";
 import TeamGrid from "./TeamGrid";
 import TeamOverlay from "./TeamOverlay";
 import { getTeams, TeamData, StatLens } from "./getTeams";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
+import { FREE_TEAM_ROWS } from "@/config/freemiumConfig";
 import {
   Tooltip,
   TooltipContent,
@@ -14,6 +16,7 @@ import {
 type Season = "2025" | "2026";
 
 export default function AFLTeamsPage() {
+  const { isPremium } = useAuth();
   const [lens, setLens] = useState<StatLens>("fantasy");
   const [season, setSeason] = useState<Season>("2025");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -169,13 +172,43 @@ export default function AFLTeamsPage() {
               </p>
             </div>
           ) : (
-            <TeamGrid
-              teams={allTeams}
-              lens={lens}
-              minRound={minRound}
-              maxRound={maxRound}
-              onTeamSelect={(t) => setSelectedId(t.id)}
-            />
+            <div className="relative">
+              <TeamGrid
+                teams={isPremium ? allTeams : allTeams.slice(0, FREE_TEAM_ROWS)}
+                lens={lens}
+                minRound={minRound}
+                maxRound={maxRound}
+                onTeamSelect={(t) => setSelectedId(t.id)}
+              />
+              {!isPremium && allTeams.length > FREE_TEAM_ROWS && (
+                <div
+                  className="rounded-b-2xl px-8 py-10 flex flex-col items-center gap-4 text-center border border-t-0 border-white/10"
+                  style={{ background: "linear-gradient(180deg, rgba(7,7,7,0.7) 0%, rgba(7,7,7,0.97) 100%)" }}
+                >
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center"
+                    style={{ background: "rgba(245,200,76,0.12)", border: "1px solid rgba(245,200,76,0.3)" }}
+                  >
+                    <Lock className="h-5 w-5 text-[#F5C84C]" />
+                  </div>
+                  <div>
+                    <p className="text-base font-bold text-white">
+                      {allTeams.length - FREE_TEAM_ROWS} more teams locked
+                    </p>
+                    <p className="text-sm text-white/50 mt-1 max-w-sm">
+                      Upgrade to Neeko+ to view all {allTeams.length} teams in full.
+                    </p>
+                  </div>
+                  <a
+                    href="/neeko-plus"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-yellow-400 text-black font-semibold text-sm hover:bg-yellow-300 transition-all shadow-[0_0_20px_rgba(250,204,21,0.4)]"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Upgrade to Neeko+
+                  </a>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
