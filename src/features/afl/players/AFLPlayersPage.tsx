@@ -5,7 +5,11 @@ import PlayerOverlay from "./PlayerOverlay";
 import { getAvailableTeams, getPlayers, PlayerData, StatLens } from "./getPlayers";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
-import { FREE_PLAYER_NAMES } from "@/config/freemiumConfig";
+import {
+  FREE_PLAYER_NAMES,
+  FREE_TOTAL_PLAYERS,
+  FREE_PLAYERS_PER_TEAM,
+} from "@/config/freemiumConfig";
 import {
   Tooltip,
   TooltipContent,
@@ -36,14 +40,11 @@ export default function AFLPlayersPage() {
     const fetchPlayers = async () => {
       setLoading(true);
       const seasonNum = parseInt(season);
-      console.log(`📊 Fetching players for season ${seasonNum}, lens: ${lens}`);
-      const response = await getPlayers(lens, seasonNum, isPremium ? undefined : FREE_PLAYER_NAMES);
-      console.log(`✓ Loaded ${response.players.length} players`);
-      console.log(`✓ Round range: ${response.minRound} to ${response.maxRound}`);
-      if (response.players.length > 0) {
-        const sampleRounds = Object.keys(response.players[0].rounds).sort((a, b) => Number(a) - Number(b));
-        console.log(`Sample player rounds:`, sampleRounds);
-      }
+      const response = await getPlayers(
+        lens,
+        seasonNum,
+        isPremium ? undefined : FREE_PLAYER_NAMES
+      );
       setAllPlayers(response.players);
       setMinRound(response.minRound);
       setMaxRound(response.maxRound);
@@ -66,10 +67,32 @@ export default function AFLPlayersPage() {
     });
   }, [allPlayers, team, query]);
 
+  const sortedFiltered = useMemo(
+    () => [...filtered].sort((a, b) => b.stats.avg - a.stats.avg),
+    [filtered]
+  );
+
+  const visiblePlayers = useMemo(() => {
+    if (isPremium) return sortedFiltered;
+
+    if (team !== "All Teams") {
+      return sortedFiltered.slice(0, FREE_PLAYERS_PER_TEAM);
+    }
+
+    return sortedFiltered.slice(0, FREE_TOTAL_PLAYERS);
+  }, [sortedFiltered, isPremium, team]);
+
+  const lockedCount = useMemo(() => {
+    if (isPremium) return 0;
+    return Math.max(0, sortedFiltered.length - visiblePlayers.length);
+  }, [isPremium, sortedFiltered, visiblePlayers]);
+
   const selected = useMemo(() => {
     if (!selectedId) return null;
     return allPlayers.find((p) => p.id === selectedId) || null;
   }, [selectedId, allPlayers]);
+
+  const isTeamFiltered = team !== "All Teams";
 
   return (
     <div className="min-h-screen">
@@ -142,14 +165,32 @@ export default function AFLPlayersPage() {
                 ))}
               </select>
 
+              {/* Search — locked for free users */}
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/35" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/35 z-10" />
                 <input
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search player, team or role"
-                  className="w-full h-11 pl-10 pr-3 rounded-xl bg-black/50 border border-white/10 text-white/80 placeholder:text-white/30 outline-none focus:border-yellow-400/50"
+                  onChange={(e) => isPremium && setQuery(e.target.value)}
+                  placeholder={isPremium ? "Search player, team or role" : "Search requires Neeko+"}
+                  disabled={!isPremium}
+                  className={cn(
+                    "w-full h-11 pl-10 pr-3 rounded-xl bg-black/50 border text-white/80 placeholder:text-white/30 outline-none transition-colors",
+                    isPremium
+                      ? "border-white/10 focus:border-yellow-400/50 cursor-text"
+                      : "border-white/5 text-white/30 cursor-not-allowed select-none"
+                  )}
                 />
+                {!isPremium && (
+                  <div
+                    className="absolute inset-0 flex items-center justify-end pr-3 rounded-xl cursor-pointer"
+                    onClick={() => { window.location.href = "/neeko-plus"; }}
+                  >
+                    <span className="inline-flex items-center gap-1 text-[11px] text-[#F5C84C]/60 font-semibold">
+                      <Lock className="h-3 w-3" />
+                      Neeko+
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -199,7 +240,7 @@ export default function AFLPlayersPage() {
           </div>
         </div>
 
-        {/* GRID OR COMING SOON */}
+        {/* GRID OR STATES */}
         <div className="mt-3 md:mt-4">
           {loading ? (
             <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl p-12 text-center">
@@ -218,7 +259,7 @@ export default function AFLPlayersPage() {
               </div>
               <h3 className="text-2xl font-bold text-white mb-3">2026 season data will be available after Round 1</h3>
             </div>
-          ) : filtered.length === 0 ? (
+          ) : sortedFiltered.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl p-12 text-center">
               <h3 className="text-2xl font-bold text-white mb-3">No Players Found</h3>
               <p className="text-white/55 max-w-md mx-auto">
@@ -226,15 +267,71 @@ export default function AFLPlayersPage() {
               </p>
             </div>
           ) : (
-            <div className="relative">
+            <div className="space-y-0">
               <PlayerGrid
-                players={filtered}
+                players={visiblePlayers}
                 lens={lens}
                 minRound={minRound}
                 maxRound={maxRound}
                 onPlayerSelect={(p) => setSelectedId(p.id)}
               />
-              {!isPremium && (
+
+              {/* LOCKED ROWS — team-filtered blur panel */}
+              {!isPremium && isTeamFiltered && lockedCount > 0 && (
+                <div className="rounded-b-2xl border border-t-0 border-white/10 overflow-hidden">
+                  {/* Ghost blurred rows */}
+                  {Array.from({ length: Math.min(lockedCount, 5) }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="border-b border-white/5 px-4 py-3 blur-sm opacity-30 pointer-events-none select-none"
+                      aria-hidden
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-0.5 h-9 rounded-full bg-white/20 flex-shrink-0" />
+                        <div className="space-y-1.5 flex-1">
+                          <div className="h-3.5 w-32 rounded bg-white/10" />
+                          <div className="h-2.5 w-20 rounded bg-white/6" />
+                        </div>
+                        <div className="flex gap-1">
+                          {Array.from({ length: 6 }).map((_, j) => (
+                            <div key={j} className="w-10 h-8 rounded-md bg-white/8" />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {/* CTA overlay */}
+                  <div
+                    className="px-8 py-8 flex flex-col items-center gap-4 text-center"
+                    style={{ background: "linear-gradient(180deg, rgba(7,7,7,0.6) 0%, rgba(7,7,7,0.96) 100%)" }}
+                  >
+                    <div
+                      className="w-11 h-11 rounded-full flex items-center justify-center"
+                      style={{ background: "rgba(245,200,76,0.12)", border: "1px solid rgba(245,200,76,0.3)" }}
+                    >
+                      <Lock className="h-5 w-5 text-[#F5C84C]" />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-white">
+                        {lockedCount} more player{lockedCount !== 1 ? "s" : ""} locked
+                      </p>
+                      <p className="text-sm text-white/50 mt-1 max-w-sm">
+                        Upgrade to Neeko+ to see the full team roster.
+                      </p>
+                    </div>
+                    <a
+                      href="/neeko-plus"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-yellow-400 text-black font-semibold text-sm hover:bg-yellow-300 transition-all shadow-[0_0_20px_rgba(250,204,21,0.4)]"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Upgrade to Neeko+
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* BOTTOM CTA — all-teams view for free users */}
+              {!isPremium && !isTeamFiltered && (
                 <div
                   className="rounded-b-2xl px-8 py-10 flex flex-col items-center gap-4 text-center border border-t-0 border-white/10"
                   style={{ background: "linear-gradient(180deg, rgba(7,7,7,0.7) 0%, rgba(7,7,7,0.97) 100%)" }}
@@ -247,15 +344,15 @@ export default function AFLPlayersPage() {
                   </div>
                   <div>
                     <p className="text-base font-bold text-white">
-                      500+ more players locked
+                      Unlock all 780+ players
                     </p>
                     <p className="text-sm text-white/50 mt-1 max-w-sm">
-                      Upgrade to Neeko+ to unlock the full player ledger.
+                      Upgrade to Neeko+ to access the full player ledger, search, and team breakdowns.
                     </p>
                   </div>
                   <a
                     href="/neeko-plus"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-yellow-400 text-black font-semibold text-sm hover:bg-yellow-300 transition-all shadow-[0_0_20px_rgba(250,204,21,0.4)]"
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-yellow-400 text-black font-bold text-base hover:bg-yellow-300 transition-all shadow-[0_0_20px_rgba(250,204,21,0.4)]"
                   >
                     <Sparkles className="h-4 w-4" />
                     Upgrade to Neeko+
