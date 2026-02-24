@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Search, TrendingUp, Target, Users, ChevronRight, Sparkles, Crown, ArrowLeft, Info } from "lucide-react";
+import { Search, TrendingUp, Target, Users, ChevronRight, Sparkles, Crown, ArrowLeft, Info, Brain } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import FantasyVerdictBadge from "@/components/FantasyVerdictBadge";
 
@@ -35,6 +35,7 @@ interface AIMatchPrediction {
   predicted_margin: number | null;
   confidence: string | null;
   ai_summary: string | null;
+  prediction_explanation: string | null;
   updated_at: string | null;
 }
 
@@ -448,7 +449,7 @@ export default function AFLAIInsightsPage() {
       const { data } = await supabase
         .schema("afl")
         .from("ai_match_predictions")
-        .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, ai_summary, updated_at")
+        .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, ai_summary, prediction_explanation, updated_at")
         .eq("season", 2026)
         .eq("round_number", currentRound)
         .order("match_id", { ascending: true })
@@ -1420,27 +1421,64 @@ export default function AFLAIInsightsPage() {
 
           {matchSummaries.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {matchSummaries.map((match) => (
-                <button
-                  key={match.match_id}
-                  onClick={() => setSelectedMatchId(selectedMatchId === match.match_id ? null : match.match_id)}
-                  className={`p-4 rounded-lg border text-left transition-all ${
-                    selectedMatchId === match.match_id
-                      ? "bg-yellow-400/20 border-yellow-400/60 text-yellow-200"
-                      : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 text-white"
-                  }`}
-                >
-                  <div className="text-xs text-white/50 mb-1">Round {match.round_number}</div>
-                  <div className="font-semibold text-sm leading-tight">
-                    {match.home_team} vs {match.away_team}
+              {matchSummaries.map((match) => {
+                const isSelected = selectedMatchId === match.match_id;
+                return (
+                  <div key={match.match_id} className="group relative">
+                    <button
+                      onClick={() => setSelectedMatchId(isSelected ? null : match.match_id)}
+                      className={`w-full p-4 rounded-lg border text-left transition-all duration-300 ${
+                        isSelected
+                          ? "bg-yellow-400/20 border-yellow-400/60 text-yellow-200 shadow-[0_0_25px_rgba(245,200,76,0.25)]"
+                          : "bg-white/5 border-white/10 hover:border-[#F5C84C] hover:shadow-[0_0_25px_rgba(245,200,76,0.25)] text-white"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs text-white/50 mb-1">Round {match.round_number}</div>
+                          <div className="font-semibold text-sm leading-tight">
+                            {match.home_team} vs {match.away_team}
+                          </div>
+                          {match.updated_at && (
+                            <div className="text-xs text-white/30 mt-1">
+                              {new Date(match.updated_at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+                            </div>
+                          )}
+                        </div>
+                        <Brain className={`w-4 h-4 flex-shrink-0 ml-2 mt-0.5 transition-colors duration-200 ${
+                          isSelected ? "text-[#F5C84C]" : "text-[#F5C84C]/40 group-hover:text-[#F5C84C]"
+                        }`} />
+                      </div>
+                    </button>
+
+                    {match.prediction_explanation && (
+                      <div
+                        className="absolute left-0 right-0 bottom-full mb-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-300 z-50"
+                        style={{ filter: "drop-shadow(0 0 30px rgba(245,200,76,0.15))" }}
+                      >
+                        <div
+                          className="rounded-xl p-4"
+                          style={{
+                            background: "#0B0B0B",
+                            border: "1px solid rgba(245,200,76,0.30)",
+                            boxShadow: "0 0 30px rgba(245,200,76,0.15), 0 20px 60px rgba(0,0,0,0.9)",
+                          }}
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <Brain className="w-3.5 h-3.5 text-[#F5C84C]" />
+                            <span className="text-[#F5C84C] text-xs font-semibold uppercase tracking-wider">
+                              AI Engine Explanation
+                            </span>
+                          </div>
+                          <p className="text-white/80 text-xs leading-relaxed">
+                            {match.prediction_explanation}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  {match.updated_at && (
-                    <div className="text-xs text-white/30 mt-1">
-                      {new Date(match.updated_at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
-                    </div>
-                  )}
-                </button>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-8 text-center">
