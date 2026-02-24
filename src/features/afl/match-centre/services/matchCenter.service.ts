@@ -32,8 +32,8 @@ export type QuarterScoreRow = {
 // Date handling: match_datetime is the primary match date source, with updated_at as fallback.
 // Convert to YYYY-MM-DD for grouping/display.
 // Ordering: round_number + match_id in query, then by date locally for display.
-export async function fetchMatches(season: number): Promise<MatchSummary[]> {
-  const { data, error } = await supabase
+export async function fetchMatches(season: number, maxRound?: number): Promise<MatchSummary[]> {
+  let query = supabase
     .schema("afl")
     .from("match_center_games_base")
     .select(`
@@ -58,6 +58,12 @@ export async function fetchMatches(season: number): Promise<MatchSummary[]> {
     .eq("season", 2025)
     .order("round_number", { ascending: true })
     .order("match_id", { ascending: true });
+
+  if (maxRound !== undefined) {
+    query = query.lte("round_number", maxRound);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("[fetchMatches]", error);
