@@ -117,20 +117,24 @@ export default function Account() {
     return <Badge variant={variants[s] || "outline"}>{label}</Badge>;
   };
 
-  // 🔥 NEW: Correct portal handler for Edge Function
-  const handleManageSubscription = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+  const [portalLoading, setPortalLoading] = useState(false);
 
-    if (!session) {
-      toast({
-        title: "Error",
-        description: "You must be logged in to manage your subscription.",
-        variant: "destructive",
-      });
-      return;
-    }
+  const handleManageSubscription = async () => {
+    if (portalLoading) return;
+    setPortalLoading(true);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to manage your subscription.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal`,
         {
@@ -144,18 +148,19 @@ export default function Account() {
 
       const data = await res.json();
 
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error("No portal URL returned");
+      if (!res.ok || !data.url) {
+        throw new Error(data.error || "No portal URL returned");
       }
-    } catch (err) {
+
+      window.location.assign(data.url);
+    } catch (err: any) {
       console.error("Portal error:", err);
       toast({
-        title: "Error",
-        description: "Unable to open subscription management.",
+        title: "Unable to open billing portal",
+        description: err.message || "Please try again or contact support.",
         variant: "destructive",
       });
+      setPortalLoading(false);
     }
   };
 
@@ -231,18 +236,29 @@ export default function Account() {
                 <Separator />
 
                 <Button
+                  type="button"
                   onClick={handleManageSubscription}
+                  disabled={portalLoading}
                   variant="outline"
                   className="w-full"
                 >
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Manage Subscription
+                  {portalLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Opening portal…
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Manage Subscription
+                    </>
+                  )}
                 </Button>
               </>
             ) : (
               <>
                 <p>You’re on the free plan. Upgrade to unlock all features.</p>
-                <Button onClick={() => { window.location.href = "https://www.neekostats.com.au/neeko-plus"; }} className="w-full">
+                <Button type="button" onClick={() => navigate("/neeko-plus")} className="w-full">
                   <Crown className="h-4 w-4 mr-2" />
                   Upgrade to Neeko+
                 </Button>

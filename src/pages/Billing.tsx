@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +20,7 @@ interface Subscription {
 const Billing = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [portalLoading, setPortalLoading] = useState(false);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -112,7 +114,7 @@ const Billing = () => {
         throw new Error(data.error || "Failed to create portal session");
       }
 
-      window.location.href = data.url;
+      window.location.assign(data.url);
     } catch (error: any) {
       console.error("Error creating portal session:", error);
       toast({
@@ -202,11 +204,16 @@ const Billing = () => {
               )}
 
               <div className="pt-4">
-                <Button onClick={handleManageBilling} disabled={portalLoading} className="w-full">
+                <Button
+                  type="button"
+                  onClick={handleManageBilling}
+                  disabled={portalLoading}
+                  className="w-full"
+                >
                   {portalLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Opening portal...
+                      Opening portal…
                     </>
                   ) : (
                     "Manage Billing"
@@ -228,7 +235,7 @@ const Billing = () => {
             <p className="text-sm text-muted-foreground">
               Subscribe to Neeko Plus to unlock premium features and advanced analytics.
             </p>
-            <Button onClick={() => (window.location.href = "https://www.neekostats.com.au/neeko-plus")} className="w-full">
+            <Button type="button" onClick={() => navigate("/neeko-plus")} className="w-full">
               View Subscription Plans
             </Button>
           </CardContent>
