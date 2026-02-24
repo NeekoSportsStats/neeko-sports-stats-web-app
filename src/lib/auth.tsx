@@ -113,16 +113,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       setUser(currentUser);
+      setLoading(false);
 
-      // Defer async premium fetch — must NOT be awaited inside onAuthStateChange
-      (async () => {
-        if (currentUser?.id) {
-          await fetchPremiumStatus(currentUser.id);
-        } else {
-          setIsPremium(false);
-        }
-        if (isMounted) setLoading(false);
-      })();
+      if (currentUser?.id) {
+        setTimeout(() => { fetchPremiumStatus(currentUser.id); }, 0);
+      } else {
+        setIsPremium(false);
+      }
     };
 
     // Single source of truth: the auth state change listener.
@@ -165,13 +162,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
 
-    // Safety net: if INITIAL_SESSION never fires within 3s, unblock loading
     const safetyTimer = setTimeout(() => {
-      if (isMounted && !initialSessionSeenRef.current) {
-        console.warn("⚠️ INITIAL_SESSION timeout — forcing loading=false");
+      if (isMounted) {
+        console.warn("⚠️ Auth safety net: forcing loading=false");
         setLoading(false);
       }
-    }, 3000);
+    }, 2000);
 
     return () => {
       console.log("🧹 AuthProvider: cleanup");

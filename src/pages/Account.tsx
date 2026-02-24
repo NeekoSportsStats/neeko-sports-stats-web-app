@@ -15,7 +15,6 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Loader2,
   Crown,
-  Calendar,
   User,
   LogOut,
   ArrowLeft,
@@ -28,8 +27,10 @@ export default function Account() {
   const { user, loading: authLoading, signOut, isPremium, refreshPremiumStatus } =
     useAuth();
 
+  // ALL hooks declared at top level — never inside conditionals
   const [profile, setProfile] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -49,13 +50,12 @@ export default function Account() {
     const loadProfile = async () => {
       setLoadingProfile(true);
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .maybeSingle();
 
-      // Fallback if row missing (new profiles)
       if (!data) {
         setProfile({
           id: user.id,
@@ -80,44 +80,9 @@ export default function Account() {
         title: "Success!",
         description: "Your subscription is now active.",
       });
-
       refreshPremiumStatus();
     }
   }, [searchParams, toast, refreshPremiumStatus]);
-
-  if (authLoading || loadingProfile) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user || !profile) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-        <p className="text-muted-foreground">Unable to load account details.</p>
-        <Button onClick={() => navigate("/auth")}>Go to login</Button>
-      </div>
-    );
-  }
-
-  const subscriptionActive =
-    profile.subscription_status === "active" || isPremium;
-
-  const getStatusBadge = (s: string) => {
-    const variants: any = {
-      active: "default",
-      trialing: "secondary",
-      past_due: "destructive",
-      canceled: "destructive",
-      free: "outline",
-    };
-    const label = s === "trialing" ? "TRIAL" : s.toUpperCase();
-    return <Badge variant={variants[s] || "outline"}>{label}</Badge>;
-  };
-
-  const [portalLoading, setPortalLoading] = useState(false);
 
   const handleManageSubscription = async () => {
     if (portalLoading) return;
@@ -132,6 +97,7 @@ export default function Account() {
           description: "You must be logged in to manage your subscription.",
           variant: "destructive",
         });
+        setPortalLoading(false);
         return;
       }
 
@@ -162,6 +128,39 @@ export default function Account() {
       });
       setPortalLoading(false);
     }
+  };
+
+  // Early returns — after all hooks
+  if (authLoading || loadingProfile) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user || !profile) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <p className="text-muted-foreground">Unable to load account details.</p>
+        <Button onClick={() => navigate("/auth")}>Go to login</Button>
+      </div>
+    );
+  }
+
+  const subscriptionActive =
+    profile.subscription_status === "active" || isPremium;
+
+  const getStatusBadge = (s: string) => {
+    const variants: Record<string, any> = {
+      active: "default",
+      trialing: "secondary",
+      past_due: "destructive",
+      canceled: "destructive",
+      free: "outline",
+    };
+    const label = s === "trialing" ? "TRIAL" : s.toUpperCase();
+    return <Badge variant={variants[s] || "outline"}>{label}</Badge>;
   };
 
   return (
@@ -257,8 +256,12 @@ export default function Account() {
               </>
             ) : (
               <>
-                <p>You’re on the free plan. Upgrade to unlock all features.</p>
-                <Button type="button" onClick={() => navigate("/neeko-plus")} className="w-full">
+                <p>You're on the free plan. Upgrade to unlock all features.</p>
+                <Button
+                  type="button"
+                  onClick={() => navigate("/neeko-plus")}
+                  className="w-full"
+                >
                   <Crown className="h-4 w-4 mr-2" />
                   Upgrade to Neeko+
                 </Button>
@@ -273,7 +276,12 @@ export default function Account() {
             <CardTitle>Actions</CardTitle>
           </CardHeader>
           <CardContent>
-            <Button variant="destructive" onClick={signOut} className="w-full">
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={signOut}
+              className="w-full"
+            >
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out
             </Button>
