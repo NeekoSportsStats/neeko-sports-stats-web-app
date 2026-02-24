@@ -128,7 +128,8 @@ export async function getAvailableTeams(): Promise<string[]> {
 
 export async function getPlayers(
   lens: StatLens,
-  season: number
+  season: number,
+  allowedNames?: string[]
 ): Promise<PlayersResponse> {
   const statColumn = getStatColumn(lens);
 
@@ -140,7 +141,7 @@ export async function getPlayers(
 
     while (hasMore) {
       const to = from + pageSize - 1;
-      const { data, error } = await supabase
+      let query = supabase
         .from("v_player_round_canonical_2025")
         .select("season, round_number, round_display, round_sort_key, player, team, position, team_color, played, disposals, goals, fantasy_points, match_index")
         .eq("season", 2025)
@@ -148,6 +149,12 @@ export async function getPlayers(
         .order("match_index", { ascending: true })
         .order("player", { ascending: true })
         .range(from, to);
+
+      if (allowedNames && allowedNames.length > 0) {
+        query = query.in("player", allowedNames);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error("Error fetching player data:", error);

@@ -37,7 +37,7 @@ export default function AFLPlayersPage() {
       setLoading(true);
       const seasonNum = parseInt(season);
       console.log(`📊 Fetching players for season ${seasonNum}, lens: ${lens}`);
-      const response = await getPlayers(lens, seasonNum);
+      const response = await getPlayers(lens, seasonNum, isPremium ? undefined : FREE_PLAYER_NAMES);
       console.log(`✓ Loaded ${response.players.length} players`);
       console.log(`✓ Round range: ${response.minRound} to ${response.maxRound}`);
       if (response.players.length > 0) {
@@ -50,7 +50,7 @@ export default function AFLPlayersPage() {
       setLoading(false);
     };
     fetchPlayers();
-  }, [lens, season]);
+  }, [lens, season, isPremium]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -228,7 +228,7 @@ export default function AFLPlayersPage() {
           ) : (
             <div className="relative">
               <PlayerGrid
-                players={isPremium ? filtered : filtered.filter(p => FREE_PLAYER_NAMES.includes(p.name))}
+                players={filtered}
                 lens={lens}
                 minRound={minRound}
                 maxRound={maxRound}
@@ -247,10 +247,10 @@ export default function AFLPlayersPage() {
                   </div>
                   <div>
                     <p className="text-base font-bold text-white">
-                      {allPlayers.length - FREE_PLAYER_NAMES.length} more players locked
+                      500+ more players locked
                     </p>
                     <p className="text-sm text-white/50 mt-1 max-w-sm">
-                      Upgrade to Neeko+ to view all {allPlayers.length} players in full.
+                      Upgrade to Neeko+ to unlock the full player ledger.
                     </p>
                   </div>
                   <a

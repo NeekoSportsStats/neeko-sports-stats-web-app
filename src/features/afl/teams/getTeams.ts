@@ -105,7 +105,8 @@ function computeStatsFromValues(values: number[], totalGames: number, lens: Stat
 
 export async function getTeams(
   lens: StatLens,
-  season: number
+  season: number,
+  allowedNames?: string[]
 ): Promise<TeamsResponse> {
   const statColumn = getStatColumn(lens);
 
@@ -117,7 +118,7 @@ export async function getTeams(
 
     while (hasMore) {
       const to = from + pageSize - 1;
-      const { data, error } = await supabase
+      let query = supabase
         .from("v_team_round_canonical_2025")
         .select("season, round_number, round_display, round_sort_key, team, team_color, played, disposals, goals, fantasy_points, match_index")
         .eq("season", 2025)
@@ -125,6 +126,12 @@ export async function getTeams(
         .order("match_index", { ascending: true })
         .order("team", { ascending: true })
         .range(from, to);
+
+      if (allowedNames && allowedNames.length > 0) {
+        query = query.in("team", allowedNames);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error("Error fetching team data:", error);

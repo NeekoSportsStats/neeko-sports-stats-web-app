@@ -30,7 +30,7 @@ export default function AFLTeamsPage() {
       setLoading(true);
       const seasonNum = parseInt(season);
       console.log(`📊 Fetching teams for season ${seasonNum}, lens: ${lens}`);
-      const response = await getTeams(lens, seasonNum);
+      const response = await getTeams(lens, seasonNum, isPremium ? undefined : FREE_TEAM_NAMES);
       console.log(`✓ Loaded ${response.teams.length} teams`);
       console.log(`✓ Round range: ${response.minRound} to ${response.maxRound}`);
       setAllTeams(response.teams);
@@ -39,7 +39,7 @@ export default function AFLTeamsPage() {
       setLoading(false);
     };
     fetchTeams();
-  }, [lens, season]);
+  }, [lens, season, isPremium]);
 
   const selected = useMemo(() => {
     if (!selectedId) return null;
@@ -174,7 +174,7 @@ export default function AFLTeamsPage() {
           ) : (
             <div className="relative">
               <TeamGrid
-                teams={isPremium ? allTeams : allTeams.filter(t => FREE_TEAM_NAMES.includes(t.id))}
+                teams={allTeams}
                 lens={lens}
                 minRound={minRound}
                 maxRound={maxRound}
@@ -193,10 +193,10 @@ export default function AFLTeamsPage() {
                   </div>
                   <div>
                     <p className="text-base font-bold text-white">
-                      {allTeams.length - FREE_TEAM_NAMES.length} more teams locked
+                      14 more teams locked
                     </p>
                     <p className="text-sm text-white/50 mt-1 max-w-sm">
-                      Upgrade to Neeko+ to view all {allTeams.length} teams in full.
+                      Upgrade to Neeko+ to unlock all 18 AFL teams.
                     </p>
                   </div>
                   <a
