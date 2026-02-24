@@ -242,7 +242,7 @@ export default function Account() {
             ) : (
               <>
                 <p>You’re on the free plan. Upgrade to unlock all features.</p>
-                <Button onClick={() => navigate("/neeko-plus")} className="w-full">
+                <Button onClick={() => { window.location.href = "https://www.neekostats.com.au/neeko-plus"; }} className="w-full">
                   <Crown className="h-4 w-4 mr-2" />
                   Upgrade to Neeko+
                 </Button>

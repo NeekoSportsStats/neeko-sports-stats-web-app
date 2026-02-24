@@ -111,7 +111,7 @@ export const AIAnalysisBlock = ({
                 <Lock className="w-8 h-8 text-primary mb-2" />
                 <p className="text-sm font-semibold mb-1">Unlock Neeko+</p>
                 <p className="text-[10px] text-muted-foreground mb-2">View all 10 players</p>
-                <Button size="sm" className="h-7 text-xs px-3" onClick={() => navigate("/neeko-plus")}>
+                <Button size="sm" className="h-7 text-xs px-3" onClick={() => { window.location.href = "https://www.neekostats.com.au/neeko-plus"; }}>
                   Upgrade
                 </Button>
               </div>

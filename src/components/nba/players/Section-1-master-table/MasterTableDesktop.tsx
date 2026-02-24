@@ -664,7 +664,7 @@ export default function MasterTableDesktop({
                   Not now
                 </button>
                 <button
-                  onClick={() => (window.location.href = "/neeko-plus")}
+                  onClick={() => (window.location.href = "https://www.neekostats.com.au/neeko-plus")}
                   className="rounded-xl border border-yellow-500/40 bg-yellow-400 px-4 py-2 text-sm font-semibold text-black shadow-[0_0_18px_rgba(250,204,21,0.35)] hover:brightness-110 transition"
                 >
                   Go to Neeko+

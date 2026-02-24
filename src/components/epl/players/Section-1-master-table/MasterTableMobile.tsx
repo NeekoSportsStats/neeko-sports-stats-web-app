@@ -357,7 +357,7 @@ export default function MasterTableMobile({
                              shadow-[0_0_24px_rgba(250,204,21,0.6)]
                              transition active:scale-[0.98]"
                   onClick={() => {
-                    window.location.href = "/neeko-plus";
+                    window.location.href = "https://www.neekostats.com.au/neeko-plus";
                   }}
                 >
                   Upgrade to Neeko+

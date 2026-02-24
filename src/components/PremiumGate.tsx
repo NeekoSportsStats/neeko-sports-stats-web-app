@@ -62,7 +62,7 @@ export function PremiumGate({ children, blur = true }: PremiumGateProps) {
                 </div>
                 <div className="flex flex-col gap-2 pt-2">
                   <Button
-                    onClick={() => navigate("/neeko-plus")}
+                    onClick={() => { window.location.href = "https://www.neekostats.com.au/neeko-plus"; }}
                     size="lg"
                     className="w-full"
                   >

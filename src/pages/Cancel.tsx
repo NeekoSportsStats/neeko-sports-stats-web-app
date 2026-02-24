@@ -9,7 +9,7 @@ const Cancel = () => {
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      navigate("/neeko-plus");
+      window.location.href = "https://www.neekostats.com.au/neeko-plus";
     }, 5000);
 
     return () => clearTimeout(timeout);
@@ -36,7 +36,7 @@ const Cancel = () => {
           </p>
         </CardContent>
         <CardFooter className="flex gap-4 justify-center">
-          <Button onClick={() => navigate("/neeko-plus")} variant="default">
+          <Button onClick={() => { window.location.href = "https://www.neekostats.com.au/neeko-plus"; }} variant="default">
             View Subscription Plans
           </Button>
           <Button onClick={() => navigate("/")} variant="outline">

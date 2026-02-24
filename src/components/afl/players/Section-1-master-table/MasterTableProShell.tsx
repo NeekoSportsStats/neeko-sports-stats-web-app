@@ -55,7 +55,7 @@ export default function MasterTableProShell({
 
         {!isPremium && (
           <a
-            href="/neeko-plus"
+            href="https://www.neekostats.com.au/neeko-plus"
             className="rounded-full bg-yellow-400 text-black px-4 py-1.5 text-xs shadow-[0_0_18px_rgba(250,204,21,0.7)]"
           >
             Unlock full table →

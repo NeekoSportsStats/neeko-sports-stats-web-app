@@ -170,10 +170,10 @@ const TeamAnalysis = () => {
                 Get AI-powered team breakdowns, performance insights, and strategic recommendations.
               </p>
               <Button asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-lg py-6">
-                <Link to="/neeko-plus">
+                <a href="https://www.neekostats.com.au/neeko-plus" target="_blank" rel="noopener noreferrer">
                   <Crown className="h-5 w-5 mr-2" />
                   Get Neeko+ — $5.99/week
-                </Link>
+                </a>
               </Button>
             </Card>
           </div>

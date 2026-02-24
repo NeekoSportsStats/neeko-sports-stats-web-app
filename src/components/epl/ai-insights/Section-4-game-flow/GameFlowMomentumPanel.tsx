@@ -581,7 +581,7 @@ function Divider() {
 function PremiumBlock({
   locked,
   children,
-  ctaHref = "/neeko-plus",
+  ctaHref = "https://www.neekostats.com.au/neeko-plus",
   ctaText = "Unlock with Neeko+",
   caption = "Premium insight",
   blurPx = 2.6,
@@ -854,7 +854,7 @@ export default function GameFlowMomentumPanel({
             {/* Remaining windows are premium-gated as a single blurred block (no repeated locks). */}
             <PremiumBlock
               locked={locked}
-              ctaHref="/neeko-plus"
+              ctaHref="https://www.neekostats.com.au/neeko-plus"
               ctaText="Unlock the full momentum window map (Neeko+)"
               caption="Momentum windows"
               blurPx={2.6}
@@ -890,7 +890,7 @@ export default function GameFlowMomentumPanel({
         {/* CARD 4 — Momentum Triggers (Neeko+) (NEEKO+ ONLY) */}
         <PremiumBlock
           locked={locked}
-          ctaHref="/neeko-plus"
+          ctaHref="https://www.neekostats.com.au/neeko-plus"
           ctaText="Unlock momentum trigger scenarios (Neeko+)"
           caption="Trigger scenarios"
           blurPx={2.8}

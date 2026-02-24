@@ -352,7 +352,7 @@ export default function TeamAIInsights() {
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
 
               <a
-                href="/neeko-plus"
+                href="https://www.neekostats.com.au/neeko-plus"
                 className="inline-flex flex-1 items-center justify-center rounded-2xl border border-yellow-400/70 bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-300 px-4 py-2.5 text-sm font-semibold text-black shadow-[0_0_30px_rgba(250,204,21,0.85)] hover:brightness-110 transition"
               >
                 Upgrade to Neeko+

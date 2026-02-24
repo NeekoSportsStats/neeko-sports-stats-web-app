@@ -151,10 +151,10 @@ const Index = () => {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
                   <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-12 py-6 font-bold">
-                    <Link to="/neeko-plus">
+                    <a href="https://www.neekostats.com.au/neeko-plus" target="_blank" rel="noopener noreferrer">
                       <Crown className="h-5 w-5 mr-2" />
                       Get Neeko+
-                    </Link>
+                    </a>
                   </Button>
                 </div>
               </div>

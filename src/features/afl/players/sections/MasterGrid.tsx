@@ -64,7 +64,7 @@ export default function MasterGrid() {
         </a>
 
         <a
-          href="/neeko-plus"
+          href="https://www.neekostats.com.au/neeko-plus"
           className={cn(
             "group relative rounded-2xl border border-yellow-500/20",
             "bg-gradient-to-br from-yellow-500/10 via-black/80 to-black/80",

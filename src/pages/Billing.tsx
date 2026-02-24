@@ -187,7 +187,7 @@ const Billing = () => {
             <p className="text-sm text-muted-foreground">
               Subscribe to Neeko Plus to unlock premium features and advanced analytics.
             </p>
-            <Button onClick={() => (window.location.href = "/neeko-plus")} className="w-full">
+            <Button onClick={() => (window.location.href = "https://www.neekostats.com.au/neeko-plus")} className="w-full">
               View Subscription Plans
             </Button>
           </CardContent>

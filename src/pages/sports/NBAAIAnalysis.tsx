@@ -132,7 +132,7 @@ const NBAAIAnalysis = () => {
 
   const handlePremiumClick = () => {
     if (!isPremium) {
-      navigate('/neeko-plus');
+      window.location.href = 'https://www.neekostats.com.au/neeko-plus';
     }
   };
 
@@ -296,10 +296,10 @@ const NBAAIAnalysis = () => {
                 Get access to 14 advanced AI insights updated automatically from live data.
               </p>
               <Button asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-lg py-6">
-                <Link to="/neeko-plus">
+                <a href="https://www.neekostats.com.au/neeko-plus" target="_blank" rel="noopener noreferrer">
                   <Crown className="h-5 w-5 mr-2" />
                   Get Neeko+ — $5.99/week
-                </Link>
+                </a>
               </Button>
             </Card>
           </div>

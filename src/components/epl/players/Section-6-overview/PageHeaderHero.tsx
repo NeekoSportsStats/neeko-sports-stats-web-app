@@ -43,7 +43,7 @@ export default function PageHeaderHero({
 
       {!isPremium && (
         <a
-          href="/neeko-plus"
+          href="https://www.neekostats.com.au/neeko-plus"
           className="inline-flex text-xs text-yellow-300 underline underline-offset-2"
         >
           Unlock deeper lenses & AI insights →
