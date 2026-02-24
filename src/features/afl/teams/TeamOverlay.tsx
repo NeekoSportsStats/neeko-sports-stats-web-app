@@ -16,6 +16,158 @@ interface TeamOverlayProps {
   onClose: () => void;
 }
 
+interface TeamPerformanceSummaryProps {
+  team: TeamData;
+  lens: StatLens;
+  hitRates: { threshold: number; count: number; percentage: number }[];
+}
+
+function TeamPerformanceSummary({ team, lens, hitRates }: TeamPerformanceSummaryProps) {
+  const avg = lens === "goals" ? parseFloat(fmt1(team.stats.avg)) : Math.round(team.stats.avg);
+  const min = lens === "goals" ? parseFloat(fmt1(team.stats.min)) : Math.round(team.stats.min);
+  const max = lens === "goals" ? parseFloat(fmt1(team.stats.max)) : Math.round(team.stats.max);
+  const games = team.stats.games;
+  const volatility = lens === "goals" ? parseFloat(fmt1(team.stats.volatility)) : Math.round(team.stats.volatility);
+
+  const lensLabel = lens === "fantasy" ? "fantasy points" : lens;
+
+  if (lens === "fantasy") {
+    const hr1500 = hitRates.find(h => h.threshold === 1500)?.percentage ?? 0;
+    const hr1600 = hitRates.find(h => h.threshold === 1600)?.percentage ?? 0;
+
+    const volatilityDescriptor =
+      volatility < 80
+        ? "very stable scoring output"
+        : volatility < 130
+        ? "moderate scoring fluctuations"
+        : "high scoring volatility";
+
+    const profileDescriptor =
+      avg > 1600 ? "elite scoring" : avg > 1500 ? "strong scoring" : "inconsistent scoring";
+
+    const ceilingDescriptor =
+      max > 1750 ? "genuine match-winning upside" : "moderate ceiling potential";
+
+    const consistencyDescriptor =
+      hr1500 > 75 ? "excellent consistency" : "variable consistency";
+
+    const finalAssessment =
+      avg > 1600
+        ? "one of the top performing teams this season"
+        : "a competitive but matchup-dependent team";
+
+    return (
+      <div className="space-y-3 text-white/80 leading-relaxed text-[14px]">
+        <p>
+          {team.name} has played {games} games this season, producing an average of {avg} fantasy points, highlighting their overall scoring strength.
+        </p>
+        <p>
+          Their ceiling of {max} demonstrates their ability to produce elite match-winning scores, while the floor of {min} shows their lowest output when underperforming.
+        </p>
+        <p>
+          Consistency has been a key factor, with the team exceeding 1500 points in {Math.round(hr1500)}% of matches and surpassing 1600 in {Math.round(hr1600)}%, confirming their ability to regularly deliver competitive fantasy totals.
+        </p>
+        <p>
+          A volatility rating of {volatility} indicates {volatilityDescriptor}, reflecting how stable or unpredictable their weekly performance has been.
+        </p>
+        <p>
+          Overall, {team.name} profiles as a {profileDescriptor} team with {ceilingDescriptor} and {consistencyDescriptor}, making them {finalAssessment}.
+        </p>
+      </div>
+    );
+  }
+
+  if (lens === "disposals") {
+    const hr300 = hitRates.find(h => h.threshold === 300)?.percentage ?? 0;
+    const hr325 = hitRates.find(h => h.threshold === 325)?.percentage ?? 0;
+
+    const volatilityDescriptor =
+      volatility < 15
+        ? "very stable disposal output"
+        : volatility < 30
+        ? "moderate disposal fluctuations"
+        : "high disposal volatility";
+
+    const profileDescriptor =
+      avg > 325 ? "elite ball-winning" : avg > 300 ? "strong disposal" : "inconsistent disposal";
+
+    const ceilingDescriptor =
+      max > 360 ? "genuine high-disposal upside" : "moderate ceiling potential";
+
+    const consistencyDescriptor =
+      hr300 > 75 ? "excellent disposal consistency" : "variable disposal output";
+
+    const finalAssessment =
+      avg > 325
+        ? "one of the top disposal teams this season"
+        : "a competitive but matchup-dependent disposal team";
+
+    return (
+      <div className="space-y-3 text-white/80 leading-relaxed text-[14px]">
+        <p>
+          {team.name} has played {games} games this season, averaging {avg} disposals, highlighting their overall ball movement strength.
+        </p>
+        <p>
+          Their ceiling of {max} disposals demonstrates their capacity for dominant possession games, while their floor of {min} reflects their lowest output when pressured.
+        </p>
+        <p>
+          The team has exceeded 300 disposals in {Math.round(hr300)}% of matches and surpassed 325 in {Math.round(hr325)}%, indicating their baseline ball-winning reliability.
+        </p>
+        <p>
+          A volatility rating of {volatility} signals {volatilityDescriptor}, showing how consistently they control possession week to week.
+        </p>
+        <p>
+          Overall, {team.name} profiles as a {profileDescriptor} team with {ceilingDescriptor} and {consistencyDescriptor}, making them {finalAssessment}.
+        </p>
+      </div>
+    );
+  }
+
+  const hr12 = hitRates.find(h => h.threshold === 12)?.percentage ?? 0;
+  const hr14 = hitRates.find(h => h.threshold === 14)?.percentage ?? 0;
+
+  const volatilityDescriptor =
+    volatility < 3
+      ? "very stable scoring output"
+      : volatility < 5
+      ? "moderate scoring fluctuations"
+      : "high scoring volatility";
+
+  const profileDescriptor =
+    avg > 14 ? "elite goal-kicking" : avg > 12 ? "strong scoring" : "inconsistent scoring";
+
+  const ceilingDescriptor =
+    max > 18 ? "genuine high-scoring upside" : "moderate ceiling potential";
+
+  const consistencyDescriptor =
+    hr12 > 75 ? "excellent scoring consistency" : "variable scoring output";
+
+  const finalAssessment =
+    avg > 14
+      ? "one of the most potent attacking teams this season"
+      : "a competitive but matchup-dependent attacking team";
+
+  return (
+    <div className="space-y-3 text-white/80 leading-relaxed text-[14px]">
+      <p>
+        {team.name} has played {games} games this season, averaging {avg} goals, reflecting their overall attacking output.
+      </p>
+      <p>
+        Their scoring ceiling of {max} goals demonstrates their ability to put up big totals in favourable matchups, while their floor of {min} highlights their lowest attacking performance.
+      </p>
+      <p>
+        The team has kicked 12 or more goals in {Math.round(hr12)}% of matches and surpassed 14 in {Math.round(hr14)}%, indicating how reliably they convert forward entries into scores.
+      </p>
+      <p>
+        A volatility rating of {volatility} indicates {volatilityDescriptor}, showing how predictable their attacking output is from week to week.
+      </p>
+      <p>
+        Overall, {team.name} profiles as a {profileDescriptor} team with {ceilingDescriptor} and {consistencyDescriptor}, making them {finalAssessment}.
+      </p>
+    </div>
+  );
+}
+
 export default function TeamOverlay({ team, lens, onLensChange, onClose }: TeamOverlayProps) {
   const navigate = useNavigate();
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -337,11 +489,7 @@ export default function TeamOverlay({ team, lens, onLensChange, onClose }: TeamO
                   <div className="flex items-center gap-2 mb-2">
                     <h3 className="text-lg font-semibold text-white">Team Performance</h3>
                   </div>
-                  <p className="text-white/80 leading-relaxed text-[14px]">
-                    {team.name} has played {team.stats.games} games this season with an average of{" "}
-                    {lens === "goals" ? fmt1(team.stats.avg) : Math.round(team.stats.avg)}{" "}
-                    {lens === "fantasy" ? "fantasy points" : lens}.
-                  </p>
+                  <TeamPerformanceSummary team={team} lens={lens} hitRates={recalculatedHitRates} />
                 </div>
               </div>
 
