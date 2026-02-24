@@ -748,13 +748,21 @@ export default function AFLAIInsightsPage() {
                 <div className="px-5 py-6 text-center text-xs text-neutral-500 animate-pulse">Loading players...</div>
               ) : (
                 <div className="divide-y divide-white/5 max-h-[320px] overflow-y-auto">
-                  {teamPlayers.map((proj) => {
+                  {[...teamPlayers]
+                    .sort((a, b) => {
+                      const aFree = FREE_PLAYER_IDS.includes(a.player_id);
+                      const bFree = FREE_PLAYER_IDS.includes(b.player_id);
+                      if (aFree && !bFree) return -1;
+                      if (!aFree && bFree) return 1;
+                      return (b.final_projection ?? 0) - (a.final_projection ?? 0);
+                    })
+                    .map((proj) => {
                     const isResultLocked = !isPremium && !FREE_PLAYER_IDS.includes(proj.player_id);
                     return (
                       <button
                         key={proj.player_id}
                         onClick={() => handleSearchResultClick(proj)}
-                        className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-white/5 transition-colors border-l-2 border-transparent hover:border-[#F5C84C]/40"
+                        className="w-full min-h-[56px] flex items-center justify-between px-5 py-3 text-left hover:bg-white/5 transition-colors border-l-2 border-transparent hover:border-[#F5C84C]/40"
                       >
                         <div className="flex items-center gap-3">
                           <span className="text-sm font-semibold text-white">{proj.player_name}</span>
