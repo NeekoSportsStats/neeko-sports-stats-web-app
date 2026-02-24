@@ -79,15 +79,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    */
   const signOut = useCallback(async () => {
     console.log("🚪 Logging out…");
-    try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.error("❌ signOut error:", err);
-    }
-
     setUser(null);
     setIsPremium(false);
     setLoading(false);
+    try {
+      await supabase.auth.signOut({ scope: "global" });
+    } catch (err) {
+      console.error("❌ signOut error:", err);
+    }
+    window.location.href = "/";
   }, []);
 
   /**

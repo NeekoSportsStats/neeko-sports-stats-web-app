@@ -53,7 +53,7 @@ const StartCheckout = () => {
             body: JSON.stringify({
               price_id:    import.meta.env.VITE_STRIPE_PRICE_ID,
               success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
-              cancel_url:  `${origin}/cancel`,
+              cancel_url:  `${origin}/billing`,
               mode:        "subscription",
             }),
           }

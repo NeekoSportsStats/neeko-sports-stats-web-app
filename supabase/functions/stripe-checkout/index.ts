@@ -78,7 +78,6 @@ Deno.serve(async (req) => {
       .from('stripe_customers')
       .select('customer_id')
       .eq('user_id', user.id)
-      .is('deleted_at', null)
       .maybeSingle();
 
     if (getCustomerError) {
