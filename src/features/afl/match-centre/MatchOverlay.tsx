@@ -242,38 +242,56 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
       }
     }
 
-    if (matchPlayerStats && matchPlayerStats.length > 0) {
+    if (matchPlayerStats && matchPlayerStats.length > 0 && hScore != null && aScore != null) {
+      const winner = hScore >= aScore ? home : away;
+      const loser = hScore >= aScore ? away : home;
+
       const sorted = [...matchPlayerStats].sort((a, b) => (b.fantasy_points ?? 0) - (a.fantasy_points ?? 0));
-      const bog = sorted[0];
-      if (bog) {
-        const disposals = bog.disposals ?? 0;
-        const fantasy = bog.fantasy_points ?? 0;
+      const winnerTopPerformer = sorted.find(p => normaliseTeamName(p.player_team) === normaliseTeamName(winner));
+      const loserTopPerformer = sorted.find(p => normaliseTeamName(p.player_team) === normaliseTeamName(loser));
+
+      if (winnerTopPerformer) {
+        const disposals = winnerTopPerformer.disposals ?? 0;
+        const fantasy = winnerTopPerformer.fantasy_points ?? 0;
         const bogSeed = (disposals + fantasy) % 3;
 
         let bogPhrase = "";
         if (disposals > 35) {
           const phrases = [
-            `${bog.player} was a one-man wrecking crew for ${bog.player_team}, amassing a game-high ${disposals} disposals en route to ${fantasy} fantasy points and best on ground honours.`,
-            `In a dominant individual display, ${bog.player} racked up ${disposals} touches for ${bog.player_team}, his ${fantasy} fantasy points underlining his influence on the contest.`,
-            `${bog.player} stood head and shoulders above the rest, pilaging ${disposals} disposals and ${fantasy} fantasy points in a virtuoso performance for ${bog.player_team}.`
+            `${winnerTopPerformer.player} was a one-man wrecking crew for ${winner}, amassing a game-high ${disposals} disposals en route to ${fantasy} fantasy points and best on ground honours.`,
+            `In a dominant individual display, ${winnerTopPerformer.player} racked up ${disposals} touches for ${winner}, his ${fantasy} fantasy points underlining his influence on the contest.`,
+            `${winnerTopPerformer.player} stood head and shoulders above the rest, pillaging ${disposals} disposals and ${fantasy} fantasy points in a virtuoso performance for ${winner}.`
           ];
           bogPhrase = phrases[bogSeed];
         } else if (disposals > 28) {
           const phrases = [
-            `${bog.player} proved the difference for ${bog.player_team}, his ${disposals} disposals and ${fantasy} fantasy points earning best afield accolades.`,
-            `The class of ${bog.player} shone through with ${disposals} touches and ${fantasy} fantasy points, spearheading ${bog.player_team}'s efforts throughout.`,
-            `${bog.player} was instrumental for ${bog.player_team}, collecting ${disposals} disposals and posting ${fantasy} fantasy points in a match-winning performance.`
+            `${winnerTopPerformer.player} proved the difference for ${winner}, his ${disposals} disposals and ${fantasy} fantasy points earning best afield accolades.`,
+            `The class of ${winnerTopPerformer.player} shone through with ${disposals} touches and ${fantasy} fantasy points, spearheading ${winner}'s efforts throughout.`,
+            `${winnerTopPerformer.player} was instrumental for ${winner}, collecting ${disposals} disposals and posting ${fantasy} fantasy points in a match-winning performance.`
           ];
           bogPhrase = phrases[bogSeed];
         } else {
           const phrases = [
-            `${bog.player} was named best on ground for ${bog.player_team}, his ${disposals} disposals and ${fantasy} fantasy points highlighting an impactful display.`,
-            `Despite modest possession numbers (${disposals} disposals), ${bog.player}'s quality shone through for ${bog.player_team}, his ${fantasy} fantasy points reflecting his game-breaking moments.`,
-            `${bog.player} took the honours with ${disposals} disposals and ${fantasy} fantasy points, his efficiency and decision-making proving crucial for ${bog.player_team}.`
+            `${winnerTopPerformer.player} was named best on ground for ${winner}, his ${disposals} disposals and ${fantasy} fantasy points highlighting an impactful display.`,
+            `Despite modest possession numbers (${disposals} disposals), ${winnerTopPerformer.player}'s quality shone through for ${winner}, his ${fantasy} fantasy points reflecting his game-breaking moments.`,
+            `${winnerTopPerformer.player} took the honours with ${disposals} disposals and ${fantasy} fantasy points, his efficiency and decision-making proving crucial for ${winner}.`
           ];
           bogPhrase = phrases[bogSeed];
         }
         sentences.push(bogPhrase);
+      }
+
+      if (loserTopPerformer) {
+        const disposals = loserTopPerformer.disposals ?? 0;
+        const fantasy = loserTopPerformer.fantasy_points ?? 0;
+        const loserSeed = (disposals + fantasy) % 3;
+
+        const loserPhrases = [
+          `${loserTopPerformer.player} fought strongly for ${loser}, finishing with ${disposals} disposals and ${fantasy} fantasy points in a valiant effort.`,
+          `Despite the result, ${loserTopPerformer.player} gave everything for ${loser}, his ${disposals} disposals and ${fantasy} fantasy points a bright spot in defeat.`,
+          `${loserTopPerformer.player} was ${loser}'s standout, battling hard with ${disposals} disposals and ${fantasy} fantasy points in a losing cause.`
+        ];
+        sentences.push(loserPhrases[loserSeed]);
       }
     }
 
