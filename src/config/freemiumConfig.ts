@@ -1,15 +1,7 @@
-export const FREE_PLAYER_IDS: number[] = [
-  362,  // Bailey Smith - Geelong
-  501,  // Max Gawn - Melbourne
-  90,   // Marcus Bontempelli - Western Bulldogs
-  272,  // Nick Daicos - Collingwood
-  387,  // Harry Sheezel - North Melbourne
-  152,  // Jordan Dawson - Adelaide
-  148,  // Josh Dunkley - Brisbane
-  14,   // Connor Rozee - Port Adelaide
-  271,  // Zach Merrett - Essendon
-  355,  // Andrew Brayshaw - Fremantle
-];
+export { FREE_PLAYER_IDS_BY_TEAM, isFreePlayer as isFreePlayerById } from "./freePlayers";
+import { FREE_PLAYER_IDS_BY_TEAM } from "./freePlayers";
+
+export const FREE_PLAYER_IDS: number[] = Object.values(FREE_PLAYER_IDS_BY_TEAM).flat();
 
 export const FREE_PLAYER_NAMES: string[] = [
   "Bailey Smith",
@@ -32,8 +24,8 @@ export const FREE_TEAM_NAMES: string[] = [
 ];
 
 export const FREE_MATCH_IDS: number[] = [
-  3345,  // Sydney vs Carlton
-  3346,  // Gold Coast Suns vs Geelong
+  3345,
+  3346,
 ];
 
 export const FREE_PLAYER_ROWS = 10;

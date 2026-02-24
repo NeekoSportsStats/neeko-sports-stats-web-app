@@ -4,7 +4,8 @@ import { supabase } from "@/lib/supabaseClient";
 import FantasyVerdictBadge from "@/components/FantasyVerdictBadge";
 import { PremiumGate, PremiumGateCTA } from "@/components/PremiumGate";
 import { useAuth } from "@/lib/auth";
-import { FREE_PLAYER_IDS, FREE_TEAM_NAMES, FREE_MATCH_IDS } from "@/config/freemiumConfig";
+import { FREE_TEAM_NAMES, FREE_MATCH_IDS } from "@/config/freemiumConfig";
+import { FREE_PLAYER_IDS_BY_TEAM } from "@/config/freePlayers";
 import PlayerSelectorDropdown from "@/components/PlayerSelectorDropdown";
 
 interface AIPlayerSummary {
@@ -348,7 +349,7 @@ export default function AFLAIInsightsPage() {
     setPlayerSearch("");
     setSearchResults([]);
 
-    const isFreePlayer = FREE_PLAYER_IDS.includes(proj.player_id);
+    const isFreePlayer = FREE_PLAYER_IDS_BY_TEAM[proj.team]?.includes(proj.player_id) ?? false;
     const canReadAI = isPremium || isFreePlayer;
 
     const selectFields = `player_id, player, team, round_number, season_avg, consistency_score, ceiling_fantasy, floor_fantasy, ai_summary, trend_direction, updated_at, opponent, volatility, matchup_delta, matchup_label, expected_fantasy, risk_tier`;
@@ -787,7 +788,7 @@ export default function AFLAIInsightsPage() {
                   <div>
                     {searchResults.map((proj, idx) => {
                       const isHighlighted = idx === highlightedIndex;
-                      const isResultLocked = !isPremium && !FREE_PLAYER_IDS.includes(proj.player_id);
+                      const isResultLocked = !isPremium && !(FREE_PLAYER_IDS_BY_TEAM[proj.team]?.includes(proj.player_id) ?? false);
                       return (
                         <button
                           key={proj.player_id}
@@ -835,7 +836,7 @@ export default function AFLAIInsightsPage() {
           {/* Player Analysis Card */}
           <div className={selectedPlayer ? "-mt-2" : ""}>
           {selectedPlayer ? (() => {
-            const isLockedPlayer = !isPremium && !FREE_PLAYER_IDS.includes(selectedPlayer.player_id);
+            const isLockedPlayer = !isPremium && !(FREE_PLAYER_IDS_BY_TEAM[selectedPlayer.team]?.includes(selectedPlayer.player_id) ?? false);
             const conf = getConfidenceLevel(selectedPlayer.consistency_score);
             const matchup = getMatchupDisplay(selectedPlayer);
             const consistencyPct = getConsistencyPercentile(selectedPlayer.consistency_score);

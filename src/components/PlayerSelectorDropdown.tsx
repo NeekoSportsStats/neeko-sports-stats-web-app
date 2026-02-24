@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown, Lock } from "lucide-react";
-import { FREE_PLAYERS_PER_TEAM } from "@/config/freemiumConfig";
+import { FREE_PLAYER_IDS_BY_TEAM } from "@/config/freePlayers";
 
 export interface PlayerProjectionItem {
   player_id: number;
@@ -37,12 +37,17 @@ export default function PlayerSelectorDropdown({
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  const sorted = [...players].sort(
-    (a, b) => (b.final_projection ?? 0) - (a.final_projection ?? 0)
-  );
+  const freeIds = FREE_PLAYER_IDS_BY_TEAM[teamName] ?? [];
 
-  const freePlayers = sorted.slice(0, FREE_PLAYERS_PER_TEAM);
-  const lockedPlayers = sorted.slice(FREE_PLAYERS_PER_TEAM);
+  const sorted = [...players].sort((a, b) => {
+    const aFree = freeIds.includes(a.player_id);
+    const bFree = freeIds.includes(b.player_id);
+    if (aFree !== bFree) return Number(bFree) - Number(aFree);
+    return (b.final_projection ?? 0) - (a.final_projection ?? 0);
+  });
+
+  const freePlayers = sorted.filter((p) => freeIds.includes(p.player_id));
+  const lockedPlayers = sorted.filter((p) => !freeIds.includes(p.player_id));
 
   function handleSelect(player: PlayerProjectionItem) {
     onSelect(player);
@@ -51,7 +56,6 @@ export default function PlayerSelectorDropdown({
 
   return (
     <div ref={containerRef} className="relative w-full">
-      {/* Trigger button */}
       <button
         onClick={() => setOpen((v) => !v)}
         className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-all duration-150 bg-[#0B0B0B] ${
@@ -68,7 +72,6 @@ export default function PlayerSelectorDropdown({
         />
       </button>
 
-      {/* Floating dropdown panel — absolute, does NOT shift layout */}
       {open && (
         <div
           className="absolute top-full left-0 w-full mt-1.5 z-50 rounded-xl border border-[#F5C84C]/20 bg-[#0B0B0B] overflow-hidden"
@@ -86,7 +89,6 @@ export default function PlayerSelectorDropdown({
             </div>
           ) : (
             <div className="max-h-80 overflow-y-auto overscroll-contain">
-              {/* Unlocked players */}
               {freePlayers.map((player) => (
                 <button
                   key={player.player_id}
@@ -104,7 +106,6 @@ export default function PlayerSelectorDropdown({
                 </button>
               ))}
 
-              {/* Locked players section */}
               {lockedPlayers.length > 0 && (
                 <>
                   <div className="px-4 pt-3 pb-1.5 border-t border-white/[0.06]">
