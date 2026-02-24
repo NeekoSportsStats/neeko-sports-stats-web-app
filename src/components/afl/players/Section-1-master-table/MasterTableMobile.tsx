@@ -18,7 +18,7 @@ const skeletonValue = () => Math.floor(70 + Math.random() * 40);
 const ROUND_LABELS = ["OR", ...Array.from({ length: 23 }, (_, i) => `R${i + 1}`)];
 const PAGE_SIZE = 10;
 
-const LEFT_COL_W = 124;
+const LEFT_COL_W = 140;
 const CELL_W = 52;
 const CELL_GAP = 4;
 
@@ -271,9 +271,9 @@ export default function MasterTableMobile({
                         className="px-4 py-4 flex items-center justify-between text-left sticky left-0 z-10 bg-black/90"
                         style={{ width: LEFT_COL_W }}
                       >
-                        <span className="text-[15px] font-semibold text-neutral-50 whitespace-nowrap">
+                        <div className="max-w-[108px] text-[13px] font-semibold text-neutral-50 whitespace-normal leading-tight break-words">
                           {p.name}
-                        </span>
+                        </div>
                         {!gated && (
                           <ChevronRight className="h-4 w-4 text-neutral-500" />
                         )}
