@@ -81,9 +81,9 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
         )}
       </div>
 
-      <div className="min-h-[380px] h-[380px] md:h-[440px] w-full overflow-x-auto pb-2">
+      <div className="h-[260px] sm:h-[400px] px-2 sm:px-0 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 20, right: 15, bottom: 55, left: 20 }}>
+          <ScatterChart margin={{ top: 10, right: 10, bottom: 30, left: 30 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.5} />
             <XAxis
               type="number"
@@ -94,10 +94,10 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
               label={{
                 value: "Disposals vs Avg",
                 position: "bottom",
-                offset: 15,
-                style: { fill: "#999", fontSize: "12px" },
+                offset: 10,
+                style: { fill: "#999", fontSize: "11px" },
               }}
-              height={50}
+              height={40}
             />
             <YAxis
               type="number"
@@ -110,9 +110,9 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                 angle: -90,
                 position: "left",
                 offset: 0,
-                style: { fill: "#999", fontSize: "12px" },
+                style: { fill: "#999", fontSize: "11px" },
               }}
-              width={45}
+              width={40}
             />
 
             <ReferenceLine x={0} stroke="#555" strokeDasharray="3 3" />
@@ -176,7 +176,7 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                           <circle
                             cx={cx}
                             cy={cy}
-                            r={15}
+                            r={10}
                             fill={resolvedHomeColor}
                             fillOpacity={0.15}
                           />
@@ -184,11 +184,11 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                         <circle
                           cx={cx}
                           cy={cy}
-                          r={8}
+                          r={4}
                           fill={resolvedHomeColor}
                           fillOpacity={opacity}
                           stroke="rgba(0,0,0,0.5)"
-                          strokeWidth={2}
+                          strokeWidth={1}
                         />
                       </>
                     );
@@ -209,7 +209,7 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                           <circle
                             cx={cx}
                             cy={cy}
-                            r={15}
+                            r={10}
                             fill={resolvedAwayColor}
                             fillOpacity={0.12}
                           />
@@ -217,11 +217,11 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                         <circle
                           cx={cx}
                           cy={cy}
-                          r={8}
+                          r={4}
                           fill={resolvedAwayColor}
                           fillOpacity={opacity}
                           stroke="rgba(0,0,0,0.4)"
-                          strokeWidth={2}
+                          strokeWidth={1}
                         />
                       </>
                     );
@@ -244,7 +244,7 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                         <circle
                           cx={cx}
                           cy={cy}
-                          r={15}
+                          r={10}
                           fill={resolvedHomeColor}
                           fillOpacity={0.15}
                         />
@@ -252,11 +252,11 @@ export default function MatchScatter({ scatterData, homeTeam, awayTeam, homeColo
                       <circle
                         cx={cx}
                         cy={cy}
-                        r={8}
+                        r={4}
                         fill={resolvedHomeColor}
                         fillOpacity={opacity}
                         stroke="rgba(0,0,0,0.4)"
-                        strokeWidth={2}
+                        strokeWidth={1}
                       />
                     </>
                   );
