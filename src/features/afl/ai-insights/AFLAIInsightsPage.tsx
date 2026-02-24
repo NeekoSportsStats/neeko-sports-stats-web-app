@@ -5,7 +5,7 @@ import FantasyVerdictBadge from "@/components/FantasyVerdictBadge";
 import { PremiumGate, PremiumGateCTA } from "@/components/PremiumGate";
 import { useAuth } from "@/lib/auth";
 import { FREE_PLAYER_IDS, FREE_TEAM_NAMES, FREE_MATCH_IDS } from "@/config/freemiumConfig";
-import PlayerSelectorDropdown from "./PlayerSelectorDropdown";
+import PlayerSelectorDropdown from "@/components/PlayerSelectorDropdown";
 
 interface AIPlayerSummary {
   player_id: number;
