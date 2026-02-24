@@ -5,6 +5,7 @@ import FantasyVerdictBadge from "@/components/FantasyVerdictBadge";
 import { PremiumGate, PremiumGateCTA } from "@/components/PremiumGate";
 import { useAuth } from "@/lib/auth";
 import { FREE_PLAYER_IDS, FREE_TEAM_NAMES, FREE_MATCH_IDS } from "@/config/freemiumConfig";
+import PlayerSelectorDropdown from "./PlayerSelectorDropdown";
 
 interface AIPlayerSummary {
   player_id: number;
@@ -737,55 +738,15 @@ export default function AFLAIInsightsPage() {
             </div>
           </div>
 
-          {/* Team Player List — shown when a team filter is active and no search query */}
+          {/* Player Dropdown Selector — shown when a team filter is active and no search query */}
           {selectedPlayerTeam && !playerSearch && (
-            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl overflow-hidden">
-              <div className="px-5 py-3 border-b border-white/10 flex items-center justify-between">
-                <span className="text-sm font-semibold text-white">{selectedPlayerTeam} — Players</span>
-                <span className="text-xs text-neutral-500">Click to view projection</span>
-              </div>
-              {teamPlayersLoading ? (
-                <div className="px-5 py-6 text-center text-xs text-neutral-500 animate-pulse">Loading players...</div>
-              ) : (
-                <div className="divide-y divide-white/5 max-h-[320px] overflow-y-auto">
-                  {[...teamPlayers]
-                    .sort((a, b) => {
-                      const aFree = FREE_PLAYER_IDS.includes(a.player_id);
-                      const bFree = FREE_PLAYER_IDS.includes(b.player_id);
-                      if (aFree && !bFree) return -1;
-                      if (!aFree && bFree) return 1;
-                      return (b.final_projection ?? 0) - (a.final_projection ?? 0);
-                    })
-                    .map((proj) => {
-                    const isResultLocked = !isPremium && !FREE_PLAYER_IDS.includes(proj.player_id);
-                    return (
-                      <button
-                        key={proj.player_id}
-                        onClick={() => handleSearchResultClick(proj)}
-                        className="w-full min-h-[56px] flex items-center justify-between px-5 py-3 text-left hover:bg-white/5 transition-colors border-l-2 border-transparent hover:border-[#F5C84C]/40"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm font-semibold text-white">{proj.player_name}</span>
-                          {isResultLocked ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-[#F5C84C]/70 font-medium">
-                              <Lock className="h-3 w-3" />
-                              Neeko+
-                            </span>
-                          ) : (
-                            proj.final_projection != null && (
-                              <span className="text-xs text-[#F5C84C] font-medium">
-                                {Number(proj.final_projection).toFixed(0)} proj.
-                              </span>
-                            )
-                          )}
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-neutral-600 flex-shrink-0" />
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <PlayerSelectorDropdown
+              teamName={selectedPlayerTeam}
+              players={teamPlayers}
+              isPremium={isPremium}
+              loading={teamPlayersLoading}
+              onSelect={handleSearchResultClick}
+            />
           )}
 
           {/* Player Search */}
