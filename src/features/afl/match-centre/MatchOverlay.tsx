@@ -383,7 +383,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
           </div>
           <button
             onClick={onClose}
-            className="h-10 w-10 rounded-xl border border-slate-700/40 bg-slate-900/50 hover:bg-slate-800/60 active:bg-slate-700/70 flex items-center justify-center transition-colors touch-manipulation"
+            className="h-11 w-11 min-h-[44px] min-w-[44px] rounded-xl border border-slate-700/40 bg-slate-900/50 hover:bg-slate-800/60 active:bg-slate-700/70 flex items-center justify-center transition-colors touch-manipulation"
           >
             <X className="h-5 w-5 text-slate-300" />
           </button>

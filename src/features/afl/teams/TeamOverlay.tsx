@@ -283,7 +283,7 @@ export default function TeamOverlay({ team, lens, onLensChange, onClose }: TeamO
 
             <button
               onClick={onClose}
-              className="p-2 rounded-lg border border-white/10 bg-black/60 text-white/70 hover:text-white hover:border-red-400/60 hover:bg-red-500/10 transition-all"
+              className="p-2 min-h-[44px] min-w-[44px] rounded-lg border border-white/10 bg-black/60 text-white/70 hover:text-white hover:border-red-400/60 hover:bg-red-500/10 transition-all flex items-center justify-center touch-manipulation"
             >
               <X className="h-5 w-5" />
             </button>
