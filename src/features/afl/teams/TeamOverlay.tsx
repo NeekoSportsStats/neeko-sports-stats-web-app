@@ -267,9 +267,10 @@ export default function TeamOverlay({ team, lens, onLensChange, onClose }: TeamO
     <div
       ref={overlayRef}
       className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto"
+      onClick={onClose}
     >
       <div className="min-h-screen p-3 md:p-8">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-5xl mx-auto" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-start justify-between mb-4 md:mb-6">
             <div className="flex items-center gap-4">
               <div
