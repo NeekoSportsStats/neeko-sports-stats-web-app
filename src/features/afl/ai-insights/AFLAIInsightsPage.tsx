@@ -750,7 +750,7 @@ export default function AFLAIInsightsPage() {
           )}
 
           {/* Player Search */}
-          <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-6">
+          <div className="rounded-xl border border-white/10 bg-[#0b0b0b] p-6">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-500 pointer-events-none" />
               <input
@@ -865,8 +865,7 @@ export default function AFLAIInsightsPage() {
               <div
                 className="relative rounded-xl border border-yellow-400/30 transition-all duration-300 hover:shadow-[0_0_30px_rgba(245,200,76,0.15)]"
                 style={{
-                  background: "radial-gradient(circle at 50% 25%, rgba(245,200,76,0.08), transparent 70%), linear-gradient(135deg, rgba(245,200,76,0.07) 0%, rgba(245,150,30,0.05) 100%)",
-                  backdropFilter: "blur(20px)",
+                  background: "linear-gradient(180deg, rgba(245,200,76,0.08) 0%, rgba(245,200,76,0.04) 100%)",
                   opacity: cardVisible ? 1 : 0,
                   transform: cardVisible ? "translateY(0)" : "translateY(10px)",
                   transition: "opacity 300ms ease, transform 300ms ease, box-shadow 300ms ease",
@@ -1158,7 +1157,7 @@ export default function AFLAIInsightsPage() {
               </div>
             );
           })() : (
-            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl py-12 text-center">
+            <div className="rounded-xl border border-white/10 bg-[#0b0b0b] py-12 text-center">
               <Target className="h-10 w-10 text-neutral-700 mx-auto mb-4" />
               <p className="text-sm text-neutral-500">Search any AFL player above to unlock AI analysis</p>
             </div>
@@ -1218,8 +1217,8 @@ export default function AFLAIInsightsPage() {
             <div
               className="relative rounded-xl border border-yellow-400/30 transition-all duration-300 hover:shadow-[0_0_30px_rgba(245,200,76,0.15)]"
               style={{
-                background: "radial-gradient(circle at 50% 25%, rgba(245,200,76,0.08), transparent 70%), linear-gradient(135deg, rgba(245,200,76,0.07) 0%, rgba(245,150,30,0.05) 100%)",
-                backdropFilter: "blur(20px)",
+                background: "linear-gradient(180deg, rgba(245,200,76,0.08) 0%, rgba(245,200,76,0.04) 100%)",
+                boxShadow: "0 0 25px rgba(245,200,76,0.18)",
               }}
             >
               <div
@@ -1609,7 +1608,7 @@ export default function AFLAIInsightsPage() {
           )}
 
           {!selectedTeam && (
-            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-12 text-center">
+            <div className="rounded-xl border border-white/10 bg-[#0b0b0b] p-12 text-center">
               <Users className="h-12 w-12 text-white/20 mx-auto mb-4" />
               <p className="text-white/50">Select a team above to view their AI summary</p>
             </div>
@@ -1667,7 +1666,7 @@ export default function AFLAIInsightsPage() {
               })}
             </div>
           ) : (
-            <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-8 text-center">
+            <div className="rounded-xl border border-white/10 bg-[#0b0b0b] p-8 text-center">
               <TrendingUp className="h-10 w-10 text-white/20 mx-auto mb-3" />
               <p className="text-white/50 text-sm">Match predictions will appear here once generated</p>
             </div>
@@ -1735,8 +1734,8 @@ export default function AFLAIInsightsPage() {
               <div
                 className="relative rounded-xl border border-yellow-400/30 transition-all duration-300 hover:shadow-[0_0_30px_rgba(245,200,76,0.15)]"
                 style={{
-                  background: "radial-gradient(circle at 50% 25%, rgba(245,200,76,0.08), transparent 70%), linear-gradient(135deg, rgba(245,200,76,0.07) 0%, rgba(245,150,30,0.05) 100%)",
-                  backdropFilter: "blur(20px)",
+                  background: "linear-gradient(180deg, rgba(245,200,76,0.08) 0%, rgba(245,200,76,0.04) 100%)",
+                  boxShadow: "0 0 25px rgba(245,200,76,0.18)",
                 }}
               >
                 <div
@@ -1912,7 +1911,7 @@ export default function AFLAIInsightsPage() {
           })()}
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-8 text-center">
+        <div className="rounded-xl border border-white/10 bg-[#0b0b0b] p-8 text-center">
           <Sparkles className="h-12 w-12 text-yellow-400 mx-auto mb-4" />
           <h3 className="text-xl font-bold mb-2">Want More Insights?</h3>
           <p className="text-white/60 mb-6 max-w-2xl mx-auto">
