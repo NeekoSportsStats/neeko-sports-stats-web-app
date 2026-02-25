@@ -46,12 +46,12 @@ export function Layout({ children }: LayoutProps) {
                 )}
 
                 {!isPremium && (
-                  <a href="https://www.neekostats.com.au/neeko-plus" target="_blank" rel="noopener noreferrer">
+                  <Link to="/neeko-plus">
                     <Button variant="outline" size="sm" className="gap-2">
                       <Crown className="h-4 w-4" />
                       <span className="hidden sm:inline">Neeko+</span>
                     </Button>
-                  </a>
+                  </Link>
                 )}
 
                 {user && (
