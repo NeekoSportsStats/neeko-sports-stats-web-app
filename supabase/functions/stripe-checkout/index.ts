@@ -174,9 +174,7 @@ Deno.serve(async (req) => {
           quantity: 1,
         },
       ],
-      subscription_data: {
-        payment_behavior: "default_incomplete",
-      },
+      subscription_data: {},
       success_url,
       cancel_url,
       payment_method_collection: "always",
