@@ -190,10 +190,6 @@ Deno.serve(async (req) => {
       success_url,
       cancel_url,
       payment_method_collection: "always",
-      subscription_data: {
-        billing_cycle_anchor: "now",
-        proration_behavior: "none",
-      },
     });
 
     console.log(`Created checkout session ${session.id} for customer ${customerId}`);
