@@ -179,16 +179,21 @@ Deno.serve(async (req) => {
     // create Checkout Session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      payment_method_types: ['card'],
+      mode: "subscription",
+      payment_method_types: ["card"],
       line_items: [
         {
           price: price_id,
           quantity: 1,
         },
       ],
-      mode,
       success_url,
       cancel_url,
+      payment_method_collection: "always",
+      subscription_data: {
+        billing_cycle_anchor: "now",
+        proration_behavior: "none",
+      },
     });
 
     console.log(`Created checkout session ${session.id} for customer ${customerId}`);
