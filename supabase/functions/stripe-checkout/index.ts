@@ -43,6 +43,14 @@ Deno.serve(async (req) => {
 
     const { price_id, success_url, cancel_url, mode } = await req.json();
 
+    console.log("stripe-checkout inputs", {
+      mode,
+      price_id,
+      success_url,
+      cancel_url,
+      hasAuthHeader: !!req.headers.get("Authorization"),
+    });
+
     const error = validateParameters(
       { price_id, success_url, cancel_url, mode },
       {
@@ -164,6 +172,13 @@ Deno.serve(async (req) => {
       }
     }
 
+    console.log("stripe-checkout creating session", {
+      customerId,
+      price_id,
+      success_url,
+      cancel_url,
+    });
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
@@ -184,8 +199,25 @@ Deno.serve(async (req) => {
 
     return corsResponse({ sessionId: session.id, url: session.url });
   } catch (error: any) {
-    console.error(`Checkout error: ${error.message}`);
-    return corsResponse({ error: error.message }, 500);
+    console.error("stripe-checkout ERROR", {
+      name: error?.name,
+      message: error?.message,
+      stack: error?.stack,
+      raw: error,
+    });
+
+    return corsResponse(
+      {
+        error: "stripe-checkout failed",
+        message: error?.message ?? String(error),
+        name: error?.name ?? null,
+        type: error?.type ?? null,
+        code: error?.code ?? null,
+        param: error?.param ?? null,
+        statusCode: error?.statusCode ?? null,
+      },
+      500,
+    );
   }
 });
 
