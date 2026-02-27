@@ -763,7 +763,7 @@ function PositionPill({ value, active, onClick }: { value: PositionFilter; activ
 
 // ─── Upgrade CTA ──────────────────────────────────────────────────────────────
 
-function UpgradeCTABanner() {
+function UpgradeCTABanner({ lockedCount }: { lockedCount: number }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-b-xl border-t border-[#F5C84C]/10 bg-[#F5C84C]/5 px-6 py-10 text-center">
       <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#F5C84C]/30 bg-[#F5C84C]/10">
@@ -771,7 +771,9 @@ function UpgradeCTABanner() {
       </div>
       <h3 className="text-base font-semibold text-white">Unlock full rankings with Neeko+</h3>
       <p className="text-sm text-white/40 max-w-xs">
-        See all players with Captain Rating, Form, Matchup, Upside & AI Recommendations.
+        {lockedCount > 0
+          ? `Unlock ${lockedCount} more players with Captain Rating, Form, Matchup, Upside & AI Recommendations.`
+          : "See all players with Captain Rating, Form, Matchup, Upside & AI Recommendations."}
       </p>
       <a
         href="/neeko-plus"
@@ -853,6 +855,7 @@ export default function AFLRankingsPage() {
 
   const freeLimit = positionFilter === "ALL" ? FREE_LIMIT_ALL : FREE_LIMIT_POSITION;
   const visibleRows = isPremium ? sorted : sorted.slice(0, FREE_VISIBLE);
+  const lockedCount = isPremium ? 0 : Math.max(0, sorted.length - freeLimit);
 
   const TOTAL_COLS = 11;
 
@@ -1037,7 +1040,7 @@ export default function AFLRankingsPage() {
           </table>
         </div>
 
-        {!isPremium && <UpgradeCTABanner />}
+        {!isPremium && <UpgradeCTABanner lockedCount={lockedCount} />}
       </div>
 
       {selected && (
