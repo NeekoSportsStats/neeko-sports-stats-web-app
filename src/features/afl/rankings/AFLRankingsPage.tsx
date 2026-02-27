@@ -42,6 +42,7 @@ interface CaptainRow {
 
 interface ScoreHistoryPoint {
   game_rank: number;
+  round_number: number | null;
   fantasy_points: number | null;
 }
 
@@ -51,6 +52,29 @@ type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
 
 const FREE_LIMIT_ALL = 5;
 const FREE_LIMIT_POSITION = 3;
+const FREE_VISIBLE = 20;
+
+const POSITION_MAP: Record<string, PositionFilter> = {
+  DEF: "DEF", DEFENDER: "DEF",
+  MID: "MID", MIDFIELDER: "MID",
+  FWD: "FWD", FORWARD: "FWD",
+  RUC: "RUC", RUCK: "RUC",
+};
+
+function normalisePosition(raw: string | null): PositionFilter | null {
+  if (!raw) return null;
+  const key = raw.trim().toUpperCase();
+  return POSITION_MAP[key] ?? null;
+}
+
+function roundLabel(roundNumber: number | null): string {
+  if (roundNumber == null) return "?";
+  if (roundNumber === 25) return "FW1";
+  if (roundNumber === 26) return "SF";
+  if (roundNumber === 27) return "PF";
+  if (roundNumber === 28) return "GF";
+  return `R${roundNumber}`;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -147,7 +171,7 @@ function getCaptainStyle(rating: string | null): { text: string; bg: string; bor
 
 function LockedCell() {
   return (
-    <div className="flex justify-center items-center">
+    <div className="flex justify-end items-center w-full">
       <Lock size={14} className="text-white/20" />
     </div>
   );
@@ -213,10 +237,11 @@ function ScoreHistoryChart({ playerName }: { playerName: string }) {
     async function load() {
       setLoading(true);
       const { data: rows } = await supabase
-        .from("v_player_score_history_chart")
-        .select("game_rank, fantasy_points")
+        .from("v_player_score_history_last10")
+        .select("game_rank, round_number, fantasy_points")
         .eq("player", playerName)
-        .order("game_rank", { ascending: false });
+        .lte("game_rank", 10)
+        .order("game_rank", { ascending: true });
       setData((rows as ScoreHistoryPoint[]) ?? []);
       setLoading(false);
     }
@@ -244,11 +269,11 @@ function ScoreHistoryChart({ playerName }: { playerName: string }) {
     <ResponsiveContainer width="100%" height={180}>
       <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
         <XAxis
-          dataKey="game_rank"
+          dataKey="round_number"
           tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={(v) => `G${v}`}
+          tickFormatter={(v) => roundLabel(v)}
         />
         <YAxis
           domain={[minVal - padding, maxVal + padding]}
@@ -266,7 +291,7 @@ function ScoreHistoryChart({ playerName }: { playerName: string }) {
           }}
           labelStyle={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}
           itemStyle={{ color: "#F5C84C", fontSize: 12, fontWeight: 600 }}
-          labelFormatter={(v) => `Game ${v}`}
+          labelFormatter={(v) => roundLabel(v)}
           formatter={(v: number) => [Math.round(v), "Score"]}
         />
         <Line
@@ -674,6 +699,8 @@ function PlayerDetailModal({
 
 // ─── Sort / filter header helpers ─────────────────────────────────────────────
 
+const TH_STICKY = "sticky top-0 z-20 bg-[#0a0a0a]";
+
 function SortTh({
   label,
   sortKey,
@@ -692,7 +719,7 @@ function SortTh({
   const active = currentKey === sortKey;
   return (
     <th
-      className={`px-3 py-3 text-right text-[11px] font-medium uppercase tracking-wider select-none whitespace-nowrap transition-colors ${
+      className={`${TH_STICKY} px-3 py-3 text-right text-[11px] font-medium uppercase tracking-wider select-none whitespace-nowrap transition-colors border-b border-white/10 ${
         locked ? "text-white/20 cursor-default" : "text-white/40 cursor-pointer hover:text-white/70"
       }`}
       onClick={() => !locked && onSort(sortKey)}
@@ -708,7 +735,7 @@ function SortTh({
 
 function PlainTh({ label, locked }: { label: string; locked?: boolean }) {
   return (
-    <th className="px-3 py-3 text-right text-[11px] font-medium uppercase tracking-wider text-white/20 whitespace-nowrap">
+    <th className={`${TH_STICKY} px-3 py-3 text-right text-[11px] font-medium uppercase tracking-wider text-white/20 whitespace-nowrap border-b border-white/10`}>
       <span className="inline-flex items-center gap-1 justify-end">
         {locked && <Lock size={10} className="text-[#F5C84C]" />}
         {label}
@@ -796,9 +823,8 @@ export default function AFLRankingsPage() {
 
       const normalized = ((data as RankingRow[]) ?? []).map((r) => ({
         ...r,
-        position: r.position?.toUpperCase()?.substring(0, 3) ?? null,
+        position: normalisePosition(r.position),
       }));
-      console.log("Positions:", [...new Set(normalized.map((r) => r.position))]);
       setRows(normalized);
 
       setLoading(false);
@@ -817,7 +843,7 @@ export default function AFLRankingsPage() {
 
   const filtered = positionFilter === "ALL"
     ? rows
-    : rows.filter((r) => r.position?.toUpperCase().substring(0, 3) === positionFilter);
+    : rows.filter((r) => r.position === positionFilter);
 
   const sorted = [...filtered].sort((a, b) => {
     const av = (a[sortKey] as number | null) ?? -Infinity;
@@ -826,7 +852,7 @@ export default function AFLRankingsPage() {
   });
 
   const freeLimit = positionFilter === "ALL" ? FREE_LIMIT_ALL : FREE_LIMIT_POSITION;
-  const visibleRows = sorted.slice(0, 20);
+  const visibleRows = isPremium ? sorted : sorted.slice(0, FREE_VISIBLE);
 
   const TOTAL_COLS = 11;
 
@@ -882,11 +908,11 @@ export default function AFLRankingsPage() {
       <div className="px-4 pb-10 md:px-8">
         <div className="overflow-x-auto rounded-xl border border-white/5">
           <table className="w-full min-w-[1000px] border-collapse">
-            <thead className="sticky top-0 z-20 bg-[#070707] border-b border-white/10">
+            <thead className="bg-[#0a0a0a]">
               <tr>
-                <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 w-10">#</th>
-                <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40">Player</th>
-                <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40">Team</th>
+                <th className={`${TH_STICKY} px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 w-10 border-b border-white/10`}>#</th>
+                <th className={`${TH_STICKY} px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 border-b border-white/10`}>Player</th>
+                <th className={`${TH_STICKY} px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 border-b border-white/10`}>Team</th>
                 <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
                 <PlainTh label="Captain" locked={!isPremium} />
                 <PlainTh label="Form" locked={!isPremium} />
