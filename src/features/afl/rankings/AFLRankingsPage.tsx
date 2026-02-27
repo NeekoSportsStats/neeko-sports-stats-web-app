@@ -209,9 +209,10 @@ function ScoreHistoryChart({ playerName }: { playerName: string }) {
     async function load() {
       setLoading(true);
       const { data: rows } = await supabase
-        .from("player_round_stats_2025_canonical")
+        .from("player_round_stats_2025")
         .select("round_number, fantasy_points")
         .eq("player", playerName)
+        .eq("season", 2025)
         .order("round_number", { ascending: true });
       setData((rows as ScoreHistoryPoint[]) ?? []);
       setLoading(false);
