@@ -237,8 +237,8 @@ function ScoreHistoryChart({ playerName }: { playerName: string }) {
   const padding = Math.max(10, (maxVal - minVal) * 0.15);
 
   return (
-    <ResponsiveContainer width="100%" height={112}>
-      <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+    <ResponsiveContainer width="100%" height={180}>
+      <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
         <XAxis
           dataKey="round_number"
           tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }}
@@ -617,14 +617,6 @@ function PlayerDetailModal({
               </div>
             )}
 
-            {/* Score History Chart */}
-            {unlocked && (
-              <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-3">
-                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-3">Score History — 2025</p>
-                <ScoreHistoryChart playerName={detail.player_name} />
-              </div>
-            )}
-
             {/* AI Insight Section — always shown, locked state for non-unlocked */}
             <div className={`rounded-lg border px-4 py-4 ${unlocked ? "border-[#F5C84C]/15 bg-[#F5C84C]/[0.04]" : "border-[#111] bg-[#111]"}`}>
               <div className="flex items-center gap-2 mb-2">
@@ -657,6 +649,14 @@ function PlayerDetailModal({
               <div className="rounded-lg border border-white/5 bg-white/[0.03] px-4 py-3">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-2">Captain Verdict</p>
                 <p className="text-sm text-white/70 leading-relaxed italic">{aiAnalysis.captain_recommendation}</p>
+              </div>
+            )}
+
+            {/* Score History Chart — below AI Analysis */}
+            {unlocked && (
+              <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-4">
+                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-3">Score History — 2025</p>
+                <ScoreHistoryChart playerName={detail.player_name} />
               </div>
             )}
           </div>
