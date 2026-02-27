@@ -699,7 +699,7 @@ function PlayerDetailModal({
 
 // ─── Sort / filter header helpers ─────────────────────────────────────────────
 
-const TH_STICKY = "sticky top-0 z-20 bg-[#0a0a0a]";
+const TH_STICKY = "bg-[#070707]";
 
 function SortTh({
   label,
@@ -911,7 +911,7 @@ export default function AFLRankingsPage() {
       <div className="px-4 pb-10 md:px-8">
         <div className="overflow-x-auto rounded-xl border border-white/5">
           <table className="w-full min-w-[1000px] border-collapse">
-            <thead className="bg-[#0a0a0a]">
+            <thead className="sticky top-0 z-50 bg-[#070707] border-b border-[#1a1a1a]">
               <tr>
                 <th className={`${TH_STICKY} px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 w-10 border-b border-white/10`}>#</th>
                 <th className={`${TH_STICKY} px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 border-b border-white/10`}>Player</th>
