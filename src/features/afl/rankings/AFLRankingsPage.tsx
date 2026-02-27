@@ -19,18 +19,14 @@ interface RankingRow {
 }
 
 interface PlayerDetail {
-  player_id: string | null;
-  player: string;
+  player_id: number;
+  player_name: string;
   team: string;
-  expected_fantasy: number | null;
-  projection_final: number | null;
-  ai_summary: string | null;
-  ceiling_fantasy: number | null;
-  ceiling_estimate: number | null;
-  floor_fantasy: number | null;
-  floor_estimate: number | null;
-  consistency_score: number | null;
-  volatility: number | null;
+  projection_final: number;
+  ceiling_estimate: number;
+  floor_estimate: number;
+  consistency_score: number;
+  ai_summary?: string | null;
 }
 
 type SortKey = "projection_final" | "consistency_score";
@@ -121,7 +117,7 @@ function PlayerDetailModal({
         ) : (
           <div className="space-y-5">
             <div>
-              <h2 className="text-lg font-semibold text-white">{detail.player}</h2>
+              <h2 className="text-lg font-semibold text-white">{detail.player_name}</h2>
               <p className="text-sm text-white/50">{detail.team}</p>
             </div>
 
@@ -129,7 +125,7 @@ function PlayerDetailModal({
               <div className="rounded-lg bg-white/5 px-4 py-3">
                 <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Projection</p>
                 <p className="text-xl font-bold text-[#F5C84C]">
-                  {fmt(detail.projection_final ?? detail.expected_fantasy)}
+                  {fmt(detail.projection_final)}
                 </p>
               </div>
 
@@ -138,13 +134,13 @@ function PlayerDetailModal({
                   <div className="rounded-lg bg-white/5 px-4 py-3">
                     <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Ceiling</p>
                     <p className="text-xl font-bold text-emerald-400">
-                      {fmt(detail.ceiling_estimate ?? detail.ceiling_fantasy)}
+                      {fmt(detail.ceiling_estimate)}
                     </p>
                   </div>
                   <div className="rounded-lg bg-white/5 px-4 py-3">
                     <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Floor</p>
                     <p className="text-xl font-bold text-red-400">
-                      {fmt(detail.floor_estimate ?? detail.floor_fantasy)}
+                      {fmt(detail.floor_estimate)}
                     </p>
                   </div>
                   <div className="rounded-lg bg-white/5 px-4 py-3">
@@ -167,7 +163,7 @@ function PlayerDetailModal({
             {isPremium && detail.ai_summary && (
               <div className="rounded-lg bg-white/5 px-4 py-3">
                 <p className="text-[11px] text-white/40 uppercase tracking-wider mb-2">AI Analysis</p>
-                <p className="text-sm text-white/70 leading-relaxed">{detail.ai_summary}</p>
+                <p className="text-sm text-white/70 leading-relaxed">{detail.ai_summary ?? "—"}</p>
               </div>
             )}
 
