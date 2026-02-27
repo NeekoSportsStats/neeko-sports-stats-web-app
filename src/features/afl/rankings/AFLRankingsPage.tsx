@@ -9,6 +9,7 @@ interface RankingRow {
   player_id: string | null;
   player_name: string;
   team: string;
+  position: string | null;
   projection_final: number | null;
   ceiling_estimate: number | null;
   floor_estimate: number | null;
@@ -29,8 +30,12 @@ interface PlayerDetail {
   volatility: number | null;
 }
 
-type SortKey = "projection_final" | "ceiling_estimate" | "floor_estimate" | "consistency_score";
+type SortKey = "projection_final" | "consistency_score";
 type SortDir = "asc" | "desc";
+type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
+
+const FREE_UNLOCK_LIMIT = 20;
+const CTA_AFTER_ROW = 50;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -39,17 +44,18 @@ function fmt(v: number | null, decimals = 1): string {
   return v.toFixed(decimals);
 }
 
-function fmtDelta(v: number | null): string {
-  if (v == null) return "—";
-  const sign = v > 0 ? "+" : "";
-  return `${sign}${v.toFixed(1)}`;
+interface ConsistencyBadge {
+  label: string;
+  className: string;
 }
 
-function consistencyColor(score: number | null): string {
-  if (score == null) return "text-white/40";
-  if (score >= 75) return "text-emerald-400";
-  if (score >= 50) return "text-yellow-400";
-  return "text-red-400";
+function getConsistencyBadge(score: number | null): ConsistencyBadge {
+  if (score == null) return { label: "—", className: "text-white/30" };
+  if (score >= 90) return { label: "Elite", className: "text-green-400" };
+  if (score >= 75) return { label: "Very Safe", className: "text-emerald-400" };
+  if (score >= 60) return { label: "Reliable", className: "text-yellow-400" };
+  if (score >= 40) return { label: "Volatile", className: "text-orange-400" };
+  return { label: "High Risk", className: "text-red-400" };
 }
 
 // ─── Player Detail Modal ──────────────────────────────────────────────────────
@@ -72,22 +78,20 @@ function PlayerDetailModal({
     async function fetchDetail() {
       setLoading(true);
       const view = isPremium ? "v_player_detail_premium" : "v_player_detail_free";
-
       let query = supabase.from(view).select("*");
-
       if (playerId) {
         query = query.eq("player_id", playerId);
       } else {
         query = query.eq("player", playerName);
       }
-
       const { data } = await query.maybeSingle();
       setDetail(data as PlayerDetail | null);
       setLoading(false);
     }
-
     fetchDetail();
   }, [playerId, playerName, isPremium]);
+
+  const badge = getConsistencyBadge(detail?.consistency_score ?? null);
 
   return (
     <div
@@ -145,8 +149,8 @@ function PlayerDetailModal({
                   </div>
                   <div className="rounded-lg bg-white/5 px-4 py-3">
                     <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Consistency</p>
-                    <p className={`text-xl font-bold ${consistencyColor(detail.consistency_score)}`}>
-                      {detail.consistency_score != null ? `${detail.consistency_score}%` : "—"}
+                    <p className={`text-xl font-bold ${badge.className}`}>
+                      {badge.label}
                     </p>
                   </div>
                 </>
@@ -209,7 +213,9 @@ function SortTh({
   return (
     <th
       className={`px-3 py-3 text-right text-[11px] font-medium uppercase tracking-wider select-none whitespace-nowrap ${
-        locked ? "text-white/20 cursor-default" : "text-white/40 cursor-pointer hover:text-white/70"
+        locked
+          ? "text-white/20 cursor-default"
+          : "text-white/40 cursor-pointer hover:text-white/70"
       } transition-colors`}
       onClick={() => !locked && onSort(sortKey)}
     >
@@ -224,6 +230,61 @@ function SortTh({
   );
 }
 
+// ─── Position Filter ──────────────────────────────────────────────────────────
+
+const POSITIONS: PositionFilter[] = ["ALL", "DEF", "MID", "FWD", "RUC"];
+
+function PositionPill({
+  value,
+  active,
+  onClick,
+}: {
+  value: PositionFilter;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+        active
+          ? "bg-[#F5C84C] text-black"
+          : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80"
+      }`}
+    >
+      {value}
+    </button>
+  );
+}
+
+// ─── Upgrade CTA Banner ───────────────────────────────────────────────────────
+
+function UpgradeCTABanner() {
+  return (
+    <tr>
+      <td colSpan={5}>
+        <div className="flex flex-col items-center justify-center gap-3 border-t border-[#F5C84C]/10 bg-[#F5C84C]/5 px-6 py-8 text-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#F5C84C]/30 bg-[#F5C84C]/10">
+            <Crown size={18} className="text-[#F5C84C]" />
+          </div>
+          <h3 className="text-base font-semibold text-white">
+            Unlock full rankings with Neeko+
+          </h3>
+          <p className="text-sm text-white/40">
+            See all ranked players with consistency badges and AI analysis.
+          </p>
+          <a
+            href="/neeko-plus"
+            className="rounded-lg bg-[#F5C84C] px-6 py-2.5 text-sm font-bold text-black hover:bg-[#f0bd30] transition-colors"
+          >
+            Upgrade Now
+          </a>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AFLRankingsPage() {
@@ -234,20 +295,20 @@ export default function AFLRankingsPage() {
   const [sortKey, setSortKey] = useState<SortKey>("projection_final");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selected, setSelected] = useState<RankingRow | null>(null);
+  const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
 
   useEffect(() => {
     async function fetchRankings() {
       setLoading(true);
-      const view = isPremium ? "v_rankings_premium" : "v_rankings_free";
       const { data } = await supabase
-        .from(view)
+        .from("v_rankings_premium")
         .select("*")
         .order("projection_final", { ascending: false });
       setRows((data as RankingRow[]) ?? []);
       setLoading(false);
     }
     fetchRankings();
-  }, [isPremium]);
+  }, []);
 
   function handleSort(key: SortKey) {
     if (!isPremium && key !== "projection_final") return;
@@ -259,10 +320,17 @@ export default function AFLRankingsPage() {
     }
   }
 
-  const sorted = [...rows].sort((a, b) => {
+  const positionFiltered =
+    positionFilter === "ALL"
+      ? rows
+      : rows.filter((r) => r.position === positionFilter);
+
+  const sorted = [...positionFiltered].sort((a, b) => {
     const av = a[sortKey] ?? -Infinity;
     const bv = b[sortKey] ?? -Infinity;
-    return sortDir === "desc" ? (bv as number) - (av as number) : (av as number) - (bv as number);
+    return sortDir === "desc"
+      ? (bv as number) - (av as number)
+      : (av as number) - (bv as number);
   });
 
   return (
@@ -292,17 +360,34 @@ export default function AFLRankingsPage() {
         {!isPremium && (
           <div className="mt-4 rounded-lg border border-white/5 bg-white/[0.03] px-4 py-3">
             <p className="text-xs text-white/40">
-              Free tier: showing top 20 players. Upgrade to see all {" "}
-              <span className="text-[#F5C84C]">594 players</span> with ceiling, floor, and consistency metrics.
+              Free tier: top 20 players unlocked. Full rankings and premium metrics available with{" "}
+              <span className="text-[#F5C84C]">Neeko+</span>.
             </p>
           </div>
         )}
       </div>
 
-      {/* Table */}
+      {/* Filters */}
       <div className="px-4 pb-4 md:px-8">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 mr-1">
+            Position
+          </span>
+          {POSITIONS.map((pos) => (
+            <PositionPill
+              key={pos}
+              value={pos}
+              active={positionFilter === pos}
+              onClick={() => setPositionFilter(pos)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="px-4 pb-10 md:px-8">
         <div className="overflow-x-auto rounded-xl border border-white/5">
-          <table className="w-full min-w-[600px] border-collapse">
+          <table className="w-full min-w-[500px] border-collapse">
             <thead>
               <tr className="border-b border-white/5 bg-white/[0.02]">
                 <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 w-10">
@@ -322,22 +407,6 @@ export default function AFLRankingsPage() {
                   onSort={handleSort}
                 />
                 <SortTh
-                  label="Ceiling"
-                  sortKey="ceiling_estimate"
-                  currentKey={sortKey}
-                  dir={sortDir}
-                  onSort={handleSort}
-                  locked={!isPremium}
-                />
-                <SortTh
-                  label="Floor"
-                  sortKey="floor_estimate"
-                  currentKey={sortKey}
-                  dir={sortDir}
-                  onSort={handleSort}
-                  locked={!isPremium}
-                />
-                <SortTh
                   label="Consistency"
                   sortKey="consistency_score"
                   currentKey={sortKey}
@@ -350,112 +419,68 @@ export default function AFLRankingsPage() {
 
             <tbody>
               {loading
-                ? Array.from({ length: 10 }).map((_, i) => (
+                ? Array.from({ length: 12 }).map((_, i) => (
                     <tr key={i} className="border-b border-white/5">
-                      {Array.from({ length: 7 }).map((__, j) => (
+                      {Array.from({ length: 5 }).map((__, j) => (
                         <td key={j} className="px-3 py-3">
                           <div className="h-4 animate-pulse rounded bg-white/5" />
                         </td>
                       ))}
                     </tr>
                   ))
-                : sorted.map((row, idx) => (
-                    <tr
-                      key={row.player_id ?? row.player_name + idx}
-                      className="border-b border-white/[0.04] cursor-pointer hover:bg-white/5 transition-colors"
-                      onClick={() => setSelected(row)}
-                    >
-                      <td className="px-3 py-3 text-sm text-white/30 tabular-nums">
-                        {idx + 1}
-                      </td>
-                      <td className="px-3 py-3">
-                        <span className="text-sm font-medium text-white">
-                          {row.player_name}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3">
-                        <span className="text-xs text-white/50">{row.team}</span>
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        <span className="text-sm font-semibold text-[#F5C84C] tabular-nums">
-                          {fmt(row.projection_final)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        {isPremium ? (
-                          <span className="text-sm text-emerald-400 tabular-nums">
-                            {fmt(row.ceiling_estimate)}
-                          </span>
-                        ) : (
-                          <Lock size={12} className="ml-auto text-white/15" />
-                        )}
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        {isPremium ? (
-                          <span className="text-sm text-red-400 tabular-nums">
-                            {fmt(row.floor_estimate)}
-                          </span>
-                        ) : (
-                          <Lock size={12} className="ml-auto text-white/15" />
-                        )}
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        {isPremium ? (
-                          <span
-                            className={`text-sm tabular-nums ${consistencyColor(row.consistency_score)}`}
-                          >
-                            {row.consistency_score != null
-                              ? `${row.consistency_score}%`
-                              : "—"}
-                          </span>
-                        ) : (
-                          <Lock size={12} className="ml-auto text-white/15" />
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                : sorted.map((row, idx) => {
+                    const isLocked = !isPremium && idx >= FREE_UNLOCK_LIMIT;
+                    const badge = getConsistencyBadge(row.consistency_score);
+                    const showCta = !isPremium && idx === CTA_AFTER_ROW;
+
+                    return (
+                      <>
+                        {showCta && <UpgradeCTABanner key={`cta-${idx}`} />}
+                        <tr
+                          key={row.player_id ?? row.player_name + idx}
+                          className={`border-b border-white/[0.04] transition-colors ${
+                            isLocked
+                              ? "opacity-40 blur-[1px] pointer-events-none select-none"
+                              : "cursor-pointer hover:bg-white/5"
+                          }`}
+                          onClick={() => !isLocked && setSelected(row)}
+                        >
+                          <td className="px-3 py-3 text-sm text-white/30 tabular-nums">
+                            {idx + 1}
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className="text-sm font-medium text-white">
+                              {row.player_name}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className="text-xs text-white/50">{row.team}</span>
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            {isLocked ? (
+                              <Lock size={12} className="ml-auto text-white/20" />
+                            ) : (
+                              <span className="text-sm font-semibold text-[#F5C84C] tabular-nums">
+                                {fmt(row.projection_final)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            {!isPremium ? (
+                              <Lock size={12} className="ml-auto text-white/15" />
+                            ) : (
+                              <span className={`text-xs font-semibold ${badge.className}`}>
+                                {badge.label}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      </>
+                    );
+                  })}
             </tbody>
           </table>
         </div>
-
-        {/* Premium locked upsell */}
-        {!isPremium && !loading && (
-          <div className="relative mt-0 overflow-hidden rounded-b-xl border border-t-0 border-white/5">
-            {/* blurred ghost rows */}
-            <div className="pointer-events-none select-none">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-4 border-b border-white/[0.04] px-3 py-3 opacity-40 blur-sm"
-                >
-                  <span className="w-8 text-sm text-white/30">{21 + i}</span>
-                  <div className="h-4 w-32 rounded bg-white/10" />
-                  <div className="h-3 w-16 rounded bg-white/8" />
-                  <div className="ml-auto h-4 w-12 rounded bg-[#F5C84C]/20" />
-                </div>
-              ))}
-            </div>
-
-            {/* overlay */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-t from-[#070707] via-[#070707]/80 to-transparent px-6 py-8 text-center">
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full border border-[#F5C84C]/30 bg-[#F5C84C]/10">
-                <Crown size={18} className="text-[#F5C84C]" />
-              </div>
-              <h3 className="mb-1 text-base font-semibold text-white">
-                Unlock full player rankings with Neeko+
-              </h3>
-              <p className="mb-4 text-sm text-white/40">
-                See all 594 ranked players with ceiling, floor, consistency scores and AI analysis.
-              </p>
-              <a
-                href="/neeko-plus"
-                className="rounded-lg bg-[#F5C84C] px-6 py-2.5 text-sm font-bold text-black hover:bg-[#f0bd30] transition-colors"
-              >
-                Upgrade Now
-              </a>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Player detail modal */}
