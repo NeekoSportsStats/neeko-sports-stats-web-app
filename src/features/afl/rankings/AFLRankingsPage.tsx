@@ -49,7 +49,7 @@ type SortKey = "projection_final" | "consistency_score";
 type SortDir = "asc" | "desc";
 type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
 
-const FREE_UNLOCK_LIMIT = 20;
+const FREE_FULL_UNLOCK = 5;
 const CTA_AFTER_ROW = 50;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -365,7 +365,7 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
             {captains.map((c, idx) => {
               const style = getCaptainStyle(c.captain_rating);
-              const isBlurred = !isPremium && idx > 0;
+              const isBlurred = !isPremium && idx >= 2;
 
               return (
                 <div
@@ -417,10 +417,12 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
 
 function PlayerDetailModal({
   row,
+  rank,
   isPremium,
   onClose,
 }: {
   row: RankingRow;
+  rank: number;
   isPremium: boolean;
   onClose: () => void;
 }) {
@@ -457,6 +459,7 @@ function PlayerDetailModal({
     fetchDetail();
   }, [row.player_id]);
 
+  const unlocked = isPremium || rank <= FREE_FULL_UNLOCK;
   const consistencyBadge = getConsistencyBadge(detail?.consistency_score ?? null);
   const recStyle = getRecommendationStyle(detail?.ai_recommendation ?? null);
   const capStyle = getCaptainStyle(captainDetail?.captain_rating ?? null);
@@ -494,8 +497,8 @@ function PlayerDetailModal({
               <p className="text-sm text-white/50">{detail.team} {detail.position ? `· ${detail.position}` : ""}</p>
             </div>
 
-            {/* Captain Rating (premium) */}
-            {isPremium && captainDetail && (
+            {/* Captain Rating */}
+            {unlocked && captainDetail && (
               <div className={`rounded-lg border px-4 py-3 ${capStyle.bg} ${capStyle.border}`}>
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Captain Rating</p>
                 <div className="flex items-center justify-between">
@@ -512,8 +515,8 @@ function PlayerDetailModal({
               </div>
             )}
 
-            {/* AI Recommendation Banner (premium) */}
-            {isPremium && detail.ai_recommendation && (
+            {/* AI Recommendation Banner */}
+            {unlocked && detail.ai_recommendation && (
               <div className={`rounded-lg border px-4 py-3 ${recStyle.bg} ${recStyle.border}`}>
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">AI Recommendation</p>
                 <p className={`text-base font-bold ${recStyle.text}`}>{detail.ai_recommendation}</p>
@@ -526,7 +529,7 @@ function PlayerDetailModal({
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Projection</p>
                 <p className="text-lg font-bold text-[#F5C84C]">{fmt(detail.projection_final)}</p>
               </div>
-              {isPremium ? (
+              {unlocked ? (
                 <>
                   <div className="rounded-lg bg-white/5 px-3 py-3">
                     <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Ceiling</p>
@@ -547,8 +550,8 @@ function PlayerDetailModal({
               )}
             </div>
 
-            {/* Consistency Range Bar (premium) */}
-            {isPremium && (
+            {/* Consistency Range Bar */}
+            {unlocked && (
               <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-3">
                 <ConsistencyRangeBar
                   floor={detail.floor_estimate ?? null}
@@ -558,8 +561,8 @@ function PlayerDetailModal({
               </div>
             )}
 
-            {/* Premium Decision Grid */}
-            {isPremium ? (
+            {/* Decision Grid */}
+            {unlocked ? (
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg bg-white/5 px-3 py-3">
                   <MetricLabel label="Form" tooltip="Measures recent scoring strength over the last 3 rounds vs season average" />
@@ -599,14 +602,15 @@ function PlayerDetailModal({
                 </div>
               </div>
             ) : (
-              <div className="rounded-lg border border-[#F5C84C]/20 bg-[#F5C84C]/5 px-4 py-4 text-center">
-                <Crown size={14} className="mx-auto mb-1 text-[#F5C84C]" />
-                <p className="text-xs text-[#F5C84C]/80 mb-3">
-                  Unlock Captain Rating, Form, Matchup, Upside & AI Recommendation
+              <div className="rounded-lg border border-[#F5C84C]/20 bg-[#F5C84C]/5 px-4 py-5 text-center">
+                <Crown size={16} className="mx-auto mb-2 text-[#F5C84C]" />
+                <p className="text-sm font-semibold text-white mb-1">Upgrade to Neeko+</p>
+                <p className="text-xs text-white/40 mb-4">
+                  Unlock Captain Rating, Form, Matchup, Upside, Risk & AI Recommendation for every player.
                 </p>
                 <a
                   href="/neeko-plus"
-                  className="inline-block rounded-md bg-[#F5C84C] px-4 py-1.5 text-xs font-semibold text-black hover:bg-[#f0bd30] transition-colors"
+                  className="inline-block rounded-md bg-[#F5C84C] px-5 py-2 text-xs font-bold text-black hover:bg-[#f0bd30] transition-colors"
                 >
                   Upgrade to Neeko+
                 </a>
@@ -614,29 +618,42 @@ function PlayerDetailModal({
             )}
 
             {/* Score History Chart */}
-            {isPremium && (
+            {unlocked && (
               <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-3">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-3">Score History — 2025</p>
                 <ScoreHistoryChart playerName={detail.player_name} />
               </div>
             )}
 
-            {/* AI Insight Section */}
-            {isPremium && (
-              <div className="rounded-lg border border-[#F5C84C]/15 bg-[#F5C84C]/[0.04] px-4 py-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-[#F5C84C]" />
-                  <p className="text-[10px] text-[#F5C84C]/70 uppercase tracking-wider font-semibold">AI Insight</p>
-                </div>
-                {aiAnalysis?.analysis ? (
+            {/* AI Insight Section — always shown, locked state for non-unlocked */}
+            <div className={`rounded-lg border px-4 py-4 ${unlocked ? "border-[#F5C84C]/15 bg-[#F5C84C]/[0.04]" : "border-[#111] bg-[#111]"}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className={`h-1.5 w-1.5 rounded-full ${unlocked ? "bg-[#F5C84C]" : "bg-white/20"}`} />
+                <p className={`text-[10px] uppercase tracking-wider font-semibold ${unlocked ? "text-[#F5C84C]/70" : "text-white/30"}`}>
+                  AI Analysis
+                </p>
+                {!unlocked && <Lock size={11} className="text-[#F5C84C]/50 ml-auto" />}
+              </div>
+              {unlocked ? (
+                aiAnalysis?.analysis ? (
                   <p className="text-sm text-white/70 leading-relaxed italic">{aiAnalysis.analysis}</p>
                 ) : (
-                  <p className="text-sm text-white/25 italic">AI analysis not yet generated for this player.</p>
-                )}
-              </div>
-            )}
+                  <p className="text-sm text-white/30 italic leading-relaxed">
+                    AI analysis not yet generated.
+                    <br />
+                    This player will be analysed before the next round.
+                  </p>
+                )
+              ) : (
+                <p className="text-sm text-white/25 italic leading-relaxed">
+                  AI analysis not yet generated.
+                  <br />
+                  This player will be analysed before the next round.
+                </p>
+              )}
+            </div>
 
-            {isPremium && aiAnalysis?.captain_recommendation && (
+            {unlocked && aiAnalysis?.captain_recommendation && (
               <div className="rounded-lg border border-white/5 bg-white/[0.03] px-4 py-3">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-2">Captain Verdict</p>
                 <p className="text-sm text-white/70 leading-relaxed italic">{aiAnalysis.captain_recommendation}</p>
@@ -746,7 +763,7 @@ export default function AFLRankingsPage() {
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("projection_final");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [selected, setSelected] = useState<RankingRow | null>(null);
+  const [selected, setSelected] = useState<(RankingRow & { _rank: number }) | null>(null);
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
 
   useEffect(() => {
@@ -783,7 +800,6 @@ export default function AFLRankingsPage() {
   }, [isPremium]);
 
   function handleSort(key: SortKey) {
-    if (!isPremium && key !== "projection_final") return;
     if (key === sortKey) {
       setSortDir((d) => (d === "desc" ? "asc" : "desc"));
     } else {
@@ -860,12 +876,12 @@ export default function AFLRankingsPage() {
                 <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40">Player</th>
                 <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40">Team</th>
                 <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
-                <PlainTh label="Captain" locked={!isPremium} />
+                <PlainTh label="Captain" />
                 <PlainTh label="Form" locked={!isPremium} />
                 <PlainTh label="Matchup" locked={!isPremium} />
                 <PlainTh label="Upside" locked={!isPremium} />
                 <PlainTh label="Confidence" locked={!isPremium} />
-                <SortTh label="Consistency" sortKey="consistency_score" currentKey={sortKey} dir={sortDir} onSort={handleSort} locked={!isPremium} />
+                <SortTh label="Consistency" sortKey="consistency_score" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
                 <PlainTh label="Recommendation" locked={!isPremium} />
               </tr>
             </thead>
@@ -881,7 +897,9 @@ export default function AFLRankingsPage() {
                     </tr>
                   ))
                 : sorted.map((row, idx) => {
-                    const isLocked = !isPremium && idx >= FREE_UNLOCK_LIMIT;
+                    const rank = idx + 1;
+                    const isTopFive = idx < FREE_FULL_UNLOCK;
+                    const metricsUnlocked = isPremium || isTopFive;
                     const consistencyBadge = getConsistencyBadge(row.consistency_score);
                     const recStyle = getRecommendationStyle(row.ai_recommendation);
                     const capStyle = getCaptainStyle(row.captain_rating);
@@ -892,37 +910,32 @@ export default function AFLRankingsPage() {
                         {showCta && <UpgradeCTABanner key={`cta-${idx}`} />}
                         <tr
                           key={row.player_id ?? row.player_name + idx}
-                          className={`border-b border-white/[0.04] transition-colors ${
-                            isLocked
-                              ? "opacity-40 blur-[1px] pointer-events-none select-none"
-                              : "cursor-pointer hover:bg-white/5"
-                          }`}
-                          onClick={() => !isLocked && setSelected(row)}
+                          className="border-b border-white/[0.04] transition-colors cursor-pointer hover:bg-white/5"
+                          onClick={() => setSelected({ ...row, _rank: rank } as RankingRow & { _rank: number })}
                         >
-                          <td className="px-3 py-3 text-sm text-white/30 tabular-nums">{idx + 1}</td>
+                          <td className="px-3 py-3 text-sm text-white/30 tabular-nums">{rank}</td>
                           <td className="px-3 py-3">
-                            <span className="text-sm font-medium text-white">{row.player_name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-white">{row.player_name}</span>
+                              {isTopFive && !isPremium && (
+                                <span className="rounded-sm bg-[#F5C84C]/15 px-1 py-0.5 text-[9px] font-semibold text-[#F5C84C] uppercase tracking-wide">Free</span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-3 py-3">
                             <span className="text-xs text-white/50">{row.team}</span>
                           </td>
 
-                          {/* Projection */}
+                          {/* Projection — always visible */}
                           <td className="px-3 py-3 text-right">
-                            {isLocked ? (
-                              <Lock size={12} className="ml-auto text-white/20" />
-                            ) : (
-                              <span className="text-sm font-semibold text-[#F5C84C] tabular-nums">
-                                {fmt(row.projection_final)}
-                              </span>
-                            )}
+                            <span className="text-sm font-semibold text-[#F5C84C] tabular-nums">
+                              {fmt(row.projection_final)}
+                            </span>
                           </td>
 
-                          {/* Captain */}
+                          {/* Captain label always visible; score locked */}
                           <td className="px-3 py-3 text-right">
-                            {!isPremium ? (
-                              <LockedCell />
-                            ) : row.captain_rating ? (
+                            {row.captain_rating ? (
                               <span
                                 className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${capStyle.text} ${capStyle.bg} ${capStyle.border}`}
                               >
@@ -935,46 +948,44 @@ export default function AFLRankingsPage() {
 
                           {/* Form */}
                           <td className="px-3 py-3 text-right">
-                            {!isPremium ? <LockedCell /> : (
+                            {!metricsUnlocked ? <LockedCell /> : (
                               <PremiumBadge label={row.form_rating != null ? fmtInt(row.form_rating) : "—"} colorClass={getFormColor(row.form_rating)} />
                             )}
                           </td>
 
                           {/* Matchup */}
                           <td className="px-3 py-3 text-right">
-                            {!isPremium ? <LockedCell /> : (
+                            {!metricsUnlocked ? <LockedCell /> : (
                               <PremiumBadge label={row.matchup_rating != null ? fmtInt(row.matchup_rating) : "—"} colorClass={getMatchupColor(row.matchup_rating)} />
                             )}
                           </td>
 
                           {/* Upside */}
                           <td className="px-3 py-3 text-right">
-                            {!isPremium ? <LockedCell /> : (
+                            {!metricsUnlocked ? <LockedCell /> : (
                               <PremiumBadge label={row.upside_rating != null ? `+${fmtInt(row.upside_rating)}%` : "—"} colorClass={getUpsideColor(row.upside_rating)} />
                             )}
                           </td>
 
                           {/* Confidence */}
                           <td className="px-3 py-3 text-right">
-                            {!isPremium ? <LockedCell /> : (
+                            {!metricsUnlocked ? <LockedCell /> : (
                               <span className={`text-xs font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence)}`}>
                                 {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
                               </span>
                             )}
                           </td>
 
-                          {/* Consistency */}
+                          {/* Consistency — always visible */}
                           <td className="px-3 py-3 text-right">
-                            {!isPremium ? <LockedCell /> : (
-                              <span className={`text-xs font-semibold ${consistencyBadge.className}`}>
-                                {consistencyBadge.label}
-                              </span>
-                            )}
+                            <span className={`text-xs font-semibold ${consistencyBadge.className}`}>
+                              {consistencyBadge.label}
+                            </span>
                           </td>
 
                           {/* Recommendation */}
                           <td className="px-3 py-3 text-right">
-                            {!isPremium ? <LockedCell /> : (
+                            {!metricsUnlocked ? <LockedCell /> : (
                               <span
                                 className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${recStyle.text} ${recStyle.bg} ${recStyle.border}`}
                               >
@@ -994,6 +1005,7 @@ export default function AFLRankingsPage() {
       {selected && (
         <PlayerDetailModal
           row={selected}
+          rank={selected._rank}
           isPremium={isPremium}
           onClose={() => setSelected(null)}
         />
