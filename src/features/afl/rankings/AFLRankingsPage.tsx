@@ -9,6 +9,7 @@ interface RankingRow {
   player_id: string | null;
   player_name: string;
   team: string;
+  position: string | null;
   projection_final: number | null;
   ceiling_estimate: number | null;
   floor_estimate: number | null;
@@ -549,7 +550,7 @@ export default function AFLRankingsPage() {
       const view = isPremium ? "v_rankings_premium" : "v_rankings_free";
       const { data } = await supabase
         .from(view)
-        .select("*")
+        .select("player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, trend_3_vs_10, matchup_delta, consistency_score, form_rating, matchup_rating, upside_rating, risk_rating, projection_confidence, ai_recommendation, captain_rating, captain_score")
         .order("projection_final", { ascending: false });
 
       const base = (data as RankingRow[]) ?? [];
@@ -589,7 +590,9 @@ export default function AFLRankingsPage() {
     }
   }
 
-  const sorted = [...rows].sort((a, b) => {
+  const filtered = positionFilter === "ALL" ? rows : rows.filter((r) => r.position === positionFilter);
+
+  const sorted = [...filtered].sort((a, b) => {
     const av = (a[sortKey] as number | null) ?? -Infinity;
     const bv = (b[sortKey] as number | null) ?? -Infinity;
     return sortDir === "desc" ? bv - av : av - bv;
