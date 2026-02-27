@@ -50,9 +50,8 @@ type SortKey = "projection_final" | "consistency_score";
 type SortDir = "asc" | "desc";
 type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
 
-const FREE_LIMIT_ALL = 5;
-const FREE_LIMIT_POSITION = 3;
-const FREE_VISIBLE = 20;
+const FREE_UNLOCKED_ALL = 5;
+const FREE_UNLOCKED_POSITION = 3;
 
 const POSITION_MAP: Record<string, PositionFilter> = {
   DEF: "DEF", DEFENDER: "DEF",
@@ -823,32 +822,10 @@ export default function AFLRankingsPage() {
   const [positionCounts, setPositionCounts] = useState<PositionCount[]>([]);
 
   useEffect(() => {
-    async function fetchTotalCounts() {
-      const { data: totalData } = await supabase
-        .from("v_rankings_premium")
-        .select("position", { count: "exact", head: false });
-
-      if (totalData) {
-        setTotalCount(totalData.length);
-        const counts: Record<string, number> = {};
-        for (const row of totalData) {
-          const pos = normalisePosition(row.position) ?? "OTHER";
-          counts[pos] = (counts[pos] ?? 0) + 1;
-        }
-        setPositionCounts(
-          Object.entries(counts).map(([position, count]) => ({ position, count }))
-        );
-      }
-    }
-    fetchTotalCounts();
-  }, []);
-
-  useEffect(() => {
     async function fetchRankings() {
       setLoading(true);
-      const view = isPremium ? "v_rankings_premium" : "v_rankings_free";
       const { data } = await supabase
-        .from(view)
+        .from("v_rankings_master")
         .select(`
           player_id,
           player_name,
@@ -873,12 +850,23 @@ export default function AFLRankingsPage() {
         ...r,
         position: normalisePosition(r.position),
       }));
+
       setRows(normalized);
+      setTotalCount(normalized.length);
+
+      const counts: Record<string, number> = {};
+      for (const row of normalized) {
+        const pos = normalisePosition(row.position) ?? "OTHER";
+        counts[pos] = (counts[pos] ?? 0) + 1;
+      }
+      setPositionCounts(
+        Object.entries(counts).map(([position, count]) => ({ position, count }))
+      );
 
       setLoading(false);
     }
     fetchRankings();
-  }, [isPremium]);
+  }, []);
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -899,12 +887,9 @@ export default function AFLRankingsPage() {
     return sortDir === "desc" ? bv - av : av - bv;
   });
 
-  const freeLimit = positionFilter === "ALL" ? FREE_LIMIT_ALL : FREE_LIMIT_POSITION;
-  const visibleRows = isPremium ? sorted : sorted.slice(0, FREE_VISIBLE);
-  const totalForFilter = positionFilter === "ALL"
-    ? totalCount
-    : (positionCounts.find((p) => p.position === positionFilter)?.count ?? sorted.length);
-  const lockedCount = isPremium ? 0 : Math.max(0, totalForFilter - freeLimit);
+  const freeUnlocked = positionFilter === "ALL" ? FREE_UNLOCKED_ALL : FREE_UNLOCKED_POSITION;
+  const visibleRows = isPremium ? sorted : sorted;
+  const lockedCount = isPremium ? 0 : Math.max(0, sorted.length - freeUnlocked);
 
   const TOTAL_COLS = 11;
 
@@ -988,7 +973,7 @@ export default function AFLRankingsPage() {
                   ))
                 : visibleRows.map((row, idx) => {
                     const rank = idx + 1;
-                    const isLocked = !isPremium && idx >= freeLimit;
+                    const isLocked = !isPremium && idx >= freeUnlocked;
                     const metricsUnlocked = !isLocked;
                     const consistencyBadge = getConsistencyBadge(row.consistency_score);
                     const recStyle = getRecommendationStyle(row.ai_recommendation);
