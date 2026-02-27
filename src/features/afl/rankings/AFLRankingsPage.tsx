@@ -21,6 +21,7 @@ interface RankingRow {
   risk_rating?: string | null;
   projection_confidence?: number | null;
   ai_recommendation?: string | null;
+  ai_analysis?: string | null;
   captain_rating?: string | null;
   captain_score?: number | null;
   total_count?: number | null;
@@ -647,8 +648,10 @@ function PlayerDetailModal({
                 {!unlocked && <Lock size={11} className="text-[#F5C84C]/50 ml-auto" />}
               </div>
               {unlocked ? (
-                aiAnalysis?.analysis ? (
-                  <p className="text-sm text-white/70 leading-relaxed italic">{aiAnalysis.analysis}</p>
+                (detail?.ai_analysis || aiAnalysis?.analysis) ? (
+                  <p className="text-sm text-white/70 leading-relaxed italic">
+                    {detail?.ai_analysis ?? aiAnalysis?.analysis}
+                  </p>
                 ) : (
                   <p className="text-sm text-white/30 italic leading-relaxed">
                     AI analysis not yet generated.
@@ -819,7 +822,8 @@ export default function AFLRankingsPage() {
             projection_confidence,
             captain_rating,
             captain_score,
-            ai_recommendation
+            ai_recommendation,
+            ai_analysis
           `)
           .order("projection_final", { ascending: false });
 
