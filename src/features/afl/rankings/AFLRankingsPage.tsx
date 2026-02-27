@@ -23,6 +23,7 @@ interface RankingRow {
   ai_recommendation?: string | null;
   captain_rating?: string | null;
   captain_score?: number | null;
+  total_count?: number | null;
 }
 
 interface PlayerDetail extends RankingRow {
@@ -41,17 +42,19 @@ interface CaptainRow {
 }
 
 interface ScoreHistoryPoint {
-  game_rank: number;
-  round_number: number | null;
+  game_index: number;
+  round_label: string;
+  round_number: number;
   fantasy_points: number | null;
+  season: number;
 }
 
 type SortKey = "projection_final" | "consistency_score";
 type SortDir = "asc" | "desc";
 type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
 
-const FREE_UNLOCKED_ALL = 5;
-const FREE_UNLOCKED_POSITION = 3;
+const FREE_ROW_LIMIT = 20;
+const FREE_UNLOCKED_METRICS = 5;
 
 const POSITION_MAP: Record<string, PositionFilter> = {
   DEF: "DEF", DEFENDER: "DEF",
@@ -64,15 +67,6 @@ function normalisePosition(raw: string | null): PositionFilter | null {
   if (!raw) return null;
   const key = raw.trim().toUpperCase();
   return POSITION_MAP[key] ?? null;
-}
-
-function roundLabel(roundNumber: number | null): string {
-  if (roundNumber == null) return "?";
-  if (roundNumber === 25) return "FW1";
-  if (roundNumber === 26) return "SF";
-  if (roundNumber === 27) return "PF";
-  if (roundNumber === 28) return "GF";
-  return `R${roundNumber}`;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -170,8 +164,8 @@ function getCaptainStyle(rating: string | null): { text: string; bg: string; bor
 
 function LockedCell() {
   return (
-    <div className="flex justify-end items-center w-full">
-      <Lock size={14} className="text-white/20" />
+    <div className="flex justify-center items-center w-full h-full">
+      <Lock size={13} className="text-white/20" />
     </div>
   );
 }
@@ -235,12 +229,10 @@ function ScoreHistoryChart({ playerName }: { playerName: string }) {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const { data: rows } = await supabase
-        .from("v_player_score_history_last10")
-        .select("game_rank, round_number, fantasy_points")
-        .eq("player", playerName)
-        .lte("game_rank", 10)
-        .order("game_rank", { ascending: true });
+      const { data: rows } = await supabase.rpc("get_player_score_history", {
+        player_name_in: playerName,
+        n_games: 10,
+      });
       setData((rows as ScoreHistoryPoint[]) ?? []);
       setLoading(false);
     }
@@ -268,11 +260,10 @@ function ScoreHistoryChart({ playerName }: { playerName: string }) {
     <ResponsiveContainer width="100%" height={180}>
       <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
         <XAxis
-          dataKey="round_number"
+          dataKey="round_label"
           tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={(v) => roundLabel(v)}
         />
         <YAxis
           domain={[minVal - padding, maxVal + padding]}
@@ -290,7 +281,6 @@ function ScoreHistoryChart({ playerName }: { playerName: string }) {
           }}
           labelStyle={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}
           itemStyle={{ color: "#F5C84C", fontSize: 12, fontWeight: 600 }}
-          labelFormatter={(v) => roundLabel(v)}
           formatter={(v: number) => [Math.round(v), "Score"]}
         />
         <Line
@@ -596,25 +586,25 @@ function PlayerDetailModal({
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg bg-white/5 px-3 py-3">
                   <MetricLabel label="Form" tooltip="Measures recent scoring strength over the last 3 rounds vs season average" />
-                  <p className={`text-sm font-semibold ${getFormColor(detail.form_rating)}`}>
+                  <p className={`text-sm font-semibold ${getFormColor(detail.form_rating ?? null)}`}>
                     {detail.form_rating != null ? fmtInt(detail.form_rating) : "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
                   <MetricLabel label="Matchup" tooltip="Measures opponent difficulty — higher means an easier matchup" />
-                  <p className={`text-sm font-semibold ${getMatchupColor(detail.matchup_rating)}`}>
+                  <p className={`text-sm font-semibold ${getMatchupColor(detail.matchup_rating ?? null)}`}>
                     {detail.matchup_rating != null ? fmtInt(detail.matchup_rating) : "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
                   <MetricLabel label="Upside" tooltip="Potential to significantly exceed projection based on ceiling gap" />
-                  <p className={`text-sm font-semibold ${getUpsideColor(detail.upside_rating)}`}>
+                  <p className={`text-sm font-semibold ${getUpsideColor(detail.upside_rating ?? null)}`}>
                     {detail.upside_rating != null ? `+${fmtInt(detail.upside_rating)}%` : "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
                   <MetricLabel label="Risk" tooltip="Chance of underperforming — lower is safer" />
-                  <p className={`text-sm font-semibold ${getRiskColor(detail.risk_rating)}`}>
+                  <p className={`text-sm font-semibold ${getRiskColor(detail.risk_rating ?? null)}`}>
                     {detail.risk_rating != null ? `${fmtInt(detail.risk_rating)}%` : "—"}
                   </p>
                 </div>
@@ -626,7 +616,7 @@ function PlayerDetailModal({
                 </div>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
                   <MetricLabel label="Confidence" tooltip="AI certainty level in this projection — based on data volume and model agreement" />
-                  <p className={`text-sm font-semibold ${getConfidenceColor(detail.projection_confidence)}`}>
+                  <p className={`text-sm font-semibold ${getConfidenceColor(detail.projection_confidence ?? null)}`}>
                     {detail.projection_confidence != null ? `${fmtInt(detail.projection_confidence)}%` : "—"}
                   </p>
                 </div>
@@ -647,7 +637,7 @@ function PlayerDetailModal({
               </div>
             )}
 
-            {/* AI Insight Section — always shown, locked state for non-unlocked */}
+            {/* AI Insight Section */}
             <div className={`rounded-lg border px-4 py-4 ${unlocked ? "border-[#F5C84C]/15 bg-[#F5C84C]/[0.04]" : "border-[#111] bg-[#111]"}`}>
               <div className="flex items-center gap-2 mb-2">
                 <div className={`h-1.5 w-1.5 rounded-full ${unlocked ? "bg-[#F5C84C]" : "bg-white/20"}`} />
@@ -682,7 +672,7 @@ function PlayerDetailModal({
               </div>
             )}
 
-            {/* Score History Chart — below AI Analysis */}
+            {/* Score History Chart */}
             {unlocked && (
               <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-4">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-3">Last 10 Games</p>
@@ -698,7 +688,7 @@ function PlayerDetailModal({
 
 // ─── Sort / filter header helpers ─────────────────────────────────────────────
 
-const TH_STICKY = "bg-[#070707]";
+const TH_BASE = "bg-[#0a0a0a] px-3 py-3 text-[11px] font-medium uppercase tracking-wider whitespace-nowrap border-b border-white/10";
 
 function SortTh({
   label,
@@ -718,7 +708,7 @@ function SortTh({
   const active = currentKey === sortKey;
   return (
     <th
-      className={`${TH_STICKY} px-3 py-3 text-right text-[11px] font-medium uppercase tracking-wider select-none whitespace-nowrap transition-colors border-b border-white/10 ${
+      className={`${TH_BASE} text-right select-none transition-colors ${
         locked ? "text-white/20 cursor-default" : "text-white/40 cursor-pointer hover:text-white/70"
       }`}
       onClick={() => !locked && onSort(sortKey)}
@@ -734,7 +724,7 @@ function SortTh({
 
 function PlainTh({ label, locked }: { label: string; locked?: boolean }) {
   return (
-    <th className={`${TH_STICKY} px-3 py-3 text-right text-[11px] font-medium uppercase tracking-wider text-white/20 whitespace-nowrap border-b border-white/10`}>
+    <th className={`${TH_BASE} text-right text-white/20`}>
       <span className="inline-flex items-center gap-1 justify-end">
         {locked && <Lock size={10} className="text-[#F5C84C]" />}
         {label}
@@ -762,41 +752,27 @@ function PositionPill({ value, active, onClick }: { value: PositionFilter; activ
 
 // ─── Upgrade CTA ──────────────────────────────────────────────────────────────
 
-interface PositionCount {
-  position: string;
-  count: number;
-}
-
-function UpgradeCTABanner({ lockedCount, positionCounts }: { lockedCount: number; positionCounts: PositionCount[] }) {
-  const POSITION_ORDER: PositionFilter[] = ["MID", "DEF", "FWD", "RUC"];
+function UpgradeCTABanner({
+  totalCount,
+  positionFilter,
+}: {
+  totalCount: number;
+  positionFilter: PositionFilter;
+}) {
+  const label =
+    positionFilter === "ALL"
+      ? `Unlock all ${totalCount} players with Neeko+`
+      : `Unlock all ${totalCount} ${positionFilter} players with Neeko+`;
 
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-b-xl border-t border-[#F5C84C]/10 bg-[#F5C84C]/5 px-6 py-10 text-center">
       <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#F5C84C]/30 bg-[#F5C84C]/10">
         <Crown size={18} className="text-[#F5C84C]" />
       </div>
-      <h3 className="text-base font-semibold text-white">
-        {lockedCount > 0
-          ? `Unlock ${lockedCount} more player insights with Neeko+`
-          : "Unlock full rankings with Neeko+"}
-      </h3>
+      <h3 className="text-base font-semibold text-white">{label}</h3>
       <p className="text-sm text-white/40 max-w-xs">
         Captain Rating, Form, Matchup, Upside & AI Recommendations for every player.
       </p>
-      {positionCounts.length > 0 && (
-        <div className="flex items-center gap-3 flex-wrap justify-center mt-1">
-          {POSITION_ORDER.map((pos) => {
-            const entry = positionCounts.find((p) => p.position === pos);
-            if (!entry) return null;
-            return (
-              <div key={pos} className="flex items-center gap-1.5">
-                <span className="rounded px-1.5 py-0.5 text-[10px] font-bold bg-white/5 text-white/40 uppercase tracking-wider">{pos}</span>
-                <span className="text-xs font-semibold text-white/60 tabular-nums">{entry.count}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
       <a
         href="/neeko-plus"
         className="mt-1 rounded-lg bg-[#F5C84C] px-6 py-2.5 text-sm font-bold text-black hover:bg-[#f0bd30] transition-colors"
@@ -819,54 +795,57 @@ export default function AFLRankingsPage() {
   const [selected, setSelected] = useState<(RankingRow & { _rank: number; _unlocked: boolean }) | null>(null);
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
   const [totalCount, setTotalCount] = useState<number>(0);
-  const [positionCounts, setPositionCounts] = useState<PositionCount[]>([]);
 
   useEffect(() => {
     async function fetchRankings() {
       setLoading(true);
-      const { data } = await supabase
-        .from("v_rankings_master")
-        .select(`
-          player_id,
-          player_name,
-          team,
-          position,
-          projection_final,
-          ceiling_estimate,
-          floor_estimate,
-          consistency_score,
-          form_rating,
-          matchup_rating,
-          upside_rating,
-          risk_rating,
-          projection_confidence,
-          captain_rating,
-          captain_score,
-          ai_recommendation
-        `)
-        .order("projection_final", { ascending: false });
 
-      const normalized = ((data as RankingRow[]) ?? []).map((r) => ({
-        ...r,
-        position: normalisePosition(r.position),
-      }));
+      if (isPremium) {
+        const { data } = await supabase
+          .from("v_rankings_master")
+          .select(`
+            player_id,
+            player_name,
+            team,
+            position,
+            projection_final,
+            ceiling_estimate,
+            floor_estimate,
+            consistency_score,
+            form_rating,
+            matchup_rating,
+            upside_rating,
+            risk_rating,
+            projection_confidence,
+            captain_rating,
+            captain_score,
+            ai_recommendation
+          `)
+          .order("projection_final", { ascending: false });
 
-      setRows(normalized);
-      setTotalCount(normalized.length);
-
-      const counts: Record<string, number> = {};
-      for (const row of normalized) {
-        const pos = normalisePosition(row.position) ?? "OTHER";
-        counts[pos] = (counts[pos] ?? 0) + 1;
+        const normalized = ((data as RankingRow[]) ?? []).map((r) => ({
+          ...r,
+          position: normalisePosition(r.position),
+        }));
+        setRows(normalized);
+        setTotalCount(normalized.length);
+      } else {
+        const { data } = await supabase.rpc("get_rankings_free", {
+          position_filter: positionFilter === "ALL" ? null : positionFilter,
+          limit_n: FREE_ROW_LIMIT,
+        });
+        const normalized = ((data as RankingRow[]) ?? []).map((r) => ({
+          ...r,
+          position: normalisePosition(r.position),
+        }));
+        setRows(normalized);
+        setTotalCount(normalized.length > 0 ? Number((normalized[0] as RankingRow).total_count ?? 0) : 0);
       }
-      setPositionCounts(
-        Object.entries(counts).map(([position, count]) => ({ position, count }))
-      );
 
       setLoading(false);
     }
     fetchRankings();
-  }, []);
+  }, [isPremium, positionFilter]);
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -877,7 +856,9 @@ export default function AFLRankingsPage() {
     }
   }
 
-  const filtered = positionFilter === "ALL"
+  const filtered = !isPremium
+    ? rows
+    : positionFilter === "ALL"
     ? rows
     : rows.filter((r) => r.position === positionFilter);
 
@@ -887,9 +868,7 @@ export default function AFLRankingsPage() {
     return sortDir === "desc" ? bv - av : av - bv;
   });
 
-  const freeUnlocked = positionFilter === "ALL" ? FREE_UNLOCKED_ALL : FREE_UNLOCKED_POSITION;
-  const visibleRows = isPremium ? sorted : sorted;
-  const lockedCount = isPremium ? 0 : Math.max(0, sorted.length - freeUnlocked);
+  const visibleRows = isPremium ? sorted : sorted.slice(0, FREE_ROW_LIMIT);
 
   const TOTAL_COLS = 11;
 
@@ -916,7 +895,7 @@ export default function AFLRankingsPage() {
         {!isPremium && (
           <div className="mt-4 rounded-lg border border-white/5 bg-white/[0.03] px-4 py-3">
             <p className="text-xs text-white/40">
-              Free tier: top 20 players unlocked. Captain Rating, Form, Matchup, Upside & AI analysis available with{" "}
+              Free tier: top 20 players shown per position. Captain Rating, Form, Matchup, Upside & AI analysis available with{" "}
               <span className="text-[#F5C84C]">Neeko+</span>.
             </p>
           </div>
@@ -926,30 +905,35 @@ export default function AFLRankingsPage() {
       {/* Captain Recommendations */}
       <CaptainSection isPremium={isPremium} />
 
-      {/* Position Filters */}
-      <div className="px-4 pb-4 md:px-8">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 mr-1">Position</span>
-          {POSITIONS.map((pos) => (
-            <PositionPill
-              key={pos}
-              value={pos}
-              active={positionFilter === pos}
-              onClick={() => setPositionFilter(pos)}
-            />
-          ))}
-        </div>
-      </div>
-
       {/* Rankings Table */}
       <div className="px-4 pb-10 md:px-8">
         <div className="overflow-x-auto rounded-xl border border-white/5">
           <table className="w-full min-w-[1000px] border-collapse">
-            <thead className="sticky top-0 z-50 bg-[#070707] border-b border-[#1a1a1a]">
+            <thead className="sticky top-0 z-30 bg-[#0a0a0a]">
+              {/* Position filter row — sticky tier 1 */}
               <tr>
-                <th className={`${TH_STICKY} px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 w-10 border-b border-white/10`}>#</th>
-                <th className={`${TH_STICKY} px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 border-b border-white/10`}>Player</th>
-                <th className={`${TH_STICKY} px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 border-b border-white/10`}>Team</th>
+                <td
+                  colSpan={TOTAL_COLS}
+                  className="bg-[#0a0a0a] px-3 py-2 border-b border-white/5"
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 mr-1">Position</span>
+                    {POSITIONS.map((pos) => (
+                      <PositionPill
+                        key={pos}
+                        value={pos}
+                        active={positionFilter === pos}
+                        onClick={() => setPositionFilter(pos)}
+                      />
+                    ))}
+                  </div>
+                </td>
+              </tr>
+              {/* Column header row — sticky tier 2 */}
+              <tr>
+                <th className={`${TH_BASE} text-left text-white/40 w-10`}>#</th>
+                <th className={`${TH_BASE} text-left text-white/40`}>Player</th>
+                <th className={`${TH_BASE} text-left text-white/40`}>Team</th>
                 <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
                 <PlainTh label="Captain" locked={!isPremium} />
                 <PlainTh label="Form" locked={!isPremium} />
@@ -973,108 +957,111 @@ export default function AFLRankingsPage() {
                   ))
                 : visibleRows.map((row, idx) => {
                     const rank = idx + 1;
-                    const isLocked = !isPremium && idx >= freeUnlocked;
+                    const isLocked = !isPremium && idx >= FREE_UNLOCKED_METRICS;
                     const metricsUnlocked = !isLocked;
                     const consistencyBadge = getConsistencyBadge(row.consistency_score);
-                    const recStyle = getRecommendationStyle(row.ai_recommendation);
-                    const capStyle = getCaptainStyle(row.captain_rating);
+                    const recStyle = getRecommendationStyle(row.ai_recommendation ?? null);
+                    const capStyle = getCaptainStyle(row.captain_rating ?? null);
 
                     return (
                       <tr
-                          key={row.player_id ?? row.player_name + idx}
-                          className="border-b border-white/[0.04] transition-colors cursor-pointer hover:bg-white/5"
-                          onClick={() => setSelected({ ...row, _rank: rank, _unlocked: !isLocked } as RankingRow & { _rank: number; _unlocked: boolean })}
-                        >
-                          <td className="px-3 py-3 text-sm text-white/30 tabular-nums">{rank}</td>
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-white">{row.player_name}</span>
-                              {!isPremium && !isLocked && (
-                                <span className="rounded-sm bg-[#F5C84C]/15 px-1 py-0.5 text-[9px] font-semibold text-[#F5C84C] uppercase tracking-wide">Free</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-3 py-3">
-                            <span className="text-xs text-white/50">{row.team}</span>
-                          </td>
+                        key={row.player_id ?? row.player_name + idx}
+                        className="border-b border-white/[0.04] transition-colors cursor-pointer hover:bg-white/5"
+                        onClick={() => setSelected({ ...row, _rank: rank, _unlocked: !isLocked } as RankingRow & { _rank: number; _unlocked: boolean })}
+                      >
+                        <td className="px-3 py-3 text-sm text-white/30 tabular-nums">{rank}</td>
+                        <td className="px-3 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-white">{row.player_name}</span>
+                            {!isPremium && !isLocked && (
+                              <span className="rounded-sm bg-[#F5C84C]/15 px-1 py-0.5 text-[9px] font-semibold text-[#F5C84C] uppercase tracking-wide">Free</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className="text-xs text-white/50">{row.team}</span>
+                        </td>
 
-                          {/* Projection — always visible */}
-                          <td className="px-3 py-3 text-right">
-                            <span className="text-sm font-semibold text-[#F5C84C] tabular-nums">
-                              {fmt(row.projection_final)}
+                        {/* Projection — always visible */}
+                        <td className="px-3 py-3 text-right">
+                          <span className="text-sm font-semibold text-[#F5C84C] tabular-nums">
+                            {fmt(row.projection_final)}
+                          </span>
+                        </td>
+
+                        {/* Captain */}
+                        <td className="px-3 py-3 text-right">
+                          {!metricsUnlocked ? <LockedCell /> : row.captain_rating ? (
+                            <span
+                              className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${capStyle.text} ${capStyle.bg} ${capStyle.border}`}
+                            >
+                              {capStyle.icon} {row.captain_rating}
                             </span>
-                          </td>
+                          ) : (
+                            <span className="text-white/20 text-xs">—</span>
+                          )}
+                        </td>
 
-                          {/* Captain — locked beyond free limit */}
-                          <td className="px-3 py-3 text-right">
-                            {!metricsUnlocked ? <LockedCell /> : row.captain_rating ? (
-                              <span
-                                className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${capStyle.text} ${capStyle.bg} ${capStyle.border}`}
-                              >
-                                {capStyle.icon} {row.captain_rating}
-                              </span>
-                            ) : (
-                              <span className="text-white/20 text-xs">—</span>
-                            )}
-                          </td>
+                        {/* Form */}
+                        <td className="px-3 py-3 text-right">
+                          {!metricsUnlocked ? <LockedCell /> : (
+                            <PremiumBadge label={row.form_rating != null ? fmtInt(row.form_rating) : "—"} colorClass={getFormColor(row.form_rating ?? null)} />
+                          )}
+                        </td>
 
-                          {/* Form */}
-                          <td className="px-3 py-3 text-right">
-                            {!metricsUnlocked ? <LockedCell /> : (
-                              <PremiumBadge label={row.form_rating != null ? fmtInt(row.form_rating) : "—"} colorClass={getFormColor(row.form_rating)} />
-                            )}
-                          </td>
+                        {/* Matchup */}
+                        <td className="px-3 py-3 text-right">
+                          {!metricsUnlocked ? <LockedCell /> : (
+                            <PremiumBadge label={row.matchup_rating != null ? fmtInt(row.matchup_rating) : "—"} colorClass={getMatchupColor(row.matchup_rating ?? null)} />
+                          )}
+                        </td>
 
-                          {/* Matchup */}
-                          <td className="px-3 py-3 text-right">
-                            {!metricsUnlocked ? <LockedCell /> : (
-                              <PremiumBadge label={row.matchup_rating != null ? fmtInt(row.matchup_rating) : "—"} colorClass={getMatchupColor(row.matchup_rating)} />
-                            )}
-                          </td>
+                        {/* Upside */}
+                        <td className="px-3 py-3 text-right">
+                          {!metricsUnlocked ? <LockedCell /> : (
+                            <PremiumBadge label={row.upside_rating != null ? `+${fmtInt(row.upside_rating)}%` : "—"} colorClass={getUpsideColor(row.upside_rating ?? null)} />
+                          )}
+                        </td>
 
-                          {/* Upside */}
-                          <td className="px-3 py-3 text-right">
-                            {!metricsUnlocked ? <LockedCell /> : (
-                              <PremiumBadge label={row.upside_rating != null ? `+${fmtInt(row.upside_rating)}%` : "—"} colorClass={getUpsideColor(row.upside_rating)} />
-                            )}
-                          </td>
+                        {/* Confidence */}
+                        <td className="px-3 py-3 text-right">
+                          {!metricsUnlocked ? <LockedCell /> : (
+                            <span className={`text-xs font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
+                              {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
+                            </span>
+                          )}
+                        </td>
 
-                          {/* Confidence */}
-                          <td className="px-3 py-3 text-right">
-                            {!metricsUnlocked ? <LockedCell /> : (
-                              <span className={`text-xs font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence)}`}>
-                                {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
-                              </span>
-                            )}
-                          </td>
+                        {/* Consistency */}
+                        <td className="px-3 py-3 text-right">
+                          {!metricsUnlocked ? <LockedCell /> : (
+                            <span className={`text-xs font-semibold ${consistencyBadge.className}`}>
+                              {consistencyBadge.label}
+                            </span>
+                          )}
+                        </td>
 
-                          {/* Consistency — locked beyond free limit */}
-                          <td className="px-3 py-3 text-right">
-                            {!metricsUnlocked ? <LockedCell /> : (
-                              <span className={`text-xs font-semibold ${consistencyBadge.className}`}>
-                                {consistencyBadge.label}
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Recommendation */}
-                          <td className="px-3 py-3 text-right">
-                            {!metricsUnlocked ? <LockedCell /> : (
-                              <span
-                                className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${recStyle.text} ${recStyle.bg} ${recStyle.border}`}
-                              >
-                                {row.ai_recommendation ?? "—"}
-                              </span>
-                            )}
-                          </td>
-                        </tr>
+                        {/* Recommendation */}
+                        <td className="px-3 py-3 text-right">
+                          {!metricsUnlocked ? <LockedCell /> : (
+                            <span
+                              className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${recStyle.text} ${recStyle.bg} ${recStyle.border}`}
+                            >
+                              {row.ai_recommendation ?? "—"}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
                     );
                   })}
             </tbody>
           </table>
-        </div>
 
-        {!isPremium && <UpgradeCTABanner lockedCount={lockedCount} positionCounts={positionCounts} />}
+          {/* CTA below the 20 rows — free users only */}
+          {!isPremium && !loading && (
+            <UpgradeCTABanner totalCount={totalCount} positionFilter={positionFilter} />
+          )}
+        </div>
       </div>
 
       {selected && (
