@@ -247,12 +247,13 @@ function PlayerDetailModal({
 }) {
   const [detail, setDetail] = useState<PlayerDetail | null>(null);
   const [captainDetail, setCaptainDetail] = useState<CaptainRow | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<{ analysis: string | null; captain_recommendation: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchDetail() {
       setLoading(true);
-      const [rankRes, capRes] = await Promise.all([
+      const [rankRes, capRes, aiRes] = await Promise.all([
         supabase
           .from("v_rankings_premium")
           .select("*")
@@ -263,9 +264,15 @@ function PlayerDetailModal({
           .select("player_id, player_name, team, projection_final, ceiling_estimate, consistency_score, captain_score, captain_rating")
           .eq("player_id", row.player_id)
           .maybeSingle(),
+        supabase
+          .from("ai_player_analysis")
+          .select("analysis, captain_recommendation")
+          .eq("player_id", row.player_id)
+          .maybeSingle(),
       ]);
       setDetail(rankRes.data as PlayerDetail | null);
       setCaptainDetail(capRes.data as CaptainRow | null);
+      setAiAnalysis(aiRes.data as { analysis: string | null; captain_recommendation: string | null } | null);
       setLoading(false);
     }
     fetchDetail();
@@ -416,10 +423,17 @@ function PlayerDetailModal({
               </div>
             )}
 
-            {isPremium && detail.ai_summary && (
+            {isPremium && aiAnalysis?.analysis && (
               <div className="rounded-lg bg-white/5 px-4 py-3">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-2">AI Analysis</p>
-                <p className="text-sm text-white/70 leading-relaxed">{detail.ai_summary}</p>
+                <p className="text-sm text-white/70 leading-relaxed">{aiAnalysis.analysis}</p>
+              </div>
+            )}
+
+            {isPremium && aiAnalysis?.captain_recommendation && (
+              <div className="rounded-lg border border-white/5 bg-white/[0.03] px-4 py-3">
+                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-2">Captain Verdict</p>
+                <p className="text-sm text-white/70 leading-relaxed italic">{aiAnalysis.captain_recommendation}</p>
               </div>
             )}
           </div>

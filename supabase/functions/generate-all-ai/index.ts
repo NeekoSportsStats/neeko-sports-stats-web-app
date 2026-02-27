@@ -60,6 +60,7 @@ Deno.serve(async (req: Request) => {
       "generate-player-summary",
       "generate-team-ai-summaries",
       "generate-match-summary",
+      "generate-ranking-ai",
     ];
 
     const results: Record<string, unknown> = {};
