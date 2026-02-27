@@ -146,7 +146,7 @@ function getCaptainStyle(rating: string | null): { text: string; bg: string; bor
 // ─── Small helpers ─────────────────────────────────────────────────────────────
 
 function LockedCell() {
-  return <Lock size={11} className="mx-auto text-white/15" />;
+  return <Lock size={12} className="mx-auto text-[#F5C84C]" />;
 }
 
 function PremiumBadge({ label, colorClass }: { label: string; colorClass: string }) {
@@ -692,7 +692,7 @@ function SortTh({
       onClick={() => !locked && onSort(sortKey)}
     >
       <span className="inline-flex items-center gap-1 justify-end">
-        {locked && <Lock size={10} className="text-[#F5C84C]/50" />}
+        {locked && <Lock size={10} className="text-[#F5C84C]" />}
         {label}
         {active && !locked && (dir === "desc" ? <ChevronDown size={12} /> : <ChevronUp size={12} />)}
       </span>
@@ -704,7 +704,7 @@ function PlainTh({ label, locked }: { label: string; locked?: boolean }) {
   return (
     <th className="px-3 py-3 text-right text-[11px] font-medium uppercase tracking-wider text-white/20 whitespace-nowrap">
       <span className="inline-flex items-center gap-1 justify-end">
-        {locked && <Lock size={10} className="text-[#F5C84C]/50" />}
+        {locked && <Lock size={10} className="text-[#F5C84C]" />}
         {label}
       </span>
     </th>
@@ -883,12 +883,12 @@ export default function AFLRankingsPage() {
                 <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40">Player</th>
                 <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40">Team</th>
                 <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
-                <PlainTh label="Captain" />
+                <PlainTh label="Captain" locked={!isPremium} />
                 <PlainTh label="Form" locked={!isPremium} />
                 <PlainTh label="Matchup" locked={!isPremium} />
                 <PlainTh label="Upside" locked={!isPremium} />
                 <PlainTh label="Confidence" locked={!isPremium} />
-                <SortTh label="Consistency" sortKey="consistency_score" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
+                <SortTh label="Consistency" sortKey="consistency_score" currentKey={sortKey} dir={sortDir} onSort={handleSort} locked={!isPremium} />
                 <PlainTh label="AI Recommendation" locked={!isPremium} />
               </tr>
             </thead>
