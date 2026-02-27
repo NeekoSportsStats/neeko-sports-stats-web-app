@@ -201,6 +201,16 @@ function MetricLabel({ label, tooltip }: { label: string; tooltip: string }) {
 
 // ─── Score History Chart ───────────────────────────────────────────────────────
 
+function formatRound(round: number): string {
+  if (round === 0) return "Opening Round";
+  if (round <= 23) return `Round ${round}`;
+  if (round === 24) return "Qualifying Final";
+  if (round === 25) return "Semi Final";
+  if (round === 26) return "Preliminary Final";
+  if (round === 27) return "Grand Final";
+  return `Round ${round}`;
+}
+
 function ScoreHistoryChart({ playerName }: { playerName: string }) {
   const [data, setData] = useState<ScoreHistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -245,7 +255,14 @@ function ScoreHistoryChart({ playerName }: { playerName: string }) {
           tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={(v) => `R${v}`}
+          tickFormatter={(v) => {
+            if (v === 0) return "OR";
+            if (v === 24) return "QF";
+            if (v === 25) return "SF";
+            if (v === 26) return "PF";
+            if (v === 27) return "GF";
+            return `R${v}`;
+          }}
         />
         <YAxis
           domain={[minVal - padding, maxVal + padding]}
@@ -263,7 +280,7 @@ function ScoreHistoryChart({ playerName }: { playerName: string }) {
           }}
           labelStyle={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}
           itemStyle={{ color: "#F5C84C", fontSize: 12, fontWeight: 600 }}
-          labelFormatter={(v) => `Round ${v}`}
+          labelFormatter={(v) => formatRound(Number(v))}
           formatter={(v: number) => [Math.round(v), "Score"]}
         />
         <Line
@@ -814,7 +831,9 @@ export default function AFLRankingsPage() {
     }
   }
 
-  const filtered = positionFilter === "ALL" ? rows : rows.filter((r) => r.position === positionFilter);
+  const filtered = positionFilter === "ALL"
+    ? rows
+    : rows.filter((r) => r.position?.toUpperCase().substring(0, 3) === positionFilter);
 
   const sorted = [...filtered].sort((a, b) => {
     const av = (a[sortKey] as number | null) ?? -Infinity;
@@ -888,7 +907,7 @@ export default function AFLRankingsPage() {
                 <PlainTh label="Upside" locked={!isPremium} />
                 <PlainTh label="Confidence" locked={!isPremium} />
                 <SortTh label="Consistency" sortKey="consistency_score" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
-                <PlainTh label="Recommendation" locked={!isPremium} />
+                <PlainTh label="AI Recommendation" locked={!isPremium} />
               </tr>
             </thead>
             <tbody>
@@ -939,9 +958,9 @@ export default function AFLRankingsPage() {
                             </span>
                           </td>
 
-                          {/* Captain label always visible; score locked */}
+                          {/* Captain — locked beyond free limit */}
                           <td className="px-3 py-3 text-right">
-                            {row.captain_rating ? (
+                            {!metricsUnlocked ? <LockedCell /> : row.captain_rating ? (
                               <span
                                 className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${capStyle.text} ${capStyle.bg} ${capStyle.border}`}
                               >
@@ -982,11 +1001,13 @@ export default function AFLRankingsPage() {
                             )}
                           </td>
 
-                          {/* Consistency — always visible */}
+                          {/* Consistency — locked beyond free limit */}
                           <td className="px-3 py-3 text-right">
-                            <span className={`text-xs font-semibold ${consistencyBadge.className}`}>
-                              {consistencyBadge.label}
-                            </span>
+                            {!metricsUnlocked ? <LockedCell /> : (
+                              <span className={`text-xs font-semibold ${consistencyBadge.className}`}>
+                                {consistencyBadge.label}
+                              </span>
+                            )}
                           </td>
 
                           {/* Recommendation */}
