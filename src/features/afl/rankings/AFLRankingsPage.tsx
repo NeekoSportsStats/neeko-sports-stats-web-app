@@ -23,9 +23,12 @@ interface PlayerDetail {
   player: string;
   team: string;
   expected_fantasy: number | null;
+  projection_final: number | null;
   ai_summary: string | null;
   ceiling_fantasy: number | null;
+  ceiling_estimate: number | null;
   floor_fantasy: number | null;
+  floor_estimate: number | null;
   consistency_score: number | null;
   volatility: number | null;
 }
@@ -51,8 +54,7 @@ interface ConsistencyBadge {
 
 function getConsistencyBadge(score: number | null): ConsistencyBadge {
   if (score == null) return { label: "—", className: "text-white/30" };
-  if (score >= 90) return { label: "Elite", className: "text-green-400" };
-  if (score >= 75) return { label: "Very Safe", className: "text-emerald-400" };
+  if (score >= 75) return { label: "Elite", className: "text-green-400" };
   if (score >= 60) return { label: "Reliable", className: "text-yellow-400" };
   if (score >= 40) return { label: "Volatile", className: "text-orange-400" };
   return { label: "High Risk", className: "text-red-400" };
@@ -78,18 +80,16 @@ function PlayerDetailModal({
     async function fetchDetail() {
       setLoading(true);
       const view = isPremium ? "v_player_detail_premium" : "v_player_detail_free";
-      let query = supabase.from(view).select("*");
-      if (playerId) {
-        query = query.eq("player_id", playerId);
-      } else {
-        query = query.eq("player", playerName);
-      }
-      const { data } = await query.maybeSingle();
+      const { data } = await supabase
+        .from(view)
+        .select("*")
+        .eq("player_id", playerId)
+        .maybeSingle();
       setDetail(data as PlayerDetail | null);
       setLoading(false);
     }
     fetchDetail();
-  }, [playerId, playerName, isPremium]);
+  }, [playerId, isPremium]);
 
   const badge = getConsistencyBadge(detail?.consistency_score ?? null);
 
@@ -129,7 +129,7 @@ function PlayerDetailModal({
               <div className="rounded-lg bg-white/5 px-4 py-3">
                 <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Projection</p>
                 <p className="text-xl font-bold text-[#F5C84C]">
-                  {fmt(detail.expected_fantasy)}
+                  {fmt(detail.projection_final ?? detail.expected_fantasy)}
                 </p>
               </div>
 
@@ -138,13 +138,13 @@ function PlayerDetailModal({
                   <div className="rounded-lg bg-white/5 px-4 py-3">
                     <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Ceiling</p>
                     <p className="text-xl font-bold text-emerald-400">
-                      {fmt(detail.ceiling_fantasy)}
+                      {fmt(detail.ceiling_estimate ?? detail.ceiling_fantasy)}
                     </p>
                   </div>
                   <div className="rounded-lg bg-white/5 px-4 py-3">
                     <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Floor</p>
                     <p className="text-xl font-bold text-red-400">
-                      {fmt(detail.floor_fantasy)}
+                      {fmt(detail.floor_estimate ?? detail.floor_fantasy)}
                     </p>
                   </div>
                   <div className="rounded-lg bg-white/5 px-4 py-3">
