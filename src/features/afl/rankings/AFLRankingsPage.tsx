@@ -13,17 +13,15 @@ interface RankingRow {
   projection_final: number | null;
   ceiling_estimate: number | null;
   floor_estimate: number | null;
-  trend_3_vs_10: number | null;
-  matchup_delta: number | null;
   consistency_score: number | null;
-  form_rating: string | null;
-  matchup_rating: string | null;
-  upside_rating: string | null;
-  risk_rating: string | null;
-  projection_confidence: number | null;
-  ai_recommendation: string | null;
-  captain_rating: string | null;
-  captain_score: number | null;
+  form_rating?: string | null;
+  matchup_rating?: string | null;
+  upside_rating?: string | null;
+  risk_rating?: string | null;
+  projection_confidence?: number | null;
+  ai_recommendation?: string | null;
+  captain_rating?: string | null;
+  captain_score?: number | null;
 }
 
 interface PlayerDetail extends RankingRow {
@@ -41,7 +39,7 @@ interface CaptainRow {
   captain_rating: string | null;
 }
 
-type SortKey = "projection_final" | "consistency_score" | "projection_confidence" | "captain_score";
+type SortKey = "projection_final" | "consistency_score";
 type SortDir = "asc" | "desc";
 type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
 
@@ -550,7 +548,7 @@ export default function AFLRankingsPage() {
       const view = isPremium ? "v_rankings_premium" : "v_rankings_free";
       const { data } = await supabase
         .from(view)
-        .select("player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, trend_3_vs_10, matchup_delta, consistency_score, form_rating, matchup_rating, upside_rating, risk_rating, projection_confidence, ai_recommendation, captain_rating, captain_score")
+        .select("player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, consistency_score")
         .order("projection_final", { ascending: false });
 
       const base = (data as RankingRow[]) ?? [];
@@ -662,7 +660,7 @@ export default function AFLRankingsPage() {
                 <PlainTh label="Form" locked={!isPremium} />
                 <PlainTh label="Matchup" locked={!isPremium} />
                 <PlainTh label="Upside" locked={!isPremium} />
-                <SortTh label="Confidence" sortKey="projection_confidence" currentKey={sortKey} dir={sortDir} onSort={handleSort} locked={!isPremium} />
+                <PlainTh label="Confidence" locked={!isPremium} />
                 <SortTh label="Consistency" sortKey="consistency_score" currentKey={sortKey} dir={sortDir} onSort={handleSort} locked={!isPremium} />
                 <PlainTh label="Recommendation" locked={!isPremium} />
               </tr>
