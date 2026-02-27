@@ -49,8 +49,9 @@ type SortKey = "projection_final" | "consistency_score";
 type SortDir = "asc" | "desc";
 type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
 
-const FREE_FULL_UNLOCK = 5;
-const CTA_AFTER_ROW = 50;
+const FREE_LIMIT_ALL = 5;
+const FREE_LIMIT_POSITION = 3;
+const CTA_AFTER_ROW = 5;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -823,6 +824,9 @@ export default function AFLRankingsPage() {
     return sortDir === "desc" ? bv - av : av - bv;
   });
 
+  const freeLimit = positionFilter === "ALL" ? FREE_LIMIT_ALL : FREE_LIMIT_POSITION;
+  const visibleRows = sorted.slice(0, 20);
+
   const TOTAL_COLS = 11;
 
   return (
@@ -903,10 +907,10 @@ export default function AFLRankingsPage() {
                       ))}
                     </tr>
                   ))
-                : sorted.map((row, idx) => {
+                : visibleRows.map((row, idx) => {
                     const rank = idx + 1;
-                    const isTopFive = idx < FREE_FULL_UNLOCK;
-                    const metricsUnlocked = isPremium || isTopFive;
+                    const isLocked = !isPremium && idx >= freeLimit;
+                    const metricsUnlocked = !isLocked;
                     const consistencyBadge = getConsistencyBadge(row.consistency_score);
                     const recStyle = getRecommendationStyle(row.ai_recommendation);
                     const capStyle = getCaptainStyle(row.captain_rating);
@@ -924,7 +928,7 @@ export default function AFLRankingsPage() {
                           <td className="px-3 py-3">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium text-white">{row.player_name}</span>
-                              {isTopFive && !isPremium && (
+                              {!isPremium && !isLocked && (
                                 <span className="rounded-sm bg-[#F5C84C]/15 px-1 py-0.5 text-[9px] font-semibold text-[#F5C84C] uppercase tracking-wide">Free</span>
                               )}
                             </div>
