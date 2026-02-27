@@ -41,7 +41,7 @@ interface CaptainRow {
 }
 
 interface ScoreHistoryPoint {
-  round_number: number;
+  game_rank: number;
   fantasy_points: number | null;
 }
 
@@ -201,16 +201,6 @@ function MetricLabel({ label, tooltip }: { label: string; tooltip: string }) {
 
 // ─── Score History Chart ───────────────────────────────────────────────────────
 
-function formatRound(round: number): string {
-  if (round === 0) return "Opening Round";
-  if (round <= 23) return `Round ${round}`;
-  if (round === 24) return "Qualifying Final";
-  if (round === 25) return "Semi Final";
-  if (round === 26) return "Preliminary Final";
-  if (round === 27) return "Grand Final";
-  return `Round ${round}`;
-}
-
 function ScoreHistoryChart({ playerName }: { playerName: string }) {
   const [data, setData] = useState<ScoreHistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -219,11 +209,10 @@ function ScoreHistoryChart({ playerName }: { playerName: string }) {
     async function load() {
       setLoading(true);
       const { data: rows } = await supabase
-        .from("player_round_stats_2025")
-        .select("round_number, fantasy_points")
+        .from("v_player_score_history_chart")
+        .select("game_rank, fantasy_points")
         .eq("player", playerName)
-        .eq("season", 2025)
-        .order("round_number", { ascending: true });
+        .order("game_rank", { ascending: false });
       setData((rows as ScoreHistoryPoint[]) ?? []);
       setLoading(false);
     }
@@ -251,18 +240,11 @@ function ScoreHistoryChart({ playerName }: { playerName: string }) {
     <ResponsiveContainer width="100%" height={180}>
       <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
         <XAxis
-          dataKey="round_number"
+          dataKey="game_rank"
           tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={(v) => {
-            if (v === 0) return "OR";
-            if (v === 24) return "QF";
-            if (v === 25) return "SF";
-            if (v === 26) return "PF";
-            if (v === 27) return "GF";
-            return `R${v}`;
-          }}
+          tickFormatter={(v) => `G${v}`}
         />
         <YAxis
           domain={[minVal - padding, maxVal + padding]}
@@ -280,7 +262,7 @@ function ScoreHistoryChart({ playerName }: { playerName: string }) {
           }}
           labelStyle={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}
           itemStyle={{ color: "#F5C84C", fontSize: 12, fontWeight: 600 }}
-          labelFormatter={(v) => formatRound(Number(v))}
+          labelFormatter={(v) => `Game ${v}`}
           formatter={(v: number) => [Math.round(v), "Score"]}
         />
         <Line
@@ -673,7 +655,7 @@ function PlayerDetailModal({
             {/* Score History Chart — below AI Analysis */}
             {unlocked && (
               <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-4">
-                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-3">Score History — 2025</p>
+                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-3">Last 10 Games</p>
                 <ScoreHistoryChart playerName={detail.player_name} />
               </div>
             )}
