@@ -1,276 +1,416 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Trophy, Brain, BarChart3, Target, Crown } from "lucide-react";
+import { Trophy, Brain, TrendingUp, Crown, ChevronRight, ArrowRight, Star, Zap, Shield } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 
-const Index = () => {
-  const { isPremium } = useAuth();
+interface RankingRow {
+  player_id: number;
+  player_name: string;
+  team: string;
+  projection_final: number | null;
+  form_rating: string | null;
+  ai_recommendation: string | null;
+}
 
-  const sports = [
-    {
-      name: "AFL",
-      icon: Trophy,
-      description: "Australian Football League stats & analytics",
-      url: "/sports/afl/players",
-      color: "from-red-500/20 to-orange-500/10"
-    },
-    {
-      name: "EPL",
-      icon: Target,
-      description: "English Premier League insights",
-      url: "/sports/epl/players",
-      color: "from-purple-500/20 to-pink-500/10"
-    },
-    {
-      name: "NBA",
-      icon: BarChart3,
-      description: "National Basketball Association analytics",
-      url: "/sports/nba/players",
-      color: "from-yellow-500/20 to-orange-500/10"
+interface InsightRow {
+  player_id: number;
+  player_name: string;
+  team: string;
+  projection_final: number | null;
+  ceiling_estimate: number | null;
+  floor_estimate: number | null;
+  trend_3_vs_10: number | null;
+  consistency_score: number | null;
+}
+
+const formColors: Record<string, string> = {
+  Elite: "text-yellow-400",
+  Strong: "text-emerald-400",
+  Average: "text-neutral-400",
+  Risky: "text-red-400",
+};
+
+const recColors: Record<string, { text: string; bg: string }> = {
+  "Must Start":    { text: "text-emerald-300", bg: "bg-emerald-500/15 border-emerald-500/30" },
+  "Strong Play":   { text: "text-yellow-300",  bg: "bg-yellow-500/15 border-yellow-500/30" },
+  "Risky Play":    { text: "text-orange-300",  bg: "bg-orange-500/15 border-orange-500/30" },
+  "Avoid":         { text: "text-red-300",     bg: "bg-red-500/15 border-red-500/30" },
+};
+
+export default function Index() {
+  const { isPremium } = useAuth();
+  const [rankings, setRankings] = useState<RankingRow[]>([]);
+  const [insights, setInsights] = useState<InsightRow[]>([]);
+  const [loadingRankings, setLoadingRankings] = useState(true);
+  const [loadingInsights, setLoadingInsights] = useState(true);
+
+  useEffect(() => {
+    async function fetchRankings() {
+      const { data } = await supabase
+        .from("v_rankings_free")
+        .select("player_id, player_name, team, projection_final, form_rating, ai_recommendation")
+        .order("projection_final", { ascending: false })
+        .limit(10);
+      setRankings((data as RankingRow[]) || []);
+      setLoadingRankings(false);
     }
-  ];
+    fetchRankings();
+  }, []);
+
+  useEffect(() => {
+    async function fetchInsights() {
+      const { data } = await supabase
+        .from("v_insights_free")
+        .select("player_id, player_name, team, projection_final, ceiling_estimate, floor_estimate, trend_3_vs_10, consistency_score")
+        .order("projection_final", { ascending: false })
+        .limit(3);
+      setInsights((data as InsightRow[]) || []);
+      setLoadingInsights(false);
+    }
+    fetchInsights();
+  }, []);
+
+  const getTrendLabel = (val: number | null) => {
+    if (val == null) return null;
+    if (val >= 5) return { label: "Trending Up", color: "text-emerald-400" };
+    if (val <= -5) return { label: "Trending Down", color: "text-red-400" };
+    return { label: "Stable", color: "text-neutral-400" };
+  };
 
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="relative w-screen left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] min-h-[40vh] md:min-h-[55vh] h-auto flex items-center justify-center overflow-hidden">
-        {/* Background Image */}
+    <div className="min-h-screen bg-[#070707] text-white">
+
+      {/* ── HERO ─────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden min-h-[60vh] flex items-center">
         <div
-          className="absolute inset-0 w-full h-full"
+          className="absolute inset-0"
           style={{
-            backgroundImage: `url(/hero.jpg)`,
+            backgroundImage: "url(/hero.jpg)",
             backgroundSize: "cover",
             backgroundPosition: "center",
-            backgroundAttachment: "scroll",
-            backgroundRepeat: "no-repeat",
           }}
         />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-[#070707]" />
 
-        {/* Gradient Overlay */}
-        <div
-          className="absolute inset-0 w-full h-full"
-          style={{
-            background: "linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.75) 100%)"
-          }}
-        />
+        <div className="relative z-10 w-full max-w-5xl mx-auto px-4 py-24 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-yellow-400/40 bg-yellow-400/10 text-yellow-300 text-xs font-semibold uppercase tracking-wider mb-6">
+            <Zap className="h-3 w-3" />
+            AFL 2026 Season Live
+          </div>
 
-        {/* Content */}
-        <div className="w-full px-4 text-center relative z-10 max-w-7xl mx-auto">
-          <h1 className="text-5xl md:text-7xl font-extrabold mb-6 text-white mt-8 md:mt-0">
-            <span className="text-primary">Neeko's Sports Stats</span>
+          <h1 className="text-5xl md:text-7xl font-extrabold mb-4 leading-tight">
+            Neeko Sports Stats
           </h1>
-          <p className="text-xl md:text-2xl text-white font-semibold mb-8 max-w-3xl mx-auto">
-            Professional-grade analytics across AFL, EPL & NBA
+          <p className="text-xl md:text-2xl text-white/70 font-medium mb-10 max-w-2xl mx-auto">
+            Elite AFL Fantasy Intelligence
           </p>
-          <p className="text-lg text-white/90 mb-12 max-w-2xl mx-auto">
-            Real-time player stats, team analysis, AI-powered insights, and match center coverage—all in one platform
-          </p>
-          <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-12 py-6 font-bold">
-            <Link to="/sports/afl/players">Explore Stats Now</Link>
-          </Button>
-        </div>
-      </section>
 
-      {/* Choose Your Sport */}
-      <section className="py-16 bg-background">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">Choose Your Sport</h2>
-          <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
-            Access comprehensive stats, analytics, and AI insights for your favorite league
-          </p>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {sports.map((sport) => {
-              const Icon = sport.icon;
-              return (
-                <Link key={sport.name} to={sport.url}>
-                  <Card className={`p-6 bg-gradient-to-br ${sport.color} border-2 border-primary/20 hover:border-primary transition-all cursor-pointer group h-full`}>
-                    <Icon className="h-12 w-12 text-primary mx-auto mb-4 group-hover:scale-110 transition-transform" />
-                    <h3 className="text-2xl font-bold mb-2 text-center">{sport.name}</h3>
-                    <p className="text-sm text-muted-foreground text-center">{sport.description}</p>
-                  </Card>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button
+              asChild
+              size="lg"
+              className="bg-yellow-400 text-black hover:bg-yellow-300 font-bold text-base px-8 py-5 rounded-xl"
+            >
+              <Link to="/sports/afl/rankings">
+                View Player Rankings
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Link>
+            </Button>
+            {!isPremium && (
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="border-white/20 text-white hover:bg-white/10 font-semibold text-base px-8 py-5 rounded-xl"
+              >
+                <Link to="/neeko-plus">
+                  <Crown className="h-4 w-4 mr-2" />
+                  Get Neeko+
                 </Link>
-              );
-            })}
+              </Button>
+            )}
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-16 bg-secondary">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">What We Offer</h2>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-            <Card className="p-6 text-center hover:bg-primary/5 transition-all">
-              <Trophy className="h-10 w-10 text-primary mx-auto mb-4" />
-              <h3 className="text-lg font-bold mb-2">Player Stats</h3>
-              <p className="text-sm text-muted-foreground">
-                Detailed performance metrics, round-by-round breakdowns, and career statistics
-              </p>
-            </Card>
-
-            <Card className="p-6 text-center hover:bg-primary/5 transition-all">
-              <BarChart3 className="h-10 w-10 text-primary mx-auto mb-4" />
-              <h3 className="text-lg font-bold mb-2">Team Stats</h3>
-              <p className="text-sm text-muted-foreground">
-                Team performance analysis, aggregated scoring data, and comparative insights
-              </p>
-            </Card>
-
-            <Card className="p-6 text-center hover:bg-primary/5 transition-all">
-              <Brain className="h-10 w-10 text-primary mx-auto mb-4" />
-              <h3 className="text-lg font-bold mb-2">AI Insights</h3>
-              <p className="text-sm text-muted-foreground">
-                Machine learning powered trends, hot/cold player detection, and predictive analysis
-              </p>
-            </Card>
-
-            <Card className="p-6 text-center hover:bg-primary/5 transition-all">
-              <Target className="h-10 w-10 text-primary mx-auto mb-4" />
-              <h3 className="text-lg font-bold mb-2">Match Center</h3>
-              <p className="text-sm text-muted-foreground">
-                Live matchup analysis, head-to-head comparisons, and game-day insights
-              </p>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* 🔥 Neeko+ Teaser — hidden for Premium users */}
-      {!isPremium && (
-        <section className="py-16 bg-background">
-          <div className="container mx-auto px-4">
-            <Card className="max-w-4xl mx-auto p-8 md:p-12 bg-gradient-to-br from-primary/10 to-transparent border-2 border-primary">
-              <div className="text-center space-y-6">
-                <Crown className="h-16 w-16 text-primary mx-auto" />
-                <h2 className="text-3xl md:text-4xl font-bold">Unlock Everything with Neeko+</h2>
-                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                  Get unlimited access to all player stats, team analytics, AI insights, and premium features across all sports for just $5.99/week
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
-                  <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-12 py-6 font-bold">
-                    <a href="https://www.neekostats.com.au/neeko-plus" target="_blank" rel="noopener noreferrer">
-                      <Crown className="h-5 w-5 mr-2" />
-                      Get Neeko+
-                    </a>
-                  </Button>
-                </div>
+      {/* ── TOP 10 RANKINGS TEASER ───────────────────────────── */}
+      <section className="py-20 bg-[#0a0a0a]">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Trophy className="h-5 w-5 text-yellow-400" />
+                <span className="text-yellow-400 text-sm font-semibold uppercase tracking-wider">Live Rankings</span>
               </div>
-            </Card>
+              <h2 className="text-3xl md:text-4xl font-bold">Top 10 Players</h2>
+              <p className="text-white/50 mt-1 text-sm">Ranked by projected fantasy score</p>
+            </div>
+            <Button
+              asChild
+              variant="outline"
+              className="hidden sm:flex border-white/15 text-white/70 hover:text-white hover:bg-white/5 rounded-lg"
+            >
+              <Link to="/sports/afl/rankings">
+                Full Rankings
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Link>
+            </Button>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 overflow-hidden bg-[#111111]">
+            {/* Table header */}
+            <div className="grid grid-cols-[2.5rem_1fr_auto_auto] gap-3 px-4 py-3 border-b border-white/10 text-xs font-semibold uppercase tracking-wider text-white/40">
+              <span>#</span>
+              <span>Player</span>
+              <span className="text-right hidden sm:block">Form</span>
+              <span className="text-right">Projection</span>
+            </div>
+
+            {loadingRankings ? (
+              <div className="divide-y divide-white/5">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <div key={i} className="grid grid-cols-[2.5rem_1fr_auto_auto] gap-3 px-4 py-3.5 animate-pulse">
+                    <div className="h-4 w-5 bg-white/10 rounded" />
+                    <div className="space-y-1.5">
+                      <div className="h-4 w-32 bg-white/10 rounded" />
+                      <div className="h-3 w-20 bg-white/5 rounded" />
+                    </div>
+                    <div className="h-4 w-14 bg-white/10 rounded hidden sm:block" />
+                    <div className="h-4 w-12 bg-white/10 rounded ml-auto" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="divide-y divide-white/5">
+                {rankings.map((p, idx) => {
+                  const rec = p.ai_recommendation ? recColors[p.ai_recommendation] : null;
+                  const formColor = p.form_rating ? (formColors[p.form_rating] ?? "text-neutral-400") : "text-neutral-500";
+                  return (
+                    <div
+                      key={p.player_id}
+                      className="grid grid-cols-[2.5rem_1fr_auto_auto] gap-3 px-4 py-3.5 hover:bg-white/[0.03] transition-colors items-center"
+                    >
+                      <span className={`text-sm font-bold tabular-nums ${idx < 3 ? "text-yellow-400" : "text-white/30"}`}>
+                        {idx + 1}
+                      </span>
+                      <div>
+                        <div className="font-semibold text-sm text-white leading-tight">{p.player_name}</div>
+                        <div className="text-xs text-white/40 mt-0.5">{p.team}</div>
+                      </div>
+                      <div className="hidden sm:flex items-center gap-2">
+                        {p.form_rating && (
+                          <span className={`text-xs font-medium ${formColor}`}>{p.form_rating}</span>
+                        )}
+                        {rec && p.ai_recommendation && (
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${rec.bg} ${rec.text}`}>
+                            {p.ai_recommendation}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-bold text-yellow-400 tabular-nums">
+                          {p.projection_final != null ? Math.round(p.projection_final) : "—"}
+                        </span>
+                        <div className="text-xs text-white/30">pts</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-5 sm:hidden text-center">
+            <Button
+              asChild
+              variant="outline"
+              className="border-white/15 text-white/70 hover:text-white hover:bg-white/5 rounded-lg w-full"
+            >
+              <Link to="/sports/afl/rankings">
+                View Full Rankings
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── INSIGHTS TEASER ──────────────────────────────────── */}
+      <section className="py-20 bg-[#070707] border-t border-white/5">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Brain className="h-5 w-5 text-sky-400" />
+            <span className="text-sky-400 text-sm font-semibold uppercase tracking-wider">AI Insights</span>
+          </div>
+          <div className="flex items-end justify-between mb-8">
+            <div>
+              <h2 className="text-3xl md:text-4xl font-bold">Top Picks This Round</h2>
+              <p className="text-white/50 mt-1 text-sm">AI-powered projections with ceiling & floor</p>
+            </div>
+            <Button
+              asChild
+              variant="outline"
+              className="hidden sm:flex border-white/15 text-white/70 hover:text-white hover:bg-white/5 rounded-lg"
+            >
+              <Link to="/sports/afl/ai-analysis">
+                Full Insights
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Link>
+            </Button>
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-4">
+            {loadingInsights ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="rounded-2xl border border-white/10 bg-[#111111] p-5 animate-pulse space-y-3">
+                  <div className="h-4 w-28 bg-white/10 rounded" />
+                  <div className="h-3 w-16 bg-white/5 rounded" />
+                  <div className="h-8 w-16 bg-white/10 rounded mt-4" />
+                  <div className="flex gap-2 mt-2">
+                    <div className="h-3 w-14 bg-white/5 rounded" />
+                    <div className="h-3 w-14 bg-white/5 rounded" />
+                  </div>
+                </div>
+              ))
+            ) : (
+              insights.map((p, idx) => {
+                const trend = getTrendLabel(p.trend_3_vs_10);
+                return (
+                  <div
+                    key={p.player_id}
+                    className="rounded-2xl border border-white/10 bg-[#111111] p-5 hover:border-white/20 transition-colors"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <div className="font-bold text-sm text-white">{p.player_name}</div>
+                        <div className="text-xs text-white/40 mt-0.5">{p.team}</div>
+                      </div>
+                      {idx === 0 && (
+                        <Star className="h-4 w-4 text-yellow-400 shrink-0 mt-0.5" />
+                      )}
+                    </div>
+
+                    <div className="text-3xl font-extrabold text-yellow-400 tabular-nums mb-1">
+                      {p.projection_final != null ? Math.round(p.projection_final) : "—"}
+                    </div>
+                    <div className="text-xs text-white/30 mb-3">projected pts</div>
+
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/50">
+                      {p.ceiling_estimate != null && (
+                        <span>Ceil <span className="text-emerald-400 font-semibold">{Math.round(p.ceiling_estimate)}</span></span>
+                      )}
+                      {p.floor_estimate != null && (
+                        <span>Floor <span className="text-red-400 font-semibold">{Math.round(p.floor_estimate)}</span></span>
+                      )}
+                    </div>
+
+                    {trend && (
+                      <div className={`text-xs font-medium mt-2 ${trend.color}`}>
+                        {trend.label}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Lock prompt for non-premium */}
+          {!isPremium && (
+            <div className="mt-8 rounded-2xl border border-white/10 bg-[#111111] p-6 text-center">
+              <Shield className="h-8 w-8 text-white/20 mx-auto mb-3" />
+              <p className="text-white/50 text-sm mb-4">
+                Full AI breakdowns, matchup ratings, and risk analysis are available with Neeko+
+              </p>
+              <Button
+                asChild
+                className="bg-yellow-400 text-black hover:bg-yellow-300 font-bold rounded-xl px-6"
+              >
+                <Link to="/neeko-plus">
+                  Unlock Full Insights
+                </Link>
+              </Button>
+            </div>
+          )}
+
+          <div className="mt-5 sm:hidden text-center">
+            <Button
+              asChild
+              variant="outline"
+              className="border-white/15 text-white/70 hover:text-white hover:bg-white/5 rounded-lg w-full"
+            >
+              <Link to="/sports/afl/ai-analysis">
+                View All AI Insights
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── NEEKO+ CTA ───────────────────────────────────────── */}
+      {!isPremium && (
+        <section className="py-20 bg-[#0a0a0a] border-t border-white/5">
+          <div className="max-w-3xl mx-auto px-4 text-center">
+            <Crown className="h-12 w-12 text-yellow-400 mx-auto mb-5" />
+            <h2 className="text-3xl md:text-4xl font-bold mb-3">Neeko+ Premium</h2>
+            <p className="text-white/50 text-lg mb-2 max-w-xl mx-auto">
+              Unlock every ranking, full AI breakdowns, matchup ratings, ceiling/floor data, and captain recommendations.
+            </p>
+            <p className="text-yellow-400 font-bold text-xl mb-8">$5.99 / week — cancel anytime</p>
+
+            <div className="grid sm:grid-cols-3 gap-4 mb-10 text-left">
+              {[
+                { icon: Trophy,    label: "Full Rankings",      desc: "All 200+ players ranked with projections" },
+                { icon: Brain,     label: "AI Analysis",        desc: "Deep-dive breakdowns & match predictions" },
+                { icon: TrendingUp, label: "Captain Intel",     desc: "Top captain picks ranked & scored" },
+              ].map(({ icon: Icon, label, desc }) => (
+                <div key={label} className="rounded-xl border border-white/10 bg-[#111111] p-4">
+                  <Icon className="h-5 w-5 text-yellow-400 mb-2" />
+                  <div className="font-semibold text-sm text-white mb-1">{label}</div>
+                  <div className="text-xs text-white/40">{desc}</div>
+                </div>
+              ))}
+            </div>
+
+            <Button
+              asChild
+              size="lg"
+              className="bg-yellow-400 text-black hover:bg-yellow-300 font-bold text-base px-10 py-5 rounded-xl"
+            >
+              <Link to="/neeko-plus">
+                <Crown className="h-4 w-4 mr-2" />
+                Upgrade Now
+              </Link>
+            </Button>
           </div>
         </section>
       )}
 
-      {/* FAQ Section */}
-      <section className="py-16 bg-secondary">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">Frequently Asked Questions</h2>
-          <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
-            Quick answers to common questions about Neeko's Sports Stats
-          </p>
-          
-          <div className="max-w-4xl mx-auto space-y-4">
-            <Card className="p-6">
-              <h3 className="font-bold text-lg mb-2">What is Neeko's Sports Stats?</h3>
-              <p className="text-muted-foreground">
-                Neeko's Sports Stats is an analytics platform offering AI-powered insights, player trends, and team statistics across AFL, EPL, and NBA.
-              </p>
-            </Card>
-            <Card className="p-6">
-              <h3 className="font-bold text-lg mb-2">What is Neeko+?</h3>
-              <p className="text-muted-foreground">
-                Neeko+ is our premium subscription that unlocks all AI insights, full player trend lists, advanced stats, and removes blurred content.
-              </p>
-            </Card>
-            <Card className="p-6">
-              <h3 className="font-bold text-lg mb-2">How much does Neeko+ cost?</h3>
-              <p className="text-muted-foreground">
-                Neeko+ costs $5.99 per week and can be cancelled anytime.
-              </p>
-            </Card>
-            <Card className="p-6">
-              <h3 className="font-bold text-lg mb-2">Do I need an account to use the site?</h3>
-              <p className="text-muted-foreground">
-                You can browse some data without an account, but an account is required for Neeko+ and full feature access.
-              </p>
-            </Card>
-            <Card className="p-6">
-              <h3 className="font-bold text-lg mb-2">How accurate are the AI insights?</h3>
-              <p className="text-muted-foreground">
-                Our AI models use performance data, trends, and predictive analytics. They are not guarantees but serve as intelligent indicators.
-              </p>
-            </Card>
-          </div>
-
-          <div className="text-center mt-8">
-            <Button asChild variant="outline" size="lg" className="text-lg px-8 py-6">
-              <Link to="/faq">View All FAQs</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* About Section */}
-      <section className="py-16 bg-background">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center space-y-6">
-            <h2 className="text-3xl md:text-4xl font-bold">Built for Sports Enthusiasts</h2>
-            <p className="text-lg text-foreground leading-relaxed">
-              Neeko's Sports Stats delivers professional-grade analytics to fans, fantasy players, analysts, and enthusiasts. 
-              Whether you follow AFL, EPL, or NBA, our platform provides the data-driven insights you need to stay ahead of the game.
+      {/* ── FOOTER ───────────────────────────────────────────── */}
+      <footer className="border-t border-white/5 bg-[#070707] py-8">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <p className="text-xs text-white/30">
+              © {new Date().getFullYear()} Neeko Sports Stats. All rights reserved.
             </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="py-20 bg-secondary">
-        <div className="container mx-auto px-4 text-center space-y-8">
-          <h2 className="text-4xl md:text-5xl font-bold">
-            Ready to Explore the Stats?
-          </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Choose your sport and start analyzing player performance, team trends, and AI-powered insights today
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
-            <Button asChild size="lg" variant="outline" className="text-lg px-12 py-6 font-bold">
-              <Link to="/sports/afl/players">Browse AFL</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline" className="text-lg px-12 py-6 font-bold">
-              <Link to="/sports/epl/players">Browse EPL</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline" className="text-lg px-12 py-6 font-bold">
-              <Link to="/sports/nba/players">Browse NBA</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-background border-t py-8">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Neeko's Sports Stats. All rights reserved.
-            </p>
-            <div className="flex gap-6 text-sm">
-              <Link to="/policies" className="text-muted-foreground hover:text-primary transition-colors">
-                Policies
-              </Link>
-              <Link to="/contact" className="text-muted-foreground hover:text-primary transition-colors">
-                Contact
-              </Link>
-              <Link to="/about" className="text-muted-foreground hover:text-primary transition-colors">
-                About
-              </Link>
+            <div className="flex gap-5 text-xs">
+              {[
+                { label: "Policies", to: "/policies" },
+                { label: "Contact",  to: "/contact" },
+                { label: "About",    to: "/about" },
+                { label: "FAQ",      to: "/faq" },
+              ].map((l) => (
+                <Link key={l.to} to={l.to} className="text-white/30 hover:text-white/70 transition-colors">
+                  {l.label}
+                </Link>
+              ))}
             </div>
           </div>
         </div>
       </footer>
     </div>
   );
-};
-
-export default Index;
+}

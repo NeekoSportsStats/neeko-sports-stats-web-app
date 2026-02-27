@@ -4,7 +4,6 @@ import { Layout } from "@/components/Layout";
 import { RequireAuth } from "@/components/RequireAuth";
 import {
   PlayersPageSkeleton,
-  TeamsPageSkeleton,
   MatchCentreSkeleton,
   AIInsightsSkeleton,
   GenericPageSkeleton,
@@ -49,27 +48,9 @@ const UserConductPolicy = React.lazy(() => import("@/pages/policies/UserConductP
 /* =========================
    AFL Pages — lazy
 ========================= */
-const AFLPlayersPage     = React.lazy(() => import("@/features/afl/players/AFLPlayersPage"));
-const AFLTeamsPage       = React.lazy(() => import("@/features/afl/teams/AFLTeamsPage"));
 const AFLMatchCentrePage = React.lazy(() => import("@/features/afl/match-centre/AFLMatchCentrePage"));
 const AFLAIInsightsPage  = React.lazy(() => import("@/features/afl/ai-insights/AFLAIInsightsPage"));
 const AFLRankingsPage    = React.lazy(() => import("@/features/afl/rankings/AFLRankingsPage"));
-
-/* =========================
-   EPL Pages — lazy
-========================= */
-const EPLPlayers     = React.lazy(() => import("@/pages/sports/epl/EPLPlayers"));
-const EPLTeams       = React.lazy(() => import("@/pages/sports/epl/EPLTeams"));
-const EPLAIInsights  = React.lazy(() => import("@/pages/sports/epl/EPLAIInsights"));
-const EPLMatchCentre = React.lazy(() => import("@/pages/sports/epl/EPLMatchCentre"));
-
-/* =========================
-   NBA Pages — lazy
-========================= */
-const NBAPlayers     = React.lazy(() => import("@/pages/sports/nba/NBAPlayers"));
-const NBATeams       = React.lazy(() => import("@/pages/sports/nba/NBATeams"));
-const NBAAIInsights  = React.lazy(() => import("@/pages/sports/nba/NBAAIInsights"));
-const NBAMatchCentre = React.lazy(() => import("@/pages/sports/nba/NBAMatchCentre"));
 
 /* =========================
    Suspense helpers
@@ -79,7 +60,6 @@ function S({ fallback, children }: { fallback: React.ReactNode; children: React.
 }
 
 const Players     = <PlayersPageSkeleton />;
-const Teams       = <TeamsPageSkeleton />;
 const MatchCentre = <MatchCentreSkeleton />;
 const AI          = <AIInsightsSkeleton />;
 const Generic     = <GenericPageSkeleton />;
@@ -194,30 +174,10 @@ function App() {
       {/* =========================
          AFL
       ========================= */}
-      <Route path="/sports/afl" element={<Navigate to="/sports/afl/players" replace />} />
-      <Route path="/sports/afl/players"     element={<Layout><S fallback={Players}><AFLPlayersPage /></S></Layout>} />
-      <Route path="/sports/afl/teams"       element={<Layout><S fallback={Teams}><AFLTeamsPage /></S></Layout>} />
-      <Route path="/sports/afl/ai-analysis" element={<Layout><S fallback={AI}><AFLAIInsightsPage /></S></Layout>} />
+      <Route path="/sports/afl" element={<Navigate to="/sports/afl/rankings" replace />} />
+      <Route path="/sports/afl/rankings"     element={<Layout><S fallback={Players}><AFLRankingsPage /></S></Layout>} />
+      <Route path="/sports/afl/ai-analysis"  element={<Layout><S fallback={AI}><AFLAIInsightsPage /></S></Layout>} />
       <Route path="/sports/afl/match-centre" element={<Layout><S fallback={MatchCentre}><AFLMatchCentrePage /></S></Layout>} />
-      <Route path="/sports/afl/rankings"    element={<Layout><S fallback={Players}><AFLRankingsPage /></S></Layout>} />
-
-      {/* =========================
-         EPL
-      ========================= */}
-      <Route path="/sports/epl" element={<Navigate to="/sports/epl/players" replace />} />
-      <Route path="/sports/epl/players"     element={<Layout><S fallback={Players}><EPLPlayers /></S></Layout>} />
-      <Route path="/sports/epl/teams"       element={<Layout><S fallback={Teams}><EPLTeams /></S></Layout>} />
-      <Route path="/sports/epl/ai-analysis" element={<Layout><S fallback={AI}><EPLAIInsights /></S></Layout>} />
-      <Route path="/sports/epl/match-centre" element={<Layout><S fallback={MatchCentre}><EPLMatchCentre /></S></Layout>} />
-
-      {/* =========================
-         NBA
-      ========================= */}
-      <Route path="/sports/nba" element={<Navigate to="/sports/nba/players" replace />} />
-      <Route path="/sports/nba/players"     element={<Layout><S fallback={Players}><NBAPlayers /></S></Layout>} />
-      <Route path="/sports/nba/teams"       element={<Layout><S fallback={Teams}><NBATeams /></S></Layout>} />
-      <Route path="/sports/nba/ai-analysis" element={<Layout><S fallback={AI}><NBAAIInsights /></S></Layout>} />
-      <Route path="/sports/nba/match-centre" element={<Layout><S fallback={MatchCentre}><NBAMatchCentre /></S></Layout>} />
 
       {/* =========================
          Catch-all
