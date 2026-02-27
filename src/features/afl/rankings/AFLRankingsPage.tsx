@@ -792,7 +792,12 @@ export default function AFLRankingsPage() {
         `)
         .order("projection_final", { ascending: false });
 
-      setRows((data as RankingRow[]) ?? []);
+      const normalized = ((data as RankingRow[]) ?? []).map((r) => ({
+        ...r,
+        position: r.position?.toUpperCase()?.substring(0, 3) ?? null,
+      }));
+      console.log("Positions:", [...new Set(normalized.map((r) => r.position))]);
+      setRows(normalized);
 
       setLoading(false);
     }
