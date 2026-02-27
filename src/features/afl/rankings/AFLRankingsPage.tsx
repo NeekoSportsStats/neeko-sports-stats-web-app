@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { Lock, Crown, ChevronUp, ChevronDown, X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Lock, Crown, ChevronUp, ChevronDown, X, Info } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Dot } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 
@@ -37,6 +38,11 @@ interface CaptainRow {
   consistency_score: number | null;
   captain_score: number | null;
   captain_rating: string | null;
+}
+
+interface ScoreHistoryPoint {
+  round_number: number;
+  fantasy_points: number | null;
 }
 
 type SortKey = "projection_final" | "consistency_score";
@@ -147,6 +153,172 @@ function PremiumBadge({ label, colorClass }: { label: string; colorClass: string
   return <span className={`inline-block text-xs font-semibold ${colorClass}`}>{label}</span>;
 }
 
+// ─── Info Tooltip ─────────────────────────────────────────────────────────────
+
+function InfoTooltip({ text }: { text: string }) {
+  const [visible, setVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setVisible(false);
+    }
+    if (visible) document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [visible]);
+
+  return (
+    <div ref={ref} className="relative inline-flex items-center">
+      <button
+        type="button"
+        onMouseEnter={() => setVisible(true)}
+        onMouseLeave={() => setVisible(false)}
+        onClick={() => setVisible((v) => !v)}
+        className="text-white/20 hover:text-white/50 transition-colors ml-1"
+      >
+        <Info size={11} />
+      </button>
+      {visible && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-44 rounded-lg border border-white/10 bg-[#181818] px-3 py-2 shadow-xl pointer-events-none">
+          <p className="text-[11px] text-white/60 leading-relaxed">{text}</p>
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#181818]" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Metric Label with tooltip ────────────────────────────────────────────────
+
+function MetricLabel({ label, tooltip }: { label: string; tooltip: string }) {
+  return (
+    <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1 flex items-center gap-0.5">
+      {label}
+      <InfoTooltip text={tooltip} />
+    </p>
+  );
+}
+
+// ─── Score History Chart ───────────────────────────────────────────────────────
+
+function ScoreHistoryChart({ playerName }: { playerName: string }) {
+  const [data, setData] = useState<ScoreHistoryPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      const { data: rows } = await supabase
+        .from("player_round_stats_2025_canonical")
+        .select("round_number, fantasy_points")
+        .eq("player", playerName)
+        .order("round_number", { ascending: true });
+      setData((rows as ScoreHistoryPoint[]) ?? []);
+      setLoading(false);
+    }
+    if (playerName) load();
+  }, [playerName]);
+
+  if (loading) {
+    return <div className="h-28 animate-pulse rounded-lg bg-white/5" />;
+  }
+
+  if (!data.length) {
+    return (
+      <div className="h-28 flex items-center justify-center rounded-lg bg-white/[0.03] border border-white/5">
+        <p className="text-xs text-white/25">No score history available</p>
+      </div>
+    );
+  }
+
+  const scores = data.map((d) => Number(d.fantasy_points ?? 0));
+  const minVal = Math.min(...scores);
+  const maxVal = Math.max(...scores);
+  const padding = Math.max(10, (maxVal - minVal) * 0.15);
+
+  return (
+    <ResponsiveContainer width="100%" height={112}>
+      <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+        <XAxis
+          dataKey="round_number"
+          tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }}
+          axisLine={false}
+          tickLine={false}
+          tickFormatter={(v) => `R${v}`}
+        />
+        <YAxis
+          domain={[minVal - padding, maxVal + padding]}
+          tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }}
+          axisLine={false}
+          tickLine={false}
+          width={32}
+        />
+        <RechartsTooltip
+          contentStyle={{
+            background: "#181818",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "8px",
+            padding: "6px 10px",
+          }}
+          labelStyle={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}
+          itemStyle={{ color: "#F5C84C", fontSize: 12, fontWeight: 600 }}
+          labelFormatter={(v) => `Round ${v}`}
+          formatter={(v: number) => [Math.round(v), "Score"]}
+        />
+        <Line
+          type="monotone"
+          dataKey="fantasy_points"
+          stroke="#F5C84C"
+          strokeWidth={2}
+          dot={<Dot r={3} fill="#F5C84C" strokeWidth={0} />}
+          activeDot={{ r: 5, fill: "#F5C84C", strokeWidth: 2, stroke: "#0e0e0e" }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+// ─── Consistency Range Bar ─────────────────────────────────────────────────────
+
+function ConsistencyRangeBar({
+  floor,
+  projection,
+  ceiling,
+}: {
+  floor: number | null;
+  projection: number | null;
+  ceiling: number | null;
+}) {
+  if (floor == null || projection == null || ceiling == null) return null;
+
+  const range = ceiling - floor;
+  if (range <= 0) return null;
+
+  const projPct = ((projection - floor) / range) * 100;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-[10px]">
+        <span className="text-red-400 font-semibold">{fmt(floor, 0)}</span>
+        <span className="text-white/40 uppercase tracking-wider">Scoring Range</span>
+        <span className="text-emerald-400 font-semibold">{fmt(ceiling, 0)}</span>
+      </div>
+      <div className="relative h-3 rounded-full overflow-hidden bg-gradient-to-r from-red-500/40 via-[#F5C84C]/40 to-emerald-500/40">
+        <div
+          className="absolute top-0 bottom-0 w-0.5 bg-white rounded-full shadow-lg"
+          style={{ left: `clamp(2px, calc(${projPct}% - 1px), calc(100% - 2px))` }}
+        />
+      </div>
+      <div className="flex items-center justify-center gap-1">
+        <div className="h-1.5 w-1.5 rounded-full bg-white/60" />
+        <span className="text-[10px] text-white/50">
+          Projection: <span className="text-[#F5C84C] font-semibold">{fmt(projection, 0)}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Captain Recommendations Section ─────────────────────────────────────────
 
 function CaptainSection({ isPremium }: { isPremium: boolean }) {
@@ -154,7 +326,7 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetch() {
+    async function load() {
       setLoading(true);
       const { data } = await supabase
         .from("v_captain_recommendations")
@@ -164,7 +336,7 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
       setCaptains((data as CaptainRow[]) ?? []);
       setLoading(false);
     }
-    fetch();
+    load();
   }, []);
 
   return (
@@ -317,9 +489,9 @@ function PlayerDetailModal({
         ) : (
           <div className="space-y-4">
             {/* Header */}
-            <div>
+            <div className="pr-6">
               <h2 className="text-lg font-semibold text-white">{detail.player_name}</h2>
-              <p className="text-sm text-white/50">{detail.team}</p>
+              <p className="text-sm text-white/50">{detail.team} {detail.position ? `· ${detail.position}` : ""}</p>
             </div>
 
             {/* Captain Rating (premium) */}
@@ -375,29 +547,40 @@ function PlayerDetailModal({
               )}
             </div>
 
+            {/* Consistency Range Bar (premium) */}
+            {isPremium && (
+              <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-3">
+                <ConsistencyRangeBar
+                  floor={detail.floor_estimate ?? null}
+                  projection={detail.projection_final ?? null}
+                  ceiling={detail.ceiling_estimate ?? null}
+                />
+              </div>
+            )}
+
             {/* Premium Decision Grid */}
             {isPremium ? (
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg bg-white/5 px-3 py-3">
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Form</p>
+                  <MetricLabel label="Form" tooltip="Measures recent scoring strength over the last 3 rounds vs season average" />
                   <p className={`text-sm font-semibold ${getFormColor(detail.form_rating)}`}>
                     {detail.form_rating != null ? fmtInt(detail.form_rating) : "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Matchup</p>
+                  <MetricLabel label="Matchup" tooltip="Measures opponent difficulty — higher means an easier matchup" />
                   <p className={`text-sm font-semibold ${getMatchupColor(detail.matchup_rating)}`}>
                     {detail.matchup_rating != null ? fmtInt(detail.matchup_rating) : "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Upside</p>
+                  <MetricLabel label="Upside" tooltip="Potential to significantly exceed projection based on ceiling gap" />
                   <p className={`text-sm font-semibold ${getUpsideColor(detail.upside_rating)}`}>
                     {detail.upside_rating != null ? `+${fmtInt(detail.upside_rating)}%` : "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Risk</p>
+                  <MetricLabel label="Risk" tooltip="Chance of underperforming — lower is safer" />
                   <p className={`text-sm font-semibold ${getRiskColor(detail.risk_rating)}`}>
                     {detail.risk_rating != null ? `${fmtInt(detail.risk_rating)}%` : "—"}
                   </p>
@@ -409,9 +592,9 @@ function PlayerDetailModal({
                   </p>
                 </div>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Confidence</p>
+                  <MetricLabel label="Confidence" tooltip="AI certainty level in this projection — based on data volume and model agreement" />
                   <p className={`text-sm font-semibold ${getConfidenceColor(detail.projection_confidence)}`}>
-                    {fmtInt(detail.projection_confidence)}%
+                    {detail.projection_confidence != null ? `${fmtInt(detail.projection_confidence)}%` : "—"}
                   </p>
                 </div>
               </div>
@@ -430,10 +613,26 @@ function PlayerDetailModal({
               </div>
             )}
 
-            {isPremium && aiAnalysis?.analysis && (
-              <div className="rounded-lg bg-white/5 px-4 py-3">
-                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-2">AI Analysis</p>
-                <p className="text-sm text-white/70 leading-relaxed">{aiAnalysis.analysis}</p>
+            {/* Score History Chart */}
+            {isPremium && (
+              <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-3">
+                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-3">Score History — 2025</p>
+                <ScoreHistoryChart playerName={detail.player_name} />
+              </div>
+            )}
+
+            {/* AI Insight Section */}
+            {isPremium && (
+              <div className="rounded-lg border border-[#F5C84C]/15 bg-[#F5C84C]/[0.04] px-4 py-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-[#F5C84C]" />
+                  <p className="text-[10px] text-[#F5C84C]/70 uppercase tracking-wider font-semibold">AI Insight</p>
+                </div>
+                {aiAnalysis?.analysis ? (
+                  <p className="text-sm text-white/70 leading-relaxed italic">{aiAnalysis.analysis}</p>
+                ) : (
+                  <p className="text-sm text-white/25 italic">AI analysis not yet generated for this player.</p>
+                )}
               </div>
             )}
 
