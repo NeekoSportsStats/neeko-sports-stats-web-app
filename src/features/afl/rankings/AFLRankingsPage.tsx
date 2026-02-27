@@ -763,21 +763,44 @@ function PositionPill({ value, active, onClick }: { value: PositionFilter; activ
 
 // ─── Upgrade CTA ──────────────────────────────────────────────────────────────
 
-function UpgradeCTABanner({ lockedCount }: { lockedCount: number }) {
+interface PositionCount {
+  position: string;
+  count: number;
+}
+
+function UpgradeCTABanner({ lockedCount, positionCounts }: { lockedCount: number; positionCounts: PositionCount[] }) {
+  const POSITION_ORDER: PositionFilter[] = ["MID", "DEF", "FWD", "RUC"];
+
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-b-xl border-t border-[#F5C84C]/10 bg-[#F5C84C]/5 px-6 py-10 text-center">
       <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#F5C84C]/30 bg-[#F5C84C]/10">
         <Crown size={18} className="text-[#F5C84C]" />
       </div>
-      <h3 className="text-base font-semibold text-white">Unlock full rankings with Neeko+</h3>
-      <p className="text-sm text-white/40 max-w-xs">
+      <h3 className="text-base font-semibold text-white">
         {lockedCount > 0
-          ? `Unlock ${lockedCount} more players with Captain Rating, Form, Matchup, Upside & AI Recommendations.`
-          : "See all players with Captain Rating, Form, Matchup, Upside & AI Recommendations."}
+          ? `Unlock ${lockedCount} more player insights with Neeko+`
+          : "Unlock full rankings with Neeko+"}
+      </h3>
+      <p className="text-sm text-white/40 max-w-xs">
+        Captain Rating, Form, Matchup, Upside & AI Recommendations for every player.
       </p>
+      {positionCounts.length > 0 && (
+        <div className="flex items-center gap-3 flex-wrap justify-center mt-1">
+          {POSITION_ORDER.map((pos) => {
+            const entry = positionCounts.find((p) => p.position === pos);
+            if (!entry) return null;
+            return (
+              <div key={pos} className="flex items-center gap-1.5">
+                <span className="rounded px-1.5 py-0.5 text-[10px] font-bold bg-white/5 text-white/40 uppercase tracking-wider">{pos}</span>
+                <span className="text-xs font-semibold text-white/60 tabular-nums">{entry.count}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <a
         href="/neeko-plus"
-        className="rounded-lg bg-[#F5C84C] px-6 py-2.5 text-sm font-bold text-black hover:bg-[#f0bd30] transition-colors"
+        className="mt-1 rounded-lg bg-[#F5C84C] px-6 py-2.5 text-sm font-bold text-black hover:bg-[#f0bd30] transition-colors"
       >
         Upgrade Now
       </a>
@@ -796,6 +819,29 @@ export default function AFLRankingsPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selected, setSelected] = useState<(RankingRow & { _rank: number; _unlocked: boolean }) | null>(null);
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [positionCounts, setPositionCounts] = useState<PositionCount[]>([]);
+
+  useEffect(() => {
+    async function fetchTotalCounts() {
+      const { data: totalData } = await supabase
+        .from("v_rankings_premium")
+        .select("position", { count: "exact", head: false });
+
+      if (totalData) {
+        setTotalCount(totalData.length);
+        const counts: Record<string, number> = {};
+        for (const row of totalData) {
+          const pos = normalisePosition(row.position) ?? "OTHER";
+          counts[pos] = (counts[pos] ?? 0) + 1;
+        }
+        setPositionCounts(
+          Object.entries(counts).map(([position, count]) => ({ position, count }))
+        );
+      }
+    }
+    fetchTotalCounts();
+  }, []);
 
   useEffect(() => {
     async function fetchRankings() {
@@ -855,7 +901,10 @@ export default function AFLRankingsPage() {
 
   const freeLimit = positionFilter === "ALL" ? FREE_LIMIT_ALL : FREE_LIMIT_POSITION;
   const visibleRows = isPremium ? sorted : sorted.slice(0, FREE_VISIBLE);
-  const lockedCount = isPremium ? 0 : Math.max(0, sorted.length - freeLimit);
+  const totalForFilter = positionFilter === "ALL"
+    ? totalCount
+    : (positionCounts.find((p) => p.position === positionFilter)?.count ?? sorted.length);
+  const lockedCount = isPremium ? 0 : Math.max(0, totalForFilter - freeLimit);
 
   const TOTAL_COLS = 11;
 
@@ -1040,7 +1089,7 @@ export default function AFLRankingsPage() {
           </table>
         </div>
 
-        {!isPremium && <UpgradeCTABanner lockedCount={lockedCount} />}
+        {!isPremium && <UpgradeCTABanner lockedCount={lockedCount} positionCounts={positionCounts} />}
       </div>
 
       {selected && (
