@@ -57,9 +57,6 @@ Deno.serve(async (req: Request) => {
     };
 
     const functions = [
-      "generate-player-summary",
-      "generate-team-ai-summaries",
-      "generate-match-summary",
       "generate-ranking-ai",
     ];
 
@@ -79,34 +76,18 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const { count: playerCount } = await supabase
-      .schema("afl")
-      .from("ai_player_summaries")
-      .select("*", { count: "exact", head: true })
-      .eq("season", 2026);
+    const { count: rankingCount } = await supabase
+      .from("ai_player_analysis")
+      .select("*", { count: "exact", head: true });
 
-    const { count: teamCount } = await supabase
-      .schema("afl")
-      .from("ai_team_summaries")
-      .select("*", { count: "exact", head: true })
-      .eq("season", 2026);
-
-    const { count: matchCount } = await supabase
-      .schema("afl")
-      .from("ai_match_predictions")
-      .select("*", { count: "exact", head: true })
-      .eq("season", 2026);
-
-    const totalRecords = (playerCount ?? 0) + (teamCount ?? 0) + (matchCount ?? 0);
+    const totalRecords = rankingCount ?? 0;
     await updateLog("success", totalRecords);
 
     return new Response(
       JSON.stringify({
         message: "generate-all-ai complete",
         summary: {
-          player_summaries_written: playerCount ?? 0,
-          team_summaries_written: teamCount ?? 0,
-          match_predictions_written: matchCount ?? 0,
+          ranking_analysis_written: rankingCount ?? 0,
         },
         results,
       }),
