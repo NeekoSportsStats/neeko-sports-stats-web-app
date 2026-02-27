@@ -51,7 +51,6 @@ type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
 
 const FREE_LIMIT_ALL = 5;
 const FREE_LIMIT_POSITION = 3;
-const CTA_AFTER_ROW = 5;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -147,7 +146,11 @@ function getCaptainStyle(rating: string | null): { text: string; bg: string; bor
 // ─── Small helpers ─────────────────────────────────────────────────────────────
 
 function LockedCell() {
-  return <Lock size={12} className="mx-auto text-[#F5C84C]" />;
+  return (
+    <div className="flex justify-center items-center">
+      <Lock size={14} className="text-white/20" />
+    </div>
+  );
 }
 
 function PremiumBadge({ label, colorClass }: { label: string; colorClass: string }) {
@@ -420,11 +423,13 @@ function PlayerDetailModal({
   row,
   rank,
   isPremium,
+  isUnlocked,
   onClose,
 }: {
   row: RankingRow;
   rank: number;
   isPremium: boolean;
+  isUnlocked: boolean;
   onClose: () => void;
 }) {
   const [detail, setDetail] = useState<PlayerDetail | null>(null);
@@ -460,7 +465,7 @@ function PlayerDetailModal({
     fetchDetail();
   }, [row.player_id]);
 
-  const unlocked = isPremium || rank <= FREE_FULL_UNLOCK;
+  const unlocked = isPremium || isUnlocked;
   const consistencyBadge = getConsistencyBadge(detail?.consistency_score ?? null);
   const recStyle = getRecommendationStyle(detail?.ai_recommendation ?? null);
   const capStyle = getCaptainStyle(captainDetail?.captain_rating ?? null);
@@ -733,25 +738,21 @@ function PositionPill({ value, active, onClick }: { value: PositionFilter; activ
 
 function UpgradeCTABanner() {
   return (
-    <tr>
-      <td colSpan={11}>
-        <div className="flex flex-col items-center justify-center gap-3 border-t border-[#F5C84C]/10 bg-[#F5C84C]/5 px-6 py-8 text-center">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#F5C84C]/30 bg-[#F5C84C]/10">
-            <Crown size={18} className="text-[#F5C84C]" />
-          </div>
-          <h3 className="text-base font-semibold text-white">Unlock full rankings with Neeko+</h3>
-          <p className="text-sm text-white/40">
-            See all players with Captain Rating, Form, Matchup, Upside & AI Recommendations.
-          </p>
-          <a
-            href="/neeko-plus"
-            className="rounded-lg bg-[#F5C84C] px-6 py-2.5 text-sm font-bold text-black hover:bg-[#f0bd30] transition-colors"
-          >
-            Upgrade Now
-          </a>
-        </div>
-      </td>
-    </tr>
+    <div className="flex flex-col items-center justify-center gap-3 rounded-b-xl border-t border-[#F5C84C]/10 bg-[#F5C84C]/5 px-6 py-10 text-center">
+      <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#F5C84C]/30 bg-[#F5C84C]/10">
+        <Crown size={18} className="text-[#F5C84C]" />
+      </div>
+      <h3 className="text-base font-semibold text-white">Unlock full rankings with Neeko+</h3>
+      <p className="text-sm text-white/40 max-w-xs">
+        See all players with Captain Rating, Form, Matchup, Upside & AI Recommendations.
+      </p>
+      <a
+        href="/neeko-plus"
+        className="rounded-lg bg-[#F5C84C] px-6 py-2.5 text-sm font-bold text-black hover:bg-[#f0bd30] transition-colors"
+      >
+        Upgrade Now
+      </a>
+    </div>
   );
 }
 
@@ -764,7 +765,7 @@ export default function AFLRankingsPage() {
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("projection_final");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [selected, setSelected] = useState<(RankingRow & { _rank: number }) | null>(null);
+  const [selected, setSelected] = useState<(RankingRow & { _rank: number; _unlocked: boolean }) | null>(null);
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
 
   useEffect(() => {
@@ -881,8 +882,8 @@ export default function AFLRankingsPage() {
       <div className="px-4 pb-10 md:px-8">
         <div className="overflow-x-auto rounded-xl border border-white/5">
           <table className="w-full min-w-[1000px] border-collapse">
-            <thead>
-              <tr className="border-b border-white/5 bg-white/[0.02]">
+            <thead className="sticky top-0 z-20 bg-[#070707] border-b border-white/10">
+              <tr>
                 <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 w-10">#</th>
                 <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40">Player</th>
                 <th className="px-3 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-white/40">Team</th>
@@ -914,15 +915,12 @@ export default function AFLRankingsPage() {
                     const consistencyBadge = getConsistencyBadge(row.consistency_score);
                     const recStyle = getRecommendationStyle(row.ai_recommendation);
                     const capStyle = getCaptainStyle(row.captain_rating);
-                    const showCta = !isPremium && idx === CTA_AFTER_ROW;
 
                     return (
-                      <>
-                        {showCta && <UpgradeCTABanner key={`cta-${idx}`} />}
-                        <tr
+                      <tr
                           key={row.player_id ?? row.player_name + idx}
                           className="border-b border-white/[0.04] transition-colors cursor-pointer hover:bg-white/5"
-                          onClick={() => setSelected({ ...row, _rank: rank } as RankingRow & { _rank: number })}
+                          onClick={() => setSelected({ ...row, _rank: rank, _unlocked: !isLocked } as RankingRow & { _rank: number; _unlocked: boolean })}
                         >
                           <td className="px-3 py-3 text-sm text-white/30 tabular-nums">{rank}</td>
                           <td className="px-3 py-3">
@@ -1007,12 +1005,13 @@ export default function AFLRankingsPage() {
                             )}
                           </td>
                         </tr>
-                      </>
                     );
                   })}
             </tbody>
           </table>
         </div>
+
+        {!isPremium && <UpgradeCTABanner />}
       </div>
 
       {selected && (
@@ -1020,6 +1019,7 @@ export default function AFLRankingsPage() {
           row={selected}
           rank={selected._rank}
           isPremium={isPremium}
+          isUnlocked={selected._unlocked}
           onClose={() => setSelected(null)}
         />
       )}
