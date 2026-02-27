@@ -71,36 +71,44 @@ function getConsistencyBadge(score: number | null) {
 }
 
 function getFormColor(r: string | null) {
-  if (!r) return "text-white/30";
-  if (r === "Elite Form") return "text-green-400";
-  if (r === "Rising") return "text-emerald-400";
-  if (r === "Neutral") return "text-white/60";
-  if (r === "Falling") return "text-orange-400";
-  return "text-blue-400";
+  if (r == null) return "text-white/30";
+  const n = typeof r === "string" ? parseFloat(r) : (r as unknown as number);
+  if (isNaN(n)) return "text-white/30";
+  if (n >= 85) return "text-green-400";
+  if (n >= 70) return "text-emerald-400";
+  if (n >= 55) return "text-white/60";
+  if (n >= 40) return "text-orange-400";
+  return "text-red-400";
 }
 
 function getMatchupColor(r: string | null) {
-  if (!r) return "text-white/30";
-  if (r === "Very Easy") return "text-green-400";
-  if (r === "Easy") return "text-emerald-400";
-  if (r === "Neutral") return "text-white/60";
-  if (r === "Hard") return "text-orange-400";
+  if (r == null) return "text-white/30";
+  const n = typeof r === "string" ? parseFloat(r) : (r as unknown as number);
+  if (isNaN(n)) return "text-white/30";
+  if (n >= 85) return "text-green-400";
+  if (n >= 70) return "text-emerald-400";
+  if (n >= 55) return "text-white/60";
+  if (n >= 40) return "text-orange-400";
   return "text-red-400";
 }
 
 function getUpsideColor(r: string | null) {
-  if (!r) return "text-white/30";
-  if (r === "Massive Upside") return "text-green-400";
-  if (r === "High Upside") return "text-emerald-400";
-  if (r === "Moderate Upside") return "text-yellow-400";
+  if (r == null) return "text-white/30";
+  const n = typeof r === "string" ? parseFloat(r) : (r as unknown as number);
+  if (isNaN(n)) return "text-white/30";
+  if (n >= 30) return "text-green-400";
+  if (n >= 20) return "text-emerald-400";
+  if (n >= 10) return "text-yellow-400";
   return "text-white/50";
 }
 
 function getRiskColor(r: string | null) {
-  if (!r) return "text-white/30";
-  if (r === "Very Safe") return "text-green-400";
-  if (r === "Safe") return "text-emerald-400";
-  if (r === "Risky") return "text-orange-400";
+  if (r == null) return "text-white/30";
+  const n = typeof r === "string" ? parseFloat(r) : (r as unknown as number);
+  if (isNaN(n)) return "text-white/30";
+  if (n <= 15) return "text-green-400";
+  if (n <= 25) return "text-emerald-400";
+  if (n <= 35) return "text-orange-400";
   return "text-red-400";
 }
 
@@ -373,25 +381,25 @@ function PlayerDetailModal({
                 <div className="rounded-lg bg-white/5 px-3 py-3">
                   <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Form</p>
                   <p className={`text-sm font-semibold ${getFormColor(detail.form_rating)}`}>
-                    {detail.form_rating ?? "—"}
+                    {detail.form_rating != null ? fmtInt(detail.form_rating) : "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
                   <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Matchup</p>
                   <p className={`text-sm font-semibold ${getMatchupColor(detail.matchup_rating)}`}>
-                    {detail.matchup_rating ?? "—"}
+                    {detail.matchup_rating != null ? fmtInt(detail.matchup_rating) : "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
                   <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Upside</p>
                   <p className={`text-sm font-semibold ${getUpsideColor(detail.upside_rating)}`}>
-                    {detail.upside_rating ?? "—"}
+                    {detail.upside_rating != null ? `+${fmtInt(detail.upside_rating)}%` : "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
                   <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Risk</p>
                   <p className={`text-sm font-semibold ${getRiskColor(detail.risk_rating)}`}>
-                    {detail.risk_rating ?? "—"}
+                    {detail.risk_rating != null ? `${fmtInt(detail.risk_rating)}%` : "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
@@ -548,30 +556,27 @@ export default function AFLRankingsPage() {
       const view = isPremium ? "v_rankings_premium" : "v_rankings_free";
       const { data } = await supabase
         .from(view)
-        .select("player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, consistency_score")
+        .select(`
+          player_id,
+          player_name,
+          team,
+          position,
+          projection_final,
+          ceiling_estimate,
+          floor_estimate,
+          consistency_score,
+          form_rating,
+          matchup_rating,
+          upside_rating,
+          risk_rating,
+          projection_confidence,
+          captain_rating,
+          captain_score,
+          ai_recommendation
+        `)
         .order("projection_final", { ascending: false });
 
-      const base = (data as RankingRow[]) ?? [];
-
-      if (isPremium) {
-        const { data: capData } = await supabase
-          .from("v_captain_recommendations")
-          .select("player_id, captain_score, captain_rating");
-
-        const capMap = new Map<string, { captain_score: number; captain_rating: string }>();
-        (capData ?? []).forEach((c: { player_id: string; captain_score: number; captain_rating: string }) => {
-          if (c.player_id) capMap.set(c.player_id, { captain_score: c.captain_score, captain_rating: c.captain_rating });
-        });
-
-        setRows(
-          base.map((r) => {
-            const cap = r.player_id ? capMap.get(r.player_id) : undefined;
-            return { ...r, captain_score: cap?.captain_score ?? null, captain_rating: cap?.captain_rating ?? null };
-          })
-        );
-      } else {
-        setRows(base);
-      }
+      setRows((data as RankingRow[]) ?? []);
 
       setLoading(false);
     }
@@ -732,21 +737,21 @@ export default function AFLRankingsPage() {
                           {/* Form */}
                           <td className="px-3 py-3 text-right">
                             {!isPremium ? <LockedCell /> : (
-                              <PremiumBadge label={row.form_rating ?? "—"} colorClass={getFormColor(row.form_rating)} />
+                              <PremiumBadge label={row.form_rating != null ? fmtInt(row.form_rating) : "—"} colorClass={getFormColor(row.form_rating)} />
                             )}
                           </td>
 
                           {/* Matchup */}
                           <td className="px-3 py-3 text-right">
                             {!isPremium ? <LockedCell /> : (
-                              <PremiumBadge label={row.matchup_rating ?? "—"} colorClass={getMatchupColor(row.matchup_rating)} />
+                              <PremiumBadge label={row.matchup_rating != null ? fmtInt(row.matchup_rating) : "—"} colorClass={getMatchupColor(row.matchup_rating)} />
                             )}
                           </td>
 
                           {/* Upside */}
                           <td className="px-3 py-3 text-right">
                             {!isPremium ? <LockedCell /> : (
-                              <PremiumBadge label={row.upside_rating ?? "—"} colorClass={getUpsideColor(row.upside_rating)} />
+                              <PremiumBadge label={row.upside_rating != null ? `+${fmtInt(row.upside_rating)}%` : "—"} colorClass={getUpsideColor(row.upside_rating)} />
                             )}
                           </td>
 
