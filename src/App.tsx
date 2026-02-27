@@ -53,6 +53,7 @@ const AFLPlayersPage     = React.lazy(() => import("@/features/afl/players/AFLPl
 const AFLTeamsPage       = React.lazy(() => import("@/features/afl/teams/AFLTeamsPage"));
 const AFLMatchCentrePage = React.lazy(() => import("@/features/afl/match-centre/AFLMatchCentrePage"));
 const AFLAIInsightsPage  = React.lazy(() => import("@/features/afl/ai-insights/AFLAIInsightsPage"));
+const AFLRankingsPage    = React.lazy(() => import("@/features/afl/rankings/AFLRankingsPage"));
 
 /* =========================
    EPL Pages — lazy
@@ -198,6 +199,7 @@ function App() {
       <Route path="/sports/afl/teams"       element={<Layout><S fallback={Teams}><AFLTeamsPage /></S></Layout>} />
       <Route path="/sports/afl/ai-analysis" element={<Layout><S fallback={AI}><AFLAIInsightsPage /></S></Layout>} />
       <Route path="/sports/afl/match-centre" element={<Layout><S fallback={MatchCentre}><AFLMatchCentrePage /></S></Layout>} />
+      <Route path="/sports/afl/rankings"    element={<Layout><S fallback={Players}><AFLRankingsPage /></S></Layout>} />
 
       {/* =========================
          EPL

@@ -142,6 +142,10 @@ export function AppSidebar() {
                           url: "/sports/afl/teams",
                         },
                         {
+                          title: "Rankings",
+                          url: "/sports/afl/rankings",
+                        },
+                        {
                           title: "AI Analysis",
                           url: "/sports/afl/ai-analysis",
                         },
