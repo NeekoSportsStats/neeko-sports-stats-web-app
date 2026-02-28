@@ -1038,7 +1038,7 @@ export default function AFLRankingsPage() {
               {/* Column header row */}
               <tr className="border-b border-[#222]">
                 <th className={`${TH_BASE} text-white/40 w-10`}>#</th>
-                <th className={`${TH_BASE} text-left text-white/40 sticky left-0 z-50 bg-[#0a0a0a] min-w-[160px]`}>Player</th>
+                <th className={`${TH_BASE} text-left text-white/40 min-w-[160px]`}>Player</th>
                 <th className={`${TH_BASE} text-white/40 min-w-[80px]`}>Team</th>
                 <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
                 <PlainTh label="Captain" locked={!isPremium} />
@@ -1078,7 +1078,7 @@ export default function AFLRankingsPage() {
                         onClick={() => setSelected({ ...row, _rank: rank, _unlocked: !isLocked } as RankingRow & { _rank: number; _unlocked: boolean })}
                       >
                         <td className="px-4 py-3 text-sm text-white/30 tabular-nums text-center whitespace-nowrap">{rank}</td>
-                        <td className="px-4 py-3 sticky left-0 z-30 bg-[#0a0a0a] min-w-[160px] whitespace-nowrap">
+                        <td className="px-4 py-3 min-w-[160px] whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-white">{row.player_name}</span>
                             {!isPremium && !isLocked && (
