@@ -22,6 +22,7 @@ interface RankingRow {
   projection_confidence?: number | null;
   ai_recommendation?: string | null;
   ai_analysis?: string | null;
+  recommendation_why?: string | null;
   recommendation_color?: string | null;
   captain_rating?: string | null;
   captain_score?: number | null;
@@ -937,7 +938,7 @@ export default function AFLRankingsPage() {
 
   const visibleRows = isPremium ? sorted : sorted.slice(0, FREE_ROW_LIMIT);
 
-  const TOTAL_COLS = 11;
+  const TOTAL_COLS = 12;
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
@@ -1009,6 +1010,7 @@ export default function AFLRankingsPage() {
                 <PlainTh label="Projection Confidence" locked={!isPremium} />
                 <SortTh label="Consistency" sortKey="consistency_score" currentKey={sortKey} dir={sortDir} onSort={handleSort} locked={!isPremium} />
                 <PlainTh label="AI Recommendation" locked={!isPremium} />
+                <PlainTh label="Why" locked={!isPremium} />
               </tr>
             </thead>
             <tbody>
@@ -1111,6 +1113,7 @@ export default function AFLRankingsPage() {
 
                         {/* Recommendation */}
                         <td className={`px-3 py-3 text-right${isEliteCaptain ? " bg-[#1A1400]" : ""}`}>
+
                           {!metricsUnlocked ? <LockedCell /> : row.ai_recommendation ? (
                             <span
                               className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap${isEliteCaptain ? " elite-captain-badge" : ""}`}
@@ -1132,6 +1135,15 @@ export default function AFLRankingsPage() {
                             </span>
                           ) : (
                             <span className="text-white/20 text-xs">—</span>
+                          )}
+                        </td>
+
+                        {/* Why */}
+                        <td className="px-3 py-3 max-w-[220px]">
+                          {!metricsUnlocked ? <LockedCell /> : (
+                            <span className="text-xs text-white/50 line-clamp-2 leading-snug">
+                              {row.recommendation_why ?? "—"}
+                            </span>
                           )}
                         </td>
                       </tr>
