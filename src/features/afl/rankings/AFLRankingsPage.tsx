@@ -861,6 +861,7 @@ export default function AFLRankingsPage() {
   const [selected, setSelected] = useState<(RankingRow & { _rank: number; _unlocked: boolean }) | null>(null);
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
   const [totalCount, setTotalCount] = useState<number>(0);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     async function fetchRankings() {
@@ -924,11 +925,15 @@ export default function AFLRankingsPage() {
     }
   }
 
-  const filtered = !isPremium
+  const posFiltered = !isPremium
     ? rows
     : positionFilter === "ALL"
     ? rows
     : rows.filter((r) => r.position === positionFilter);
+
+  const filtered = isPremium && searchTerm.trim()
+    ? posFiltered.filter((r) => r.player_name.toLowerCase().includes(searchTerm.toLowerCase()))
+    : posFiltered;
 
   const sorted = [...filtered].sort((a, b) => {
     const av = (a[sortKey] as number | null) ?? -Infinity;
@@ -975,6 +980,38 @@ export default function AFLRankingsPage() {
 
       {/* Rankings Table */}
       <div className="px-4 pb-10 md:px-8">
+
+        {/* Search bar */}
+        <div className="mb-4 relative">
+          <input
+            type="text"
+            placeholder={isPremium ? "Search player…" : "Search player (Neeko+)"}
+            value={searchTerm}
+            onChange={(e) => {
+              if (!isPremium) return;
+              setSearchTerm(e.target.value);
+            }}
+            onClick={() => {
+              if (!isPremium) window.location.href = "/neeko-plus";
+            }}
+            className={`w-full bg-[#0B0B0B] border border-[#333] rounded-lg px-4 py-3 text-white placeholder-[#555] focus:outline-none focus:border-[#F5C84C] transition-colors${!isPremium ? " cursor-pointer opacity-60 blur-[0.6px] select-none" : ""}`}
+          />
+          {!isPremium && (
+            <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-[#F5C84C] text-xs font-semibold">
+              <Lock size={12} />
+              Neeko+
+            </div>
+          )}
+          {isPremium && searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
         <div className="relative">
           <div className="overflow-x-auto rounded-xl border border-white/5 scrollbar-thin scrollbar-thumb-[#333] scrollbar-track-transparent">
           <table className="w-full min-w-[1400px] border-collapse">
