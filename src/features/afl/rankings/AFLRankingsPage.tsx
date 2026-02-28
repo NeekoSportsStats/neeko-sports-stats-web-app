@@ -41,6 +41,7 @@ interface CaptainRow {
   consistency_score: number | null;
   captain_score: number | null;
   captain_rating: string | null;
+  captain_confidence: number | null;
 }
 
 interface ScoreHistoryPoint {
@@ -397,7 +398,11 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
                   key={c.player_id ?? c.player_name}
                   className={`relative rounded-lg border px-3 py-3 transition-all ${style.bg} ${style.border} ${
                     isBlurred ? "select-none" : ""
-                  } ${idx === 0 ? "shadow-[0_0_15px_rgba(245,200,76,0.6)] border-[#F5C84C]" : ""}`}
+                  } ${idx === 0 ? "shadow-[0_0_15px_rgba(245,200,76,0.6)] border-[#F5C84C]" : ""} ${
+                    c.captain_confidence != null && c.captain_confidence >= 95
+                      ? "shadow-[0_0_20px_rgba(245,200,76,0.7)]"
+                      : ""
+                  }`}
                 >
                   {isBlurred && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg backdrop-blur-sm bg-black/40 z-10">
@@ -419,6 +424,27 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
                     <span className={`text-[10px] font-semibold ${style.text}`}>{c.captain_rating}</span>
                   </div>
                   <p className="text-sm font-semibold text-white leading-tight truncate">{c.player_name}</p>
+                  {c.captain_confidence != null && (
+                    <div
+                      className="text-xs font-semibold mt-1 mb-1 px-2 py-0.5 rounded inline-block"
+                      style={{
+                        background:
+                          c.captain_confidence >= 90
+                            ? "rgba(245,200,76,0.15)"
+                            : c.captain_confidence >= 80
+                            ? "rgba(0,200,83,0.15)"
+                            : "rgba(255,109,0,0.15)",
+                        color:
+                          c.captain_confidence >= 90
+                            ? "#F5C84C"
+                            : c.captain_confidence >= 80
+                            ? "#00C853"
+                            : "#FF6D00",
+                      }}
+                    >
+                      {c.captain_confidence}% Confidence
+                    </div>
+                  )}
                   <p className="text-[11px] text-white/40 truncate">{c.team}</p>
                   <div className="mt-2 flex items-center justify-between">
                     <div>
