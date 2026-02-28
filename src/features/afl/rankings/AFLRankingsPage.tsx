@@ -994,7 +994,7 @@ export default function AFLRankingsPage() {
             onClick={() => {
               if (!isPremium) window.location.href = "/neeko-plus";
             }}
-            className={`w-full bg-[#0B0B0B] border border-[#333] rounded-lg px-4 py-3 text-white placeholder-[#555] focus:outline-none focus:border-[#F5C84C] transition-colors${!isPremium ? " cursor-pointer opacity-60 blur-[0.6px] select-none" : ""}`}
+            className={`w-full bg-[#111111] border border-[#3a3a3a] rounded-lg px-4 py-3 text-white placeholder-[#666] focus:outline-none focus:border-[#F5C84C] transition-colors${!isPremium ? " cursor-pointer opacity-60 blur-[0.6px] select-none" : ""}`}
           />
           {!isPremium && (
             <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-[#F5C84C] text-xs font-semibold">
@@ -1176,10 +1176,10 @@ export default function AFLRankingsPage() {
                         </td>
 
                         {/* Why */}
-                        <td className="px-4 py-3 min-w-[220px] max-w-[260px]">
+                        <td className="px-4 py-3 text-left min-w-[260px] max-w-[260px] whitespace-normal">
                           {!metricsUnlocked ? (
                             <LockedCell />
-                          ) : !isPremium && idx >= 3 ? (
+                          ) : !isPremium && idx >= 5 ? (
                             <div className="blur-sm opacity-40 select-none pointer-events-none text-xs text-white/50 line-clamp-2 leading-snug">
                               {row.recommendation_why ?? "—"}
                             </div>
