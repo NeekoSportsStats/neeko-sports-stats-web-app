@@ -49,6 +49,16 @@ export default function PlayerTrendModal(props: {
 
   const [compareId, setCompareId] = useState<string>("");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      const t = setTimeout(() => setIsVisible(true), 10);
+      return () => clearTimeout(t);
+    } else {
+      setIsVisible(false);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) setCompareId("");
@@ -150,29 +160,39 @@ export default function PlayerTrendModal(props: {
   };
 
   return (
-    <div className="fixed inset-0 z-[80]" style={{ overflow: "hidden" }}>
+    <div className="fixed inset-0 z-[80] flex items-end justify-center md:items-center" style={{ overflow: "hidden" }}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-3xl -translate-x-1/2 -translate-y-1/2">
+      <div
+        className={`relative w-full md:w-[720px] h-[90vh] md:h-auto bg-[#0b0b0b] rounded-t-2xl md:rounded-2xl shadow-2xl transform transition-transform duration-300 ease-out flex flex-col ${isVisible ? "translate-y-0" : "translate-y-full"}`}
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        {/* Drag handle */}
+        <div className="w-full flex justify-center pt-3 pb-2 flex-shrink-0 md:hidden">
+          <div className="w-12 h-1.5 bg-gray-600 rounded-full" />
+        </div>
+
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-10 rounded-full border border-white/10 bg-black/20 p-2 text-white/70 hover:bg-white/5"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        {/* Scrollable content */}
         <div
-          className="max-h-[90vh] overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0b0b] shadow-2xl"
+          className="overflow-y-auto h-full"
           style={{ WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", touchAction: "pan-y" }}
         >
-          <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-2">
-            <div>
+          <div className="px-5 pt-4 pb-2">
+            <div className="pr-10">
               <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Player Trend</div>
               <div className="mt-0.5 text-2xl font-semibold text-white">{player.name}</div>
               <div className="mt-0.5 text-sm text-white/55">Weekly {statLabel} output</div>
             </div>
-
-            <button
-              onClick={onClose}
-              className="rounded-full border border-white/10 bg-black/20 p-2 text-white/70 hover:bg-white/5"
-            >
-              <X className="h-4 w-4" />
-            </button>
           </div>
 
-          <div className="px-5 pb-4">
+          <div className="px-5 pb-6">
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1">
                 <select
@@ -436,8 +456,8 @@ export default function PlayerTrendModal(props: {
               </div>
             )}
           </div>
-        </div>
-      </div>
+        </div>{/* end scrollable content */}
+      </div>{/* end modal container */}
     </div>
   );
 }
