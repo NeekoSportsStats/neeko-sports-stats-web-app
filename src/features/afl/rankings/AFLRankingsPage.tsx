@@ -348,11 +348,7 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const { data } = await supabase
-        .from("v_captain_recommendations")
-        .select("player_id, player_name, team, projection_final, ceiling_estimate, consistency_score, captain_score, captain_rating")
-        .order("captain_score", { ascending: false })
-        .limit(5);
+      const { data } = await supabase.rpc("get_captain_recommendations_free");
       setCaptains((data as CaptainRow[]) ?? []);
       setLoading(false);
     }
@@ -387,17 +383,35 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
               const style = getCaptainStyle(c.captain_rating);
               const isBlurred = !isPremium && idx >= 2;
 
+              const medal =
+                idx === 0
+                  ? { icon: "👑", color: "#F5C84C", label: "Gold" }
+                  : idx === 1
+                  ? { icon: "🥈", color: "#C0C0C0", label: "Silver" }
+                  : idx === 2
+                  ? { icon: "🥉", color: "#CD7F32", label: "Bronze" }
+                  : null;
+
               return (
                 <div
                   key={c.player_id ?? c.player_name}
                   className={`relative rounded-lg border px-3 py-3 transition-all ${style.bg} ${style.border} ${
                     isBlurred ? "select-none" : ""
-                  }`}
+                  } ${idx === 0 ? "shadow-[0_0_15px_rgba(245,200,76,0.6)] border-[#F5C84C]" : ""}`}
                 >
                   {isBlurred && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg backdrop-blur-sm bg-black/40 z-10">
                       <Lock size={14} className="text-[#F5C84C]/60 mb-1" />
                       <span className="text-[10px] text-white/30">Neeko+</span>
+                    </div>
+                  )}
+                  {medal && (
+                    <div
+                      className="flex items-center gap-1 text-xs font-semibold mb-1"
+                      style={{ color: medal.color }}
+                    >
+                      <span>{medal.icon}</span>
+                      <span>{medal.label} Captain</span>
                     </div>
                   )}
                   <div className="flex items-center gap-1 mb-1.5">
