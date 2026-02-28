@@ -36,9 +36,6 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const openai = new OpenAI({ apiKey: openaiKey });
 
-    const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
-    const batchSize: number = body.batch_size ?? 15;
-
     const { data: promptRow, error: promptErr } = await supabase
       .schema("afl")
       .from("ai_prompts")
@@ -56,47 +53,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: pending, error: inputErr } = await supabase
-      .from("v_ai_player_ranking_openai_inputs_2026")
-      .select("season, round_number, player_id, prompt_key, payload, input_hash")
-      .limit(batchSize);
+    const { data: queue, error: queueErr } = await supabase
+      .from("v_ai_rankings_generation_queue")
+      .select("player_id, player_name, team, position, openai_input_json, updated_at");
 
-    if (inputErr) throw inputErr;
-    if (!pending || pending.length === 0) {
+    if (queueErr) throw queueErr;
+
+    if (!queue || queue.length === 0) {
       return new Response(
-        JSON.stringify({ message: "No pending inputs found", processed: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const existingHashes = new Set<string>();
-    const playerIds = pending.map((r: { player_id: number }) => r.player_id);
-    const season = pending[0].season as number;
-    const roundNumber = pending[0].round_number as number;
-
-    const { data: existing } = await supabase
-      .from("ai_rankings_player_recos")
-      .select("player_id, input_hash")
-      .eq("season", season)
-      .eq("round_number", roundNumber)
-      .in("player_id", playerIds);
-
-    for (const row of (existing ?? [])) {
-      existingHashes.add(`${row.player_id}:${row.input_hash}`);
-    }
-
-    const toProcess = (pending as Array<{
-      season: number;
-      round_number: number;
-      player_id: number;
-      prompt_key: string;
-      payload: Record<string, unknown>;
-      input_hash: string;
-    }>).filter((r) => !existingHashes.has(`${r.player_id}:${r.input_hash}`));
-
-    if (toProcess.length === 0) {
-      return new Response(
-        JSON.stringify({ message: "All players already up-to-date", skipped: pending.length }),
+        JSON.stringify({ message: "No players need generation", processed: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -105,9 +70,16 @@ Deno.serve(async (req: Request) => {
     let errors = 0;
     const samplePlayers: string[] = [];
 
-    for (const row of toProcess) {
+    for (const row of queue as Array<{
+      player_id: number;
+      player_name: string;
+      team: string;
+      position: string | null;
+      openai_input_json: Record<string, unknown>;
+      updated_at: string | null;
+    }>) {
       try {
-        const payloadText = JSON.stringify(row.payload, null, 2);
+        const payloadText = JSON.stringify(row.openai_input_json, null, 2);
         const userPrompt = (promptRow.user_prompt_template as string).replace("{{DATA}}", payloadText);
 
         const completion = await openai.chat.completions.create({
@@ -135,31 +107,22 @@ Deno.serve(async (req: Request) => {
           ? parsed.recommendation_label
           : "Watchlist";
 
-        const playerName = (row.payload as Record<string, string>).player ?? "";
-        const team = (row.payload as Record<string, string>).team ?? "";
-        const position = (row.payload as Record<string, string>).position ?? null;
+        const now = new Date().toISOString();
 
         await supabase
           .from("ai_rankings_player_recos")
           .upsert({
-            season: row.season,
-            round_number: row.round_number,
             player_id: row.player_id,
-            player_name: playerName,
-            team,
-            position,
+            season: 2026,
             recommendation_label: label,
             recommendation_short: clampText(parsed.recommendation_short, 60),
             recommendation_long: clampText(parsed.recommendation_long, 300),
-            confidence_pct: null,
-            generated_at: new Date().toISOString(),
-            model: "gpt-4o-mini",
-            prompt_key: "player_ranking_recommendation",
-            input_hash: row.input_hash,
-          });
+            generated_at: now,
+            updated_at: now,
+          }, { onConflict: "player_id" });
 
         processed++;
-        if (samplePlayers.length < 3) samplePlayers.push(playerName);
+        if (samplePlayers.length < 3) samplePlayers.push(row.player_name);
       } catch (playerErr) {
         errors++;
         console.error(`Error on player_id ${row.player_id}:`, playerErr);
@@ -171,8 +134,7 @@ Deno.serve(async (req: Request) => {
         message: "generate-player-ranking-recos complete",
         processed,
         errors,
-        skipped: pending.length - toProcess.length,
-        total_input: pending.length,
+        total_queued: queue.length,
         sample_players: samplePlayers,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
