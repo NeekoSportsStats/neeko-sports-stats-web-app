@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Lock, X } from "lucide-react";
 import type { LensKey, PlayerPoint, PlayerTrendPoint } from "./usePlayerScatterData";
 
@@ -49,16 +50,6 @@ export default function PlayerTrendModal(props: {
 
   const [compareId, setCompareId] = useState<string>("");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      const t = setTimeout(() => setIsVisible(true), 10);
-      return () => clearTimeout(t);
-    } else {
-      setIsVisible(false);
-    }
-  }, [open]);
 
   useEffect(() => {
     if (!open) setCompareId("");
@@ -112,9 +103,8 @@ export default function PlayerTrendModal(props: {
     return "Monitor role signals — current profile is sensitive to matchup conditions.";
   }, [player]);
 
-  if (!open || !player || !player.trend || player.trend.length === 0) return null;
-
   const statLabel = lens === "fantasy" ? "Fantasy" : lens === "disposals" ? "Disposals" : "Goals";
+  const shouldRender = open && !!player && !!player.trend && player.trend.length > 0;
 
   const CH_W = 760;
   const CH_H = 340;
@@ -160,15 +150,35 @@ export default function PlayerTrendModal(props: {
   };
 
   return (
+    <AnimatePresence>
+      {shouldRender && (
     <div className="fixed inset-0 z-[80] flex items-end justify-center md:items-center" style={{ overflow: "hidden" }}>
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div
-        className={`relative w-full md:w-[720px] h-[90vh] md:h-auto bg-[#0b0b0b] rounded-t-2xl md:rounded-2xl shadow-2xl transform transition-transform duration-300 ease-out flex flex-col ${isVisible ? "translate-y-0" : "translate-y-full"}`}
+      <motion.div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        drag="y"
+        dragConstraints={{ top: 0 }}
+        dragElastic={0.2}
+        onDragEnd={(_event, info) => {
+          if (info.offset.y > 120 || info.velocity.y > 500) {
+            onClose();
+          }
+        }}
+        className="relative w-full md:w-[720px] h-[90vh] md:h-auto bg-[#0b0b0b] rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {/* Drag handle */}
         <div className="w-full flex justify-center pt-3 pb-2 flex-shrink-0 md:hidden">
-          <div className="w-12 h-1.5 bg-gray-600 rounded-full" />
+          <div className="w-12 h-1.5 bg-gray-500 rounded-full" />
         </div>
 
         {/* Close button */}
@@ -457,7 +467,9 @@ export default function PlayerTrendModal(props: {
             )}
           </div>
         </div>{/* end scrollable content */}
-      </div>{/* end modal container */}
+      </motion.div>{/* end modal container */}
     </div>
+      )}
+    </AnimatePresence>
   );
 }
