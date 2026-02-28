@@ -888,7 +888,8 @@ export default function AFLRankingsPage() {
             captain_score,
             ai_recommendation,
             ai_analysis,
-            recommendation_color
+            recommendation_color,
+            recommendation_why
           `)
           .order("projection_final", { ascending: false });
 
@@ -1013,7 +1014,7 @@ export default function AFLRankingsPage() {
         </div>
 
         <div className="relative w-full">
-          <div className="overflow-x-auto rounded-xl border border-white/5 scrollbar-thin scrollbar-thumb-[#333] scrollbar-track-transparent">
+          <div className="overflow-x-auto overflow-y-auto max-h-[75vh] rounded-xl border border-white/5 scrollbar-thin scrollbar-thumb-[#333] scrollbar-track-transparent">
           <table className="min-w-[1400px] w-full border-collapse table-auto">
             <thead className="sticky top-0 z-40">
               {/* Position filter row */}
@@ -1177,16 +1178,18 @@ export default function AFLRankingsPage() {
 
                         {/* Why */}
                         <td className="px-4 py-3 text-left min-w-[260px] max-w-[260px] whitespace-normal">
-                          {!metricsUnlocked ? (
-                            <LockedCell />
-                          ) : !isPremium && idx >= 5 ? (
-                            <div className="blur-sm opacity-40 select-none pointer-events-none text-xs text-white/50 line-clamp-2 leading-snug">
-                              {row.recommendation_why ?? "—"}
-                            </div>
-                          ) : (
+                          {isPremium ? (
                             <span className="text-xs text-white/50 line-clamp-2 leading-snug">
                               {row.recommendation_why ?? "—"}
                             </span>
+                          ) : idx < 5 ? (
+                            <span className="text-xs text-white/50 line-clamp-2 leading-snug">
+                              {row.recommendation_why ?? "—"}
+                            </span>
+                          ) : (
+                            <div className="blur-sm select-none text-xs text-white/50">
+                              Premium
+                            </div>
                           )}
                         </td>
                       </tr>
