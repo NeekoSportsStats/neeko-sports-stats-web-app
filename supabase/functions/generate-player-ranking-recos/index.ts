@@ -8,14 +8,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const VALID_LABELS = new Set([
-  "Elite Captain",
-  "Strong Pick",
-  "Value Play",
-  "Watchlist",
-  "Avoid",
-  "High Risk",
-]);
+const TIER_COLORS: Record<string, string> = {
+  "ELITE CAPTAIN":    "#F5C84C",
+  "CAPTAIN LOCK":     "#D4AF37",
+  "MUST START":       "#00C853",
+  "STRONG START":     "#1B5E20",
+  "HIGH CONFIDENCE":  "#2E7D32",
+  "SOLID PICK":       "#66BB6A",
+  "VALUE PLAY":       "#29B6F6",
+  "FLEX OPTION":      "#90A4AE",
+  "HIGH RISK":        "#FF7043",
+  "AVOID":            "#D32F2F",
+};
+
+const VALID_LABELS = new Set(Object.keys(TIER_COLORS));
 
 function clampText(text: string | null | undefined, maxWords: number): string {
   if (!text) return "";
@@ -105,8 +111,9 @@ Deno.serve(async (req: Request) => {
 
         const label = VALID_LABELS.has(parsed.recommendation_label)
           ? parsed.recommendation_label
-          : "Watchlist";
+          : "FLEX OPTION";
 
+        const color = TIER_COLORS[label];
         const now = new Date().toISOString();
 
         await supabase
@@ -115,6 +122,7 @@ Deno.serve(async (req: Request) => {
             player_id: row.player_id,
             season: 2026,
             recommendation_label: label,
+            recommendation_color: color,
             recommendation_short: clampText(parsed.recommendation_short, 60),
             recommendation_long: clampText(parsed.recommendation_long, 300),
             generated_at: now,
