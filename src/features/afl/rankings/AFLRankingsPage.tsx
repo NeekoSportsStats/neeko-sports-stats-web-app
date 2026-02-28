@@ -754,7 +754,7 @@ function PlayerDetailModal({
 
 // ─── Sort / filter header helpers ─────────────────────────────────────────────
 
-const TH_BASE = "bg-[#0a0a0a] px-3 py-3 text-[11px] font-medium uppercase tracking-wider whitespace-nowrap border-b border-white/10";
+const TH_BASE = "bg-[#0a0a0a] px-4 py-3 text-[11px] font-medium uppercase tracking-wider whitespace-nowrap border-b border-white/10 text-center";
 
 function SortTh({
   label,
@@ -774,12 +774,12 @@ function SortTh({
   const active = currentKey === sortKey;
   return (
     <th
-      className={`${TH_BASE} text-right select-none transition-colors ${
+      className={`${TH_BASE} select-none transition-colors ${
         locked ? "text-white/20 cursor-default" : "text-white/40 cursor-pointer hover:text-white/70"
       }`}
       onClick={() => !locked && onSort(sortKey)}
     >
-      <span className="inline-flex items-center gap-1 justify-end">
+      <span className="inline-flex items-center gap-1 justify-center">
         {locked && <Lock size={10} className="text-[#F5C84C]" />}
         {label}
         {active && !locked && (dir === "desc" ? <ChevronDown size={12} /> : <ChevronUp size={12} />)}
@@ -790,8 +790,8 @@ function SortTh({
 
 function PlainTh({ label, locked }: { label: string; locked?: boolean }) {
   return (
-    <th className={`${TH_BASE} text-right text-white/20`}>
-      <span className="inline-flex items-center gap-1 justify-end">
+    <th className={`${TH_BASE} text-white/20`}>
+      <span className="inline-flex items-center gap-1 justify-center">
         {locked && <Lock size={10} className="text-[#F5C84C]" />}
         {label}
       </span>
@@ -976,7 +976,7 @@ export default function AFLRankingsPage() {
       {/* Rankings Table */}
       <div className="px-4 pb-10 md:px-8">
         <div className="overflow-x-auto rounded-xl border border-white/5">
-          <table className="w-full min-w-[1000px] border-collapse">
+          <table className="w-full min-w-[1400px] border-collapse">
             <thead className="sticky top-0 z-30 bg-[#0a0a0a]">
               {/* Position filter row — sticky tier 1 */}
               <tr>
@@ -999,9 +999,9 @@ export default function AFLRankingsPage() {
               </tr>
               {/* Column header row — sticky tier 2 */}
               <tr>
-                <th className={`${TH_BASE} text-left text-white/40 w-10`}>#</th>
-                <th className={`${TH_BASE} text-left text-white/40`}>Player</th>
-                <th className={`${TH_BASE} text-left text-white/40`}>Team</th>
+                <th className={`${TH_BASE} text-white/40 w-10`}>#</th>
+                <th className={`${TH_BASE} text-left text-white/40 sticky left-0 z-40 bg-[#0a0a0a] min-w-[160px]`}>Player</th>
+                <th className={`${TH_BASE} text-white/40 min-w-[80px]`}>Team</th>
                 <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
                 <PlainTh label="Captain" locked={!isPremium} />
                 <PlainTh label="Form" locked={!isPremium} />
@@ -1039,8 +1039,8 @@ export default function AFLRankingsPage() {
                         className={`border-b border-white/[0.04] transition-colors cursor-pointer hover:bg-white/5${isEliteCaptain ? " bg-[#120E00]" : ""}`}
                         onClick={() => setSelected({ ...row, _rank: rank, _unlocked: !isLocked } as RankingRow & { _rank: number; _unlocked: boolean })}
                       >
-                        <td className="px-3 py-3 text-sm text-white/30 tabular-nums">{rank}</td>
-                        <td className="px-3 py-3">
+                        <td className="px-4 py-3 text-sm text-white/30 tabular-nums text-center whitespace-nowrap">{rank}</td>
+                        <td className="px-4 py-3 sticky left-0 z-20 bg-[#0a0a0a] min-w-[160px] whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-white">{row.player_name}</span>
                             {!isPremium && !isLocked && (
@@ -1048,19 +1048,19 @@ export default function AFLRankingsPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-3 py-3">
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
                           <span className="text-xs text-white/50">{row.team}</span>
                         </td>
 
                         {/* Projection — always visible */}
-                        <td className="px-3 py-3 text-right">
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
                           <span className="text-sm font-semibold text-[#F5C84C] tabular-nums">
                             {fmt(row.projection_final)}
                           </span>
                         </td>
 
                         {/* Captain */}
-                        <td className="px-3 py-3 text-right">
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
                           {!metricsUnlocked ? <LockedCell /> : row.captain_rating ? (
                             <span
                               className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${capStyle.text} ${capStyle.bg} ${capStyle.border}`}
@@ -1073,28 +1073,28 @@ export default function AFLRankingsPage() {
                         </td>
 
                         {/* Form */}
-                        <td className="px-3 py-3 text-right">
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
                           {!metricsUnlocked ? <LockedCell /> : (
                             <PremiumBadge label={row.form_rating != null ? fmtInt(row.form_rating) : "—"} colorClass={getFormColor(row.form_rating ?? null)} />
                           )}
                         </td>
 
                         {/* Matchup */}
-                        <td className="px-3 py-3 text-right">
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
                           {!metricsUnlocked ? <LockedCell /> : (
                             <PremiumBadge label={row.matchup_rating != null ? fmtInt(row.matchup_rating) : "—"} colorClass={getMatchupColor(row.matchup_rating ?? null)} />
                           )}
                         </td>
 
                         {/* Upside */}
-                        <td className="px-3 py-3 text-right">
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
                           {!metricsUnlocked ? <LockedCell /> : (
                             <PremiumBadge label={row.upside_rating != null ? `+${fmtInt(row.upside_rating)}%` : "—"} colorClass={getUpsideColor(row.upside_rating ?? null)} />
                           )}
                         </td>
 
                         {/* Confidence */}
-                        <td className="px-3 py-3 text-right">
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
                           {!metricsUnlocked ? <LockedCell /> : (
                             <span className={`text-xs font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
                               {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
@@ -1103,7 +1103,7 @@ export default function AFLRankingsPage() {
                         </td>
 
                         {/* Consistency */}
-                        <td className="px-3 py-3 text-right">
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
                           {!metricsUnlocked ? <LockedCell /> : (
                             <span className={`text-xs font-semibold ${consistencyBadge.className}`}>
                               {consistencyBadge.label}
@@ -1112,8 +1112,7 @@ export default function AFLRankingsPage() {
                         </td>
 
                         {/* Recommendation */}
-                        <td className={`px-3 py-3 text-right${isEliteCaptain ? " bg-[#1A1400]" : ""}`}>
-
+                        <td className={`px-4 py-3 text-center whitespace-nowrap${isEliteCaptain ? " bg-[#1A1400]" : ""}`}>
                           {!metricsUnlocked ? <LockedCell /> : row.ai_recommendation ? (
                             <span
                               className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap${isEliteCaptain ? " elite-captain-badge" : ""}`}
@@ -1139,7 +1138,7 @@ export default function AFLRankingsPage() {
                         </td>
 
                         {/* Why */}
-                        <td className="px-3 py-3 max-w-[220px]">
+                        <td className="px-4 py-3 min-w-[220px] max-w-[260px]">
                           {!metricsUnlocked ? (
                             <LockedCell />
                           ) : !isPremium && idx >= 3 ? (
