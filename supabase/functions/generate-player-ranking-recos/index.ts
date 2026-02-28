@@ -10,15 +10,15 @@ const corsHeaders = {
 
 const TIER_COLORS: Record<string, string> = {
   "ELITE CAPTAIN":    "#F5C84C",
-  "CAPTAIN LOCK":     "#D4AF37",
-  "MUST START":       "#00C853",
-  "STRONG START":     "#1B5E20",
-  "HIGH CONFIDENCE":  "#2E7D32",
-  "SOLID PICK":       "#66BB6A",
-  "VALUE PLAY":       "#29B6F6",
-  "FLEX OPTION":      "#90A4AE",
-  "HIGH RISK":        "#FF7043",
-  "AVOID":            "#D32F2F",
+  "CAPTAIN LOCK":     "#E0B100",
+  "MUST START":       "#00E676",
+  "STRONG START":     "#00C853",
+  "HIGH CONFIDENCE":  "#00A844",
+  "SOLID PICK":       "#2196F3",
+  "VALUE PLAY":       "#00B0FF",
+  "FLEX OPTION":      "#9E9E9E",
+  "HIGH RISK":        "#FF6D00",
+  "AVOID":            "#D50000",
 };
 
 const VALID_LABELS = new Set(Object.keys(TIER_COLORS));
