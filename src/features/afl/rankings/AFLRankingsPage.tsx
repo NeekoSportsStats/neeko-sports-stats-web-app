@@ -369,7 +369,9 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
               </span>
             )}
           </div>
-          <p className="text-[11px] text-white/30">Top 5 by captain score</p>
+          <p className="text-[11px] text-white/30">
+            {isPremium ? "Top 5 by captain score" : "2 free · 3 locked · upgrade for all 5"}
+          </p>
         </div>
 
         {loading ? (
@@ -442,7 +444,7 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
                             : "#FF6D00",
                       }}
                     >
-                      {c.captain_confidence}% Confidence
+                      {c.captain_confidence}% Captain Confidence
                     </div>
                   )}
                   <p className="text-[11px] text-white/40 truncate">{c.team}</p>
@@ -464,8 +466,9 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
 
         {!isPremium && (
           <p className="mt-3 text-center text-[11px] text-white/30">
-            Unlock all 5 captain recommendations with{" "}
-            <a href="/neeko-plus" className="text-[#F5C84C] hover:underline">Neeko+</a>
+            Free users see top 2 captains.{" "}
+            <a href="/neeko-plus" className="text-[#F5C84C] hover:underline">Upgrade to Neeko+</a>{" "}
+            to unlock all 5.
           </p>
         )}
       </div>
@@ -1003,7 +1006,7 @@ export default function AFLRankingsPage() {
                 <PlainTh label="Form" locked={!isPremium} />
                 <PlainTh label="Matchup" locked={!isPremium} />
                 <PlainTh label="Upside" locked={!isPremium} />
-                <PlainTh label="Confidence" locked={!isPremium} />
+                <PlainTh label="Projection Confidence" locked={!isPremium} />
                 <SortTh label="Consistency" sortKey="consistency_score" currentKey={sortKey} dir={sortDir} onSort={handleSort} locked={!isPremium} />
                 <PlainTh label="AI Recommendation" locked={!isPremium} />
               </tr>
