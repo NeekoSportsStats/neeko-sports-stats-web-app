@@ -65,8 +65,12 @@ export default function PlayerTrendModal(props: {
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
       return () => {
         document.body.style.overflow = "";
+        document.body.style.position = "";
+        document.body.style.width = "";
       };
     }
   }, [open]);
@@ -146,10 +150,13 @@ export default function PlayerTrendModal(props: {
   };
 
   return (
-    <div className="fixed inset-0 z-[80]">
+    <div className="fixed inset-0 z-[80]" style={{ overflow: "hidden" }}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="absolute left-1/2 top-1/2 w-[92vw] max-w-3xl -translate-x-1/2 -translate-y-1/2">
-        <div className="max-h-[90vh] overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0b0b] shadow-2xl">
+        <div
+          className="max-h-[90vh] overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0b0b] shadow-2xl"
+          style={{ WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", touchAction: "pan-y" }}
+        >
           <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-2">
             <div>
               <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Player Trend</div>

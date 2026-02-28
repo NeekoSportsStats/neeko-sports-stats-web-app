@@ -1,5 +1,5 @@
 // src/components/afl/match-center/MatchDetailOverlay.tsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { FixtureMatch, TeamStatLine } from "../data/types";
 import type { StatConfig } from "@/lib/stats/types";
 import { X, ChevronDown } from "lucide-react";
@@ -48,6 +48,20 @@ type Props = {
 /* -------------------------------------------------------------------------- */
 
 export default function MatchDetailOverlay({ match, onClose, statConfig }: Props) {
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    const prevPosition = document.body.style.position;
+    const prevWidth = document.body.style.width;
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.width = "100%";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.position = prevPosition;
+      document.body.style.width = prevWidth;
+    };
+  }, []);
+
   const isFinal = match.status === "final";
 
   const margin =
@@ -127,12 +141,15 @@ export default function MatchDetailOverlay({ match, onClose, statConfig }: Props
   const [showLists, setShowLists] = useState(true);
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="fixed inset-0 z-50 flex justify-end" style={{ overflow: "hidden" }}>
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
-      <aside className="relative h-full w-full max-w-[460px] bg-[#0b0b0b] border-l border-white/10 p-5 overflow-y-auto">
+      <aside
+        className="relative h-full w-full max-w-[460px] bg-[#0b0b0b] border-l border-white/10 p-5 overflow-y-auto"
+        style={{ WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", touchAction: "pan-y" }}
+      >
         {/* Header */}
         <div className="flex justify-between items-start mb-6">
           <div>

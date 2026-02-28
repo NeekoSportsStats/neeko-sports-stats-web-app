@@ -103,7 +103,13 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
   const [showQuarters, setShowQuarters] = useState(false);
 
   useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    const prevPosition = document.body.style.position;
+    const prevWidth = document.body.style.width;
+
     document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.width = "100%";
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -111,7 +117,9 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
     window.addEventListener("keydown", onKeyDown);
 
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = prevOverflow;
+      document.body.style.position = prevPosition;
+      document.body.style.width = prevWidth;
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [onClose]);
@@ -386,6 +394,7 @@ export default function MatchOverlay({ match, timeline, matchPlayerStats, scatte
     <div
       ref={overlayRef}
       className="fixed inset-0 z-50 bg-gradient-to-b from-[#070707] to-black overflow-y-auto px-4 pb-10 pt-6 sm:max-w-4xl sm:mx-auto sm:mt-10 sm:rounded-xl animate-in fade-in duration-200"
+      style={{ WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", touchAction: "pan-y" }}
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}

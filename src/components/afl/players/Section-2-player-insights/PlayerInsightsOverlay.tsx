@@ -37,12 +37,19 @@ export default function PlayerInsightsOverlay({
   /* LOCK BACKGROUND SCROLL                                                  */
   /* ---------------------------------------------------------------------- */
   useEffect(() => {
-    const prev = document.body.style.overflow;
+    const prevOverflow = document.body.style.overflow;
+    const prevPosition = document.body.style.position;
+    const prevWidth = document.body.style.width;
+
     document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.width = "100%";
     setMounted(true);
 
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = prevOverflow;
+      document.body.style.position = prevPosition;
+      document.body.style.width = prevWidth;
     };
   }, []);
 
@@ -106,6 +113,7 @@ export default function PlayerInsightsOverlay({
   return (
     <div
       className="fixed inset-0 z-[999] isolate bg-black/80 backdrop-blur-md"
+      style={{ overflow: "hidden" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -162,7 +170,10 @@ export default function PlayerInsightsOverlay({
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto px-5 py-4 pb-12">
+          <div
+            className="flex-1 overflow-y-auto px-5 py-4 pb-12"
+            style={{ WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", touchAction: "pan-y" }}
+          >
             <InsightsContent
               player={player}
               selectedStat={selectedStat}
@@ -244,7 +255,7 @@ export default function PlayerInsightsOverlay({
           <div
             ref={scrollRef}
             className="flex-1 overflow-y-auto px-4 pb-[max(5rem,env(safe-area-inset-bottom))]"
-            style={{ WebkitOverflowScrolling: "touch" }}
+            style={{ WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", touchAction: "pan-y" }}
           >
             <InsightsContent
               player={player}
