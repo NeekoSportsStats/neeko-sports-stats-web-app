@@ -7,6 +7,16 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes eliteGlow {
+  0%   { box-shadow: 0 0 10px rgba(245, 200, 76, 0.4); }
+  50%  { box-shadow: 0 0 18px rgba(245, 200, 76, 0.8); }
+  100% { box-shadow: 0 0 10px rgba(245, 200, 76, 0.4); }
+}
+
+.elite-captain-badge {
+  animation: eliteGlow 2.5s ease-in-out infinite;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  DESIGN TOKENS                                                             */
 /* -------------------------------------------------------------------------- */

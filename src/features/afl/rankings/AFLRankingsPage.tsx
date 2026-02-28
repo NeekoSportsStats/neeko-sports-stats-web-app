@@ -22,6 +22,7 @@ interface RankingRow {
   projection_confidence?: number | null;
   ai_recommendation?: string | null;
   ai_analysis?: string | null;
+  recommendation_color?: string | null;
   captain_rating?: string | null;
   captain_score?: number | null;
   total_count?: number | null;
@@ -482,8 +483,9 @@ function PlayerDetailModal({
 
   const unlocked = isPremium || isUnlocked;
   const consistencyBadge = getConsistencyBadge(detail?.consistency_score ?? null);
-  const recStyle = getRecommendationStyle(detail?.ai_recommendation ?? null);
   const capStyle = getCaptainStyle(captainDetail?.captain_rating ?? null);
+  const modalIsEliteCaptain = detail?.ai_recommendation === "ELITE CAPTAIN";
+  const modalRecColor = detail?.recommendation_color ?? null;
 
   return (
     <div
@@ -538,9 +540,26 @@ function PlayerDetailModal({
 
             {/* AI Recommendation Banner */}
             {unlocked && detail.ai_recommendation && (
-              <div className={`rounded-lg border px-4 py-3 ${recStyle.bg} ${recStyle.border}`}>
+              <div
+                className={`rounded-lg border px-4 py-3${modalIsEliteCaptain ? " elite-captain-badge" : ""}`}
+                style={modalIsEliteCaptain ? {
+                  background: "linear-gradient(90deg, #3A2A00, #5A4200, #3A2A00)",
+                  borderColor: "#F5C84C",
+                } : modalRecColor ? {
+                  background: `${modalRecColor}18`,
+                  borderColor: `${modalRecColor}40`,
+                } : {
+                  background: "rgba(255,255,255,0.03)",
+                  borderColor: "rgba(255,255,255,0.08)",
+                }}
+              >
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">AI Recommendation</p>
-                <p className={`text-base font-bold ${recStyle.text}`}>{detail.ai_recommendation}</p>
+                <p
+                  className="text-base font-bold"
+                  style={{ color: modalIsEliteCaptain ? "#F5C84C" : (modalRecColor ?? "rgba(255,255,255,0.6)") }}
+                >
+                  {detail.ai_recommendation}
+                </p>
               </div>
             )}
 
@@ -823,7 +842,8 @@ export default function AFLRankingsPage() {
             captain_rating,
             captain_score,
             ai_recommendation,
-            ai_analysis
+            ai_analysis,
+            recommendation_color
           `)
           .order("projection_final", { ascending: false });
 
@@ -964,13 +984,14 @@ export default function AFLRankingsPage() {
                     const isLocked = !isPremium && idx >= FREE_UNLOCKED_METRICS;
                     const metricsUnlocked = !isLocked;
                     const consistencyBadge = getConsistencyBadge(row.consistency_score);
-                    const recStyle = getRecommendationStyle(row.ai_recommendation ?? null);
+                    const isEliteCaptain = row.ai_recommendation === "ELITE CAPTAIN";
+                    const recColor = row.recommendation_color ?? null;
                     const capStyle = getCaptainStyle(row.captain_rating ?? null);
 
                     return (
                       <tr
                         key={row.player_id ?? row.player_name + idx}
-                        className="border-b border-white/[0.04] transition-colors cursor-pointer hover:bg-white/5"
+                        className={`border-b border-white/[0.04] transition-colors cursor-pointer hover:bg-white/5${isEliteCaptain ? " bg-[#120E00]" : ""}`}
                         onClick={() => setSelected({ ...row, _rank: rank, _unlocked: !isLocked } as RankingRow & { _rank: number; _unlocked: boolean })}
                       >
                         <td className="px-3 py-3 text-sm text-white/30 tabular-nums">{rank}</td>
@@ -1046,13 +1067,28 @@ export default function AFLRankingsPage() {
                         </td>
 
                         {/* Recommendation */}
-                        <td className="px-3 py-3 text-right">
-                          {!metricsUnlocked ? <LockedCell /> : (
+                        <td className={`px-3 py-3 text-right${isEliteCaptain ? " bg-[#1A1400]" : ""}`}>
+                          {!metricsUnlocked ? <LockedCell /> : row.ai_recommendation ? (
                             <span
-                              className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${recStyle.text} ${recStyle.bg} ${recStyle.border}`}
+                              className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap${isEliteCaptain ? " elite-captain-badge" : ""}`}
+                              style={isEliteCaptain ? {
+                                color: "#F5C84C",
+                                background: "linear-gradient(90deg, #3A2A00, #5A4200, #3A2A00)",
+                                borderColor: "#F5C84C",
+                              } : recColor ? {
+                                color: recColor,
+                                background: `${recColor}18`,
+                                borderColor: `${recColor}40`,
+                              } : {
+                                color: "rgba(255,255,255,0.3)",
+                                background: "rgba(255,255,255,0.05)",
+                                borderColor: "rgba(255,255,255,0.1)",
+                              }}
                             >
-                              {row.ai_recommendation ?? "—"}
+                              {row.ai_recommendation}
                             </span>
+                          ) : (
+                            <span className="text-white/20 text-xs">—</span>
                           )}
                         </td>
                       </tr>
