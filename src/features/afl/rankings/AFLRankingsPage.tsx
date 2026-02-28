@@ -975,9 +975,10 @@ export default function AFLRankingsPage() {
 
       {/* Rankings Table */}
       <div className="px-4 pb-10 md:px-8">
-        <div className="overflow-x-auto rounded-xl border border-white/5">
+        <div className="relative">
+          <div className="overflow-x-auto rounded-xl border border-white/5 scrollbar-thin scrollbar-thumb-[#333] scrollbar-track-transparent">
           <table className="w-full min-w-[1400px] border-collapse">
-            <thead className="sticky top-0 z-30 bg-[#0a0a0a]">
+            <thead className="sticky top-[120px] z-40 bg-[#0a0a0a] border-b border-[#222]">
               {/* Position filter row — sticky tier 1 */}
               <tr>
                 <td
@@ -1000,7 +1001,7 @@ export default function AFLRankingsPage() {
               {/* Column header row — sticky tier 2 */}
               <tr>
                 <th className={`${TH_BASE} text-white/40 w-10`}>#</th>
-                <th className={`${TH_BASE} text-left text-white/40 sticky left-0 z-40 bg-[#0a0a0a] min-w-[160px]`}>Player</th>
+                <th className={`${TH_BASE} text-left text-white/40 sticky left-0 z-50 bg-[#0B0B0B] min-w-[160px]`}>Player</th>
                 <th className={`${TH_BASE} text-white/40 min-w-[80px]`}>Team</th>
                 <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
                 <PlainTh label="Captain" locked={!isPremium} />
@@ -1036,11 +1037,11 @@ export default function AFLRankingsPage() {
                     return (
                       <tr
                         key={row.player_id ?? row.player_name + idx}
-                        className={`border-b border-white/[0.04] transition-colors cursor-pointer hover:bg-white/5${isEliteCaptain ? " bg-[#120E00]" : ""}`}
+                        className={`border-b border-white/[0.04] transition-colors duration-150 cursor-pointer hover:bg-[#111]${isEliteCaptain ? " bg-[#120E00]" : ""}`}
                         onClick={() => setSelected({ ...row, _rank: rank, _unlocked: !isLocked } as RankingRow & { _rank: number; _unlocked: boolean })}
                       >
                         <td className="px-4 py-3 text-sm text-white/30 tabular-nums text-center whitespace-nowrap">{rank}</td>
-                        <td className="px-4 py-3 sticky left-0 z-20 bg-[#0a0a0a] min-w-[160px] whitespace-nowrap">
+                        <td className="px-4 py-3 sticky left-0 z-30 bg-[#0B0B0B] min-w-[160px] whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-white">{row.player_name}</span>
                             {!isPremium && !isLocked && (
@@ -1161,6 +1162,9 @@ export default function AFLRankingsPage() {
           {!isPremium && !loading && (
             <UpgradeCTABanner totalCount={totalCount} positionFilter={positionFilter} />
           )}
+          </div>
+          <div className="pointer-events-none absolute top-0 left-0 w-8 h-full bg-gradient-to-r from-[#0B0B0B] to-transparent z-10 rounded-l-xl" />
+          <div className="pointer-events-none absolute top-0 right-0 w-8 h-full bg-gradient-to-l from-[#0B0B0B] to-transparent z-10 rounded-r-xl" />
         </div>
       </div>
 
