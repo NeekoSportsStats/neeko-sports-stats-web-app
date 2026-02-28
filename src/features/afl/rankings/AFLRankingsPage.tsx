@@ -1140,7 +1140,13 @@ export default function AFLRankingsPage() {
 
                         {/* Why */}
                         <td className="px-3 py-3 max-w-[220px]">
-                          {!metricsUnlocked ? <LockedCell /> : (
+                          {!metricsUnlocked ? (
+                            <LockedCell />
+                          ) : !isPremium && idx >= 3 ? (
+                            <div className="blur-sm opacity-40 select-none pointer-events-none text-xs text-white/50 line-clamp-2 leading-snug">
+                              {row.recommendation_why ?? "—"}
+                            </div>
+                          ) : (
                             <span className="text-xs text-white/50 line-clamp-2 leading-snug">
                               {row.recommendation_why ?? "—"}
                             </span>
