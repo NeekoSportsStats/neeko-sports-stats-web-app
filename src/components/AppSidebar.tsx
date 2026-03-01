@@ -133,6 +133,7 @@ export function AppSidebar() {
 
                       {[
                         { title: "Rankings",     url: "/sports/afl/rankings" },
+                        { title: "Neeko Intel",  url: "/sports/afl/neeko-intel" },
                         { title: "AI Analysis",  url: "/sports/afl/ai-analysis" },
                         { title: "Match Centre", url: "/sports/afl/match-centre" },
                       ].map((item) => (
