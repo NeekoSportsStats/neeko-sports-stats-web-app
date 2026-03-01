@@ -36,10 +36,9 @@ interface BreakoutRow {
   ai_recommendation: string | null;
   ai_analysis: string | null;
   recommendation_color: string | null;
-  recommendation_short: string | null;
+  recommendation_why: string | null;
   captain_score: number | null;
   captain_rating: string | null;
-  captain_confidence: number | null;
 }
 
 interface CaptainRow {
@@ -56,10 +55,9 @@ interface CaptainRow {
   projection_confidence: number | null;
   ai_recommendation: string | null;
   recommendation_color: string | null;
-  recommendation_short: string | null;
+  recommendation_why: string | null;
   captain_score: number | null;
   captain_rating: string | null;
-  captain_confidence: number | null;
 }
 
 interface RiskRow {
@@ -76,7 +74,7 @@ interface RiskRow {
   projection_confidence: number | null;
   ai_recommendation: string | null;
   recommendation_color: string | null;
-  recommendation_short: string | null;
+  recommendation_why: string | null;
 }
 
 interface RiserRow {
@@ -95,7 +93,7 @@ interface RiserRow {
   projection_confidence: number | null;
   ai_recommendation: string | null;
   recommendation_color: string | null;
-  recommendation_short: string | null;
+  recommendation_why: string | null;
   captain_score: number | null;
 }
 
@@ -113,7 +111,7 @@ interface FallerRow {
   projection_confidence: number | null;
   ai_recommendation: string | null;
   recommendation_color: string | null;
-  recommendation_short: string | null;
+  recommendation_why: string | null;
 }
 
 interface MatchRow {
@@ -136,19 +134,19 @@ interface MatchRow {
 // ─── Explicit column selects (no select *) ────────────────────────────────────
 
 const PLAYER_COLS =
-  "player_id,player_name,team,position,projection_final,ceiling_estimate,floor_estimate,consistency_score,form_rating,matchup_rating,upside_rating,risk_rating,projection_confidence,ai_recommendation,ai_analysis,recommendation_color,recommendation_short,captain_score,captain_rating,captain_confidence";
+  "player_id,player_name,team,position,projection_final,ceiling_estimate,floor_estimate,consistency_score,form_rating,matchup_rating,upside_rating,risk_rating,projection_confidence,ai_recommendation,ai_analysis,recommendation_color,recommendation_why,captain_score,captain_rating";
 
 const CAPTAIN_COLS =
-  "player_id,player_name,team,position,projection_final,ceiling_estimate,floor_estimate,consistency_score,form_rating,matchup_rating,projection_confidence,ai_recommendation,recommendation_color,recommendation_short,captain_score,captain_rating,captain_confidence";
+  "player_id,player_name,team,position,projection_final,ceiling_estimate,floor_estimate,consistency_score,form_rating,matchup_rating,projection_confidence,ai_recommendation,recommendation_color,recommendation_why,captain_score,captain_rating";
 
 const RISK_COLS =
-  "player_id,player_name,team,position,projection_final,floor_estimate,consistency_score,form_rating,matchup_rating,risk_rating,projection_confidence,ai_recommendation,recommendation_color,recommendation_short";
+  "player_id,player_name,team,position,projection_final,floor_estimate,consistency_score,form_rating,matchup_rating,risk_rating,projection_confidence,ai_recommendation,recommendation_color,recommendation_why";
 
 const RISER_COLS =
-  "player_id,player_name,team,position,projection_final,ceiling_estimate,floor_estimate,consistency_score,form_rating,matchup_rating,upside_rating,risk_rating,projection_confidence,ai_recommendation,recommendation_color,recommendation_short,captain_score";
+  "player_id,player_name,team,position,projection_final,ceiling_estimate,floor_estimate,consistency_score,form_rating,matchup_rating,upside_rating,risk_rating,projection_confidence,ai_recommendation,recommendation_color,recommendation_why,captain_score";
 
 const FALLER_COLS =
-  "player_id,player_name,team,position,projection_final,floor_estimate,consistency_score,form_rating,matchup_rating,risk_rating,projection_confidence,ai_recommendation,recommendation_color,recommendation_short";
+  "player_id,player_name,team,position,projection_final,floor_estimate,consistency_score,form_rating,matchup_rating,risk_rating,projection_confidence,ai_recommendation,recommendation_color,recommendation_why";
 
 const MATCH_COLS =
   "match_id,home_team,away_team,home_projection,away_projection,margin,confidence,winner,ai_summary,prediction_explanation,round_number,season,match_date,updated_at";
@@ -315,10 +313,10 @@ function EliteCaptainHero({
             playerName={row.player_name}
             team={row.team}
             projection={row.projection_final}
-            confidence={row.captain_confidence}
+            confidence={row.projection_confidence}
             label={row.captain_rating}
             color="#F5C84C"
-            reason={row.recommendation_short}
+            reason={row.recommendation_why}
             captainScore={row.captain_score}
             locked={false}
           />
@@ -404,7 +402,7 @@ type AnyPlayerRow = {
   projection_confidence?: number | null;
   ai_recommendation?: string | null;
   recommendation_color?: string | null;
-  recommendation_short?: string | null;
+  recommendation_why?: string | null;
   captain_score?: number | null;
 };
 
@@ -436,7 +434,7 @@ function renderPlayerCards(rows: AnyPlayerRow[], loading: boolean, error: boolea
       confidence={row.projection_confidence}
       label={row.ai_recommendation}
       color={row.recommendation_color}
-      reason={row.recommendation_short}
+      reason={row.recommendation_why}
       captainScore={row.captain_score}
       locked={false}
     />
@@ -677,11 +675,11 @@ export default function AFLNeekoIntelPage() {
                       playerName={row.player_name}
                       team={row.team}
                       projection={row.projection_final}
-                      confidence={row.captain_confidence}
+                      confidence={row.projection_confidence}
                       label={row.captain_rating}
                       captainScore={row.captain_score}
                       color="#F5C84C"
-                      reason={row.recommendation_short}
+                      reason={row.recommendation_why}
                       locked={false}
                     />
                   ))
