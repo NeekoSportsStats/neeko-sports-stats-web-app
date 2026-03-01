@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Lock, Crown, ChevronUp, ChevronDown, X, Info, Search } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Dot } from "recharts";
@@ -467,11 +468,16 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
         )}
 
         {!isPremium && (
-          <p className="mt-3 text-center text-[11px] text-white/30">
-            Free users see top 2 captains.{" "}
-            <a href="/neeko-plus" className="text-[#F5C84C] hover:underline">Upgrade to Neeko+</a>{" "}
-            to unlock all 5.
-          </p>
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-[#F5C84C]/15 bg-[#F5C84C]/5 px-4 py-3">
+            <p className="text-sm text-[#F5C84C]/80 font-medium">Upgrade to Neeko+ to unlock all 5 elite captain recommendations.</p>
+            <a
+              href="/neeko-plus"
+              className="inline-flex items-center gap-1.5 bg-[#F5C84C] text-black font-semibold rounded-lg hover:brightness-110 transition-all duration-150 px-4 py-2 text-sm whitespace-nowrap shrink-0"
+            >
+              <Crown size={13} />
+              Upgrade to Neeko+
+            </a>
+          </div>
         )}
       </div>
     </div>
@@ -695,18 +701,22 @@ function PlayerDetailModal({
                 </div>
               </div>
             ) : (
-              <div className="rounded-lg border border-[#F5C84C]/20 bg-[#F5C84C]/5 px-4 py-5 text-center">
-                <Crown size={16} className="mx-auto mb-2 text-[#F5C84C]" />
-                <p className="text-sm font-semibold text-white mb-1">Upgrade to Neeko+</p>
-                <p className="text-xs text-white/40 mb-4">
-                  Unlock Captain Rating, Form, Matchup, Upside, Risk & AI Recommendation for every player.
+              <div className="rounded-xl border border-[#F5C84C]/30 bg-gradient-to-br from-[#1a1a1a] to-[#111] px-5 py-5 mt-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <Crown size={15} className="text-[#F5C84C]" />
+                  <p className="text-sm font-semibold text-white">Unlock Elite AI Analysis</p>
+                </div>
+                <p className="text-xs text-white/50 mb-4 leading-relaxed">
+                  Get full projections, ceiling, floor, matchup rating, captain recommendation, and AI breakdown for every player.
                 </p>
                 <a
                   href="/neeko-plus"
-                  className="inline-block rounded-md bg-[#F5C84C] px-5 py-2 text-xs font-bold text-black hover:bg-[#f0bd30] transition-colors"
+                  className="inline-flex items-center gap-1.5 bg-[#F5C84C] text-black font-semibold rounded-lg hover:brightness-110 transition-all duration-150 px-4 py-2 text-sm"
                 >
-                  Upgrade to Neeko+
+                  <Crown size={13} />
+                  Upgrade Now
                 </a>
+                <p className="text-[11px] text-white/30 mt-2">Trusted by serious AFL Fantasy players</p>
               </div>
             )}
 
@@ -979,11 +989,27 @@ export default function AFLRankingsPage() {
         </div>
 
         {!isPremium && (
-          <div className="mt-4 rounded-lg border border-white/5 bg-white/[0.03] px-4 py-3">
-            <p className="text-xs text-white/40">
-              Free tier: top 20 players shown per position. Captain Rating, Form, Matchup, Upside & AI analysis available with{" "}
-              <span className="text-[#F5C84C]">Neeko+</span>.
-            </p>
+          <div className="mt-4 space-y-3">
+            <div className="rounded-lg border border-white/5 bg-white/[0.03] px-4 py-3">
+              <p className="text-xs text-white/40">
+                Free tier: top 20 players shown per position. Captain Rating, Form, Matchup, Upside & AI analysis available with{" "}
+                <span className="text-[#F5C84C]">Neeko+</span>.
+              </p>
+            </div>
+            <div className="rounded-xl border border-[#F5C84C]/20 bg-gradient-to-r from-[#F5C84C]/10 to-transparent px-5 py-4">
+              <p className="text-sm font-semibold text-white mb-1">Take your AFL Fantasy team to elite level</p>
+              <p className="text-xs text-white/50 mb-3">Neeko+ unlocks full AI player analysis, captain recommendations, matchup insights, and projection confidence for every player.</p>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <a
+                  href="/neeko-plus"
+                  className="inline-flex items-center gap-1.5 bg-[#F5C84C] text-black font-semibold rounded-lg hover:brightness-110 transition-all duration-150 px-4 py-2 text-sm"
+                >
+                  <Crown size={13} />
+                  Upgrade to Neeko+
+                </a>
+                <p className="text-xs text-white/40">Trusted by serious AFL Fantasy players</p>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -999,32 +1025,46 @@ export default function AFLRankingsPage() {
       <div className="px-4 pb-10 md:px-8">
 
         {/* Search bar */}
-        <div className="mb-4 relative">
-          <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/40 w-4 h-4" />
-          <input
-            type="text"
-            placeholder={isPremium ? "Search player…" : "Search player (Neeko+)"}
-            value={searchTerm}
-            disabled={!isPremium}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onClick={() => {
-              if (!isPremium) window.location.href = "/neeko-plus";
-            }}
-            className={`w-full bg-[#161616] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-[#F5C84C] transition-colors${!isPremium ? " cursor-pointer opacity-60" : ""}`}
-          />
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/40 w-4 h-4" />
+            <input
+              type="text"
+              placeholder={isPremium ? "Search player…" : "Search all 800+ players (Neeko+)"}
+              value={searchTerm}
+              disabled={!isPremium}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onClick={() => {
+                if (!isPremium) window.location.href = "/neeko-plus";
+              }}
+              className={`w-full bg-zinc-900 border rounded-xl pl-10 pr-28 py-3 text-white placeholder:text-white/30 focus:outline-none focus:ring-1 transition-colors${
+                isPremium
+                  ? " border-zinc-700 focus:border-[#F5C84C] focus:ring-[#F5C84C]"
+                  : " border-zinc-700 cursor-pointer"
+              }`}
+            />
+            {!isPremium && (
+              <a
+                href="/neeko-plus"
+                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-[#F5C84C]/20 text-[#F5C84C] text-xs font-semibold px-2.5 py-1.5 rounded-lg hover:bg-[#F5C84C]/30 transition-colors"
+              >
+                <Lock size={11} />
+                Unlock Search
+              </a>
+            )}
+            {isPremium && searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
           {!isPremium && (
-            <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-[#F5C84C] text-xs font-semibold">
-              <Lock size={12} />
-              Neeko+
-            </div>
-          )}
-          {isPremium && searchTerm && (
-            <button
-              onClick={() => setSearchTerm("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors"
-            >
-              <X size={14} />
-            </button>
+            <p className="mt-1.5 text-[11px] text-zinc-500 pl-1">
+              Neeko+ unlocks full player search, AI analysis, and projections for all 800+ players.
+            </p>
           )}
         </div>
 
@@ -1124,9 +1164,16 @@ export default function AFLRankingsPage() {
                             )}
                           </>
                         ) : (
-                          <div className="flex items-center gap-1 text-[#F5C84C]/50 text-xs">
-                            <Lock size={10} />
-                            <span>Unlock with Neeko+</span>
+                          <div className="flex flex-col gap-1.5 mt-1">
+                            <p className="text-xs text-[#F5C84C]/70">Unlock full AI analysis, projections, and captain rating</p>
+                            <a
+                              href="/neeko-plus"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 self-start px-2 py-1 text-xs bg-[#F5C84C]/20 text-[#F5C84C] rounded-md hover:bg-[#F5C84C]/30 transition-colors"
+                            >
+                              <Lock size={9} />
+                              Unlock
+                            </a>
                           </div>
                         )}
                       </div>
@@ -1141,9 +1188,10 @@ export default function AFLRankingsPage() {
                           {row.recommendation_why}
                         </div>
                       ) : !isPremium && idx >= 5 ? (
-                        <div className="mt-3 pt-3 border-t border-white/5">
-                          <a href="/neeko-plus" className="text-xs text-[#F5C84C]/70 hover:text-[#F5C84C] transition-colors">
-                            Upgrade to Neeko+ to unlock AI insight
+                        <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between gap-2">
+                          <p className="text-xs text-white/40">AI insight locked</p>
+                          <a href="/neeko-plus" onClick={(e) => e.stopPropagation()} className="text-xs text-[#F5C84C] font-semibold hover:underline transition-colors">
+                            Upgrade to Neeko+
                           </a>
                         </div>
                       ) : null}
