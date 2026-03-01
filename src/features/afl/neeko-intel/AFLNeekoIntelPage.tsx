@@ -10,7 +10,7 @@ import {
   Swords,
   RefreshCw,
 } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import {
   NeekoIntelCard,
