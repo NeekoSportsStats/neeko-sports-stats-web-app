@@ -1,5 +1,15 @@
 import { useState, useEffect } from "react";
-import { Lock, Crown, Zap, TrendingUp, TrendingDown, Shield, Star, Swords, RefreshCw } from "lucide-react";
+import {
+  Lock,
+  Crown,
+  Zap,
+  TrendingUp,
+  TrendingDown,
+  Shield,
+  Star,
+  Swords,
+  RefreshCw,
+} from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import {
@@ -25,7 +35,6 @@ interface RankingRow {
   captain_rating: string | null;
   upside_rating: number | null;
   risk_rating: number | null;
-  updated_at?: string | null;
 }
 
 interface CaptainRow {
@@ -57,7 +66,7 @@ interface MatchPrediction {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const FREE_PREVIEW_COUNT = 2;
+const FREE_PREVIEW_COUNT = 1;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -79,14 +88,6 @@ function relativeTime(iso: string | null): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
-}
-
-function confidenceColor(v: number | null): string {
-  if (v == null) return "text-white/30";
-  if (v >= 80) return "text-green-400";
-  if (v >= 65) return "text-yellow-400";
-  if (v >= 45) return "text-orange-400";
-  return "text-red-400";
 }
 
 // ─── Section Header ───────────────────────────────────────────────────────────
@@ -120,9 +121,9 @@ function SectionHeader({
 
 // ─── Section Shell ────────────────────────────────────────────────────────────
 
-function Section({ children }: { children: React.ReactNode }) {
+function Section({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d0d] p-5">
+    <div className={`rounded-2xl border border-white/[0.07] bg-[#0d0d0d] p-4 md:p-6 ${className}`}>
       {children}
     </div>
   );
@@ -132,7 +133,7 @@ function Section({ children }: { children: React.ReactNode }) {
 
 function UpgradeCTABanner() {
   return (
-    <div className="rounded-2xl overflow-hidden relative">
+    <div className="rounded-2xl overflow-hidden">
       <div className="bg-gradient-to-r from-[#3A2A00] via-[#5A4200] to-[#3A2A00] border border-[#F5C84C]/30 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -149,6 +150,59 @@ function UpgradeCTABanner() {
         >
           Upgrade to Neeko+
         </a>
+      </div>
+    </div>
+  );
+}
+
+// ─── Elite Captain Hero Card ──────────────────────────────────────────────────
+
+function EliteCaptainHero({ rows, loading }: { rows: RankingRow[]; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="rounded-2xl border border-[#F5C84C]/20 bg-gradient-to-r from-[#1a1408] to-[#0a0a0a] p-4 md:p-6 animate-pulse">
+        <div className="h-4 w-48 rounded bg-white/10 mb-4" />
+        <div className="space-y-3">
+          <div className="h-20 rounded-xl bg-white/5" />
+          <div className="h-20 rounded-xl bg-white/5" />
+        </div>
+      </div>
+    );
+  }
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-r from-[#1a1408] to-[#0a0a0a] p-4 md:p-6">
+      <div className="flex items-center gap-3 mb-5">
+        <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[#F5C84C]/15 text-[#F5C84C] shrink-0">
+          <Star size={18} />
+        </div>
+        <div>
+          <h2 className="text-base font-bold text-[#F5C84C]">Elite Captain Locks</h2>
+          <p className="text-[11px] text-white/40 mt-0.5">
+            Highest win probability captains this round
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {rows.map((row, idx) => (
+          <NeekoIntelCard
+            key={row.player_id ?? row.player_name + idx}
+            rank={idx + 1}
+            playerName={row.player_name}
+            team={row.team}
+            position={row.position}
+            projection={row.projection_final}
+            confidence={row.projection_confidence}
+            label={row.ai_recommendation}
+            color={row.recommendation_color}
+            reason={row.recommendation_why}
+            captainScore={row.captain_score}
+            locked={false}
+          />
+        ))}
       </div>
     </div>
   );
@@ -171,7 +225,7 @@ function MatchPredictionCard({
   return (
     <div
       className={`rounded-xl border border-white/10 bg-[#111111] p-4 transition-all ${
-        locked ? "blur-sm opacity-50 select-none pointer-events-none" : ""
+        locked ? "blur-sm opacity-40 select-none pointer-events-none" : ""
       }`}
     >
       <div className="flex items-center justify-between gap-2 mb-3">
@@ -196,7 +250,11 @@ function MatchPredictionCard({
       <div className="flex items-center justify-between gap-2">
         <div className={`flex-1 text-center ${homeWin ? "opacity-100" : "opacity-50"}`}>
           <div className="font-bold text-white text-sm leading-tight">{match.home_team}</div>
-          <div className={`text-2xl font-black tabular-nums mt-1 ${homeWin ? "text-[#F5C84C]" : "text-white/60"}`}>
+          <div
+            className={`text-2xl font-black tabular-nums mt-1 ${
+              homeWin ? "text-[#F5C84C]" : "text-white/60"
+            }`}
+          >
             {fmt(match.predicted_home_score, 0)}
           </div>
         </div>
@@ -205,14 +263,19 @@ function MatchPredictionCard({
           <div className="text-white/20 text-xs font-bold">VS</div>
           {match.predicted_margin != null && (
             <div className="text-[10px] text-white/30 mt-1">
-              {homeWin ? "+" : "-"}{Math.abs(Math.round(Number(match.predicted_margin)))} pts
+              {homeWin ? "+" : "-"}
+              {Math.abs(Math.round(Number(match.predicted_margin)))} pts
             </div>
           )}
         </div>
 
         <div className={`flex-1 text-center ${!homeWin ? "opacity-100" : "opacity-50"}`}>
           <div className="font-bold text-white text-sm leading-tight">{match.away_team}</div>
-          <div className={`text-2xl font-black tabular-nums mt-1 ${!homeWin ? "text-[#F5C84C]" : "text-white/60"}`}>
+          <div
+            className={`text-2xl font-black tabular-nums mt-1 ${
+              !homeWin ? "text-[#F5C84C]" : "text-white/60"
+            }`}
+          >
             {fmt(match.predicted_away_score, 0)}
           </div>
         </div>
@@ -254,27 +317,27 @@ export default function AFLNeekoIntelPage() {
 
           supabase
             .from("v_captain_recommendations")
-            .select("player_id, player_name, team, projection_final, ceiling_estimate, consistency_score, captain_score, captain_rating, captain_confidence")
+            .select(
+              "player_id, player_name, team, projection_final, ceiling_estimate, consistency_score, captain_score, captain_rating, captain_confidence"
+            )
             .order("captain_score", { ascending: false })
             .limit(20),
 
           supabase
             .from("v_ai_match_predictions_preview")
-            .select("match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, ai_summary, prediction_explanation, updated_at")
+            .select(
+              "match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, ai_summary, prediction_explanation, updated_at"
+            )
             .order("round_number", { ascending: false })
             .limit(9),
         ]);
 
-        if (rankRes.data) {
-          setAllRows(rankRes.data as RankingRow[]);
-          const anyUpdated = (rankRes.data as RankingRow[]).find((r) => (r as unknown as { updated_at?: string }).updated_at);
-          if (anyUpdated) setLastUpdated((anyUpdated as unknown as { updated_at: string }).updated_at);
-        }
+        if (rankRes.data) setAllRows(rankRes.data as RankingRow[]);
         if (captainRes.data) setCaptains(captainRes.data as CaptainRow[]);
         if (matchRes.data) {
           setMatches(matchRes.data as MatchPrediction[]);
           const first = (matchRes.data as MatchPrediction[])[0];
-          if (first?.updated_at && !lastUpdated) setLastUpdated(first.updated_at);
+          if (first?.updated_at) setLastUpdated(first.updated_at);
         }
       } finally {
         setLoading(false);
@@ -283,17 +346,21 @@ export default function AFLNeekoIntelPage() {
     load();
   }, []);
 
+  const eliteCaptains = allRows.filter(
+    (r) =>
+      r.ai_recommendation === "ELITE CAPTAIN" || r.ai_recommendation === "CAPTAIN LOCK"
+  );
+
   const breakouts = allRows
-    .filter((r) =>
-      r.ai_recommendation === "MUST START" ||
-      r.ai_recommendation === "HIGH CONFIDENCE"
+    .filter(
+      (r) =>
+        r.ai_recommendation === "MUST START" || r.ai_recommendation === "HIGH CONFIDENCE"
     )
     .slice(0, 5);
 
   const risks = allRows
-    .filter((r) =>
-      r.ai_recommendation === "HIGH RISK" ||
-      r.ai_recommendation === "AVOID"
+    .filter(
+      (r) => r.ai_recommendation === "HIGH RISK" || r.ai_recommendation === "AVOID"
     )
     .sort((a, b) => (b.risk_rating ?? 0) - (a.risk_rating ?? 0))
     .slice(0, 5);
@@ -310,18 +377,13 @@ export default function AFLNeekoIntelPage() {
 
   const topCaptains = captains.slice(0, 5);
 
-  const isEmpty = !loading && allRows.length === 0;
+  const isEmpty = !loading && allRows.length === 0 && captains.length === 0;
 
-  function renderCards(
-    rows: RankingRow[],
-    keyField: "breakout" | "risk" | "risers" | "fallers"
-  ) {
+  function renderCards(rows: RankingRow[], keyField: string) {
     const freeCount = isPremium ? rows.length : FREE_PREVIEW_COUNT;
 
     if (loading) {
-      return Array.from({ length: 3 }).map((_, i) => (
-        <NeekoIntelSkeletonCard key={i} />
-      ));
+      return Array.from({ length: 3 }).map((_, i) => <NeekoIntelSkeletonCard key={i} />);
     }
 
     if (rows.length === 0) {
@@ -332,37 +394,33 @@ export default function AFLNeekoIntelPage() {
       );
     }
 
-    return (
-      <>
-        {rows.map((row, idx) => {
-          const locked = idx >= freeCount;
-          if (locked) return <NeekoIntelCardLocked key={`${keyField}-locked-${idx}`} />;
-          return (
-            <NeekoIntelCard
-              key={row.player_id ?? row.player_name + idx}
-              rank={idx + 1}
-              playerName={row.player_name}
-              team={row.team}
-              position={row.position}
-              projection={row.projection_final}
-              confidence={row.projection_confidence}
-              label={row.ai_recommendation}
-              color={row.recommendation_color}
-              reason={row.recommendation_why}
-              locked={false}
-            />
-          );
-        })}
-      </>
-    );
+    return rows.map((row, idx) => {
+      const locked = idx >= freeCount;
+      if (locked) return <NeekoIntelCardLocked key={`${keyField}-locked-${idx}`} />;
+      return (
+        <NeekoIntelCard
+          key={row.player_id ?? row.player_name + idx}
+          rank={idx + 1}
+          playerName={row.player_name}
+          team={row.team}
+          position={row.position}
+          projection={row.projection_final}
+          confidence={row.projection_confidence}
+          label={row.ai_recommendation}
+          color={row.recommendation_color}
+          reason={row.recommendation_why}
+          locked={false}
+        />
+      );
+    });
   }
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
-      {/* Hero Header */}
+      {/* ── Hero Header ── */}
       <div className="border-b border-white/[0.06] bg-[#0a0a0a]">
         <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>
               <div className="flex items-center gap-2.5 mb-1">
                 <div className="w-2 h-2 rounded-full bg-[#F5C84C] animate-pulse" />
@@ -376,9 +434,12 @@ export default function AFLNeekoIntelPage() {
               <p className="text-white/40 text-sm mt-1">
                 AI-powered fantasy intelligence · Updated {relativeTime(lastUpdated)}
               </p>
+              <p className="text-white/25 text-xs mt-1">
+                Updated automatically each round using Neeko AI projections
+              </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 shrink-0">
               {!isPremium && (
                 <a
                   href="/neeko-plus"
@@ -397,12 +458,15 @@ export default function AFLNeekoIntelPage() {
             </div>
           </div>
 
-          {/* Free preview banner */}
           {!isPremium && (
             <div className="mt-4 flex items-center gap-2 bg-[#F5C84C]/5 border border-[#F5C84C]/15 rounded-xl px-4 py-3">
               <Lock size={13} className="text-[#F5C84C]/60 shrink-0" />
               <p className="text-[12px] text-white/50">
-                Showing <span className="text-[#F5C84C] font-semibold">{FREE_PREVIEW_COUNT} free picks</span> per section.{" "}
+                Showing{" "}
+                <span className="text-[#F5C84C] font-semibold">
+                  {FREE_PREVIEW_COUNT} free pick
+                </span>{" "}
+                per section.{" "}
                 <a href="/neeko-plus" className="text-[#F5C84C] font-semibold hover:underline">
                   Upgrade to Neeko+
                 </a>{" "}
@@ -413,7 +477,7 @@ export default function AFLNeekoIntelPage() {
         </div>
       </div>
 
-      {/* Page Content */}
+      {/* ── Page Content ── */}
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
         {isEmpty && (
@@ -426,7 +490,12 @@ export default function AFLNeekoIntelPage() {
 
         {!isEmpty && (
           <>
-            {/* ── Breakouts / Must Starts ── */}
+            {/* ── HERO: Elite Captain Locks ── */}
+            {(loading || eliteCaptains.length > 0) && (
+              <EliteCaptainHero rows={eliteCaptains} loading={loading} />
+            )}
+
+            {/* ── Breakouts & Must Starts ── */}
             <Section>
               <SectionHeader
                 icon={<Zap size={16} />}
@@ -434,9 +503,7 @@ export default function AFLNeekoIntelPage() {
                 subtitle="Players with elite projections and high confidence"
                 locked={!isPremium}
               />
-              <div className="space-y-3">
-                {renderCards(breakouts, "breakout")}
-              </div>
+              <div className="space-y-3">{renderCards(breakouts, "breakout")}</div>
             </Section>
 
             {/* ── Captain Picks ── */}
@@ -451,7 +518,9 @@ export default function AFLNeekoIntelPage() {
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => <NeekoIntelSkeletonCard key={i} />)
                 ) : topCaptains.length === 0 ? (
-                  <div className="text-center py-6 text-white/30 text-sm">Neeko Intel generating...</div>
+                  <div className="text-center py-6 text-white/30 text-sm">
+                    Neeko Intel generating...
+                  </div>
                 ) : (
                   topCaptains.map((row, idx) => {
                     const locked = !isPremium && idx >= FREE_PREVIEW_COUNT;
@@ -475,7 +544,7 @@ export default function AFLNeekoIntelPage() {
             </Section>
 
             {/* ── Risers / Fallers ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Section>
                 <SectionHeader
                   icon={<TrendingUp size={16} />}
@@ -483,9 +552,7 @@ export default function AFLNeekoIntelPage() {
                   subtitle="Highest upside plays this round"
                   locked={!isPremium}
                 />
-                <div className="space-y-3">
-                  {renderCards(risers, "risers")}
-                </div>
+                <div className="space-y-3">{renderCards(risers, "risers")}</div>
               </Section>
 
               <Section>
@@ -495,13 +562,11 @@ export default function AFLNeekoIntelPage() {
                   subtitle="High risk players to consider avoiding"
                   locked={!isPremium}
                 />
-                <div className="space-y-3">
-                  {renderCards(fallers, "fallers")}
-                </div>
+                <div className="space-y-3">{renderCards(fallers, "fallers")}</div>
               </Section>
             </div>
 
-            {/* ── Risk / Avoid ── */}
+            {/* ── Risk & Avoid ── */}
             <Section>
               <SectionHeader
                 icon={<Shield size={16} />}
@@ -509,9 +574,7 @@ export default function AFLNeekoIntelPage() {
                 subtitle="Players flagged as high risk or to avoid this round"
                 locked={!isPremium}
               />
-              <div className="space-y-3">
-                {renderCards(risks, "risk")}
-              </div>
+              <div className="space-y-3">{renderCards(risks, "risk")}</div>
             </Section>
 
             {/* ── Match Projections ── */}
@@ -523,15 +586,19 @@ export default function AFLNeekoIntelPage() {
                 locked={!isPremium}
               />
               {loading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {Array.from({ length: 3 }).map((_, i) => <NeekoIntelSkeletonCard key={i} />)}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <NeekoIntelSkeletonCard key={i} />
+                  ))}
                 </div>
               ) : matches.length === 0 ? (
-                <div className="text-center py-6 text-white/30 text-sm">Neeko Intel generating...</div>
+                <div className="text-center py-6 text-white/30 text-sm">
+                  Neeko Intel generating...
+                </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {matches.map((m, idx) => {
-                    const locked = !isPremium && idx >= 1;
+                    const locked = !isPremium && idx >= FREE_PREVIEW_COUNT;
                     if (locked) {
                       return (
                         <div key={m.match_id} className="relative">
@@ -556,45 +623,9 @@ export default function AFLNeekoIntelPage() {
 
             {/* ── Upgrade CTA (free users only) ── */}
             {!isPremium && <UpgradeCTABanner />}
-
-            {/* ── Elite Captains highlight (premium) ── */}
-            {isPremium && (() => {
-              const elites = allRows.filter(
-                (r) => r.ai_recommendation === "ELITE CAPTAIN" || r.ai_recommendation === "CAPTAIN LOCK"
-              );
-              if (elites.length === 0) return null;
-              return (
-                <Section>
-                  <SectionHeader
-                    icon={<Star size={16} />}
-                    title="Elite Captain Locks"
-                    subtitle="The highest-rated captain options in the competition"
-                  />
-                  <div className="space-y-3">
-                    {elites.map((row, idx) => (
-                      <NeekoIntelCard
-                        key={row.player_id ?? row.player_name + idx}
-                        rank={idx + 1}
-                        playerName={row.player_name}
-                        team={row.team}
-                        position={row.position}
-                        projection={row.projection_final}
-                        confidence={row.projection_confidence}
-                        label={row.ai_recommendation}
-                        color={row.recommendation_color}
-                        reason={row.recommendation_why}
-                        captainScore={row.captain_score}
-                        locked={false}
-                      />
-                    ))}
-                  </div>
-                </Section>
-              );
-            })()}
           </>
         )}
 
-        {/* Bottom padding */}
         <div className="h-6" />
       </div>
     </div>

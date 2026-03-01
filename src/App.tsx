@@ -49,7 +49,6 @@ const UserConductPolicy = React.lazy(() => import("@/pages/policies/UserConductP
    AFL Pages — lazy
 ========================= */
 const AFLMatchCentrePage  = React.lazy(() => import("@/features/afl/match-centre/AFLMatchCentrePage"));
-const AFLAIInsightsPage   = React.lazy(() => import("@/features/afl/ai-insights/AFLAIInsightsPage"));
 const AFLRankingsPage     = React.lazy(() => import("@/features/afl/rankings/AFLRankingsPage"));
 const AFLNeekoIntelPage   = React.lazy(() => import("@/features/afl/neeko-intel/AFLNeekoIntelPage"));
 
@@ -178,7 +177,6 @@ function App() {
       <Route path="/sports/afl" element={<Navigate to="/sports/afl/rankings" replace />} />
       <Route path="/sports/afl/rankings"     element={<Layout><S fallback={Players}><AFLRankingsPage /></S></Layout>} />
       <Route path="/sports/afl/neeko-intel"  element={<Layout><S fallback={AI}><AFLNeekoIntelPage /></S></Layout>} />
-      <Route path="/sports/afl/ai-analysis"  element={<Layout><S fallback={AI}><AFLAIInsightsPage /></S></Layout>} />
       <Route path="/sports/afl/match-centre" element={<Layout><S fallback={MatchCentre}><AFLMatchCentrePage /></S></Layout>} />
 
       {/* =========================
