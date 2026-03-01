@@ -1,4 +1,4 @@
-import { Lock, Zap, AlertTriangle } from "lucide-react";
+import { Lock, Zap, AlertTriangle, TrendingUp, TrendingDown, Shield } from "lucide-react";
 
 // ─── Badge helpers ────────────────────────────────────────────────────────────
 
@@ -82,6 +82,44 @@ export function AvoidBadge({ flag }: { flag: boolean | null }) {
   return <Badge label="Avoid" color="red" icon={<AlertTriangle size={8} />} />;
 }
 
+// ─── Trend Badge ─────────────────────────────────────────────────────────────
+
+export function TrendBadge({ value }: { value: string | null }) {
+  if (!value || value === "STABLE") return null;
+  const map: Record<string, { cls: string; up: boolean }> = {
+    SURGING:  { cls: "text-green-400 bg-green-400/10 border-green-400/25",  up: true },
+    RISING:   { cls: "text-sky-400 bg-sky-400/10 border-sky-400/25",        up: true },
+    FADING:   { cls: "text-orange-400 bg-orange-400/10 border-orange-400/25", up: false },
+    CRASHING: { cls: "text-red-400 bg-red-400/10 border-red-400/25",        up: false },
+  };
+  const cfg = map[value] ?? { cls: "text-white/40 bg-white/5 border-white/10", up: true };
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide whitespace-nowrap ${cfg.cls}`}>
+      {cfg.up ? <TrendingUp size={8} /> : <TrendingDown size={8} />}
+      {value}
+    </span>
+  );
+}
+
+// ─── Role Signal Badge ────────────────────────────────────────────────────────
+
+export function RoleSignalBadge({ value }: { value: string | null }) {
+  if (!value) return null;
+  const map: Record<string, string> = {
+    "MID BOOST": "text-[#F5C84C] bg-[#F5C84C]/10 border-[#F5C84C]/30",
+    "ROLE LOSS": "text-red-400 bg-red-400/10 border-red-400/25",
+    "TOG DROP":  "text-orange-400 bg-orange-400/10 border-orange-400/25",
+    "DEF SHIFT": "text-sky-400 bg-sky-400/10 border-sky-400/25",
+    "FWD SHIFT": "text-green-400 bg-green-400/10 border-green-400/25",
+  };
+  const cls = map[value] ?? "text-white/40 bg-white/5 border-white/10";
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide whitespace-nowrap ${cls}`}>
+      <Shield size={8} />{value}
+    </span>
+  );
+}
+
 // ─── Confidence Tier Badge ────────────────────────────────────────────────────
 
 export function ConfidenceBadge({ value }: { value: number | null }) {
@@ -116,6 +154,10 @@ export interface NeekoIntelCardProps {
   captainTier?: string | null;
   breakoutFlag?: boolean | null;
   avoidFlag?: boolean | null;
+  trendLabel?: string | null;
+  roleSignal?: string | null;
+  nextOpponent?: string | null;
+  nextRound?: number | null;
 }
 
 function fmt(v: number | null, decimals = 1): string {
@@ -149,11 +191,16 @@ export function NeekoIntelCard({
   captainTier,
   breakoutFlag,
   avoidFlag,
+  trendLabel,
+  roleSignal,
+  nextOpponent,
+  nextRound,
 }: NeekoIntelCardProps) {
   const isElite = label === "ELITE CAPTAIN" || label === "CAPTAIN LOCK";
 
   const hasBadgeRow =
-    matchupDifficulty || volatilityLevel || captainTier || breakoutFlag || avoidFlag || confidence != null;
+    matchupDifficulty || volatilityLevel || captainTier || breakoutFlag || avoidFlag ||
+    confidence != null || trendLabel || roleSignal;
 
   return (
     <div
@@ -174,6 +221,11 @@ export function NeekoIntelCard({
             <div className="font-semibold text-white text-sm leading-tight truncate">{playerName}</div>
             <div className="text-[11px] text-white/40 mt-0.5">
               {team}{position ? ` · ${position}` : ""}
+              {nextOpponent && (
+                <span className="ml-1.5 text-white/25">
+                  · {nextRound != null ? `R${nextRound} ` : ""}vs {nextOpponent}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -251,6 +303,8 @@ export function NeekoIntelCard({
       {hasBadgeRow && (
         <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-white/[0.06]">
           {confidence != null && <ConfidenceBadge value={confidence} />}
+          {trendLabel && <TrendBadge value={trendLabel} />}
+          {roleSignal && <RoleSignalBadge value={roleSignal} />}
           {matchupDifficulty && <MatchupBadge value={matchupDifficulty} />}
           {volatilityLevel && <VolatilityBadge value={volatilityLevel} />}
           {captainTier && <CaptainTierBadge value={captainTier} />}

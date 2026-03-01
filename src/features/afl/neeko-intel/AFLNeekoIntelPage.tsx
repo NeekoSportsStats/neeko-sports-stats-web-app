@@ -11,6 +11,7 @@ import {
   Swords,
   Gem,
   Lightbulb,
+  AlertTriangle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -53,12 +54,35 @@ interface MasterRow {
   is_riser: boolean;
   is_risk: boolean;
   is_value: boolean;
+  // Phase 2
   matchup_difficulty: string | null;
   volatility_score: number | null;
   volatility_level: string | null;
   captain_tier: string | null;
   breakout_flag: boolean | null;
   avoid_flag: boolean | null;
+  // Phase 3
+  next_round_number: number | null;
+  next_opponent: string | null;
+  next_venue: string | null;
+  next_start_time: string | null;
+  is_home: boolean | null;
+  trend_label: string | null;
+  trend_delta_3v_season: number | null;
+  trend_delta_5v_season: number | null;
+  avg_last_3: number | null;
+  avg_last_5: number | null;
+  trend_avg_season: number | null;
+  consistency_label: string | null;
+  role_signal: string | null;
+  role_signal_strength: number | null;
+  delta_cba: number | null;
+  delta_tog: number | null;
+  availability_note: string | null;
+  days_rest: number | null;
+  quick_turnaround_flag: boolean | null;
+  value_tier: string | null;
+  value_score: number | null;
 }
 
 interface MatchRow {
@@ -89,14 +113,52 @@ interface RoundInsightRow {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function relativeTime(iso: string | null): string {
-  if (!iso) return "recently";
-  const diff = Date.now() - new Date(iso).getTime();
-  const hours = Math.floor(diff / 3600000);
-  if (hours < 1) return "just now";
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+function fmt1(v: number | null): string {
+  if (v == null) return "—";
+  return Number(v).toFixed(1);
+}
+
+function fmtRound(v: number | null): string {
+  if (v == null) return "—";
+  return `R${v}`;
+}
+
+// ─── Trend Label Badge ────────────────────────────────────────────────────────
+
+function TrendBadge({ label }: { label: string | null }) {
+  if (!label || label === "STABLE") return null;
+  const map: Record<string, string> = {
+    SURGING:  "text-green-400 bg-green-400/10 border-green-400/25",
+    RISING:   "text-sky-400 bg-sky-400/10 border-sky-400/25",
+    FADING:   "text-orange-400 bg-orange-400/10 border-orange-400/25",
+    CRASHING: "text-red-400 bg-red-400/10 border-red-400/25",
+  };
+  const cls = map[label] ?? "text-white/40 bg-white/5 border-white/10";
+  const icon = label === "SURGING" || label === "RISING"
+    ? <TrendingUp size={8} />
+    : <TrendingDown size={8} />;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide whitespace-nowrap ${cls}`}>
+      {icon}{label}
+    </span>
+  );
+}
+
+function RoleSignalBadge({ signal }: { signal: string | null }) {
+  if (!signal) return null;
+  const map: Record<string, string> = {
+    "MID BOOST": "text-[#F5C84C] bg-[#F5C84C]/10 border-[#F5C84C]/30",
+    "ROLE LOSS": "text-red-400 bg-red-400/10 border-red-400/25",
+    "TOG DROP":  "text-orange-400 bg-orange-400/10 border-orange-400/25",
+    "DEF SHIFT": "text-sky-400 bg-sky-400/10 border-sky-400/25",
+    "FWD SHIFT": "text-green-400 bg-green-400/10 border-green-400/25",
+  };
+  const cls = map[signal] ?? "text-white/40 bg-white/5 border-white/10";
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide whitespace-nowrap ${cls}`}>
+      <Shield size={8} />{signal}
+    </span>
+  );
 }
 
 // ─── Section Header ───────────────────────────────────────────────────────────
@@ -128,8 +190,6 @@ function SectionHeader({
   );
 }
 
-// ─── Section Shell ────────────────────────────────────────────────────────────
-
 function Section({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={`rounded-2xl border border-white/[0.07] bg-[#0d0d0d] p-4 md:p-6 ${className}`}>
@@ -137,8 +197,6 @@ function Section({ children, className = "" }: { children: React.ReactNode; clas
     </div>
   );
 }
-
-// ─── Section Error ────────────────────────────────────────────────────────────
 
 function SectionError() {
   return (
@@ -149,7 +207,13 @@ function SectionError() {
   );
 }
 
-// ─── Locked Overlay Card ──────────────────────────────────────────────────────
+function SectionEmpty({ message }: { message: string }) {
+  return (
+    <div className="flex items-center justify-center gap-2 py-6 rounded-xl border border-white/5 bg-white/[0.02]">
+      <span className="text-white/25 text-sm text-center">{message}</span>
+    </div>
+  );
+}
 
 function LockedCard() {
   return (
@@ -174,21 +238,36 @@ function LockedCard() {
   );
 }
 
-// ─── Player Cards With Freemium Gating ───────────────────────────────────────
+// ─── Player Card List ─────────────────────────────────────────────────────────
 
 const FREE_VISIBLE = 1;
 const FREE_BLURRED = 2;
+
+function buildReason(row: MasterRow, isPremium: boolean): string | null {
+  if (!isPremium) return null;
+  const parts: string[] = [];
+  if (row.trend_label && row.trend_label !== "STABLE" && row.trend_delta_3v_season != null) {
+    const sign = row.trend_delta_3v_season > 0 ? "+" : "";
+    parts.push(`${row.trend_label} (${sign}${fmt1(row.trend_delta_3v_season)} vs season avg)`);
+  }
+  if (row.role_signal) parts.push(row.role_signal);
+  if (row.availability_note) parts.push(row.availability_note);
+  if (row.recommendation_why && parts.length === 0) return row.recommendation_why;
+  return parts.length > 0 ? parts.join(" · ") : row.recommendation_why ?? null;
+}
 
 function PlayerCardList({
   rows,
   loading,
   error,
   isPremium,
+  emptyMessage = "No data detected yet — check back soon",
 }: {
   rows: MasterRow[];
   loading: boolean;
   error: boolean;
   isPremium: boolean;
+  emptyMessage?: string;
 }) {
   if (loading) {
     return (
@@ -198,13 +277,7 @@ function PlayerCardList({
     );
   }
   if (error) return <SectionError />;
-  if (rows.length === 0) {
-    return (
-      <div className="text-center py-6 text-white/30 text-sm">
-        Neeko Intel generating...
-      </div>
-    );
-  }
+  if (rows.length === 0) return <SectionEmpty message={emptyMessage} />;
 
   return (
     <div className="space-y-3">
@@ -223,7 +296,7 @@ function PlayerCardList({
             confidence={row.projection_confidence}
             label={row.ai_recommendation}
             color={row.recommendation_color}
-            reason={row.recommendation_why}
+            reason={buildReason(row, isPremium)}
             captainScore={row.captain_score}
             locked={false}
             matchupDifficulty={row.matchup_difficulty}
@@ -231,6 +304,10 @@ function PlayerCardList({
             captainTier={row.captain_tier}
             breakoutFlag={row.breakout_flag}
             avoidFlag={row.avoid_flag}
+            trendLabel={isPremium ? row.trend_label : null}
+            roleSignal={isPremium ? row.role_signal : null}
+            nextOpponent={row.next_opponent}
+            nextRound={row.next_round_number}
           />
         );
       })}
@@ -251,16 +328,16 @@ function MatchProjectionCard({ match }: { match: MatchRow }) {
   const conf = match.confidence;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[#111111] p-4">
+    <div className="rounded-xl border border-white/10 bg-[#111111] p-4 flex flex-col h-full">
       <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="font-semibold text-white text-sm leading-tight">
             {match.home_team}{" "}
             <span className="text-white/30 font-normal">vs</span>{" "}
             {match.away_team}
           </div>
           <div className="text-[11px] text-white/40 mt-0.5">
-            Round {match.round_number ?? "—"} · {match.season ?? "2026"}
+            {fmtRound(match.round_number)} · {match.season ?? 2026} · AFL match score prediction
           </div>
         </div>
         {conf != null && (
@@ -278,7 +355,7 @@ function MatchProjectionCard({ match }: { match: MatchRow }) {
         )}
       </div>
 
-      <div className="flex items-end gap-5">
+      <div className="flex items-end gap-5 flex-1">
         {winner && margin != null && (
           <div>
             <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Winner</div>
@@ -330,25 +407,21 @@ function MatchCardList({
   }
   if (error) return <SectionError />;
   if (rows.length === 0) {
-    return (
-      <div className="text-center py-6 text-white/30 text-sm">
-        Match projections generating...
-      </div>
-    );
+    return <SectionEmpty message="Match projections generating — check back before round starts" />;
   }
 
-  const visible = isPremium ? rows.slice(0, 9) : rows.slice(0, 1);
+  const visible = isPremium ? rows : rows.slice(0, 1);
   const locked = !isPremium ? rows.slice(1, 3) : [];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-stretch">
       {visible.map((match, idx) => (
         <MatchProjectionCard
           key={match.id ?? match.match_id ?? `${match.home_team}-${idx}`}
           match={match}
         />
       ))}
-      {locked.map((match, idx) => (
+      {locked.map((_, idx) => (
         <LockedCard key={`locked-match-${idx}`} />
       ))}
     </div>
@@ -357,7 +430,13 @@ function MatchCardList({
 
 // ─── Round Insight Banner ─────────────────────────────────────────────────────
 
-function RoundInsightBanner({ row }: { row: RoundInsightRow | null }) {
+function RoundInsightBanner({
+  row,
+  nextRound,
+}: {
+  row: RoundInsightRow | null;
+  nextRound: number | null;
+}) {
   if (!row) return null;
   return (
     <div className="rounded-2xl border border-[#F5C84C]/20 bg-gradient-to-r from-[#1a1408] to-[#0d0d0d] p-4 md:p-5">
@@ -367,7 +446,7 @@ function RoundInsightBanner({ row }: { row: RoundInsightRow | null }) {
         </div>
         <div>
           <div className="text-[10px] text-[#F5C84C]/60 font-semibold uppercase tracking-widest mb-1">
-            Round Insight
+            {nextRound != null ? `Round ${nextRound} Insight` : "Round Insight"}
           </div>
           <p className="text-white/80 text-sm font-medium leading-snug">{row.headline}</p>
           {row.projection_final != null && (
@@ -389,13 +468,7 @@ function RoundInsightBanner({ row }: { row: RoundInsightRow | null }) {
 
 // ─── Elite Captain Hero ───────────────────────────────────────────────────────
 
-function EliteCaptainHero({
-  rows,
-  loading,
-}: {
-  rows: MasterRow[];
-  loading: boolean;
-}) {
+function EliteCaptainHero({ rows, loading, isPremium }: { rows: MasterRow[]; loading: boolean; isPremium: boolean }) {
   if (loading) {
     return (
       <div className="rounded-2xl border border-[#F5C84C]/20 bg-gradient-to-r from-[#1a1408] to-[#0a0a0a] p-4 md:p-6 animate-pulse">
@@ -437,7 +510,7 @@ function EliteCaptainHero({
             confidence={row.projection_confidence}
             label={row.captain_rating}
             color="#F5C84C"
-            reason={row.recommendation_why}
+            reason={buildReason(row, isPremium)}
             captainScore={row.captain_score}
             locked={false}
             matchupDifficulty={row.matchup_difficulty}
@@ -445,6 +518,10 @@ function EliteCaptainHero({
             captainTier={row.captain_tier}
             breakoutFlag={row.breakout_flag}
             avoidFlag={row.avoid_flag}
+            trendLabel={isPremium ? row.trend_label : null}
+            roleSignal={isPremium ? row.role_signal : null}
+            nextOpponent={row.next_opponent}
+            nextRound={row.next_round_number}
           />
         ))}
       </div>
@@ -464,7 +541,7 @@ function UpgradeCTABanner() {
             <span className="text-[#F5C84C] font-bold text-lg">Unlock Full Neeko Intel</span>
           </div>
           <p className="text-white/60 text-sm">
-            Access all breakouts, risers, captain picks, value picks and AI reasoning for every player.
+            Trend signals, role changes, full match projections, AI reasoning and every player ranked.
           </p>
         </div>
         <a
@@ -497,7 +574,7 @@ export default function AFLNeekoIntelPage() {
       setLoading(true);
       setFetchError(false);
       const { data, error } = await supabase
-        .from("v_neeko_intel_master_v2")
+        .from("v_neeko_intel_master_v3")
         .select("*");
       if (error || !data) {
         setFetchError(true);
@@ -534,27 +611,70 @@ export default function AFLNeekoIntelPage() {
     loadRoundInsight();
   }, []);
 
-  // ── Category Arrays (mutually exclusive where noted) ──────────────────────
+  // ── Derived next round number ──────────────────────────────────────────────
+  const nextRound = allData.find((r) => r.next_round_number != null)?.next_round_number ?? null;
+  const roundLabel = nextRound != null ? `Round ${nextRound}` : "Upcoming Round";
 
+  // ── Section: Captain Picks ─────────────────────────────────────────────────
   const captains = [...allData]
     .filter((p) => p.is_captain)
     .sort((a, b) => (b.captain_score_num ?? 0) - (a.captain_score_num ?? 0))
     .slice(0, 10);
 
+  // ── Section: Breakouts & Must Starts ──────────────────────────────────────
+  // breakout_flag OR must-start recommendation — exclude avoid
   const breakouts = allData
-    .filter((p) => p.is_breakout && !p.is_captain)
+    .filter(
+      (p) =>
+        (p.breakout_flag === true || p.is_breakout) &&
+        !p.avoid_flag &&
+        !p.is_captain
+    )
+    .sort((a, b) => (b.projection_final ?? 0) - (a.projection_final ?? 0))
     .slice(0, 10);
 
+  // ── Section: Risers — driven by TREND DELTA, not upside label ────────────
   const risers = allData
-    .filter((p) => p.is_riser && !p.is_captain)
+    .filter(
+      (p) =>
+        (p.trend_label === "SURGING" || p.trend_label === "RISING" || p.role_signal === "MID BOOST") &&
+        !p.is_captain
+    )
+    .sort(
+      (a, b) =>
+        (b.trend_delta_3v_season ?? b.upside_rating ?? 0) -
+        (a.trend_delta_3v_season ?? a.upside_rating ?? 0)
+    )
     .slice(0, 10);
 
+  // ── Section: Fallers — FADING/CRASHING or ROLE LOSS / TOG DROP ────────────
+  const fallers = allData
+    .filter(
+      (p) =>
+        p.trend_label === "FADING" ||
+        p.trend_label === "CRASHING" ||
+        p.role_signal === "ROLE LOSS" ||
+        p.role_signal === "TOG DROP"
+    )
+    .sort(
+      (a, b) =>
+        (a.trend_delta_3v_season ?? 0) - (b.trend_delta_3v_season ?? 0)
+    )
+    .slice(0, 10);
+
+  // ── Section: Risk & Avoid ─────────────────────────────────────────────────
   const risk = allData
-    .filter((p) => p.is_risk)
-    .slice(0, 10);
-
-  const value = allData
-    .filter((p) => p.is_value && !p.is_captain)
+    .filter(
+      (p) =>
+        p.avoid_flag === true ||
+        (p.risk_rating ?? 0) >= 65 ||
+        p.quick_turnaround_flag === true
+    )
+    .sort(
+      (a, b) =>
+        (b.risk_rating ?? 0) - (a.risk_rating ?? 0) ||
+        (a.projection_confidence ?? 100) - (b.projection_confidence ?? 100)
+    )
     .slice(0, 10);
 
   return (
@@ -575,7 +695,7 @@ export default function AFLNeekoIntelPage() {
                 Neeko Intel
               </h1>
               <p className="text-white/40 text-sm mt-1">
-                AI-powered fantasy intelligence · Updated {relativeTime(null)}
+                AI-powered fantasy intelligence · {roundLabel} · Updated automatically
               </p>
             </div>
 
@@ -607,7 +727,7 @@ export default function AFLNeekoIntelPage() {
                 <a href="/neeko-plus" className="text-[#F5C84C] font-semibold hover:underline">
                   Upgrade to Neeko+
                 </a>{" "}
-                for full access.
+                for trend signals, role changes and full access.
               </p>
             </div>
           )}
@@ -628,17 +748,17 @@ export default function AFLNeekoIntelPage() {
         {!fetchError && (
           <>
             {/* ── Round Insight ── */}
-            {!loading && <RoundInsightBanner row={roundInsight} />}
+            {!loading && <RoundInsightBanner row={roundInsight} nextRound={nextRound} />}
 
             {/* ── Elite Captain Locks Hero ── */}
-            <EliteCaptainHero rows={captains} loading={loading} />
+            <EliteCaptainHero rows={captains} loading={loading} isPremium={isPremium} />
 
             {/* ── Captain Picks ── */}
             <Section>
               <SectionHeader
                 icon={<Crown size={16} />}
                 title="Captain Picks"
-                subtitle="Top-ranked captain options sorted by captain score"
+                subtitle="Top-ranked captain options by captain score"
                 locked={!isPremium}
               />
               <PlayerCardList
@@ -646,6 +766,7 @@ export default function AFLNeekoIntelPage() {
                 loading={loading}
                 error={fetchError}
                 isPremium={isPremium}
+                emptyMessage="No strong captain picks detected yet"
               />
             </Section>
 
@@ -654,7 +775,7 @@ export default function AFLNeekoIntelPage() {
               <SectionHeader
                 icon={<Swords size={16} />}
                 title="Match Projections"
-                subtitle="AI-predicted outcomes and margins for this round"
+                subtitle={`AFL match score predictions for ${roundLabel} — not fantasy points`}
                 locked={!isPremium}
               />
               <MatchCardList
@@ -665,12 +786,12 @@ export default function AFLNeekoIntelPage() {
               />
             </Section>
 
-            {/* ── Breakouts ── */}
+            {/* ── Breakouts & Must Starts ── */}
             <Section>
               <SectionHeader
                 icon={<Zap size={16} />}
                 title="Breakouts & Must Starts"
-                subtitle="High upside players with moderate confidence — speculative pop"
+                subtitle="High upside picks not flagged as avoid — speculative pop targets"
                 locked={!isPremium}
               />
               <PlayerCardList
@@ -678,22 +799,7 @@ export default function AFLNeekoIntelPage() {
                 loading={loading}
                 error={fetchError}
                 isPremium={isPremium}
-              />
-            </Section>
-
-            {/* ── Value Picks ── */}
-            <Section>
-              <SectionHeader
-                icon={<Gem size={16} />}
-                title="Value Picks"
-                subtitle="Solid projections with high confidence — not elite but trustworthy"
-                locked={!isPremium}
-              />
-              <PlayerCardList
-                rows={value}
-                loading={loading}
-                error={fetchError}
-                isPremium={isPremium}
+                emptyMessage="No strong breakout candidates detected yet — wait for form data"
               />
             </Section>
 
@@ -703,7 +809,7 @@ export default function AFLNeekoIntelPage() {
                 <SectionHeader
                   icon={<TrendingUp size={16} />}
                   title="Risers"
-                  subtitle="Strongly trending up with high upside and confidence"
+                  subtitle="Trending up based on recent form vs season average"
                   locked={!isPremium}
                 />
                 <PlayerCardList
@@ -711,24 +817,43 @@ export default function AFLNeekoIntelPage() {
                   loading={loading}
                   error={fetchError}
                   isPremium={isPremium}
+                  emptyMessage="No strong risers detected yet — wait for form data"
                 />
               </Section>
 
               <Section>
                 <SectionHeader
                   icon={<TrendingDown size={16} />}
-                  title="Risk & Avoid"
-                  subtitle="High risk rating or low confidence — use caution"
+                  title="Fallers"
+                  subtitle="Fading form, role loss or usage drop — consider avoiding"
                   locked={!isPremium}
                 />
                 <PlayerCardList
-                  rows={risk}
+                  rows={fallers}
                   loading={loading}
                   error={fetchError}
                   isPremium={isPremium}
+                  emptyMessage="No notable fallers detected yet"
                 />
               </Section>
             </div>
+
+            {/* ── Risk & Avoid ── */}
+            <Section>
+              <SectionHeader
+                icon={<AlertTriangle size={16} />}
+                title="Risk & Avoid"
+                subtitle="High risk rating, low confidence, or turnaround risk flagged"
+                locked={!isPremium}
+              />
+              <PlayerCardList
+                rows={risk}
+                loading={loading}
+                error={fetchError}
+                isPremium={isPremium}
+                emptyMessage="No specific avoid flags this round"
+              />
+            </Section>
 
             {/* ── Upgrade CTA (free users) ── */}
             {!isPremium && <UpgradeCTABanner />}
