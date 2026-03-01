@@ -25,26 +25,41 @@ interface BreakoutRow {
   team: string;
   position: string | null;
   projection_final: number | null;
-  projection_confidence: number | null;
+  ceiling_estimate: number | null;
+  floor_estimate: number | null;
+  consistency_score: number | null;
   form_rating: number | null;
   matchup_rating: number | null;
+  upside_rating: number | null;
   risk_rating: number | null;
+  projection_confidence: number | null;
   ai_recommendation: string | null;
+  ai_analysis: string | null;
   recommendation_color: string | null;
   recommendation_short: string | null;
+  captain_score: number | null;
+  captain_rating: string | null;
+  captain_confidence: number | null;
 }
 
 interface CaptainRow {
   player_id: string | null;
   player_name: string;
   team: string;
+  position: string | null;
   projection_final: number | null;
   ceiling_estimate: number | null;
+  floor_estimate: number | null;
   consistency_score: number | null;
+  form_rating: number | null;
+  matchup_rating: number | null;
+  projection_confidence: number | null;
+  ai_recommendation: string | null;
+  recommendation_color: string | null;
+  recommendation_short: string | null;
   captain_score: number | null;
   captain_rating: string | null;
   captain_confidence: number | null;
-  recommendation_short: string | null;
 }
 
 interface RiskRow {
@@ -53,9 +68,12 @@ interface RiskRow {
   team: string;
   position: string | null;
   projection_final: number | null;
-  projection_confidence: number | null;
-  risk_rating: number | null;
+  floor_estimate: number | null;
   consistency_score: number | null;
+  form_rating: number | null;
+  matchup_rating: number | null;
+  risk_rating: number | null;
+  projection_confidence: number | null;
   ai_recommendation: string | null;
   recommendation_color: string | null;
   recommendation_short: string | null;
@@ -67,12 +85,18 @@ interface RiserRow {
   team: string;
   position: string | null;
   projection_final: number | null;
-  projection_confidence: number | null;
-  upside_rating: number | null;
+  ceiling_estimate: number | null;
+  floor_estimate: number | null;
+  consistency_score: number | null;
   form_rating: number | null;
+  matchup_rating: number | null;
+  upside_rating: number | null;
+  risk_rating: number | null;
+  projection_confidence: number | null;
   ai_recommendation: string | null;
   recommendation_color: string | null;
   recommendation_short: string | null;
+  captain_score: number | null;
 }
 
 interface FallerRow {
@@ -81,9 +105,12 @@ interface FallerRow {
   team: string;
   position: string | null;
   projection_final: number | null;
-  projection_confidence: number | null;
-  risk_rating: number | null;
+  floor_estimate: number | null;
+  consistency_score: number | null;
   form_rating: number | null;
+  matchup_rating: number | null;
+  risk_rating: number | null;
+  projection_confidence: number | null;
   ai_recommendation: string | null;
   recommendation_color: string | null;
   recommendation_short: string | null;
@@ -106,16 +133,47 @@ interface MatchRow {
   updated_at: string | null;
 }
 
+// ─── Explicit column selects (no select *) ────────────────────────────────────
+
+const PLAYER_COLS =
+  "player_id,player_name,team,position,projection_final,ceiling_estimate,floor_estimate,consistency_score,form_rating,matchup_rating,upside_rating,risk_rating,projection_confidence,ai_recommendation,ai_analysis,recommendation_color,recommendation_short,captain_score,captain_rating,captain_confidence";
+
+const CAPTAIN_COLS =
+  "player_id,player_name,team,position,projection_final,ceiling_estimate,floor_estimate,consistency_score,form_rating,matchup_rating,projection_confidence,ai_recommendation,recommendation_color,recommendation_short,captain_score,captain_rating,captain_confidence";
+
+const RISK_COLS =
+  "player_id,player_name,team,position,projection_final,floor_estimate,consistency_score,form_rating,matchup_rating,risk_rating,projection_confidence,ai_recommendation,recommendation_color,recommendation_short";
+
+const RISER_COLS =
+  "player_id,player_name,team,position,projection_final,ceiling_estimate,floor_estimate,consistency_score,form_rating,matchup_rating,upside_rating,risk_rating,projection_confidence,ai_recommendation,recommendation_color,recommendation_short,captain_score";
+
+const FALLER_COLS =
+  "player_id,player_name,team,position,projection_final,floor_estimate,consistency_score,form_rating,matchup_rating,risk_rating,projection_confidence,ai_recommendation,recommendation_color,recommendation_short";
+
+const MATCH_COLS =
+  "match_id,home_team,away_team,home_projection,away_projection,margin,confidence,winner,ai_summary,prediction_explanation,round_number,season,match_date,updated_at";
+
+// ─── Retry wrapper ────────────────────────────────────────────────────────────
+
+async function fetchWithRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e: unknown) {
+    const msg = String((e as { message?: string })?.message ?? e);
+    const status = (e as { status?: number })?.status;
+    if (msg.includes("500") || status === 500) {
+      await new Promise((r) => setTimeout(r, 400 + Math.random() * 600));
+      return await fn();
+    }
+    throw e;
+  }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmt(v: number | null, decimals = 1): string {
   if (v == null) return "—";
   return Number(v).toFixed(decimals);
-}
-
-function fmtInt(v: number | null): string {
-  if (v == null) return "—";
-  return Math.round(Number(v)).toString();
 }
 
 function relativeTime(iso: string | null): string {
@@ -167,6 +225,17 @@ function Section({ children, className = "" }: { children: React.ReactNode; clas
   );
 }
 
+// ─── Section Error Fallback ───────────────────────────────────────────────────
+
+function SectionError() {
+  return (
+    <div className="flex items-center justify-center gap-2 py-6 rounded-xl border border-white/5 bg-white/[0.02]">
+      <RefreshCw size={13} className="text-white/20 shrink-0" />
+      <span className="text-white/30 text-sm">Temporarily unavailable — refresh to retry</span>
+    </div>
+  );
+}
+
 // ─── Upgrade CTA Banner ───────────────────────────────────────────────────────
 
 function UpgradeCTABanner() {
@@ -195,7 +264,15 @@ function UpgradeCTABanner() {
 
 // ─── Elite Captain Hero Card ──────────────────────────────────────────────────
 
-function EliteCaptainHero({ rows, loading }: { rows: CaptainRow[]; loading: boolean }) {
+function EliteCaptainHero({
+  rows,
+  loading,
+  error,
+}: {
+  rows: CaptainRow[];
+  loading: boolean;
+  error: boolean;
+}) {
   if (loading) {
     return (
       <div className="rounded-2xl border border-[#F5C84C]/20 bg-gradient-to-r from-[#1a1408] to-[#0a0a0a] p-4 md:p-6 animate-pulse">
@@ -207,6 +284,8 @@ function EliteCaptainHero({ rows, loading }: { rows: CaptainRow[]; loading: bool
       </div>
     );
   }
+
+  if (error) return null;
 
   const eliteRows = rows.filter(
     (r) => r.captain_rating === "ELITE CAPTAIN" || r.captain_rating === "CAPTAIN LOCK"
@@ -251,13 +330,7 @@ function EliteCaptainHero({ rows, loading }: { rows: CaptainRow[]; loading: bool
 
 // ─── Match Card ───────────────────────────────────────────────────────────────
 
-function MatchPredictionCard({
-  match,
-  locked,
-}: {
-  match: MatchRow;
-  locked: boolean;
-}) {
+function MatchPredictionCard({ match, locked }: { match: MatchRow; locked: boolean }) {
   const homeWin =
     match.home_projection != null &&
     match.away_projection != null &&
@@ -291,11 +364,7 @@ function MatchPredictionCard({
       <div className="flex items-center justify-between gap-2">
         <div className={`flex-1 text-center ${homeWin ? "opacity-100" : "opacity-50"}`}>
           <div className="font-bold text-white text-sm leading-tight">{match.home_team}</div>
-          <div
-            className={`text-2xl font-black tabular-nums mt-1 ${
-              homeWin ? "text-[#F5C84C]" : "text-white/60"
-            }`}
-          >
+          <div className={`text-2xl font-black tabular-nums mt-1 ${homeWin ? "text-[#F5C84C]" : "text-white/60"}`}>
             {fmt(match.home_projection, 0)}
           </div>
         </div>
@@ -303,19 +372,13 @@ function MatchPredictionCard({
         <div className="text-center shrink-0 px-2">
           <div className="text-white/20 text-xs font-bold">VS</div>
           {match.margin != null && (
-            <div className="text-[10px] text-white/30 mt-1">
-              {Math.round(Number(match.margin))} pts
-            </div>
+            <div className="text-[10px] text-white/30 mt-1">{Math.round(Number(match.margin))} pts</div>
           )}
         </div>
 
         <div className={`flex-1 text-center ${!homeWin ? "opacity-100" : "opacity-50"}`}>
           <div className="font-bold text-white text-sm leading-tight">{match.away_team}</div>
-          <div
-            className={`text-2xl font-black tabular-nums mt-1 ${
-              !homeWin ? "text-[#F5C84C]" : "text-white/60"
-            }`}
-          >
+          <div className={`text-2xl font-black tabular-nums mt-1 ${!homeWin ? "text-[#F5C84C]" : "text-white/60"}`}>
             {fmt(match.away_projection, 0)}
           </div>
         </div>
@@ -343,17 +406,15 @@ type AnyPlayerRow = {
   recommendation_color?: string | null;
   recommendation_short?: string | null;
   captain_score?: number | null;
-  upside_rating?: number | null;
-  risk_rating?: number | null;
 };
 
-function renderPlayerCards(
-  rows: AnyPlayerRow[],
-  keyField: string,
-  loading: boolean
-) {
+function renderPlayerCards(rows: AnyPlayerRow[], loading: boolean, error: boolean) {
   if (loading) {
     return Array.from({ length: 3 }).map((_, i) => <NeekoIntelSkeletonCard key={i} />);
+  }
+
+  if (error) {
+    return <SectionError />;
   }
 
   if (rows.length === 0) {
@@ -400,39 +461,74 @@ export default function AFLNeekoIntelPage() {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
+  const [sectionErrors, setSectionErrors] = useState({
+    breakouts: false,
+    captains: false,
+    risk: false,
+    risers: false,
+    fallers: false,
+    matches: false,
+  });
+
   useEffect(() => {
     async function load() {
       setLoading(true);
-      try {
-        const [
-          breakoutsRes,
-          captainsRes,
-          riskRes,
-          risersRes,
-          fallersRes,
-          matchesRes,
-        ] = await Promise.all([
-          supabase.from("v_neeko_intel_breakouts").select("*"),
-          supabase.from("v_neeko_intel_captains").select("*"),
-          supabase.from("v_neeko_intel_risk").select("*"),
-          supabase.from("v_neeko_intel_risers").select("*"),
-          supabase.from("v_neeko_intel_fallers").select("*"),
-          supabase.from("v_neeko_intel_matches").select("*"),
-        ]);
+      setSectionErrors({ breakouts: false, captains: false, risk: false, risers: false, fallers: false, matches: false });
 
-        if (breakoutsRes.data) setBreakouts(breakoutsRes.data as BreakoutRow[]);
-        if (captainsRes.data) setCaptains(captainsRes.data as CaptainRow[]);
-        if (riskRes.data) setRisk(riskRes.data as RiskRow[]);
-        if (risersRes.data) setRisers(risersRes.data as RiserRow[]);
-        if (fallersRes.data) setFallers(fallersRes.data as FallerRow[]);
-        if (matchesRes.data) {
-          setMatches(matchesRes.data as MatchRow[]);
-          const first = (matchesRes.data as MatchRow[])[0];
-          if (first?.updated_at) setLastUpdated(first.updated_at);
-        }
-      } finally {
-        setLoading(false);
+      const results = await Promise.allSettled([
+        fetchWithRetry(() => supabase.from("v_neeko_intel_breakouts").select(PLAYER_COLS)),
+        fetchWithRetry(() => supabase.from("v_neeko_intel_captains").select(CAPTAIN_COLS)),
+        fetchWithRetry(() => supabase.from("v_neeko_intel_risk").select(RISK_COLS)),
+        fetchWithRetry(() => supabase.from("v_neeko_intel_risers").select(RISER_COLS)),
+        fetchWithRetry(() => supabase.from("v_neeko_intel_fallers").select(FALLER_COLS)),
+        fetchWithRetry(() => supabase.from("v_neeko_intel_matches").select(MATCH_COLS)),
+      ]);
+
+      const errors = { breakouts: false, captains: false, risk: false, risers: false, fallers: false, matches: false };
+
+      const [breakoutsR, captainsR, riskR, risersR, fallersR, matchesR] = results;
+
+      if (breakoutsR.status === "fulfilled" && !breakoutsR.value.error && breakoutsR.value.data) {
+        setBreakouts(breakoutsR.value.data as BreakoutRow[]);
+      } else {
+        errors.breakouts = true;
       }
+
+      if (captainsR.status === "fulfilled" && !captainsR.value.error && captainsR.value.data) {
+        setCaptains(captainsR.value.data as CaptainRow[]);
+      } else {
+        errors.captains = true;
+      }
+
+      if (riskR.status === "fulfilled" && !riskR.value.error && riskR.value.data) {
+        setRisk(riskR.value.data as RiskRow[]);
+      } else {
+        errors.risk = true;
+      }
+
+      if (risersR.status === "fulfilled" && !risersR.value.error && risersR.value.data) {
+        setRisers(risersR.value.data as RiserRow[]);
+      } else {
+        errors.risers = true;
+      }
+
+      if (fallersR.status === "fulfilled" && !fallersR.value.error && fallersR.value.data) {
+        setFallers(fallersR.value.data as FallerRow[]);
+      } else {
+        errors.fallers = true;
+      }
+
+      if (matchesR.status === "fulfilled" && !matchesR.value.error && matchesR.value.data) {
+        const matchData = matchesR.value.data as MatchRow[];
+        setMatches(matchData);
+        const first = matchData[0];
+        if (first?.updated_at) setLastUpdated(first.updated_at);
+      } else {
+        errors.matches = true;
+      }
+
+      setSectionErrors(errors);
+      setLoading(false);
     }
     load();
   }, []);
@@ -444,8 +540,15 @@ export default function AFLNeekoIntelPage() {
   const visibleFallers = isPremium ? fallers : fallers.slice(0, FREE_PREVIEW_COUNT);
   const visibleMatches = isPremium ? matches : matches.slice(0, FREE_PREVIEW_COUNT);
 
+  const allSectionsFailed =
+    !loading &&
+    sectionErrors.breakouts &&
+    sectionErrors.captains &&
+    sectionErrors.matches;
+
   const isEmpty =
     !loading &&
+    !allSectionsFailed &&
     breakouts.length === 0 &&
     captains.length === 0 &&
     matches.length === 0;
@@ -515,6 +618,14 @@ export default function AFLNeekoIntelPage() {
       {/* ── Page Content ── */}
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
+        {allSectionsFailed && (
+          <div className="text-center py-16">
+            <RefreshCw size={32} className="text-white/20 mx-auto mb-3" />
+            <p className="text-white/40 text-sm">Neeko Intel temporarily unavailable</p>
+            <p className="text-white/25 text-xs mt-1">Refresh the page to retry</p>
+          </div>
+        )}
+
         {isEmpty && (
           <div className="text-center py-16">
             <RefreshCw size={32} className="text-white/20 mx-auto mb-3 animate-spin" />
@@ -523,10 +634,10 @@ export default function AFLNeekoIntelPage() {
           </div>
         )}
 
-        {!isEmpty && (
+        {!allSectionsFailed && (
           <>
             {/* ── HERO: Elite Captain Locks ── */}
-            <EliteCaptainHero rows={captains} loading={loading} />
+            <EliteCaptainHero rows={captains} loading={loading} error={sectionErrors.captains} />
 
             {/* ── Breakouts & Must Starts ── */}
             <Section>
@@ -537,7 +648,7 @@ export default function AFLNeekoIntelPage() {
                 locked={!isPremium}
               />
               <div className="space-y-3">
-                {renderPlayerCards(visibleBreakouts, "breakout", loading)}
+                {renderPlayerCards(visibleBreakouts, loading, sectionErrors.breakouts)}
               </div>
             </Section>
 
@@ -552,6 +663,8 @@ export default function AFLNeekoIntelPage() {
               <div className="space-y-3">
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => <NeekoIntelSkeletonCard key={i} />)
+                ) : sectionErrors.captains ? (
+                  <SectionError />
                 ) : visibleCaptains.length === 0 ? (
                   <div className="text-center py-6 text-white/30 text-sm">
                     Neeko Intel generating...
@@ -586,7 +699,7 @@ export default function AFLNeekoIntelPage() {
                   locked={!isPremium}
                 />
                 <div className="space-y-3">
-                  {renderPlayerCards(visibleRisers, "risers", loading)}
+                  {renderPlayerCards(visibleRisers, loading, sectionErrors.risers)}
                 </div>
               </Section>
 
@@ -598,7 +711,7 @@ export default function AFLNeekoIntelPage() {
                   locked={!isPremium}
                 />
                 <div className="space-y-3">
-                  {renderPlayerCards(visibleFallers, "fallers", loading)}
+                  {renderPlayerCards(visibleFallers, loading, sectionErrors.fallers)}
                 </div>
               </Section>
             </div>
@@ -612,7 +725,7 @@ export default function AFLNeekoIntelPage() {
                 locked={!isPremium}
               />
               <div className="space-y-3">
-                {renderPlayerCards(visibleRisk, "risk", loading)}
+                {renderPlayerCards(visibleRisk, loading, sectionErrors.risk)}
               </div>
             </Section>
 
@@ -626,10 +739,10 @@ export default function AFLNeekoIntelPage() {
               />
               {loading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <NeekoIntelSkeletonCard key={i} />
-                  ))}
+                  {Array.from({ length: 3 }).map((_, i) => <NeekoIntelSkeletonCard key={i} />)}
                 </div>
+              ) : sectionErrors.matches ? (
+                <SectionError />
               ) : visibleMatches.length === 0 ? (
                 <div className="text-center py-6 text-white/30 text-sm">
                   Neeko Intel generating...
