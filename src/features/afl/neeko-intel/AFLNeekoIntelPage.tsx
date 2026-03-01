@@ -8,6 +8,7 @@ import {
   Shield,
   Star,
   RefreshCw,
+  Swords,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -17,6 +18,23 @@ import {
 } from "./NeekoIntelCard";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface MatchRow {
+  match_id: string | null;
+  home_team: string;
+  away_team: string;
+  round_number: number | null;
+  season: number | null;
+  predicted_home_score: number | null;
+  predicted_away_score: number | null;
+  predicted_margin: number | null;
+  predicted_total: number | null;
+  confidence: number | null;
+  prediction: string | null;
+  ai_summary: string | null;
+  prediction_explanation: string | null;
+  updated_at: string | null;
+}
 
 interface PlayerRow {
   player_id: string | null;
@@ -226,6 +244,77 @@ function renderPlayerCards(rows: PlayerRow[], loading: boolean, error: boolean) 
   ));
 }
 
+// ─── Match Projection Card ────────────────────────────────────────────────────
+
+function MatchProjectionCard({ match, locked }: { match: MatchRow; locked: boolean }) {
+  const margin = match.predicted_margin != null ? Math.abs(Math.round(match.predicted_margin)) : null;
+  const winner = match.predicted_margin != null
+    ? match.predicted_margin > 0 ? match.home_team : match.away_team
+    : null;
+  const confidence = match.confidence;
+
+  return (
+    <div
+      className={`rounded-xl border p-4 bg-[#111111] border-white/10 transition-all duration-150 ${
+        locked ? "opacity-50 blur-sm select-none pointer-events-none" : ""
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <div className="font-semibold text-white text-sm leading-tight">
+            {match.home_team} <span className="text-white/30 font-normal">vs</span> {match.away_team}
+          </div>
+          <div className="text-[11px] text-white/40 mt-0.5">
+            Round {match.round_number ?? "—"} · {match.season ?? "2026"}
+          </div>
+        </div>
+        {confidence != null && (
+          <div
+            className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold whitespace-nowrap ${
+              confidence >= 75
+                ? "text-green-400 bg-green-400/10 border border-green-400/30"
+                : confidence >= 55
+                ? "text-yellow-400 bg-yellow-400/10 border border-yellow-400/30"
+                : "text-orange-400 bg-orange-400/10 border border-orange-400/30"
+            }`}
+          >
+            {Math.round(confidence)}% conf.
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-end gap-5">
+        {winner && margin != null && (
+          <div>
+            <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Predicted Winner</div>
+            <div className="text-[#F5C84C] font-bold text-base leading-none">{winner}</div>
+          </div>
+        )}
+        {margin != null && (
+          <div>
+            <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Margin</div>
+            <div className="text-white font-semibold text-sm tabular-nums">{margin} pts</div>
+          </div>
+        )}
+        {match.predicted_home_score != null && match.predicted_away_score != null && (
+          <div>
+            <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Scores</div>
+            <div className="text-white/60 text-sm tabular-nums">
+              {Math.round(match.predicted_home_score)} – {Math.round(match.predicted_away_score)}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {(match.ai_summary || match.prediction_explanation) && (
+        <p className="mt-3 text-[11px] text-white/50 leading-relaxed border-t border-white/5 pt-3 line-clamp-2">
+          {match.ai_summary ?? match.prediction_explanation}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const FREE_LIMIT = 1;
@@ -236,8 +325,11 @@ export default function AFLNeekoIntelPage() {
   const { isPremium } = useAuth();
 
   const [allData, setAllData] = useState<PlayerRow[]>([]);
+  const [matches, setMatches] = useState<MatchRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [matchesLoading, setMatchesLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
+  const [matchesError, setMatchesError] = useState(false);
   const [lastUpdated] = useState<string | null>(null);
 
   useEffect(() => {
@@ -258,7 +350,27 @@ export default function AFLNeekoIntelPage() {
 
       setLoading(false);
     }
+
+    async function loadMatches() {
+      setMatchesLoading(true);
+      setMatchesError(false);
+
+      const { data, error } = await supabase
+        .from("v_ai_match_predictions_preview")
+        .select("*")
+        .order("round_number", { ascending: true });
+
+      if (error || !data) {
+        setMatchesError(true);
+      } else {
+        setMatches(data as MatchRow[]);
+      }
+
+      setMatchesLoading(false);
+    }
+
     load();
+    loadMatches();
   }, []);
 
   const breakouts = allData
@@ -286,6 +398,7 @@ export default function AFLNeekoIntelPage() {
   const visibleRisk = isPremium ? risk : risk.slice(0, FREE_LIMIT);
   const visibleRisers = isPremium ? risers : risers.slice(0, FREE_LIMIT);
   const visibleFallers = isPremium ? fallers : fallers.slice(0, FREE_LIMIT);
+  const visibleMatches = isPremium ? matches.slice(0, 5) : matches.slice(0, 1);
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
@@ -407,6 +520,37 @@ export default function AFLNeekoIntelPage() {
                       captainScore={row.captain_score}
                       color="#F5C84C"
                       reason={row.recommendation_why}
+                      locked={false}
+                    />
+                  ))
+                )}
+              </div>
+            </Section>
+
+            {/* ── Match Projections ── */}
+            <Section>
+              <SectionHeader
+                icon={<Swords size={16} />}
+                title="Match Projections"
+                subtitle="AI-predicted outcomes and margins for this round"
+                locked={!isPremium}
+              />
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {matchesLoading ? (
+                  Array.from({ length: 3 }).map((_, i) => <NeekoIntelSkeletonCard key={i} />)
+                ) : matchesError ? (
+                  <div className="col-span-full">
+                    <SectionError />
+                  </div>
+                ) : visibleMatches.length === 0 ? (
+                  <div className="col-span-full text-center py-6 text-white/30 text-sm">
+                    Match projections generating...
+                  </div>
+                ) : (
+                  visibleMatches.map((match, idx) => (
+                    <MatchProjectionCard
+                      key={match.match_id ?? `${match.home_team}-${match.away_team}-${idx}`}
+                      match={match}
                       locked={false}
                     />
                   ))
