@@ -1018,7 +1018,7 @@ export default function AFLRankingsPage() {
       <CaptainSection isPremium={isPremium} />
 
       <div className="md:hidden text-center text-xs text-white/30 mt-2 mb-1 pb-2">
-        Swipe down to view full rankings
+        Swipe left to scroll all columns · tap any player for full AI breakdown
       </div>
 
       {/* Rankings Table */}
@@ -1068,175 +1068,145 @@ export default function AFLRankingsPage() {
           )}
         </div>
 
-        {/* Mobile card layout */}
+        {/* Rankings Table — shared horizontal scroll layout for mobile and desktop */}
         {isMobile ? (
-          <div className="space-y-3">
-            {/* Position filter */}
-            <div className="flex items-center gap-2 flex-wrap mb-2">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 mr-1">Position</span>
-              {POSITIONS.map((pos) => (
-                <PositionPill
-                  key={pos}
-                  value={pos}
-                  active={positionFilter === pos}
-                  onClick={() => setPositionFilter(pos)}
-                />
-              ))}
-            </div>
-
-            {loading
-              ? Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="h-28 animate-pulse rounded-xl bg-white/5" />
-                ))
-              : visibleRows.map((row, idx) => {
-                  const rank = idx + 1;
-                  const isLocked = !isPremium && idx >= FREE_UNLOCKED_METRICS;
-                  const metricsUnlocked = !isLocked;
-                  const isEliteCaptain = row.ai_recommendation === "ELITE CAPTAIN";
-                  const recColor = row.recommendation_color ?? null;
-                  const capStyle = getCaptainStyle(row.captain_rating ?? null);
-                  const consistencyBadge = getConsistencyBadge(row.consistency_score);
-                  const isExpanded = expandedPlayer === (row.player_id ?? row.player_name);
-
-                  return (
-                    <div
-                      key={row.player_id ?? row.player_name + idx}
-                      className={`rounded-xl border px-4 py-4 transition-all${isEliteCaptain ? " bg-[#120E00] border-[#F5C84C]/20" : " bg-[#111111] border-white/10"}`}
-                    >
-                      {/* Header row */}
-                      <div
-                        className="flex items-start justify-between gap-3 cursor-pointer"
-                        onClick={() => setSelected({ ...row, _rank: rank, _unlocked: !isLocked } as RankingRow & { _rank: number; _unlocked: boolean })}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-white/30 text-xs tabular-nums w-5 shrink-0">{rank}</span>
-                          <div className="min-w-0">
-                            <div className="text-white font-semibold text-base leading-tight truncate">{row.player_name}</div>
-                            <div className="text-xs text-white/50 mt-0.5">{row.team}{row.position ? ` · ${row.position}` : ""}</div>
-                          </div>
-                        </div>
-                        {metricsUnlocked && row.ai_recommendation ? (
-                          <div
-                            className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold whitespace-nowrap"
-                            style={isEliteCaptain ? {
-                              color: "#F5C84C",
-                              background: "linear-gradient(90deg, #3A2A00, #5A4200, #3A2A00)",
-                              border: "1px solid #F5C84C",
-                            } : recColor ? {
-                              color: recColor,
-                              backgroundColor: `${recColor}22`,
-                              border: `1px solid ${recColor}66`,
-                            } : {
-                              color: "rgba(255,255,255,0.4)",
-                              backgroundColor: "rgba(255,255,255,0.05)",
-                              border: "1px solid rgba(255,255,255,0.1)",
-                            }}
-                          >
-                            {row.ai_recommendation}
-                          </div>
-                        ) : !metricsUnlocked ? (
-                          <div className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold text-[#F5C84C]/60 bg-[#F5C84C]/5 border border-[#F5C84C]/20 flex items-center gap-1">
-                            <Lock size={9} />
-                            Neeko+
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {/* Stats row */}
-                      <div className="flex items-center gap-4 mt-3">
-                        <div>
-                          <div className="text-white/40 text-[10px] uppercase tracking-wider">Projection</div>
-                          <div className="text-[#F5C84C] font-bold text-xl tabular-nums leading-tight">{fmt(row.projection_final)}</div>
-                        </div>
-                        {metricsUnlocked ? (
-                          <>
-                            <div>
-                              <div className="text-white/40 text-[10px] uppercase tracking-wider">Confidence</div>
-                              <div className={`text-sm font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
-                                {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
-                              </div>
-                            </div>
-                            {row.captain_rating && (
-                              <div>
-                                <div className="text-white/40 text-[10px] uppercase tracking-wider">Captain</div>
-                                <div className={`text-xs font-semibold ${capStyle.text}`}>{capStyle.icon} {row.captain_rating}</div>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <div className="flex flex-col gap-1.5 mt-1">
-                            <p className="text-xs text-[#F5C84C]/70">Unlock full AI analysis, projections, and captain rating</p>
-                            <a
-                              href="/neeko-plus"
-                              onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center gap-1 self-start px-2 py-1 text-xs bg-[#F5C84C]/20 text-[#F5C84C] rounded-md hover:bg-[#F5C84C]/30 transition-colors"
-                            >
-                              <Lock size={9} />
-                              Unlock
-                            </a>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Why text */}
-                      {isPremium && row.recommendation_why ? (
-                        <div className="mt-3 text-xs text-white/60 leading-relaxed border-t border-white/5 pt-3">
-                          {row.recommendation_why}
-                        </div>
-                      ) : !isPremium && idx < 5 && row.recommendation_why ? (
-                        <div className="mt-3 text-xs text-white/60 leading-relaxed border-t border-white/5 pt-3">
-                          {row.recommendation_why}
-                        </div>
-                      ) : !isPremium && idx >= 5 ? (
-                        <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between gap-2">
-                          <p className="text-xs text-white/40">AI insight locked</p>
-                          <a href="/neeko-plus" onClick={(e) => e.stopPropagation()} className="text-xs text-[#F5C84C] font-semibold hover:underline transition-colors">
-                            Upgrade to Neeko+
-                          </a>
-                        </div>
-                      ) : null}
-
-                      {/* Expandable metrics */}
-                      {metricsUnlocked && (
-                        <button
-                          className="mt-3 flex items-center gap-1 text-[10px] text-white/30 hover:text-white/60 transition-colors"
-                          onClick={() => setExpandedPlayer(isExpanded ? null : (row.player_id ?? row.player_name))}
-                        >
-                          <ChevronDown size={12} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                          {isExpanded ? "Less" : "More stats"}
-                        </button>
-                      )}
-
-                      {isExpanded && metricsUnlocked && (
-                        <div className="mt-3 grid grid-cols-2 gap-2 pt-3 border-t border-white/5">
-                          <div className="rounded-lg bg-white/[0.04] px-3 py-2">
-                            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-0.5">Form</div>
-                            <div className={`text-sm font-semibold ${getFormColor(row.form_rating ?? null)}`}>
-                              {row.form_rating != null ? fmtInt(row.form_rating) : "—"}
-                            </div>
-                          </div>
-                          <div className="rounded-lg bg-white/[0.04] px-3 py-2">
-                            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-0.5">Matchup</div>
-                            <div className={`text-sm font-semibold ${getMatchupColor(row.matchup_rating ?? null)}`}>
-                              {row.matchup_rating != null ? fmtInt(row.matchup_rating) : "—"}
-                            </div>
-                          </div>
-                          <div className="rounded-lg bg-white/[0.04] px-3 py-2">
-                            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-0.5">Consistency</div>
-                            <div className={`text-sm font-semibold ${consistencyBadge.className}`}>{consistencyBadge.label}</div>
-                          </div>
-                          <div className="rounded-lg bg-white/[0.04] px-3 py-2">
-                            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-0.5">Risk</div>
-                            <div className={`text-sm font-semibold ${getRiskColor(row.risk_rating ?? null)}`}>
-                              {row.risk_rating != null ? `${fmtInt(row.risk_rating)}%` : "—"}
-                            </div>
-                          </div>
-                        </div>
-                      )}
+        <div className="relative">
+          <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-[#070707] to-transparent z-20" />
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-[#070707] to-transparent z-20" />
+          <div
+            className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-[#F5C84C]/30 scrollbar-track-transparent rounded-xl border border-white/5"
+            style={{ WebkitOverflowScrolling: "touch" }}
+          >
+            <table className="min-w-[900px] w-full border-collapse">
+              <thead className="sticky top-0 z-30 bg-[#070707] border-b border-[#F5C84C]/20">
+                <tr>
+                  <td colSpan={TOTAL_COLS} className="bg-[#0a0a0a] px-3 py-2 border-b border-white/5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 mr-1">Position</span>
+                      {POSITIONS.map((pos) => (
+                        <PositionPill
+                          key={pos}
+                          value={pos}
+                          active={positionFilter === pos}
+                          onClick={() => setPositionFilter(pos)}
+                        />
+                      ))}
                     </div>
-                  );
-                })}
+                  </td>
+                </tr>
+                <tr className="border-b border-[#222]">
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C] uppercase tracking-wider w-[50px]">#</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#F5C84C] uppercase tracking-wider w-[220px]">Player</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C] uppercase tracking-wider w-[100px]">Proj</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C] uppercase tracking-wider w-[110px]">Confidence</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C]/40 uppercase tracking-wider w-[140px]">
+                    <span className="flex items-center justify-center gap-1"><Lock size={10} />Captain</span>
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C]/40 uppercase tracking-wider w-[100px]">
+                    <span className="flex items-center justify-center gap-1"><Lock size={10} />Upside</span>
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C]/40 uppercase tracking-wider w-[160px]">
+                    <span className="flex items-center justify-center gap-1"><Lock size={10} />AI Rec</span>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#F5C84C]/40 uppercase tracking-wider w-[280px]">
+                    <span className="flex items-center gap-1"><Lock size={10} />Why</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading
+                  ? Array.from({ length: 10 }).map((_, i) => (
+                      <tr key={i} className="border-b border-white/5">
+                        {Array.from({ length: TOTAL_COLS }).map((__, j) => (
+                          <td key={j} className="px-4 py-4">
+                            <div className="h-4 animate-pulse rounded bg-white/5" />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  : visibleRows.map((row, idx) => {
+                      const rank = idx + 1;
+                      const isLocked = !isPremium && idx >= FREE_UNLOCKED_METRICS;
+                      const metricsUnlocked = !isLocked;
+                      const isEliteCaptain = row.ai_recommendation === "ELITE CAPTAIN";
+                      const recColor = row.recommendation_color ?? null;
+                      const capStyle = getCaptainStyle(row.captain_rating ?? null);
+
+                      return (
+                        <tr
+                          key={row.player_id ?? row.player_name + idx}
+                          onClick={() => setSelected({ ...row, _rank: rank, _unlocked: !isLocked } as RankingRow & { _rank: number; _unlocked: boolean })}
+                          className={`border-b border-white/[0.04] cursor-pointer hover:bg-[#F5C84C]/5 transition-colors${isEliteCaptain ? " bg-[#120E00]" : ""}`}
+                        >
+                          <td className="px-4 py-4 text-center text-sm text-white/30 tabular-nums w-[50px]">{rank}</td>
+                          <td className="px-4 py-4 text-left w-[220px]">
+                            <div className="font-semibold text-sm text-white leading-tight truncate">{row.player_name}</div>
+                            <div className="text-[11px] text-white/40 mt-0.5">{row.team}{row.position ? ` · ${row.position}` : ""}</div>
+                          </td>
+                          <td className="px-4 py-4 text-center text-sm w-[100px]">
+                            <span className="font-bold text-[#F5C84C] tabular-nums">{fmt(row.projection_final)}</span>
+                          </td>
+                          <td className="px-4 py-4 text-center text-sm w-[110px]">
+                            {!metricsUnlocked ? <LockedCell /> : (
+                              <span className={`font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
+                                {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 text-center w-[140px]">
+                            {!metricsUnlocked ? <LockedCell /> : row.captain_rating ? (
+                              <span className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${capStyle.text} ${capStyle.bg} ${capStyle.border}`}>
+                                {capStyle.icon} {row.captain_rating}
+                              </span>
+                            ) : (
+                              <span className="text-white/20 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 text-center w-[100px]">
+                            {!metricsUnlocked ? <LockedCell /> : (
+                              <PremiumBadge label={row.upside_rating != null ? `+${fmtInt(row.upside_rating)}%` : "—"} colorClass={getUpsideColor(row.upside_rating ?? null)} />
+                            )}
+                          </td>
+                          <td className={`px-4 py-4 text-center w-[160px]${isEliteCaptain ? " bg-[#1A1400]" : ""}`}>
+                            {!metricsUnlocked ? <LockedCell /> : row.ai_recommendation ? (
+                              <span
+                                className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap${isEliteCaptain ? " elite-captain-badge" : ""}`}
+                                style={isEliteCaptain ? {
+                                  color: "#F5C84C",
+                                  background: "linear-gradient(90deg, #3A2A00, #5A4200, #3A2A00)",
+                                  borderColor: "#F5C84C",
+                                } : recColor ? {
+                                  color: recColor,
+                                  background: `${recColor}18`,
+                                  borderColor: `${recColor}40`,
+                                } : {
+                                  color: "rgba(255,255,255,0.3)",
+                                  background: "rgba(255,255,255,0.05)",
+                                  borderColor: "rgba(255,255,255,0.1)",
+                                }}
+                              >
+                                {row.ai_recommendation}
+                              </span>
+                            ) : (
+                              <span className="text-white/20 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 text-left w-[280px]">
+                            {isPremium ? (
+                              <span className="text-xs text-white/60 line-clamp-2 leading-snug">{row.recommendation_why ?? "—"}</span>
+                            ) : idx < 5 ? (
+                              <span className="text-xs text-white/60 line-clamp-2 leading-snug">{row.recommendation_why ?? "—"}</span>
+                            ) : (
+                              <span className="blur-sm select-none text-xs text-white/50 line-clamp-2">AI insight available with Neeko+</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+              </tbody>
+            </table>
           </div>
+        </div>
         ) : (
         <div className="relative w-full">
           <p className="text-xs text-zinc-500 mt-2 mb-2">Click any player for full AI breakdown</p>
