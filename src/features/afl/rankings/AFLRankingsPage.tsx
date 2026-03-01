@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Lock, Crown, ChevronUp, ChevronDown, X, Info } from "lucide-react";
+import { Lock, Crown, ChevronUp, ChevronDown, X, Info, Search } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Dot } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
@@ -853,6 +854,7 @@ function UpgradeCTABanner({
 
 export default function AFLRankingsPage() {
   const { isPremium } = useAuth();
+  const isMobile = useIsMobile();
 
   const [rows, setRows] = useState<RankingRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -862,6 +864,7 @@ export default function AFLRankingsPage() {
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
   const [totalCount, setTotalCount] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchRankings() {
@@ -979,23 +982,26 @@ export default function AFLRankingsPage() {
       {/* Captain Recommendations */}
       <CaptainSection isPremium={isPremium} />
 
+      <div className="md:hidden text-center text-xs text-white/30 mt-2 mb-1 pb-2">
+        Swipe down to view full rankings
+      </div>
+
       {/* Rankings Table */}
       <div className="px-4 pb-10 md:px-8">
 
         {/* Search bar */}
         <div className="mb-4 relative">
+          <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/40 w-4 h-4" />
           <input
             type="text"
             placeholder={isPremium ? "Search player…" : "Search player (Neeko+)"}
             value={searchTerm}
-            onChange={(e) => {
-              if (!isPremium) return;
-              setSearchTerm(e.target.value);
-            }}
+            disabled={!isPremium}
+            onChange={(e) => setSearchTerm(e.target.value)}
             onClick={() => {
               if (!isPremium) window.location.href = "/neeko-plus";
             }}
-            className={`w-full bg-[#111111] border border-[#3a3a3a] rounded-lg px-4 py-3 text-white placeholder-[#666] focus:outline-none focus:border-[#F5C84C] transition-colors${!isPremium ? " cursor-pointer opacity-60 blur-[0.6px] select-none" : ""}`}
+            className={`w-full bg-[#161616] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-[#F5C84C] transition-colors${!isPremium ? " cursor-pointer opacity-60" : ""}`}
           />
           {!isPremium && (
             <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-[#F5C84C] text-xs font-semibold">
@@ -1013,6 +1019,168 @@ export default function AFLRankingsPage() {
           )}
         </div>
 
+        {/* Mobile card layout */}
+        {isMobile ? (
+          <div className="space-y-3">
+            {/* Position filter */}
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 mr-1">Position</span>
+              {POSITIONS.map((pos) => (
+                <PositionPill
+                  key={pos}
+                  value={pos}
+                  active={positionFilter === pos}
+                  onClick={() => setPositionFilter(pos)}
+                />
+              ))}
+            </div>
+
+            {loading
+              ? Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="h-28 animate-pulse rounded-xl bg-white/5" />
+                ))
+              : visibleRows.map((row, idx) => {
+                  const rank = idx + 1;
+                  const isLocked = !isPremium && idx >= FREE_UNLOCKED_METRICS;
+                  const metricsUnlocked = !isLocked;
+                  const isEliteCaptain = row.ai_recommendation === "ELITE CAPTAIN";
+                  const recColor = row.recommendation_color ?? null;
+                  const capStyle = getCaptainStyle(row.captain_rating ?? null);
+                  const consistencyBadge = getConsistencyBadge(row.consistency_score);
+                  const isExpanded = expandedPlayer === (row.player_id ?? row.player_name);
+
+                  return (
+                    <div
+                      key={row.player_id ?? row.player_name + idx}
+                      className={`rounded-xl border px-4 py-4 transition-all${isEliteCaptain ? " bg-[#120E00] border-[#F5C84C]/20" : " bg-[#111111] border-white/10"}`}
+                    >
+                      {/* Header row */}
+                      <div
+                        className="flex items-start justify-between gap-3 cursor-pointer"
+                        onClick={() => setSelected({ ...row, _rank: rank, _unlocked: !isLocked } as RankingRow & { _rank: number; _unlocked: boolean })}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-white/30 text-xs tabular-nums w-5 shrink-0">{rank}</span>
+                          <div className="min-w-0">
+                            <div className="text-white font-semibold text-base leading-tight truncate">{row.player_name}</div>
+                            <div className="text-xs text-white/50 mt-0.5">{row.team}{row.position ? ` · ${row.position}` : ""}</div>
+                          </div>
+                        </div>
+                        {metricsUnlocked && row.ai_recommendation ? (
+                          <div
+                            className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold whitespace-nowrap"
+                            style={isEliteCaptain ? {
+                              color: "#F5C84C",
+                              background: "linear-gradient(90deg, #3A2A00, #5A4200, #3A2A00)",
+                              border: "1px solid #F5C84C",
+                            } : recColor ? {
+                              color: recColor,
+                              backgroundColor: `${recColor}22`,
+                              border: `1px solid ${recColor}66`,
+                            } : {
+                              color: "rgba(255,255,255,0.4)",
+                              backgroundColor: "rgba(255,255,255,0.05)",
+                              border: "1px solid rgba(255,255,255,0.1)",
+                            }}
+                          >
+                            {row.ai_recommendation}
+                          </div>
+                        ) : !metricsUnlocked ? (
+                          <div className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold text-[#F5C84C]/60 bg-[#F5C84C]/5 border border-[#F5C84C]/20 flex items-center gap-1">
+                            <Lock size={9} />
+                            Neeko+
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {/* Stats row */}
+                      <div className="flex items-center gap-4 mt-3">
+                        <div>
+                          <div className="text-white/40 text-[10px] uppercase tracking-wider">Projection</div>
+                          <div className="text-[#F5C84C] font-bold text-xl tabular-nums leading-tight">{fmt(row.projection_final)}</div>
+                        </div>
+                        {metricsUnlocked ? (
+                          <>
+                            <div>
+                              <div className="text-white/40 text-[10px] uppercase tracking-wider">Confidence</div>
+                              <div className={`text-sm font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
+                                {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
+                              </div>
+                            </div>
+                            {row.captain_rating && (
+                              <div>
+                                <div className="text-white/40 text-[10px] uppercase tracking-wider">Captain</div>
+                                <div className={`text-xs font-semibold ${capStyle.text}`}>{capStyle.icon} {row.captain_rating}</div>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-1 text-[#F5C84C]/50 text-xs">
+                            <Lock size={10} />
+                            <span>Unlock with Neeko+</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Why text */}
+                      {isPremium && row.recommendation_why ? (
+                        <div className="mt-3 text-xs text-white/60 leading-relaxed border-t border-white/5 pt-3">
+                          {row.recommendation_why}
+                        </div>
+                      ) : !isPremium && idx < 5 && row.recommendation_why ? (
+                        <div className="mt-3 text-xs text-white/60 leading-relaxed border-t border-white/5 pt-3">
+                          {row.recommendation_why}
+                        </div>
+                      ) : !isPremium && idx >= 5 ? (
+                        <div className="mt-3 pt-3 border-t border-white/5">
+                          <a href="/neeko-plus" className="text-xs text-[#F5C84C]/70 hover:text-[#F5C84C] transition-colors">
+                            Upgrade to Neeko+ to unlock AI insight
+                          </a>
+                        </div>
+                      ) : null}
+
+                      {/* Expandable metrics */}
+                      {metricsUnlocked && (
+                        <button
+                          className="mt-3 flex items-center gap-1 text-[10px] text-white/30 hover:text-white/60 transition-colors"
+                          onClick={() => setExpandedPlayer(isExpanded ? null : (row.player_id ?? row.player_name))}
+                        >
+                          <ChevronDown size={12} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                          {isExpanded ? "Less" : "More stats"}
+                        </button>
+                      )}
+
+                      {isExpanded && metricsUnlocked && (
+                        <div className="mt-3 grid grid-cols-2 gap-2 pt-3 border-t border-white/5">
+                          <div className="rounded-lg bg-white/[0.04] px-3 py-2">
+                            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-0.5">Form</div>
+                            <div className={`text-sm font-semibold ${getFormColor(row.form_rating ?? null)}`}>
+                              {row.form_rating != null ? fmtInt(row.form_rating) : "—"}
+                            </div>
+                          </div>
+                          <div className="rounded-lg bg-white/[0.04] px-3 py-2">
+                            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-0.5">Matchup</div>
+                            <div className={`text-sm font-semibold ${getMatchupColor(row.matchup_rating ?? null)}`}>
+                              {row.matchup_rating != null ? fmtInt(row.matchup_rating) : "—"}
+                            </div>
+                          </div>
+                          <div className="rounded-lg bg-white/[0.04] px-3 py-2">
+                            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-0.5">Consistency</div>
+                            <div className={`text-sm font-semibold ${consistencyBadge.className}`}>{consistencyBadge.label}</div>
+                          </div>
+                          <div className="rounded-lg bg-white/[0.04] px-3 py-2">
+                            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-0.5">Risk</div>
+                            <div className={`text-sm font-semibold ${getRiskColor(row.risk_rating ?? null)}`}>
+                              {row.risk_rating != null ? `${fmtInt(row.risk_rating)}%` : "—"}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+          </div>
+        ) : (
         <div className="relative w-full">
           <div className="overflow-x-auto overflow-y-auto max-h-[75vh] rounded-xl border border-white/5 scrollbar-thin scrollbar-thumb-[#333] scrollbar-track-transparent">
           <table className="min-w-[1400px] w-full border-collapse table-auto">
@@ -1202,6 +1370,7 @@ export default function AFLRankingsPage() {
           <div className="pointer-events-none absolute top-0 left-0 w-8 h-full bg-gradient-to-r from-[#070707] to-transparent z-20 rounded-l-xl" />
           <div className="pointer-events-none absolute top-0 right-0 w-8 h-full bg-gradient-to-l from-[#070707] to-transparent z-20 rounded-r-xl" />
         </div>
+        )}
 
         {/* CTA below the table — free users only */}
         {!isPremium && !loading && (
