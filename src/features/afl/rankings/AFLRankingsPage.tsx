@@ -681,9 +681,17 @@ function PlayerDetailModal({
                 </div>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
                   <MetricLabel label="Confidence" tooltip="AI certainty level in this projection — based on data volume and model agreement" />
-                  <p className={`text-sm font-semibold ${getConfidenceColor(detail.projection_confidence ?? null)}`}>
+                  <p className={`text-sm font-semibold mb-1.5 ${getConfidenceColor(detail.projection_confidence ?? null)}`}>
                     {detail.projection_confidence != null ? `${fmtInt(detail.projection_confidence)}%` : "—"}
                   </p>
+                  {detail.projection_confidence != null && (
+                    <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-yellow-300 transition-all"
+                        style={{ width: `${Math.min(100, Math.max(0, detail.projection_confidence))}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -947,7 +955,7 @@ export default function AFLRankingsPage() {
 
   const visibleRows = isPremium ? sorted : sorted.slice(0, FREE_ROW_LIMIT);
 
-  const TOTAL_COLS = 12;
+  const TOTAL_COLS = 8;
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
@@ -957,6 +965,7 @@ export default function AFLRankingsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white">Player Rankings</h1>
             <p className="mt-1 text-sm text-white/40">AFL 2026 — Fantasy projection rankings</p>
+            <p className="mt-1 text-sm text-zinc-500">AI-powered fantasy projections updated weekly using advanced statistical modelling and matchup analysis.</p>
           </div>
           {!isPremium && (
             <a
@@ -1182,9 +1191,10 @@ export default function AFLRankingsPage() {
           </div>
         ) : (
         <div className="relative w-full">
+          <p className="text-xs text-zinc-500 mt-2 mb-2">Click any player for full AI breakdown</p>
           <div className="overflow-x-auto overflow-y-auto max-h-[75vh] rounded-xl border border-white/5 scrollbar-thin scrollbar-thumb-[#333] scrollbar-track-transparent">
-          <table className="min-w-[1400px] w-full border-collapse table-auto">
-            <thead className="sticky top-0 z-40">
+          <table className="min-w-[900px] w-full border-collapse table-auto">
+            <thead className="sticky top-0 z-30 bg-[#070707]">
               {/* Position filter row */}
               <tr>
                 <td
@@ -1211,11 +1221,7 @@ export default function AFLRankingsPage() {
                 <th className={`${TH_BASE} text-white/40 min-w-[80px]`}>Team</th>
                 <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
                 <PlainTh label="Captain" locked={!isPremium} />
-                <PlainTh label="Form" locked={!isPremium} />
-                <PlainTh label="Matchup" locked={!isPremium} />
                 <PlainTh label="Upside" locked={!isPremium} />
-                <PlainTh label="Projection Confidence" locked={!isPremium} />
-                <SortTh label="Consistency" sortKey="consistency_score" currentKey={sortKey} dir={sortDir} onSort={handleSort} locked={!isPremium} />
                 <PlainTh label="AI Recommendation" locked={!isPremium} />
                 <PlainTh label="Why" locked={!isPremium} />
               </tr>
@@ -1243,7 +1249,7 @@ export default function AFLRankingsPage() {
                     return (
                       <tr
                         key={row.player_id ?? row.player_name + idx}
-                        className={`border-b border-white/[0.04] transition-colors duration-150 cursor-pointer hover:bg-[#111]${isEliteCaptain ? " bg-[#120E00]" : ""}`}
+                        className={`border-b border-white/[0.04] transition-all duration-150 cursor-pointer hover:bg-white/5 hover:shadow-[0_0_12px_rgba(245,200,76,0.15)]${isEliteCaptain ? " bg-[#120E00]" : ""}`}
                         onClick={() => setSelected({ ...row, _rank: rank, _unlocked: !isLocked } as RankingRow & { _rank: number; _unlocked: boolean })}
                       >
                         <td className="px-4 py-3 text-sm text-white/30 tabular-nums text-center whitespace-nowrap">{rank}</td>
@@ -1279,42 +1285,10 @@ export default function AFLRankingsPage() {
                           )}
                         </td>
 
-                        {/* Form */}
-                        <td className="px-4 py-3 text-center whitespace-nowrap">
-                          {!metricsUnlocked ? <LockedCell /> : (
-                            <PremiumBadge label={row.form_rating != null ? fmtInt(row.form_rating) : "—"} colorClass={getFormColor(row.form_rating ?? null)} />
-                          )}
-                        </td>
-
-                        {/* Matchup */}
-                        <td className="px-4 py-3 text-center whitespace-nowrap">
-                          {!metricsUnlocked ? <LockedCell /> : (
-                            <PremiumBadge label={row.matchup_rating != null ? fmtInt(row.matchup_rating) : "—"} colorClass={getMatchupColor(row.matchup_rating ?? null)} />
-                          )}
-                        </td>
-
                         {/* Upside */}
                         <td className="px-4 py-3 text-center whitespace-nowrap">
                           {!metricsUnlocked ? <LockedCell /> : (
                             <PremiumBadge label={row.upside_rating != null ? `+${fmtInt(row.upside_rating)}%` : "—"} colorClass={getUpsideColor(row.upside_rating ?? null)} />
-                          )}
-                        </td>
-
-                        {/* Confidence */}
-                        <td className="px-4 py-3 text-center whitespace-nowrap">
-                          {!metricsUnlocked ? <LockedCell /> : (
-                            <span className={`text-xs font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
-                              {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Consistency */}
-                        <td className="px-4 py-3 text-center whitespace-nowrap">
-                          {!metricsUnlocked ? <LockedCell /> : (
-                            <span className={`text-xs font-semibold ${consistencyBadge.className}`}>
-                              {consistencyBadge.label}
-                            </span>
                           )}
                         </td>
 
@@ -1345,19 +1319,19 @@ export default function AFLRankingsPage() {
                         </td>
 
                         {/* Why */}
-                        <td className="px-4 py-3 text-left min-w-[260px] max-w-[260px] whitespace-normal">
+                        <td className="px-4 py-3 text-left align-middle min-w-[220px] max-w-[280px] whitespace-normal">
                           {isPremium ? (
-                            <span className="text-xs text-white/50 line-clamp-2 leading-snug">
+                            <span className="text-xs text-white/60 line-clamp-2 leading-snug">
                               {row.recommendation_why ?? "—"}
                             </span>
                           ) : idx < 5 ? (
-                            <span className="text-xs text-white/50 line-clamp-2 leading-snug">
+                            <span className="text-xs text-white/60 line-clamp-2 leading-snug">
                               {row.recommendation_why ?? "—"}
                             </span>
                           ) : (
-                            <div className="blur-sm select-none text-xs text-white/50">
-                              Premium
-                            </div>
+                            <span className="blur-sm select-none text-xs text-white/50 line-clamp-2">
+                              AI insight available with Neeko+
+                            </span>
                           )}
                         </td>
                       </tr>
