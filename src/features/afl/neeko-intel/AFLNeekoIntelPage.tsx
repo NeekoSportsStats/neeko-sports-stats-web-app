@@ -20,21 +20,19 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface RankingRow {
+interface BreakoutRow {
   player_id: string | null;
   player_name: string;
   team: string;
   position: string | null;
   projection_final: number | null;
   projection_confidence: number | null;
-  consistency_score: number | null;
+  form_rating: number | null;
+  matchup_rating: number | null;
+  risk_rating: number | null;
   ai_recommendation: string | null;
   recommendation_color: string | null;
-  recommendation_why: string | null;
-  captain_score: number | null;
-  captain_rating: string | null;
-  upside_rating: number | null;
-  risk_rating: number | null;
+  recommendation_short: string | null;
 }
 
 interface CaptainRow {
@@ -47,20 +45,65 @@ interface CaptainRow {
   captain_score: number | null;
   captain_rating: string | null;
   captain_confidence: number | null;
+  recommendation_short: string | null;
 }
 
-interface MatchPrediction {
+interface RiskRow {
+  player_id: string | null;
+  player_name: string;
+  team: string;
+  position: string | null;
+  projection_final: number | null;
+  projection_confidence: number | null;
+  risk_rating: number | null;
+  consistency_score: number | null;
+  ai_recommendation: string | null;
+  recommendation_color: string | null;
+  recommendation_short: string | null;
+}
+
+interface RiserRow {
+  player_id: string | null;
+  player_name: string;
+  team: string;
+  position: string | null;
+  projection_final: number | null;
+  projection_confidence: number | null;
+  upside_rating: number | null;
+  form_rating: number | null;
+  ai_recommendation: string | null;
+  recommendation_color: string | null;
+  recommendation_short: string | null;
+}
+
+interface FallerRow {
+  player_id: string | null;
+  player_name: string;
+  team: string;
+  position: string | null;
+  projection_final: number | null;
+  projection_confidence: number | null;
+  risk_rating: number | null;
+  form_rating: number | null;
+  ai_recommendation: string | null;
+  recommendation_color: string | null;
+  recommendation_short: string | null;
+}
+
+interface MatchRow {
   match_id: number;
   home_team: string;
   away_team: string;
-  round_number: number;
-  season: number;
-  predicted_home_score: number | null;
-  predicted_away_score: number | null;
-  predicted_margin: number | null;
+  home_projection: number | null;
+  away_projection: number | null;
+  margin: number | null;
   confidence: string | null;
+  winner: string | null;
   ai_summary: string | null;
   prediction_explanation: string | null;
+  round_number: number;
+  season: number;
+  match_date: string | null;
   updated_at: string | null;
 }
 
@@ -157,7 +200,7 @@ function UpgradeCTABanner() {
 
 // ─── Elite Captain Hero Card ──────────────────────────────────────────────────
 
-function EliteCaptainHero({ rows, loading }: { rows: RankingRow[]; loading: boolean }) {
+function EliteCaptainHero({ rows, loading }: { rows: CaptainRow[]; loading: boolean }) {
   if (loading) {
     return (
       <div className="rounded-2xl border border-[#F5C84C]/20 bg-gradient-to-r from-[#1a1408] to-[#0a0a0a] p-4 md:p-6 animate-pulse">
@@ -170,7 +213,11 @@ function EliteCaptainHero({ rows, loading }: { rows: RankingRow[]; loading: bool
     );
   }
 
-  if (rows.length === 0) return null;
+  const eliteRows = rows.filter(
+    (r) => r.captain_rating === "ELITE CAPTAIN" || r.captain_rating === "CAPTAIN LOCK"
+  );
+
+  if (eliteRows.length === 0) return null;
 
   return (
     <div className="rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-r from-[#1a1408] to-[#0a0a0a] p-4 md:p-6">
@@ -187,18 +234,17 @@ function EliteCaptainHero({ rows, loading }: { rows: RankingRow[]; loading: bool
       </div>
 
       <div className="space-y-3">
-        {rows.map((row, idx) => (
+        {eliteRows.map((row, idx) => (
           <NeekoIntelCard
             key={row.player_id ?? row.player_name + idx}
             rank={idx + 1}
             playerName={row.player_name}
             team={row.team}
-            position={row.position}
             projection={row.projection_final}
-            confidence={row.projection_confidence}
-            label={row.ai_recommendation}
-            color={row.recommendation_color}
-            reason={row.recommendation_why}
+            confidence={row.captain_confidence}
+            label={row.captain_rating}
+            color="#F5C84C"
+            reason={row.recommendation_short}
             captainScore={row.captain_score}
             locked={false}
           />
@@ -214,13 +260,13 @@ function MatchPredictionCard({
   match,
   locked,
 }: {
-  match: MatchPrediction;
+  match: MatchRow;
   locked: boolean;
 }) {
   const homeWin =
-    match.predicted_home_score != null &&
-    match.predicted_away_score != null &&
-    match.predicted_home_score > match.predicted_away_score;
+    match.home_projection != null &&
+    match.away_projection != null &&
+    match.home_projection > match.away_projection;
 
   return (
     <div
@@ -255,16 +301,15 @@ function MatchPredictionCard({
               homeWin ? "text-[#F5C84C]" : "text-white/60"
             }`}
           >
-            {fmt(match.predicted_home_score, 0)}
+            {fmt(match.home_projection, 0)}
           </div>
         </div>
 
         <div className="text-center shrink-0 px-2">
           <div className="text-white/20 text-xs font-bold">VS</div>
-          {match.predicted_margin != null && (
+          {match.margin != null && (
             <div className="text-[10px] text-white/30 mt-1">
-              {homeWin ? "+" : "-"}
-              {Math.abs(Math.round(Number(match.predicted_margin)))} pts
+              {Math.round(Number(match.margin))} pts
             </div>
           )}
         </div>
@@ -276,7 +321,7 @@ function MatchPredictionCard({
               !homeWin ? "text-[#F5C84C]" : "text-white/60"
             }`}
           >
-            {fmt(match.predicted_away_score, 0)}
+            {fmt(match.away_projection, 0)}
           </div>
         </div>
       </div>
@@ -290,14 +335,76 @@ function MatchPredictionCard({
   );
 }
 
+// ─── Generic Player Card Renderer ────────────────────────────────────────────
+
+type AnyPlayerRow = {
+  player_id: string | null;
+  player_name: string;
+  team: string;
+  position?: string | null;
+  projection_final: number | null;
+  projection_confidence?: number | null;
+  ai_recommendation?: string | null;
+  recommendation_color?: string | null;
+  recommendation_short?: string | null;
+  captain_score?: number | null;
+  upside_rating?: number | null;
+  risk_rating?: number | null;
+};
+
+function renderPlayerCards(
+  rows: AnyPlayerRow[],
+  keyField: string,
+  loading: boolean,
+  isPremium: boolean
+) {
+  const visibleCount = isPremium ? rows.length : FREE_PREVIEW_COUNT;
+
+  if (loading) {
+    return Array.from({ length: 3 }).map((_, i) => <NeekoIntelSkeletonCard key={i} />);
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="text-center py-6 text-white/30 text-sm">
+        Neeko Intel generating...
+      </div>
+    );
+  }
+
+  return rows.map((row, idx) => {
+    const locked = idx >= visibleCount;
+    if (locked) return <NeekoIntelCardLocked key={`${keyField}-locked-${idx}`} />;
+    return (
+      <NeekoIntelCard
+        key={row.player_id ?? row.player_name + idx}
+        rank={idx + 1}
+        playerName={row.player_name}
+        team={row.team}
+        position={row.position}
+        projection={row.projection_final}
+        confidence={row.projection_confidence}
+        label={row.ai_recommendation}
+        color={row.recommendation_color}
+        reason={row.recommendation_short}
+        captainScore={row.captain_score}
+        locked={false}
+      />
+    );
+  });
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AFLNeekoIntelPage() {
   const { isPremium } = useAuth();
 
-  const [allRows, setAllRows] = useState<RankingRow[]>([]);
+  const [breakouts, setBreakouts] = useState<BreakoutRow[]>([]);
   const [captains, setCaptains] = useState<CaptainRow[]>([]);
-  const [matches, setMatches] = useState<MatchPrediction[]>([]);
+  const [risk, setRisk] = useState<RiskRow[]>([]);
+  const [risers, setRisers] = useState<RiserRow[]>([]);
+  const [fallers, setFallers] = useState<FallerRow[]>([]);
+  const [matches, setMatches] = useState<MatchRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
@@ -305,38 +412,30 @@ export default function AFLNeekoIntelPage() {
     async function load() {
       setLoading(true);
       try {
-        const [rankRes, captainRes, matchRes] = await Promise.all([
-          supabase
-            .from("v_rankings_master")
-            .select(
-              "player_id, player_name, team, position, projection_final, projection_confidence, consistency_score, ai_recommendation, recommendation_color, recommendation_why, captain_score, captain_rating, upside_rating, risk_rating"
-            )
-            .not("ai_recommendation", "is", null)
-            .order("projection_final", { ascending: false })
-            .limit(200),
-
-          supabase
-            .from("v_captain_recommendations")
-            .select(
-              "player_id, player_name, team, projection_final, ceiling_estimate, consistency_score, captain_score, captain_rating, captain_confidence"
-            )
-            .order("captain_score", { ascending: false })
-            .limit(20),
-
-          supabase
-            .from("v_ai_match_predictions_preview")
-            .select(
-              "match_id, home_team, away_team, round_number, season, predicted_home_score, predicted_away_score, predicted_margin, confidence, ai_summary, prediction_explanation, updated_at"
-            )
-            .order("round_number", { ascending: false })
-            .limit(9),
+        const [
+          breakoutsRes,
+          captainsRes,
+          riskRes,
+          risersRes,
+          fallersRes,
+          matchesRes,
+        ] = await Promise.all([
+          supabase.from("v_neeko_intel_breakouts").select("*"),
+          supabase.from("v_neeko_intel_captains").select("*"),
+          supabase.from("v_neeko_intel_risk").select("*"),
+          supabase.from("v_neeko_intel_risers").select("*"),
+          supabase.from("v_neeko_intel_fallers").select("*"),
+          supabase.from("v_neeko_intel_matches").select("*"),
         ]);
 
-        if (rankRes.data) setAllRows(rankRes.data as RankingRow[]);
-        if (captainRes.data) setCaptains(captainRes.data as CaptainRow[]);
-        if (matchRes.data) {
-          setMatches(matchRes.data as MatchPrediction[]);
-          const first = (matchRes.data as MatchPrediction[])[0];
+        if (breakoutsRes.data) setBreakouts(breakoutsRes.data as BreakoutRow[]);
+        if (captainsRes.data) setCaptains(captainsRes.data as CaptainRow[]);
+        if (riskRes.data) setRisk(riskRes.data as RiskRow[]);
+        if (risersRes.data) setRisers(risersRes.data as RiserRow[]);
+        if (fallersRes.data) setFallers(fallersRes.data as FallerRow[]);
+        if (matchesRes.data) {
+          setMatches(matchesRes.data as MatchRow[]);
+          const first = (matchesRes.data as MatchRow[])[0];
           if (first?.updated_at) setLastUpdated(first.updated_at);
         }
       } finally {
@@ -346,74 +445,11 @@ export default function AFLNeekoIntelPage() {
     load();
   }, []);
 
-  const eliteCaptains = allRows.filter(
-    (r) =>
-      r.ai_recommendation === "ELITE CAPTAIN" || r.ai_recommendation === "CAPTAIN LOCK"
-  );
-
-  const breakouts = allRows
-    .filter(
-      (r) =>
-        r.ai_recommendation === "MUST START" || r.ai_recommendation === "HIGH CONFIDENCE"
-    )
-    .slice(0, 5);
-
-  const risks = allRows
-    .filter(
-      (r) => r.ai_recommendation === "HIGH RISK" || r.ai_recommendation === "AVOID"
-    )
-    .sort((a, b) => (b.risk_rating ?? 0) - (a.risk_rating ?? 0))
-    .slice(0, 5);
-
-  const risers = allRows
-    .filter((r) => (r.upside_rating ?? 0) >= 20 && r.ai_recommendation !== "AVOID")
-    .sort((a, b) => (b.upside_rating ?? 0) - (a.upside_rating ?? 0))
-    .slice(0, 5);
-
-  const fallers = allRows
-    .filter((r) => r.ai_recommendation === "HIGH RISK" || r.ai_recommendation === "AVOID")
-    .sort((a, b) => (b.risk_rating ?? 0) - (a.risk_rating ?? 0))
-    .slice(0, 5);
-
-  const topCaptains = captains.slice(0, 5);
-
-  const isEmpty = !loading && allRows.length === 0 && captains.length === 0;
-
-  function renderCards(rows: RankingRow[], keyField: string) {
-    const freeCount = isPremium ? rows.length : FREE_PREVIEW_COUNT;
-
-    if (loading) {
-      return Array.from({ length: 3 }).map((_, i) => <NeekoIntelSkeletonCard key={i} />);
-    }
-
-    if (rows.length === 0) {
-      return (
-        <div className="text-center py-6 text-white/30 text-sm">
-          Neeko Intel generating...
-        </div>
-      );
-    }
-
-    return rows.map((row, idx) => {
-      const locked = idx >= freeCount;
-      if (locked) return <NeekoIntelCardLocked key={`${keyField}-locked-${idx}`} />;
-      return (
-        <NeekoIntelCard
-          key={row.player_id ?? row.player_name + idx}
-          rank={idx + 1}
-          playerName={row.player_name}
-          team={row.team}
-          position={row.position}
-          projection={row.projection_final}
-          confidence={row.projection_confidence}
-          label={row.ai_recommendation}
-          color={row.recommendation_color}
-          reason={row.recommendation_why}
-          locked={false}
-        />
-      );
-    });
-  }
+  const isEmpty =
+    !loading &&
+    breakouts.length === 0 &&
+    captains.length === 0 &&
+    matches.length === 0;
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
@@ -491,9 +527,7 @@ export default function AFLNeekoIntelPage() {
         {!isEmpty && (
           <>
             {/* ── HERO: Elite Captain Locks ── */}
-            {(loading || eliteCaptains.length > 0) && (
-              <EliteCaptainHero rows={eliteCaptains} loading={loading} />
-            )}
+            <EliteCaptainHero rows={captains} loading={loading} />
 
             {/* ── Breakouts & Must Starts ── */}
             <Section>
@@ -503,7 +537,9 @@ export default function AFLNeekoIntelPage() {
                 subtitle="Players with elite projections and high confidence"
                 locked={!isPremium}
               />
-              <div className="space-y-3">{renderCards(breakouts, "breakout")}</div>
+              <div className="space-y-3">
+                {renderPlayerCards(breakouts, "breakout", loading, isPremium)}
+              </div>
             </Section>
 
             {/* ── Captain Picks ── */}
@@ -517,12 +553,12 @@ export default function AFLNeekoIntelPage() {
               <div className="space-y-3">
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => <NeekoIntelSkeletonCard key={i} />)
-                ) : topCaptains.length === 0 ? (
+                ) : captains.length === 0 ? (
                   <div className="text-center py-6 text-white/30 text-sm">
                     Neeko Intel generating...
                   </div>
                 ) : (
-                  topCaptains.map((row, idx) => {
+                  captains.map((row, idx) => {
                     const locked = !isPremium && idx >= FREE_PREVIEW_COUNT;
                     if (locked) return <NeekoIntelCardLocked key={`cap-locked-${idx}`} />;
                     return (
@@ -532,9 +568,11 @@ export default function AFLNeekoIntelPage() {
                         playerName={row.player_name}
                         team={row.team}
                         projection={row.projection_final}
+                        confidence={row.captain_confidence}
                         label={row.captain_rating}
                         captainScore={row.captain_score}
                         color="#F5C84C"
+                        reason={row.recommendation_short}
                         locked={false}
                       />
                     );
@@ -552,7 +590,9 @@ export default function AFLNeekoIntelPage() {
                   subtitle="Highest upside plays this round"
                   locked={!isPremium}
                 />
-                <div className="space-y-3">{renderCards(risers, "risers")}</div>
+                <div className="space-y-3">
+                  {renderPlayerCards(risers, "risers", loading, isPremium)}
+                </div>
               </Section>
 
               <Section>
@@ -562,7 +602,9 @@ export default function AFLNeekoIntelPage() {
                   subtitle="High risk players to consider avoiding"
                   locked={!isPremium}
                 />
-                <div className="space-y-3">{renderCards(fallers, "fallers")}</div>
+                <div className="space-y-3">
+                  {renderPlayerCards(fallers, "fallers", loading, isPremium)}
+                </div>
               </Section>
             </div>
 
@@ -574,7 +616,9 @@ export default function AFLNeekoIntelPage() {
                 subtitle="Players flagged as high risk or to avoid this round"
                 locked={!isPremium}
               />
-              <div className="space-y-3">{renderCards(risks, "risk")}</div>
+              <div className="space-y-3">
+                {renderPlayerCards(risk, "risk", loading, isPremium)}
+              </div>
             </Section>
 
             {/* ── Match Projections ── */}
