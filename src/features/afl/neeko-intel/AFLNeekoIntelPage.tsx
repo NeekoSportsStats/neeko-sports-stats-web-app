@@ -382,6 +382,10 @@ function renderPlayerCards(
   ));
 }
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const FREE_PREVIEW_COUNT = 1;
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AFLNeekoIntelPage() {
@@ -433,14 +437,12 @@ export default function AFLNeekoIntelPage() {
     load();
   }, []);
 
-  const FREE_LIMIT = 1;
-
-  const visibleBreakouts = isPremium ? breakouts : breakouts.slice(0, FREE_LIMIT);
-  const visibleCaptains = isPremium ? captains : captains.slice(0, FREE_LIMIT);
-  const visibleRisk = isPremium ? risk : risk.slice(0, FREE_LIMIT);
-  const visibleRisers = isPremium ? risers : risers.slice(0, FREE_LIMIT);
-  const visibleFallers = isPremium ? fallers : fallers.slice(0, FREE_LIMIT);
-  const visibleMatches = isPremium ? matches : matches.slice(0, FREE_LIMIT);
+  const visibleBreakouts = isPremium ? breakouts : breakouts.slice(0, FREE_PREVIEW_COUNT);
+  const visibleCaptains = isPremium ? captains : captains.slice(0, FREE_PREVIEW_COUNT);
+  const visibleRisk = isPremium ? risk : risk.slice(0, FREE_PREVIEW_COUNT);
+  const visibleRisers = isPremium ? risers : risers.slice(0, FREE_PREVIEW_COUNT);
+  const visibleFallers = isPremium ? fallers : fallers.slice(0, FREE_PREVIEW_COUNT);
+  const visibleMatches = isPremium ? matches : matches.slice(0, FREE_PREVIEW_COUNT);
 
   const isEmpty =
     !loading &&
