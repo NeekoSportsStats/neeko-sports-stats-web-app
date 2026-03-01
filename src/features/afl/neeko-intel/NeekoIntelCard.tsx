@@ -1,6 +1,103 @@
-import { Lock } from "lucide-react";
+import { Lock, Zap, AlertTriangle } from "lucide-react";
 
-interface NeekoIntelCardProps {
+// ─── Badge helpers ────────────────────────────────────────────────────────────
+
+interface BadgeProps {
+  label: string;
+  color?: "gold" | "green" | "blue" | "orange" | "red" | "gray";
+  icon?: React.ReactNode;
+}
+
+function Badge({ label, color = "gray", icon }: BadgeProps) {
+  const styles: Record<string, string> = {
+    gold:   "text-[#F5C84C] bg-[#F5C84C]/10 border-[#F5C84C]/30",
+    green:  "text-green-400 bg-green-400/10 border-green-400/25",
+    blue:   "text-sky-400 bg-sky-400/10 border-sky-400/25",
+    orange: "text-orange-400 bg-orange-400/10 border-orange-400/25",
+    red:    "text-red-400 bg-red-400/10 border-red-400/25",
+    gray:   "text-white/40 bg-white/5 border-white/10",
+  };
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide whitespace-nowrap ${styles[color]}`}
+    >
+      {icon}
+      {label}
+    </span>
+  );
+}
+
+// ─── Matchup Difficulty Badge ─────────────────────────────────────────────────
+
+export function MatchupBadge({ value }: { value: string | null }) {
+  if (!value) return null;
+  const map: Record<string, { color: BadgeProps["color"]; label: string }> = {
+    "VERY EASY": { color: "green",  label: "Very Easy" },
+    "EASY":      { color: "green",  label: "Easy" },
+    "NEUTRAL":   { color: "gray",   label: "Neutral" },
+    "HARD":      { color: "orange", label: "Hard" },
+    "VERY HARD": { color: "red",    label: "Very Hard" },
+  };
+  const cfg = map[value] ?? { color: "gray", label: value };
+  return <Badge label={cfg.label} color={cfg.color} />;
+}
+
+// ─── Volatility Badge ─────────────────────────────────────────────────────────
+
+export function VolatilityBadge({ value }: { value: string | null }) {
+  if (!value) return null;
+  const map: Record<string, BadgeProps["color"]> = {
+    EXTREME: "red",
+    HIGH:    "orange",
+    MEDIUM:  "blue",
+    LOW:     "gray",
+  };
+  return <Badge label={value} color={map[value] ?? "gray"} />;
+}
+
+// ─── Captain Tier Badge ───────────────────────────────────────────────────────
+
+export function CaptainTierBadge({ value }: { value: string | null }) {
+  if (!value) return null;
+  const map: Record<string, BadgeProps["color"]> = {
+    ELITE:  "gold",
+    STRONG: "green",
+    SAFE:   "blue",
+    RISKY:  "red",
+  };
+  return <Badge label={value} color={map[value] ?? "gray"} />;
+}
+
+// ─── Breakout Badge ───────────────────────────────────────────────────────────
+
+export function BreakoutBadge({ flag }: { flag: boolean | null }) {
+  if (!flag) return null;
+  return <Badge label="Breakout" color="gold" icon={<Zap size={8} />} />;
+}
+
+// ─── Avoid Badge ─────────────────────────────────────────────────────────────
+
+export function AvoidBadge({ flag }: { flag: boolean | null }) {
+  if (!flag) return null;
+  return <Badge label="Avoid" color="red" icon={<AlertTriangle size={8} />} />;
+}
+
+// ─── Confidence Tier Badge ────────────────────────────────────────────────────
+
+export function ConfidenceBadge({ value }: { value: number | null }) {
+  if (value == null) return null;
+  let label: string;
+  let color: BadgeProps["color"];
+  if (value >= 75) { label = "High Confidence"; color = "green"; }
+  else if (value >= 60) { label = "Strong";         color = "blue"; }
+  else if (value >= 50) { label = "Moderate";        color = "orange"; }
+  else                  { label = "Low Confidence";  color = "red"; }
+  return <Badge label={label} color={color} />;
+}
+
+// ─── Main Card Props ──────────────────────────────────────────────────────────
+
+export interface NeekoIntelCardProps {
   playerName: string;
   team: string;
   position?: string | null;
@@ -14,6 +111,11 @@ interface NeekoIntelCardProps {
   locked: boolean;
   rank?: number;
   onClick?: () => void;
+  matchupDifficulty?: string | null;
+  volatilityLevel?: string | null;
+  captainTier?: string | null;
+  breakoutFlag?: boolean | null;
+  avoidFlag?: boolean | null;
 }
 
 function fmt(v: number | null, decimals = 1): string {
@@ -25,6 +127,8 @@ function fmtInt(v: number | null): string {
   if (v == null) return "—";
   return Math.round(Number(v)).toString();
 }
+
+// ─── Card ─────────────────────────────────────────────────────────────────────
 
 export function NeekoIntelCard({
   playerName,
@@ -40,8 +144,16 @@ export function NeekoIntelCard({
   locked,
   rank,
   onClick,
+  matchupDifficulty,
+  volatilityLevel,
+  captainTier,
+  breakoutFlag,
+  avoidFlag,
 }: NeekoIntelCardProps) {
   const isElite = label === "ELITE CAPTAIN" || label === "CAPTAIN LOCK";
+
+  const hasBadgeRow =
+    matchupDifficulty || volatilityLevel || captainTier || breakoutFlag || avoidFlag || confidence != null;
 
   return (
     <div
@@ -52,6 +164,7 @@ export function NeekoIntelCard({
           : "bg-[#111111] border-white/10"
       } ${locked ? "opacity-50 blur-sm select-none pointer-events-none" : onClick ? "cursor-pointer hover:bg-white/[0.04] hover:border-white/20" : ""}`}
     >
+      {/* ── Top Row ── */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           {rank != null && (
@@ -93,6 +206,7 @@ export function NeekoIntelCard({
         )}
       </div>
 
+      {/* ── Stats Row ── */}
       <div className="flex items-end gap-5 mt-3">
         <div>
           <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Projection</div>
@@ -104,11 +218,11 @@ export function NeekoIntelCard({
             <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Confidence</div>
             <div
               className={`text-sm font-semibold tabular-nums ${
-                confidence >= 80
+                confidence >= 75
                   ? "text-green-400"
-                  : confidence >= 65
-                  ? "text-yellow-400"
-                  : confidence >= 45
+                  : confidence >= 60
+                  ? "text-sky-400"
+                  : confidence >= 50
                   ? "text-orange-400"
                   : "text-red-400"
               }`}
@@ -133,6 +247,19 @@ export function NeekoIntelCard({
         )}
       </div>
 
+      {/* ── Intelligence Badge Row ── */}
+      {hasBadgeRow && (
+        <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-white/[0.06]">
+          {confidence != null && <ConfidenceBadge value={confidence} />}
+          {matchupDifficulty && <MatchupBadge value={matchupDifficulty} />}
+          {volatilityLevel && <VolatilityBadge value={volatilityLevel} />}
+          {captainTier && <CaptainTierBadge value={captainTier} />}
+          {breakoutFlag && <BreakoutBadge flag={breakoutFlag} />}
+          {avoidFlag && <AvoidBadge flag={avoidFlag} />}
+        </div>
+      )}
+
+      {/* ── AI Reason ── */}
       {reason && (
         <p className="mt-3 text-[11px] text-white/50 leading-relaxed border-t border-white/5 pt-3 line-clamp-2">
           {reason}
@@ -141,6 +268,8 @@ export function NeekoIntelCard({
     </div>
   );
 }
+
+// ─── Locked Card ─────────────────────────────────────────────────────────────
 
 export function NeekoIntelCardLocked() {
   return (
@@ -162,6 +291,8 @@ export function NeekoIntelCardLocked() {
   );
 }
 
+// ─── Skeleton ────────────────────────────────────────────────────────────────
+
 export function NeekoIntelSkeletonCard() {
   return (
     <div className="rounded-xl border border-white/5 bg-[#111111] p-4 space-y-3 animate-pulse">
@@ -173,8 +304,12 @@ export function NeekoIntelSkeletonCard() {
         <div className="h-6 w-24 rounded-full bg-white/10" />
       </div>
       <div className="h-7 w-16 rounded bg-white/10" />
+      <div className="flex gap-1.5">
+        <div className="h-5 w-20 rounded-full bg-white/5" />
+        <div className="h-5 w-16 rounded-full bg-white/5" />
+        <div className="h-5 w-14 rounded-full bg-white/5" />
+      </div>
       <div className="h-2.5 w-full rounded bg-white/5" />
-      <div className="h-2.5 w-3/4 rounded bg-white/5" />
     </div>
   );
 }

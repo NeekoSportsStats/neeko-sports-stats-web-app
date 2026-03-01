@@ -53,6 +53,12 @@ interface MasterRow {
   is_riser: boolean;
   is_risk: boolean;
   is_value: boolean;
+  matchup_difficulty: string | null;
+  volatility_score: number | null;
+  volatility_level: string | null;
+  captain_tier: string | null;
+  breakout_flag: boolean | null;
+  avoid_flag: boolean | null;
 }
 
 interface MatchRow {
@@ -220,6 +226,11 @@ function PlayerCardList({
             reason={row.recommendation_why}
             captainScore={row.captain_score}
             locked={false}
+            matchupDifficulty={row.matchup_difficulty}
+            volatilityLevel={row.volatility_level}
+            captainTier={row.captain_tier}
+            breakoutFlag={row.breakout_flag}
+            avoidFlag={row.avoid_flag}
           />
         );
       })}
@@ -429,6 +440,11 @@ function EliteCaptainHero({
             reason={row.recommendation_why}
             captainScore={row.captain_score}
             locked={false}
+            matchupDifficulty={row.matchup_difficulty}
+            volatilityLevel={row.volatility_level}
+            captainTier={row.captain_tier}
+            breakoutFlag={row.breakout_flag}
+            avoidFlag={row.avoid_flag}
           />
         ))}
       </div>
@@ -481,7 +497,7 @@ export default function AFLNeekoIntelPage() {
       setLoading(true);
       setFetchError(false);
       const { data, error } = await supabase
-        .from("v_neeko_intel_master")
+        .from("v_neeko_intel_master_v2")
         .select("*");
       if (error || !data) {
         setFetchError(true);
