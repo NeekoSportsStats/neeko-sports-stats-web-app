@@ -14,7 +14,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import {
   NeekoIntelCard,
-  NeekoIntelCardLocked,
   NeekoIntelSkeletonCard,
 } from "./NeekoIntelCard";
 
@@ -106,10 +105,6 @@ interface MatchRow {
   match_date: string | null;
   updated_at: string | null;
 }
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const FREE_PREVIEW_COUNT = 1;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -355,11 +350,8 @@ type AnyPlayerRow = {
 function renderPlayerCards(
   rows: AnyPlayerRow[],
   keyField: string,
-  loading: boolean,
-  isPremium: boolean
+  loading: boolean
 ) {
-  const visibleCount = isPremium ? rows.length : FREE_PREVIEW_COUNT;
-
   if (loading) {
     return Array.from({ length: 3 }).map((_, i) => <NeekoIntelSkeletonCard key={i} />);
   }
@@ -372,26 +364,22 @@ function renderPlayerCards(
     );
   }
 
-  return rows.map((row, idx) => {
-    const locked = idx >= visibleCount;
-    if (locked) return <NeekoIntelCardLocked key={`${keyField}-locked-${idx}`} />;
-    return (
-      <NeekoIntelCard
-        key={row.player_id ?? row.player_name + idx}
-        rank={idx + 1}
-        playerName={row.player_name}
-        team={row.team}
-        position={row.position}
-        projection={row.projection_final}
-        confidence={row.projection_confidence}
-        label={row.ai_recommendation}
-        color={row.recommendation_color}
-        reason={row.recommendation_short}
-        captainScore={row.captain_score}
-        locked={false}
-      />
-    );
-  });
+  return rows.map((row, idx) => (
+    <NeekoIntelCard
+      key={row.player_id ?? row.player_name + idx}
+      rank={idx + 1}
+      playerName={row.player_name}
+      team={row.team}
+      position={row.position}
+      projection={row.projection_final}
+      confidence={row.projection_confidence}
+      label={row.ai_recommendation}
+      color={row.recommendation_color}
+      reason={row.recommendation_short}
+      captainScore={row.captain_score}
+      locked={false}
+    />
+  ));
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -444,6 +432,15 @@ export default function AFLNeekoIntelPage() {
     }
     load();
   }, []);
+
+  const FREE_LIMIT = 1;
+
+  const visibleBreakouts = isPremium ? breakouts : breakouts.slice(0, FREE_LIMIT);
+  const visibleCaptains = isPremium ? captains : captains.slice(0, FREE_LIMIT);
+  const visibleRisk = isPremium ? risk : risk.slice(0, FREE_LIMIT);
+  const visibleRisers = isPremium ? risers : risers.slice(0, FREE_LIMIT);
+  const visibleFallers = isPremium ? fallers : fallers.slice(0, FREE_LIMIT);
+  const visibleMatches = isPremium ? matches : matches.slice(0, FREE_LIMIT);
 
   const isEmpty =
     !loading &&
@@ -538,7 +535,7 @@ export default function AFLNeekoIntelPage() {
                 locked={!isPremium}
               />
               <div className="space-y-3">
-                {renderPlayerCards(breakouts, "breakout", loading, isPremium)}
+                {renderPlayerCards(visibleBreakouts, "breakout", loading)}
               </div>
             </Section>
 
@@ -553,30 +550,26 @@ export default function AFLNeekoIntelPage() {
               <div className="space-y-3">
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => <NeekoIntelSkeletonCard key={i} />)
-                ) : captains.length === 0 ? (
+                ) : visibleCaptains.length === 0 ? (
                   <div className="text-center py-6 text-white/30 text-sm">
                     Neeko Intel generating...
                   </div>
                 ) : (
-                  captains.map((row, idx) => {
-                    const locked = !isPremium && idx >= FREE_PREVIEW_COUNT;
-                    if (locked) return <NeekoIntelCardLocked key={`cap-locked-${idx}`} />;
-                    return (
-                      <NeekoIntelCard
-                        key={row.player_id ?? row.player_name + idx}
-                        rank={idx + 1}
-                        playerName={row.player_name}
-                        team={row.team}
-                        projection={row.projection_final}
-                        confidence={row.captain_confidence}
-                        label={row.captain_rating}
-                        captainScore={row.captain_score}
-                        color="#F5C84C"
-                        reason={row.recommendation_short}
-                        locked={false}
-                      />
-                    );
-                  })
+                  visibleCaptains.map((row, idx) => (
+                    <NeekoIntelCard
+                      key={row.player_id ?? row.player_name + idx}
+                      rank={idx + 1}
+                      playerName={row.player_name}
+                      team={row.team}
+                      projection={row.projection_final}
+                      confidence={row.captain_confidence}
+                      label={row.captain_rating}
+                      captainScore={row.captain_score}
+                      color="#F5C84C"
+                      reason={row.recommendation_short}
+                      locked={false}
+                    />
+                  ))
                 )}
               </div>
             </Section>
@@ -591,7 +584,7 @@ export default function AFLNeekoIntelPage() {
                   locked={!isPremium}
                 />
                 <div className="space-y-3">
-                  {renderPlayerCards(risers, "risers", loading, isPremium)}
+                  {renderPlayerCards(visibleRisers, "risers", loading)}
                 </div>
               </Section>
 
@@ -603,7 +596,7 @@ export default function AFLNeekoIntelPage() {
                   locked={!isPremium}
                 />
                 <div className="space-y-3">
-                  {renderPlayerCards(fallers, "fallers", loading, isPremium)}
+                  {renderPlayerCards(visibleFallers, "fallers", loading)}
                 </div>
               </Section>
             </div>
@@ -617,7 +610,7 @@ export default function AFLNeekoIntelPage() {
                 locked={!isPremium}
               />
               <div className="space-y-3">
-                {renderPlayerCards(risk, "risk", loading, isPremium)}
+                {renderPlayerCards(visibleRisk, "risk", loading)}
               </div>
             </Section>
 
@@ -635,32 +628,15 @@ export default function AFLNeekoIntelPage() {
                     <NeekoIntelSkeletonCard key={i} />
                   ))}
                 </div>
-              ) : matches.length === 0 ? (
+              ) : visibleMatches.length === 0 ? (
                 <div className="text-center py-6 text-white/30 text-sm">
                   Neeko Intel generating...
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {matches.map((m, idx) => {
-                    const locked = !isPremium && idx >= FREE_PREVIEW_COUNT;
-                    if (locked) {
-                      return (
-                        <div key={m.match_id} className="relative">
-                          <MatchPredictionCard match={m} locked={true} />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <a
-                              href="/neeko-plus"
-                              className="flex items-center gap-1.5 bg-[#F5C84C]/15 text-[#F5C84C] text-xs font-semibold px-3 py-2 rounded-lg hover:bg-[#F5C84C]/25 transition-colors border border-[#F5C84C]/20"
-                            >
-                              <Lock size={11} />
-                              Unlock Neeko+
-                            </a>
-                          </div>
-                        </div>
-                      );
-                    }
-                    return <MatchPredictionCard key={m.match_id} match={m} locked={false} />;
-                  })}
+                  {visibleMatches.map((m) => (
+                    <MatchPredictionCard key={m.match_id} match={m} locked={false} />
+                  ))}
                 </div>
               )}
             </Section>
