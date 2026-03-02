@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Gauge,
   Target,
+  ArrowRightLeft,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -144,7 +145,7 @@ function SectionHeader({
 
 function Section({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl border border-white/[0.07] bg-[#0d0d0d] p-4 md:p-6 ${className}`}>
+    <div className={`rounded-2xl border border-white/[0.07] bg-[#0d0d0d] p-4 ${className}`}>
       {children}
     </div>
   );
@@ -200,8 +201,71 @@ function LockedCard() {
 
 // ─── Player Card List ─────────────────────────────────────────────────────────
 
-const FREE_VISIBLE = 1;
-const FREE_BLURRED = 2;
+const FREE_LIMIT = 2;
+const PREMIUM_LIMIT = 5;
+
+function BlurredPlayerCard({ row }: { row: MasterRow }) {
+  return (
+    <div className="relative rounded-xl border border-white/10 bg-[#111111] p-4 overflow-hidden">
+      {/* Visible identity — name, team, position only */}
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <div className="font-semibold text-white text-sm leading-tight truncate">{row.player_name}</div>
+          <div className="text-[11px] text-white/40 mt-0.5">
+            {row.team}{row.position ? ` · ${row.position}` : ""}
+          </div>
+        </div>
+        {row.ai_recommendation && (
+          <div className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold whitespace-nowrap text-white/20 bg-white/5 border border-white/10 blur-sm select-none">
+            {row.ai_recommendation}
+          </div>
+        )}
+      </div>
+
+      {/* Stats row — blurred */}
+      <div className="flex items-end gap-5 blur-md select-none pointer-events-none">
+        <div>
+          <div className="text-[10px] text-white/35 uppercase tracking-wider mb-1">Neeko Score</div>
+          <div className="text-4xl font-black tabular-nums text-[#F5C84C]">
+            {row.neeko_score != null ? Math.round(row.neeko_score) : "—"}
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Projection</div>
+          <div className="text-white/80 font-bold text-xl tabular-nums">
+            {row.projection_final != null ? Number(row.projection_final).toFixed(1) : "—"}
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Conf.</div>
+          <div className="text-sm font-semibold text-sky-400 tabular-nums">
+            {row.projection_confidence != null ? `${Math.round(row.projection_confidence)}%` : "—"}
+          </div>
+        </div>
+      </div>
+
+      {/* Badge row — blurred */}
+      <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-white/[0.06] blur-md select-none pointer-events-none">
+        <div className="h-5 w-20 rounded-full bg-white/10" />
+        <div className="h-5 w-16 rounded-full bg-white/5" />
+        <div className="h-5 w-14 rounded-full bg-white/5" />
+      </div>
+
+      {/* Overlay */}
+      <div className="absolute inset-0 backdrop-blur-[2px] bg-black/40 flex items-center justify-center rounded-xl">
+        <div className="flex flex-col items-center gap-2 text-center px-4">
+          <Lock size={14} className="text-[#F5C84C]/70 shrink-0" />
+          <span className="text-[11px] text-white/60 font-medium leading-snug">
+            Unlock with{" "}
+            <a href="/neeko-plus" className="text-[#F5C84C] font-bold hover:underline">
+              Neeko+
+            </a>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function PlayerCardList({
   rows,
@@ -228,37 +292,40 @@ function PlayerCardList({
   if (error) return <SectionError onRetry={onRetry} />;
   if (rows.length === 0) return <SectionEmpty message={emptyMessage} />;
 
+  const visiblePlayers = rows.slice(0, PREMIUM_LIMIT);
+  const freePlayers = visiblePlayers.slice(0, FREE_LIMIT);
+  const blurredPlayers = isPremium ? [] : visiblePlayers.slice(FREE_LIMIT, PREMIUM_LIMIT);
+  const renderedPlayers = isPremium ? visiblePlayers : freePlayers;
+
   return (
     <div className="space-y-3">
-      {rows.map((row, idx) => {
-        const isLocked = !isPremium && idx >= FREE_VISIBLE;
-        if (isLocked && idx >= FREE_VISIBLE + FREE_BLURRED) return null;
-        if (isLocked) return <LockedCard key={row.player_id ?? row.player_name + idx} />;
-        return (
-          <NeekoIntelCard
-            key={row.player_id ?? row.player_name + idx}
-            rank={idx + 1}
-            playerName={row.player_name}
-            team={row.team}
-            position={row.position}
-            projection={row.projection_final}
-            confidence={row.projection_confidence}
-            label={row.ai_recommendation}
-            color={row.recommendation_color}
-            reason={isPremium ? row.recommendation_why : null}
-            captainScore={row.captain_score}
-            locked={false}
-            neekoScore={row.neeko_score}
-            ceilingPct={isPremium ? row.ceiling_probability_pct : null}
-            bustPct={isPremium ? row.bust_probability_pct : null}
-            matchupTier={row.matchup_tier}
-            trendTag={row.trend_tag}
-            neekoTier={row.neeko_tier}
-            volatilityTag={isPremium ? row.volatility_tag : null}
-            trendStrength={isPremium ? row.trend_strength : null}
-          />
-        );
-      })}
+      {renderedPlayers.map((row, idx) => (
+        <NeekoIntelCard
+          key={row.player_id ?? row.player_name + idx}
+          rank={idx + 1}
+          playerName={row.player_name}
+          team={row.team}
+          position={row.position}
+          projection={row.projection_final}
+          confidence={row.projection_confidence}
+          label={row.ai_recommendation}
+          color={row.recommendation_color}
+          reason={isPremium ? row.recommendation_why : null}
+          captainScore={row.captain_score}
+          locked={false}
+          neekoScore={row.neeko_score}
+          ceilingPct={isPremium ? row.ceiling_probability_pct : null}
+          bustPct={isPremium ? row.bust_probability_pct : null}
+          matchupTier={row.matchup_tier}
+          trendTag={row.trend_tag}
+          neekoTier={row.neeko_tier}
+          volatilityTag={isPremium ? row.volatility_tag : null}
+          trendStrength={isPremium ? row.trend_strength : null}
+        />
+      ))}
+      {blurredPlayers.map((row, idx) => (
+        <BlurredPlayerCard key={`blurred-${row.player_id ?? row.player_name + idx}`} row={row} />
+      ))}
     </div>
   );
 }
@@ -997,6 +1064,16 @@ export default function AFLNeekoIntelPage() {
     .sort((a, b) => (b.bust_probability_pct ?? 0) - (a.bust_probability_pct ?? 0))
     .slice(0, 10);
 
+  // ── Section: Trade Targets ─────────────────────────────────────────────────
+  const tradeTargets = [...allData]
+    .filter(
+      (p) =>
+        (p.neeko_score ?? 0) >= 70 &&
+        (p.trend_tag === "RISING" || p.trend_tag === "Rising")
+    )
+    .sort((a, b) => (b.neeko_score ?? 0) - (a.neeko_score ?? 0))
+    .slice(0, PREMIUM_LIMIT);
+
   return (
     <div className="min-h-screen bg-[#070707] text-white">
 
@@ -1043,11 +1120,11 @@ export default function AFLNeekoIntelPage() {
               <Lock size={13} className="text-[#F5C84C]/60 shrink-0" />
               <p className="text-[12px] text-white/50">
                 Showing{" "}
-                <span className="text-[#F5C84C] font-semibold">1 free pick</span> per section.{" "}
+                <span className="text-[#F5C84C] font-semibold">2 free picks</span> per section — 3 more blurred.{" "}
                 <a href="/neeko-plus" className="text-[#F5C84C] font-semibold hover:underline">
                   Upgrade to Neeko+
                 </a>{" "}
-                for Neeko Score, Ceiling%, Bust% and full access.
+                for full Neeko Score, Ceiling%, Bust% and all 5 players.
               </p>
             </div>
           )}
@@ -1055,7 +1132,7 @@ export default function AFLNeekoIntelPage() {
       </div>
 
       {/* ── Page Content ── */}
-      <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 py-6 space-y-8">
 
         {fetchError && (
           <div className="text-center py-16">
@@ -1148,6 +1225,24 @@ export default function AFLNeekoIntelPage() {
               />
             </Section>
 
+            {/* ── Trade Targets ── */}
+            <Section>
+              <SectionHeader
+                icon={<ArrowRightLeft size={16} />}
+                title="Trade Targets"
+                subtitle="Top recommended players to trade in this week"
+                locked={!isPremium}
+              />
+              <PlayerCardList
+                rows={tradeTargets}
+                loading={loading}
+                error={fetchError}
+                isPremium={isPremium}
+                emptyMessage="No strong trade targets this round — check back closer to lockout"
+                onRetry={loadPlayers}
+              />
+            </Section>
+
             {/* ── Breakouts This Week ── */}
             <Section>
               <SectionHeader
@@ -1167,7 +1262,7 @@ export default function AFLNeekoIntelPage() {
             </Section>
 
             {/* ── Risers / Fallers ── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Section>
                 <SectionHeader
                   icon={<TrendingUp size={16} />}
@@ -1228,6 +1323,19 @@ export default function AFLNeekoIntelPage() {
 
         <div className="h-6" />
       </div>
+
+      {/* ── Sticky Upgrade Button (free users) ── */}
+      {!isPremium && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <a
+            href="/neeko-plus"
+            className="flex items-center gap-2 bg-[#F5C84C] text-[#070707] font-bold text-sm px-5 py-3 rounded-xl shadow-lg hover:bg-[#FFD84C] transition-all duration-150 whitespace-nowrap"
+          >
+            <Crown size={14} />
+            Upgrade to Neeko+
+          </a>
+        </div>
+      )}
     </div>
   );
 }

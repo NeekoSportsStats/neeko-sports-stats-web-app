@@ -1,4 +1,10 @@
-import { Lock, Zap, AlertTriangle, TrendingUp, TrendingDown, Shield } from "lucide-react";
+import { Lock, Zap, AlertTriangle, TrendingUp, TrendingDown, Shield, Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ─── Badge helpers ────────────────────────────────────────────────────────────
 
@@ -425,7 +431,19 @@ export function NeekoIntelCard({
         {/* Neeko Score — dominant left anchor */}
         {neekoScore != null && (
           <div>
-            <div className="text-[10px] text-white/35 uppercase tracking-wider mb-1">Neeko Score</div>
+            <div className="flex items-center gap-1 text-[10px] text-white/35 uppercase tracking-wider mb-1">
+              Neeko Score
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info size={9} className="text-white/25 cursor-default shrink-0" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[200px] text-center text-[11px] bg-[#1a1a1a] border-white/10 text-white/80">
+                    Neeko Score is a 0–100 rating based on projection, matchup, ceiling and risk.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <NeekoScoreDominant value={neekoScore} />
           </div>
         )}
