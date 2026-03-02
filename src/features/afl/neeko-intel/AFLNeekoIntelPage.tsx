@@ -47,6 +47,10 @@ interface MasterRow {
   matchup_tier: string | null;
   trend_tag: string | null;
   role_tag: string | null;
+  // Phase 4.5
+  neeko_tier: string | null;
+  volatility_tag: string | null;
+  trend_strength: number | null;
 }
 
 interface MatchRow {
@@ -215,6 +219,8 @@ function PlayerCardList({
             bustPct={isPremium ? row.bust_probability_pct : null}
             matchupTier={row.matchup_tier}
             trendTag={row.trend_tag}
+            neekoTier={row.neeko_tier}
+            volatilityTag={isPremium ? row.volatility_tag : null}
           />
         );
       })}
@@ -427,6 +433,8 @@ function EliteCaptainHero({
             bustPct={isPremium ? row.bust_probability_pct : null}
             matchupTier={row.matchup_tier}
             trendTag={row.trend_tag}
+            neekoTier={row.neeko_tier}
+            volatilityTag={isPremium ? row.volatility_tag : null}
           />
         ))}
       </div>
@@ -484,7 +492,8 @@ export default function AFLNeekoIntelPage() {
         "consistency_score,form_rating,matchup_rating,upside_rating,risk_rating,projection_confidence," +
         "ai_recommendation,ai_analysis,recommendation_color,recommendation_why," +
         "captain_score,captain_rating," +
-        "neeko_score,ceiling_probability_pct,bust_probability_pct,matchup_tier,trend_tag,role_tag"
+        "neeko_score,ceiling_probability_pct,bust_probability_pct,matchup_tier,trend_tag,role_tag," +
+        "neeko_tier,volatility_tag,trend_strength"
       );
     if (error || !data) {
       console.error("[NeekoIntel] player load error:", error?.message, error?.details);

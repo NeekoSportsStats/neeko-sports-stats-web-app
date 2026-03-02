@@ -47,6 +47,10 @@ export function MatchupBadge({ value }: { value: string | null }) {
 export function VolatilityBadge({ value }: { value: string | null }) {
   if (!value) return null;
   const map: Record<string, BadgeProps["color"]> = {
+    Extreme: "red",
+    Volatile: "orange",
+    Normal: "blue",
+    Safe: "green",
     EXTREME: "red",
     HIGH:    "orange",
     MEDIUM:  "blue",
@@ -195,6 +199,21 @@ export function TrendTagBadge({ value }: { value: string | null }) {
   );
 }
 
+// ─── Neeko Tier Badge ─────────────────────────────────────────────────────────
+
+export function NeekoTierBadge({ value }: { value: string | null }) {
+  if (!value) return null;
+  const map: Record<string, BadgeProps["color"]> = {
+    Generational: "gold",
+    Elite:        "gold",
+    Strong:       "green",
+    Solid:        "blue",
+    Risky:        "orange",
+    Avoid:        "red",
+  };
+  return <Badge label={value} color={map[value] ?? "gray"} />;
+}
+
 // ─── Confidence Tier Badge ────────────────────────────────────────────────────
 
 export function ConfidenceBadge({ value }: { value: number | null }) {
@@ -239,6 +258,10 @@ export interface NeekoIntelCardProps {
   bustPct?: number | null;
   matchupTier?: string | null;
   trendTag?: string | null;
+  // Phase 4.5
+  neekoTier?: string | null;
+  volatilityTag?: string | null;
+  trendStrength?: number | null;
 }
 
 function fmt(v: number | null, decimals = 1): string {
@@ -281,13 +304,15 @@ export function NeekoIntelCard({
   bustPct,
   matchupTier,
   trendTag,
+  neekoTier,
+  volatilityTag,
 }: NeekoIntelCardProps) {
   const isElite = label === "ELITE CAPTAIN" || label === "CAPTAIN LOCK";
 
   const hasBadgeRow =
     matchupDifficulty || volatilityLevel || captainTier || breakoutFlag || avoidFlag ||
     confidence != null || trendLabel || roleSignal || matchupTier || trendTag ||
-    ceilingPct != null || bustPct != null;
+    ceilingPct != null || bustPct != null || neekoTier || volatilityTag;
 
   return (
     <div
@@ -398,6 +423,7 @@ export function NeekoIntelCard({
       {/* ── Intelligence Badge Row ── */}
       {hasBadgeRow && (
         <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-white/[0.06]">
+          {neekoTier && <NeekoTierBadge value={neekoTier} />}
           {trendTag && <TrendTagBadge value={trendTag} />}
           {trendLabel && <TrendBadge value={trendLabel} />}
           {roleSignal && <RoleSignalBadge value={roleSignal} />}
@@ -406,8 +432,9 @@ export function NeekoIntelCard({
           {(ceilingPct != null || bustPct != null) && (
             <CeilingBustChips ceiling={ceilingPct} bust={bustPct} />
           )}
+          {volatilityTag && <VolatilityBadge value={volatilityTag} />}
           {confidence != null && <ConfidenceBadge value={confidence} />}
-          {volatilityLevel && <VolatilityBadge value={volatilityLevel} />}
+          {volatilityLevel && !volatilityTag && <VolatilityBadge value={volatilityLevel} />}
           {captainTier && <CaptainTierBadge value={captainTier} />}
           {breakoutFlag && <BreakoutBadge flag={breakoutFlag} />}
           {avoidFlag && <AvoidBadge flag={avoidFlag} />}
