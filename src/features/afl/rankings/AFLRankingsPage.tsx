@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Lock, Crown, X, Info, Search } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Dot } from "recharts";
@@ -218,34 +219,38 @@ function getRiskBadge(risk: number | null) {
 
 function InfoTooltip({ text }: { text: string }) {
   const [visible, setVisible] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    function handleOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setVisible(false);
-    }
-    if (visible) document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, [visible]);
+  function updatePos() {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setPos({ top: r.top - 8, left: r.left + r.width / 2 });
+  }
 
   return (
-    <div ref={ref} className="relative inline-flex items-center">
+    <span className="inline-flex items-center">
       <button
+        ref={btnRef}
         type="button"
-        onMouseEnter={() => setVisible(true)}
+        onMouseEnter={() => { updatePos(); setVisible(true); }}
         onMouseLeave={() => setVisible(false)}
-        onClick={() => setVisible((v) => !v)}
+        onClick={() => { updatePos(); setVisible((v) => !v); }}
         className="text-white/20 hover:text-white/50 transition-colors ml-1"
       >
         <Info size={11} />
       </button>
-      {visible && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-44 rounded-lg border border-white/10 bg-[#181818] px-3 py-2 shadow-xl pointer-events-none">
+      {visible && createPortal(
+        <div
+          className="pointer-events-none fixed z-[9999] w-44 -translate-x-1/2 -translate-y-full rounded-lg border border-white/10 bg-[#181818] px-3 py-2 shadow-xl"
+          style={{ top: pos.top, left: pos.left }}
+        >
           <p className="text-[11px] text-white/60 leading-relaxed">{text}</p>
           <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#181818]" />
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </span>
   );
 }
 
@@ -803,7 +808,7 @@ export default function AFLRankingsPage() {
       const { data } = await supabase.rpc("get_rankings_premium", {
         position_filter: posArg,
         sort_key: sortArg,
-        limit_n: 200,
+        limit_n: 1000,
       });
       const normalized = ((data as RankingRow[]) ?? []).map((r) => ({
         ...r,
@@ -841,7 +846,7 @@ export default function AFLRankingsPage() {
     : rows;
 
   function isPremiumColumn(colKey: string): boolean {
-    return ["price", "value_score", "value_tag", "ai_recommendation", "recommendation_why", "ai_summary", "captain_score", "captain_rating"].includes(colKey);
+    return ["price", "value_score", "value_tag", "ai_recommendation", "recommendation_why", "ai_summary"].includes(colKey);
   }
 
   function isFreeRow(idx: number): boolean {
@@ -992,7 +997,7 @@ export default function AFLRankingsPage() {
     );
 
     return (
-      <tr key={`${row.player_id ?? row.player_name}-${idx}`} className={rowClass} onClick={handleRowClick}>
+      <tr key={row.player_id ?? row.player_name} className={rowClass} onClick={handleRowClick}>
         {rankCell}
         {playerCell}
         {neekoCell}
@@ -1082,25 +1087,33 @@ export default function AFLRankingsPage() {
           <p className="mt-2 text-xs text-white/40 leading-relaxed">{TAB_DESCRIPTIONS[activeTab]}</p>
         </div>
 
-        {isPremium && (
-          <div className="mb-4">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/40 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search player…"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-700 rounded-xl pl-10 pr-10 py-3 text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:border-[#F5C84C] focus:ring-[#F5C84C] transition-colors"
-              />
-              {searchTerm && (
-                <button onClick={() => setSearchTerm("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors">
-                  <X size={14} />
-                </button>
-              )}
-            </div>
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/40 w-4 h-4" />
+            <input
+              type="text"
+              placeholder={isPremium ? "Search player…" : "Search player… (Neeko+ only)"}
+              value={searchTerm}
+              onChange={(e) => { if (isPremium) setSearchTerm(e.target.value); }}
+              disabled={!isPremium}
+              className={`w-full bg-zinc-900 border border-zinc-700 rounded-xl pl-10 pr-10 py-3 text-white placeholder:text-white/30 focus:outline-none transition-colors ${
+                isPremium
+                  ? "focus:ring-1 focus:border-[#F5C84C] focus:ring-[#F5C84C]"
+                  : "opacity-50 cursor-not-allowed"
+              }`}
+            />
+            {isPremium && searchTerm && (
+              <button onClick={() => setSearchTerm("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors">
+                <X size={14} />
+              </button>
+            )}
+            {!isPremium && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <Lock size={12} className="text-[#F5C84C]/50" />
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         <div className="mb-4">
           <div className="flex items-center gap-2 flex-wrap">
