@@ -402,7 +402,7 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
             )}
           </div>
           <p className="text-[11px] text-white/30">
-            {isPremium ? "Top 5 by captain score" : "Top pick shown · unlock all 5 with Neeko+"}
+            {isPremium ? "Top 5 by captain score" : "Top 2 picks shown · unlock all 5 with Neeko+"}
           </p>
         </div>
 
@@ -420,7 +420,7 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
             {captains.map((c, idx) => {
               const style = getCaptainStyle(c.captain_rating);
-              const isBlurred = !isPremium && idx >= 1;
+              const isBlurred = !isPremium && idx >= 2;
 
               const medal =
                 idx === 0
