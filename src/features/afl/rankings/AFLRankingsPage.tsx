@@ -61,11 +61,13 @@ interface ScoreHistoryPoint {
   season: number;
 }
 
-type SortKey = "projection_final" | "consistency_score" | "value_score" | "price" | "neeko_rating";
+type SortKey = "projection_final" | "value_score" | "price" | "neeko_rating";
 type SortDir = "asc" | "desc";
 type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
 
 const FREE_ROW_LIMIT = 20;
+const FREE_VISIBLE = 5;
+const FREE_BLURRED = 5;
 const FREE_UNLOCKED_METRICS = 5;
 
 const POSITION_MAP: Record<string, PositionFilter> = {
@@ -839,6 +841,7 @@ function SortTh({
   onSort,
   locked,
   goldLabel,
+  width,
 }: {
   label: string;
   sortKey: SortKey;
@@ -847,6 +850,7 @@ function SortTh({
   onSort: (k: SortKey) => void;
   locked?: boolean;
   goldLabel?: boolean;
+  width?: number;
 }) {
   const active = currentKey === sortKey;
   return (
@@ -854,6 +858,7 @@ function SortTh({
       className={`${TH_BASE} select-none transition-colors ${
         locked ? "text-white/20 cursor-default" : goldLabel ? "text-[#F5C84C] cursor-pointer hover:text-[#f0bd30]" : "text-white/40 cursor-pointer hover:text-white/70"
       }`}
+      style={width ? { width, minWidth: width } : undefined}
       onClick={() => !locked && onSort(sortKey)}
     >
       <span className="inline-flex items-center gap-1 justify-center">
@@ -865,9 +870,9 @@ function SortTh({
   );
 }
 
-function PlainTh({ label, locked }: { label: string; locked?: boolean }) {
+function PlainTh({ label, locked, width }: { label: string; locked?: boolean; width?: number }) {
   return (
-    <th className={`${TH_BASE} text-white/20`}>
+    <th className={`${TH_BASE} text-white/20`} style={width ? { width, minWidth: width } : undefined}>
       <span className="inline-flex items-center gap-1 justify-center">
         {locked && <Lock size={10} className="text-[#F5C84C]" />}
         {label}
@@ -952,8 +957,6 @@ const MODE_DESCRIPTIONS: Record<RankingsMode, string> = {
 // ─── Mode column configs ──────────────────────────────────────────────────────
 
 type RankingsMode = "best" | "value" | "projection";
-
-const FREE_LIMIT = 10;
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -1055,30 +1058,14 @@ export default function AFLRankingsPage() {
     ? rows
     : rows.filter((r) => r.position === positionFilter);
 
-  const bestPicks = [...posFiltered]
-    .filter((r) => r.ai_recommendation !== "AVOID")
-    .sort((a, b) => (Number(b.neeko_rating) || 0) - (Number(a.neeko_rating) || 0))
-    .slice(0, 80);
-
-  const valueList = [...posFiltered]
-    .filter((r) => r.value_score != null)
-    .sort((a, b) => (Number(b.value_score) || 0) - (Number(a.value_score) || 0))
-    .slice(0, 60);
-
-  const projectionList = [...posFiltered]
-    .sort((a, b) => (b.projection_final ?? 0) - (a.projection_final ?? 0))
-    .slice(0, 80);
-
-  const modeList =
-    mode === "best" ? bestPicks :
-    mode === "value" ? valueList :
-    projectionList;
-
-  // ── Apply filters on top of mode list ────────────────────────────────────
+  const modeFiltered =
+    mode === "best" ? posFiltered.filter((r) => r.ai_recommendation !== "AVOID") :
+    mode === "value" ? posFiltered.filter((r) => r.value_score != null) :
+    posFiltered;
 
   const searchFiltered = isPremium && searchTerm.trim()
-    ? modeList.filter((r) => r.player_name.toLowerCase().includes(searchTerm.toLowerCase()))
-    : modeList;
+    ? modeFiltered.filter((r) => r.player_name.toLowerCase().includes(searchTerm.toLowerCase()))
+    : modeFiltered;
 
   const sorted = [...searchFiltered].sort((a, b) => {
     const av = (a[sortKey] as number | null) ?? -Infinity;
@@ -1086,8 +1073,8 @@ export default function AFLRankingsPage() {
     return sortDir === "desc" ? bv - av : av - bv;
   });
 
-  const visibleRows = isPremium ? sorted : sorted.slice(0, FREE_LIMIT);
-  const lockedRows = isPremium ? [] : sorted.slice(FREE_LIMIT, FREE_ROW_LIMIT);
+  const visibleRows = isPremium ? sorted : sorted.slice(0, FREE_VISIBLE);
+  const lockedRows = isPremium ? [] : sorted.slice(FREE_VISIBLE, FREE_VISIBLE + FREE_BLURRED);
 
   // ── Column count per mode ─────────────────────────────────────────────────
   const TOTAL_COLS =
@@ -1114,13 +1101,13 @@ export default function AFLRankingsPage() {
       : `border-b border-white/[0.04] transition-all duration-150 cursor-pointer hover:bg-white/5 hover:shadow-[0_0_12px_rgba(245,200,76,0.1)]${isEliteCaptain ? " bg-[#120E00]" : ""}`;
 
     const rankCell = (
-      <td className="px-4 py-3 text-sm text-white/30 tabular-nums text-center whitespace-nowrap w-10">
+      <td className="px-3 py-3 text-sm text-white/30 tabular-nums text-center whitespace-nowrap" style={{ width: 60, minWidth: 60, maxWidth: 60 }}>
         {isLockedRow ? <Lock size={12} className="mx-auto text-white/15" /> : rank}
       </td>
     );
 
     const playerCell = (
-      <td className="px-4 py-3 min-w-[160px] whitespace-nowrap">
+      <td className="px-4 py-3 whitespace-nowrap" style={{ width: 260, minWidth: 200 }}>
         {isLockedRow ? (
           <div className="space-y-1">
             <div className="h-3.5 w-32 rounded bg-white/[0.04]" />
@@ -1143,7 +1130,7 @@ export default function AFLRankingsPage() {
     );
 
     const projCell = (
-      <td className="px-4 py-3 text-center whitespace-nowrap">
+      <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 120, minWidth: 100 }}>
         {isLockedRow
           ? <div className="h-4 w-10 mx-auto rounded bg-white/[0.04]" />
           : <span className="text-sm font-semibold text-[#F5C84C] tabular-nums">{fmt(row.projection_final)}</span>
@@ -1184,7 +1171,7 @@ export default function AFLRankingsPage() {
     );
 
     const confidenceCell = (
-      <td className="px-4 py-3 text-center whitespace-nowrap">
+      <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 120, minWidth: 100 }}>
         {isLockedRow ? <div className="h-4 w-10 mx-auto rounded bg-white/[0.04]" />
           : !metricsUnlocked ? <LockedCell />
           : <span className={`text-sm font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
@@ -1208,7 +1195,7 @@ export default function AFLRankingsPage() {
     );
 
     const riskCell = (
-      <td className="px-4 py-3 text-center whitespace-nowrap">
+      <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 120, minWidth: 100 }}>
         {isLockedRow ? <div className="h-5 w-16 mx-auto rounded bg-white/[0.04]" />
           : !metricsUnlocked ? <LockedCell />
           : (
@@ -1221,7 +1208,7 @@ export default function AFLRankingsPage() {
     );
 
     const aiRecCell = (
-      <td className={`px-4 py-3 text-center whitespace-nowrap${isEliteCaptain ? " bg-[#1A1400]" : ""}`}>
+      <td className={`px-4 py-3 text-center whitespace-nowrap${isEliteCaptain ? " bg-[#1A1400]" : ""}`} style={{ width: 160, minWidth: 140 }}>
         {isLockedRow ? <div className="h-5 w-24 mx-auto rounded bg-white/[0.04]" />
           : !metricsUnlocked ? <LockedCell />
           : row.ai_recommendation ? (
@@ -1249,7 +1236,7 @@ export default function AFLRankingsPage() {
     );
 
     const whyCell = (
-      <td className="px-4 py-3 text-left align-middle min-w-[200px] max-w-[260px] whitespace-normal">
+      <td className="px-4 py-3 text-left align-middle whitespace-normal" style={{ minWidth: 160 }}>
         {isLockedRow ? (
           <div className="space-y-1">
             <div className="h-2.5 w-full rounded bg-white/[0.04]" />
@@ -1275,7 +1262,7 @@ export default function AFLRankingsPage() {
     );
 
     const neekoRatingCell = (
-      <td className="px-4 py-3 text-center whitespace-nowrap">
+      <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 140, minWidth: 120 }}>
         {isLockedRow ? <div className="h-5 w-20 mx-auto rounded bg-white/[0.04]" />
           : !metricsUnlocked ? <LockedCell />
           : (
@@ -1323,19 +1310,19 @@ export default function AFLRankingsPage() {
   function renderHeaders() {
     const base = (
       <>
-        <th className={`${TH_BASE} text-white/40 w-10`}>#</th>
-        <th className={`${TH_BASE} text-left text-white/40 min-w-[160px]`}>Player</th>
+        <th className={`${TH_BASE} text-white/40`} style={{ width: 60, minWidth: 60 }}>#</th>
+        <th className={`${TH_BASE} text-left text-white/40`} style={{ width: 260, minWidth: 200 }}>Player</th>
       </>
     );
 
     if (mode === "best") return (
       <tr className="border-b border-[#222]">
         {base}
-        <SortTh label="Neeko Rating" sortKey="neeko_rating" currentKey={sortKey} dir={sortDir} onSort={handleSort} goldLabel />
-        <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
-        <PlainTh label="Confidence" locked={!isPremium} />
-        <PlainTh label="Risk" locked={!isPremium} />
-        <PlainTh label="AI Rec" locked={!isPremium} />
+        <SortTh label="Neeko Rating" sortKey="neeko_rating" currentKey={sortKey} dir={sortDir} onSort={handleSort} goldLabel width={140} />
+        <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} width={120} />
+        <PlainTh label="Confidence" locked={!isPremium} width={120} />
+        <PlainTh label="Risk" locked={!isPremium} width={120} />
+        <PlainTh label="AI Rec" locked={!isPremium} width={160} />
         <PlainTh label="Why" locked={!isPremium} />
       </tr>
     );
@@ -1343,10 +1330,10 @@ export default function AFLRankingsPage() {
     if (mode === "value") return (
       <tr className="border-b border-[#222]">
         {base}
-        <SortTh label="Price" sortKey="price" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
-        <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
-        <SortTh label="Value Score" sortKey="value_score" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
-        <PlainTh label="Risk" locked={!isPremium} />
+        <SortTh label="Price" sortKey="price" currentKey={sortKey} dir={sortDir} onSort={handleSort} width={120} />
+        <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} width={120} />
+        <SortTh label="Value Score" sortKey="value_score" currentKey={sortKey} dir={sortDir} onSort={handleSort} width={140} />
+        <PlainTh label="Risk" locked={!isPremium} width={120} />
         <PlainTh label="Why" locked={!isPremium} />
       </tr>
     );
@@ -1354,12 +1341,12 @@ export default function AFLRankingsPage() {
     return (
       <tr className="border-b border-[#222]">
         {base}
-        <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
-        <PlainTh label="Captain" locked={!isPremium} />
-        <PlainTh label="Confidence" locked={!isPremium} />
-        <PlainTh label="Matchup" locked={!isPremium} />
-        <PlainTh label="Risk" locked={!isPremium} />
-        <PlainTh label="AI Rec" locked={!isPremium} />
+        <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} width={120} />
+        <PlainTh label="Captain" locked={!isPremium} width={140} />
+        <PlainTh label="Confidence" locked={!isPremium} width={120} />
+        <PlainTh label="Matchup" locked={!isPremium} width={120} />
+        <PlainTh label="Risk" locked={!isPremium} width={120} />
+        <PlainTh label="AI Rec" locked={!isPremium} width={160} />
       </tr>
     );
   }
@@ -1494,7 +1481,6 @@ export default function AFLRankingsPage() {
                 <option value="projection_final">Projection</option>
                 <option value="value_score">Value Score</option>
                 <option value="price">Price</option>
-                <option value="consistency_score">Consistency</option>
               </select>
               <button
                 onClick={() => setSortDir((d) => d === "desc" ? "asc" : "desc")}
