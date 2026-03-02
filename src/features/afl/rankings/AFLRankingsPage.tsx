@@ -27,6 +27,7 @@ interface RankingRow {
   recommendation_color?: string | null;
   captain_rating?: string | null;
   captain_score?: number | null;
+  neeko_rating?: number | null;
   price?: number | null;
   value_score?: number | null;
   price_tier?: string | null;
@@ -60,7 +61,7 @@ interface ScoreHistoryPoint {
   season: number;
 }
 
-type SortKey = "projection_final" | "consistency_score" | "value_score" | "price";
+type SortKey = "projection_final" | "consistency_score" | "value_score" | "price" | "neeko_rating";
 type SortDir = "asc" | "desc";
 type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
 type ValueFilter = "ALL" | "ELITE" | "GOOD" | "POOR";
@@ -835,6 +836,7 @@ function SortTh({
   dir,
   onSort,
   locked,
+  goldLabel,
 }: {
   label: string;
   sortKey: SortKey;
@@ -842,12 +844,13 @@ function SortTh({
   dir: SortDir;
   onSort: (k: SortKey) => void;
   locked?: boolean;
+  goldLabel?: boolean;
 }) {
   const active = currentKey === sortKey;
   return (
     <th
       className={`${TH_BASE} select-none transition-colors ${
-        locked ? "text-white/20 cursor-default" : "text-white/40 cursor-pointer hover:text-white/70"
+        locked ? "text-white/20 cursor-default" : goldLabel ? "text-[#F5C84C] cursor-pointer hover:text-[#f0bd30]" : "text-white/40 cursor-pointer hover:text-white/70"
       }`}
       onClick={() => !locked && onSort(sortKey)}
     >
@@ -932,10 +935,24 @@ function getRiskBadge(risk: string | null | undefined): { label: string; text: s
   return { label: "SAFE", text: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30" };
 }
 
+// ─── Neeko Rating badge ───────────────────────────────────────────────────────
+
+function getNeekoRatingBadge(rating: number | null | undefined): { label: string; text: string; bg: string; border: string } {
+  if (rating == null) return { label: "—", text: "text-white/30", bg: "bg-transparent", border: "border-transparent" };
+  const n = typeof rating === "string" ? parseFloat(rating as unknown as string) : (rating as number);
+  if (isNaN(n)) return { label: "—", text: "text-white/30", bg: "bg-transparent", border: "border-transparent" };
+  if (n >= 95) return { label: "GENERATIONAL", text: "text-[#F5C84C]", bg: "bg-[#F5C84C]/15", border: "border-[#F5C84C]/40" };
+  if (n >= 90) return { label: "ELITE", text: "text-yellow-300", bg: "bg-yellow-400/10", border: "border-yellow-400/30" };
+  if (n >= 80) return { label: "PREMIUM", text: "text-emerald-300", bg: "bg-emerald-400/10", border: "border-emerald-400/30" };
+  if (n >= 70) return { label: "STRONG", text: "text-blue-300", bg: "bg-blue-400/10", border: "border-blue-400/30" };
+  if (n >= 60) return { label: "SOLID", text: "text-white/60", bg: "bg-white/5", border: "border-white/15" };
+  return { label: "RISK", text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" };
+}
+
 // ─── Mode descriptions ────────────────────────────────────────────────────────
 
 const MODE_DESCRIPTIONS: Record<RankingsMode, string> = {
-  best: "Best overall picks based on AI projection, value, and confidence",
+  best: "True intelligence ranking combining projection, upside, consistency, and risk — sorted by Neeko Rating",
   value: "Most underpriced players based on price vs projected score",
   projection: "Highest projected fantasy scorers this round",
 };
@@ -955,7 +972,7 @@ export default function AFLRankingsPage() {
   const [mode, setMode] = useState<RankingsMode>("best");
   const [rows, setRows] = useState<RankingRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortKey, setSortKey] = useState<SortKey>("projection_final");
+  const [sortKey, setSortKey] = useState<SortKey>("neeko_rating");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selected, setSelected] = useState<(RankingRow & { _rank: number; _unlocked: boolean }) | null>(null);
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
@@ -987,6 +1004,7 @@ export default function AFLRankingsPage() {
             projection_confidence,
             captain_rating,
             captain_score,
+            neeko_rating,
             ai_recommendation,
             ai_analysis,
             recommendation_color,
@@ -1026,7 +1044,7 @@ export default function AFLRankingsPage() {
 
   // Reset sort when mode changes
   useEffect(() => {
-    if (mode === "best") { setSortKey("projection_final"); setSortDir("desc"); }
+    if (mode === "best") { setSortKey("neeko_rating"); setSortDir("desc"); }
     if (mode === "value") { setSortKey("value_score"); setSortDir("desc"); }
     if (mode === "projection") { setSortKey("projection_final"); setSortDir("desc"); }
     setValueFilter("ALL");
@@ -1053,7 +1071,7 @@ export default function AFLRankingsPage() {
 
   const bestPicks = [...posFiltered]
     .filter((r) => r.ai_recommendation !== "AVOID")
-    .sort((a, b) => (b.projection_final ?? 0) - (a.projection_final ?? 0))
+    .sort((a, b) => (Number(b.neeko_rating) || 0) - (Number(a.neeko_rating) || 0))
     .slice(0, 80);
 
   const valueList = [...posFiltered]
@@ -1111,6 +1129,7 @@ export default function AFLRankingsPage() {
     const recColor = row.recommendation_color ?? null;
     const capStyle = getCaptainStyle(row.captain_rating ?? null);
     const riskBadge = getRiskBadge(row.risk_rating ?? null);
+    const neekoRBadge = getNeekoRatingBadge(row.neeko_rating ?? null);
 
     const rowClass = isLockedRow
       ? "border-b border-white/[0.02] cursor-pointer select-none"
@@ -1277,6 +1296,24 @@ export default function AFLRankingsPage() {
       </td>
     );
 
+    const neekoRatingCell = (
+      <td className="px-4 py-3 text-center whitespace-nowrap">
+        {isLockedRow ? <div className="h-5 w-20 mx-auto rounded bg-white/[0.04]" />
+          : !metricsUnlocked ? <LockedCell />
+          : (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className={`text-sm font-bold tabular-nums ${neekoRBadge.text}`}>
+                {row.neeko_rating != null ? Number(row.neeko_rating).toFixed(1) : "—"}
+              </span>
+              <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${neekoRBadge.text} ${neekoRBadge.bg} ${neekoRBadge.border}`}>
+                {neekoRBadge.label}
+              </span>
+            </div>
+          )
+        }
+      </td>
+    );
+
     const handleClick = isLockedRow
       ? () => { window.location.href = "/neeko-plus"; }
       : () => setSelected({ ...row, _rank: rank, _unlocked: !isLocked } as RankingRow & { _rank: number; _unlocked: boolean });
@@ -1284,7 +1321,7 @@ export default function AFLRankingsPage() {
     if (mode === "best") {
       return (
         <tr key={(row.player_id ?? row.player_name) + idx} className={rowClass} onClick={handleClick}>
-          {rankCell}{playerCell}{projCell}{confidenceCell}{valueCell}{riskCell}{aiRecCell}{whyCell}
+          {rankCell}{playerCell}{neekoRatingCell}{projCell}{confidenceCell}{riskCell}{aiRecCell}{whyCell}
         </tr>
       );
     }
@@ -1316,9 +1353,9 @@ export default function AFLRankingsPage() {
     if (mode === "best") return (
       <tr className="border-b border-[#222]">
         {base}
+        <SortTh label="Neeko Rating" sortKey="neeko_rating" currentKey={sortKey} dir={sortDir} onSort={handleSort} goldLabel />
         <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
         <PlainTh label="Confidence" locked={!isPremium} />
-        <PlainTh label="Value" locked={!isPremium} />
         <PlainTh label="Risk" locked={!isPremium} />
         <PlainTh label="AI Rec" locked={!isPremium} />
         <PlainTh label="Why" locked={!isPremium} />
