@@ -38,18 +38,6 @@ interface RankingRow {
   total_count: number | null;
 }
 
-interface CaptainRow {
-  player_id: number | null;
-  player_name: string;
-  team: string;
-  projection_final: number | null;
-  ceiling_estimate: number | null;
-  consistency_score: number | null;
-  captain_score: number | null;
-  captain_rating: string | null;
-  captain_confidence: number | null;
-}
-
 interface ScoreHistoryPoint {
   game_index: number;
   round_label: string;
@@ -188,6 +176,7 @@ function getConsistencyBadge(score: number | null) {
   if (score >= 40) return { label: "Volatile", className: "text-orange-400" };
   return { label: "High Risk", className: "text-red-400" };
 }
+
 
 function getCaptainStyle(rating: string | null) {
   if (!rating) return { text: "text-white/30", bg: "bg-white/5", border: "border-white/10", icon: "" };
@@ -412,158 +401,6 @@ function ConsistencyRangeBar({ floor, projection, ceiling }: { floor: number | n
       <div className="flex items-center justify-center gap-1">
         <div className="h-1.5 w-1.5 rounded-full bg-white/60" />
         <span className="text-[10px] text-white/50">Projection: <span className="text-[#F5C84C] font-semibold">{fmt(projection, 0)}</span></span>
-      </div>
-    </div>
-  );
-}
-
-// ─── Captain Section ───────────────────────────────────────────────────────────
-
-function CaptainSection({ isPremium, onUpgradeClick }: { isPremium: boolean; onUpgradeClick: () => void }) {
-  const [captains, setCaptains] = useState<CaptainRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      const rpc = isPremium ? "get_captain_recommendations_premium" : "get_captain_recommendations_free";
-      const { data } = await supabase.rpc(rpc);
-      if (!cancelled) {
-        setCaptains((data as CaptainRow[]) ?? []);
-        setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [isPremium]);
-
-  const realCards = isPremium ? captains : captains.slice(0, 2);
-  const lockedCount = isPremium ? 0 : Math.max(0, 5 - realCards.length);
-  const cards: Array<CaptainRow | null> = [
-    ...realCards,
-    ...Array.from({ length: lockedCount }, () => null),
-  ];
-
-  const MEDALS = [
-    { icon: "👑", color: "#F5C84C", label: "Gold" },
-    { icon: "🥈", color: "#C0C0C0", label: "Silver" },
-    { icon: "🥉", color: "#CD7F32", label: "Bronze" },
-  ];
-
-  return (
-    <div className="px-4 pb-6 md:px-8">
-      <div className="rounded-xl border border-white/8 bg-white/[0.025] p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <span className="text-base">👑</span>
-            <h2 className="text-sm font-semibold text-white tracking-wide">Captain Recommendations</h2>
-            {!isPremium && (
-              <span className="rounded-full border border-[#F5C84C]/30 bg-[#F5C84C]/10 px-2 py-0.5 text-[10px] font-semibold text-[#F5C84C]">Neeko+</span>
-            )}
-          </div>
-          <p className="text-[11px] text-white/30">
-            {isPremium ? "Top 5 by captain score" : "Top 2 shown · unlock all 5 with Neeko+"}
-          </p>
-        </div>
-
-        {loading ? (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-28 animate-pulse rounded-lg bg-white/5" />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
-            {cards.map((c, idx) => {
-              const isLocked = !isPremium && idx >= 2;
-              const style = getCaptainStyle(c?.captain_rating ?? null);
-              const medal = MEDALS[idx] ?? null;
-
-              if (isLocked) {
-                return (
-                  <div
-                    key={`locked-${idx}`}
-                    className="relative rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 cursor-pointer"
-                    onClick={onUpgradeClick}
-                  >
-                    <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg backdrop-blur-sm bg-black/50 z-10">
-                      <Lock size={16} className="text-[#F5C84C]/60 mb-1.5" />
-                      <span className="text-[10px] font-semibold text-[#F5C84C]/70">Unlock Neeko+</span>
-                    </div>
-                    {medal && (
-                      <div className="flex items-center gap-1 text-xs font-semibold mb-1" style={{ color: medal.color }}>
-                        <span>{medal.icon}</span>
-                        <span>{medal.label} Captain</span>
-                      </div>
-                    )}
-                    <div className="h-3 w-20 rounded bg-white/5 mb-2" />
-                    <div className="h-4 w-28 rounded bg-white/5 mb-1" />
-                    <div className="h-3 w-16 rounded bg-white/5" />
-                  </div>
-                );
-              }
-
-              if (!c) return null;
-
-              return (
-                <div
-                  key={c.player_id ?? `captain-${idx}`}
-                  className={`relative rounded-lg border px-3 py-3 transition-all ${style.bg} ${style.border} ${
-                    idx === 0 ? "shadow-[0_0_15px_rgba(245,200,76,0.5)] border-[#F5C84C]" : ""
-                  }`}
-                >
-                  {medal && (
-                    <div className="flex items-center gap-1 text-xs font-semibold mb-1" style={{ color: medal.color }}>
-                      <span>{medal.icon}</span>
-                      <span>{medal.label} Captain</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1 mb-1.5">
-                    <span className="text-xs">{style.icon}</span>
-                    <span className={`text-[10px] font-semibold ${style.text}`}>{c.captain_rating}</span>
-                  </div>
-                  <p className="text-sm font-semibold text-white leading-tight truncate">{c.player_name}</p>
-                  {c.captain_confidence != null && (
-                    <div
-                      className="text-xs font-semibold mt-1 mb-1 px-2 py-0.5 rounded inline-block"
-                      style={{
-                        background: c.captain_confidence >= 90 ? "rgba(245,200,76,0.15)" : c.captain_confidence >= 80 ? "rgba(0,200,83,0.15)" : "rgba(255,109,0,0.15)",
-                        color: c.captain_confidence >= 90 ? "#F5C84C" : c.captain_confidence >= 80 ? "#00C853" : "#FF6D00",
-                      }}
-                    >
-                      {c.captain_confidence}% Confidence
-                    </div>
-                  )}
-                  <p className="text-[11px] text-white/40 truncate">{c.team}</p>
-                  <div className="mt-2 flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] text-white/30">Proj</p>
-                      <p className="text-xs font-bold text-[#F5C84C]">{fmt(c.projection_final)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] text-white/30">Score</p>
-                      <p className={`text-xs font-bold ${style.text}`}>{fmt(c.captain_score)}</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {!isPremium && (
-          <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-[#F5C84C]/15 bg-[#F5C84C]/5 px-4 py-3">
-            <p className="text-sm text-[#F5C84C]/80 font-medium">Upgrade to Neeko+ to unlock all 5 elite captain recommendations.</p>
-            <a
-              href="/neeko-plus"
-              className="inline-flex items-center gap-1.5 bg-[#F5C84C] text-black font-semibold rounded-lg hover:brightness-110 transition-all duration-150 px-4 py-2 text-sm whitespace-nowrap shrink-0"
-            >
-              <Crown size={13} />
-              Upgrade to Neeko+
-            </a>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -1136,8 +973,6 @@ export default function AFLRankingsPage() {
           </div>
         )}
       </div>
-
-      <CaptainSection isPremium={isPremium} onUpgradeClick={() => setShowUpgradeModal(true)} />
 
       {showUpgradeModal && <UpgradeModal onClose={() => setShowUpgradeModal(false)} />}
 
