@@ -5,7 +5,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Dot } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
-import { CaptainTeaserCard } from "./components/CaptainTeaserCard";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,13 +68,21 @@ const TAB_SORT_KEY: Record<RankingsTab, string> = {
 };
 
 const TAB_DESCRIPTIONS: Record<RankingsTab, string> = {
-  best: "True intelligence ranking combining projection, upside, consistency, and risk — sorted by Neeko Rating",
+  best: "Neeko Rating combines projection, matchup difficulty, consistency, risk, and AI intelligence to identify the best fantasy picks each round.",
   value: "Most underpriced players based on price vs projected score — sorted by Value Score",
   projection: "Highest projected fantasy scorers this round — sorted by Projection",
 };
 
 const FREE_ROW_LIMIT = 20;
 const FREE_UNLOCKED_ROWS = 5;
+const FREE_PARTIAL_ROWS = 20;
+
+const LOCKED_TEASERS = {
+  price: ["$450k·Neeko+", "$820k·Neeko+", "$610k·Neeko+", "$390k·Neeko+", "$730k·Neeko+"],
+  value: ["Elite Value", "Strong Value", "Good Value", "Elite Value", "Premium Pick"],
+  ai_rec: ["Must Start", "Strong Play", "Captain Candidate", "Must Start", "Elite Option"],
+  why: ["Favourable matchup + elite form", "Elite projected scorer this round", "Dominant upside rating detected", "Favourable matchup + elite form", "High ceiling — must consider"],
+};
 
 const POSITIONS: PositionFilter[] = ["ALL", "DEF", "MID", "FWD", "RUC"];
 
@@ -266,6 +273,63 @@ function LockedCell({ onClick }: { onClick?: () => void }) {
     >
       <Lock size={11} className="text-[#F5C84C]/40 group-hover:text-[#F5C84C]/70 transition-colors" />
     </div>
+  );
+}
+
+function LockedTeaserCell({ label, onClick }: { label: string; onClick?: () => void }) {
+  return (
+    <div
+      className="flex items-center justify-center gap-1 cursor-pointer group"
+      onClick={onClick}
+    >
+      <Lock size={9} className="text-[#F5C84C]/40 shrink-0 group-hover:text-[#F5C84C]/70 transition-colors" />
+      <span className="text-[10px] font-semibold text-[#F5C84C]/50 group-hover:text-[#F5C84C]/80 transition-colors whitespace-nowrap">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+// ─── Upgrade Modal ─────────────────────────────────────────────────────────────
+
+function UpgradeModal({ onClose }: { onClose: () => void }) {
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-sm rounded-2xl border border-[#F5C84C]/30 bg-[#0e0e0e] p-7 shadow-2xl text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button onClick={onClose} className="absolute right-4 top-4 text-white/30 hover:text-white/70 transition-colors">
+          <X size={16} />
+        </button>
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30 mx-auto mb-4">
+          <Crown size={22} className="text-[#F5C84C]" />
+        </div>
+        <h3 className="text-lg font-bold text-white mb-2">Unlock Neeko+</h3>
+        <p className="text-sm text-white/50 leading-relaxed mb-5">
+          Access Value and Projection rankings, full price data, AI recommendations, and complete analysis for every player.
+        </p>
+        <div className="space-y-2 text-left mb-5">
+          {["Value & Projection filter modes", "Full player price & value scores", "AI recommendations for all players", "Search & advanced position filters", "Captain ratings & ceiling/floor data"].map((f) => (
+            <div key={f} className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#F5C84C] shrink-0" />
+              <span className="text-xs text-white/60">{f}</span>
+            </div>
+          ))}
+        </div>
+        <a
+          href="/neeko-plus"
+          className="block w-full bg-[#F5C84C] text-black font-bold rounded-xl py-3 text-sm hover:brightness-110 transition-all"
+        >
+          Upgrade to Neeko+
+        </a>
+        <button onClick={onClose} className="mt-3 text-xs text-white/30 hover:text-white/50 transition-colors">
+          Maybe later
+        </button>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -797,6 +861,7 @@ export default function AFLRankingsPage() {
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
   const [searchTerm, setSearchTerm] = useState("");
   const [selected, setSelected] = useState<(RankingRow & { _rank: number; _unlocked: boolean }) | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const fetchRankings = useCallback(async () => {
     setLoading(true);
@@ -854,17 +919,24 @@ export default function AFLRankingsPage() {
     return idx < FREE_UNLOCKED_ROWS;
   }
 
-  function cellValue(row: RankingRow, colKey: string, idx: number): "unlocked" | "locked_free" | "locked_premium" {
+  function cellValue(row: RankingRow, colKey: string, idx: number): "unlocked" | "locked_teaser" | "locked_plain" {
     if (isPremium) return "unlocked";
     if (isFreeRow(idx)) return "unlocked";
-    if (isPremiumColumn(colKey)) return "locked_premium";
+    if (isPremiumColumn(colKey)) return "locked_teaser";
     return "unlocked";
   }
 
-  function renderLockedOrValue(row: RankingRow, colKey: string, idx: number, render: () => React.ReactNode): React.ReactNode {
+  function renderLockedOrValue(
+    row: RankingRow,
+    colKey: string,
+    idx: number,
+    render: () => React.ReactNode,
+    teaserLabel?: string
+  ): React.ReactNode {
     const state = cellValue(row, colKey, idx);
-    if (state === "locked_premium") {
-      return <LockedCell onClick={() => { window.location.href = "/neeko-plus"; }} />;
+    if (state === "locked_teaser") {
+      const label = teaserLabel ?? "Neeko+";
+      return <LockedTeaserCell label={label} onClick={() => setShowUpgradeModal(true)} />;
     }
     return render();
   }
@@ -923,24 +995,22 @@ export default function AFLRankingsPage() {
       </td>
     );
 
+    const teaserIdx = Math.min(idx - FREE_UNLOCKED_ROWS, LOCKED_TEASERS.price.length - 1);
+
     const confCell = (
       <td key="conf" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
-        {renderLockedOrValue(row, "projection_confidence", idx, () => (
-          <span className={`text-sm font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
-            {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
-          </span>
-        ))}
+        <span className={`text-sm font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
+          {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
+        </span>
       </td>
     );
 
     const riskBadge = getRiskBadge(Number(row.risk_rating) ?? null);
     const riskCell = (
       <td key="risk" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
-        {renderLockedOrValue(row, "risk_rating", idx, () => (
-          <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${riskBadge.text} ${riskBadge.bg} ${riskBadge.border}`}>
-            {riskBadge.label}
-          </span>
-        ))}
+        <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${riskBadge.text} ${riskBadge.bg} ${riskBadge.border}`}>
+          {riskBadge.label}
+        </span>
       </td>
     );
 
@@ -958,7 +1028,8 @@ export default function AFLRankingsPage() {
             >
               {row.ai_recommendation}
             </span>
-          ) : <span className="text-white/20 text-xs">—</span>
+          ) : <span className="text-white/20 text-xs">—</span>,
+          LOCKED_TEASERS.ai_rec[teaserIdx]
         )}
       </td>
     );
@@ -967,7 +1038,7 @@ export default function AFLRankingsPage() {
       <td key="why" className="px-4 py-3 text-left align-middle" style={{ minWidth: 160 }}>
         {renderLockedOrValue(row, "recommendation_why", idx, () => (
           <span className="text-xs text-white/60 line-clamp-2 leading-snug">{row.recommendation_why ?? "—"}</span>
-        ))}
+        ), LOCKED_TEASERS.why[teaserIdx])}
       </td>
     );
 
@@ -975,7 +1046,7 @@ export default function AFLRankingsPage() {
       <td key="price" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 110, minWidth: 90 }}>
         {renderLockedOrValue(row, "price", idx, () => (
           <span className="text-sm font-semibold text-white/70 tabular-nums">{fmtPrice(row.price)}</span>
-        ))}
+        ), LOCKED_TEASERS.price[teaserIdx])}
       </td>
     );
 
@@ -993,7 +1064,7 @@ export default function AFLRankingsPage() {
               </span>
             )}
           </div>
-        ))}
+        ), LOCKED_TEASERS.value[teaserIdx])}
       </td>
     );
 
@@ -1002,11 +1073,11 @@ export default function AFLRankingsPage() {
         {rankCell}
         {playerCell}
         {neekoCell}
-        {priceCell}
         {projCell}
-        {valueCell}
         {confCell}
         {riskCell}
+        {priceCell}
+        {valueCell}
         {aiRecCell}
         {whyCell}
       </tr>
@@ -1018,12 +1089,12 @@ export default function AFLRankingsPage() {
       <tr className="border-b border-[#222]">
         <th className={`${TH} text-white/40`} style={{ width: 52, minWidth: 52 }}>#</th>
         <th className={`${TH} text-left text-white/40`} style={{ width: 240, minWidth: 200 }}>Player</th>
-        <Th label="Neeko Rating" gold width={140} tooltip="Composite intelligence score: projection + upside + consistency + matchup" />
-        <Th label="Price" locked={!isPremium} width={110} />
+        <Th label="Neeko Rating" gold width={140} tooltip="Neeko Rating combines projection, matchup difficulty, consistency, risk, and AI intelligence to identify the best fantasy picks each round." />
         <Th label="Projection" width={100} />
-        <Th label="Value Score" locked={!isPremium} width={120} tooltip="Points per dollar — higher is better value" />
-        <Th label="Confidence" locked={!isPremium} width={100} tooltip="AI certainty in the projection" />
-        <Th label="Risk" locked={!isPremium} width={100} />
+        <Th label="Confidence" width={100} tooltip="AI certainty in the projection" />
+        <Th label="Risk" width={100} />
+        <Th label="Price" locked={!isPremium} width={110} />
+        <Th label="Value" locked={!isPremium} width={120} tooltip="Points per dollar — higher is better value" />
         <Th label="AI Rec" locked={!isPremium} width={150} />
         <Th label="Why" locked={!isPremium} />
       </tr>
@@ -1066,24 +1137,38 @@ export default function AFLRankingsPage() {
         )}
       </div>
 
-      <CaptainTeaserCard isPremium={isPremium} />
+      <CaptainSection isPremium={isPremium} onUpgradeClick={() => setShowUpgradeModal(true)} />
+
+      {showUpgradeModal && <UpgradeModal onClose={() => setShowUpgradeModal(false)} />}
 
       <div className="px-4 pb-10 md:px-8">
         <div className="mb-3">
           <div className="flex gap-2 flex-wrap">
-            {(["best", "value", "projection"] as RankingsTab[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => handleTabChange(tab)}
-                className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
-                  activeTab === tab
-                    ? "bg-[#F5C84C] text-black shadow-[0_0_12px_rgba(245,200,76,0.3)]"
-                    : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10 hover:text-white/80"
-                }`}
-              >
-                {tab === "best" ? "Best Picks" : tab === "value" ? "Value" : "Projection"}
-              </button>
-            ))}
+            {(["best", "value", "projection"] as RankingsTab[]).map((tab) => {
+              const isLocked = !isPremium && tab !== "best";
+              const isActive = activeTab === tab;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => {
+                    if (isLocked) { setShowUpgradeModal(true); return; }
+                    handleTabChange(tab);
+                  }}
+                  className={`relative rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
+                    isActive
+                      ? "bg-[#F5C84C] text-black shadow-[0_0_12px_rgba(245,200,76,0.3)]"
+                      : isLocked
+                      ? "bg-white/5 text-white/30 border border-white/8 cursor-pointer hover:border-[#F5C84C]/30"
+                      : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10 hover:text-white/80"
+                  }`}
+                >
+                  {tab === "best" ? "Best Picks" : tab === "value" ? "Value" : "Projection"}
+                  {isLocked && (
+                    <Lock size={9} className="inline-block ml-1.5 text-[#F5C84C]/50 relative -top-px" />
+                  )}
+                </button>
+              );
+            })}
           </div>
           <p className="mt-2 text-xs text-white/40 leading-relaxed">{TAB_DESCRIPTIONS[activeTab]}</p>
         </div>
@@ -1096,11 +1181,12 @@ export default function AFLRankingsPage() {
               placeholder={isPremium ? "Search player…" : "Search player… (Neeko+ only)"}
               value={searchTerm}
               onChange={(e) => { if (isPremium) setSearchTerm(e.target.value); }}
-              disabled={!isPremium}
+              onClick={() => { if (!isPremium) setShowUpgradeModal(true); }}
+              readOnly={!isPremium}
               className={`w-full bg-zinc-900 border border-zinc-700 rounded-xl pl-10 pr-10 py-3 text-white placeholder:text-white/30 focus:outline-none transition-colors ${
                 isPremium
                   ? "focus:ring-1 focus:border-[#F5C84C] focus:ring-[#F5C84C]"
-                  : "opacity-50 cursor-not-allowed"
+                  : "opacity-50 cursor-pointer"
               }`}
             />
             {isPremium && searchTerm && (
@@ -1174,7 +1260,38 @@ export default function AFLRankingsPage() {
                         ))}
                       </tr>
                     ))
-                  : displayRows.map((row, idx) => renderRow(row, idx))
+                  : displayRows.map((row, idx) => {
+                      if (!isPremium && idx >= FREE_PARTIAL_ROWS) {
+                        return (
+                          <tr
+                            key={row.player_id ?? `blurred-${idx}`}
+                            className="border-b border-white/[0.04] relative cursor-pointer"
+                            onClick={() => setShowUpgradeModal(true)}
+                          >
+                            <td
+                              colSpan={TOTAL_COLS}
+                              className="px-4 py-3 select-none"
+                            >
+                              <div className="blur-sm pointer-events-none flex items-center gap-6">
+                                <span className="text-sm text-white/20 w-8 tabular-nums text-center">{idx + 1}</span>
+                                <span className="text-sm font-medium text-white/30 w-40">Player {idx + 1}</span>
+                                <span className="text-sm text-[#F5C84C]/20 w-20 tabular-nums">—</span>
+                                <span className="text-sm text-white/20 w-16 tabular-nums">—</span>
+                                <span className="text-sm text-white/20 w-16 tabular-nums">—</span>
+                                <span className="text-sm text-white/20 w-16 tabular-nums">—</span>
+                              </div>
+                              <div className="absolute inset-0 flex items-center justify-center gap-2">
+                                <Lock size={11} className="text-[#F5C84C]/50 shrink-0" />
+                                <span className="text-[11px] font-semibold text-[#F5C84C]/60">
+                                  Unlock with Neeko+
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
+                      return renderRow(row, idx);
+                    })
                 }
               </tbody>
             </table>
