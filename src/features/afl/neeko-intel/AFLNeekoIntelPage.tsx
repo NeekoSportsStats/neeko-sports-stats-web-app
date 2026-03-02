@@ -23,6 +23,7 @@ import {
   NeekoIntelCard,
   NeekoIntelSkeletonCard,
 } from "./NeekoIntelCard";
+import { NeekoIntelCaptainModule } from "./components/NeekoIntelCaptainModule";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1153,26 +1154,8 @@ export default function AFLNeekoIntelPage() {
             {/* ── Round Insight ── */}
             {!loading && <RoundInsightBanner row={roundInsight} />}
 
-            {/* ── Elite Captain Locks Hero ── */}
-            <EliteCaptainHero rows={captains} loading={loading} isPremium={isPremium} />
-
-            {/* ── Captain Picks ── */}
-            <Section>
-              <SectionHeader
-                icon={<Crown size={16} />}
-                title="Captain Picks"
-                subtitle="Top-ranked captain options by captain score"
-                locked={!isPremium}
-              />
-              <PlayerCardList
-                rows={captains}
-                loading={loading}
-                error={fetchError}
-                isPremium={isPremium}
-                emptyMessage="No strong captain picks detected yet"
-                onRetry={loadPlayers}
-              />
-            </Section>
+            {/* ── Captain Picks Module ── */}
+            <NeekoIntelCaptainModule isPremium={isPremium} />
 
             {/* ── Match Intelligence ── */}
             <Section>

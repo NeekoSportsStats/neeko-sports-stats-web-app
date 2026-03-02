@@ -5,6 +5,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Dot } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
+import { CaptainTeaserCard } from "./components/CaptainTeaserCard";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1065,7 +1066,7 @@ export default function AFLRankingsPage() {
         )}
       </div>
 
-      <CaptainSection isPremium={isPremium} onUpgradeClick={() => { window.location.href = "/neeko-plus"; }} />
+      <CaptainTeaserCard isPremium={isPremium} />
 
       <div className="px-4 pb-10 md:px-8">
         <div className="mb-3">
