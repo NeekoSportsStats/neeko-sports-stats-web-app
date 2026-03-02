@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Search, TrendingUp, Target, Users, ChevronRight, Sparkles, Lock, ArrowLeft, Info, Brain } from "lucide-react";
+import { getAflRoundLabel } from "@/features/afl/shared/data/getAflRoundLabel";
 import { supabase } from "@/lib/supabaseClient";
 import FantasyVerdictBadge from "@/components/FantasyVerdictBadge";
 import { PremiumGate, PremiumGateCTA } from "@/components/PremiumGate";
@@ -1242,7 +1243,7 @@ export default function AFLAIInsightsPage() {
                         <h3 className="text-2xl font-bold text-white">{selectedTeam}</h3>
                         {!isLockedTeam && teamSummary && (
                           <div className="text-xs text-neutral-500 mt-1">
-                            {teamSummary.season} Season · Round {teamSummary.round_number}
+                            {teamSummary.season} Season · {getAflRoundLabel(teamSummary.round_number)}
                           </div>
                         )}
                       </div>
@@ -1654,7 +1655,7 @@ export default function AFLAIInsightsPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
-                          <div className="text-xs text-white/50">Round {match.round_number}</div>
+                          <div className="text-xs text-white/50">{getAflRoundLabel(match.round_number)}</div>
                           {isLocked && <Lock className="h-3 w-3 text-[#F5C84C] flex-shrink-0" />}
                         </div>
                         <div className="font-semibold text-sm leading-tight">
@@ -1750,7 +1751,7 @@ export default function AFLAIInsightsPage() {
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <div className="flex items-center gap-2 text-xs font-semibold text-[#F5C84C]/70 uppercase tracking-widest mb-2">
-                        Match Fantasy Prediction · Round {match.round_number}
+                        Match Fantasy Prediction · {getAflRoundLabel(match.round_number)}
                         {isLockedMatch && <Lock className="h-3 w-3 text-[#F5C84C]" />}
                       </div>
                       <h3 className="text-2xl font-bold text-white">

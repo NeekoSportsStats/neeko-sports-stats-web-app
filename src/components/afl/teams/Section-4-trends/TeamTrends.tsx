@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { MOCK_TEAMS } from "../data/mockTeams";
 import { TrendingUp, Shield, Activity, MoveVertical } from "lucide-react";
+import { getAflRoundLabel } from "@/features/afl/shared/data/getAflRoundLabel";
 
 /* -------------------------------------------------------------------------- */
 /*                               Tooltip helpers                              */
@@ -71,7 +72,7 @@ function TrendTooltipPortal({ tooltip }: { tooltip: TooltipPayload | null }) {
       }}
     >
       <div className="text-[8px] uppercase tracking-wider text-neutral-400">
-        Round {tooltip.round}
+        {getAflRoundLabel(tooltip.round)}
       </div>
       <div className="font-semibold">
         {formatTooltipValue(tooltip.value, tooltip.unit)}

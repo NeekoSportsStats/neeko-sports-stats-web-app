@@ -5,6 +5,7 @@
  * Finals: Rounds 25-28
  */
 export function getAflRoundLabel(roundNumber: number): string {
+  if (roundNumber === 0) return "Opening Round";
   if (roundNumber <= 24) {
     return `Round ${roundNumber}`;
   }
