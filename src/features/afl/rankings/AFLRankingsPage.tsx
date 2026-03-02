@@ -921,12 +921,38 @@ function UpgradeCTABanner({
   );
 }
 
+// ─── Risk badge helper ────────────────────────────────────────────────────────
+
+function getRiskBadge(risk: string | null | undefined): { label: string; text: string; bg: string; border: string } {
+  if (risk == null) return { label: "—", text: "text-white/30", bg: "bg-transparent", border: "border-transparent" };
+  const n = typeof risk === "string" ? parseFloat(risk) : (risk as unknown as number);
+  if (isNaN(n)) return { label: "—", text: "text-white/30", bg: "bg-transparent", border: "border-transparent" };
+  if (n >= 75) return { label: "HIGH RISK", text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" };
+  if (n >= 50) return { label: "RISKY", text: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/30" };
+  return { label: "SAFE", text: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30" };
+}
+
+// ─── Mode descriptions ────────────────────────────────────────────────────────
+
+const MODE_DESCRIPTIONS: Record<RankingsMode, string> = {
+  best: "Best overall picks based on AI projection, value, and confidence",
+  value: "Most underpriced players based on price vs projected score",
+  projection: "Highest projected fantasy scorers this round",
+};
+
+// ─── Mode column configs ──────────────────────────────────────────────────────
+
+type RankingsMode = "best" | "value" | "projection";
+
+const FREE_LIMIT = 10;
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AFLRankingsPage() {
   const { isPremium } = useAuth();
   const isMobile = useIsMobile();
 
+  const [mode, setMode] = useState<RankingsMode>("best");
   const [rows, setRows] = useState<RankingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("projection_final");
@@ -998,6 +1024,16 @@ export default function AFLRankingsPage() {
     fetchRankings();
   }, [isPremium, positionFilter]);
 
+  // Reset sort when mode changes
+  useEffect(() => {
+    if (mode === "best") { setSortKey("projection_final"); setSortDir("desc"); }
+    if (mode === "value") { setSortKey("value_score"); setSortDir("desc"); }
+    if (mode === "projection") { setSortKey("projection_final"); setSortDir("desc"); }
+    setValueFilter("ALL");
+    setConsistencyFilter("ALL");
+    setSearchTerm("");
+  }, [mode]);
+
   function handleSort(key: SortKey) {
     if (key === sortKey) {
       setSortDir((d) => (d === "desc" ? "asc" : "desc"));
@@ -1007,15 +1043,38 @@ export default function AFLRankingsPage() {
     }
   }
 
+  // ── Derive the 3 mode lists from raw rows ─────────────────────────────────
+
   const posFiltered = !isPremium
     ? rows
     : positionFilter === "ALL"
     ? rows
     : rows.filter((r) => r.position === positionFilter);
 
+  const bestPicks = [...posFiltered]
+    .filter((r) => r.ai_recommendation !== "AVOID")
+    .sort((a, b) => (b.projection_final ?? 0) - (a.projection_final ?? 0))
+    .slice(0, 80);
+
+  const valueList = [...posFiltered]
+    .filter((r) => r.value_score != null)
+    .sort((a, b) => (Number(b.value_score) || 0) - (Number(a.value_score) || 0))
+    .slice(0, 60);
+
+  const projectionList = [...posFiltered]
+    .sort((a, b) => (b.projection_final ?? 0) - (a.projection_final ?? 0))
+    .slice(0, 80);
+
+  const modeList =
+    mode === "best" ? bestPicks :
+    mode === "value" ? valueList :
+    projectionList;
+
+  // ── Apply filters on top of mode list ────────────────────────────────────
+
   const valueFiltered = !isPremium || valueFilter === "ALL"
-    ? posFiltered
-    : posFiltered.filter((r) => r.value_tier === valueFilter);
+    ? modeList
+    : modeList.filter((r) => r.value_tier === valueFilter);
 
   const consistencyFiltered = !isPremium || consistencyFilter === "ALL"
     ? valueFiltered
@@ -1031,9 +1090,264 @@ export default function AFLRankingsPage() {
     return sortDir === "desc" ? bv - av : av - bv;
   });
 
-  const visibleRows = isPremium ? sorted : sorted.slice(0, FREE_ROW_LIMIT);
+  const visibleRows = isPremium ? sorted : sorted.slice(0, FREE_LIMIT);
+  const lockedRows = isPremium ? [] : sorted.slice(FREE_LIMIT, FREE_ROW_LIMIT);
 
-  const TOTAL_COLS = 10;
+  // ── Column count per mode ─────────────────────────────────────────────────
+  const TOTAL_COLS =
+    mode === "best" ? 8 :
+    mode === "value" ? 7 :
+    7;
+
+  // ── Table row renderer ────────────────────────────────────────────────────
+
+  function renderRow(row: RankingRow, idx: number, isLockedRow = false) {
+    const rank = idx + 1;
+    const isLocked = isLockedRow || (!isPremium && idx >= FREE_UNLOCKED_METRICS);
+    const metricsUnlocked = !isLocked;
+    const valueFree = !isPremium && idx < FREE_UNLOCKED_METRICS;
+    const valueUnlocked = isPremium || valueFree;
+    const isEliteCaptain = row.ai_recommendation === "ELITE CAPTAIN";
+    const recColor = row.recommendation_color ?? null;
+    const capStyle = getCaptainStyle(row.captain_rating ?? null);
+    const riskBadge = getRiskBadge(row.risk_rating ?? null);
+
+    const rowClass = isLockedRow
+      ? "border-b border-white/[0.02] cursor-pointer select-none"
+      : `border-b border-white/[0.04] transition-all duration-150 cursor-pointer hover:bg-white/5 hover:shadow-[0_0_12px_rgba(245,200,76,0.1)]${isEliteCaptain ? " bg-[#120E00]" : ""}`;
+
+    const rankCell = (
+      <td className="px-4 py-3 text-sm text-white/30 tabular-nums text-center whitespace-nowrap w-10">
+        {isLockedRow ? <Lock size={12} className="mx-auto text-white/15" /> : rank}
+      </td>
+    );
+
+    const playerCell = (
+      <td className="px-4 py-3 min-w-[160px] whitespace-nowrap">
+        {isLockedRow ? (
+          <div className="space-y-1">
+            <div className="h-3.5 w-32 rounded bg-white/[0.04]" />
+            <div className="h-2.5 w-20 rounded bg-white/[0.03]" />
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-white">{row.player_name}</span>
+              {!isPremium && !isLocked && (
+                <span className="rounded-sm bg-[#F5C84C]/15 px-1 py-0.5 text-[9px] font-semibold text-[#F5C84C] uppercase tracking-wide">Free</span>
+              )}
+            </div>
+            <div className="text-[11px] text-white/40 mt-0.5">
+              {row.team}{row.position ? ` · ${row.position}` : ""}
+            </div>
+          </div>
+        )}
+      </td>
+    );
+
+    const projCell = (
+      <td className="px-4 py-3 text-center whitespace-nowrap">
+        {isLockedRow
+          ? <div className="h-4 w-10 mx-auto rounded bg-white/[0.04]" />
+          : <span className="text-sm font-semibold text-[#F5C84C] tabular-nums">{fmt(row.projection_final)}</span>
+        }
+      </td>
+    );
+
+    const priceCell = (
+      <td className="px-4 py-3 text-center whitespace-nowrap">
+        {isLockedRow ? <div className="h-4 w-12 mx-auto rounded bg-white/[0.04]" />
+          : !valueUnlocked ? <LockedCell />
+          : <span className="text-sm font-semibold text-white/60 tabular-nums">{fmtPrice(row.price)}</span>
+        }
+      </td>
+    );
+
+    const valueCell = (
+      <td className="px-4 py-3 text-center whitespace-nowrap">
+        {isLockedRow ? <div className="h-4 w-14 mx-auto rounded bg-white/[0.04]" />
+          : !valueUnlocked ? <LockedCell />
+          : (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className={`text-sm font-bold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
+                {row.value_score != null ? Number(row.value_score).toFixed(2) : "—"}
+              </span>
+              {row.value_tag && (() => {
+                const s = getValueTagStyle(row.value_tag);
+                return (
+                  <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${s.text} ${s.bg} ${s.border}`}>
+                    {row.value_tag}
+                  </span>
+                );
+              })()}
+            </div>
+          )
+        }
+      </td>
+    );
+
+    const confidenceCell = (
+      <td className="px-4 py-3 text-center whitespace-nowrap">
+        {isLockedRow ? <div className="h-4 w-10 mx-auto rounded bg-white/[0.04]" />
+          : !metricsUnlocked ? <LockedCell />
+          : <span className={`text-sm font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
+              {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
+            </span>
+        }
+      </td>
+    );
+
+    const captainCell = (
+      <td className="px-4 py-3 text-center whitespace-nowrap">
+        {isLockedRow ? <div className="h-5 w-20 mx-auto rounded bg-white/[0.04]" />
+          : !metricsUnlocked ? <LockedCell />
+          : row.captain_rating ? (
+            <span className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${capStyle.text} ${capStyle.bg} ${capStyle.border}`}>
+              {capStyle.icon} {row.captain_rating}
+            </span>
+          ) : <span className="text-white/20 text-xs">—</span>
+        }
+      </td>
+    );
+
+    const riskCell = (
+      <td className="px-4 py-3 text-center whitespace-nowrap">
+        {isLockedRow ? <div className="h-5 w-16 mx-auto rounded bg-white/[0.04]" />
+          : !metricsUnlocked ? <LockedCell />
+          : (
+            <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${riskBadge.text} ${riskBadge.bg} ${riskBadge.border}`}>
+              {riskBadge.label}
+            </span>
+          )
+        }
+      </td>
+    );
+
+    const aiRecCell = (
+      <td className={`px-4 py-3 text-center whitespace-nowrap${isEliteCaptain ? " bg-[#1A1400]" : ""}`}>
+        {isLockedRow ? <div className="h-5 w-24 mx-auto rounded bg-white/[0.04]" />
+          : !metricsUnlocked ? <LockedCell />
+          : row.ai_recommendation ? (
+            <span
+              className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap${isEliteCaptain ? " elite-captain-badge" : ""}`}
+              style={isEliteCaptain ? {
+                color: "#F5C84C",
+                background: "linear-gradient(90deg, #3A2A00, #5A4200, #3A2A00)",
+                borderColor: "#F5C84C",
+              } : recColor ? {
+                color: recColor,
+                background: `${recColor}18`,
+                borderColor: `${recColor}40`,
+              } : {
+                color: "rgba(255,255,255,0.3)",
+                background: "rgba(255,255,255,0.05)",
+                borderColor: "rgba(255,255,255,0.1)",
+              }}
+            >
+              {row.ai_recommendation}
+            </span>
+          ) : <span className="text-white/20 text-xs">—</span>
+        }
+      </td>
+    );
+
+    const whyCell = (
+      <td className="px-4 py-3 text-left align-middle min-w-[200px] max-w-[260px] whitespace-normal">
+        {isLockedRow ? (
+          <div className="space-y-1">
+            <div className="h-2.5 w-full rounded bg-white/[0.04]" />
+            <div className="h-2.5 w-3/4 rounded bg-white/[0.04]" />
+          </div>
+        ) : isPremium || idx < FREE_UNLOCKED_METRICS ? (
+          <span className="text-xs text-white/60 line-clamp-2 leading-snug">{row.recommendation_why ?? "—"}</span>
+        ) : (
+          <span className="blur-sm select-none text-xs text-white/50 line-clamp-2">AI insight available with Neeko+</span>
+        )}
+      </td>
+    );
+
+    const matchupCell = (
+      <td className="px-4 py-3 text-center whitespace-nowrap">
+        {isLockedRow ? <div className="h-4 w-10 mx-auto rounded bg-white/[0.04]" />
+          : !metricsUnlocked ? <LockedCell />
+          : <span className={`text-sm font-semibold tabular-nums ${getMatchupColor(row.matchup_rating ?? null)}`}>
+              {row.matchup_rating != null ? fmtInt(row.matchup_rating) : "—"}
+            </span>
+        }
+      </td>
+    );
+
+    const handleClick = isLockedRow
+      ? () => { window.location.href = "/neeko-plus"; }
+      : () => setSelected({ ...row, _rank: rank, _unlocked: !isLocked } as RankingRow & { _rank: number; _unlocked: boolean });
+
+    if (mode === "best") {
+      return (
+        <tr key={(row.player_id ?? row.player_name) + idx} className={rowClass} onClick={handleClick}>
+          {rankCell}{playerCell}{projCell}{confidenceCell}{valueCell}{riskCell}{aiRecCell}{whyCell}
+        </tr>
+      );
+    }
+    if (mode === "value") {
+      return (
+        <tr key={(row.player_id ?? row.player_name) + idx} className={rowClass} onClick={handleClick}>
+          {rankCell}{playerCell}{priceCell}{projCell}{valueCell}{riskCell}{whyCell}
+        </tr>
+      );
+    }
+    // projection mode
+    return (
+      <tr key={(row.player_id ?? row.player_name) + idx} className={rowClass} onClick={handleClick}>
+        {rankCell}{playerCell}{projCell}{captainCell}{confidenceCell}{matchupCell}{riskCell}{aiRecCell}
+      </tr>
+    );
+  }
+
+  // ── Column headers per mode ───────────────────────────────────────────────
+
+  function renderHeaders() {
+    const base = (
+      <>
+        <th className={`${TH_BASE} text-white/40 w-10`}>#</th>
+        <th className={`${TH_BASE} text-left text-white/40 min-w-[160px]`}>Player</th>
+      </>
+    );
+
+    if (mode === "best") return (
+      <tr className="border-b border-[#222]">
+        {base}
+        <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
+        <PlainTh label="Confidence" locked={!isPremium} />
+        <PlainTh label="Value" locked={!isPremium} />
+        <PlainTh label="Risk" locked={!isPremium} />
+        <PlainTh label="AI Rec" locked={!isPremium} />
+        <PlainTh label="Why" locked={!isPremium} />
+      </tr>
+    );
+
+    if (mode === "value") return (
+      <tr className="border-b border-[#222]">
+        {base}
+        <SortTh label="Price" sortKey="price" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
+        <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
+        <SortTh label="Value Score" sortKey="value_score" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
+        <PlainTh label="Risk" locked={!isPremium} />
+        <PlainTh label="Why" locked={!isPremium} />
+      </tr>
+    );
+
+    return (
+      <tr className="border-b border-[#222]">
+        {base}
+        <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
+        <PlainTh label="Captain" locked={!isPremium} />
+        <PlainTh label="Confidence" locked={!isPremium} />
+        <PlainTh label="Matchup" locked={!isPremium} />
+        <PlainTh label="Risk" locked={!isPremium} />
+        <PlainTh label="AI Rec" locked={!isPremium} />
+      </tr>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
@@ -1043,7 +1357,6 @@ export default function AFLRankingsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white">Player Rankings</h1>
             <p className="mt-1 text-sm text-white/40">AFL 2026 — Fantasy projection rankings</p>
-            <p className="mt-1 text-sm text-zinc-500">AI-powered fantasy projections updated weekly using advanced statistical modelling and matchup analysis.</p>
           </div>
           {!isPremium && (
             <a
@@ -1057,27 +1370,16 @@ export default function AFLRankingsPage() {
         </div>
 
         {!isPremium && (
-          <div className="mt-4 space-y-3">
-            <div className="rounded-lg border border-white/5 bg-white/[0.03] px-4 py-3">
-              <p className="text-xs text-white/40">
-                Free tier: top 20 players shown per position. Captain Rating, Form, Matchup, Upside & AI analysis available with{" "}
-                <span className="text-[#F5C84C]">Neeko+</span>.
-              </p>
-            </div>
-            <div className="rounded-xl border border-[#F5C84C]/20 bg-gradient-to-r from-[#F5C84C]/10 to-transparent px-5 py-4">
-              <p className="text-sm font-semibold text-white mb-1">Take your AFL Fantasy team to elite level</p>
-              <p className="text-xs text-white/50 mb-3">Neeko+ unlocks full AI player analysis, captain recommendations, matchup insights, and projection confidence for every player.</p>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <a
-                  href="/neeko-plus"
-                  className="inline-flex items-center gap-1.5 bg-[#F5C84C] text-black font-semibold rounded-lg hover:brightness-110 transition-all duration-150 px-4 py-2 text-sm"
-                >
-                  <Crown size={13} />
-                  Upgrade to Neeko+
-                </a>
-                <p className="text-xs text-white/40">Trusted by serious AFL Fantasy players</p>
-              </div>
-            </div>
+          <div className="mt-4 rounded-xl border border-[#F5C84C]/20 bg-gradient-to-r from-[#F5C84C]/10 to-transparent px-5 py-4">
+            <p className="text-sm font-semibold text-white mb-1">Take your AFL Fantasy team to elite level</p>
+            <p className="text-xs text-white/50 mb-3">Neeko+ unlocks full AI player analysis, captain picks, matchup insights, and projections for every player.</p>
+            <a
+              href="/neeko-plus"
+              className="inline-flex items-center gap-1.5 bg-[#F5C84C] text-black font-semibold rounded-lg hover:brightness-110 transition-all duration-150 px-4 py-2 text-sm"
+            >
+              <Crown size={13} />
+              Upgrade to Neeko+
+            </a>
           </div>
         )}
       </div>
@@ -1085,12 +1387,28 @@ export default function AFLRankingsPage() {
       {/* Captain Recommendations */}
       <CaptainSection isPremium={isPremium} />
 
-      <div className="md:hidden text-center text-xs text-white/30 mt-2 mb-1 pb-2">
-        Swipe left to scroll all columns · tap any player for full AI breakdown
-      </div>
-
       {/* Rankings Table */}
       <div className="px-4 pb-10 md:px-8">
+
+        {/* Mode Switcher */}
+        <div className="mb-3">
+          <div className="flex gap-2 flex-wrap">
+            {(["best", "value", "projection"] as RankingsMode[]).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
+                  mode === m
+                    ? "bg-[#F5C84C] text-black shadow-[0_0_12px_rgba(245,200,76,0.3)]"
+                    : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10 hover:text-white/80"
+                }`}
+              >
+                {m === "best" ? "Best Picks" : m === "value" ? "Value" : "Projection"}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-white/40 leading-relaxed">{MODE_DESCRIPTIONS[mode]}</p>
+        </div>
 
         {/* Search bar */}
         <div className="mb-4">
@@ -1098,13 +1416,11 @@ export default function AFLRankingsPage() {
             <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/40 w-4 h-4" />
             <input
               type="text"
-              placeholder={isPremium ? "Search player…" : "Search all 800+ players (Neeko+)"}
+              placeholder={isPremium ? "Search player…" : "Search all players (Neeko+)"}
               value={searchTerm}
               disabled={!isPremium}
               onChange={(e) => setSearchTerm(e.target.value)}
-              onClick={() => {
-                if (!isPremium) window.location.href = "/neeko-plus";
-              }}
+              onClick={() => { if (!isPremium) window.location.href = "/neeko-plus"; }}
               className={`w-full bg-zinc-900 border rounded-xl pl-10 pr-28 py-3 text-white placeholder:text-white/30 focus:outline-none focus:ring-1 transition-colors${
                 isPremium
                   ? " border-zinc-700 focus:border-[#F5C84C] focus:ring-[#F5C84C]"
@@ -1129,17 +1445,84 @@ export default function AFLRankingsPage() {
               </button>
             )}
           </div>
-          {!isPremium && (
-            <p className="mt-1.5 text-[11px] text-zinc-500 pl-1">
-              Neeko+ unlocks full player search, AI analysis, and projections for all 800+ players.
-            </p>
-          )}
         </div>
 
-        {/* Sort + Filter Controls */}
-        {isPremium && (
-          <div className="mb-4 space-y-2.5">
-            {/* Row 1: Sort */}
+        {/* Filter Controls — premium only, filters disabled for free users */}
+        <div className="mb-4 space-y-2.5">
+          {/* Position */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-20 shrink-0">Position</span>
+            {POSITIONS.map((pos) => (
+              <button
+                key={pos}
+                onClick={() => isPremium && setPositionFilter(pos)}
+                disabled={!isPremium}
+                title={!isPremium ? "Premium feature" : undefined}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  !isPremium
+                    ? "bg-white/5 text-white/20 cursor-not-allowed opacity-50"
+                    : positionFilter === pos
+                    ? "bg-[#F5C84C] text-black"
+                    : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80"
+                }`}
+              >
+                {pos}
+              </button>
+            ))}
+            {!isPremium && <span className="text-[10px] text-white/25 flex items-center gap-1"><Lock size={9} />Neeko+</span>}
+          </div>
+          {/* Value filter */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-20 shrink-0">Value</span>
+            {(["ALL", "ELITE", "GOOD", "POOR"] as ValueFilter[]).map((v) => (
+              <button
+                key={v}
+                onClick={() => isPremium && setValueFilter(v)}
+                disabled={!isPremium}
+                title={!isPremium ? "Premium feature" : undefined}
+                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                  !isPremium
+                    ? "bg-white/5 text-white/20 cursor-not-allowed opacity-50 border border-transparent"
+                    : valueFilter === v
+                    ? v === "ELITE" ? "bg-green-500/20 text-green-300 border border-green-500/40"
+                      : v === "GOOD" ? "bg-[#F5C84C]/20 text-[#F5C84C] border border-[#F5C84C]/40"
+                      : v === "POOR" ? "bg-red-500/20 text-red-400 border border-red-500/40"
+                      : "bg-white/10 text-white/80 border border-white/20"
+                    : "bg-white/5 text-white/40 border border-transparent hover:bg-white/10 hover:text-white/60"
+                }`}
+              >
+                {v === "ALL" ? "All" : v === "ELITE" ? "Elite Value" : v === "GOOD" ? "Good Value" : "Poor Value"}
+              </button>
+            ))}
+            {!isPremium && <span className="text-[10px] text-white/25 flex items-center gap-1"><Lock size={9} />Neeko+</span>}
+          </div>
+          {/* Consistency filter */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-20 shrink-0">Consistency</span>
+            {(["ALL", "ELITE", "GOOD", "POOR"] as ConsistencyFilter[]).map((v) => (
+              <button
+                key={v}
+                onClick={() => isPremium && setConsistencyFilter(v)}
+                disabled={!isPremium}
+                title={!isPremium ? "Premium feature" : undefined}
+                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                  !isPremium
+                    ? "bg-white/5 text-white/20 cursor-not-allowed opacity-50 border border-transparent"
+                    : consistencyFilter === v
+                    ? v === "ELITE" ? "bg-green-500/20 text-green-300 border border-green-500/40"
+                      : v === "GOOD" ? "bg-sky-500/20 text-sky-300 border border-sky-500/40"
+                      : v === "POOR" ? "bg-orange-500/20 text-orange-400 border border-orange-500/40"
+                      : "bg-white/10 text-white/80 border border-white/20"
+                    : "bg-white/5 text-white/40 border border-transparent hover:bg-white/10 hover:text-white/60"
+                }`}
+              >
+                {v === "ALL" ? "All" : v === "ELITE" ? "Elite (80+)" : v === "GOOD" ? "Good (60+)" : "Low (<60)"}
+              </button>
+            ))}
+            {!isPremium && <span className="text-[10px] text-white/25 flex items-center gap-1"><Lock size={9} />Neeko+</span>}
+          </div>
+          {/* Sort (premium only) */}
+          {isPremium && (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-20 shrink-0">Sort By</span>
               <select
@@ -1160,99 +1543,37 @@ export default function AFLRankingsPage() {
                 {sortDir === "desc" ? "High → Low" : "Low → High"}
               </button>
             </div>
-            {/* Row 2: Value filter */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-20 shrink-0">Value</span>
-              {(["ALL", "ELITE", "GOOD", "POOR"] as ValueFilter[]).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setValueFilter(v)}
-                  className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                    valueFilter === v
-                      ? v === "ELITE" ? "bg-green-500/20 text-green-300 border border-green-500/40"
-                        : v === "GOOD" ? "bg-[#F5C84C]/20 text-[#F5C84C] border border-[#F5C84C]/40"
-                        : v === "POOR" ? "bg-red-500/20 text-red-400 border border-red-500/40"
-                        : "bg-white/10 text-white/80 border border-white/20"
-                      : "bg-white/5 text-white/40 border border-transparent hover:bg-white/10 hover:text-white/60"
-                  }`}
-                >
-                  {v === "ALL" ? "All" : v === "ELITE" ? "Elite Value" : v === "GOOD" ? "Good Value" : "Poor Value"}
-                </button>
-              ))}
-            </div>
-            {/* Row 3: Consistency filter */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-20 shrink-0">Consistency</span>
-              {(["ALL", "ELITE", "GOOD", "POOR"] as ConsistencyFilter[]).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setConsistencyFilter(v)}
-                  className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                    consistencyFilter === v
-                      ? v === "ELITE" ? "bg-green-500/20 text-green-300 border border-green-500/40"
-                        : v === "GOOD" ? "bg-sky-500/20 text-sky-300 border border-sky-500/40"
-                        : v === "POOR" ? "bg-orange-500/20 text-orange-400 border border-orange-500/40"
-                        : "bg-white/10 text-white/80 border border-white/20"
-                      : "bg-white/5 text-white/40 border border-transparent hover:bg-white/10 hover:text-white/60"
-                  }`}
-                >
-                  {v === "ALL" ? "All" : v === "ELITE" ? "Elite (80+)" : v === "GOOD" ? "Good (60+)" : "Low (<60)"}
-                </button>
-              ))}
-            </div>
+          )}
+        </div>
+
+        {isMobile && (
+          <div className="text-center text-xs text-white/30 mb-2">
+            Swipe left to scroll · tap any player for full breakdown
           </div>
         )}
 
-        {/* Rankings Table — shared horizontal scroll layout for mobile and desktop */}
-        {isMobile ? (
-        <div className="relative">
-          <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-[#070707] to-transparent z-20" />
-          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-[#070707] to-transparent z-20" />
+        {/* Table */}
+        <div className="relative w-full">
+          {isMobile && (
+            <>
+              <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-[#070707] to-transparent z-20" />
+              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-[#070707] to-transparent z-20" />
+            </>
+          )}
+          {!isMobile && (
+            <>
+              <div className="pointer-events-none absolute top-0 left-0 w-6 h-full bg-gradient-to-r from-[#070707] to-transparent z-20 rounded-l-xl" />
+              <div className="pointer-events-none absolute top-0 right-0 w-6 h-full bg-gradient-to-l from-[#070707] to-transparent z-20 rounded-r-xl" />
+              <p className="text-xs text-zinc-500 mt-2 mb-2">Click any player for full AI breakdown</p>
+            </>
+          )}
           <div
-            className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-[#F5C84C]/30 scrollbar-track-transparent rounded-xl border border-white/5"
-            style={{ WebkitOverflowScrolling: "touch" }}
+            className={`w-full overflow-x-auto scrollbar-thin scrollbar-thumb-[#F5C84C]/30 scrollbar-track-transparent rounded-xl border border-white/5 ${!isMobile ? "overflow-y-auto max-h-[75vh]" : ""}`}
+            style={isMobile ? { WebkitOverflowScrolling: "touch" } : undefined}
           >
-            <table className="min-w-[900px] w-full border-collapse">
+            <table className="min-w-[800px] w-full border-collapse">
               <thead className="sticky top-0 z-30 bg-[#070707] border-b border-[#F5C84C]/20">
-                <tr>
-                  <td colSpan={TOTAL_COLS} className="bg-[#0a0a0a] px-3 py-2 border-b border-white/5">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 mr-1">Position</span>
-                      {POSITIONS.map((pos) => (
-                        <PositionPill
-                          key={pos}
-                          value={pos}
-                          active={positionFilter === pos}
-                          onClick={() => setPositionFilter(pos)}
-                        />
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-                <tr className="border-b border-[#222]">
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C] uppercase tracking-wider w-[50px]">#</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#F5C84C] uppercase tracking-wider w-[220px]">Player</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C] uppercase tracking-wider w-[100px]">Proj</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C]/40 uppercase tracking-wider w-[100px]">
-                    <span className="flex items-center justify-center gap-1"><Lock size={10} />Price</span>
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C]/40 uppercase tracking-wider w-[110px]">
-                    <span className="flex items-center justify-center gap-1"><Lock size={10} />Value</span>
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C] uppercase tracking-wider w-[110px]">Confidence</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C]/40 uppercase tracking-wider w-[140px]">
-                    <span className="flex items-center justify-center gap-1"><Lock size={10} />Captain</span>
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C]/40 uppercase tracking-wider w-[100px]">
-                    <span className="flex items-center justify-center gap-1"><Lock size={10} />Upside</span>
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C]/40 uppercase tracking-wider w-[160px]">
-                    <span className="flex items-center justify-center gap-1"><Lock size={10} />AI Rec</span>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#F5C84C]/40 uppercase tracking-wider w-[280px]">
-                    <span className="flex items-center gap-1"><Lock size={10} />Why</span>
-                  </th>
-                </tr>
+                {renderHeaders()}
               </thead>
               <tbody>
                 {loading
@@ -1265,303 +1586,15 @@ export default function AFLRankingsPage() {
                         ))}
                       </tr>
                     ))
-                  : visibleRows.map((row, idx) => {
-                      const rank = idx + 1;
-                      const isLocked = !isPremium && idx >= FREE_UNLOCKED_METRICS;
-                      const metricsUnlocked = !isLocked;
-                      const valueFree = !isPremium && idx < FREE_UNLOCKED_METRICS;
-                      const valueUnlocked = isPremium || valueFree;
-                      const isEliteCaptain = row.ai_recommendation === "ELITE CAPTAIN";
-                      const recColor = row.recommendation_color ?? null;
-                      const capStyle = getCaptainStyle(row.captain_rating ?? null);
-
-                      return (
-                        <tr
-                          key={row.player_id ?? row.player_name + idx}
-                          onClick={() => setSelected({ ...row, _rank: rank, _unlocked: !isLocked } as RankingRow & { _rank: number; _unlocked: boolean })}
-                          className={`border-b border-white/[0.04] cursor-pointer hover:bg-[#F5C84C]/5 transition-colors${isEliteCaptain ? " bg-[#120E00]" : ""}`}
-                        >
-                          <td className="px-4 py-4 text-center text-sm text-white/30 tabular-nums w-[50px]">{rank}</td>
-                          <td className="px-4 py-4 text-left w-[220px]">
-                            <div className="font-semibold text-sm text-white leading-tight truncate">{row.player_name}</div>
-                            <div className="text-[11px] text-white/40 mt-0.5">{row.team}{row.position ? ` · ${row.position}` : ""}</div>
-                          </td>
-                          <td className="px-4 py-4 text-center text-sm w-[100px]">
-                            <span className="font-bold text-[#F5C84C] tabular-nums">{fmt(row.projection_final)}</span>
-                          </td>
-                          <td className="px-4 py-4 text-center text-sm w-[100px]">
-                            {!valueUnlocked ? <LockedCell /> : (
-                              <span className="font-semibold text-white/60 tabular-nums">
-                                {fmtPrice(row.price)}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4 text-center text-sm w-[110px]">
-                            {!valueUnlocked ? <LockedCell /> : (
-                              <div className="flex flex-col items-center gap-0.5">
-                                <span className={`font-bold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
-                                  {row.value_score != null ? Number(row.value_score).toFixed(2) : "—"}
-                                </span>
-                                {row.value_tag && (() => {
-                                  const s = getValueTagStyle(row.value_tag);
-                                  return (
-                                    <span className={`inline-block rounded px-1 py-0.5 text-[9px] font-semibold border ${s.text} ${s.bg} ${s.border}`}>
-                                      {row.value_tag}
-                                    </span>
-                                  );
-                                })()}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-4 text-center text-sm w-[110px]">
-                            {!metricsUnlocked ? <LockedCell /> : (
-                              <span className={`font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
-                                {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4 text-center w-[140px]">
-                            {!metricsUnlocked ? <LockedCell /> : row.captain_rating ? (
-                              <span className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${capStyle.text} ${capStyle.bg} ${capStyle.border}`}>
-                                {capStyle.icon} {row.captain_rating}
-                              </span>
-                            ) : (
-                              <span className="text-white/20 text-xs">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4 text-center w-[100px]">
-                            {!metricsUnlocked ? <LockedCell /> : (
-                              <PremiumBadge label={row.upside_rating != null ? `+${fmtInt(row.upside_rating)}%` : "—"} colorClass={getUpsideColor(row.upside_rating ?? null)} />
-                            )}
-                          </td>
-                          <td className={`px-4 py-4 text-center w-[160px]${isEliteCaptain ? " bg-[#1A1400]" : ""}`}>
-                            {!metricsUnlocked ? <LockedCell /> : row.ai_recommendation ? (
-                              <span
-                                className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap${isEliteCaptain ? " elite-captain-badge" : ""}`}
-                                style={isEliteCaptain ? {
-                                  color: "#F5C84C",
-                                  background: "linear-gradient(90deg, #3A2A00, #5A4200, #3A2A00)",
-                                  borderColor: "#F5C84C",
-                                } : recColor ? {
-                                  color: recColor,
-                                  background: `${recColor}18`,
-                                  borderColor: `${recColor}40`,
-                                } : {
-                                  color: "rgba(255,255,255,0.3)",
-                                  background: "rgba(255,255,255,0.05)",
-                                  borderColor: "rgba(255,255,255,0.1)",
-                                }}
-                              >
-                                {row.ai_recommendation}
-                              </span>
-                            ) : (
-                              <span className="text-white/20 text-xs">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4 text-left w-[280px]">
-                            {isPremium ? (
-                              <span className="text-xs text-white/60 line-clamp-2 leading-snug">{row.recommendation_why ?? "—"}</span>
-                            ) : idx < 5 ? (
-                              <span className="text-xs text-white/60 line-clamp-2 leading-snug">{row.recommendation_why ?? "—"}</span>
-                            ) : (
-                              <span className="blur-sm select-none text-xs text-white/50 line-clamp-2">AI insight available with Neeko+</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                  : <>
+                      {visibleRows.map((row, idx) => renderRow(row, idx, false))}
+                      {lockedRows.map((row, idx) => renderRow(row, visibleRows.length + idx, true))}
+                    </>
+                }
               </tbody>
             </table>
           </div>
         </div>
-        ) : (
-        <div className="relative w-full">
-          <p className="text-xs text-zinc-500 mt-2 mb-2">Click any player for full AI breakdown</p>
-          <div className="overflow-x-auto overflow-y-auto max-h-[75vh] rounded-xl border border-white/5 scrollbar-thin scrollbar-thumb-[#333] scrollbar-track-transparent">
-          <table className="min-w-[900px] w-full border-collapse table-auto">
-            <thead className="sticky top-0 z-30 bg-[#070707]">
-              {/* Position filter row */}
-              <tr>
-                <td
-                  colSpan={TOTAL_COLS}
-                  className="bg-[#0a0a0a] px-3 py-2 border-b border-white/5"
-                >
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 mr-1">Position</span>
-                    {POSITIONS.map((pos) => (
-                      <PositionPill
-                        key={pos}
-                        value={pos}
-                        active={positionFilter === pos}
-                        onClick={() => setPositionFilter(pos)}
-                      />
-                    ))}
-                  </div>
-                </td>
-              </tr>
-              {/* Column header row */}
-              <tr className="border-b border-[#222]">
-                <th className={`${TH_BASE} text-white/40 w-10`}>#</th>
-                <th className={`${TH_BASE} text-left text-white/40 min-w-[160px]`}>Player</th>
-                <th className={`${TH_BASE} text-white/40 min-w-[80px]`}>Team</th>
-                <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
-                <PlainTh label="Price" locked={!isPremium} />
-                <PlainTh label="Value" locked={!isPremium} />
-                <PlainTh label="Captain" locked={!isPremium} />
-                <PlainTh label="Upside" locked={!isPremium} />
-                <PlainTh label="AI Recommendation" locked={!isPremium} />
-                <PlainTh label="Why" locked={!isPremium} />
-              </tr>
-            </thead>
-            <tbody>
-              {loading
-                ? Array.from({ length: 12 }).map((_, i) => (
-                    <tr key={i} className="border-b border-white/5">
-                      {Array.from({ length: TOTAL_COLS }).map((__, j) => (
-                        <td key={j} className="px-3 py-3">
-                          <div className="h-4 animate-pulse rounded bg-white/5" />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                : visibleRows.map((row, idx) => {
-                    const rank = idx + 1;
-                    const isLocked = !isPremium && idx >= FREE_UNLOCKED_METRICS;
-                    const metricsUnlocked = !isLocked;
-                    const valueFree = !isPremium && idx < FREE_UNLOCKED_METRICS;
-                    const valueUnlocked = isPremium || valueFree;
-                    const consistencyBadge = getConsistencyBadge(row.consistency_score);
-                    const isEliteCaptain = row.ai_recommendation === "ELITE CAPTAIN";
-                    const recColor = row.recommendation_color ?? null;
-                    const capStyle = getCaptainStyle(row.captain_rating ?? null);
-
-                    return (
-                      <tr
-                        key={row.player_id ?? row.player_name + idx}
-                        className={`border-b border-white/[0.04] transition-all duration-150 cursor-pointer hover:bg-white/5 hover:shadow-[0_0_12px_rgba(245,200,76,0.15)]${isEliteCaptain ? " bg-[#120E00]" : ""}`}
-                        onClick={() => setSelected({ ...row, _rank: rank, _unlocked: !isLocked } as RankingRow & { _rank: number; _unlocked: boolean })}
-                      >
-                        <td className="px-4 py-3 text-sm text-white/30 tabular-nums text-center whitespace-nowrap">{rank}</td>
-                        <td className="px-4 py-3 min-w-[160px] whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-white">{row.player_name}</span>
-                            {!isPremium && !isLocked && (
-                              <span className="rounded-sm bg-[#F5C84C]/15 px-1 py-0.5 text-[9px] font-semibold text-[#F5C84C] uppercase tracking-wide">Free</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-center whitespace-nowrap">
-                          <span className="text-xs text-white/50">{row.team}</span>
-                        </td>
-
-                        {/* Projection — always visible */}
-                        <td className="px-4 py-3 text-center whitespace-nowrap">
-                          <span className="text-sm font-semibold text-[#F5C84C] tabular-nums">
-                            {fmt(row.projection_final)}
-                          </span>
-                        </td>
-
-                        {/* Price */}
-                        <td className="px-4 py-3 text-center whitespace-nowrap">
-                          {!valueUnlocked ? <LockedCell /> : (
-                            <span className="text-sm font-semibold text-white/60 tabular-nums">
-                              {fmtPrice(row.price)}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Value Score + Tag */}
-                        <td className="px-4 py-3 text-center whitespace-nowrap">
-                          {!valueUnlocked ? <LockedCell /> : (
-                            <div className="flex flex-col items-center gap-0.5">
-                              <span className={`text-sm font-bold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
-                                {row.value_score != null ? Number(row.value_score).toFixed(2) : "—"}
-                              </span>
-                              {row.value_tag && (() => {
-                                const s = getValueTagStyle(row.value_tag);
-                                return (
-                                  <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${s.text} ${s.bg} ${s.border}`}>
-                                    {row.value_tag}
-                                  </span>
-                                );
-                              })()}
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Captain */}
-                        <td className="px-4 py-3 text-center whitespace-nowrap">
-                          {!metricsUnlocked ? <LockedCell /> : row.captain_rating ? (
-                            <span
-                              className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${capStyle.text} ${capStyle.bg} ${capStyle.border}`}
-                            >
-                              {capStyle.icon} {row.captain_rating}
-                            </span>
-                          ) : (
-                            <span className="text-white/20 text-xs">—</span>
-                          )}
-                        </td>
-
-                        {/* Upside */}
-                        <td className="px-4 py-3 text-center whitespace-nowrap">
-                          {!metricsUnlocked ? <LockedCell /> : (
-                            <PremiumBadge label={row.upside_rating != null ? `+${fmtInt(row.upside_rating)}%` : "—"} colorClass={getUpsideColor(row.upside_rating ?? null)} />
-                          )}
-                        </td>
-
-                        {/* Recommendation */}
-                        <td className={`px-4 py-3 text-center whitespace-nowrap${isEliteCaptain ? " bg-[#1A1400]" : ""}`}>
-                          {!metricsUnlocked ? <LockedCell /> : row.ai_recommendation ? (
-                            <span
-                              className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap${isEliteCaptain ? " elite-captain-badge" : ""}`}
-                              style={isEliteCaptain ? {
-                                color: "#F5C84C",
-                                background: "linear-gradient(90deg, #3A2A00, #5A4200, #3A2A00)",
-                                borderColor: "#F5C84C",
-                              } : recColor ? {
-                                color: recColor,
-                                background: `${recColor}18`,
-                                borderColor: `${recColor}40`,
-                              } : {
-                                color: "rgba(255,255,255,0.3)",
-                                background: "rgba(255,255,255,0.05)",
-                                borderColor: "rgba(255,255,255,0.1)",
-                              }}
-                            >
-                              {row.ai_recommendation}
-                            </span>
-                          ) : (
-                            <span className="text-white/20 text-xs">—</span>
-                          )}
-                        </td>
-
-                        {/* Why */}
-                        <td className="px-4 py-3 text-left align-middle min-w-[220px] max-w-[280px] whitespace-normal">
-                          {isPremium ? (
-                            <span className="text-xs text-white/60 line-clamp-2 leading-snug">
-                              {row.recommendation_why ?? "—"}
-                            </span>
-                          ) : idx < 5 ? (
-                            <span className="text-xs text-white/60 line-clamp-2 leading-snug">
-                              {row.recommendation_why ?? "—"}
-                            </span>
-                          ) : (
-                            <span className="blur-sm select-none text-xs text-white/50 line-clamp-2">
-                              AI insight available with Neeko+
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-            </tbody>
-          </table>
-
-          </div>
-          <div className="pointer-events-none absolute top-0 left-0 w-8 h-full bg-gradient-to-r from-[#070707] to-transparent z-20 rounded-l-xl" />
-          <div className="pointer-events-none absolute top-0 right-0 w-8 h-full bg-gradient-to-l from-[#070707] to-transparent z-20 rounded-r-xl" />
-        </div>
-        )}
 
         {/* CTA below the table — free users only */}
         {!isPremium && !loading && (
