@@ -5,11 +5,9 @@ import {
   Zap,
   TrendingUp,
   TrendingDown,
-  Shield,
   Star,
   RefreshCw,
   Swords,
-  Gem,
   Lightbulb,
   AlertTriangle,
 } from "lucide-react";
@@ -23,7 +21,7 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface MasterRow {
-  player_id: string | null;
+  player_id: number | null;
   player_name: string;
   team: string;
   position: string | null;
@@ -38,51 +36,17 @@ interface MasterRow {
   projection_confidence: number | null;
   ai_recommendation: string | null;
   ai_analysis: string | null;
-  recommendation_why: string | null;
   recommendation_color: string | null;
+  recommendation_why: string | null;
   captain_score: number | null;
   captain_rating: string | null;
-  projection: number | null;
-  ceiling: number | null;
-  floor: number | null;
-  confidence: number | null;
-  captain_score_num: number | null;
-  upside: number | null;
-  risk: number | null;
-  is_captain: boolean;
-  is_breakout: boolean;
-  is_riser: boolean;
-  is_risk: boolean;
-  is_value: boolean;
-  // Phase 2
-  matchup_difficulty: string | null;
-  volatility_score: number | null;
-  volatility_level: string | null;
-  captain_tier: string | null;
-  breakout_flag: boolean | null;
-  avoid_flag: boolean | null;
-  // Phase 3
-  next_round_number: number | null;
-  next_opponent: string | null;
-  next_venue: string | null;
-  next_start_time: string | null;
-  is_home: boolean | null;
-  trend_label: string | null;
-  trend_delta_3v_season: number | null;
-  trend_delta_5v_season: number | null;
-  avg_last_3: number | null;
-  avg_last_5: number | null;
-  trend_avg_season: number | null;
-  consistency_label: string | null;
-  role_signal: string | null;
-  role_signal_strength: number | null;
-  delta_cba: number | null;
-  delta_tog: number | null;
-  availability_note: string | null;
-  days_rest: number | null;
-  quick_turnaround_flag: boolean | null;
-  value_tier: string | null;
-  value_score: number | null;
+  // Phase 4
+  neeko_score: number | null;
+  ceiling_probability_pct: number | null;
+  bust_probability_pct: number | null;
+  matchup_tier: string | null;
+  trend_tag: string | null;
+  role_tag: string | null;
 }
 
 interface MatchRow {
@@ -109,56 +73,6 @@ interface RoundInsightRow {
   position: string | null;
   projection_final: number | null;
   headline: string;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt1(v: number | null): string {
-  if (v == null) return "—";
-  return Number(v).toFixed(1);
-}
-
-function fmtRound(v: number | null): string {
-  if (v == null) return "—";
-  return `R${v}`;
-}
-
-// ─── Trend Label Badge ────────────────────────────────────────────────────────
-
-function TrendBadge({ label }: { label: string | null }) {
-  if (!label || label === "STABLE") return null;
-  const map: Record<string, string> = {
-    SURGING:  "text-green-400 bg-green-400/10 border-green-400/25",
-    RISING:   "text-sky-400 bg-sky-400/10 border-sky-400/25",
-    FADING:   "text-orange-400 bg-orange-400/10 border-orange-400/25",
-    CRASHING: "text-red-400 bg-red-400/10 border-red-400/25",
-  };
-  const cls = map[label] ?? "text-white/40 bg-white/5 border-white/10";
-  const icon = label === "SURGING" || label === "RISING"
-    ? <TrendingUp size={8} />
-    : <TrendingDown size={8} />;
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide whitespace-nowrap ${cls}`}>
-      {icon}{label}
-    </span>
-  );
-}
-
-function RoleSignalBadge({ signal }: { signal: string | null }) {
-  if (!signal) return null;
-  const map: Record<string, string> = {
-    "MID BOOST": "text-[#F5C84C] bg-[#F5C84C]/10 border-[#F5C84C]/30",
-    "ROLE LOSS": "text-red-400 bg-red-400/10 border-red-400/25",
-    "TOG DROP":  "text-orange-400 bg-orange-400/10 border-orange-400/25",
-    "DEF SHIFT": "text-sky-400 bg-sky-400/10 border-sky-400/25",
-    "FWD SHIFT": "text-green-400 bg-green-400/10 border-green-400/25",
-  };
-  const cls = map[signal] ?? "text-white/40 bg-white/5 border-white/10";
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide whitespace-nowrap ${cls}`}>
-      <Shield size={8} />{signal}
-    </span>
-  );
 }
 
 // ─── Section Header ───────────────────────────────────────────────────────────
@@ -198,11 +112,19 @@ function Section({ children, className = "" }: { children: React.ReactNode; clas
   );
 }
 
-function SectionError() {
+function SectionError({ onRetry }: { onRetry?: () => void }) {
   return (
-    <div className="flex items-center justify-center gap-2 py-6 rounded-xl border border-white/5 bg-white/[0.02]">
+    <div className="flex items-center justify-center gap-3 py-6 rounded-xl border border-white/5 bg-white/[0.02]">
       <RefreshCw size={13} className="text-white/20 shrink-0" />
-      <span className="text-white/30 text-sm">Temporarily unavailable — refresh to retry</span>
+      <span className="text-white/30 text-sm">Temporarily unavailable</span>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="text-[11px] text-[#F5C84C]/70 hover:text-[#F5C84C] transition-colors underline"
+        >
+          retry
+        </button>
+      )}
     </div>
   );
 }
@@ -243,31 +165,20 @@ function LockedCard() {
 const FREE_VISIBLE = 1;
 const FREE_BLURRED = 2;
 
-function buildReason(row: MasterRow, isPremium: boolean): string | null {
-  if (!isPremium) return null;
-  const parts: string[] = [];
-  if (row.trend_label && row.trend_label !== "STABLE" && row.trend_delta_3v_season != null) {
-    const sign = row.trend_delta_3v_season > 0 ? "+" : "";
-    parts.push(`${row.trend_label} (${sign}${fmt1(row.trend_delta_3v_season)} vs season avg)`);
-  }
-  if (row.role_signal) parts.push(row.role_signal);
-  if (row.availability_note) parts.push(row.availability_note);
-  if (row.recommendation_why && parts.length === 0) return row.recommendation_why;
-  return parts.length > 0 ? parts.join(" · ") : row.recommendation_why ?? null;
-}
-
 function PlayerCardList({
   rows,
   loading,
   error,
   isPremium,
   emptyMessage = "No data detected yet — check back soon",
+  onRetry,
 }: {
   rows: MasterRow[];
   loading: boolean;
   error: boolean;
   isPremium: boolean;
   emptyMessage?: string;
+  onRetry?: () => void;
 }) {
   if (loading) {
     return (
@@ -276,7 +187,7 @@ function PlayerCardList({
       </div>
     );
   }
-  if (error) return <SectionError />;
+  if (error) return <SectionError onRetry={onRetry} />;
   if (rows.length === 0) return <SectionEmpty message={emptyMessage} />;
 
   return (
@@ -296,18 +207,14 @@ function PlayerCardList({
             confidence={row.projection_confidence}
             label={row.ai_recommendation}
             color={row.recommendation_color}
-            reason={buildReason(row, isPremium)}
+            reason={isPremium ? row.recommendation_why : null}
             captainScore={row.captain_score}
             locked={false}
-            matchupDifficulty={row.matchup_difficulty}
-            volatilityLevel={row.volatility_level}
-            captainTier={row.captain_tier}
-            breakoutFlag={row.breakout_flag}
-            avoidFlag={row.avoid_flag}
-            trendLabel={isPremium ? row.trend_label : null}
-            roleSignal={isPremium ? row.role_signal : null}
-            nextOpponent={row.next_opponent}
-            nextRound={row.next_round_number}
+            neekoScore={row.neeko_score}
+            ceilingPct={isPremium ? row.ceiling_probability_pct : null}
+            bustPct={isPremium ? row.bust_probability_pct : null}
+            matchupTier={row.matchup_tier}
+            trendTag={row.trend_tag}
           />
         );
       })}
@@ -337,7 +244,7 @@ function MatchProjectionCard({ match }: { match: MatchRow }) {
             {match.away_team}
           </div>
           <div className="text-[11px] text-white/40 mt-0.5">
-            {fmtRound(match.round_number)} · {match.season ?? 2026} · AFL match score prediction
+            R{match.round_number ?? "—"} · {match.season ?? 2026} · AFL match score prediction
           </div>
         </div>
         {conf != null && (
@@ -392,11 +299,13 @@ function MatchCardList({
   loading,
   error,
   isPremium,
+  onRetry,
 }: {
   rows: MatchRow[];
   loading: boolean;
   error: boolean;
   isPremium: boolean;
+  onRetry?: () => void;
 }) {
   if (loading) {
     return (
@@ -405,7 +314,7 @@ function MatchCardList({
       </div>
     );
   }
-  if (error) return <SectionError />;
+  if (error) return <SectionError onRetry={onRetry} />;
   if (rows.length === 0) {
     return <SectionEmpty message="Match projections generating — check back before round starts" />;
   }
@@ -430,13 +339,7 @@ function MatchCardList({
 
 // ─── Round Insight Banner ─────────────────────────────────────────────────────
 
-function RoundInsightBanner({
-  row,
-  nextRound,
-}: {
-  row: RoundInsightRow | null;
-  nextRound: number | null;
-}) {
+function RoundInsightBanner({ row }: { row: RoundInsightRow | null }) {
   if (!row) return null;
   return (
     <div className="rounded-2xl border border-[#F5C84C]/20 bg-gradient-to-r from-[#1a1408] to-[#0d0d0d] p-4 md:p-5">
@@ -446,7 +349,7 @@ function RoundInsightBanner({
         </div>
         <div>
           <div className="text-[10px] text-[#F5C84C]/60 font-semibold uppercase tracking-widest mb-1">
-            {nextRound != null ? `Round ${nextRound} Insight` : "Round Insight"}
+            Round Insight
           </div>
           <p className="text-white/80 text-sm font-medium leading-snug">{row.headline}</p>
           {row.projection_final != null && (
@@ -468,14 +371,20 @@ function RoundInsightBanner({
 
 // ─── Elite Captain Hero ───────────────────────────────────────────────────────
 
-function EliteCaptainHero({ rows, loading, isPremium }: { rows: MasterRow[]; loading: boolean; isPremium: boolean }) {
+function EliteCaptainHero({
+  rows,
+  loading,
+  isPremium,
+}: {
+  rows: MasterRow[];
+  loading: boolean;
+  isPremium: boolean;
+}) {
   if (loading) {
     return (
       <div className="rounded-2xl border border-[#F5C84C]/20 bg-gradient-to-r from-[#1a1408] to-[#0a0a0a] p-4 md:p-6 animate-pulse">
         <div className="h-4 w-48 rounded bg-white/10 mb-4" />
-        <div className="space-y-3">
-          <div className="h-20 rounded-xl bg-white/5" />
-        </div>
+        <div className="h-20 rounded-xl bg-white/5" />
       </div>
     );
   }
@@ -494,7 +403,7 @@ function EliteCaptainHero({ rows, loading, isPremium }: { rows: MasterRow[]; loa
         <div>
           <h2 className="text-base font-bold text-[#F5C84C]">Elite Captain Locks</h2>
           <p className="text-[11px] text-white/40 mt-0.5">
-            Highest probability captains this round
+            Highest-probability captains this round
           </p>
         </div>
       </div>
@@ -510,18 +419,14 @@ function EliteCaptainHero({ rows, loading, isPremium }: { rows: MasterRow[]; loa
             confidence={row.projection_confidence}
             label={row.captain_rating}
             color="#F5C84C"
-            reason={buildReason(row, isPremium)}
+            reason={isPremium ? row.recommendation_why : null}
             captainScore={row.captain_score}
             locked={false}
-            matchupDifficulty={row.matchup_difficulty}
-            volatilityLevel={row.volatility_level}
-            captainTier={row.captain_tier}
-            breakoutFlag={row.breakout_flag}
-            avoidFlag={row.avoid_flag}
-            trendLabel={isPremium ? row.trend_label : null}
-            roleSignal={isPremium ? row.role_signal : null}
-            nextOpponent={row.next_opponent}
-            nextRound={row.next_round_number}
+            neekoScore={row.neeko_score}
+            ceilingPct={isPremium ? row.ceiling_probability_pct : null}
+            bustPct={isPremium ? row.bust_probability_pct : null}
+            matchupTier={row.matchup_tier}
+            trendTag={row.trend_tag}
           />
         ))}
       </div>
@@ -541,7 +446,7 @@ function UpgradeCTABanner() {
             <span className="text-[#F5C84C] font-bold text-lg">Unlock Full Neeko Intel</span>
           </div>
           <p className="text-white/60 text-sm">
-            Trend signals, role changes, full match projections, AI reasoning and every player ranked.
+            Full Neeko Scores, Ceiling%, Bust%, AI reasoning, match projections and every player ranked.
           </p>
         </div>
         <a
@@ -569,35 +474,43 @@ export default function AFLNeekoIntelPage() {
   const [fetchError, setFetchError] = useState(false);
   const [matchesError, setMatchesError] = useState(false);
 
+  async function loadPlayers() {
+    setLoading(true);
+    setFetchError(false);
+    const { data, error } = await supabase
+      .from("v_neeko_intel_master_2026")
+      .select(
+        "player_id,player_name,team,position,projection_final,ceiling_estimate,floor_estimate," +
+        "consistency_score,form_rating,matchup_rating,upside_rating,risk_rating,projection_confidence," +
+        "ai_recommendation,ai_analysis,recommendation_color,recommendation_why," +
+        "captain_score,captain_rating," +
+        "neeko_score,ceiling_probability_pct,bust_probability_pct,matchup_tier,trend_tag,role_tag"
+      );
+    if (error || !data) {
+      console.error("[NeekoIntel] player load error:", error?.message, error?.details);
+      setFetchError(true);
+    } else {
+      setAllData(data as MasterRow[]);
+    }
+    setLoading(false);
+  }
+
+  async function loadMatches() {
+    setMatchesLoading(true);
+    setMatchesError(false);
+    const { data, error } = await supabase
+      .from("v_neeko_match_predictions")
+      .select("*");
+    if (error || !data) {
+      console.error("[NeekoIntel] match load error:", error?.message, error?.details);
+      setMatchesError(true);
+    } else {
+      setMatches(data as MatchRow[]);
+    }
+    setMatchesLoading(false);
+  }
+
   useEffect(() => {
-    async function loadPlayers() {
-      setLoading(true);
-      setFetchError(false);
-      const { data, error } = await supabase
-        .from("v_neeko_intel_master_v3")
-        .select("*");
-      if (error || !data) {
-        setFetchError(true);
-      } else {
-        setAllData(data as MasterRow[]);
-      }
-      setLoading(false);
-    }
-
-    async function loadMatches() {
-      setMatchesLoading(true);
-      setMatchesError(false);
-      const { data, error } = await supabase
-        .from("v_neeko_match_predictions")
-        .select("*");
-      if (error || !data) {
-        setMatchesError(true);
-      } else {
-        setMatches(data as MatchRow[]);
-      }
-      setMatchesLoading(false);
-    }
-
     async function loadRoundInsight() {
       const { data } = await supabase
         .from("v_neeko_intel_round_insight")
@@ -611,70 +524,46 @@ export default function AFLNeekoIntelPage() {
     loadRoundInsight();
   }, []);
 
-  // ── Derived next round number ──────────────────────────────────────────────
-  const nextRound = allData.find((r) => r.next_round_number != null)?.next_round_number ?? null;
-  const roundLabel = nextRound != null ? `Round ${nextRound}` : "Upcoming Round";
-
   // ── Section: Captain Picks ─────────────────────────────────────────────────
   const captains = [...allData]
-    .filter((p) => p.is_captain)
-    .sort((a, b) => (b.captain_score_num ?? 0) - (a.captain_score_num ?? 0))
+    .filter((p) => p.captain_score != null)
+    .sort((a, b) => (b.captain_score ?? 0) - (a.captain_score ?? 0))
     .slice(0, 10);
 
-  // ── Section: Breakouts & Must Starts ──────────────────────────────────────
-  // breakout_flag OR must-start recommendation — exclude avoid
-  const breakouts = allData
+  // ── Section: Breakouts This Week ──────────────────────────────────────────
+  const breakouts = [...allData]
     .filter(
       (p) =>
-        (p.breakout_flag === true || p.is_breakout) &&
-        !p.avoid_flag &&
-        !p.is_captain
+        p.trend_tag === "Rising" ||
+        ((p.upside_rating ?? 0) >= 12 && (p.neeko_score ?? 0) >= 70)
     )
-    .sort((a, b) => (b.projection_final ?? 0) - (a.projection_final ?? 0))
+    .sort((a, b) => (b.neeko_score ?? 0) - (a.neeko_score ?? 0))
     .slice(0, 10);
 
-  // ── Section: Risers — driven by TREND DELTA, not upside label ────────────
-  const risers = allData
-    .filter(
-      (p) =>
-        (p.trend_label === "SURGING" || p.trend_label === "RISING" || p.role_signal === "MID BOOST") &&
-        !p.is_captain
-    )
-    .sort(
-      (a, b) =>
-        (b.trend_delta_3v_season ?? b.upside_rating ?? 0) -
-        (a.trend_delta_3v_season ?? a.upside_rating ?? 0)
-    )
+  // ── Section: Risers ───────────────────────────────────────────────────────
+  const risers = [...allData]
+    .filter((p) => p.trend_tag === "Rising" && (p.neeko_score ?? 0) >= 65)
+    .sort((a, b) => (b.neeko_score ?? 0) - (a.neeko_score ?? 0))
     .slice(0, 10);
 
-  // ── Section: Fallers — FADING/CRASHING or ROLE LOSS / TOG DROP ────────────
-  const fallers = allData
+  // ── Section: Fallers ──────────────────────────────────────────────────────
+  const fallers = [...allData]
     .filter(
       (p) =>
-        p.trend_label === "FADING" ||
-        p.trend_label === "CRASHING" ||
-        p.role_signal === "ROLE LOSS" ||
-        p.role_signal === "TOG DROP"
+        p.trend_tag === "Falling" ||
+        (p.bust_probability_pct ?? 0) >= 60
     )
-    .sort(
-      (a, b) =>
-        (a.trend_delta_3v_season ?? 0) - (b.trend_delta_3v_season ?? 0)
-    )
+    .sort((a, b) => (b.bust_probability_pct ?? 0) - (a.bust_probability_pct ?? 0))
     .slice(0, 10);
 
-  // ── Section: Risk & Avoid ─────────────────────────────────────────────────
-  const risk = allData
+  // ── Section: Risk / Avoid ─────────────────────────────────────────────────
+  const risk = [...allData]
     .filter(
       (p) =>
-        p.avoid_flag === true ||
-        (p.risk_rating ?? 0) >= 65 ||
-        p.quick_turnaround_flag === true
+        (p.bust_probability_pct ?? 0) >= 55 ||
+        (p.risk_rating ?? 0) >= 70
     )
-    .sort(
-      (a, b) =>
-        (b.risk_rating ?? 0) - (a.risk_rating ?? 0) ||
-        (a.projection_confidence ?? 100) - (b.projection_confidence ?? 100)
-    )
+    .sort((a, b) => (b.bust_probability_pct ?? 0) - (a.bust_probability_pct ?? 0))
     .slice(0, 10);
 
   return (
@@ -695,7 +584,7 @@ export default function AFLNeekoIntelPage() {
                 Neeko Intel
               </h1>
               <p className="text-white/40 text-sm mt-1">
-                AI-powered fantasy intelligence · {roundLabel} · Updated automatically
+                AI-powered fantasy intelligence · Updated automatically
               </p>
             </div>
 
@@ -727,7 +616,7 @@ export default function AFLNeekoIntelPage() {
                 <a href="/neeko-plus" className="text-[#F5C84C] font-semibold hover:underline">
                   Upgrade to Neeko+
                 </a>{" "}
-                for trend signals, role changes and full access.
+                for Neeko Score, Ceiling%, Bust% and full access.
               </p>
             </div>
           )}
@@ -741,14 +630,20 @@ export default function AFLNeekoIntelPage() {
           <div className="text-center py-16">
             <RefreshCw size={32} className="text-white/20 mx-auto mb-3" />
             <p className="text-white/40 text-sm">Neeko Intel temporarily unavailable</p>
-            <p className="text-white/25 text-xs mt-1">Refresh the page to retry</p>
+            <p className="text-white/25 text-xs mt-1 mb-4">Check your connection and try again</p>
+            <button
+              onClick={() => loadPlayers()}
+              className="text-[#F5C84C]/70 hover:text-[#F5C84C] text-sm underline transition-colors"
+            >
+              Retry
+            </button>
           </div>
         )}
 
         {!fetchError && (
           <>
             {/* ── Round Insight ── */}
-            {!loading && <RoundInsightBanner row={roundInsight} nextRound={nextRound} />}
+            {!loading && <RoundInsightBanner row={roundInsight} />}
 
             {/* ── Elite Captain Locks Hero ── */}
             <EliteCaptainHero rows={captains} loading={loading} isPremium={isPremium} />
@@ -767,6 +662,7 @@ export default function AFLNeekoIntelPage() {
                 error={fetchError}
                 isPremium={isPremium}
                 emptyMessage="No strong captain picks detected yet"
+                onRetry={loadPlayers}
               />
             </Section>
 
@@ -775,7 +671,7 @@ export default function AFLNeekoIntelPage() {
               <SectionHeader
                 icon={<Swords size={16} />}
                 title="Match Projections"
-                subtitle={`AFL match score predictions for ${roundLabel} — not fantasy points`}
+                subtitle="AFL match score predictions — not fantasy points"
                 locked={!isPremium}
               />
               <MatchCardList
@@ -783,15 +679,16 @@ export default function AFLNeekoIntelPage() {
                 loading={matchesLoading}
                 error={matchesError}
                 isPremium={isPremium}
+                onRetry={loadMatches}
               />
             </Section>
 
-            {/* ── Breakouts & Must Starts ── */}
+            {/* ── Breakouts This Week ── */}
             <Section>
               <SectionHeader
                 icon={<Zap size={16} />}
-                title="Breakouts & Must Starts"
-                subtitle="High upside picks not flagged as avoid — speculative pop targets"
+                title="Breakouts This Week"
+                subtitle="Rising trend or high Neeko Score with strong upside — speculative pop targets"
                 locked={!isPremium}
               />
               <PlayerCardList
@@ -799,7 +696,8 @@ export default function AFLNeekoIntelPage() {
                 loading={loading}
                 error={fetchError}
                 isPremium={isPremium}
-                emptyMessage="No strong breakout candidates detected yet — wait for form data"
+                emptyMessage="No strong breakout candidates detected yet — check back closer to round"
+                onRetry={loadPlayers}
               />
             </Section>
 
@@ -809,7 +707,7 @@ export default function AFLNeekoIntelPage() {
                 <SectionHeader
                   icon={<TrendingUp size={16} />}
                   title="Risers"
-                  subtitle="Trending up based on recent form vs season average"
+                  subtitle="Rising trend + Neeko Score ≥ 65 — form improving"
                   locked={!isPremium}
                 />
                 <PlayerCardList
@@ -817,7 +715,8 @@ export default function AFLNeekoIntelPage() {
                   loading={loading}
                   error={fetchError}
                   isPremium={isPremium}
-                  emptyMessage="No strong risers detected yet — wait for form data"
+                  emptyMessage="No strong risers detected — check back after early scoring"
+                  onRetry={loadPlayers}
                 />
               </Section>
 
@@ -825,7 +724,7 @@ export default function AFLNeekoIntelPage() {
                 <SectionHeader
                   icon={<TrendingDown size={16} />}
                   title="Fallers"
-                  subtitle="Fading form, role loss or usage drop — consider avoiding"
+                  subtitle="Falling trend or high Bust% — consider avoiding"
                   locked={!isPremium}
                 />
                 <PlayerCardList
@@ -833,7 +732,8 @@ export default function AFLNeekoIntelPage() {
                   loading={loading}
                   error={fetchError}
                   isPremium={isPremium}
-                  emptyMessage="No notable fallers detected yet"
+                  emptyMessage="No notable fallers this round"
+                  onRetry={loadPlayers}
                 />
               </Section>
             </div>
@@ -843,7 +743,7 @@ export default function AFLNeekoIntelPage() {
               <SectionHeader
                 icon={<AlertTriangle size={16} />}
                 title="Risk & Avoid"
-                subtitle="High risk rating, low confidence, or turnaround risk flagged"
+                subtitle="Bust% ≥ 55 or Risk Rating ≥ 70 — high chance of underperforming"
                 locked={!isPremium}
               />
               <PlayerCardList
@@ -852,6 +752,7 @@ export default function AFLNeekoIntelPage() {
                 error={fetchError}
                 isPremium={isPremium}
                 emptyMessage="No specific avoid flags this round"
+                onRetry={loadPlayers}
               />
             </Section>
 

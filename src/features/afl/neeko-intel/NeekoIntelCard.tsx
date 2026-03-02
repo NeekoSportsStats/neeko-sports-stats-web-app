@@ -120,6 +120,81 @@ export function RoleSignalBadge({ value }: { value: string | null }) {
   );
 }
 
+// ─── Neeko Score Badge ────────────────────────────────────────────────────────
+
+export function NeekoScoreBadge({ value }: { value: number | null }) {
+  if (value == null) return null;
+  let cls: string;
+  if (value >= 80)      cls = "text-[#F5C84C] bg-[#F5C84C]/15 border-[#F5C84C]/40";
+  else if (value >= 65) cls = "text-green-400 bg-green-400/10 border-green-400/30";
+  else if (value >= 50) cls = "text-sky-400 bg-sky-400/10 border-sky-400/25";
+  else if (value >= 35) cls = "text-orange-400 bg-orange-400/10 border-orange-400/25";
+  else                  cls = "text-red-400 bg-red-400/10 border-red-400/25";
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide whitespace-nowrap ${cls}`}>
+      N {value}
+    </span>
+  );
+}
+
+// ─── Ceiling / Bust Probability Chips ─────────────────────────────────────────
+
+export function CeilingBustChips({
+  ceiling,
+  bust,
+}: {
+  ceiling: number | null;
+  bust: number | null;
+}) {
+  if (ceiling == null && bust == null) return null;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {ceiling != null && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-green-400/25 bg-green-400/8 px-2 py-0.5 text-[9px] font-bold text-green-400 whitespace-nowrap">
+          C {Math.round(ceiling)}%
+        </span>
+      )}
+      {bust != null && (
+        <span className="inline-flex items-center gap-1 rounded-full border border-red-400/25 bg-red-400/8 px-2 py-0.5 text-[9px] font-bold text-red-400 whitespace-nowrap">
+          B {Math.round(bust)}%
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ─── Matchup Tier Badge ───────────────────────────────────────────────────────
+
+export function MatchupTierBadge({ value }: { value: string | null }) {
+  if (!value) return null;
+  const map: Record<string, BadgeProps["color"]> = {
+    Elite:   "green",
+    Good:    "blue",
+    Neutral: "gray",
+    Hard:    "orange",
+    Avoid:   "red",
+  };
+  return <Badge label={`Matchup: ${value}`} color={map[value] ?? "gray"} />;
+}
+
+// ─── Trend Tag Badge ──────────────────────────────────────────────────────────
+
+export function TrendTagBadge({ value }: { value: string | null }) {
+  if (!value || value === "Stable") return null;
+  const map: Record<string, { color: BadgeProps["color"]; up: boolean }> = {
+    Rising:  { color: "green",  up: true },
+    Falling: { color: "orange", up: false },
+  };
+  const cfg = map[value] ?? { color: "gray", up: true };
+  return (
+    <Badge
+      label={value}
+      color={cfg.color}
+      icon={cfg.up ? <TrendingUp size={8} /> : <TrendingDown size={8} />}
+    />
+  );
+}
+
 // ─── Confidence Tier Badge ────────────────────────────────────────────────────
 
 export function ConfidenceBadge({ value }: { value: number | null }) {
@@ -158,6 +233,12 @@ export interface NeekoIntelCardProps {
   roleSignal?: string | null;
   nextOpponent?: string | null;
   nextRound?: number | null;
+  // Phase 4
+  neekoScore?: number | null;
+  ceilingPct?: number | null;
+  bustPct?: number | null;
+  matchupTier?: string | null;
+  trendTag?: string | null;
 }
 
 function fmt(v: number | null, decimals = 1): string {
@@ -195,12 +276,18 @@ export function NeekoIntelCard({
   roleSignal,
   nextOpponent,
   nextRound,
+  neekoScore,
+  ceilingPct,
+  bustPct,
+  matchupTier,
+  trendTag,
 }: NeekoIntelCardProps) {
   const isElite = label === "ELITE CAPTAIN" || label === "CAPTAIN LOCK";
 
   const hasBadgeRow =
     matchupDifficulty || volatilityLevel || captainTier || breakoutFlag || avoidFlag ||
-    confidence != null || trendLabel || roleSignal;
+    confidence != null || trendLabel || roleSignal || matchupTier || trendTag ||
+    ceilingPct != null || bustPct != null;
 
   return (
     <div
@@ -297,15 +384,29 @@ export function NeekoIntelCard({
             <div className="text-sm font-semibold text-yellow-300">{captainRating}</div>
           </div>
         )}
+
+        {neekoScore != null && (
+          <div className="ml-auto">
+            <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5 text-right">Neeko Score</div>
+            <div className="flex justify-end">
+              <NeekoScoreBadge value={neekoScore} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Intelligence Badge Row ── */}
       {hasBadgeRow && (
         <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-white/[0.06]">
-          {confidence != null && <ConfidenceBadge value={confidence} />}
+          {trendTag && <TrendTagBadge value={trendTag} />}
           {trendLabel && <TrendBadge value={trendLabel} />}
           {roleSignal && <RoleSignalBadge value={roleSignal} />}
-          {matchupDifficulty && <MatchupBadge value={matchupDifficulty} />}
+          {matchupTier && <MatchupTierBadge value={matchupTier} />}
+          {matchupDifficulty && !matchupTier && <MatchupBadge value={matchupDifficulty} />}
+          {(ceilingPct != null || bustPct != null) && (
+            <CeilingBustChips ceiling={ceilingPct} bust={bustPct} />
+          )}
+          {confidence != null && <ConfidenceBadge value={confidence} />}
           {volatilityLevel && <VolatilityBadge value={volatilityLevel} />}
           {captainTier && <CaptainTierBadge value={captainTier} />}
           {breakoutFlag && <BreakoutBadge flag={breakoutFlag} />}
