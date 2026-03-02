@@ -64,9 +64,9 @@ const TAB_DESCRIPTIONS: Record<RankingsTab, string> = {
   projection: "Highest projected fantasy scorers this round — sorted by Projection",
 };
 
-const FREE_ROW_LIMIT = 20;
-const FREE_UNLOCKED_ROWS = 5;
-const FREE_PARTIAL_ROWS = 20;
+const FREE_FULL_ROWS = 3;
+const FREE_PARTIAL_ROWS = 10;
+const FREE_FETCH_LIMIT = 25;
 
 const LOCKED_WHY_TEASER = "Unlock matchup, role, ceiling analysis";
 
@@ -254,10 +254,15 @@ function LockedCell({ onClick }: { onClick?: () => void }) {
   return (
     <div
       className="flex justify-center items-center w-full h-full gap-1.5 cursor-pointer group opacity-60"
-      onClick={onClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
     >
       <Lock size={10} className="text-gray-500 group-hover:text-[#F5C84C]/60 transition-colors shrink-0" />
-      <span className="text-xs text-gray-500 group-hover:text-[#F5C84C]/60 transition-colors">Locked</span>
+      <span className="text-xs text-gray-500 group-hover:text-[#F5C84C]/60 transition-colors">
+        Locked
+      </span>
     </div>
   );
 }
@@ -266,7 +271,10 @@ function LockedWhyCell({ onClick }: { onClick?: () => void }) {
   return (
     <div
       className="flex items-center gap-1.5 cursor-pointer group"
-      onClick={onClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
     >
       <Lock size={9} className="text-[#F5C84C]/40 shrink-0 group-hover:text-[#F5C84C]/70 transition-colors" />
       <span className="text-xs font-medium text-[#F5C84C]/60 group-hover:text-[#F5C84C]/90 transition-colors truncate">
@@ -838,7 +846,7 @@ export default function AFLRankingsPage() {
       const { data } = await supabase.rpc("get_rankings_free", {
         position_filter: posArg,
         sort_key: sortArg,
-        limit_n: FREE_ROW_LIMIT,
+        limit_n: FREE_FETCH_LIMIT,
       });
       const normalized = ((data as RankingRow[]) ?? []).map((r) => ({
         ...r,
@@ -906,14 +914,24 @@ export default function AFLRankingsPage() {
     return ["price", "value_score", "value_tag", "ai_recommendation", "recommendation_why", "ai_summary"].includes(colKey);
   }
 
-  function isFreeRow(idx: number): boolean {
-    return idx < FREE_UNLOCKED_ROWS;
+  function isFreeFullRow(idx: number): boolean {
+    return idx < FREE_FULL_ROWS;
+  }
+
+  function isFreePartialRow(idx: number): boolean {
+    return idx >= FREE_FULL_ROWS && idx < FREE_PARTIAL_ROWS;
   }
 
   function isLockedCell(colKey: string, idx: number): boolean {
     if (isPremium) return false;
-    if (isFreeRow(idx)) return false;
-    return isPremiumColumn(colKey);
+
+    if (isFreeFullRow(idx)) return false;
+
+    if (isFreePartialRow(idx)) {
+      return isPremiumColumn(colKey);
+    }
+
+    return true;
   }
 
   function SortIcon({ col }: { col: SortKey }) {
@@ -926,7 +944,7 @@ export default function AFLRankingsPage() {
 
   function renderRow(row: RankingRow, idx: number) {
     const rank = idx + 1;
-    const rowUnlocked = isFreeRow(idx) || isPremium;
+    const rowUnlocked = isPremium || isFreeFullRow(idx);
 
     const handleRowClick = () => {
       setSelected({ ...row, _rank: rank, _unlocked: rowUnlocked });
