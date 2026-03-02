@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Lock, Crown, X, Info, Search } from "lucide-react";
+import { Lock, Crown, X, Info, Search, ChevronUp, ChevronDown, Download } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Dot } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
@@ -48,6 +48,9 @@ interface ScoreHistoryPoint {
 
 type RankingsTab = "best" | "value" | "projection";
 type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
+type PremiumFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC" | "TOP50" | "TOP100" | "ELITE";
+type SortKey = "neeko_rating" | "projection_final" | "value_score" | "projection_confidence" | "risk_rating";
+type SortDir = "asc" | "desc";
 
 const TAB_SORT_KEY: Record<RankingsTab, string> = {
   best: "best",
@@ -192,11 +195,10 @@ function getValueTagStyle(tag: string | null | undefined) {
 
 function getNeekoRatingBadge(rating: number | null) {
   if (rating == null) return { label: "—", text: "text-white/30", bg: "bg-transparent", border: "border-transparent" };
-  if (rating >= 95) return { label: "GENERATIONAL", text: "text-[#F5C84C]", bg: "bg-[#F5C84C]/15", border: "border-[#F5C84C]/40" };
-  if (rating >= 90) return { label: "ELITE", text: "text-yellow-300", bg: "bg-yellow-400/10", border: "border-yellow-400/30" };
-  if (rating >= 80) return { label: "PREMIUM", text: "text-emerald-300", bg: "bg-emerald-400/10", border: "border-emerald-400/30" };
-  if (rating >= 70) return { label: "STRONG", text: "text-blue-300", bg: "bg-blue-400/10", border: "border-blue-400/30" };
-  if (rating >= 60) return { label: "SOLID", text: "text-white/60", bg: "bg-white/5", border: "border-white/15" };
+  if (rating >= 150) return { label: "GENERATIONAL", text: "text-yellow-400", bg: "bg-yellow-400/15", border: "border-yellow-400/40" };
+  if (rating >= 130) return { label: "ELITE", text: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30" };
+  if (rating >= 110) return { label: "STRONG", text: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/30" };
+  if (rating >= 90) return { label: "SOLID", text: "text-gray-300", bg: "bg-white/5", border: "border-white/15" };
   return { label: "RISK", text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" };
 }
 
@@ -740,6 +742,62 @@ function UpgradeCTABanner() {
   );
 }
 
+// ─── Premium Insights Bar ─────────────────────────────────────────────────────
+
+function PremiumInsightsBar({ rows }: { rows: RankingRow[] }) {
+  const total = rows.length;
+  const elite = rows.filter((r) => (r.neeko_rating ?? 0) >= 130).length;
+  const value = rows.filter((r) => (r.value_score ?? 0) >= 1.10).length;
+  const risk = rows.filter((r) => (r.risk_rating ?? 0) >= 75).length;
+
+  const stats = [
+    { label: "Players Analysed", value: total, color: "text-white" },
+    { label: "Elite Picks (130+)", value: elite, color: "text-green-400" },
+    { label: "Value Picks", value: value, color: "text-[#F5C84C]" },
+    { label: "High Risk", value: risk, color: "text-red-400" },
+  ];
+
+  return (
+    <div className="mb-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+      {stats.map(({ label, value: val, color }) => (
+        <div key={label} className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3">
+          <p className="text-[10px] text-white/35 uppercase tracking-wider mb-1">{label}</p>
+          <p className={`text-xl font-bold tabular-nums ${color}`}>{val}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── CSV Export ───────────────────────────────────────────────────────────────
+
+function exportToCSV(rows: RankingRow[]) {
+  const headers = ["Rank", "Player", "Team", "Position", "Neeko Rating", "Projection", "Confidence", "Risk", "Price", "Value Score", "AI Rec", "Why"];
+  const lines = rows.map((r, i) => [
+    i + 1,
+    r.player_name,
+    r.team,
+    r.position ?? "",
+    r.neeko_rating != null ? Number(r.neeko_rating).toFixed(1) : "",
+    r.projection_final != null ? Number(r.projection_final).toFixed(1) : "",
+    r.projection_confidence != null ? `${Math.round(Number(r.projection_confidence))}%` : "",
+    r.risk_rating != null ? `${Math.round(Number(r.risk_rating))}%` : "",
+    r.price != null ? (Number(r.price) >= 1_000_000 ? `$${(Number(r.price) / 1_000_000).toFixed(2)}m` : `$${Math.round(Number(r.price) / 1000)}k`) : "",
+    r.value_score != null ? Number(r.value_score).toFixed(2) : "",
+    r.ai_recommendation ?? "",
+    (r.recommendation_why ?? "").replace(/,/g, " "),
+  ].map(String).join(","));
+
+  const csv = [headers.join(","), ...lines].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `neeko-rankings-${new Date().toISOString().split("T")[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AFLRankingsPage() {
@@ -750,10 +808,13 @@ export default function AFLRankingsPage() {
   const [rows, setRows] = useState<RankingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
+  const [premiumFilter, setPremiumFilter] = useState<PremiumFilter>("ALL");
   const [searchTerm, setSearchTerm] = useState("");
   const [selected, setSelected] = useState<(RankingRow & { _rank: number; _unlocked: boolean }) | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [ratingInfoOpen, setRatingInfoOpen] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("neeko_rating");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const fetchRankings = useCallback(async () => {
     setLoading(true);
@@ -799,9 +860,47 @@ export default function AFLRankingsPage() {
     setSearchTerm("");
   }
 
-  const displayRows = isPremium && searchTerm.trim()
-    ? rows.filter((r) => r.player_name.toLowerCase().includes(searchTerm.toLowerCase()))
-    : rows;
+  function handleSortClick(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  }
+
+  const displayRows = useMemo(() => {
+    let filtered = [...rows];
+
+    if (isPremium && searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (r) => r.player_name.toLowerCase().includes(term) || r.team.toLowerCase().includes(term)
+      );
+    }
+
+    if (isPremium && premiumFilter !== "ALL") {
+      if (premiumFilter === "TOP50") {
+        filtered = filtered.slice(0, 50);
+      } else if (premiumFilter === "TOP100") {
+        filtered = filtered.slice(0, 100);
+      } else if (premiumFilter === "ELITE") {
+        filtered = filtered.filter((r) => (r.neeko_rating ?? 0) >= 130);
+      } else {
+        filtered = filtered.filter((r) => normalisePosition(r.position) === premiumFilter);
+      }
+    }
+
+    if (isPremium) {
+      filtered.sort((a, b) => {
+        const av = (a[sortKey] as number | null) ?? -Infinity;
+        const bv = (b[sortKey] as number | null) ?? -Infinity;
+        return sortDir === "desc" ? bv - av : av - bv;
+      });
+    }
+
+    return filtered;
+  }, [rows, searchTerm, isPremium, premiumFilter, sortKey, sortDir]);
 
   function isPremiumColumn(colKey: string): boolean {
     return ["price", "value_score", "value_tag", "ai_recommendation", "recommendation_why", "ai_summary"].includes(colKey);
@@ -817,6 +916,14 @@ export default function AFLRankingsPage() {
     return isPremiumColumn(colKey);
   }
 
+  function SortIcon({ col }: { col: SortKey }) {
+    if (!isPremium) return null;
+    if (sortKey !== col) return <ChevronDown size={11} className="text-white/20 inline-block ml-0.5" />;
+    return sortDir === "desc"
+      ? <ChevronDown size={11} className="text-[#F5C84C] inline-block ml-0.5" />
+      : <ChevronUp size={11} className="text-[#F5C84C] inline-block ml-0.5" />;
+  }
+
   function renderRow(row: RankingRow, idx: number) {
     const rank = idx + 1;
     const rowUnlocked = isFreeRow(idx) || isPremium;
@@ -825,141 +932,121 @@ export default function AFLRankingsPage() {
       setSelected({ ...row, _rank: rank, _unlocked: rowUnlocked });
     };
 
-    const rowClass = "border-b border-white/[0.04] transition-all duration-150 cursor-pointer hover:bg-white/5";
-
-    const rankCell = (
-      <td key="rank" className="px-3 py-3 text-sm text-white/30 tabular-nums text-center whitespace-nowrap" style={{ width: 52, minWidth: 52 }}>
-        {rank}
-      </td>
-    );
-
-    const playerCell = (
-      <td key="player" className="px-4 py-3 whitespace-nowrap" style={{ width: 240, minWidth: 200 }}>
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-white">{row.player_name}</span>
-            {!isPremium && rowUnlocked && (
-              <span className="rounded-sm bg-[#F5C84C]/15 px-1 py-0.5 text-[9px] font-semibold text-[#F5C84C] uppercase tracking-wide">Free</span>
-            )}
-          </div>
-          <div className="text-[11px] text-white/40 mt-0.5">
-            {row.team}{row.position ? ` · ${row.position}` : ""}
-          </div>
-        </div>
-      </td>
-    );
-
     const neekoRBadge = getNeekoRatingBadge(row.neeko_rating ?? null);
-    const neekoCell = (
-      <td key="neeko" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 140, minWidth: 120 }}>
-        <div className="flex flex-col items-center gap-0.5">
-          <span className={`text-sm font-bold tabular-nums ${neekoRBadge.text}`}>
-            {row.neeko_rating != null ? Number(row.neeko_rating).toFixed(1) : "—"}
-          </span>
-          {neekoRBadge.label !== "—" && (
-            <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${neekoRBadge.text} ${neekoRBadge.bg} ${neekoRBadge.border}`}>
-              {neekoRBadge.label}
-            </span>
-          )}
-        </div>
-      </td>
-    );
-
-    const projCell = (
-      <td key="proj" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
-        <span className="text-sm font-semibold text-[#F5C84C] tabular-nums">{fmt(row.projection_final)}</span>
-      </td>
-    );
-
-    const confCell = (
-      <td key="conf" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
-        <span className={`text-sm font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
-          {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
-        </span>
-      </td>
-    );
-
     const riskBadge = getRiskBadge(Number(row.risk_rating) ?? null);
-    const riskCell = (
-      <td key="risk" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
-        <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${riskBadge.text} ${riskBadge.bg} ${riskBadge.border}`}>
-          {riskBadge.label}
-        </span>
-      </td>
-    );
-
-    const aiRecCell = (
-      <td key="airec" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 150, minWidth: 130 }}>
-        {isLockedCell("ai_recommendation", idx) ? (
-          <LockedCell onClick={() => setShowUpgradeModal(true)} />
-        ) : row.ai_recommendation ? (
-          <span
-            className="inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap"
-            style={row.recommendation_color ? {
-              color: row.recommendation_color,
-              background: `${row.recommendation_color}18`,
-              borderColor: `${row.recommendation_color}40`,
-            } : { color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)" }}
-          >
-            {row.ai_recommendation}
-          </span>
-        ) : <span className="text-white/20 text-xs">—</span>}
-      </td>
-    );
-
-    const whyCell = (
-      <td key="why" className="px-4 py-3 text-left align-middle" style={{ minWidth: 160, maxWidth: 260 }}>
-        {isLockedCell("recommendation_why", idx) ? (
-          <LockedWhyCell onClick={() => setShowUpgradeModal(true)} />
-        ) : (
-          <span className="text-xs text-white/60 line-clamp-2 leading-snug max-w-[260px] block truncate">{row.recommendation_why ?? "—"}</span>
-        )}
-      </td>
-    );
-
-    const priceCell = (
-      <td key="price" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 110, minWidth: 90 }}>
-        {isLockedCell("price", idx) ? (
-          <LockedCell onClick={() => setShowUpgradeModal(true)} />
-        ) : (
-          <span className="text-sm font-semibold text-white/70 tabular-nums">{fmtPrice(row.price)}</span>
-        )}
-      </td>
-    );
-
     const vtStyle = getValueTagStyle(row.value_tag);
-    const valueCell = (
-      <td key="value" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 120, minWidth: 100 }}>
-        {isLockedCell("value_score", idx) ? (
-          <LockedCell onClick={() => setShowUpgradeModal(true)} />
-        ) : (
-          <div className="flex flex-col items-center gap-0.5">
-            <span className={`text-sm font-bold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
-              {fmtValueScore(row.value_score)}
-            </span>
-            {row.value_tag && (
-              <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${vtStyle.text} ${vtStyle.bg} ${vtStyle.border}`}>
-                {row.value_tag}
-              </span>
-            )}
-          </div>
-        )}
-      </td>
-    );
+
+    const rowClass = isPremium
+      ? "border-b border-white/[0.04] cursor-pointer transition-all duration-150 hover:bg-white/[0.06] hover:scale-[1.002]"
+      : "border-b border-white/[0.04] transition-all duration-150 cursor-pointer hover:bg-white/5";
 
     return (
       <tr key={row.player_id ?? row.player_name} className={rowClass} onClick={handleRowClick}>
-        {rankCell}
-        {playerCell}
-        {neekoCell}
-        {projCell}
-        {confCell}
-        {riskCell}
-        {priceCell}
-        {valueCell}
-        {aiRecCell}
-        {whyCell}
+        <td className="px-3 py-3 text-sm text-white/30 tabular-nums text-center whitespace-nowrap" style={{ width: 52, minWidth: 52 }}>
+          {rank}
+        </td>
+        <td className="px-4 py-3 whitespace-nowrap" style={{ width: 240, minWidth: 200 }}>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-white">{row.player_name}</span>
+              {!isPremium && rowUnlocked && (
+                <span className="rounded-sm bg-[#F5C84C]/15 px-1 py-0.5 text-[9px] font-semibold text-[#F5C84C] uppercase tracking-wide">Free</span>
+              )}
+            </div>
+            <div className="text-[11px] text-white/40 mt-0.5">
+              {row.team}{row.position ? ` · ${row.position}` : ""}
+            </div>
+          </div>
+        </td>
+        <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 140, minWidth: 120 }}>
+          <div className="flex flex-col items-center gap-0.5">
+            <span className={`text-sm font-bold tabular-nums ${neekoRBadge.text}`}>
+              {row.neeko_rating != null ? Number(row.neeko_rating).toFixed(1) : "—"}
+            </span>
+            {neekoRBadge.label !== "—" && (
+              <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${neekoRBadge.text} ${neekoRBadge.bg} ${neekoRBadge.border}`}>
+                {neekoRBadge.label}
+              </span>
+            )}
+          </div>
+        </td>
+        <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
+          <span className="text-sm font-semibold text-[#F5C84C] tabular-nums">{fmt(row.projection_final)}</span>
+        </td>
+        <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
+          <span className={`text-sm font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
+            {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
+          </span>
+        </td>
+        <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
+          <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${riskBadge.text} ${riskBadge.bg} ${riskBadge.border}`}>
+            {riskBadge.label}
+          </span>
+        </td>
+        <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 110, minWidth: 90 }}>
+          {isLockedCell("price", idx) ? (
+            <LockedCell onClick={() => setShowUpgradeModal(true)} />
+          ) : (
+            <span className="text-sm font-semibold text-white/70 tabular-nums">{fmtPrice(row.price)}</span>
+          )}
+        </td>
+        <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 120, minWidth: 100 }}>
+          {isLockedCell("value_score", idx) ? (
+            <LockedCell onClick={() => setShowUpgradeModal(true)} />
+          ) : (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className={`text-sm font-bold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
+                {fmtValueScore(row.value_score)}
+              </span>
+              {row.value_tag && (
+                <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${vtStyle.text} ${vtStyle.bg} ${vtStyle.border}`}>
+                  {row.value_tag}
+                </span>
+              )}
+            </div>
+          )}
+        </td>
+        <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 150, minWidth: 130 }}>
+          {isLockedCell("ai_recommendation", idx) ? (
+            <LockedCell onClick={() => setShowUpgradeModal(true)} />
+          ) : row.ai_recommendation ? (
+            <span
+              className="inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap"
+              style={row.recommendation_color ? {
+                color: row.recommendation_color,
+                background: `${row.recommendation_color}18`,
+                borderColor: `${row.recommendation_color}40`,
+              } : { color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)" }}
+            >
+              {row.ai_recommendation}
+            </span>
+          ) : <span className="text-white/20 text-xs">—</span>}
+        </td>
+        <td className="px-4 py-3 text-left align-middle" style={{ minWidth: 160, maxWidth: 260 }}>
+          {isLockedCell("recommendation_why", idx) ? (
+            <LockedWhyCell onClick={() => setShowUpgradeModal(true)} />
+          ) : (
+            <span className="text-xs text-white/60 leading-snug max-w-[260px] block truncate">{row.recommendation_why ?? "—"}</span>
+          )}
+        </td>
       </tr>
+    );
+  }
+
+  function SortableTh({ label, col, width, tooltip }: { label: string; col: SortKey; width?: number; tooltip?: string }) {
+    const isActive = isPremium && sortKey === col;
+    return (
+      <th
+        className={`${TH} ${isActive ? "text-[#F5C84C]" : "text-white/40"} ${isPremium ? "cursor-pointer hover:text-white/70 select-none" : ""} transition-colors`}
+        style={width ? { width, minWidth: width } : undefined}
+        onClick={isPremium ? () => handleSortClick(col) : undefined}
+      >
+        <span className="inline-flex items-center gap-0.5 justify-center">
+          {label}
+          {tooltip && <InfoTooltip text={tooltip} />}
+          <SortIcon col={col} />
+        </span>
+      </th>
     );
   }
 
@@ -971,20 +1058,24 @@ export default function AFLRankingsPage() {
         <th
           className={`${TH} text-[#F5C84C] cursor-pointer hover:text-[#F5C84C]/80 transition-colors select-none`}
           style={{ width: 140, minWidth: 120 }}
-          onClick={() => setRatingInfoOpen(true)}
+          onClick={() => isPremium ? handleSortClick("neeko_rating") : setRatingInfoOpen(true)}
         >
           <span className="inline-flex items-center gap-1.5 justify-center">
             Neeko Rating
-            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-[#F5C84C]/40 bg-[#F5C84C]/10 text-[#F5C84C] text-[9px] font-bold leading-none shrink-0">
-              ?
-            </span>
+            {isPremium ? (
+              <SortIcon col="neeko_rating" />
+            ) : (
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-[#F5C84C]/40 bg-[#F5C84C]/10 text-[#F5C84C] text-[9px] font-bold leading-none shrink-0">
+                ?
+              </span>
+            )}
           </span>
         </th>
-        <Th label="Projection" width={100} />
-        <Th label="Confidence" width={100} tooltip="AI certainty in the projection" />
-        <Th label="Risk" width={100} />
+        <SortableTh label="Projection" col="projection_final" width={100} />
+        <SortableTh label="Confidence" col="projection_confidence" width={100} tooltip="AI certainty in the projection" />
+        <SortableTh label="Risk" col="risk_rating" width={100} />
         <Th label="Price" locked={!isPremium} width={110} />
-        <Th label="Value" locked={!isPremium} width={120} tooltip="Points per dollar — higher is better value" />
+        <SortableTh label="Value" col="value_score" width={120} tooltip="Points per dollar — higher is better value" />
         <Th label="AI Rec" locked={!isPremium} width={150} />
         <Th label="Why" locked={!isPremium} />
       </tr>
@@ -993,23 +1084,51 @@ export default function AFLRankingsPage() {
 
   const TOTAL_COLS = 10;
 
+  const PREMIUM_QUICK_FILTERS: { key: PremiumFilter; label: string }[] = [
+    { key: "ALL", label: "All" },
+    { key: "DEF", label: "DEF" },
+    { key: "MID", label: "MID" },
+    { key: "FWD", label: "FWD" },
+    { key: "RUC", label: "RUC" },
+    { key: "TOP50", label: "Top 50" },
+    { key: "TOP100", label: "Top 100" },
+    { key: "ELITE", label: "Elite Only" },
+  ];
+
   return (
     <div className="min-h-screen bg-[#070707] text-white">
       <div className="px-4 pt-10 pb-6 md:px-8">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white">Player Rankings</h1>
             <p className="mt-1 text-sm text-white/40">AFL 2026 — Fantasy projection rankings</p>
           </div>
-          {!isPremium && (
-            <a
-              href="/neeko-plus"
-              className="flex items-center gap-1.5 rounded-lg border border-[#F5C84C]/30 bg-[#F5C84C]/10 px-3 py-2 text-xs font-semibold text-[#F5C84C] hover:bg-[#F5C84C]/20 transition-colors whitespace-nowrap"
-            >
-              <Crown size={12} />
-              Upgrade to Neeko+
-            </a>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {isPremium && (
+              <>
+                <button
+                  onClick={() => exportToCSV(displayRows)}
+                  className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/60 hover:bg-white/10 hover:text-white/80 transition-colors whitespace-nowrap"
+                >
+                  <Download size={12} />
+                  Export CSV
+                </button>
+                <div className="flex items-center gap-1.5 rounded-lg border border-[#F5C84C]/30 bg-[#F5C84C]/10 px-3 py-2 whitespace-nowrap">
+                  <Crown size={12} className="text-[#F5C84C]" />
+                  <span className="text-xs font-semibold text-yellow-400">Neeko+ Active</span>
+                </div>
+              </>
+            )}
+            {!isPremium && (
+              <a
+                href="/neeko-plus"
+                className="flex items-center gap-1.5 rounded-lg border border-[#F5C84C]/30 bg-[#F5C84C]/10 px-3 py-2 text-xs font-semibold text-[#F5C84C] hover:bg-[#F5C84C]/20 transition-colors whitespace-nowrap"
+              >
+                <Crown size={12} />
+                Upgrade to Neeko+
+              </a>
+            )}
+          </div>
         </div>
 
         {!isPremium && (
@@ -1047,7 +1166,7 @@ export default function AFLRankingsPage() {
                     isActive
                       ? "bg-[#F5C84C] text-black shadow-[0_0_12px_rgba(245,200,76,0.3)]"
                       : isLocked
-                      ? "bg-white/5 text-white/30 border border-white/8 cursor-pointer hover:border-[#F5C84C]/30"
+                      ? "bg-white/5 text-white/30 border border-white/[0.08] cursor-pointer hover:border-[#F5C84C]/30"
                       : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10 hover:text-white/80"
                   }`}
                 >
@@ -1067,12 +1186,12 @@ export default function AFLRankingsPage() {
             <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/40 w-4 h-4" />
             <input
               type="text"
-              placeholder={isPremium ? "Search player…" : "Search player… (Neeko+ only)"}
+              placeholder={isPremium ? "Search player or team…" : "Search player… (Neeko+ only)"}
               value={searchTerm}
               onChange={(e) => { if (isPremium) setSearchTerm(e.target.value); }}
               onClick={() => { if (!isPremium) setShowUpgradeModal(true); }}
               readOnly={!isPremium}
-              className={`w-full bg-zinc-900 border border-zinc-700 rounded-xl pl-10 pr-10 py-3 text-white placeholder:text-white/30 focus:outline-none transition-colors ${
+              className={`w-full bg-zinc-900 border border-zinc-700 rounded-xl pl-10 pr-10 py-3 text-white placeholder:text-white/30 focus:outline-none transition-colors text-sm ${
                 isPremium
                   ? "focus:ring-1 focus:border-[#F5C84C] focus:ring-[#F5C84C]"
                   : "opacity-50 cursor-pointer"
@@ -1091,30 +1210,58 @@ export default function AFLRankingsPage() {
           </div>
         </div>
 
-        <div className="mb-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-20 shrink-0">Position</span>
-            {POSITIONS.map((pos) => (
-              <button
-                key={pos}
-                onClick={() => setPositionFilter(pos)}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  positionFilter === pos
-                    ? "bg-[#F5C84C] text-black"
-                    : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80"
-                }`}
-              >
-                {pos}
-              </button>
-            ))}
+        {isPremium ? (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-14 shrink-0">Filter</span>
+              {PREMIUM_QUICK_FILTERS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setPremiumFilter(key)}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    premiumFilter === key
+                      ? "bg-[#F5C84C] text-black"
+                      : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-20 shrink-0">Position</span>
+              {POSITIONS.map((pos) => (
+                <button
+                  key={pos}
+                  onClick={() => setPositionFilter(pos)}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    positionFilter === pos
+                      ? "bg-[#F5C84C] text-black"
+                      : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80"
+                  }`}
+                >
+                  {pos}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isPremium && !loading && <PremiumInsightsBar rows={displayRows} />}
 
         {isMobile && (
           <div className="text-center text-xs text-white/30 mb-2">Swipe left to scroll · tap any player for full breakdown</div>
         )}
-        {!isMobile && (
+        {!isMobile && !isPremium && (
           <p className="text-xs text-zinc-500 mb-2">Click any player for full AI breakdown</p>
+        )}
+        {!isMobile && isPremium && (
+          <p className="text-xs text-white/25 mb-2">
+            {displayRows.length} players · Click column headers to sort · Click any player for full breakdown
+          </p>
         )}
 
         <div className="relative w-full">
@@ -1131,11 +1278,11 @@ export default function AFLRankingsPage() {
             </>
           )}
           <div
-            className={`w-full overflow-x-auto scrollbar-thin scrollbar-thumb-[#F5C84C]/30 scrollbar-track-transparent rounded-xl border border-white/5 ${!isMobile ? "overflow-y-auto max-h-[75vh]" : ""}`}
+            className={`w-full overflow-x-auto scrollbar-thin scrollbar-thumb-[#F5C84C]/30 scrollbar-track-transparent rounded-xl border ${isPremium ? "border-[#F5C84C]/10" : "border-white/5"} ${!isMobile ? "overflow-y-auto max-h-[75vh]" : ""}`}
             style={isMobile ? { WebkitOverflowScrolling: "touch" } : undefined}
           >
             <table className="min-w-[800px] w-full border-collapse">
-              <thead className="sticky top-0 z-30 bg-[#070707] border-b border-[#F5C84C]/20">
+              <thead className={`sticky top-0 z-30 ${isPremium ? "bg-[#0a0a0a]" : "bg-[#070707]"} border-b border-[#F5C84C]/20`}>
                 {renderHeaders()}
               </thead>
               <tbody>
@@ -1157,10 +1304,7 @@ export default function AFLRankingsPage() {
                             className="border-b border-white/[0.04] relative cursor-pointer"
                             onClick={() => setShowUpgradeModal(true)}
                           >
-                            <td
-                              colSpan={TOTAL_COLS}
-                              className="px-4 py-3 select-none"
-                            >
+                            <td colSpan={TOTAL_COLS} className="px-4 py-3 select-none">
                               <div className="blur-sm pointer-events-none flex items-center gap-6">
                                 <span className="text-sm text-white/20 w-8 tabular-nums text-center">{idx + 1}</span>
                                 <span className="text-sm font-medium text-white/30 w-40">Player {idx + 1}</span>
@@ -1171,9 +1315,7 @@ export default function AFLRankingsPage() {
                               </div>
                               <div className="absolute inset-0 flex items-center justify-center gap-2">
                                 <Lock size={11} className="text-[#F5C84C]/50 shrink-0" />
-                                <span className="text-[11px] font-semibold text-[#F5C84C]/60">
-                                  Unlock with Neeko+
-                                </span>
+                                <span className="text-[11px] font-semibold text-[#F5C84C]/60">Unlock with Neeko+</span>
                               </div>
                             </td>
                           </tr>
