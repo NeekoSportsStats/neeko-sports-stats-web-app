@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { Lock, Crown, ChevronUp, ChevronDown, X, Info, Search } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Dot } from "recharts";
@@ -31,6 +30,7 @@ interface RankingRow {
   price?: number | null;
   value_score?: number | null;
   price_tier?: string | null;
+  value_tag?: string | null;
   total_count?: number | null;
 }
 
@@ -58,9 +58,10 @@ interface ScoreHistoryPoint {
   season: number;
 }
 
-type SortKey = "projection_final" | "consistency_score";
+type SortKey = "projection_final" | "consistency_score" | "value_score" | "price";
 type SortDir = "asc" | "desc";
 type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
+type ValueFilter = "ALL" | "ELITE VALUE" | "GOOD VALUE" | "POOR VALUE";
 
 const FREE_ROW_LIMIT = 20;
 const FREE_UNLOCKED_METRICS = 5;
@@ -163,9 +164,24 @@ function getConfidenceColor(v: number | null) {
 
 function getValueScoreColor(v: number | null) {
   if (v == null) return "text-white/30";
-  if (v >= 1.5) return "text-green-400";
-  if (v >= 1.0) return "text-yellow-400";
+  if (v >= 1.25) return "text-green-400";
+  if (v >= 1.10) return "text-[#F5C84C]";
+  if (v >= 0.95) return "text-white/50";
   return "text-red-400";
+}
+
+function fmtPrice(v: number | null | undefined): string {
+  if (v == null) return "—";
+  if (v >= 1000000) return `$${(v / 1000000).toFixed(2)}m`;
+  return `$${Math.round(v / 1000)}k`;
+}
+
+function getValueTagStyle(tag: string | null | undefined): { text: string; bg: string; border: string } {
+  if (!tag) return { text: "text-white/30", bg: "bg-white/5", border: "border-white/10" };
+  if (tag === "ELITE VALUE") return { text: "text-green-300", bg: "bg-green-500/10", border: "border-green-500/30" };
+  if (tag === "GOOD VALUE") return { text: "text-[#F5C84C]", bg: "bg-[#F5C84C]/10", border: "border-[#F5C84C]/30" };
+  if (tag === "FAIR VALUE") return { text: "text-white/50", bg: "bg-white/5", border: "border-white/10" };
+  return { text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" };
 }
 
 function getCaptainStyle(rating: string | null): { text: string; bg: string; border: string; icon: string } {
@@ -519,7 +535,7 @@ function PlayerDetailModal({
       setLoading(true);
       const [rankRes, capRes, aiRes] = await Promise.all([
         supabase
-          .from("v_rankings_premium")
+          .from("v_rankings_with_value")
           .select("*")
           .eq("player_id", row.player_id)
           .maybeSingle(),
@@ -650,6 +666,31 @@ function PlayerDetailModal({
                 </div>
               )}
             </div>
+
+            {/* Price + Value Block */}
+            {unlocked && (detail.price != null || detail.value_score != null) && (() => {
+              const vtStyle = getValueTagStyle(detail.value_tag);
+              return (
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-lg bg-white/[0.04] border border-white/5 px-3 py-3">
+                    <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Price</p>
+                    <p className="text-base font-bold text-white/80">{fmtPrice(detail.price)}</p>
+                  </div>
+                  <div className="rounded-lg bg-white/[0.04] border border-white/5 px-3 py-3">
+                    <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Value Score</p>
+                    <p className={`text-base font-bold tabular-nums ${getValueScoreColor(detail.value_score ?? null)}`}>
+                      {detail.value_score != null ? Number(detail.value_score).toFixed(2) : "—"}
+                    </p>
+                  </div>
+                  <div className={`rounded-lg border px-3 py-3 ${vtStyle.bg} ${vtStyle.border}`}>
+                    <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Value</p>
+                    <p className={`text-xs font-bold leading-tight ${vtStyle.text}`}>
+                      {detail.value_tag ?? "—"}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Consistency Range Bar */}
             {unlocked && (
@@ -890,9 +931,9 @@ export default function AFLRankingsPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selected, setSelected] = useState<(RankingRow & { _rank: number; _unlocked: boolean }) | null>(null);
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
+  const [valueFilter, setValueFilter] = useState<ValueFilter>("ALL");
   const [totalCount, setTotalCount] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState("");
-  const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchRankings() {
@@ -900,7 +941,7 @@ export default function AFLRankingsPage() {
 
       if (isPremium) {
         const { data } = await supabase
-          .from("v_rankings_value_2026")
+          .from("v_rankings_with_value")
           .select(`
             player_id,
             player_name,
@@ -923,7 +964,8 @@ export default function AFLRankingsPage() {
             recommendation_why,
             price,
             value_score,
-            price_tier
+            price_tier,
+            value_tag
           `)
           .order("projection_final", { ascending: false });
 
@@ -966,11 +1008,19 @@ export default function AFLRankingsPage() {
     ? rows
     : rows.filter((r) => r.position === positionFilter);
 
-  const filtered = isPremium && searchTerm.trim()
-    ? posFiltered.filter((r) => r.player_name.toLowerCase().includes(searchTerm.toLowerCase()))
-    : posFiltered;
+  const valueFiltered = !isPremium || valueFilter === "ALL"
+    ? posFiltered
+    : valueFilter === "ELITE VALUE"
+    ? posFiltered.filter((r) => r.value_tag === "ELITE VALUE")
+    : valueFilter === "GOOD VALUE"
+    ? posFiltered.filter((r) => r.value_tag === "ELITE VALUE" || r.value_tag === "GOOD VALUE")
+    : posFiltered.filter((r) => r.value_tag === "POOR VALUE");
 
-  const sorted = [...filtered].sort((a, b) => {
+  const searchFiltered = isPremium && searchTerm.trim()
+    ? valueFiltered.filter((r) => r.player_name.toLowerCase().includes(searchTerm.toLowerCase()))
+    : valueFiltered;
+
+  const sorted = [...searchFiltered].sort((a, b) => {
     const av = (a[sortKey] as number | null) ?? -Infinity;
     const bv = (b[sortKey] as number | null) ?? -Infinity;
     return sortDir === "desc" ? bv - av : av - bv;
@@ -978,7 +1028,7 @@ export default function AFLRankingsPage() {
 
   const visibleRows = isPremium ? sorted : sorted.slice(0, FREE_ROW_LIMIT);
 
-  const TOTAL_COLS = 9;
+  const TOTAL_COLS = 10;
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
@@ -1081,6 +1131,51 @@ export default function AFLRankingsPage() {
           )}
         </div>
 
+        {/* Sort + Value Filter Controls */}
+        {isPremium && (
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 whitespace-nowrap">Sort By</span>
+              <select
+                value={sortKey}
+                onChange={(e) => { setSortKey(e.target.value as SortKey); setSortDir("desc"); }}
+                className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white/80 focus:outline-none focus:border-[#F5C84C] transition-colors"
+              >
+                <option value="projection_final">Projection</option>
+                <option value="value_score">Value Score</option>
+                <option value="price">Price</option>
+                <option value="consistency_score">Consistency</option>
+              </select>
+              <button
+                onClick={() => setSortDir((d) => d === "desc" ? "asc" : "desc")}
+                className="flex items-center gap-1 rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs text-white/50 hover:text-white/80 transition-colors"
+              >
+                {sortDir === "desc" ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                {sortDir === "desc" ? "High → Low" : "Low → High"}
+              </button>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 whitespace-nowrap">Value</span>
+              {(["ALL", "ELITE VALUE", "GOOD VALUE", "POOR VALUE"] as ValueFilter[]).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setValueFilter(v)}
+                  className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                    valueFilter === v
+                      ? v === "ELITE VALUE" ? "bg-green-500/20 text-green-300 border border-green-500/40"
+                        : v === "GOOD VALUE" ? "bg-[#F5C84C]/20 text-[#F5C84C] border border-[#F5C84C]/40"
+                        : v === "POOR VALUE" ? "bg-red-500/20 text-red-400 border border-red-500/40"
+                        : "bg-white/10 text-white/80 border border-white/20"
+                      : "bg-white/5 text-white/40 border border-transparent hover:bg-white/10 hover:text-white/60"
+                  }`}
+                >
+                  {v === "ALL" ? "All" : v}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Rankings Table — shared horizontal scroll layout for mobile and desktop */}
         {isMobile ? (
         <div className="relative">
@@ -1111,6 +1206,9 @@ export default function AFLRankingsPage() {
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C] uppercase tracking-wider w-[50px]">#</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[#F5C84C] uppercase tracking-wider w-[220px]">Player</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C] uppercase tracking-wider w-[100px]">Proj</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C]/40 uppercase tracking-wider w-[100px]">
+                    <span className="flex items-center justify-center gap-1"><Lock size={10} />Price</span>
+                  </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C]/40 uppercase tracking-wider w-[110px]">
                     <span className="flex items-center justify-center gap-1"><Lock size={10} />Value</span>
                   </th>
@@ -1162,11 +1260,28 @@ export default function AFLRankingsPage() {
                           <td className="px-4 py-4 text-center text-sm w-[100px]">
                             <span className="font-bold text-[#F5C84C] tabular-nums">{fmt(row.projection_final)}</span>
                           </td>
+                          <td className="px-4 py-4 text-center text-sm w-[100px]">
+                            {!metricsUnlocked ? <LockedCell /> : (
+                              <span className="font-semibold text-white/60 tabular-nums">
+                                {fmtPrice(row.price)}
+                              </span>
+                            )}
+                          </td>
                           <td className="px-4 py-4 text-center text-sm w-[110px]">
                             {!metricsUnlocked ? <LockedCell /> : (
-                              <span className={`font-semibold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
-                                {row.value_score != null ? `Value: ${Number(row.value_score).toFixed(2)}` : "—"}
-                              </span>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className={`font-bold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
+                                  {row.value_score != null ? Number(row.value_score).toFixed(2) : "—"}
+                                </span>
+                                {row.value_tag && (() => {
+                                  const s = getValueTagStyle(row.value_tag);
+                                  return (
+                                    <span className={`inline-block rounded px-1 py-0.5 text-[9px] font-semibold border ${s.text} ${s.bg} ${s.border}`}>
+                                      {row.value_tag}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
                             )}
                           </td>
                           <td className="px-4 py-4 text-center text-sm w-[110px]">
@@ -1261,6 +1376,7 @@ export default function AFLRankingsPage() {
                 <th className={`${TH_BASE} text-left text-white/40 min-w-[160px]`}>Player</th>
                 <th className={`${TH_BASE} text-white/40 min-w-[80px]`}>Team</th>
                 <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
+                <PlainTh label="Price" locked={!isPremium} />
                 <PlainTh label="Value" locked={!isPremium} />
                 <PlainTh label="Captain" locked={!isPremium} />
                 <PlainTh label="Upside" locked={!isPremium} />
@@ -1314,12 +1430,31 @@ export default function AFLRankingsPage() {
                           </span>
                         </td>
 
-                        {/* Value Score */}
+                        {/* Price */}
                         <td className="px-4 py-3 text-center whitespace-nowrap">
                           {!metricsUnlocked ? <LockedCell /> : (
-                            <span className={`text-sm font-semibold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
-                              {row.value_score != null ? `Value: ${Number(row.value_score).toFixed(2)}` : "—"}
+                            <span className="text-sm font-semibold text-white/60 tabular-nums">
+                              {fmtPrice(row.price)}
                             </span>
+                          )}
+                        </td>
+
+                        {/* Value Score + Tag */}
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
+                          {!metricsUnlocked ? <LockedCell /> : (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className={`text-sm font-bold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
+                                {row.value_score != null ? Number(row.value_score).toFixed(2) : "—"}
+                              </span>
+                              {row.value_tag && (() => {
+                                const s = getValueTagStyle(row.value_tag);
+                                return (
+                                  <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${s.text} ${s.bg} ${s.border}`}>
+                                    {row.value_tag}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                           )}
                         </td>
 
