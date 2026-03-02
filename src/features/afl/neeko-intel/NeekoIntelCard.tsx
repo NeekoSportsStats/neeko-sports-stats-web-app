@@ -274,6 +274,52 @@ function fmtInt(v: number | null): string {
   return Math.round(Number(v)).toString();
 }
 
+// ─── Neeko Score Dominant (large left-anchor display) ────────────────────────
+
+function NeekoScoreDominant({ value }: { value: number }) {
+  let cls: string;
+  if (value >= 80)      cls = "text-[#F5C84C]";
+  else if (value >= 65) cls = "text-emerald-400";
+  else if (value >= 50) cls = "text-sky-400";
+  else if (value >= 35) cls = "text-orange-400";
+  else                  cls = "text-red-400";
+  return (
+    <div className={`text-4xl font-black tabular-nums leading-none ${cls}`}>
+      {value}
+    </div>
+  );
+}
+
+// ─── Trend Strength Display ───────────────────────────────────────────────────
+
+function TrendStrengthDisplay({
+  value,
+  trendTag,
+}: {
+  value: number | null;
+  trendTag?: string | null;
+}) {
+  if (value == null) return null;
+  const isPositive = value > 0;
+  const isNeutral = value === 0;
+  const sign = isPositive ? "+" : "";
+  const cls = isNeutral
+    ? "text-white/40"
+    : isPositive
+    ? "text-green-400"
+    : "text-orange-400";
+  const tag = trendTag ?? (isPositive ? "Rising" : value < 0 ? "Falling" : "Stable");
+  return (
+    <div>
+      <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Trend</div>
+      <div className={`text-sm font-semibold tabular-nums flex items-center gap-1 ${cls}`}>
+        {isPositive ? <TrendingUp size={12} /> : !isNeutral ? <TrendingDown size={12} /> : null}
+        {tag} ({sign}{value})
+      </div>
+    </div>
+  );
+}
+
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
 export function NeekoIntelCard({
@@ -306,13 +352,14 @@ export function NeekoIntelCard({
   trendTag,
   neekoTier,
   volatilityTag,
+  trendStrength,
 }: NeekoIntelCardProps) {
   const isElite = label === "ELITE CAPTAIN" || label === "CAPTAIN LOCK";
 
   const hasBadgeRow =
     matchupDifficulty || volatilityLevel || captainTier || breakoutFlag || avoidFlag ||
     confidence != null || trendLabel || roleSignal || matchupTier || trendTag ||
-    ceilingPct != null || bustPct != null || neekoTier || volatilityTag;
+    ceilingPct != null || bustPct != null || volatilityTag;
 
   return (
     <div
@@ -331,13 +378,16 @@ export function NeekoIntelCard({
           )}
           <div className="min-w-0">
             <div className="font-semibold text-white text-sm leading-tight truncate">{playerName}</div>
-            <div className="text-[11px] text-white/40 mt-0.5">
-              {team}{position ? ` · ${position}` : ""}
-              {nextOpponent && (
-                <span className="ml-1.5 text-white/25">
-                  · {nextRound != null ? `R${nextRound} ` : ""}vs {nextOpponent}
-                </span>
-              )}
+            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+              <span className="text-[11px] text-white/40">
+                {team}{position ? ` · ${position}` : ""}
+                {nextOpponent && (
+                  <span className="ml-1.5 text-white/25">
+                    · {nextRound != null ? `R${nextRound} ` : ""}vs {nextOpponent}
+                  </span>
+                )}
+              </span>
+              {neekoTier && <NeekoTierBadge value={neekoTier} />}
             </div>
           </div>
         </div>
@@ -372,14 +422,26 @@ export function NeekoIntelCard({
 
       {/* ── Stats Row ── */}
       <div className="flex items-end gap-5 mt-3">
+        {/* Neeko Score — dominant left anchor */}
+        {neekoScore != null && (
+          <div>
+            <div className="text-[10px] text-white/35 uppercase tracking-wider mb-1">Neeko Score</div>
+            <NeekoScoreDominant value={neekoScore} />
+          </div>
+        )}
+
         <div>
           <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Projection</div>
-          <div className="text-[#F5C84C] font-bold text-2xl tabular-nums leading-none">{fmt(projection)}</div>
+          <div className="text-white/80 font-bold text-xl tabular-nums leading-none">{fmt(projection)}</div>
         </div>
+
+        {trendStrength != null && (
+          <TrendStrengthDisplay value={trendStrength} trendTag={trendTag} />
+        )}
 
         {confidence != null && (
           <div>
-            <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Confidence</div>
+            <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Conf.</div>
             <div
               className={`text-sm font-semibold tabular-nums ${
                 confidence >= 75
@@ -398,7 +460,7 @@ export function NeekoIntelCard({
 
         {captainScore != null && (
           <div>
-            <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Captain Score</div>
+            <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">C Score</div>
             <div className="text-sm font-semibold text-yellow-300 tabular-nums">{fmtInt(captainScore)}</div>
           </div>
         )}
@@ -409,22 +471,12 @@ export function NeekoIntelCard({
             <div className="text-sm font-semibold text-yellow-300">{captainRating}</div>
           </div>
         )}
-
-        {neekoScore != null && (
-          <div className="ml-auto">
-            <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5 text-right">Neeko Score</div>
-            <div className="flex justify-end">
-              <NeekoScoreBadge value={neekoScore} />
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ── Intelligence Badge Row ── */}
       {hasBadgeRow && (
         <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-white/[0.06]">
-          {neekoTier && <NeekoTierBadge value={neekoTier} />}
-          {trendTag && <TrendTagBadge value={trendTag} />}
+          {trendTag && !trendStrength && <TrendTagBadge value={trendTag} />}
           {trendLabel && <TrendBadge value={trendLabel} />}
           {roleSignal && <RoleSignalBadge value={roleSignal} />}
           {matchupTier && <MatchupTierBadge value={matchupTier} />}

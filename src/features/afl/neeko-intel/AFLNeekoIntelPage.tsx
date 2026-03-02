@@ -221,6 +221,7 @@ function PlayerCardList({
             trendTag={row.trend_tag}
             neekoTier={row.neeko_tier}
             volatilityTag={isPremium ? row.volatility_tag : null}
+            trendStrength={isPremium ? row.trend_strength : null}
           />
         );
       })}
@@ -435,6 +436,7 @@ function EliteCaptainHero({
             trendTag={row.trend_tag}
             neekoTier={row.neeko_tier}
             volatilityTag={isPremium ? row.volatility_tag : null}
+            trendStrength={isPremium ? row.trend_strength : null}
           />
         ))}
       </div>
