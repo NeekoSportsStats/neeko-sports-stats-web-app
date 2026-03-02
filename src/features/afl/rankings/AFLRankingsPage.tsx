@@ -866,14 +866,12 @@ export default function AFLRankingsPage() {
   function renderRow(row: RankingRow, idx: number) {
     const rank = idx + 1;
     const rowUnlocked = isFreeRow(idx) || isPremium;
-    const isElite = row.ai_recommendation != null && row.ai_recommendation !== "";
-    void isElite;
 
     const handleRowClick = () => {
       setSelected({ ...row, _rank: rank, _unlocked: rowUnlocked });
     };
 
-    const rowClass = `border-b border-white/[0.04] transition-all duration-150 cursor-pointer hover:bg-white/5`;
+    const rowClass = "border-b border-white/[0.04] transition-all duration-150 cursor-pointer hover:bg-white/5";
 
     const rankCell = (
       <td key="rank" className="px-3 py-3 text-sm text-white/30 tabular-nums text-center whitespace-nowrap" style={{ width: 52, minWidth: 52 }}>
@@ -993,97 +991,40 @@ export default function AFLRankingsPage() {
       </td>
     );
 
-    const capStyle = getCaptainStyle(row.captain_rating ?? null);
-    const captainCell = (
-      <td key="captain" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 140, minWidth: 120 }}>
-        {renderLockedOrValue(row, "captain_rating", idx, () =>
-          row.captain_rating ? (
-            <span className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${capStyle.text} ${capStyle.bg} ${capStyle.border}`}>
-              {capStyle.icon} {row.captain_rating}
-            </span>
-          ) : <span className="text-white/20 text-xs">—</span>
-        )}
-      </td>
-    );
-
-    const matchupCell = (
-      <td key="matchup" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
-        {renderLockedOrValue(row, "matchup_rating", idx, () => (
-          <span className={`text-sm font-semibold tabular-nums ${getMatchupColor(row.matchup_rating ?? null)}`}>
-            {fmtInt(row.matchup_rating)}
-          </span>
-        ))}
-      </td>
-    );
-
-    if (activeTab === "best") {
-      return (
-        <tr key={`${row.player_id ?? row.player_name}-${idx}`} className={rowClass} onClick={handleRowClick}>
-          {rankCell}{playerCell}{neekoCell}{projCell}{confCell}{riskCell}{aiRecCell}{whyCell}
-        </tr>
-      );
-    }
-    if (activeTab === "value") {
-      return (
-        <tr key={`${row.player_id ?? row.player_name}-${idx}`} className={rowClass} onClick={handleRowClick}>
-          {rankCell}{playerCell}{priceCell}{projCell}{valueCell}{riskCell}{whyCell}
-        </tr>
-      );
-    }
     return (
       <tr key={`${row.player_id ?? row.player_name}-${idx}`} className={rowClass} onClick={handleRowClick}>
-        {rankCell}{playerCell}{projCell}{captainCell}{confCell}{matchupCell}{riskCell}{aiRecCell}
+        {rankCell}
+        {playerCell}
+        {neekoCell}
+        {priceCell}
+        {projCell}
+        {valueCell}
+        {confCell}
+        {riskCell}
+        {aiRecCell}
+        {whyCell}
       </tr>
     );
   }
 
   function renderHeaders() {
-    const base = (
-      <>
-        <th className={`${TH} text-white/40`} style={{ width: 52, minWidth: 52 }}>#</th>
-        <th className={`${TH} text-left text-white/40`} style={{ width: 240, minWidth: 200 }}>Player</th>
-      </>
-    );
-
-    if (activeTab === "best") {
-      return (
-        <tr className="border-b border-[#222]">
-          {base}
-          <Th label="Neeko Rating" gold width={140} tooltip="Composite intelligence score: projection + upside + consistency + matchup" />
-          <Th label="Projection" width={100} />
-          <Th label="Confidence" locked={!isPremium} width={100} tooltip="AI certainty in the projection" />
-          <Th label="Risk" locked={!isPremium} width={100} />
-          <Th label="AI Rec" locked={!isPremium} width={150} />
-          <Th label="Why" locked={!isPremium} />
-        </tr>
-      );
-    }
-    if (activeTab === "value") {
-      return (
-        <tr className="border-b border-[#222]">
-          {base}
-          <Th label="Price" locked={!isPremium} width={110} />
-          <Th label="Projection" width={100} />
-          <Th label="Value Score" locked={!isPremium} gold width={120} tooltip="Points per dollar — higher is better value" />
-          <Th label="Risk" locked={!isPremium} width={100} />
-          <Th label="Why" locked={!isPremium} />
-        </tr>
-      );
-    }
     return (
       <tr className="border-b border-[#222]">
-        {base}
-        <Th label="Projection" gold width={100} />
-        <Th label="Captain" locked={!isPremium} width={140} />
-        <Th label="Confidence" locked={!isPremium} width={100} />
-        <Th label="Matchup" locked={!isPremium} width={100} />
+        <th className={`${TH} text-white/40`} style={{ width: 52, minWidth: 52 }}>#</th>
+        <th className={`${TH} text-left text-white/40`} style={{ width: 240, minWidth: 200 }}>Player</th>
+        <Th label="Neeko Rating" gold width={140} tooltip="Composite intelligence score: projection + upside + consistency + matchup" />
+        <Th label="Price" locked={!isPremium} width={110} />
+        <Th label="Projection" width={100} />
+        <Th label="Value Score" locked={!isPremium} width={120} tooltip="Points per dollar — higher is better value" />
+        <Th label="Confidence" locked={!isPremium} width={100} tooltip="AI certainty in the projection" />
         <Th label="Risk" locked={!isPremium} width={100} />
         <Th label="AI Rec" locked={!isPremium} width={150} />
+        <Th label="Why" locked={!isPremium} />
       </tr>
     );
   }
 
-  const TOTAL_COLS = activeTab === "best" ? 8 : activeTab === "value" ? 7 : 8;
+  const TOTAL_COLS = 10;
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
