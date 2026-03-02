@@ -14,6 +14,7 @@ import {
   ChevronUp,
   ChevronDown,
   Gauge,
+  Target,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -90,6 +91,18 @@ interface MatchIntelRow {
   stack_team: string | null;
   avoid_team: string | null;
   confidence: string | null;
+}
+
+interface ScorePredictionRow {
+  player_id: number;
+  player_name: string;
+  team: string;
+  position: string | null;
+  predicted_score: number | null;
+  ceiling_score: number | null;
+  floor_score: number | null;
+  confidence_score: number | null;
+  volatility_rating: string | null;
 }
 
 interface RoundInsightRow {
@@ -429,6 +442,172 @@ function MatchIntelList({
   );
 }
 
+// ─── Predicted Score Card ─────────────────────────────────────────────────────
+
+const VOLATILITY_STYLES: Record<string, string> = {
+  High:   "text-red-400 bg-red-400/10 border-red-400/25",
+  Medium: "text-orange-400 bg-orange-400/10 border-orange-400/25",
+  Low:    "text-green-400 bg-green-400/10 border-green-400/25",
+};
+
+function PredictedScoreCard({
+  row,
+  rank,
+  isPremium,
+}: {
+  row: ScorePredictionRow;
+  rank: number;
+  isPremium: boolean;
+}) {
+  const predicted = row.predicted_score != null ? Math.round(row.predicted_score) : null;
+  const ceiling = row.ceiling_score != null ? Math.round(row.ceiling_score) : null;
+  const floor = row.floor_score != null ? Math.round(row.floor_score) : null;
+  const conf = row.confidence_score;
+  const volatility = row.volatility_rating;
+  const volStyle = volatility ? (VOLATILITY_STYLES[volatility] ?? VOLATILITY_STYLES.Low) : VOLATILITY_STYLES.Low;
+
+  const confColor =
+    conf == null ? "text-white/40"
+    : conf >= 75 ? "text-green-400"
+    : conf >= 50 ? "text-sky-400"
+    : "text-orange-400";
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#111111] p-4 flex flex-col gap-3">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="shrink-0 text-white/25 text-xs tabular-nums w-5 text-center">{rank}</span>
+          <div className="min-w-0">
+            <div className="font-semibold text-white text-sm leading-tight truncate">{row.player_name}</div>
+            <div className="text-[11px] text-white/40 mt-0.5">
+              {row.team}{row.position ? ` · ${row.position}` : ""}
+            </div>
+          </div>
+        </div>
+        {volatility && (
+          <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold whitespace-nowrap ${volStyle}`}>
+            {volatility}
+          </span>
+        )}
+      </div>
+
+      {/* Predicted Score — dominant number */}
+      <div className="flex items-end gap-5">
+        <div>
+          <div className="text-[10px] text-white/35 uppercase tracking-wider mb-1">Predicted Score</div>
+          <div className={`text-4xl font-black tabular-nums leading-none ${
+            predicted == null ? "text-white/30"
+            : predicted >= 110 ? "text-[#F5C84C]"
+            : predicted >= 90  ? "text-emerald-400"
+            : predicted >= 70  ? "text-sky-400"
+            : "text-white/70"
+          }`}>
+            {predicted ?? "—"}
+          </div>
+        </div>
+
+        {isPremium && conf != null && (
+          <div>
+            <div className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Conf.</div>
+            <div className={`text-sm font-semibold tabular-nums ${confColor}`}>{conf}%</div>
+          </div>
+        )}
+      </div>
+
+      {/* Range bar — ceiling / floor */}
+      {isPremium && ceiling != null && floor != null && (
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] text-white/30 uppercase tracking-wider">Range</span>
+            <span className="text-[10px] text-white/30 tabular-nums">
+              <span className="text-green-400/70">{ceiling}</span>
+              <span className="text-white/20 mx-1">—</span>
+              <span className="text-red-400/70">{floor}</span>
+            </span>
+          </div>
+          <div className="relative h-1.5 rounded-full bg-white/5 overflow-hidden">
+            {predicted != null && (() => {
+              const range = ceiling - floor;
+              if (range <= 0) return null;
+              const floorPct = 0;
+              const ceilPct = 100;
+              const predPct = Math.max(0, Math.min(100, ((predicted - floor) / range) * 100));
+              return (
+                <>
+                  <div
+                    className="absolute h-full rounded-full bg-gradient-to-r from-red-400/30 via-sky-400/40 to-green-400/40"
+                    style={{ left: `${floorPct}%`, right: `${100 - ceilPct}%` }}
+                  />
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-[#F5C84C] border border-[#070707] shadow"
+                    style={{ left: `calc(${predPct}% - 4px)` }}
+                  />
+                </>
+              );
+            })()}
+          </div>
+          <div className="flex justify-between mt-1">
+            <span className="text-[9px] text-red-400/50">Floor {floor}</span>
+            <span className="text-[9px] text-green-400/50">Ceiling {ceiling}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Free user — ceiling/floor teaser */}
+      {!isPremium && (
+        <div className="flex items-center gap-2 rounded-lg bg-white/[0.03] border border-white/[0.06] px-3 py-2">
+          <Lock size={10} className="text-[#F5C84C]/50 shrink-0" />
+          <span className="text-[11px] text-white/35">
+            Ceiling, floor & confidence —{" "}
+            <a href="/neeko-plus" className="text-[#F5C84C]/70 hover:text-[#F5C84C] font-semibold">Neeko+ only</a>
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const SCORE_FREE_VISIBLE = 3;
+
+function PredictedScoreList({
+  rows,
+  loading,
+  error,
+  isPremium,
+  onRetry,
+}: {
+  rows: ScorePredictionRow[];
+  loading: boolean;
+  error: boolean;
+  isPremium: boolean;
+  onRetry?: () => void;
+}) {
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 3 }).map((_, i) => <NeekoIntelSkeletonCard key={i} />)}
+      </div>
+    );
+  }
+  if (error) return <SectionError onRetry={onRetry} />;
+  if (rows.length === 0) return <SectionEmpty message="Score predictions generating — check back soon" />;
+
+  const visible = isPremium ? rows : rows.slice(0, SCORE_FREE_VISIBLE);
+  const lockedCount = !isPremium ? Math.min(2, rows.length - SCORE_FREE_VISIBLE) : 0;
+
+  return (
+    <div className="space-y-3">
+      {visible.map((row, idx) => (
+        <PredictedScoreCard key={row.player_id} row={row} rank={idx + 1} isPremium={isPremium} />
+      ))}
+      {Array.from({ length: Math.max(0, lockedCount) }).map((_, idx) => (
+        <LockedCard key={`locked-score-${idx}`} />
+      ))}
+    </div>
+  );
+}
+
 // ─── Match Projection Card ────────────────────────────────────────────────────
 
 function MatchProjectionCard({ match }: { match: MatchRow }) {
@@ -679,13 +858,16 @@ export default function AFLNeekoIntelPage() {
   const [matches, setMatches] = useState<MatchRow[]>([]);
   const [matchIntel, setMatchIntel] = useState<MatchIntelRow[]>([]);
   const [roundInsight, setRoundInsight] = useState<RoundInsightRow | null>(null);
+  const [scorePredictions, setScorePredictions] = useState<ScorePredictionRow[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [matchesLoading, setMatchesLoading] = useState(true);
   const [matchIntelLoading, setMatchIntelLoading] = useState(true);
+  const [scorePredictionsLoading, setScorePredictionsLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [matchesError, setMatchesError] = useState(false);
   const [matchIntelError, setMatchIntelError] = useState(false);
+  const [scorePredictionsError, setScorePredictionsError] = useState(false);
 
   async function loadPlayers() {
     setLoading(true);
@@ -724,6 +906,23 @@ export default function AFLNeekoIntelPage() {
     setMatchesLoading(false);
   }
 
+  async function loadScorePredictions() {
+    setScorePredictionsLoading(true);
+    setScorePredictionsError(false);
+    const { data, error } = await supabase
+      .from("v_neeko_score_predictions_2026")
+      .select("*")
+      .order("predicted_score", { ascending: false })
+      .limit(20);
+    if (error || !data) {
+      console.error("[NeekoIntel] score predictions load error:", error?.message);
+      setScorePredictionsError(true);
+    } else {
+      setScorePredictions(data as ScorePredictionRow[]);
+    }
+    setScorePredictionsLoading(false);
+  }
+
   async function loadMatchIntel() {
     setMatchIntelLoading(true);
     setMatchIntelError(false);
@@ -752,6 +951,7 @@ export default function AFLNeekoIntelPage() {
     loadPlayers();
     loadMatches();
     loadMatchIntel();
+    loadScorePredictions();
     loadRoundInsight();
   }, []);
 
@@ -928,6 +1128,23 @@ export default function AFLNeekoIntelPage() {
                 error={matchesError}
                 isPremium={isPremium}
                 onRetry={loadMatches}
+              />
+            </Section>
+
+            {/* ── Predicted Scores ── */}
+            <Section>
+              <SectionHeader
+                icon={<Target size={16} />}
+                title="Predicted Scores"
+                subtitle="AI fantasy score projections ranked by predicted output — top 3 free, top 20 with Neeko+"
+                locked={!isPremium}
+              />
+              <PredictedScoreList
+                rows={scorePredictions}
+                loading={scorePredictionsLoading}
+                error={scorePredictionsError}
+                isPremium={isPremium}
+                onRetry={loadScorePredictions}
               />
             </Section>
 
