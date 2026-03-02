@@ -10,6 +10,10 @@ import {
   Swords,
   Lightbulb,
   AlertTriangle,
+  Activity,
+  ChevronUp,
+  ChevronDown,
+  Gauge,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -69,6 +73,23 @@ interface MatchRow {
   ai_summary: string | null;
   prediction_explanation: string | null;
   updated_at: string | null;
+}
+
+interface MatchIntelRow {
+  match_id: string;
+  round_number: number | null;
+  home_team: string;
+  away_team: string;
+  home_projection: number | null;
+  away_projection: number | null;
+  predicted_winner: string | null;
+  projected_margin: number | null;
+  projected_total: number | null;
+  tempo_rating: number | null;
+  blowout_risk: string | null;
+  stack_team: string | null;
+  avoid_team: string | null;
+  confidence: string | null;
 }
 
 interface RoundInsightRow {
@@ -225,6 +246,185 @@ function PlayerCardList({
           />
         );
       })}
+    </div>
+  );
+}
+
+// ─── Match Intelligence Card ──────────────────────────────────────────────────
+
+const BLOWOUT_COLOR: Record<string, string> = {
+  Extreme: "text-red-400 bg-red-400/10 border-red-400/30",
+  High:    "text-orange-400 bg-orange-400/10 border-orange-400/30",
+  Moderate:"text-yellow-400 bg-yellow-400/10 border-yellow-400/30",
+  Low:     "text-green-400 bg-green-400/10 border-green-400/30",
+};
+
+function TempoBar({ rating }: { rating: number | null }) {
+  if (rating == null) return null;
+  const pct = Math.round(((rating - 45) / 45) * 100);
+  const color =
+    rating >= 90 ? "#22c55e" :
+    rating >= 75 ? "#F5C84C" :
+    rating >= 60 ? "#fb923c" :
+    "#94a3b8";
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[10px] text-white/35 uppercase tracking-wider flex items-center gap-1">
+          <Gauge size={9} />
+          Tempo
+        </span>
+        <span className="text-[10px] font-bold" style={{ color }}>{rating}</span>
+      </div>
+      <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${pct}%`, backgroundColor: color }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function MatchIntelCard({ match }: { match: MatchIntelRow }) {
+  const margin = match.projected_margin != null ? Math.round(match.projected_margin) : null;
+  const homeProj = match.home_projection != null ? Math.round(match.home_projection) : null;
+  const awayProj = match.away_projection != null ? Math.round(match.away_projection) : null;
+  const conf = match.confidence != null ? Math.round(Number(match.confidence)) : null;
+  const blowoutStyle = match.blowout_risk ? (BLOWOUT_COLOR[match.blowout_risk] ?? BLOWOUT_COLOR.Low) : BLOWOUT_COLOR.Low;
+  const isHomeWinner = match.predicted_winner === match.home_team;
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#111111] p-4 flex flex-col gap-3 h-full">
+
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-white text-sm leading-tight">
+            <span className={isHomeWinner ? "text-[#F5C84C]" : "text-white/70"}>{match.home_team}</span>
+            <span className="text-white/25 font-normal mx-1.5">vs</span>
+            <span className={!isHomeWinner ? "text-[#F5C84C]" : "text-white/70"}>{match.away_team}</span>
+          </div>
+          <div className="text-[10px] text-white/35 mt-0.5">
+            R{match.round_number ?? "—"} · 2026 AFL
+          </div>
+        </div>
+        {conf != null && (
+          <div
+            className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold whitespace-nowrap border ${
+              conf >= 75
+                ? "text-green-400 bg-green-400/10 border-green-400/30"
+                : conf >= 55
+                ? "text-yellow-400 bg-yellow-400/10 border-yellow-400/30"
+                : "text-orange-400 bg-orange-400/10 border-orange-400/30"
+            }`}
+          >
+            {conf}% conf.
+          </div>
+        )}
+      </div>
+
+      {/* Score projections */}
+      {homeProj != null && awayProj != null && (
+        <div className="flex items-center justify-between rounded-lg bg-white/[0.03] border border-white/[0.06] px-3 py-2">
+          <div className="text-center">
+            <div className="text-[10px] text-white/30 mb-0.5 truncate max-w-[80px]">{match.home_team}</div>
+            <div className={`text-lg font-black tabular-nums ${isHomeWinner ? "text-[#F5C84C]" : "text-white/60"}`}>
+              {homeProj}
+            </div>
+          </div>
+          <div className="text-white/20 text-xs font-semibold">—</div>
+          <div className="text-center">
+            <div className="text-[10px] text-white/30 mb-0.5 truncate max-w-[80px]">{match.away_team}</div>
+            <div className={`text-lg font-black tabular-nums ${!isHomeWinner ? "text-[#F5C84C]" : "text-white/60"}`}>
+              {awayProj}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Key metrics row */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-lg bg-white/[0.03] border border-white/[0.05] p-2 text-center">
+          <div className="text-[10px] text-white/30 mb-0.5">Winner</div>
+          <div className="text-[11px] font-bold text-[#F5C84C] leading-tight line-clamp-1">
+            {match.predicted_winner ?? "—"}
+          </div>
+        </div>
+        <div className="rounded-lg bg-white/[0.03] border border-white/[0.05] p-2 text-center">
+          <div className="text-[10px] text-white/30 mb-0.5">Margin</div>
+          <div className="text-[11px] font-bold text-white tabular-nums">
+            {margin != null ? `${margin} pts` : "—"}
+          </div>
+        </div>
+        <div className={`rounded-lg p-2 text-center border ${blowoutStyle}`}>
+          <div className="text-[10px] opacity-70 mb-0.5">Blowout</div>
+          <div className="text-[11px] font-bold leading-tight">
+            {match.blowout_risk ?? "—"}
+          </div>
+        </div>
+      </div>
+
+      {/* Tempo bar */}
+      <TempoBar rating={match.tempo_rating} />
+
+      {/* Stack / Avoid */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-lg bg-green-400/5 border border-green-400/15 px-3 py-2 flex items-center gap-2">
+          <ChevronUp size={13} className="text-green-400 shrink-0" />
+          <div className="min-w-0">
+            <div className="text-[9px] text-white/30 uppercase tracking-wider">Stack</div>
+            <div className="text-[11px] font-bold text-green-400 truncate">{match.stack_team ?? "—"}</div>
+          </div>
+        </div>
+        <div className="rounded-lg bg-red-400/5 border border-red-400/15 px-3 py-2 flex items-center gap-2">
+          <ChevronDown size={13} className="text-red-400 shrink-0" />
+          <div className="min-w-0">
+            <div className="text-[9px] text-white/30 uppercase tracking-wider">Avoid</div>
+            <div className="text-[11px] font-bold text-red-400 truncate">{match.avoid_team ?? "—"}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MatchIntelList({
+  rows,
+  loading,
+  error,
+  isPremium,
+  onRetry,
+}: {
+  rows: MatchIntelRow[];
+  loading: boolean;
+  error: boolean;
+  isPremium: boolean;
+  onRetry?: () => void;
+}) {
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        {Array.from({ length: 3 }).map((_, i) => <NeekoIntelSkeletonCard key={i} />)}
+      </div>
+    );
+  }
+  if (error) return <SectionError onRetry={onRetry} />;
+  if (rows.length === 0) {
+    return <SectionEmpty message="Match intelligence generating — check back before round starts" />;
+  }
+
+  const visible = isPremium ? rows : rows.slice(0, 1);
+  const locked = !isPremium ? rows.slice(1, 3) : [];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-stretch">
+      {visible.map((match) => (
+        <MatchIntelCard key={match.match_id} match={match} />
+      ))}
+      {locked.map((_, idx) => (
+        <LockedCard key={`locked-intel-${idx}`} />
+      ))}
     </div>
   );
 }
@@ -477,12 +677,15 @@ export default function AFLNeekoIntelPage() {
 
   const [allData, setAllData] = useState<MasterRow[]>([]);
   const [matches, setMatches] = useState<MatchRow[]>([]);
+  const [matchIntel, setMatchIntel] = useState<MatchIntelRow[]>([]);
   const [roundInsight, setRoundInsight] = useState<RoundInsightRow | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [matchesLoading, setMatchesLoading] = useState(true);
+  const [matchIntelLoading, setMatchIntelLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [matchesError, setMatchesError] = useState(false);
+  const [matchIntelError, setMatchIntelError] = useState(false);
 
   async function loadPlayers() {
     setLoading(true);
@@ -521,6 +724,22 @@ export default function AFLNeekoIntelPage() {
     setMatchesLoading(false);
   }
 
+  async function loadMatchIntel() {
+    setMatchIntelLoading(true);
+    setMatchIntelError(false);
+    const { data, error } = await supabase
+      .from("v_neeko_match_intelligence_2026")
+      .select("*")
+      .order("round_number", { ascending: true });
+    if (error || !data) {
+      console.error("[NeekoIntel] match intel load error:", error?.message, error?.details);
+      setMatchIntelError(true);
+    } else {
+      setMatchIntel(data as MatchIntelRow[]);
+    }
+    setMatchIntelLoading(false);
+  }
+
   useEffect(() => {
     async function loadRoundInsight() {
       const { data } = await supabase
@@ -532,6 +751,7 @@ export default function AFLNeekoIntelPage() {
 
     loadPlayers();
     loadMatches();
+    loadMatchIntel();
     loadRoundInsight();
   }, []);
 
@@ -674,6 +894,23 @@ export default function AFLNeekoIntelPage() {
                 isPremium={isPremium}
                 emptyMessage="No strong captain picks detected yet"
                 onRetry={loadPlayers}
+              />
+            </Section>
+
+            {/* ── Match Intelligence ── */}
+            <Section>
+              <SectionHeader
+                icon={<Activity size={16} />}
+                title="Match Intelligence"
+                subtitle="Fantasy environment analysis — tempo, blowout risk, stack & avoid targets"
+                locked={!isPremium}
+              />
+              <MatchIntelList
+                rows={matchIntel}
+                loading={matchIntelLoading}
+                error={matchIntelError}
+                isPremium={isPremium}
+                onRetry={loadMatchIntel}
               />
             </Section>
 
