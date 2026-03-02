@@ -31,6 +31,8 @@ interface RankingRow {
   value_score?: number | null;
   price_tier?: string | null;
   value_tag?: string | null;
+  value_tier?: string | null;
+  consistency_tier?: string | null;
   total_count?: number | null;
 }
 
@@ -61,7 +63,8 @@ interface ScoreHistoryPoint {
 type SortKey = "projection_final" | "consistency_score" | "value_score" | "price";
 type SortDir = "asc" | "desc";
 type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
-type ValueFilter = "ALL" | "ELITE VALUE" | "GOOD VALUE" | "POOR VALUE";
+type ValueFilter = "ALL" | "ELITE" | "GOOD" | "POOR";
+type ConsistencyFilter = "ALL" | "ELITE" | "GOOD" | "POOR";
 
 const FREE_ROW_LIMIT = 20;
 const FREE_UNLOCKED_METRICS = 5;
@@ -178,9 +181,8 @@ function fmtPrice(v: number | null | undefined): string {
 
 function getValueTagStyle(tag: string | null | undefined): { text: string; bg: string; border: string } {
   if (!tag) return { text: "text-white/30", bg: "bg-white/5", border: "border-white/10" };
-  if (tag === "ELITE VALUE") return { text: "text-green-300", bg: "bg-green-500/10", border: "border-green-500/30" };
-  if (tag === "GOOD VALUE") return { text: "text-[#F5C84C]", bg: "bg-[#F5C84C]/10", border: "border-[#F5C84C]/30" };
-  if (tag === "FAIR VALUE") return { text: "text-white/50", bg: "bg-white/5", border: "border-white/10" };
+  if (tag === "ELITE VALUE" || tag === "ELITE") return { text: "text-green-300", bg: "bg-green-500/10", border: "border-green-500/30" };
+  if (tag === "GOOD VALUE" || tag === "GOOD") return { text: "text-[#F5C84C]", bg: "bg-[#F5C84C]/10", border: "border-[#F5C84C]/30" };
   return { text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" };
 }
 
@@ -932,6 +934,7 @@ export default function AFLRankingsPage() {
   const [selected, setSelected] = useState<(RankingRow & { _rank: number; _unlocked: boolean }) | null>(null);
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
   const [valueFilter, setValueFilter] = useState<ValueFilter>("ALL");
+  const [consistencyFilter, setConsistencyFilter] = useState<ConsistencyFilter>("ALL");
   const [totalCount, setTotalCount] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -965,7 +968,9 @@ export default function AFLRankingsPage() {
             price,
             value_score,
             price_tier,
-            value_tag
+            value_tag,
+            value_tier,
+            consistency_tier
           `)
           .order("projection_final", { ascending: false });
 
@@ -1010,15 +1015,15 @@ export default function AFLRankingsPage() {
 
   const valueFiltered = !isPremium || valueFilter === "ALL"
     ? posFiltered
-    : valueFilter === "ELITE VALUE"
-    ? posFiltered.filter((r) => r.value_tag === "ELITE VALUE")
-    : valueFilter === "GOOD VALUE"
-    ? posFiltered.filter((r) => r.value_tag === "ELITE VALUE" || r.value_tag === "GOOD VALUE")
-    : posFiltered.filter((r) => r.value_tag === "POOR VALUE");
+    : posFiltered.filter((r) => r.value_tier === valueFilter);
+
+  const consistencyFiltered = !isPremium || consistencyFilter === "ALL"
+    ? valueFiltered
+    : valueFiltered.filter((r) => r.consistency_tier === consistencyFilter);
 
   const searchFiltered = isPremium && searchTerm.trim()
-    ? valueFiltered.filter((r) => r.player_name.toLowerCase().includes(searchTerm.toLowerCase()))
-    : valueFiltered;
+    ? consistencyFiltered.filter((r) => r.player_name.toLowerCase().includes(searchTerm.toLowerCase()))
+    : consistencyFiltered;
 
   const sorted = [...searchFiltered].sort((a, b) => {
     const av = (a[sortKey] as number | null) ?? -Infinity;
@@ -1131,11 +1136,12 @@ export default function AFLRankingsPage() {
           )}
         </div>
 
-        {/* Sort + Value Filter Controls */}
+        {/* Sort + Filter Controls */}
         {isPremium && (
-          <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 whitespace-nowrap">Sort By</span>
+          <div className="mb-4 space-y-2.5">
+            {/* Row 1: Sort */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-20 shrink-0">Sort By</span>
               <select
                 value={sortKey}
                 onChange={(e) => { setSortKey(e.target.value as SortKey); setSortDir("desc"); }}
@@ -1154,22 +1160,43 @@ export default function AFLRankingsPage() {
                 {sortDir === "desc" ? "High → Low" : "Low → High"}
               </button>
             </div>
+            {/* Row 2: Value filter */}
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 whitespace-nowrap">Value</span>
-              {(["ALL", "ELITE VALUE", "GOOD VALUE", "POOR VALUE"] as ValueFilter[]).map((v) => (
+              <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-20 shrink-0">Value</span>
+              {(["ALL", "ELITE", "GOOD", "POOR"] as ValueFilter[]).map((v) => (
                 <button
                   key={v}
                   onClick={() => setValueFilter(v)}
                   className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
                     valueFilter === v
-                      ? v === "ELITE VALUE" ? "bg-green-500/20 text-green-300 border border-green-500/40"
-                        : v === "GOOD VALUE" ? "bg-[#F5C84C]/20 text-[#F5C84C] border border-[#F5C84C]/40"
-                        : v === "POOR VALUE" ? "bg-red-500/20 text-red-400 border border-red-500/40"
+                      ? v === "ELITE" ? "bg-green-500/20 text-green-300 border border-green-500/40"
+                        : v === "GOOD" ? "bg-[#F5C84C]/20 text-[#F5C84C] border border-[#F5C84C]/40"
+                        : v === "POOR" ? "bg-red-500/20 text-red-400 border border-red-500/40"
                         : "bg-white/10 text-white/80 border border-white/20"
                       : "bg-white/5 text-white/40 border border-transparent hover:bg-white/10 hover:text-white/60"
                   }`}
                 >
-                  {v === "ALL" ? "All" : v}
+                  {v === "ALL" ? "All" : v === "ELITE" ? "Elite Value" : v === "GOOD" ? "Good Value" : "Poor Value"}
+                </button>
+              ))}
+            </div>
+            {/* Row 3: Consistency filter */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-20 shrink-0">Consistency</span>
+              {(["ALL", "ELITE", "GOOD", "POOR"] as ConsistencyFilter[]).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setConsistencyFilter(v)}
+                  className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                    consistencyFilter === v
+                      ? v === "ELITE" ? "bg-green-500/20 text-green-300 border border-green-500/40"
+                        : v === "GOOD" ? "bg-sky-500/20 text-sky-300 border border-sky-500/40"
+                        : v === "POOR" ? "bg-orange-500/20 text-orange-400 border border-orange-500/40"
+                        : "bg-white/10 text-white/80 border border-white/20"
+                      : "bg-white/5 text-white/40 border border-transparent hover:bg-white/10 hover:text-white/60"
+                  }`}
+                >
+                  {v === "ALL" ? "All" : v === "ELITE" ? "Elite (80+)" : v === "GOOD" ? "Good (60+)" : "Low (<60)"}
                 </button>
               ))}
             </div>
@@ -1242,6 +1269,8 @@ export default function AFLRankingsPage() {
                       const rank = idx + 1;
                       const isLocked = !isPremium && idx >= FREE_UNLOCKED_METRICS;
                       const metricsUnlocked = !isLocked;
+                      const valueFree = !isPremium && idx < FREE_UNLOCKED_METRICS;
+                      const valueUnlocked = isPremium || valueFree;
                       const isEliteCaptain = row.ai_recommendation === "ELITE CAPTAIN";
                       const recColor = row.recommendation_color ?? null;
                       const capStyle = getCaptainStyle(row.captain_rating ?? null);
@@ -1261,14 +1290,14 @@ export default function AFLRankingsPage() {
                             <span className="font-bold text-[#F5C84C] tabular-nums">{fmt(row.projection_final)}</span>
                           </td>
                           <td className="px-4 py-4 text-center text-sm w-[100px]">
-                            {!metricsUnlocked ? <LockedCell /> : (
+                            {!valueUnlocked ? <LockedCell /> : (
                               <span className="font-semibold text-white/60 tabular-nums">
                                 {fmtPrice(row.price)}
                               </span>
                             )}
                           </td>
                           <td className="px-4 py-4 text-center text-sm w-[110px]">
-                            {!metricsUnlocked ? <LockedCell /> : (
+                            {!valueUnlocked ? <LockedCell /> : (
                               <div className="flex flex-col items-center gap-0.5">
                                 <span className={`font-bold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
                                   {row.value_score != null ? Number(row.value_score).toFixed(2) : "—"}
@@ -1399,6 +1428,8 @@ export default function AFLRankingsPage() {
                     const rank = idx + 1;
                     const isLocked = !isPremium && idx >= FREE_UNLOCKED_METRICS;
                     const metricsUnlocked = !isLocked;
+                    const valueFree = !isPremium && idx < FREE_UNLOCKED_METRICS;
+                    const valueUnlocked = isPremium || valueFree;
                     const consistencyBadge = getConsistencyBadge(row.consistency_score);
                     const isEliteCaptain = row.ai_recommendation === "ELITE CAPTAIN";
                     const recColor = row.recommendation_color ?? null;
@@ -1432,7 +1463,7 @@ export default function AFLRankingsPage() {
 
                         {/* Price */}
                         <td className="px-4 py-3 text-center whitespace-nowrap">
-                          {!metricsUnlocked ? <LockedCell /> : (
+                          {!valueUnlocked ? <LockedCell /> : (
                             <span className="text-sm font-semibold text-white/60 tabular-nums">
                               {fmtPrice(row.price)}
                             </span>
@@ -1441,7 +1472,7 @@ export default function AFLRankingsPage() {
 
                         {/* Value Score + Tag */}
                         <td className="px-4 py-3 text-center whitespace-nowrap">
-                          {!metricsUnlocked ? <LockedCell /> : (
+                          {!valueUnlocked ? <LockedCell /> : (
                             <div className="flex flex-col items-center gap-0.5">
                               <span className={`text-sm font-bold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
                                 {row.value_score != null ? Number(row.value_score).toFixed(2) : "—"}
