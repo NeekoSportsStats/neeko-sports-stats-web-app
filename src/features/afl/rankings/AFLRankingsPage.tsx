@@ -28,6 +28,9 @@ interface RankingRow {
   recommendation_color?: string | null;
   captain_rating?: string | null;
   captain_score?: number | null;
+  price?: number | null;
+  value_score?: number | null;
+  price_tier?: string | null;
   total_count?: number | null;
 }
 
@@ -155,6 +158,13 @@ function getConfidenceColor(v: number | null) {
   if (v >= 80) return "text-green-400";
   if (v >= 65) return "text-yellow-400";
   if (v >= 45) return "text-orange-400";
+  return "text-red-400";
+}
+
+function getValueScoreColor(v: number | null) {
+  if (v == null) return "text-white/30";
+  if (v >= 1.5) return "text-green-400";
+  if (v >= 1.0) return "text-yellow-400";
   return "text-red-400";
 }
 
@@ -890,7 +900,7 @@ export default function AFLRankingsPage() {
 
       if (isPremium) {
         const { data } = await supabase
-          .from("v_rankings_master")
+          .from("v_rankings_value_2026")
           .select(`
             player_id,
             player_name,
@@ -910,7 +920,10 @@ export default function AFLRankingsPage() {
             ai_recommendation,
             ai_analysis,
             recommendation_color,
-            recommendation_why
+            recommendation_why,
+            price,
+            value_score,
+            price_tier
           `)
           .order("projection_final", { ascending: false });
 
@@ -965,7 +978,7 @@ export default function AFLRankingsPage() {
 
   const visibleRows = isPremium ? sorted : sorted.slice(0, FREE_ROW_LIMIT);
 
-  const TOTAL_COLS = 8;
+  const TOTAL_COLS = 9;
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
@@ -1098,6 +1111,9 @@ export default function AFLRankingsPage() {
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C] uppercase tracking-wider w-[50px]">#</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[#F5C84C] uppercase tracking-wider w-[220px]">Player</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C] uppercase tracking-wider w-[100px]">Proj</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C]/40 uppercase tracking-wider w-[110px]">
+                    <span className="flex items-center justify-center gap-1"><Lock size={10} />Value</span>
+                  </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C] uppercase tracking-wider w-[110px]">Confidence</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[#F5C84C]/40 uppercase tracking-wider w-[140px]">
                     <span className="flex items-center justify-center gap-1"><Lock size={10} />Captain</span>
@@ -1145,6 +1161,13 @@ export default function AFLRankingsPage() {
                           </td>
                           <td className="px-4 py-4 text-center text-sm w-[100px]">
                             <span className="font-bold text-[#F5C84C] tabular-nums">{fmt(row.projection_final)}</span>
+                          </td>
+                          <td className="px-4 py-4 text-center text-sm w-[110px]">
+                            {!metricsUnlocked ? <LockedCell /> : (
+                              <span className={`font-semibold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
+                                {row.value_score != null ? `Value: ${Number(row.value_score).toFixed(2)}` : "—"}
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-4 text-center text-sm w-[110px]">
                             {!metricsUnlocked ? <LockedCell /> : (
@@ -1238,6 +1261,7 @@ export default function AFLRankingsPage() {
                 <th className={`${TH_BASE} text-left text-white/40 min-w-[160px]`}>Player</th>
                 <th className={`${TH_BASE} text-white/40 min-w-[80px]`}>Team</th>
                 <SortTh label="Projection" sortKey="projection_final" currentKey={sortKey} dir={sortDir} onSort={handleSort} />
+                <PlainTh label="Value" locked={!isPremium} />
                 <PlainTh label="Captain" locked={!isPremium} />
                 <PlainTh label="Upside" locked={!isPremium} />
                 <PlainTh label="AI Recommendation" locked={!isPremium} />
@@ -1288,6 +1312,15 @@ export default function AFLRankingsPage() {
                           <span className="text-sm font-semibold text-[#F5C84C] tabular-nums">
                             {fmt(row.projection_final)}
                           </span>
+                        </td>
+
+                        {/* Value Score */}
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
+                          {!metricsUnlocked ? <LockedCell /> : (
+                            <span className={`text-sm font-semibold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
+                              {row.value_score != null ? `Value: ${Number(row.value_score).toFixed(2)}` : "—"}
+                            </span>
+                          )}
                         </td>
 
                         {/* Captain */}
