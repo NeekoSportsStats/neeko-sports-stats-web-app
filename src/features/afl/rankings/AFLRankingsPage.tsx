@@ -64,8 +64,6 @@ interface ScoreHistoryPoint {
 type SortKey = "projection_final" | "consistency_score" | "value_score" | "price" | "neeko_rating";
 type SortDir = "asc" | "desc";
 type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
-type ValueFilter = "ALL" | "ELITE" | "GOOD" | "POOR";
-type ConsistencyFilter = "ALL" | "ELITE" | "GOOD" | "POOR";
 
 const FREE_ROW_LIMIT = 20;
 const FREE_UNLOCKED_METRICS = 5;
@@ -402,7 +400,7 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
             )}
           </div>
           <p className="text-[11px] text-white/30">
-            {isPremium ? "Top 5 by captain score" : "2 free · 3 locked · upgrade for all 5"}
+            {isPremium ? "Top 5 by captain score" : "Top pick shown · unlock all 5 with Neeko+"}
           </p>
         </div>
 
@@ -412,11 +410,15 @@ function CaptainSection({ isPremium }: { isPremium: boolean }) {
               <div key={i} className="h-20 animate-pulse rounded-lg bg-white/5" />
             ))}
           </div>
+        ) : captains.length === 0 ? (
+          <div className="flex items-center justify-center py-8 text-sm text-white/25">
+            Captain recommendations will be available before round 1.
+          </div>
         ) : (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
             {captains.map((c, idx) => {
               const style = getCaptainStyle(c.captain_rating);
-              const isBlurred = !isPremium && idx >= 2;
+              const isBlurred = !isPremium && idx >= 1;
 
               const medal =
                 idx === 0
@@ -893,26 +895,16 @@ function PositionPill({ value, active, onClick }: { value: PositionFilter; activ
 
 // ─── Upgrade CTA ──────────────────────────────────────────────────────────────
 
-function UpgradeCTABanner({
-  totalCount,
-  positionFilter,
-}: {
-  totalCount: number;
-  positionFilter: PositionFilter;
-}) {
-  const label =
-    positionFilter === "ALL"
-      ? `Unlock all ${totalCount} players with Neeko+`
-      : `Unlock all ${totalCount} ${positionFilter} players with Neeko+`;
-
+function UpgradeCTABanner({ totalCount }: { totalCount: number }) {
+  void totalCount;
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-b-xl border-t border-[#F5C84C]/10 bg-[#F5C84C]/5 px-6 py-10 text-center">
       <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#F5C84C]/30 bg-[#F5C84C]/10">
         <Crown size={18} className="text-[#F5C84C]" />
       </div>
-      <h3 className="text-base font-semibold text-white">{label}</h3>
+      <h3 className="text-base font-semibold text-white">Unlock elite trade targets, generational picks, and full AI intelligence</h3>
       <p className="text-sm text-white/40 max-w-xs">
-        Captain Rating, Form, Matchup, Upside & AI Recommendations for every player.
+        Captain ratings, matchup insights, upside scores, risk analysis, and AI breakdown for every player.
       </p>
       <a
         href="/neeko-plus"
@@ -976,8 +968,6 @@ export default function AFLRankingsPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selected, setSelected] = useState<(RankingRow & { _rank: number; _unlocked: boolean }) | null>(null);
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
-  const [valueFilter, setValueFilter] = useState<ValueFilter>("ALL");
-  const [consistencyFilter, setConsistencyFilter] = useState<ConsistencyFilter>("ALL");
   const [totalCount, setTotalCount] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -1047,8 +1037,6 @@ export default function AFLRankingsPage() {
     if (mode === "best") { setSortKey("neeko_rating"); setSortDir("desc"); }
     if (mode === "value") { setSortKey("value_score"); setSortDir("desc"); }
     if (mode === "projection") { setSortKey("projection_final"); setSortDir("desc"); }
-    setValueFilter("ALL");
-    setConsistencyFilter("ALL");
     setSearchTerm("");
   }, [mode]);
 
@@ -1063,9 +1051,7 @@ export default function AFLRankingsPage() {
 
   // ── Derive the 3 mode lists from raw rows ─────────────────────────────────
 
-  const posFiltered = !isPremium
-    ? rows
-    : positionFilter === "ALL"
+  const posFiltered = positionFilter === "ALL"
     ? rows
     : rows.filter((r) => r.position === positionFilter);
 
@@ -1090,17 +1076,9 @@ export default function AFLRankingsPage() {
 
   // ── Apply filters on top of mode list ────────────────────────────────────
 
-  const valueFiltered = !isPremium || valueFilter === "ALL"
-    ? modeList
-    : modeList.filter((r) => r.value_tier === valueFilter);
-
-  const consistencyFiltered = !isPremium || consistencyFilter === "ALL"
-    ? valueFiltered
-    : valueFiltered.filter((r) => r.consistency_tier === consistencyFilter);
-
   const searchFiltered = isPremium && searchTerm.trim()
-    ? consistencyFiltered.filter((r) => r.player_name.toLowerCase().includes(searchTerm.toLowerCase()))
-    : consistencyFiltered;
+    ? modeList.filter((r) => r.player_name.toLowerCase().includes(searchTerm.toLowerCase()))
+    : modeList;
 
   const sorted = [...searchFiltered].sort((a, b) => {
     const av = (a[sortKey] as number | null) ?? -Infinity;
@@ -1484,21 +1462,17 @@ export default function AFLRankingsPage() {
           </div>
         </div>
 
-        {/* Filter Controls — premium only, filters disabled for free users */}
-        <div className="mb-4 space-y-2.5">
+        {/* Filter Controls */}
+        <div className="mb-4">
           {/* Position */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-20 shrink-0">Position</span>
             {POSITIONS.map((pos) => (
               <button
                 key={pos}
-                onClick={() => isPremium && setPositionFilter(pos)}
-                disabled={!isPremium}
-                title={!isPremium ? "Premium feature" : undefined}
+                onClick={() => setPositionFilter(pos)}
                 className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  !isPremium
-                    ? "bg-white/5 text-white/20 cursor-not-allowed opacity-50"
-                    : positionFilter === pos
+                  positionFilter === pos
                     ? "bg-[#F5C84C] text-black"
                     : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/80"
                 }`}
@@ -1506,67 +1480,17 @@ export default function AFLRankingsPage() {
                 {pos}
               </button>
             ))}
-            {!isPremium && <span className="text-[10px] text-white/25 flex items-center gap-1"><Lock size={9} />Neeko+</span>}
-          </div>
-          {/* Value filter */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-20 shrink-0">Value</span>
-            {(["ALL", "ELITE", "GOOD", "POOR"] as ValueFilter[]).map((v) => (
-              <button
-                key={v}
-                onClick={() => isPremium && setValueFilter(v)}
-                disabled={!isPremium}
-                title={!isPremium ? "Premium feature" : undefined}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                  !isPremium
-                    ? "bg-white/5 text-white/20 cursor-not-allowed opacity-50 border border-transparent"
-                    : valueFilter === v
-                    ? v === "ELITE" ? "bg-green-500/20 text-green-300 border border-green-500/40"
-                      : v === "GOOD" ? "bg-[#F5C84C]/20 text-[#F5C84C] border border-[#F5C84C]/40"
-                      : v === "POOR" ? "bg-red-500/20 text-red-400 border border-red-500/40"
-                      : "bg-white/10 text-white/80 border border-white/20"
-                    : "bg-white/5 text-white/40 border border-transparent hover:bg-white/10 hover:text-white/60"
-                }`}
-              >
-                {v === "ALL" ? "All" : v === "ELITE" ? "Elite Value" : v === "GOOD" ? "Good Value" : "Poor Value"}
-              </button>
-            ))}
-            {!isPremium && <span className="text-[10px] text-white/25 flex items-center gap-1"><Lock size={9} />Neeko+</span>}
-          </div>
-          {/* Consistency filter */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-20 shrink-0">Consistency</span>
-            {(["ALL", "ELITE", "GOOD", "POOR"] as ConsistencyFilter[]).map((v) => (
-              <button
-                key={v}
-                onClick={() => isPremium && setConsistencyFilter(v)}
-                disabled={!isPremium}
-                title={!isPremium ? "Premium feature" : undefined}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                  !isPremium
-                    ? "bg-white/5 text-white/20 cursor-not-allowed opacity-50 border border-transparent"
-                    : consistencyFilter === v
-                    ? v === "ELITE" ? "bg-green-500/20 text-green-300 border border-green-500/40"
-                      : v === "GOOD" ? "bg-sky-500/20 text-sky-300 border border-sky-500/40"
-                      : v === "POOR" ? "bg-orange-500/20 text-orange-400 border border-orange-500/40"
-                      : "bg-white/10 text-white/80 border border-white/20"
-                    : "bg-white/5 text-white/40 border border-transparent hover:bg-white/10 hover:text-white/60"
-                }`}
-              >
-                {v === "ALL" ? "All" : v === "ELITE" ? "Elite (80+)" : v === "GOOD" ? "Good (60+)" : "Low (<60)"}
-              </button>
-            ))}
-            {!isPremium && <span className="text-[10px] text-white/25 flex items-center gap-1"><Lock size={9} />Neeko+</span>}
           </div>
           {/* Sort (premium only) */}
           {isPremium && (
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap mt-2.5">
               <span className="text-[11px] font-medium uppercase tracking-wider text-white/30 w-20 shrink-0">Sort By</span>
               <select
                 value={sortKey}
                 onChange={(e) => { setSortKey(e.target.value as SortKey); setSortDir("desc"); }}
                 className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white/80 focus:outline-none focus:border-[#F5C84C] transition-colors"
               >
+                <option value="neeko_rating">Neeko Rating</option>
                 <option value="projection_final">Projection</option>
                 <option value="value_score">Value Score</option>
                 <option value="price">Price</option>
@@ -1635,7 +1559,7 @@ export default function AFLRankingsPage() {
 
         {/* CTA below the table — free users only */}
         {!isPremium && !loading && (
-          <UpgradeCTABanner totalCount={totalCount} positionFilter={positionFilter} />
+          <UpgradeCTABanner totalCount={totalCount} />
         )}
       </div>
 
