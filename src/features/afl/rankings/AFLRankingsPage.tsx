@@ -65,12 +65,7 @@ const FREE_ROW_LIMIT = 20;
 const FREE_UNLOCKED_ROWS = 5;
 const FREE_PARTIAL_ROWS = 20;
 
-const LOCKED_TEASERS = {
-  price: ["$450k·Neeko+", "$820k·Neeko+", "$610k·Neeko+", "$390k·Neeko+", "$730k·Neeko+"],
-  value: ["Elite Value", "Strong Value", "Good Value", "Elite Value", "Premium Pick"],
-  ai_rec: ["Must Start", "Strong Play", "Captain Candidate", "Must Start", "Elite Option"],
-  why: ["Favourable matchup + elite form", "Elite projected scorer this round", "Dominant upside rating detected", "Favourable matchup + elite form", "High ceiling — must consider"],
-};
+const LOCKED_WHY_TEASER = "Unlock matchup, role, ceiling analysis";
 
 const POSITIONS: PositionFilter[] = ["ALL", "DEF", "MID", "FWD", "RUC"];
 
@@ -256,26 +251,79 @@ function InfoTooltip({ text }: { text: string }) {
 function LockedCell({ onClick }: { onClick?: () => void }) {
   return (
     <div
-      className="flex justify-center items-center w-full h-full gap-1 group cursor-pointer"
-      title="Neeko+"
+      className="flex justify-center items-center w-full h-full gap-1.5 cursor-pointer group opacity-60"
       onClick={onClick}
     >
-      <Lock size={11} className="text-[#F5C84C]/40 group-hover:text-[#F5C84C]/70 transition-colors" />
+      <Lock size={10} className="text-gray-500 group-hover:text-[#F5C84C]/60 transition-colors shrink-0" />
+      <span className="text-xs text-gray-500 group-hover:text-[#F5C84C]/60 transition-colors">Locked</span>
     </div>
   );
 }
 
-function LockedTeaserCell({ label, onClick }: { label: string; onClick?: () => void }) {
+function LockedWhyCell({ onClick }: { onClick?: () => void }) {
   return (
     <div
-      className="flex items-center justify-center gap-1 cursor-pointer group"
+      className="flex items-center gap-1.5 cursor-pointer group"
       onClick={onClick}
     >
       <Lock size={9} className="text-[#F5C84C]/40 shrink-0 group-hover:text-[#F5C84C]/70 transition-colors" />
-      <span className="text-[10px] font-semibold text-[#F5C84C]/50 group-hover:text-[#F5C84C]/80 transition-colors whitespace-nowrap">
-        {label}
+      <span className="text-xs font-medium text-[#F5C84C]/60 group-hover:text-[#F5C84C]/90 transition-colors truncate">
+        {LOCKED_WHY_TEASER}
       </span>
     </div>
+  );
+}
+
+// ─── Neeko Rating Info Modal ───────────────────────────────────────────────────
+
+function NeekoRatingInfoModal({ onClose }: { onClose: () => void }) {
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-sm rounded-2xl border border-[#F5C84C]/30 bg-[#0e0e0e] p-7 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button onClick={onClose} className="absolute right-4 top-4 text-white/30 hover:text-white/70 transition-colors">
+          <X size={16} />
+        </button>
+        <div className="flex items-center justify-center w-11 h-11 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30 mx-auto mb-4">
+          <span className="text-[#F5C84C] font-bold text-base">N</span>
+        </div>
+        <h3 className="text-lg font-bold text-white mb-1 text-center">How Neeko Rating Works</h3>
+        <p className="text-xs text-white/40 text-center mb-5">Our proprietary fantasy scoring model</p>
+        <div className="space-y-3 mb-5">
+          {[
+            ["Projection", "Expected fantasy score this round based on verified AFL data"],
+            ["Matchup Difficulty", "How tough or favourable the opposition is"],
+            ["Role Security", "Likelihood of guaranteed game time and usage"],
+            ["Consistency", "Historical scoring reliability across the season"],
+            ["Ceiling & Upside", "Potential to blow up and exceed projection"],
+            ["Risk Level", "Chance of underperforming or being a trap pick"],
+          ].map(([label, desc]) => (
+            <div key={label} className="flex items-start gap-2.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#F5C84C] shrink-0 mt-1.5" />
+              <div>
+                <span className="text-xs font-semibold text-white">{label}</span>
+                <p className="text-[11px] text-white/40 leading-relaxed mt-0.5">{desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3 mb-5">
+          <p className="text-xs text-white/50 leading-relaxed">
+            Each player receives a <span className="text-[#F5C84C] font-semibold">0–200 rating</span>. Higher rating = stronger fantasy selection this round. Neeko Rating updates automatically every week using verified AFL data.
+          </p>
+        </div>
+        <button
+          onClick={onClose}
+          className="block w-full border border-white/10 text-white/60 font-semibold rounded-xl py-2.5 text-sm hover:bg-white/5 transition-all"
+        >
+          Close
+        </button>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -297,13 +345,19 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
         </div>
         <h3 className="text-lg font-bold text-white mb-2">Unlock Neeko+</h3>
         <p className="text-sm text-white/50 leading-relaxed mb-5">
-          Access Value and Projection rankings, full price data, AI recommendations, and complete analysis for every player.
+          Gain full access to elite-level AFL Fantasy intelligence.
         </p>
-        <div className="space-y-2 text-left mb-5">
-          {["Value & Projection filter modes", "Full player price & value scores", "AI recommendations for all players", "Search & advanced position filters", "Captain ratings & ceiling/floor data"].map((f) => (
-            <div key={f} className="flex items-center gap-2">
+        <div className="space-y-2.5 text-left mb-6">
+          {[
+            "Full Value and Projection rankings",
+            "Breakout players before price rises",
+            "Trap players to avoid this round",
+            "Weekly AI trade and captain insights",
+            "Complete matchup and ceiling analysis",
+          ].map((f) => (
+            <div key={f} className="flex items-center gap-2.5">
               <div className="w-1.5 h-1.5 rounded-full bg-[#F5C84C] shrink-0" />
-              <span className="text-xs text-white/60">{f}</span>
+              <span className="text-xs text-white/70">{f}</span>
             </div>
           ))}
         </div>
@@ -678,7 +732,7 @@ function UpgradeCTABanner() {
         <Crown size={18} className="text-[#F5C84C]" />
       </div>
       <h3 className="text-base font-semibold text-white">Unlock elite trade targets, generational picks, and full AI intelligence</h3>
-      <p className="text-sm text-white/40 max-w-xs">Captain ratings, matchup insights, upside scores, risk analysis, and AI breakdown for every player.</p>
+      <p className="text-sm text-white/40 max-w-xs">Value rankings, matchup insights, upside scores, risk analysis, and AI breakdown for every player.</p>
       <a href="/neeko-plus" className="mt-1 rounded-lg bg-[#F5C84C] px-6 py-2.5 text-sm font-bold text-black hover:bg-[#f0bd30] transition-colors">
         Upgrade Now
       </a>
@@ -699,6 +753,7 @@ export default function AFLRankingsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selected, setSelected] = useState<(RankingRow & { _rank: number; _unlocked: boolean }) | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [ratingInfoOpen, setRatingInfoOpen] = useState(false);
 
   const fetchRankings = useCallback(async () => {
     setLoading(true);
@@ -756,26 +811,10 @@ export default function AFLRankingsPage() {
     return idx < FREE_UNLOCKED_ROWS;
   }
 
-  function cellValue(row: RankingRow, colKey: string, idx: number): "unlocked" | "locked_teaser" | "locked_plain" {
-    if (isPremium) return "unlocked";
-    if (isFreeRow(idx)) return "unlocked";
-    if (isPremiumColumn(colKey)) return "locked_teaser";
-    return "unlocked";
-  }
-
-  function renderLockedOrValue(
-    row: RankingRow,
-    colKey: string,
-    idx: number,
-    render: () => React.ReactNode,
-    teaserLabel?: string
-  ): React.ReactNode {
-    const state = cellValue(row, colKey, idx);
-    if (state === "locked_teaser") {
-      const label = teaserLabel ?? "Neeko+";
-      return <LockedTeaserCell label={label} onClick={() => setShowUpgradeModal(true)} />;
-    }
-    return render();
+  function isLockedCell(colKey: string, idx: number): boolean {
+    if (isPremium) return false;
+    if (isFreeRow(idx)) return false;
+    return isPremiumColumn(colKey);
   }
 
   function renderRow(row: RankingRow, idx: number) {
@@ -798,7 +837,7 @@ export default function AFLRankingsPage() {
       <td key="player" className="px-4 py-3 whitespace-nowrap" style={{ width: 240, minWidth: 200 }}>
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-white">{row.player_name}</span>
+            <span className="text-sm font-semibold text-white">{row.player_name}</span>
             {!isPremium && rowUnlocked && (
               <span className="rounded-sm bg-[#F5C84C]/15 px-1 py-0.5 text-[9px] font-semibold text-[#F5C84C] uppercase tracking-wide">Free</span>
             )}
@@ -832,8 +871,6 @@ export default function AFLRankingsPage() {
       </td>
     );
 
-    const teaserIdx = Math.min(idx - FREE_UNLOCKED_ROWS, LOCKED_TEASERS.price.length - 1);
-
     const confCell = (
       <td key="conf" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
         <span className={`text-sm font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
@@ -853,44 +890,49 @@ export default function AFLRankingsPage() {
 
     const aiRecCell = (
       <td key="airec" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 150, minWidth: 130 }}>
-        {renderLockedOrValue(row, "ai_recommendation", idx, () =>
-          row.ai_recommendation ? (
-            <span
-              className="inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap"
-              style={row.recommendation_color ? {
-                color: row.recommendation_color,
-                background: `${row.recommendation_color}18`,
-                borderColor: `${row.recommendation_color}40`,
-              } : { color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)" }}
-            >
-              {row.ai_recommendation}
-            </span>
-          ) : <span className="text-white/20 text-xs">—</span>,
-          LOCKED_TEASERS.ai_rec[teaserIdx]
-        )}
+        {isLockedCell("ai_recommendation", idx) ? (
+          <LockedCell onClick={() => setShowUpgradeModal(true)} />
+        ) : row.ai_recommendation ? (
+          <span
+            className="inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap"
+            style={row.recommendation_color ? {
+              color: row.recommendation_color,
+              background: `${row.recommendation_color}18`,
+              borderColor: `${row.recommendation_color}40`,
+            } : { color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)" }}
+          >
+            {row.ai_recommendation}
+          </span>
+        ) : <span className="text-white/20 text-xs">—</span>}
       </td>
     );
 
     const whyCell = (
-      <td key="why" className="px-4 py-3 text-left align-middle" style={{ minWidth: 160 }}>
-        {renderLockedOrValue(row, "recommendation_why", idx, () => (
-          <span className="text-xs text-white/60 line-clamp-2 leading-snug">{row.recommendation_why ?? "—"}</span>
-        ), LOCKED_TEASERS.why[teaserIdx])}
+      <td key="why" className="px-4 py-3 text-left align-middle" style={{ minWidth: 160, maxWidth: 260 }}>
+        {isLockedCell("recommendation_why", idx) ? (
+          <LockedWhyCell onClick={() => setShowUpgradeModal(true)} />
+        ) : (
+          <span className="text-xs text-white/60 line-clamp-2 leading-snug max-w-[260px] block truncate">{row.recommendation_why ?? "—"}</span>
+        )}
       </td>
     );
 
     const priceCell = (
       <td key="price" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 110, minWidth: 90 }}>
-        {renderLockedOrValue(row, "price", idx, () => (
+        {isLockedCell("price", idx) ? (
+          <LockedCell onClick={() => setShowUpgradeModal(true)} />
+        ) : (
           <span className="text-sm font-semibold text-white/70 tabular-nums">{fmtPrice(row.price)}</span>
-        ), LOCKED_TEASERS.price[teaserIdx])}
+        )}
       </td>
     );
 
     const vtStyle = getValueTagStyle(row.value_tag);
     const valueCell = (
       <td key="value" className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 120, minWidth: 100 }}>
-        {renderLockedOrValue(row, "value_score", idx, () => (
+        {isLockedCell("value_score", idx) ? (
+          <LockedCell onClick={() => setShowUpgradeModal(true)} />
+        ) : (
           <div className="flex flex-col items-center gap-0.5">
             <span className={`text-sm font-bold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
               {fmtValueScore(row.value_score)}
@@ -901,7 +943,7 @@ export default function AFLRankingsPage() {
               </span>
             )}
           </div>
-        ), LOCKED_TEASERS.value[teaserIdx])}
+        )}
       </td>
     );
 
@@ -926,7 +968,18 @@ export default function AFLRankingsPage() {
       <tr className="border-b border-[#222]">
         <th className={`${TH} text-white/40`} style={{ width: 52, minWidth: 52 }}>#</th>
         <th className={`${TH} text-left text-white/40`} style={{ width: 240, minWidth: 200 }}>Player</th>
-        <Th label="Neeko Rating" gold width={140} tooltip="Neeko Rating combines projection, matchup difficulty, consistency, risk, and AI intelligence to identify the best fantasy picks each round." />
+        <th
+          className={`${TH} text-[#F5C84C] cursor-pointer hover:text-[#F5C84C]/80 transition-colors select-none`}
+          style={{ width: 140, minWidth: 120 }}
+          onClick={() => setRatingInfoOpen(true)}
+        >
+          <span className="inline-flex items-center gap-1.5 justify-center">
+            Neeko Rating
+            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-[#F5C84C]/40 bg-[#F5C84C]/10 text-[#F5C84C] text-[9px] font-bold leading-none shrink-0">
+              ?
+            </span>
+          </span>
+        </th>
         <Th label="Projection" width={100} />
         <Th label="Confidence" width={100} tooltip="AI certainty in the projection" />
         <Th label="Risk" width={100} />
@@ -961,8 +1014,8 @@ export default function AFLRankingsPage() {
 
         {!isPremium && (
           <div className="mt-4 rounded-xl border border-[#F5C84C]/20 bg-gradient-to-r from-[#F5C84C]/10 to-transparent px-5 py-4">
-            <p className="text-sm font-semibold text-white mb-1">Take your AFL Fantasy team to elite level</p>
-            <p className="text-xs text-white/50 mb-3">Neeko+ unlocks full AI player analysis, captain picks, matchup insights, and projections for every player.</p>
+            <p className="text-sm font-semibold text-white mb-1">See the full leaderboard — all 200+ players ranked</p>
+            <p className="text-xs text-white/50 mb-3">Neeko+ unlocks complete value scores, AI recommendations, matchup ratings, and ceiling analysis for every player.</p>
             <a
               href="/neeko-plus"
               className="inline-flex items-center gap-1.5 bg-[#F5C84C] text-black font-semibold rounded-lg hover:brightness-110 transition-all duration-150 px-4 py-2 text-sm"
@@ -975,6 +1028,7 @@ export default function AFLRankingsPage() {
       </div>
 
       {showUpgradeModal && <UpgradeModal onClose={() => setShowUpgradeModal(false)} />}
+      {ratingInfoOpen && <NeekoRatingInfoModal onClose={() => setRatingInfoOpen(false)} />}
 
       <div className="px-4 pb-10 md:px-8">
         <div className="mb-3">
