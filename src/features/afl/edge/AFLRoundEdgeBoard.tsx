@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   Lock, Crown, X, TrendingUp, TriangleAlert as AlertTriangle,
@@ -34,7 +34,12 @@ interface RankingRow {
 
 type Section = "captain" | "breakout" | "trap";
 
-// ─── Confidence tier ──────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const FREE_VISIBLE = 1;
+const PREMIUM_VISIBLE = 5;
+
+// ─── Confidence helpers ───────────────────────────────────────────────────────
 
 function getConfidenceTier(v: number | null): string {
   if (v == null) return "Speculative";
@@ -156,14 +161,6 @@ function getPositionBadgeStyle(pos: string | null): string {
 }
 
 // ─── Opening Round Banner ─────────────────────────────────────────────────────
-
-const TRACKING_BULLETS = [
-  "Weekly projection vs actual score comparison",
-  "Captain accuracy tracking",
-  "Trap avoidance success rate",
-  "Breakout hit percentage",
-  "Model confidence grading",
-];
 
 function OpeningRoundBanner() {
   return (
@@ -393,6 +390,7 @@ interface PlayerCardProps {
 function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnlock, isFeature = false }: PlayerCardProps) {
   const isTrap = section === "trap";
   const [expanded, setExpanded] = useState(false);
+
   const sectionAccent =
     section === "captain"
       ? { border: "border-yellow-400/20", bg: "bg-yellow-400/[0.04]", badge: "bg-yellow-400/15 text-yellow-300 border-yellow-400/30" }
@@ -408,7 +406,6 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
       : rank === 1 ? "Trap Pick" : `#${rank} Trap`;
 
   const signalLabel = SECTION_SIGNAL_LABEL[section];
-
   const sharpened = row.ai_summary ? sharpenSummary(row.ai_summary) : null;
   const sentences = sharpened ? sharpened.split(". ").filter(s => s.trim().length > 0) : [];
   const isLong = sentences.length > 2;
@@ -433,7 +430,7 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
               </span>
             )}
           </div>
-          <h3 className={`font-bold text-white truncate ${isFeature ? "text-base" : "text-sm"}`}>{row.player_name}</h3>
+          <h3 className={`font-bold text-white ${isFeature ? "text-base" : "text-sm"}`}>{row.player_name}</h3>
           <p className="text-xs text-white/40 mt-0.5">{row.team}</p>
         </div>
 
@@ -516,7 +513,7 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
             className="overflow-hidden transition-all duration-300 ease-in-out"
             style={{ maxHeight: expanded ? "600px" : "4rem" }}
           >
-            <p className="text-xs text-white/65 leading-relaxed">
+            <p className="text-xs text-white/65 leading-relaxed whitespace-normal break-words">
               {expanded ? sharpened : previewText}
             </p>
           </div>
@@ -538,7 +535,7 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
       {sharpened && locked && (
         <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2.5">
           <p className="text-[10px] font-bold uppercase tracking-widest text-[#F5C84C]/70 mb-1.5">{signalLabel}</p>
-          <p className="text-xs text-white/65 leading-relaxed">
+          <p className="text-xs text-white/65 leading-relaxed whitespace-normal break-words">
             {firstSentence}
           </p>
           <p className="text-[11px] text-white/25 mt-1.5 italic">
@@ -628,10 +625,145 @@ function SectionHeader({ section, count }: { section: Section; count: number }) 
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Horizontal Scroll Card Carousel (mobile) ─────────────────────────────────
 
-const FREE_VISIBLE = 1;
-const PREMIUM_VISIBLE = 5;
+interface CardCarouselProps {
+  rows: RankingRow[];
+  section: Section;
+  visible: number;
+  isPremium: boolean;
+  sectionStats: SectionStats;
+  onUnlock: () => void;
+}
+
+function CardCarousel({ rows, section, visible, isPremium, sectionStats, onUnlock }: CardCarouselProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const cardWidth = el.scrollWidth / rows.length;
+    const index = Math.round(el.scrollLeft / cardWidth);
+    setActiveIndex(Math.min(index, rows.length - 1));
+  };
+
+  return (
+    <div>
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        {rows.map((row, i) => {
+          const rank = i + 1;
+          const locked = rank > visible;
+          return (
+            <div
+              key={row.player_id ?? row.player_name}
+              className="snap-start shrink-0"
+              style={{ width: "min(320px, calc(100vw - 48px))" }}
+            >
+              <PlayerCard
+                row={row}
+                rank={rank}
+                section={section}
+                locked={locked}
+                isPremium={isPremium}
+                sectionStats={sectionStats}
+                onUnlock={onUnlock}
+                isFeature={rank === 1}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {rows.length > 1 && (
+        <div className="flex items-center justify-center gap-1.5 mt-3">
+          {rows.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => {
+                const el = scrollRef.current;
+                if (!el) return;
+                const cardWidth = el.scrollWidth / rows.length;
+                el.scrollTo({ left: i * cardWidth, behavior: "smooth" });
+              }}
+              className={`rounded-full transition-all duration-200 ${
+                i === activeIndex
+                  ? section === "captain"
+                    ? "w-4 h-1.5 bg-yellow-400"
+                    : section === "breakout"
+                    ? "w-4 h-1.5 bg-green-400"
+                    : "w-4 h-1.5 bg-red-400"
+                  : "w-1.5 h-1.5 bg-white/15"
+              }`}
+              aria-label={`Go to card ${i + 1}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Desktop Grid Layout ──────────────────────────────────────────────────────
+
+interface DesktopGridProps {
+  rows: RankingRow[];
+  section: Section;
+  visible: number;
+  isPremium: boolean;
+  sectionStats: SectionStats;
+  onUnlock: () => void;
+}
+
+function DesktopGrid({ rows, section, visible, isPremium, sectionStats, onUnlock }: DesktopGridProps) {
+  const featureCard = rows[0];
+  const remainingCards = rows.slice(1);
+
+  return (
+    <div>
+      <div className="mb-3">
+        <PlayerCard
+          row={featureCard}
+          rank={1}
+          section={section}
+          locked={false}
+          isPremium={isPremium}
+          sectionStats={sectionStats}
+          onUnlock={onUnlock}
+          isFeature
+        />
+      </div>
+
+      {remainingCards.length > 0 && (
+        <div className="grid gap-3 md:grid-cols-2">
+          {remainingCards.map((row, i) => {
+            const rank = i + 2;
+            const locked = rank > visible;
+            return (
+              <PlayerCard
+                key={row.player_id ?? row.player_name}
+                row={row}
+                rank={rank}
+                section={section}
+                locked={locked}
+                isPremium={isPremium}
+                sectionStats={sectionStats}
+                onUnlock={onUnlock}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AFLRoundEdgeBoard() {
   const { isPremium } = useAuth();
@@ -725,6 +857,7 @@ export default function AFLRoundEdgeBoard() {
           50% { box-shadow: 0 0 8px 2px rgba(245,200,76,0.18); border-color: rgba(245,200,76,0.65); }
         }
         .animate-pulse-gold-border { animation: pulse-gold-border 2.2s ease-in-out infinite; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
       `}</style>
 
       <div className="max-w-5xl mx-auto">
@@ -784,8 +917,6 @@ export default function AFLRoundEdgeBoard() {
           {sections.map(({ key, data }) => {
             if (data.length === 0) return null;
 
-            const featureCard = data[0];
-            const remainingCards = data.slice(1);
             const lockedCount = !isPremium ? Math.max(0, data.length - FREE_VISIBLE) : 0;
             const sectionStats = computeSectionStats(data);
 
@@ -793,39 +924,29 @@ export default function AFLRoundEdgeBoard() {
               <section key={key}>
                 <SectionHeader section={key} count={Math.min(data.length, PREMIUM_VISIBLE)} />
 
-                <div className="mb-3">
-                  <PlayerCard
-                    row={featureCard}
-                    rank={1}
+                {/* Mobile: horizontal scroll carousel */}
+                <div className="md:hidden">
+                  <CardCarousel
+                    rows={data}
                     section={key}
-                    locked={false}
+                    visible={visible}
                     isPremium={isPremium}
                     sectionStats={sectionStats}
                     onUnlock={() => setShowUpgrade(true)}
-                    isFeature
                   />
                 </div>
 
-                {remainingCards.length > 0 && (
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {remainingCards.map((row, i) => {
-                      const rank = i + 2;
-                      const isLocked = rank > visible;
-                      return (
-                        <PlayerCard
-                          key={row.player_id ?? row.player_name}
-                          row={row}
-                          rank={rank}
-                          section={key}
-                          locked={isLocked}
-                          isPremium={isPremium}
-                          sectionStats={sectionStats}
-                          onUnlock={() => setShowUpgrade(true)}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
+                {/* Desktop: stacked feature + 2-col grid */}
+                <div className="hidden md:block">
+                  <DesktopGrid
+                    rows={data}
+                    section={key}
+                    visible={visible}
+                    isPremium={isPremium}
+                    sectionStats={sectionStats}
+                    onUnlock={() => setShowUpgrade(true)}
+                  />
+                </div>
 
                 {!isPremium && lockedCount > 0 && (
                   <SectionLockFooter
