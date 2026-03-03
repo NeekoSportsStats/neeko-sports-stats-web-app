@@ -1,4 +1,4 @@
-import { Lock, Zap, AlertTriangle, TrendingUp, TrendingDown, Shield, Info } from "lucide-react";
+import { Lock, Zap, TriangleAlert as AlertTriangle, TrendingUp, TrendingDown, Shield, Info } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,

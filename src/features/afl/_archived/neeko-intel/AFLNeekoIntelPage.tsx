@@ -1,22 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  Lock,
-  Crown,
-  Zap,
-  TrendingUp,
-  TrendingDown,
-  Star,
-  RefreshCw,
-  Swords,
-  Lightbulb,
-  AlertTriangle,
-  Activity,
-  ChevronUp,
-  ChevronDown,
-  Gauge,
-  Target,
-  ArrowRightLeft,
-} from "lucide-react";
+import { Lock, Crown, Zap, TrendingUp, TrendingDown, Star, RefreshCw, Swords, Lightbulb, TriangleAlert as AlertTriangle, Activity, ChevronUp, ChevronDown, Gauge, Target, ArrowRightLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import {
