@@ -137,20 +137,28 @@ export function AppSidebar() {
                         </SidebarMenuSubItem>
                       ))}
 
-                      {[
-                        { title: "Edge Board" },
-                        { title: "Player v Player" },
-                      ].map((item) => (
-                        <SidebarMenuSubItem key={item.title}>
-                          <SidebarMenuSubButton
-                            className="py-0.5 pl-8 text-xs opacity-40 cursor-default pointer-events-none"
-                            disabled
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild className="py-0.5">
+                          <NavLink
+                            to="/sports/afl/edge-board"
+                            className="hover:bg-muted/50 pl-8 text-xs"
+                            activeClassName="bg-muted text-primary font-medium"
+                            onClick={handleLinkClick}
                           >
-                            {item.title}
-                            <span className="ml-auto text-[10px] text-muted-foreground">Soon</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
+                            Edge Board
+                          </NavLink>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton
+                          className="py-0.5 pl-8 text-xs opacity-40 cursor-default pointer-events-none"
+                          disabled
+                        >
+                          Player v Player
+                          <span className="ml-auto text-[10px] text-muted-foreground">Soon</span>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
                     </SidebarMenuSub>
                   </CollapsibleContent>
                 </SidebarMenuItem>
