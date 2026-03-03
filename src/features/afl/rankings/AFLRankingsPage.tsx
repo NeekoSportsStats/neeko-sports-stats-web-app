@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Lock, Crown, X, Info, Search, ChevronUp, ChevronDown, Download } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Dot } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
@@ -810,7 +809,6 @@ function exportToCSV(rows: RankingRow[]) {
 
 export default function AFLRankingsPage() {
   const { isPremium } = useAuth();
-  const isMobile = useIsMobile();
 
   const [activeTab, setActiveTab] = useState<RankingsTab>("best");
   const [rows, setRows] = useState<RankingRow[]>([]);
@@ -818,7 +816,7 @@ export default function AFLRankingsPage() {
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
   const [premiumFilter, setPremiumFilter] = useState<PremiumFilter>("ALL");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selected, setSelected] = useState<(RankingRow & { _rank: number; _unlocked: boolean }) | null>(null);
+  const [selected, setSelected] = useState<(RankingRow & { _rank: number; _unlocked: boolean; _tier: "premium" | "full" | "partial" | "locked" }) | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [ratingInfoOpen, setRatingInfoOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("neeko_rating");
@@ -947,7 +945,18 @@ export default function AFLRankingsPage() {
     const rowUnlocked = isPremium || isFreeFullRow(idx);
 
     const handleRowClick = () => {
-      setSelected({ ...row, _rank: rank, _unlocked: rowUnlocked });
+      setSelected({
+        ...row,
+        _rank: rank,
+        _unlocked: rowUnlocked,
+        _tier: isPremium
+          ? "premium"
+          : isFreeFullRow(idx)
+          ? "full"
+          : isFreePartialRow(idx)
+          ? "partial"
+          : "locked",
+      });
     };
 
     const neekoRBadge = getNeekoRatingBadge(row.neeko_rating ?? null);
@@ -1270,36 +1279,22 @@ export default function AFLRankingsPage() {
 
         {isPremium && !loading && <PremiumInsightsBar rows={displayRows} />}
 
-        {isMobile && (
-          <div className="text-center text-xs text-white/30 mb-2">Swipe left to scroll · tap any player for full breakdown</div>
-        )}
-        {!isMobile && !isPremium && (
-          <p className="text-xs text-zinc-500 mb-2">Click any player for full AI breakdown</p>
-        )}
-        {!isMobile && isPremium && (
+        {isPremium ? (
           <p className="text-xs text-white/25 mb-2">
             {displayRows.length} players · Click column headers to sort · Click any player for full breakdown
           </p>
+        ) : (
+          <p className="text-xs text-white/30 mb-2">Swipe left to see all columns · tap any player for full breakdown</p>
         )}
 
         <div className="relative w-full">
-          {isMobile && (
-            <>
-              <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-[#070707] to-transparent z-20" />
-              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-[#070707] to-transparent z-20" />
-            </>
-          )}
-          {!isMobile && (
-            <>
-              <div className="pointer-events-none absolute top-0 left-0 w-6 h-full bg-gradient-to-r from-[#070707] to-transparent z-20 rounded-l-xl" />
-              <div className="pointer-events-none absolute top-0 right-0 w-6 h-full bg-gradient-to-l from-[#070707] to-transparent z-20 rounded-r-xl" />
-            </>
-          )}
+          <div className="pointer-events-none absolute top-0 left-0 w-6 h-full bg-gradient-to-r from-[#070707] to-transparent z-20 rounded-l-xl" />
+          <div className="pointer-events-none absolute top-0 right-0 w-6 h-full bg-gradient-to-l from-[#070707] to-transparent z-20 rounded-r-xl" />
           <div
-            className={`w-full overflow-x-auto scrollbar-thin scrollbar-thumb-[#F5C84C]/30 scrollbar-track-transparent rounded-xl border ${isPremium ? "border-[#F5C84C]/10" : "border-white/5"} ${!isMobile ? "overflow-y-auto max-h-[75vh]" : ""}`}
-            style={isMobile ? { WebkitOverflowScrolling: "touch" } : undefined}
+            className={`w-full overflow-x-auto overflow-y-auto max-h-[75vh] scrollbar-thin scrollbar-thumb-[#F5C84C]/30 scrollbar-track-transparent rounded-xl border ${isPremium ? "border-[#F5C84C]/10" : "border-white/5"}`}
+            style={{ WebkitOverflowScrolling: "touch" }}
           >
-            <table className="min-w-[800px] w-full border-collapse">
+            <table className="min-w-[1100px] w-full border-collapse">
               <thead className={`sticky top-0 z-30 ${isPremium ? "bg-[#0a0a0a]" : "bg-[#070707]"} border-b border-[#F5C84C]/20`}>
                 {renderHeaders()}
               </thead>
