@@ -1,8 +1,5 @@
 import { Link } from "react-router-dom";
-import {
-  Trophy, Target, BarChart2 as BarChart, TrendingUp,
-  Star, AlertTriangle, Shield, ArrowRight, Cpu,
-} from "lucide-react";
+import { Trophy, Target, ChartBar as BarChart, TrendingUp, Star, TriangleAlert as AlertTriangle, Shield, ArrowRight, Cpu } from "lucide-react";
 
 const FOCUS_AREAS = [
   {
