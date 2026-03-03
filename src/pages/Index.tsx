@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Crown, ArrowRight, Trophy, BarChart2, GitCompare } from "lucide-react";
+import { Crown, ArrowRight, Trophy, ChartBar as BarChart2, GitCompare } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 const FEATURES = [
