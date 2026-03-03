@@ -26,7 +26,7 @@ const trustFeatures = [
     icon: TrendingUp,
     title: "Data-driven edge",
     description:
-      "Advanced trend modelling across AFL, EPL, and NBA — designed to surface momentum shifts before they show up in box scores.",
+      "Advanced AFL trend modelling designed to surface momentum shifts before they appear in fantasy scores.",
   },
   {
     icon: Target,
