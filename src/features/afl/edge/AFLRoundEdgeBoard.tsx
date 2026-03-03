@@ -253,16 +253,34 @@ function PlayerCard({ row, rank, section, locked, onUnlock, isFeature = false }:
         </div>
       )}
 
-      {aiText && !locked && (
+      {row.ai_summary && !locked && (
         <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2.5">
           <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">AI Summary</p>
           <p className="text-xs text-white/55 leading-relaxed italic">{aiText}</p>
         </div>
       )}
 
-      {!aiText && !locked && (
+      {row.ai_summary && locked && (
         <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2.5">
-          <p className="text-xs text-white/25 italic">AI analysis pending</p>
+          <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">AI Summary</p>
+          <p className="text-xs text-white/55 leading-relaxed italic">
+            {row.ai_summary.split(". ")[0] + "."}
+          </p>
+          <p className="text-xs text-white/35 leading-relaxed italic blur-sm select-none pointer-events-none mt-1">
+            Full matchup, ceiling and volatility breakdown locked.
+          </p>
+          <button
+            onClick={onUnlock}
+            className="mt-2 text-[11px] font-semibold text-[#F5C84C] hover:underline transition-all"
+          >
+            Unlock full AI breakdown →
+          </button>
+        </div>
+      )}
+
+      {!row.ai_summary && !locked && (
+        <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2.5">
+          <p className="text-xs text-white/25 italic">AI breakdown unavailable for this player.</p>
         </div>
       )}
     </div>
