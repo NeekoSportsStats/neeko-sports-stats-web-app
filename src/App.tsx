@@ -50,6 +50,7 @@ const UserConductPolicy = React.lazy(() => import("@/pages/policies/UserConductP
 const AFLRankingsPage   = React.lazy(() => import("@/features/afl/rankings/AFLRankingsPage"));
 const AFLNeekoIntelPage = React.lazy(() => import("@/features/afl/neeko-intel/AFLNeekoIntelPage"));
 const AFLRoundEdgeBoard = React.lazy(() => import("@/features/afl/edge/AFLRoundEdgeBoard"));
+const AFLPlayerCompare  = React.lazy(() => import("@/features/afl/compare/AFLPlayerCompare"));
 
 /* =========================
    Suspense helpers
@@ -175,7 +176,8 @@ function App() {
       <Route path="/sports/afl" element={<Navigate to="/sports/afl/rankings" replace />} />
       <Route path="/sports/afl/rankings"    element={<Layout><S fallback={Players}><AFLRankingsPage /></S></Layout>} />
       <Route path="/sports/afl/neeko-intel" element={<Layout><S fallback={AI}><AFLNeekoIntelPage /></S></Layout>} />
-      <Route path="/sports/afl/edge-board"  element={<Layout><S fallback={Generic}><AFLRoundEdgeBoard /></S></Layout>} />
+      <Route path="/sports/afl/edge-board"    element={<Layout><S fallback={Generic}><AFLRoundEdgeBoard /></S></Layout>} />
+      <Route path="/sports/afl/compare"      element={<Layout><S fallback={Generic}><AFLPlayerCompare /></S></Layout>} />
 
       {/* =========================
          Catch-all
