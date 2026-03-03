@@ -403,6 +403,7 @@ interface PlayerCardProps {
 
 function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnlock, isFeature = false }: PlayerCardProps) {
   const isTrap = section === "trap";
+  const [expanded, setExpanded] = useState(false);
   const sectionAccent =
     section === "captain"
       ? { border: "border-yellow-400/20", bg: "bg-yellow-400/[0.04]", badge: "bg-yellow-400/15 text-yellow-300 border-yellow-400/30" }
@@ -420,10 +421,10 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
   const signalLabel = SECTION_SIGNAL_LABEL[section];
 
   const sharpened = row.ai_summary ? sharpenSummary(row.ai_summary) : null;
-  const aiTwoLines = sharpened
-    ? sharpened.split(". ").slice(0, 2).join(". ").trim() + (sharpened.split(". ").length > 2 ? "…" : "")
-    : null;
-  const firstSentence = sharpened ? sharpened.split(". ")[0] + "." : null;
+  const sentences = sharpened ? sharpened.split(". ").filter(s => s.trim().length > 0) : [];
+  const isLong = sentences.length > 2;
+  const previewText = isLong ? sentences.slice(0, 2).join(". ").trim() + "." : sharpened;
+  const firstSentence = sharpened ? sentences[0] + "." : null;
 
   return (
     <div
@@ -522,9 +523,26 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
       {sharpened && !locked && (
         <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2.5">
           <p className="text-[10px] font-bold uppercase tracking-widest text-[#F5C84C]/70 mb-1.5">{signalLabel}</p>
-          <p className="text-xs text-white/65 leading-relaxed">
-            {aiTwoLines}
-          </p>
+          <div
+            className="overflow-hidden transition-all duration-300 ease-in-out"
+            style={{ maxHeight: expanded ? "600px" : "4rem" }}
+          >
+            <p className="text-xs text-white/65 leading-relaxed">
+              {expanded ? sharpened : previewText}
+            </p>
+          </div>
+          {isLong && (
+            <button
+              onClick={() => setExpanded(prev => !prev)}
+              className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-white/40 hover:text-white/70 transition-colors"
+            >
+              <ChevronDown
+                size={12}
+                className={`transition-transform duration-300 ${expanded ? "rotate-180" : "rotate-0"}`}
+              />
+              {expanded ? "Show Less" : "Show More"}
+            </button>
+          )}
         </div>
       )}
 
