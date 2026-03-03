@@ -19,13 +19,13 @@ Deno.serve(async (req: Request) => {
 
     const monthlyProduct = await stripe.products.create({
       name: "Neeko+ Monthly",
-      description: "Full access to Neeko Sports Stats premium features including Complete Rankings access, Full AI player breakdowns, Captain Edge board, Breakout alerts, Trap warnings, Player vs Player comparison, and Advanced projections and value metrics.",
+      description: "Full access to Neeko Sports Stats premium AFL fantasy analytics including: Complete Rankings access, AI player insights, Captain Edge board, Breakout watch alerts, Trap pick warnings, Player vs Player comparison, and Advanced projections and value metrics.",
       metadata: { plan: "monthly" },
     });
 
     const monthlyPrice = await stripe.prices.create({
       product: monthlyProduct.id,
-      unit_amount: 1299,
+      unit_amount: 999,
       currency: "aud",
       recurring: {
         interval: "month",
@@ -36,13 +36,13 @@ Deno.serve(async (req: Request) => {
 
     const yearlyProduct = await stripe.products.create({
       name: "Neeko+ Yearly",
-      description: "Full access to Neeko Sports Stats premium features. Save over 24% compared to monthly.",
+      description: "Full access to Neeko Sports Stats premium AFL fantasy analytics. Save 26% with annual billing.",
       metadata: { plan: "yearly" },
     });
 
     const yearlyPrice = await stripe.prices.create({
       product: yearlyProduct.id,
-      unit_amount: 11900,
+      unit_amount: 8900,
       currency: "aud",
       recurring: {
         interval: "year",
@@ -64,14 +64,14 @@ Deno.serve(async (req: Request) => {
         monthly: {
           product_id: monthlyProduct.id,
           price_id: monthlyPrice.id,
-          amount: 1299,
+          amount: 999,
           currency: "aud",
           interval: "month",
         },
         yearly: {
           product_id: yearlyProduct.id,
           price_id: yearlyPrice.id,
-          amount: 11900,
+          amount: 8900,
           currency: "aud",
           interval: "year",
         },
