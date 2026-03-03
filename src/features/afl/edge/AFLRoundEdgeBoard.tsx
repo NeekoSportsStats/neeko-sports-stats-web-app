@@ -52,6 +52,22 @@ function fmtValueScore(v: number | null | undefined): string {
   return n.toFixed(2);
 }
 
+// ─── AI text sharpener ────────────────────────────────────────────────────────
+
+function sharpenSummary(text: string): string {
+  return text
+    .replace(/is expected to /gi, "")
+    .replace(/projects to /gi, "")
+    .replace(/may see /gi, "")
+    .replace(/could see /gi, "");
+}
+
+const SECTION_SIGNAL_LABEL: Record<Section, string> = {
+  captain: "CAPTAIN EDGE",
+  breakout: "BUY SIGNAL",
+  trap: "AVOID SIGNAL",
+};
+
 // ─── Color helpers ─────────────────────────────────────────────────────────────
 
 function getConfidenceColor(v: number | null): string {
@@ -180,11 +196,16 @@ function PlayerCard({ row, rank, section, locked, onUnlock, isFeature = false }:
       ? rank === 1 ? "Top Breakout" : `#${rank} Breakout`
       : rank === 1 ? "Trap Pick" : `#${rank} Trap`;
 
-  const aiText = row.ai_summary
-    ? row.ai_summary.length > 220
-      ? row.ai_summary.slice(0, 220) + "…"
-      : row.ai_summary
+  const signalLabel = SECTION_SIGNAL_LABEL[section];
+
+  const sharpened = row.ai_summary ? sharpenSummary(row.ai_summary) : null;
+  const aiText = sharpened
+    ? sharpened.length > 220
+      ? sharpened.slice(0, 220) + "…"
+      : sharpened
     : null;
+
+  const firstSentence = sharpened ? sharpened.split(". ")[0] + "." : null;
 
   return (
     <div className={`relative rounded-xl border ${sectionAccent.border} ${sectionAccent.bg} overflow-hidden transition-all duration-200 ${isFeature ? "p-5" : "p-4"}`}>
@@ -210,7 +231,7 @@ function PlayerCard({ row, rank, section, locked, onUnlock, isFeature = false }:
           <p className={`font-bold text-white tabular-nums ${isFeature ? "text-2xl" : "text-xl"}`}>
             {fmtInt(row.projection_final)}
           </p>
-          <p className="text-[10px] text-white/30 mt-0.5">proj.</p>
+          <p className="text-[10px] text-white/30 mt-0.5">Round Projection</p>
         </div>
       </div>
 
@@ -253,34 +274,30 @@ function PlayerCard({ row, rank, section, locked, onUnlock, isFeature = false }:
         </div>
       )}
 
-      {row.ai_summary && !locked && (
+      {sharpened && !locked && (
         <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2.5">
-          <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">AI Summary</p>
-          <p className="text-xs text-white/55 leading-relaxed italic">{aiText}</p>
+          <p className="text-xs text-white/70 leading-relaxed">
+            <span className="font-semibold text-[#F5C84C]">{signalLabel}:</span>{" "}
+            {aiText}
+          </p>
         </div>
       )}
 
-      {row.ai_summary && locked && (
+      {sharpened && locked && (
         <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2.5">
-          <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">AI Summary</p>
-          <p className="text-xs text-white/55 leading-relaxed italic">
-            {row.ai_summary.split(". ")[0] + "."}
+          <p className="text-xs text-white/70 leading-relaxed">
+            <span className="font-semibold text-[#F5C84C]">{signalLabel}:</span>{" "}
+            {firstSentence}
           </p>
-          <p className="text-xs text-white/35 leading-relaxed italic blur-sm select-none pointer-events-none mt-1">
+          <p className="text-xs text-white/35 leading-relaxed blur-sm select-none pointer-events-none mt-1">
             Full matchup, ceiling and volatility breakdown locked.
           </p>
           <button
             onClick={onUnlock}
             className="mt-2 text-[11px] font-semibold text-[#F5C84C] hover:underline transition-all"
           >
-            Unlock full AI breakdown →
+            Unlock This Week's Full Edge →
           </button>
-        </div>
-      )}
-
-      {!row.ai_summary && !locked && (
-        <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2.5">
-          <p className="text-xs text-white/25 italic">AI breakdown unavailable for this player.</p>
         </div>
       )}
     </div>
@@ -297,19 +314,19 @@ interface SectionHeaderProps {
 const SECTION_META: Record<Section, { label: string; sub: string; icon: React.ReactNode; accent: string }> = {
   captain: {
     label: "Captain Edge",
-    sub: "Highest-ceiling captain options ranked by captain score",
+    sub: "This week's strongest captain signals — ranked by ceiling, matchup and volatility edge.",
     icon: <Star size={16} className="text-yellow-400" />,
     accent: "text-yellow-400",
   },
   breakout: {
     label: "Breakout Watch",
-    sub: "Underpriced players with high upside — price risers before the market moves",
+    sub: "Undervalued breakout signals before price correction hits.",
     icon: <TrendingUp size={16} className="text-green-400" />,
     accent: "text-green-400",
   },
   trap: {
     label: "Trap Alert",
-    sub: "High-risk, overvalued players to avoid this round",
+    sub: "High-risk and overpriced plays flagged before they cost you.",
     icon: <AlertTriangle size={16} className="text-red-400" />,
     accent: "text-red-400",
   },
@@ -439,21 +456,24 @@ export default function AFLRoundEdgeBoard() {
             </div>
             <h1 className="text-xl font-bold text-white">Edge Board</h1>
           </div>
-          <p className="text-sm text-white/35 max-w-md">
-            Round intelligence — captain locks, breakout targets, and traps to avoid.
+          <p className="text-sm text-white/70 max-w-md font-medium">
+            Turn projections into round-winning decisions.
+          </p>
+          <p className="text-[11px] text-white/25 mt-1 max-w-md tracking-wide">
+            Updated every round using 594 player intelligence models.
           </p>
 
           {!isPremium && (
             <div className="mt-4 flex items-center gap-3 rounded-xl border border-[#F5C84C]/20 bg-[#F5C84C]/[0.04] px-4 py-3">
               <Crown size={14} className="text-[#F5C84C] shrink-0" />
               <p className="text-xs text-white/50 flex-1">
-                Free preview — see 1 per section. Upgrade to unlock all 5.
+                You're seeing 1 of 5 high-impact picks this round. The remaining edges are locked.
               </p>
               <a
                 href="/neeko-plus"
-                className="text-xs font-semibold text-[#F5C84C] hover:text-yellow-300 transition-colors shrink-0"
+                className="text-xs font-semibold text-[#F5C84C] hover:underline transition-all shrink-0"
               >
-                Upgrade
+                Unlock This Week's Full Edge →
               </a>
             </div>
           )}
