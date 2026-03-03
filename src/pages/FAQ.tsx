@@ -7,6 +7,41 @@ import {
 } from "@/components/ui/accordion";
 import { ArrowLeft } from "lucide-react";
 
+const PRICING_ANSWER = (
+  <div className="space-y-4">
+    <p>Neeko+ is available in two subscription options:</p>
+    <div className="space-y-2">
+      <div>
+        <p className="font-semibold text-white/70">Monthly</p>
+        <p>$12.99 AUD per month</p>
+      </div>
+      <div>
+        <p className="font-semibold text-white/70">Yearly</p>
+        <p>$119 AUD per year <span className="text-[#F5C84C]">(Save 24% compared to monthly)</span></p>
+      </div>
+    </div>
+    <div>
+      <p className="mb-2">Your subscription includes full access to:</p>
+      <ul className="space-y-1 list-none">
+        {[
+          "Complete rankings table",
+          "AI player breakdowns",
+          "Captain Edge board",
+          "Breakout alerts",
+          "Trap warnings",
+          "Player vs Player comparison",
+          "Advanced projections and value metrics",
+        ].map((item) => (
+          <li key={item} className="flex items-center gap-2">
+            <span className="text-[#F5C84C]">•</span> {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+    <p>Subscriptions renew automatically and can be cancelled anytime.</p>
+  </div>
+);
+
 const FAQ_GROUPS = [
   {
     group: "The Platform",
@@ -58,7 +93,7 @@ const FAQ_GROUPS = [
       },
       {
         q: "How much does Neeko+ cost?",
-        a: "Neeko+ is $5.99 per week, billed weekly. No lock-in period.",
+        a: PRICING_ANSWER,
       },
       {
         q: "Can I cancel anytime?",
