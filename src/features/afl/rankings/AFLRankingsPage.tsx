@@ -1416,33 +1416,12 @@ export default function AFLRankingsPage() {
 
                       const rendered = renderRow(row, idx);
 
-                      if (!isPremium && idx === FREE_FULL_ROWS - 1) {
-                        return (
-                          <>
-                            {rendered}
-                            <tr key={`conversion-mid-${idx}`}>
-                              <td colSpan={TOTAL_COLS} className="px-4 py-3">
-                                <div className="flex items-center justify-between gap-3 rounded-lg border border-white/8 bg-white/[0.03] px-4 py-2.5">
-                                  <span className="text-xs text-white/40">{FREE_PARTIAL_ROWS - FREE_FULL_ROWS} breakout candidates in the top {FREE_PARTIAL_ROWS} are hidden.</span>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); setShowUpgradeModal(true); }}
-                                    className="shrink-0 rounded-md bg-[#F5C84C] hover:bg-[#F5C84C]/90 px-3 py-1.5 text-xs font-bold text-black transition-colors"
-                                  >
-                                    Unlock full Rankings
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          </>
-                        );
-                      }
-
                       if (!isPremium && idx === FREE_PARTIAL_ROWS - 1) {
                         return (
                           <>
                             {rendered}
                             <tr key={`conversion-wall-${idx}`}>
-                              <td colSpan={TOTAL_COLS} className="px-4 py-5">
+                              <td colSpan={TOTAL_COLS} className="px-4 pt-8 pb-5">
                                 <div className="flex flex-col items-center gap-2 rounded-lg border border-[#F5C84C]/15 bg-[#F5C84C]/[0.04] px-5 py-5 text-center">
                                   <p className="text-sm font-semibold text-white/70">You're viewing 15 of 594 ranked players.</p>
                                   <p className="text-xs text-white/40">Elite trade targets, ceiling picks and matchup edges are locked.</p>
