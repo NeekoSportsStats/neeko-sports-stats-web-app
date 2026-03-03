@@ -1365,13 +1365,10 @@ export default function AFLRankingsPage() {
         )}
 
         <div
-          className={`w-full overflow-y-auto max-h-[75vh] rounded-xl border ${isPremium ? "border-[#F5C84C]/10" : "border-white/5"}`}
+          className={`w-full overflow-x-auto overflow-y-auto max-h-[75vh] rounded-xl border scrollbar-thin scrollbar-thumb-[#F5C84C]/30 scrollbar-track-transparent ${isPremium ? "border-[#F5C84C]/10" : "border-white/5"}`}
+          style={{ WebkitOverflowScrolling: "touch" }}
         >
-          <div
-            className="relative w-full overflow-x-auto scrollbar-thin scrollbar-thumb-[#F5C84C]/30 scrollbar-track-transparent"
-            style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-x pan-y" }}
-          >
-            <table className="min-w-[900px] w-full border-collapse">
+            <table className="min-w-[1100px] w-full border-collapse" style={{ touchAction: "pan-x pan-y" }}>
               <thead className={`sticky top-0 z-30 ${isPremium ? "bg-[#0a0a0a]" : "bg-[#070707]"} border-b border-[#F5C84C]/20`}>
                 {renderHeaders()}
               </thead>
@@ -1466,7 +1463,6 @@ export default function AFLRankingsPage() {
                 }
               </tbody>
             </table>
-          </div>
         </div>
 
       </div>
