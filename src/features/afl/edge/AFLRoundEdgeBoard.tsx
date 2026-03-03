@@ -29,6 +29,45 @@ interface RankingRow {
 
 type Section = "captain" | "breakout" | "trap";
 
+// ─── Credibility stats (placeholder — structure ready for live data) ──────────
+
+interface CredibilityStats {
+  captainHitRate: string;
+  breakoutSuccess: string;
+  trapAccuracy: string;
+}
+
+const CREDIBILITY_PLACEHOLDER: CredibilityStats = {
+  captainHitRate: "64%",
+  breakoutSuccess: "3/5",
+  trapAccuracy: "4/5",
+};
+
+function CredibilityBar({ stats }: { stats: CredibilityStats }) {
+  return (
+    <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-5">
+      <span className="text-[10px] text-white/20 uppercase tracking-widest shrink-0">Last Round</span>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+        <span className="text-[11px] text-white/35">
+          Captain Hit Rate:{" "}
+          <span className="text-[#F5C84C]/70 font-semibold">{stats.captainHitRate}</span>
+          <span className="text-white/20"> above 120</span>
+        </span>
+        <span className="text-[11px] text-white/35">
+          Breakout Success:{" "}
+          <span className="text-green-400/70 font-semibold">{stats.breakoutSuccess}</span>
+          <span className="text-white/20"> beat projection</span>
+        </span>
+        <span className="text-[11px] text-white/35">
+          Trap Accuracy:{" "}
+          <span className="text-red-400/70 font-semibold">{stats.trapAccuracy}</span>
+          <span className="text-white/20"> underperformed</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
 function fmtPrice(v: number | null | undefined): string {
@@ -289,8 +328,8 @@ function PlayerCard({ row, rank, section, locked, onUnlock, isFeature = false }:
             <span className="font-semibold text-[#F5C84C]">{signalLabel}:</span>{" "}
             {firstSentence}
           </p>
-          <p className="text-xs text-white/35 leading-relaxed blur-sm select-none pointer-events-none mt-1">
-            Full matchup, ceiling and volatility breakdown locked.
+          <p className="text-xs text-white/25 leading-relaxed mt-1.5 italic">
+            Ceiling projection, matchup grade and volatility breakdown locked.
           </p>
           <button
             onClick={onUnlock}
@@ -301,6 +340,21 @@ function PlayerCard({ row, rank, section, locked, onUnlock, isFeature = false }:
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Section Lock Footer ───────────────────────────────────────────────────────
+
+function SectionLockFooter({ count, onUnlock }: { count: number; onUnlock: () => void }) {
+  if (count <= 0) return null;
+  return (
+    <button
+      onClick={onUnlock}
+      className="mt-3 flex items-center gap-2 text-[11px] text-[#F5C84C]/45 hover:text-[#F5C84C]/70 transition-colors"
+    >
+      <Lock size={10} className="shrink-0" />
+      <span>+{count} additional signal{count !== 1 ? "s" : ""} locked in this section</span>
+    </button>
   );
 }
 
@@ -463,15 +517,22 @@ export default function AFLRoundEdgeBoard() {
             Updated every round using 594 player intelligence models.
           </p>
 
+          <CredibilityBar stats={CREDIBILITY_PLACEHOLDER} />
+
           {!isPremium && (
             <div className="mt-4 flex items-center gap-3 rounded-xl border border-[#F5C84C]/20 bg-[#F5C84C]/[0.04] px-4 py-3">
               <Crown size={14} className="text-[#F5C84C] shrink-0" />
-              <p className="text-xs text-white/50 flex-1">
-                You're seeing 1 of 5 high-impact picks this round. The remaining edges are locked.
-              </p>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-white/60">
+                  You're seeing 1 of 5 high-impact edges this round.
+                </p>
+                <p className="text-xs text-white/35 mt-0.5">
+                  The remaining signals are locked.
+                </p>
+              </div>
               <a
                 href="/neeko-plus"
-                className="text-xs font-semibold text-[#F5C84C] hover:underline transition-all shrink-0"
+                className="text-xs font-semibold text-[#F5C84C] hover:underline transition-all shrink-0 whitespace-nowrap"
               >
                 Unlock This Week's Full Edge →
               </a>
@@ -486,6 +547,7 @@ export default function AFLRoundEdgeBoard() {
 
             const featureCard = data[0];
             const remainingCards = data.slice(1);
+            const lockedCount = !isPremium ? Math.max(0, data.length - FREE_VISIBLE) : 0;
 
             return (
               <section key={key}>
@@ -523,14 +585,12 @@ export default function AFLRoundEdgeBoard() {
                   </div>
                 )}
 
-                {/* Free tier CTA under each section */}
-                {!isPremium && data.length > 1 && (
-                  <button
-                    onClick={() => setShowUpgrade(true)}
-                    className="mt-4 w-full rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.03] py-3 text-xs font-semibold text-[#F5C84C]/60 hover:text-[#F5C84C] hover:border-[#F5C84C]/30 hover:bg-[#F5C84C]/[0.06] transition-all"
-                  >
-                    Unlock {data.length - 1} more {key === "captain" ? "captain options" : key === "breakout" ? "breakout picks" : "trap alerts"}
-                  </button>
+                {/* Section-level lock reinforcement */}
+                {!isPremium && lockedCount > 0 && (
+                  <SectionLockFooter
+                    count={lockedCount}
+                    onUnlock={() => setShowUpgrade(true)}
+                  />
                 )}
               </section>
             );
