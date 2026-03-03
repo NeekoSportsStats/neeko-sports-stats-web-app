@@ -120,8 +120,7 @@ export function AppSidebar() {
                       </SidebarMenuSubItem>
 
                       {[
-                        { title: "Rankings",    url: "/sports/afl/rankings" },
-                        { title: "Neeko Intel", url: "/sports/afl/neeko-intel" },
+                        { title: "Rankings", url: "/sports/afl/rankings" },
                       ].map((item) => (
                         <SidebarMenuSubItem key={item.title}>
                           <SidebarMenuSubButton asChild className="py-0.5">
