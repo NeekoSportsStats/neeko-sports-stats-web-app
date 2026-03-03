@@ -64,9 +64,9 @@ const TAB_DESCRIPTIONS: Record<RankingsTab, string> = {
   projection: "Highest projected fantasy scorers this round — sorted by Projection",
 };
 
-const FREE_FULL_ROWS = 3;
-const FREE_PARTIAL_ROWS = 10;
-const FREE_FETCH_LIMIT = 25;
+const FREE_FULL_ROWS = 5;
+const FREE_PARTIAL_ROWS = 15;
+const FREE_FETCH_LIMIT = 30;
 
 const LOCKED_WHY_TEASER = "Unlock matchup, role, ceiling analysis";
 
@@ -1339,7 +1339,56 @@ export default function AFLRankingsPage() {
                           </tr>
                         );
                       }
-                      return renderRow(row, idx);
+
+                      const rendered = renderRow(row, idx);
+
+                      if (!isPremium && idx === FREE_FULL_ROWS - 1) {
+                        return (
+                          <>
+                            {rendered}
+                            <tr key={`conversion-mid-${idx}`}>
+                              <td colSpan={TOTAL_COLS} className="px-4 py-4">
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-lg border border-[#F5C84C]/15 bg-[#F5C84C]/[0.04] px-5 py-3.5">
+                                  <div className="flex items-center gap-2.5">
+                                    <Lock size={13} className="text-[#F5C84C]/60 shrink-0" />
+                                    <span className="text-sm text-white/60">4 breakout candidates in the top 15 are hidden.</span>
+                                  </div>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setShowUpgradeModal(true); }}
+                                    className="shrink-0 rounded-md bg-[#F5C84C]/15 hover:bg-[#F5C84C]/25 border border-[#F5C84C]/30 px-4 py-1.5 text-xs font-semibold text-[#F5C84C] transition-colors"
+                                  >
+                                    Unlock Full Rankings
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          </>
+                        );
+                      }
+
+                      if (!isPremium && idx === FREE_PARTIAL_ROWS - 1) {
+                        return (
+                          <>
+                            {rendered}
+                            <tr key={`conversion-wall-${idx}`}>
+                              <td colSpan={TOTAL_COLS} className="px-4 py-5">
+                                <div className="flex flex-col items-center gap-2 rounded-lg border border-[#F5C84C]/15 bg-[#F5C84C]/[0.04] px-5 py-5 text-center">
+                                  <p className="text-sm font-semibold text-white/70">You're viewing 15 of 594 ranked players.</p>
+                                  <p className="text-xs text-white/40">Elite trade targets, ceiling picks and matchup edges are locked.</p>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setShowUpgradeModal(true); }}
+                                    className="mt-1 rounded-md bg-[#F5C84C] hover:bg-[#F5C84C]/90 px-5 py-2 text-xs font-bold text-[#070707] transition-colors"
+                                  >
+                                    Upgrade to Neeko+
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          </>
+                        );
+                      }
+
+                      return rendered;
                     })
                 }
               </tbody>
