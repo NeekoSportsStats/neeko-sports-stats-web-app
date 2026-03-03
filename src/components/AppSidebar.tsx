@@ -132,9 +132,8 @@ export function AppSidebar() {
                       </SidebarMenuSubItem>
 
                       {[
-                        { title: "Rankings",     url: "/sports/afl/rankings" },
-                        { title: "Neeko Intel",  url: "/sports/afl/neeko-intel" },
-                        { title: "Match Centre", url: "/sports/afl/match-centre" },
+                        { title: "Rankings",    url: "/sports/afl/rankings" },
+                        { title: "Neeko Intel", url: "/sports/afl/neeko-intel" },
                       ].map((item) => (
                         <SidebarMenuSubItem key={item.title}>
                           <SidebarMenuSubButton asChild className="py-0.5">
@@ -146,6 +145,21 @@ export function AppSidebar() {
                             >
                               {item.title}
                             </NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+
+                      {[
+                        { title: "Edge Board" },
+                        { title: "Player v Player" },
+                      ].map((item) => (
+                        <SidebarMenuSubItem key={item.title}>
+                          <SidebarMenuSubButton
+                            className="py-0.5 pl-8 text-xs opacity-40 cursor-default pointer-events-none"
+                            disabled
+                          >
+                            {item.title}
+                            <span className="ml-auto text-[10px] text-muted-foreground">Soon</span>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                       ))}

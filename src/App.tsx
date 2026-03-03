@@ -4,7 +4,6 @@ import { Layout } from "@/components/Layout";
 import { RequireAuth } from "@/components/RequireAuth";
 import {
   PlayersPageSkeleton,
-  MatchCentreSkeleton,
   AIInsightsSkeleton,
   GenericPageSkeleton,
 } from "@/components/skeletons/PageSkeletons";
@@ -48,9 +47,8 @@ const UserConductPolicy = React.lazy(() => import("@/pages/policies/UserConductP
 /* =========================
    AFL Pages — lazy
 ========================= */
-const AFLMatchCentrePage  = React.lazy(() => import("@/features/afl/match-centre/AFLMatchCentrePage"));
-const AFLRankingsPage     = React.lazy(() => import("@/features/afl/rankings/AFLRankingsPage"));
-const AFLNeekoIntelPage   = React.lazy(() => import("@/features/afl/neeko-intel/AFLNeekoIntelPage"));
+const AFLRankingsPage   = React.lazy(() => import("@/features/afl/rankings/AFLRankingsPage"));
+const AFLNeekoIntelPage = React.lazy(() => import("@/features/afl/neeko-intel/AFLNeekoIntelPage"));
 
 /* =========================
    Suspense helpers
@@ -59,10 +57,9 @@ function S({ fallback, children }: { fallback: React.ReactNode; children: React.
   return <Suspense fallback={fallback}>{children}</Suspense>;
 }
 
-const Players     = <PlayersPageSkeleton />;
-const MatchCentre = <MatchCentreSkeleton />;
-const AI          = <AIInsightsSkeleton />;
-const Generic     = <GenericPageSkeleton />;
+const Players = <PlayersPageSkeleton />;
+const AI      = <AIInsightsSkeleton />;
+const Generic = <GenericPageSkeleton />;
 
 function App() {
   return (
@@ -175,9 +172,8 @@ function App() {
          AFL
       ========================= */}
       <Route path="/sports/afl" element={<Navigate to="/sports/afl/rankings" replace />} />
-      <Route path="/sports/afl/rankings"     element={<Layout><S fallback={Players}><AFLRankingsPage /></S></Layout>} />
-      <Route path="/sports/afl/neeko-intel"  element={<Layout><S fallback={AI}><AFLNeekoIntelPage /></S></Layout>} />
-      <Route path="/sports/afl/match-centre" element={<Layout><S fallback={MatchCentre}><AFLMatchCentrePage /></S></Layout>} />
+      <Route path="/sports/afl/rankings"    element={<Layout><S fallback={Players}><AFLRankingsPage /></S></Layout>} />
+      <Route path="/sports/afl/neeko-intel" element={<Layout><S fallback={AI}><AFLNeekoIntelPage /></S></Layout>} />
 
       {/* =========================
          Catch-all
