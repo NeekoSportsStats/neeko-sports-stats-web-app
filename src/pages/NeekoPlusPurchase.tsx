@@ -7,6 +7,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription }
 import { Badge } from "@/components/ui/badge";
 import { Check, Crown, Sparkles, Loader as Loader2, ArrowLeft, TrendingUp, Target, Zap, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { NEEKO_PRICING } from "@/config/neekoPricing";
 type Plan = "monthly" | "yearly";
 
 const features = [
@@ -242,7 +243,7 @@ function PlanCard({ plan, selected, onSelect, isPremium, loading, onSubscribe }:
       {isYearly && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
           <Badge className="bg-primary text-black font-bold px-3 py-0.5 text-xs">
-            Best Value — Save 26%
+            Best Value — Save {NEEKO_PRICING.savingsPercent}%
           </Badge>
         </div>
       )}
@@ -250,17 +251,17 @@ function PlanCard({ plan, selected, onSelect, isPremium, loading, onSubscribe }:
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-lg">
           <Sparkles className="h-4 w-4 text-primary" />
-          {isYearly ? "Neeko+ Yearly" : "Neeko+ Monthly"}
+          {isYearly ? NEEKO_PRICING.yearly.label : NEEKO_PRICING.monthly.label}
         </CardTitle>
         <CardDescription>
-          {isYearly ? "Billed once per year" : "Billed monthly, cancel anytime"}
+          {isYearly ? NEEKO_PRICING.yearly.billingNote : NEEKO_PRICING.monthly.billingNote}
         </CardDescription>
       </CardHeader>
 
       <CardContent>
         <div className="flex items-end gap-1.5 mb-1">
           <span className="text-4xl font-extrabold text-white">
-            {isYearly ? "$89" : "$9.99"}
+            ${isYearly ? NEEKO_PRICING.yearly.price : NEEKO_PRICING.monthly.price}
           </span>
           <span className="text-muted-foreground mb-1 text-sm">
             AUD / {isYearly ? "year" : "month"}
@@ -268,7 +269,7 @@ function PlanCard({ plan, selected, onSelect, isPremium, loading, onSubscribe }:
         </div>
         {isYearly && (
           <p className="text-xs text-primary/80 font-medium">
-            Equivalent to $7.42/month
+            Equivalent to ${NEEKO_PRICING.yearly.monthlyEquivalent}/month
           </p>
         )}
       </CardContent>

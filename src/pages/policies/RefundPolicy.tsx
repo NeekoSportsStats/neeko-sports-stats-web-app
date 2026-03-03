@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { NEEKO_PRICING } from "@/config/neekoPricing";
 
 const SECTIONS = [
   {
@@ -21,11 +22,11 @@ const SECTIONS = [
         </p>
         <div className="space-y-3">
           <div className="rounded-xl border border-white/[0.07] bg-[#151515] px-5 py-4">
-            <p className="text-sm font-bold text-white mb-1">Monthly — $12.99 / month</p>
+            <p className="text-sm font-bold text-white mb-1">Monthly — ${NEEKO_PRICING.monthly.price} / month</p>
             <p className="text-sm text-white/40">Billed monthly. Automatically renews unless cancelled before the next billing date.</p>
           </div>
           <div className="rounded-xl border border-white/[0.07] bg-[#151515] px-5 py-4">
-            <p className="text-sm font-bold text-white mb-1">Yearly — $119 / year</p>
+            <p className="text-sm font-bold text-white mb-1">Yearly — ${NEEKO_PRICING.yearly.price} / year</p>
             <p className="text-sm text-white/40">Billed annually. Automatically renews unless cancelled before the next billing date.</p>
           </div>
         </div>

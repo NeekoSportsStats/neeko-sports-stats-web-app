@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Crown, ArrowRight, Star, TrendingUp, TriangleAlert as AlertTriangle, Check, Database, Cpu, Radio, Trophy, Users, ChartBar as BarChart2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
+import { NEEKO_PRICING } from "@/config/neekoPricing";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -500,10 +501,10 @@ export default function Index() {
               <div className="rounded-2xl border border-white/[0.09] bg-[#0e0e0e] p-6">
                 <p className="text-xs font-bold uppercase tracking-widest text-white/30 mb-3">Monthly</p>
                 <div className="flex items-end gap-1.5 mb-1">
-                  <span className="text-4xl font-extrabold text-white">$12.99</span>
+                  <span className="text-4xl font-extrabold text-white">${NEEKO_PRICING.monthly.price}</span>
                   <span className="text-sm text-white/35 mb-1">AUD / month</span>
                 </div>
-                <p className="text-xs text-white/25 mb-6">Billed monthly. Cancel anytime.</p>
+                <p className="text-xs text-white/25 mb-6">{NEEKO_PRICING.monthly.billingNote}</p>
                 <Link
                   to="/neeko-plus"
                   className="block text-center border border-[#F5C84C]/40 text-[#F5C84C] font-semibold text-sm py-2.5 rounded-xl hover:bg-[#F5C84C]/10 transition-all"
@@ -523,15 +524,15 @@ export default function Index() {
               >
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <span className="bg-[#F5C84C] text-black text-[11px] font-black px-3 py-0.5 rounded-full uppercase tracking-wide">
-                    Best Value — Save 24%
+                    Best Value — Save {NEEKO_PRICING.savingsPercent}%
                   </span>
                 </div>
                 <p className="text-xs font-bold uppercase tracking-widest text-[#F5C84C]/60 mb-3">Yearly</p>
                 <div className="flex items-end gap-1.5 mb-1">
-                  <span className="text-4xl font-extrabold text-white">$119</span>
+                  <span className="text-4xl font-extrabold text-white">${NEEKO_PRICING.yearly.price}</span>
                   <span className="text-sm text-white/35 mb-1">AUD / year</span>
                 </div>
-                <p className="text-xs text-[#F5C84C]/50 mb-6">Equivalent to $9.92/month</p>
+                <p className="text-xs text-[#F5C84C]/50 mb-6">Equivalent to ${NEEKO_PRICING.yearly.monthlyEquivalent}/month</p>
                 <Link
                   to="/neeko-plus"
                   className="block text-center bg-[#F5C84C] text-black font-bold text-sm py-2.5 rounded-xl hover:brightness-110 transition-all"

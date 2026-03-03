@@ -6,6 +6,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { ArrowLeft } from "lucide-react";
+import { NEEKO_PRICING } from "@/config/neekoPricing";
 
 const PRICING_ANSWER = (
   <div className="space-y-4">
@@ -13,11 +14,11 @@ const PRICING_ANSWER = (
     <div className="space-y-2">
       <div>
         <p className="font-semibold text-white/70">Monthly</p>
-        <p>$12.99 AUD per month</p>
+        <p>${NEEKO_PRICING.monthly.price} AUD per month</p>
       </div>
       <div>
         <p className="font-semibold text-white/70">Yearly</p>
-        <p>$119 AUD per year <span className="text-[#F5C84C]">(Save 24% compared to monthly)</span></p>
+        <p>${NEEKO_PRICING.yearly.price} AUD per year <span className="text-[#F5C84C]">(Save {NEEKO_PRICING.savingsPercent}% compared to monthly)</span></p>
       </div>
     </div>
     <div>

@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Lock, Crown, Loader as Loader2, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
-import { STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY } from "@/config/stripePrices";
+import { NEEKO_PRICING } from "@/config/neekoPricing";
 
 interface PremiumGateProps {
   children?: ReactNode;
@@ -90,8 +90,7 @@ function UnlockModal({ onClose }: { onClose: () => void }) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("No session");
 
-      const priceId = plan === "monthly" ? STRIPE_PRICE_MONTHLY : STRIPE_PRICE_YEARLY;
-      const origin  = window.location.origin;
+      const origin = window.location.origin;
 
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`,
@@ -102,10 +101,9 @@ function UnlockModal({ onClose }: { onClose: () => void }) {
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
-            price_id:    priceId,
+            plan,
             success_url: `${origin}/success`,
             cancel_url:  `${origin}/neeko-plus`,
-            mode:        "subscription",
           }),
         }
       );
@@ -172,7 +170,7 @@ function UnlockModal({ onClose }: { onClose: () => void }) {
             {loading === "yearly" ? (
               <Loader2 size={14} className="animate-spin" />
             ) : null}
-            Start Yearly
+            Yearly — ${NEEKO_PRICING.yearly.price} AUD
             <span className="text-xs font-medium opacity-75">(Best Value)</span>
           </button>
 
@@ -184,7 +182,7 @@ function UnlockModal({ onClose }: { onClose: () => void }) {
             {loading === "monthly" ? (
               <Loader2 size={14} className="animate-spin" />
             ) : null}
-            Start Monthly
+            Monthly — ${NEEKO_PRICING.monthly.price} AUD
           </button>
         </div>
 
