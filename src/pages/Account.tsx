@@ -29,6 +29,7 @@ export default function Account() {
 
   // ALL hooks declared at top level — never inside conditionals
   const [profile, setProfile] = useState<any>(null);
+  const [subRecord, setSubRecord] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [portalLoading, setPortalLoading] = useState(false);
 
@@ -65,6 +66,24 @@ export default function Account() {
         });
       } else {
         setProfile(data);
+      }
+
+      const { data: customer } = await supabase
+        .from("stripe_customers")
+        .select("customer_id")
+        .or(`profile_id.eq.${user.id},user_id.eq.${user.id}`)
+        .maybeSingle();
+
+      if (customer?.customer_id) {
+        const { data: sub } = await supabase
+          .from("stripe_subscriptions")
+          .select("*")
+          .eq("customer_id", customer.customer_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        setSubRecord(sub ?? null);
       }
 
       setLoadingProfile(false);
@@ -222,13 +241,24 @@ export default function Account() {
             {subscriptionActive ? (
               <>
                 <p>
-                  Plan: <strong>Neeko+ Premium</strong>
+                  <span className="text-sm text-muted-foreground">Plan</span><br />
+                  <strong>
+                    {subRecord?.plan_interval === "year" || subRecord?.interval === "year"
+                      ? "Neeko+ Yearly"
+                      : "Neeko+ Monthly"}
+                  </strong>
                 </p>
 
-                {profile.current_period_end && (
+                {(subRecord?.current_period_end || profile.current_period_end) && (
                   <p>
-                    Next Billing:{" "}
-                    {new Date(profile.current_period_end).toLocaleDateString()}
+                    <span className="text-sm text-muted-foreground">Next Billing Date</span><br />
+                    {subRecord?.current_period_end
+                      ? new Date(
+                          typeof subRecord.current_period_end === "number"
+                            ? subRecord.current_period_end * 1000
+                            : subRecord.current_period_end
+                        ).toLocaleDateString()
+                      : new Date(profile.current_period_end).toLocaleDateString()}
                   </p>
                 )}
 
@@ -256,14 +286,14 @@ export default function Account() {
               </>
             ) : (
               <>
-                <p>You're on the free plan. Upgrade to unlock all features.</p>
+                <p>You're on the free plan. Unlock Neeko+ to access all features.</p>
                 <Button
                   type="button"
                   onClick={() => navigate("/neeko-plus")}
                   className="w-full"
                 >
                   <Crown className="h-4 w-4 mr-2" />
-                  Upgrade to Neeko+
+                  Unlock Neeko+
                 </Button>
               </>
             )}

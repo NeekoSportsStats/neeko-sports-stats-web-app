@@ -1,74 +1,69 @@
-// src/pages/NeekoPlusPurchase.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
-
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Crown, Sparkles, Loader2, ArrowLeft, TrendingUp, Target, Zap, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+const MONTHLY_PRICE_ID = "price_1T70lqEKV8332a9YTnS3kZGQ";
+const YEARLY_PRICE_ID  = "price_1T70lqEKV8332a9Y1yiGTbCY";
+
+type Plan = "monthly" | "yearly";
+
+const features = [
+  "Full Rankings table — all players",
+  "Full AI player breakdowns",
+  "Captain Edge board",
+  "Breakout alerts",
+  "Trap warnings",
+  "Player vs Player comparison",
+  "Advanced projections and value metrics",
+];
+
+const trustFeatures = [
+  {
+    icon: TrendingUp,
+    title: "Data-driven edge",
+    description:
+      "Advanced trend modelling across AFL, EPL, and NBA — designed to surface momentum shifts before they show up in box scores.",
+  },
+  {
+    icon: Target,
+    title: "Fantasy-first analysis",
+    description:
+      "Every metric is tuned for fantasy relevance, including hit-rate thresholds, volatility bands, and ceiling projections.",
+  },
+  {
+    icon: Zap,
+    title: "Built weekly, not retrospectively",
+    description:
+      "Neeko+ is designed around upcoming matchups — not post-game summaries.",
+  },
+  {
+    icon: Users,
+    title: "Trusted by growing community",
+    description:
+      "Used weekly by a growing base of fantasy-focused users preparing lineups, trades, and match decisions.",
+  },
+];
+
 const NeekoPlusPurchase = () => {
+  const [selectedPlan, setSelectedPlan] = useState<Plan>("yearly");
   const [loading, setLoading] = useState(false);
   const { user, isPremium } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const price = "5.99";
-
-  const features = [
-    "Advanced AI-powered analytics",
-    "Predictive match outcomes",
-    "Player performance trends",
-    "Team comparison insights",
-    "Priority support",
-    "Early access to new features",
-  ];
-
-  const trustFeatures = [
-    {
-      icon: TrendingUp,
-      title: "Data-driven edge",
-      description:
-        "Advanced trend modelling across AFL, EPL, and NBA — designed to surface momentum shifts before they show up in box scores.",
-    },
-    {
-      icon: Target,
-      title: "Fantasy-first analysis",
-      description:
-        "Every metric is tuned for fantasy relevance, including hit-rate thresholds, volatility bands, and ceiling projections.",
-    },
-    {
-      icon: Zap,
-      title: "Built weekly, not retrospectively",
-      description:
-        "Neeko+ is designed around upcoming matchups — not post-game summaries.",
-    },
-    {
-      icon: Users,
-      title: "Trusted by growing community",
-      description:
-        "Used weekly by a growing base of fantasy-focused users preparing lineups, trades, and match decisions.",
-    },
-  ];
-
-  // 🔥 Prevent premium users from entering checkout
   useEffect(() => {
     if (isPremium) {
-      console.log("🔐 User already premium — disabling checkout button");
+      console.log("User already premium");
     }
   }, [isPremium]);
 
-  const handleSubscribe = async () => {
+  const handleSubscribe = async (plan: Plan) => {
     if (isPremium) {
       toast({
         title: "Already subscribed",
@@ -81,9 +76,7 @@ const NeekoPlusPurchase = () => {
     setLoading(true);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
         toast({
@@ -95,7 +88,9 @@ const NeekoPlusPurchase = () => {
         return;
       }
 
-      const origin = window.location.origin;
+      const priceId = plan === "monthly" ? MONTHLY_PRICE_ID : YEARLY_PRICE_ID;
+      const origin  = window.location.origin;
+
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`,
         {
@@ -105,7 +100,7 @@ const NeekoPlusPurchase = () => {
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
-            price_id:    import.meta.env.VITE_STRIPE_PRICE_ID || "price_1T4YX0EKV8332a9Ywko44M02",
+            price_id:    priceId,
             success_url: `${origin}/success`,
             cancel_url:  `${origin}/neeko-plus`,
             mode:        "subscription",
@@ -119,7 +114,6 @@ const NeekoPlusPurchase = () => {
       }
 
       const data = await res.json();
-
       if (!data.url) throw new Error("No checkout URL returned");
 
       window.location.assign(data.url);
@@ -135,7 +129,6 @@ const NeekoPlusPurchase = () => {
 
   return (
     <div className="container max-w-4xl py-8 md:py-12 px-4">
-      {/* BACK BUTTON */}
       <Button
         variant="ghost"
         className="mb-6 flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
@@ -145,7 +138,6 @@ const NeekoPlusPurchase = () => {
         Back
       </Button>
 
-      {/* HEADER */}
       <div className="text-center mb-12">
         <div className="flex items-center justify-center gap-2 mb-4">
           <Crown className="h-10 w-10 text-primary" />
@@ -156,88 +148,48 @@ const NeekoPlusPurchase = () => {
         </p>
       </div>
 
-      {/* MAIN CARD */}
       <div className="relative mb-10 md:mb-16">
-        <div
-          className="
-          absolute inset-0 -z-10
-          blur-[140px]
-          opacity-70
-          bg-[radial-gradient(circle_at_center,rgba(255,200,60,0.55),rgba(255,170,30,0.35),rgba(255,140,0,0.15),transparent)]
-        "
-        />
+        <div className="absolute inset-0 -z-10 blur-[140px] opacity-70 bg-[radial-gradient(circle_at_center,rgba(255,200,60,0.55),rgba(255,170,30,0.35),rgba(255,140,0,0.15),transparent)]" />
 
-        <Card className="border-primary/40 hover:border-primary transition-all shadow-xl rounded-2xl bg-black/40 backdrop-blur-sm p-1">
+        <div className="grid md:grid-cols-2 gap-5 mb-6">
+          <PlanCard
+            plan="monthly"
+            selected={selectedPlan === "monthly"}
+            onSelect={() => setSelectedPlan("monthly")}
+            isPremium={isPremium}
+            loading={loading}
+            onSubscribe={handleSubscribe}
+          />
+          <PlanCard
+            plan="yearly"
+            selected={selectedPlan === "yearly"}
+            onSelect={() => setSelectedPlan("yearly")}
+            isPremium={isPremium}
+            loading={loading}
+            onSubscribe={handleSubscribe}
+          />
+        </div>
+
+        <Card className="border-primary/20 bg-black/30 backdrop-blur-sm rounded-2xl">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              Neeko+
-              <Badge>Premium</Badge>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Everything included in Neeko+
             </CardTitle>
-
-            <CardDescription>
-              Advanced analytics and AI insights for serious fans and fantasy
-              players.
-            </CardDescription>
-
-            {/* PRICE */}
-            <div className="pt-4 flex items-end gap-2 relative">
-              <span className="text-5xl font-extrabold text-white animate-[pulse_3s_ease-in-out_infinite]">
-                ${price}
-              </span>
-              <span className="text-muted-foreground mb-1">
-                /week — cancel anytime
-              </span>
-
-              <div className="absolute left-0 right-0 -bottom-2 h-3 bg-gradient-to-r from-transparent via-amber-300/40 to-transparent rounded-full blur-md" />
-            </div>
           </CardHeader>
-
           <CardContent>
-            <div className="space-y-3 mt-6">
+            <div className="grid sm:grid-cols-2 gap-y-3 gap-x-6">
               {features.map((feature, idx) => (
                 <div key={idx} className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-primary" />
-                  <span>{feature}</span>
+                  <Check className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-sm">{feature}</span>
                 </div>
               ))}
             </div>
           </CardContent>
-
-          {/* BUTTONS */}
-          <CardFooter className="flex flex-col gap-3 pt-4">
-            {!isPremium && (
-              <Button
-                onClick={handleSubscribe}
-                disabled={loading}
-                className="w-full text-lg font-bold transition-all hover:-translate-y-0.5"
-                size="lg"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                    Processing…
-                  </>
-                ) : (
-                  "Get Neeko+ Now"
-                )}
-              </Button>
-            )}
-
-            {isPremium && (
-              <Button
-                onClick={() => navigate("/account")}
-                variant="outline"
-                className="w-full text-lg"
-              >
-                Manage Subscription
-              </Button>
-            )}
-          </CardFooter>
         </Card>
       </div>
 
-      {/* TRUST FEATURES */}
       <div className="mt-20">
         <h2 className="text-3xl font-bold mb-2 text-center">
           Why serious fantasy players use Neeko+
@@ -257,9 +209,7 @@ const NeekoPlusPurchase = () => {
                 <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4">
                   <Icon className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2 text-white">
-                  {feature.title}
-                </h3>
+                <h3 className="text-lg font-semibold mb-2 text-white">{feature.title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   {feature.description}
                 </p>
@@ -275,5 +225,90 @@ const NeekoPlusPurchase = () => {
     </div>
   );
 };
+
+interface PlanCardProps {
+  plan: Plan;
+  selected: boolean;
+  onSelect: () => void;
+  isPremium: boolean;
+  loading: boolean;
+  onSubscribe: (plan: Plan) => void;
+}
+
+function PlanCard({ plan, selected, onSelect, isPremium, loading, onSubscribe }: PlanCardProps) {
+  const isYearly = plan === "yearly";
+
+  return (
+    <Card
+      onClick={onSelect}
+      className={`relative cursor-pointer border-2 rounded-2xl bg-black/40 backdrop-blur-sm transition-all hover:-translate-y-0.5 ${
+        selected ? "border-primary shadow-[0_0_30px_rgba(245,200,76,0.25)]" : "border-primary/20 hover:border-primary/40"
+      }`}
+    >
+      {isYearly && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+          <Badge className="bg-primary text-black font-bold px-3 py-0.5 text-xs">
+            Best Value — Save 24%
+          </Badge>
+        </div>
+      )}
+
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Sparkles className="h-4 w-4 text-primary" />
+          {isYearly ? "Neeko+ Yearly" : "Neeko+ Monthly"}
+        </CardTitle>
+        <CardDescription>
+          {isYearly ? "Billed once per year" : "Billed monthly, cancel anytime"}
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent>
+        <div className="flex items-end gap-1.5 mb-1">
+          <span className="text-4xl font-extrabold text-white">
+            {isYearly ? "$119" : "$12.99"}
+          </span>
+          <span className="text-muted-foreground mb-1 text-sm">
+            AUD / {isYearly ? "year" : "month"}
+          </span>
+        </div>
+        {isYearly && (
+          <p className="text-xs text-primary/80 font-medium">
+            Equivalent to $9.92/month
+          </p>
+        )}
+      </CardContent>
+
+      <CardFooter>
+        {isPremium ? (
+          <Button variant="outline" className="w-full" disabled>
+            Current Plan
+          </Button>
+        ) : (
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              onSubscribe(plan);
+            }}
+            disabled={loading}
+            className={`w-full font-bold transition-all hover:-translate-y-0.5 ${
+              selected ? "bg-primary text-black hover:bg-primary/90" : ""
+            }`}
+            variant={selected ? "default" : "outline"}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Processing…
+              </>
+            ) : (
+              `Start ${isYearly ? "Yearly" : "Monthly"}`
+            )}
+          </Button>
+        )}
+      </CardFooter>
+    </Card>
+  );
+}
 
 export default NeekoPlusPurchase;

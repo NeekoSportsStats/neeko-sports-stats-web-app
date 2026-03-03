@@ -183,7 +183,10 @@ const Billing = () => {
                     <DollarSign className="h-4 w-4" />
                     Amount:
                   </span>
-                  <span className="text-sm">${(subscription.amount / 100).toFixed(2)}/month</span>
+                  <span className="text-sm">
+                    ${(subscription.amount / 100).toFixed(2)}
+                    {subscription.amount === 11900 ? "/year" : "/month"}
+                  </span>
                 </div>
               )}
 
@@ -233,10 +236,10 @@ const Billing = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Subscribe to Neeko Plus to unlock premium features and advanced analytics.
+              Subscribe to Neeko+ to unlock premium features and advanced analytics.
             </p>
             <Button type="button" onClick={() => navigate("/neeko-plus")} className="w-full">
-              View Subscription Plans
+              Unlock Neeko+
             </Button>
           </CardContent>
         </Card>

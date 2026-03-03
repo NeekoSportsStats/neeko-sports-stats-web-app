@@ -9,7 +9,7 @@ interface UpgradeButtonProps {
 }
 
 export function UpgradeButton({
-  label = "Upgrade to Neeko+",
+  label = "Unlock Neeko+",
   size = "md",
   className = "",
   to = "/neeko-plus",
