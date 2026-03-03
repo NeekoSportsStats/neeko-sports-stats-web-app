@@ -1,103 +1,88 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
-import { FileText, Shield, Users, DollarSign, Lock, ArrowLeft } from "lucide-react";
+import { FileText, Shield, Users, DollarSign, Lock, ArrowLeft, ChevronRight } from "lucide-react";
 
-const policyCategories = [
+const POLICIES = [
   {
     title: "Terms & Conditions",
     description: "Platform usage rules, prohibited activities, and legal agreements",
     icon: FileText,
     url: "/policies/terms",
-    color: "from-blue-500/10 to-blue-600/5"
   },
   {
     title: "Privacy Policy",
     description: "How we collect, store, and protect your personal information",
     icon: Shield,
     url: "/policies/privacy",
-    color: "from-green-500/10 to-green-600/5"
   },
   {
     title: "User Conduct Policy",
-    description: "Expected behavior, community guidelines, and acceptable use",
+    description: "Acceptable use, account misuse, and scraping prevention",
     icon: Users,
     url: "/policies/conduct",
-    color: "from-purple-500/10 to-purple-600/5"
   },
   {
     title: "Refund Policy",
-    description: "Subscription cancellation, refund eligibility, and billing terms",
+    description: "Monthly and yearly plan refund windows and billing terms",
     icon: DollarSign,
     url: "/policies/refund",
-    color: "from-orange-500/10 to-orange-600/5"
   },
   {
     title: "Data Handling & Security",
     description: "Security measures, data retention, and protection standards",
     icon: Lock,
     url: "/policies/security",
-    color: "from-red-500/10 to-red-600/5"
-  }
+  },
 ];
 
 export default function Policies() {
   const navigate = useNavigate();
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl">
-      <Button
-        variant="ghost"
-        onClick={() => navigate("/")}
-        className="mb-6"
-      >
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back
-      </Button>
-      <div className="mb-8 text-center">
-        <h1 className="text-4xl font-bold mb-2">Policies</h1>
-        <p className="text-muted-foreground text-lg">
-          Important information about using Neeko's Sports Stats
-        </p>
-      </div>
+    <div className="min-h-screen bg-[#070707] text-white">
+      <div className="max-w-3xl mx-auto px-4 py-16">
 
-      <div className="grid md:grid-cols-2 gap-6">
-        {policyCategories.map((policy) => {
-          const Icon = policy.icon;
-          return (
-            <Link key={policy.title} to={policy.url}>
-              <Card className={`p-6 bg-gradient-to-br ${policy.color} border-2 hover:border-primary/50 transition-all cursor-pointer group h-full`}>
-                <div className="flex items-start gap-4">
-                  <div className="rounded-lg bg-primary/10 p-3 group-hover:bg-primary/20 transition-colors">
-                    <Icon className="h-6 w-6 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors">
-                      {policy.title}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {policy.description}
-                    </p>
-                  </div>
-                </div>
-              </Card>
+        <button
+          onClick={() => navigate("/")}
+          className="flex items-center gap-2 text-white/30 hover:text-white/60 text-sm mb-10 transition-colors"
+        >
+          <ArrowLeft size={14} />
+          Back
+        </button>
+
+        <div className="mb-12">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/25 mb-4">Legal</p>
+          <h1 className="text-4xl font-extrabold mb-3">Policies</h1>
+          <p className="text-white/40 text-base">
+            Important information about using Neeko Sports Stats.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] overflow-hidden divide-y divide-white/[0.06]">
+          {POLICIES.map(({ title, description, icon: Icon, url }) => (
+            <Link
+              key={url}
+              to={url}
+              className="flex items-center gap-4 px-6 py-5 hover:bg-white/[0.03] transition-colors group"
+            >
+              <div className="shrink-0 w-9 h-9 rounded-xl bg-white/[0.06] flex items-center justify-center group-hover:bg-white/[0.09] transition-colors">
+                <Icon size={16} className="text-white/50" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-white/80 group-hover:text-white transition-colors">{title}</p>
+                <p className="text-xs text-white/30 mt-0.5 truncate">{description}</p>
+              </div>
+              <ChevronRight size={14} className="text-white/20 group-hover:text-white/40 transition-colors shrink-0" />
             </Link>
-          );
-        })}
-      </div>
+          ))}
+        </div>
 
-      <div className="mt-12 text-center">
-        <Card className="p-6 bg-muted/50">
-          <p className="text-sm text-muted-foreground">
-            Last updated: {new Date().toLocaleDateString()}
-          </p>
-          <p className="text-sm text-muted-foreground mt-2">
-            For questions about our policies, contact us at{" "}
-            <a href="mailto:admin@neekostats.com.au" className="text-primary hover:underline">
-              admin@neekostats.com.au
-            </a>
-          </p>
-        </Card>
+        <p className="text-center text-xs text-white/20 mt-10">
+          Questions?{" "}
+          <a href="mailto:admin@neekostats.com.au" className="text-white/35 hover:text-white/60 underline underline-offset-2 transition-colors">
+            admin@neekostats.com.au
+          </a>
+        </p>
+
       </div>
     </div>
   );
