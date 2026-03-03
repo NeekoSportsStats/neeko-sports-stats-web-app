@@ -180,9 +180,26 @@ Deno.serve(async (req) => {
       }
     }
 
+    let priceObj;
+    try {
+      priceObj = await stripe.prices.retrieve(price_id);
+    } catch (priceErr: any) {
+      console.error("stripe-checkout: price lookup failed", {
+        price_id,
+        message: priceErr?.message,
+        type: priceErr?.type,
+        code: priceErr?.code,
+      });
+      return corsResponse(
+        { error: `Invalid price ID: ${priceErr?.message ?? price_id}` },
+        400,
+      );
+    }
+
     console.log("stripe-checkout creating session", {
       customerId,
       price_id,
+      priceActive: priceObj?.active,
       success_url,
       cancel_url,
     });

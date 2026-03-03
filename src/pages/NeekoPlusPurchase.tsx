@@ -108,7 +108,7 @@ const NeekoPlusPurchase = () => {
 
       if (!res.ok) {
         const errorBody = await res.json().catch(() => null);
-        throw new Error(errorBody?.error || `Checkout request failed (${res.status})`);
+        throw new Error(errorBody?.message || errorBody?.error || `Checkout request failed (${res.status})`);
       }
 
       const data = await res.json();
