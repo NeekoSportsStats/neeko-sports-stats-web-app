@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Crown, ArrowRight, Trophy, Zap, TriangleAlert as AlertTriangle, Star, TrendingUp, ChartBar as BarChart2, GitCompare, Check, Database, Cpu, Radio } from "lucide-react";
+import { Crown, ArrowRight, Star, TrendingUp, TriangleAlert as AlertTriangle, Check, Database, Cpu, Radio, Trophy, Users, ChartBar as BarChart2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 
@@ -30,17 +30,17 @@ const FEATURES = [
   {
     icon: Cpu,
     title: "AI Player Analysis",
-    desc: "Each player is assessed against matchup conditions, recent form and historical ceiling. The output is a scored, ranked verdict — not an opinion.",
+    desc: "Each player is evaluated using matchup difficulty, recent form, historical scoring and projection ceilings.",
   },
   {
     icon: Radio,
     title: "Weekly Edge Signals",
-    desc: "Captain picks, breakout watches and trap flags are generated weekly from a multi-factor model built around price, form and opponent context.",
+    desc: "Captain picks, breakout watches and trap warnings generated from projection models.",
   },
   {
     icon: BarChart2,
     title: "Advanced Rankings",
-    desc: "Neeko Rating combines projection, matchup grade, volatility band and AI verdict into a single number designed for head-to-head trading decisions.",
+    desc: "Neeko Rating combines projection, matchup grade, volatility band and AI verdict.",
   },
 ];
 
@@ -49,26 +49,48 @@ const HOW_IT_WORKS = [
     step: "01",
     icon: Database,
     title: "Data Modelling",
-    desc: "Match results, player statistics and historical trends are ingested and normalised into structured fantasy-relevant features.",
+    desc: "Historical match data, player statistics and form trends are normalised into fantasy relevant metrics.",
   },
   {
     step: "02",
     icon: Cpu,
     title: "AI Projection Engine",
-    desc: "A multi-model pipeline scores each player for projection, ceiling, floor, volatility and matchup grade against the upcoming round.",
+    desc: "Projection models estimate scoring range, ceiling and volatility for each player.",
   },
   {
     step: "03",
     icon: Radio,
-    title: "Weekly Edge Signals",
-    desc: "Captain signals, breakout candidates and trap warnings are derived from mispricing, form velocity and opponent softness.",
+    title: "Edge Signals",
+    desc: "Captain signals, breakout alerts and trap warnings generated from projection mismatches.",
   },
 ];
 
-const PROOF_STATIC = [
-  { stat: "250+",   label: "Players analysed" },
-  { stat: "2,400+", label: "Games processed" },
-  { stat: "3",      label: "AI models running" },
+const WHO_FOR = [
+  {
+    icon: Trophy,
+    title: "Competitive League Players",
+    desc: "Looking for weekly captain edges and matchup advantages.",
+  },
+  {
+    icon: BarChart2,
+    title: "Data Driven Coaches",
+    desc: "Who prefer projections and metrics over guesswork.",
+  },
+  {
+    icon: Users,
+    title: "Fantasy Optimisers",
+    desc: "Trying to maximise every lineup decision.",
+  },
+];
+
+const NEEKO_FEATURES = [
+  "Full rankings table",
+  "AI player breakdowns",
+  "Captain Edge Board",
+  "Breakout alerts",
+  "Trap warnings",
+  "Player vs Player comparison",
+  "Advanced projections and value metrics",
 ];
 
 const FOOTER_LINKS = [
@@ -78,34 +100,25 @@ const FOOTER_LINKS = [
   { label: "FAQ",      to: "/faq" },
 ];
 
-const NEEKO_FEATURES = [
-  "Full Rankings table — all players",
-  "Full AI player breakdowns",
-  "Captain Edge board",
-  "Breakout alerts & trap warnings",
-  "Player vs Player comparison",
-  "Advanced projections and value metrics",
-];
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function teamAbbr(team: string) {
   const map: Record<string, string> = {
-    "Adelaide":            "ADE", "Brisbane Lions":    "BRL", "Carlton":           "CAR",
-    "Collingwood":         "COL", "Essendon":           "ESS", "Fremantle":         "FRE",
-    "Geelong":             "GEE", "Gold Coast":         "GCS", "Greater Western Sydney": "GWS",
-    "Hawthorn":            "HAW", "Melbourne":          "MEL", "North Melbourne":   "NME",
-    "Port Adelaide":       "PAD", "Richmond":           "RIC", "St Kilda":          "STK",
-    "Sydney":              "SYD", "West Coast":         "WCE", "Western Bulldogs":  "WBD",
+    "Adelaide": "ADE", "Brisbane Lions": "BRL", "Carlton": "CAR",
+    "Collingwood": "COL", "Essendon": "ESS", "Fremantle": "FRE",
+    "Geelong": "GEE", "Gold Coast": "GCS", "Greater Western Sydney": "GWS",
+    "Hawthorn": "HAW", "Melbourne": "MEL", "North Melbourne": "NME",
+    "Port Adelaide": "PAD", "Richmond": "RIC", "St Kilda": "STK",
+    "Sydney": "SYD", "West Coast": "WCE", "Western Bulldogs": "WBD",
   };
   return map[team] ?? team.slice(0, 3).toUpperCase();
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Shared layout ────────────────────────────────────────────────────────────
 
 function SectionLabel({ children }: { children: string }) {
   return (
-    <p className="text-center text-[11px] text-white/25 uppercase tracking-[0.18em] font-semibold mb-4">
+    <p className="text-center text-[11px] text-white/25 uppercase tracking-[0.18em] font-semibold mb-3">
       {children}
     </p>
   );
@@ -121,7 +134,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 function GoldDivider() {
   return (
-    <div className="flex justify-center my-5">
+    <div className="flex justify-center my-4">
       <div className="w-10 h-0.5 rounded-full bg-[#F5C84C]/30" />
     </div>
   );
@@ -140,21 +153,21 @@ function RankingsPreview() {
         p_position: "ALL",
         p_sort_key: "neeko_rating",
         p_sort_dir: "desc",
-        p_limit:    10,
+        p_limit:    5,
         p_offset:   0,
       });
-      setRows((data ?? []).slice(0, 10));
+      setRows((data ?? []).slice(0, 5));
       setLoading(false);
     })();
   }, []);
 
   return (
-    <section className="py-20 bg-[#070707] border-t border-white/[0.05]">
-      <div className="max-w-4xl mx-auto px-4">
+    <section className="py-16 bg-[#070707] border-t border-white/[0.05]">
+      <div className="max-w-3xl mx-auto px-4">
         <SectionLabel>Rankings Preview</SectionLabel>
-        <SectionHeading>Top 10 Players This Round</SectionHeading>
+        <SectionHeading>This Week's Top Fantasy Projections</SectionHeading>
         <GoldDivider />
-        <p className="text-center text-white/40 text-sm mb-10 max-w-md mx-auto">
+        <p className="text-center text-white/40 text-sm mb-8 max-w-md mx-auto">
           Ranked by Neeko Rating — projection, matchup and AI verdict combined.
         </p>
 
@@ -168,29 +181,36 @@ function RankingsPreview() {
 
           {loading
             ? Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] animate-pulse">
+                <div key={i} className="grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-4 border-b border-white/[0.04] bg-[#0c0c0c] animate-pulse last:border-0">
                   <div className="h-4 w-4 bg-white/10 rounded" />
-                  <div className="h-4 w-32 bg-white/10 rounded" />
+                  <div className="h-4 w-36 bg-white/10 rounded" />
                   <div className="h-4 w-10 bg-white/10 rounded mx-auto" />
                   <div className="h-4 w-12 bg-white/10 rounded ml-auto" />
                 </div>
               ))
-            : rows.map((row, idx) => (
-                <div
-                  key={idx}
-                  className="grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors"
-                >
-                  <span className="text-sm text-white/25 font-mono">{idx + 1}</span>
-                  <span className="text-sm font-semibold text-white truncate">{row.player_name}</span>
-                  <span className="text-xs text-white/40 text-center self-center">{teamAbbr(row.team)}</span>
-                  <span className="text-sm font-bold text-[#F5C84C] text-right">
-                    {row.projection_final != null ? Math.round(row.projection_final) : "—"}
-                  </span>
+            : rows.length > 0
+              ? rows.map((row, idx) => (
+                  <div
+                    key={idx}
+                    className="grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-4 border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors last:border-0"
+                  >
+                    <span className="text-sm text-white/25 font-mono">{idx + 1}</span>
+                    <span className="text-sm font-semibold text-white truncate">{row.player_name}</span>
+                    <span className="text-xs text-white/40 text-center self-center">{teamAbbr(row.team)}</span>
+                    <span className="text-sm font-bold text-[#F5C84C] text-right">
+                      {row.projection_final != null ? Math.round(row.projection_final) : "—"}
+                    </span>
+                  </div>
+                ))
+              : (
+                <div className="px-5 py-8 text-center text-sm text-white/25 bg-[#0c0c0c]">
+                  Rankings will be available when round data is processed.
                 </div>
-              ))}
+              )
+          }
         </div>
 
-        <div className="flex justify-center mt-7">
+        <div className="flex justify-center mt-6">
           <Link
             to="/sports/afl/rankings"
             className="inline-flex items-center gap-2 border border-white/15 text-white/70 hover:text-white hover:border-white/30 font-semibold text-sm px-7 py-3 rounded-xl transition-all"
@@ -251,12 +271,12 @@ function EdgeBoardPreview() {
   ];
 
   return (
-    <section className="py-20 bg-[#0a0a0a] border-t border-white/[0.05]">
-      <div className="max-w-4xl mx-auto px-4">
-        <SectionLabel>Edge Board Preview</SectionLabel>
+    <section className="py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
+      <div className="max-w-3xl mx-auto px-4">
+        <SectionLabel>Edge Signals Preview</SectionLabel>
         <SectionHeading>This Round's Edge Signals</SectionHeading>
         <GoldDivider />
-        <p className="text-center text-white/40 text-sm mb-10 max-w-md mx-auto">
+        <p className="text-center text-white/40 text-sm mb-8 max-w-md mx-auto">
           One signal from each category. Unlock Neeko+ to see the full board.
         </p>
 
@@ -268,7 +288,7 @@ function EdgeBoardPreview() {
             >
               <div className="flex items-center gap-2 mb-4">
                 <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
                   style={{ background: `${color}15`, border: `1px solid ${color}30` }}
                 >
                   <Icon size={15} style={{ color }} />
@@ -280,8 +300,9 @@ function EdgeBoardPreview() {
 
               {loading ? (
                 <div className="space-y-2 animate-pulse">
-                  <div className="h-5 w-28 bg-white/10 rounded" />
-                  <div className="h-3 w-16 bg-white/10 rounded" />
+                  <div className="h-5 w-32 bg-white/10 rounded" />
+                  <div className="h-3 w-20 bg-white/10 rounded" />
+                  <div className="h-3 w-24 bg-white/10 rounded" />
                 </div>
               ) : row ? (
                 <>
@@ -297,13 +318,17 @@ function EdgeBoardPreview() {
                   )}
                 </>
               ) : (
-                <p className="text-sm text-white/20">No signal this round</p>
+                <div className="space-y-2 animate-pulse">
+                  <div className="h-5 w-32 bg-white/[0.06] rounded" />
+                  <div className="h-3 w-20 bg-white/[0.06] rounded" />
+                  <div className="h-3 w-24 bg-white/[0.06] rounded" />
+                </div>
               )}
             </div>
           ))}
         </div>
 
-        <div className="flex justify-center mt-7">
+        <div className="flex justify-center mt-6">
           <Link
             to="/neeko-plus"
             className="inline-flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3 rounded-xl hover:brightness-110 transition-all"
@@ -321,16 +346,6 @@ function EdgeBoardPreview() {
 
 export default function Index() {
   const { isPremium } = useAuth();
-  const [playerCount, setPlayerCount] = useState<number | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      const { count } = await supabase
-        .from("afl_player_ledger")
-        .select("*", { count: "exact", head: true });
-      setPlayerCount(count ?? null);
-    })();
-  }, []);
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
@@ -358,7 +373,7 @@ export default function Index() {
           </h1>
 
           <p className="text-lg md:text-xl text-white/55 font-medium mb-10 max-w-xl mx-auto leading-relaxed">
-            AI-powered projections, captain signals, breakout alerts and trap warnings — built to help serious AFL Fantasy coaches make smarter decisions.
+            AI-powered projections, captain signals, breakout alerts and trap warnings — designed to help serious AFL Fantasy coaches make smarter decisions.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
@@ -386,45 +401,20 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ── LIVE DATA BANNER ──────────────────────────────────────────────────── */}
-      <section className="border-t border-white/[0.06] bg-[#0a0a0a] py-10">
-        <div className="max-w-3xl mx-auto px-4">
-          <p className="text-center text-xs text-white/25 uppercase tracking-widest font-semibold mb-7">
-            Opening Round Insights
-          </p>
-          <div className="grid grid-cols-3 gap-6 text-center">
-            <div>
-              <p className="text-2xl md:text-3xl font-extrabold text-white mb-1">
-                {playerCount != null ? `${playerCount}+` : "250+"}
-              </p>
-              <p className="text-xs text-white/30 font-medium">Total players analysed this round</p>
-            </div>
-            <div>
-              <p className="text-2xl md:text-3xl font-extrabold text-white mb-1">2,400+</p>
-              <p className="text-xs text-white/30 font-medium">Games processed</p>
-            </div>
-            <div>
-              <p className="text-2xl md:text-3xl font-extrabold text-white mb-1">Weekly</p>
-              <p className="text-xs text-white/30 font-medium">Updated picks</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── RANKINGS PREVIEW ──────────────────────────────────────────────────── */}
+      {/* ── SECTION 2: RANKINGS PREVIEW ───────────────────────────────────────── */}
       <RankingsPreview />
 
-      {/* ── EDGE BOARD PREVIEW ────────────────────────────────────────────────── */}
+      {/* ── SECTION 3: EDGE SIGNALS PREVIEW ──────────────────────────────────── */}
       <EdgeBoardPreview />
 
-      {/* ── WHAT NEEKO DOES ───────────────────────────────────────────────────── */}
-      <section className="py-20 bg-[#070707] border-t border-white/[0.05]">
+      {/* ── SECTION 4: WHY NEEKO WINS ─────────────────────────────────────────── */}
+      <section className="py-16 bg-[#070707] border-t border-white/[0.05]">
         <div className="max-w-4xl mx-auto px-4">
-          <SectionLabel>What Neeko Does</SectionLabel>
-          <SectionHeading>Built for AFL Fantasy Decision-Making</SectionHeading>
+          <SectionLabel>Why Neeko+</SectionLabel>
+          <SectionHeading>Why Fantasy Coaches Use Neeko+</SectionHeading>
           <GoldDivider />
-          <p className="text-center text-white/40 text-sm mb-12 max-w-md mx-auto">
-            Not news. Not chat. Just structured intelligence that plugs directly into how you build your team.
+          <p className="text-center text-white/40 text-sm mb-10 max-w-md mx-auto">
+            Not news. Not chat. Structured intelligence designed for AFL Fantasy decision-making.
           </p>
 
           <div className="grid sm:grid-cols-3 gap-5">
@@ -444,16 +434,16 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ── HOW IT WORKS ──────────────────────────────────────────────────────── */}
-      <section className="py-20 bg-[#0a0a0a] border-t border-white/[0.05]">
+      {/* ── SECTION 5: HOW IT WORKS ───────────────────────────────────────────── */}
+      <section className="py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
         <div className="max-w-4xl mx-auto px-4">
           <SectionLabel>How It Works</SectionLabel>
           <SectionHeading>From Raw Data to Weekly Edge Signals</SectionHeading>
           <GoldDivider />
 
-          <div className="grid sm:grid-cols-3 gap-5 mt-10">
+          <div className="grid sm:grid-cols-3 gap-5 mt-8">
             {HOW_IT_WORKS.map(({ step, icon: Icon, title, desc }) => (
-              <div key={step} className="relative rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-6">
+              <div key={step} className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-6">
                 <div className="flex items-start gap-4 mb-4">
                   <span className="text-[11px] font-black text-[#F5C84C]/40 tracking-widest font-mono mt-0.5">
                     {step}
@@ -470,36 +460,42 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ── SOCIAL PROOF ──────────────────────────────────────────────────────── */}
-      <section className="py-20 bg-[#070707] border-t border-white/[0.05]">
-        <div className="max-w-3xl mx-auto px-4">
-          <SectionLabel>By the Numbers</SectionLabel>
-          <SectionHeading>The Engine Behind Neeko+</SectionHeading>
+      {/* ── SECTION 6: WHO NEEKO IS FOR ───────────────────────────────────────── */}
+      <section className="py-16 bg-[#070707] border-t border-white/[0.05]">
+        <div className="max-w-4xl mx-auto px-4">
+          <SectionLabel>Who It's For</SectionLabel>
+          <SectionHeading>Built For Serious AFL Fantasy Coaches</SectionHeading>
           <GoldDivider />
 
-          <div className="grid grid-cols-3 gap-8 mt-10 text-center">
-            {PROOF_STATIC.map(({ stat, label }) => (
-              <div key={label}>
-                <p className="text-3xl md:text-4xl font-extrabold text-[#F5C84C] mb-2">{stat}</p>
-                <p className="text-sm text-white/35 font-medium">{label}</p>
+          <div className="grid sm:grid-cols-3 gap-5 mt-8">
+            {WHO_FOR.map(({ icon: Icon, title, desc }) => (
+              <div
+                key={title}
+                className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-6 hover:border-white/[0.12] transition-all"
+              >
+                <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/[0.05] border border-white/[0.08] mb-5">
+                  <Icon size={18} className="text-white/50" />
+                </div>
+                <h3 className="text-base font-bold text-white mb-2">{title}</h3>
+                <p className="text-sm text-white/40 leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── PRICING ───────────────────────────────────────────────────────────── */}
+      {/* ── SECTION 7: PRICING ────────────────────────────────────────────────── */}
       {!isPremium && (
-        <section className="py-20 bg-[#0a0a0a] border-t border-white/[0.05]">
+        <section className="py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
           <div className="max-w-3xl mx-auto px-4">
             <SectionLabel>Pricing</SectionLabel>
             <SectionHeading>Simple. No Hidden Fees.</SectionHeading>
             <GoldDivider />
-            <p className="text-center text-white/40 text-sm mb-12 max-w-sm mx-auto">
+            <p className="text-center text-white/40 text-sm mb-10 max-w-sm mx-auto">
               One subscription. Full access. Cancel anytime.
             </p>
 
-            <div className="grid sm:grid-cols-2 gap-5 mb-10">
+            <div className="grid sm:grid-cols-2 gap-5 mb-8">
               {/* Monthly */}
               <div className="rounded-2xl border border-white/[0.09] bg-[#0e0e0e] p-6">
                 <p className="text-xs font-bold uppercase tracking-widest text-white/30 mb-3">Monthly</p>
@@ -522,7 +518,7 @@ export default function Index() {
                 style={{
                   border: "1px solid rgba(245,200,76,0.35)",
                   background: "linear-gradient(160deg, #111 0%, #0d0d0d 100%)",
-                  boxShadow: "0 0 40px rgba(245,200,76,0.1)",
+                  boxShadow: "0 0 40px rgba(245,200,76,0.08)",
                 }}
               >
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -559,9 +555,9 @@ export default function Index() {
         </section>
       )}
 
-      {/* ── FOOTER CTA ────────────────────────────────────────────────────────── */}
+      {/* ── SECTION 8: FINAL CTA ──────────────────────────────────────────────── */}
       {!isPremium && (
-        <section className="py-20 bg-[#070707] border-t border-white/[0.05]">
+        <section className="py-16 bg-[#070707] border-t border-white/[0.05]">
           <div className="max-w-xl mx-auto px-4 text-center">
             <div
               className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-6"
