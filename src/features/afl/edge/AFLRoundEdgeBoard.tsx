@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
   Lock, Crown, X, TrendingUp, TriangleAlert as AlertTriangle,
-  Star, ChevronDown, ChevronUp, ShieldCheck,
+  Star, ShieldCheck, Info,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
@@ -155,88 +155,46 @@ function getPositionBadgeStyle(pos: string | null): string {
   return "bg-white/10 text-white/40";
 }
 
-// ─── Social Proof Bar ─────────────────────────────────────────────────────────
+// ─── Opening Round Banner ─────────────────────────────────────────────────────
 
-function SocialProofBar() {
-  const metrics = [
-    { label: "Captain Hit Rate", value: "64%", sub: "120+ threshold", pct: 64 },
-    { label: "Breakout Success", value: "3/5", sub: "beat projection", pct: 60 },
-    { label: "Trap Avoided Avg", value: "-18pts", sub: "vs projection", pct: 80 },
-  ];
-
-  function metricColor(pct: number) {
-    if (pct >= 70) return "text-[#F5C84C]";
-    if (pct >= 55) return "text-green-400";
-    return "text-red-400";
-  }
-
+function OpeningRoundBanner() {
   return (
-    <div className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.025] px-4 py-3">
-      <p className="text-[10px] text-white/25 uppercase tracking-widest mb-2.5">Edge Performance Snapshot — This Season</p>
-      <div className="flex flex-wrap gap-x-6 gap-y-2">
-        {metrics.map((m) => (
-          <div key={m.label} className="flex items-center gap-2">
-            <div className={`text-sm font-bold tabular-nums ${metricColor(m.pct)}`}>{m.value}</div>
-            <div>
-              <p className="text-[10px] text-white/50 leading-none">{m.label}</p>
-              <p className="text-[10px] text-white/25 leading-none mt-0.5">{m.sub}</p>
-            </div>
-          </div>
-        ))}
+    <div className="mt-4 rounded-xl border border-[#F5C84C]/20 bg-[#F5C84C]/[0.03] px-4 py-3 flex items-start gap-3">
+      <Info size={14} className="text-[#F5C84C]/70 shrink-0 mt-0.5" />
+      <div>
+        <p className="text-xs font-semibold text-white/80">
+          2026 Performance Tracking Activates After Opening Round.
+        </p>
+        <p className="text-[11px] text-white/40 mt-0.5">
+          Edge results and model accuracy will be published weekly.
+        </p>
       </div>
     </div>
   );
 }
 
-// ─── Edge Performance Tracker ─────────────────────────────────────────────────
+// ─── Model Authority Section ──────────────────────────────────────────────────
 
-interface EdgeTrackerProps {
-  isPremium: boolean;
-}
+const MODEL_SIGNALS = [
+  "2025 Rolling Baseline Integration",
+  "Dynamic 2026 Projection Blending",
+  "Volatility & Ceiling Modeling",
+  "Matchup Delta Adjustments",
+  "Price-Adjusted Value Engine",
+];
 
-function EdgePerformanceTracker({ isPremium }: EdgeTrackerProps) {
-  const [open, setOpen] = useState(isPremium);
-
-  const captainHitRate = 64;
-  const breakoutROI = 18;
-  const trapMissRate = 22;
-  const netAdvantage = (captainHitRate * 2) + (breakoutROI * 0.5) - trapMissRate;
-
-  const trackerStats = [
-    { label: "Rolling Captain Accuracy", value: "64%", sub: "Last 5 rounds", color: "text-[#F5C84C]" },
-    { label: "Avg Breakout ROI", value: "+18pts", sub: "Above projection", color: "text-green-400" },
-    { label: "Trap Underperformance Avg", value: "-22pts", sub: "Vs expectation", color: "text-red-400" },
-    { label: "Total Signals This Season", value: "75", sub: "Across all sections", color: "text-white/70" },
-    { label: "Net Advantage Score", value: netAdvantage.toFixed(1), sub: "Season aggregate", color: "text-[#F5C84C]" },
-  ];
-
+function ModelAuthoritySection() {
   return (
-    <div className="mt-4 rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.02]">
-      <button
-        className="w-full flex items-center justify-between px-4 py-3 text-left"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#F5C84C]/60" />
-          <span className="text-xs font-semibold text-white/70">Edge Performance Tracker</span>
-        </div>
-        {open
-          ? <ChevronUp size={14} className="text-white/30" />
-          : <ChevronDown size={14} className="text-white/30" />
-        }
-      </button>
-
-      {open && (
-        <div className="px-4 pb-4 grid grid-cols-2 sm:grid-cols-3 gap-3 border-t border-white/[0.06] pt-3">
-          {trackerStats.map((s) => (
-            <div key={s.label} className="rounded-lg bg-black/20 px-3 py-2.5">
-              <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1">{s.label}</p>
-              <p className={`text-sm font-bold tabular-nums ${s.color}`}>{s.value}</p>
-              <p className="text-[10px] text-white/25 mt-0.5">{s.sub}</p>
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.02] px-4 py-3">
+      <p className="text-[10px] text-white/30 uppercase tracking-widest mb-3">How Edge Signals Are Built</p>
+      <div className="space-y-2">
+        {MODEL_SIGNALS.map((signal) => (
+          <div key={signal} className="flex items-center gap-2.5">
+            <div className="w-1 h-1 rounded-full bg-[#F5C84C]/50 shrink-0" />
+            <span className="text-[11px] text-white/55">{signal}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -762,8 +720,8 @@ export default function AFLRoundEdgeBoard() {
             Updated every round using 594 player intelligence models.
           </p>
 
-          <SocialProofBar />
-          <EdgePerformanceTracker isPremium={isPremium} />
+          <OpeningRoundBanner />
+          <ModelAuthoritySection />
 
           {!isPremium && (
             <div className="mt-4 flex items-center gap-3 rounded-xl border border-[#F5C84C]/20 bg-[#F5C84C]/[0.04] px-4 py-3">
