@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Lock, Crown, X, TrendingUp, AlertTriangle, Star } from "lucide-react";
+import { Lock, Crown, X, TrendingUp, TriangleAlert as AlertTriangle, Star } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 
