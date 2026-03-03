@@ -252,33 +252,40 @@ function InfoTooltip({ text }: { text: string }) {
 function LockedCell({ onClick }: { onClick?: () => void }) {
   return (
     <div
-      className="flex justify-center items-center w-full h-full gap-1.5 cursor-pointer group opacity-60"
+      className="flex justify-center items-center gap-1.5 cursor-pointer group"
       onClick={(e) => {
         e.stopPropagation();
         onClick?.();
       }}
     >
-      <Lock size={10} className="text-gray-500 group-hover:text-[#F5C84C]/60 transition-colors shrink-0" />
-      <span className="text-xs text-gray-500 group-hover:text-[#F5C84C]/60 transition-colors">
-        Locked
-      </span>
+      <Lock size={9} className="text-white/20 group-hover:text-[#F5C84C]/50 transition-colors shrink-0" />
+      <div className="h-2 w-12 rounded-full bg-white/10 blur-[2px] group-hover:bg-white/15 transition-colors" />
     </div>
   );
 }
 
-function LockedWhyCell({ onClick }: { onClick?: () => void }) {
+function LockedWhyCell({ why, onClick }: { why?: string | null; onClick?: () => void }) {
+  const teaser = why ? why.slice(0, 38) : null;
+  const hasMore = why && why.length > 38;
   return (
     <div
-      className="flex items-center gap-1.5 cursor-pointer group"
+      className="flex items-center gap-1.5 cursor-pointer group min-w-0"
       onClick={(e) => {
         e.stopPropagation();
         onClick?.();
       }}
     >
-      <Lock size={9} className="text-[#F5C84C]/40 shrink-0 group-hover:text-[#F5C84C]/70 transition-colors" />
-      <span className="text-xs font-medium text-[#F5C84C]/60 group-hover:text-[#F5C84C]/90 transition-colors truncate">
-        {LOCKED_WHY_TEASER}
-      </span>
+      <Lock size={9} className="text-white/20 shrink-0 group-hover:text-[#F5C84C]/50 transition-colors" />
+      {teaser ? (
+        <span className="text-xs text-white/40 leading-snug min-w-0">
+          <span className="group-hover:text-white/50 transition-colors">{teaser}</span>
+          {hasMore && (
+            <span className="blur-[3px] select-none text-white/30">{why!.slice(38, 58)}</span>
+          )}
+        </span>
+      ) : (
+        <span className="text-xs text-white/25 italic">Member analysis</span>
+      )}
     </div>
   );
 }
@@ -1128,7 +1135,7 @@ export default function AFLRankingsPage() {
         </td>
         <td className="px-4 py-3 text-left align-middle" style={{ minWidth: 160, maxWidth: 260 }}>
           {isLockedCell("recommendation_why", idx) ? (
-            <LockedWhyCell onClick={() => setShowUpgradeModal(true)} />
+            <LockedWhyCell why={row.recommendation_why} onClick={() => setShowUpgradeModal(true)} />
           ) : (
             <span className="text-xs text-white/60 leading-snug max-w-[260px] block truncate">{row.recommendation_why ?? "—"}</span>
           )}
@@ -1226,25 +1233,26 @@ export default function AFLRankingsPage() {
             {!isPremium && (
               <a
                 href="/neeko-plus"
-                className="flex items-center gap-1.5 rounded-lg border border-[#F5C84C]/30 bg-[#F5C84C]/10 px-3 py-2 text-xs font-semibold text-[#F5C84C] hover:bg-[#F5C84C]/20 transition-colors whitespace-nowrap"
+                className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/40 hover:text-white/60 hover:bg-white/8 transition-colors whitespace-nowrap"
               >
-                <Crown size={12} />
-                Upgrade to Neeko+
+                <Crown size={11} className="text-white/30" />
+                Neeko+
               </a>
             )}
           </div>
         </div>
 
         {!isPremium && (
-          <div className="mt-4 rounded-xl border border-[#F5C84C]/20 bg-gradient-to-r from-[#F5C84C]/10 to-transparent px-5 py-4">
-            <p className="text-sm font-semibold text-white mb-1">See the full leaderboard — all 200+ players ranked</p>
-            <p className="text-xs text-white/50 mb-3">Neeko+ unlocks complete value scores, AI recommendations, matchup ratings, and ceiling analysis for every player.</p>
+          <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Crown size={13} className="text-[#F5C84C]/60 shrink-0" />
+              <p className="text-xs text-white/50 truncate">Neeko+ unlocks value scores, AI recs, and full rankings for 200+ players</p>
+            </div>
             <a
               href="/neeko-plus"
-              className="inline-flex items-center gap-1.5 bg-[#F5C84C] text-black font-semibold rounded-lg hover:brightness-110 transition-all duration-150 px-4 py-2 text-sm"
+              className="shrink-0 inline-flex items-center gap-1.5 bg-[#F5C84C] text-black font-semibold rounded-md hover:brightness-110 transition-all duration-150 px-3 py-1.5 text-xs"
             >
-              <Crown size={13} />
-              Upgrade to Neeko+
+              Upgrade
             </a>
           </div>
         )}
@@ -1388,22 +1396,18 @@ export default function AFLRankingsPage() {
                         return (
                           <tr
                             key={row.player_id ?? `blurred-${idx}`}
-                            className="border-b border-white/[0.04] relative cursor-pointer"
+                            className="border-b border-white/[0.03] cursor-pointer"
                             style={{ touchAction: "manipulation" }}
                             onClick={() => setShowUpgradeModal(true)}
                           >
-                            <td colSpan={TOTAL_COLS} className="px-4 py-3 select-none">
-                              <div className="blur-sm pointer-events-none flex items-center gap-6">
-                                <span className="text-sm text-white/20 w-8 tabular-nums text-center">{idx + 1}</span>
-                                <span className="text-sm font-medium text-white/30 w-40">Player {idx + 1}</span>
-                                <span className="text-sm text-[#F5C84C]/20 w-20 tabular-nums">—</span>
-                                <span className="text-sm text-white/20 w-16 tabular-nums">—</span>
-                                <span className="text-sm text-white/20 w-16 tabular-nums">—</span>
-                                <span className="text-sm text-white/20 w-16 tabular-nums">—</span>
-                              </div>
-                              <div className="absolute inset-0 flex items-center justify-center gap-2">
-                                <Lock size={11} className="text-[#F5C84C]/50 shrink-0" />
-                                <span className="text-[11px] font-semibold text-[#F5C84C]/60">Unlock with Neeko+</span>
+                            <td colSpan={TOTAL_COLS} className="px-4 py-2.5 select-none">
+                              <div className="blur-sm pointer-events-none flex items-center gap-6 opacity-30">
+                                <span className="text-sm text-white/40 w-8 tabular-nums text-center">{idx + 1}</span>
+                                <span className="text-sm font-medium text-white/50 w-40">Player {idx + 1}</span>
+                                <span className="text-sm text-white/30 w-20 tabular-nums">—</span>
+                                <span className="text-sm text-white/30 w-16 tabular-nums">—</span>
+                                <span className="text-sm text-white/30 w-16 tabular-nums">—</span>
+                                <span className="text-sm text-white/30 w-16 tabular-nums">—</span>
                               </div>
                             </td>
                           </tr>
@@ -1417,17 +1421,14 @@ export default function AFLRankingsPage() {
                           <>
                             {rendered}
                             <tr key={`conversion-mid-${idx}`}>
-                              <td colSpan={TOTAL_COLS} className="px-4 py-4">
-                                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-lg border border-[#F5C84C]/15 bg-[#F5C84C]/[0.04] px-5 py-3.5">
-                                  <div className="flex items-center gap-2.5">
-                                    <Lock size={13} className="text-[#F5C84C]/60 shrink-0" />
-                                    <span className="text-sm text-white/60">{FREE_PARTIAL_ROWS - FREE_FULL_ROWS} breakout candidates in the top {FREE_PARTIAL_ROWS} are hidden.</span>
-                                  </div>
+                              <td colSpan={TOTAL_COLS} className="px-4 py-3">
+                                <div className="flex items-center justify-between gap-3 rounded-lg border border-white/8 bg-white/[0.03] px-4 py-2.5">
+                                  <span className="text-xs text-white/40">{FREE_PARTIAL_ROWS - FREE_FULL_ROWS} breakout candidates in the top {FREE_PARTIAL_ROWS} are hidden.</span>
                                   <button
                                     onClick={(e) => { e.stopPropagation(); setShowUpgradeModal(true); }}
-                                    className="shrink-0 rounded-md bg-[#F5C84C]/15 hover:bg-[#F5C84C]/25 border border-[#F5C84C]/30 px-4 py-1.5 text-xs font-semibold text-[#F5C84C] transition-colors"
+                                    className="shrink-0 rounded-md bg-[#F5C84C] hover:bg-[#F5C84C]/90 px-3 py-1.5 text-xs font-bold text-black transition-colors"
                                   >
-                                    Unlock Full Rankings
+                                    Unlock full Rankings
                                   </button>
                                 </div>
                               </td>
