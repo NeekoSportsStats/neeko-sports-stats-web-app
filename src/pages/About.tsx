@@ -1,130 +1,166 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Trophy, Target, Users, Sparkles, TrendingUp, Shield, Heart, MessageCircle, ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
+import {
+  Trophy, Target, BarChart2 as BarChart, TrendingUp,
+  Star, AlertTriangle, Shield, ArrowRight, Cpu,
+} from "lucide-react";
 
-const About = () => {
-  const navigate = useNavigate();
+const FOCUS_AREAS = [
+  {
+    icon: Trophy,
+    title: "Weekly Rankings",
+    desc: "Every relevant player ranked by projected fantasy score, updated each round. Designed to surface must-starts and isolate value picks before lock.",
+  },
+  {
+    icon: Star,
+    title: "Captain Signals",
+    desc: "A dedicated captain scoring model that weights ceiling probability, matchup grade and recent form into a single ranked output.",
+  },
+  {
+    icon: TrendingUp,
+    title: "Breakout Alerts",
+    desc: "Players identified as price-inefficient relative to their projection trajectory — candidates whose current price understates their upside.",
+  },
+  {
+    icon: AlertTriangle,
+    title: "Trap Warnings",
+    desc: "Overpriced or over-owned players flagged for elevated risk. High ownership combined with difficult matchups or declining form metrics.",
+  },
+  {
+    icon: Cpu,
+    title: "Projection Modelling",
+    desc: "Multi-factor projections built on historical performance, opponent defensive ratings, venue context and recent form velocity.",
+  },
+  {
+    icon: BarChart,
+    title: "Matchup Analysis",
+    desc: "Opponent strength assessed by position, identifying where defences leak fantasy points and which players stand to benefit.",
+  },
+];
 
+const PRINCIPLES = [
+  {
+    icon: Target,
+    title: "Structured Output",
+    desc: "Every signal is the result of a defined model, not editorial opinion. Rankings, verdicts and alerts follow consistent, repeatable logic.",
+  },
+  {
+    icon: Shield,
+    title: "Data Integrity",
+    desc: "Projections are built from verified match statistics. Outputs are reviewed each round and the model is iterated to improve accuracy over time.",
+  },
+  {
+    icon: TrendingUp,
+    title: "Decision Relevance",
+    desc: "The product is scoped to what actually matters in AFL Fantasy: captain choice, trade targets, starting decisions and trap avoidance.",
+  },
+];
+
+export default function About() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <Button
-        variant="ghost"
-        onClick={() => navigate("/")}
-        className="mb-6"
-      >
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back
-      </Button>
-      <div className="max-w-4xl mx-auto space-y-12">
+    <div className="min-h-screen bg-[#070707] text-white">
+      <div className="max-w-4xl mx-auto px-4 py-16">
+
         {/* Header */}
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl md:text-5xl font-bold">About Neeko's Sports Stats</h1>
-          <p className="text-xl text-primary font-medium">
-            Your edge in every game
+        <div className="mb-14">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/25 mb-4">About</p>
+          <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-5">
+            Neeko Sports Stats
+          </h1>
+          <p className="text-lg text-white/50 leading-relaxed max-w-2xl">
+            An AFL Fantasy analytics platform built to provide advanced projections and AI-driven player insights for coaches who take their game seriously.
           </p>
         </div>
 
-        {/* Overview Section */}
-        <Card className="p-8">
-          <h2 className="text-2xl font-bold mb-4">Overview</h2>
-          <p className="text-muted-foreground leading-relaxed">
-            Neeko's Sports Stats is a modern analytics platform built for fans who want more than the basics. 
-            Whether users are tracking their fantasy squad, preparing bets, or deep-diving players and teams 
-            across AFL, EPL, and NBA, the goal is to deliver smart, fast, and easy-to-understand analytics 
-            that provide a real competitive edge.
-          </p>
-        </Card>
+        {/* Divider */}
+        <div className="w-10 h-0.5 rounded-full bg-[#F5C84C]/30 mb-14" />
 
-        {/* Mission Section */}
-        <Card className="p-8 bg-gradient-to-br from-primary/5 via-transparent to-transparent border-primary/20">
-          <div className="flex items-start gap-4">
-            <div className="rounded-lg bg-primary/10 p-3">
-              <Target className="h-8 w-8 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold mb-3">Our Mission</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                To empower every sports fan with professional-level analytics. No jargon. No fluff. 
-                Just clear, powerful insights designed to level the playing field for everyone.
-              </p>
-            </div>
+        {/* What the platform is */}
+        <section className="mb-16">
+          <h2 className="text-xl font-bold text-white mb-4">What it is</h2>
+          <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-7 space-y-4">
+            <p className="text-white/55 leading-relaxed">
+              Neeko Sports Stats is a decision-support tool for AFL Fantasy coaches. The platform ingests match statistics, processes them through a structured analytics pipeline, and produces weekly outputs designed to support team-building decisions.
+            </p>
+            <p className="text-white/55 leading-relaxed">
+              The product is not a news aggregator or a tipping service. It is a modelling platform — built to answer a specific question each round: which players represent the best and worst selections relative to their price, form and upcoming matchup.
+            </p>
+            <p className="text-white/55 leading-relaxed">
+              Outputs are generated weekly and cover the full player pool. The platform is scoped entirely to AFL Fantasy.
+            </p>
           </div>
-        </Card>
+        </section>
 
-        {/* What Makes Us Different Section */}
-        <div className="space-y-6">
-          <h2 className="text-3xl font-bold text-center">What Makes Us Different</h2>
-          
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card className="p-6">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="rounded-lg bg-primary/10 p-2">
-                  <Sparkles className="h-6 w-6 text-primary" />
+        {/* Focus areas */}
+        <section className="mb-16">
+          <h2 className="text-xl font-bold text-white mb-6">Focus areas</h2>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {FOCUS_AREAS.map(({ icon: Icon, title, desc }) => (
+              <div
+                key={title}
+                className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-white/[0.12] transition-all"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-[#F5C84C]/10 border border-[#F5C84C]/20 flex items-center justify-center shrink-0">
+                    <Icon size={15} className="text-[#F5C84C]" />
+                  </div>
+                  <h3 className="text-sm font-bold text-white">{title}</h3>
                 </div>
-                <h3 className="text-xl font-bold">Innovation that actually helps</h3>
+                <p className="text-sm text-white/40 leading-relaxed">{desc}</p>
               </div>
-              <p className="text-muted-foreground">
-                Our AI identifies patterns, hot streaks, cold trends, player movements, and performance 
-                indicators that most people miss. It provides actionable insights rather than just raw stats.
-              </p>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="rounded-lg bg-primary/10 p-2">
-                  <Shield className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold">Quality you can trust</h3>
-              </div>
-              <p className="text-muted-foreground">
-                All data is sourced from reliable feeds and validated for accuracy. Precision matters, 
-                especially for fantasy decisions, betting insights, and analytical work.
-              </p>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="rounded-lg bg-primary/10 p-2">
-                  <Heart className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold">Built for real fans</h3>
-              </div>
-              <p className="text-muted-foreground">
-                Neeko's Sports Stats exists because traditional stat pages don't go deep enough. We build tools 
-                for people who truly watch and understand the sport, and who want meaningful analysis not found elsewhere.
-              </p>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="rounded-lg bg-primary/10 p-2">
-                  <MessageCircle className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold">Community-first mindset</h3>
-              </div>
-              <p className="text-muted-foreground">
-                Thousands of fans and analysts rely on the platform. The product constantly evolves based on 
-                real user feedback and the changing needs of sports analytics.
-              </p>
-            </Card>
+            ))}
           </div>
+        </section>
+
+        {/* Principles */}
+        <section className="mb-16">
+          <h2 className="text-xl font-bold text-white mb-6">How the platform operates</h2>
+          <div className="grid sm:grid-cols-3 gap-4">
+            {PRINCIPLES.map(({ icon: Icon, title, desc }) => (
+              <div
+                key={title}
+                className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5"
+              >
+                <div className="w-9 h-9 rounded-xl bg-[#F5C84C]/10 border border-[#F5C84C]/20 flex items-center justify-center mb-4">
+                  <Icon size={16} className="text-[#F5C84C]" />
+                </div>
+                <h3 className="text-sm font-bold text-white mb-2">{title}</h3>
+                <p className="text-sm text-white/40 leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Who it is for */}
+        <section className="mb-16">
+          <h2 className="text-xl font-bold text-white mb-4">Who it is for</h2>
+          <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-7">
+            <p className="text-white/55 leading-relaxed">
+              Neeko Sports Stats is built for AFL Fantasy coaches who engage seriously with the game — coaches who research before lockout, who track value across the season and who want data behind their decisions rather than gut feel or social media consensus.
+            </p>
+            <p className="text-white/55 leading-relaxed mt-4">
+              The platform assumes basic familiarity with AFL Fantasy structure. It does not explain the game. It provides intelligence for people who already know what they need to decide.
+            </p>
+          </div>
+        </section>
+
+        {/* CTA */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Link
+            to="/sports/afl/rankings"
+            className="inline-flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3 rounded-xl hover:brightness-110 transition-all"
+          >
+            View Rankings
+            <ArrowRight size={14} />
+          </Link>
+          <Link
+            to="/contact"
+            className="inline-flex items-center gap-2 border border-white/15 text-white/60 hover:text-white hover:border-white/30 font-semibold text-sm px-7 py-3 rounded-xl transition-all"
+          >
+            Contact
+          </Link>
         </div>
 
-        {/* Why It Matters Section */}
-        <Card className="p-8 text-center bg-gradient-to-br from-primary/5 via-transparent to-transparent border-primary/20">
-          <div className="inline-flex items-center justify-center rounded-full bg-primary/10 p-4 mb-4">
-            <TrendingUp className="h-10 w-10 text-primary" />
-          </div>
-          <h2 className="text-2xl font-bold mb-4">Why It Matters</h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Sports can be unpredictable, but the data tells the story. Neeko's Sports Stats makes complex 
-            analytics accessible, fast, and powerful so users can stay ahead of every game.
-          </p>
-        </Card>
       </div>
     </div>
   );
-};
-
-export default About;
+}
