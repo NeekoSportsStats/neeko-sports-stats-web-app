@@ -1045,7 +1045,7 @@ export default function AFLRankingsPage() {
       : "border-b border-white/[0.04] transition-all duration-150 cursor-pointer hover:bg-white/5";
 
     return (
-      <tr key={row.player_id ?? row.player_name} className={rowClass} onClick={handleRowClick}>
+      <tr key={row.player_id ?? row.player_name} className={rowClass} style={{ touchAction: "manipulation" }} onClick={handleRowClick}>
         <td className="px-3 py-3 text-sm text-white/30 tabular-nums text-center whitespace-nowrap" style={{ width: 52, minWidth: 52 }}>
           {rank}
         </td>
@@ -1364,14 +1364,14 @@ export default function AFLRankingsPage() {
           <p className="text-xs text-white/30 mb-2">Swipe left to see all columns · tap any player for full breakdown</p>
         )}
 
-        <div className="relative w-full">
-          <div className="pointer-events-none absolute top-0 left-0 w-6 h-full bg-gradient-to-r from-[#070707] to-transparent z-20 rounded-l-xl" />
-          <div className="pointer-events-none absolute top-0 right-0 w-6 h-full bg-gradient-to-l from-[#070707] to-transparent z-20 rounded-r-xl" />
+        <div
+          className={`w-full overflow-y-auto max-h-[75vh] rounded-xl border ${isPremium ? "border-[#F5C84C]/10" : "border-white/5"}`}
+        >
           <div
-            className={`w-full overflow-x-auto overflow-y-auto max-h-[75vh] scrollbar-thin scrollbar-thumb-[#F5C84C]/30 scrollbar-track-transparent rounded-xl border ${isPremium ? "border-[#F5C84C]/10" : "border-white/5"}`}
-            style={{ WebkitOverflowScrolling: "touch" }}
+            className="relative w-full overflow-x-auto scrollbar-thin scrollbar-thumb-[#F5C84C]/30 scrollbar-track-transparent"
+            style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-x pan-y" }}
           >
-            <table className="min-w-[1100px] w-full border-collapse">
+            <table className="min-w-[900px] w-full border-collapse">
               <thead className={`sticky top-0 z-30 ${isPremium ? "bg-[#0a0a0a]" : "bg-[#070707]"} border-b border-[#F5C84C]/20`}>
                 {renderHeaders()}
               </thead>
@@ -1392,6 +1392,7 @@ export default function AFLRankingsPage() {
                           <tr
                             key={row.player_id ?? `blurred-${idx}`}
                             className="border-b border-white/[0.04] relative cursor-pointer"
+                            style={{ touchAction: "manipulation" }}
                             onClick={() => setShowUpgradeModal(true)}
                           >
                             <td colSpan={TOTAL_COLS} className="px-4 py-3 select-none">
