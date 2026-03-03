@@ -1,140 +1,169 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { ArrowLeft } from "lucide-react";
 
-const faqs = [
+const FAQ_GROUPS = [
   {
-    question: "What is Neeko's Sports Stats?",
-    answer: "Neeko's Sports Stats is an analytics platform offering AI-powered insights, player trends, and team statistics across AFL, EPL, and NBA."
+    group: "The Platform",
+    items: [
+      {
+        q: "What is Neeko Sports Stats?",
+        a: "Neeko Sports Stats is an AFL Fantasy analytics platform. It provides weekly player rankings, captain signals, breakout alerts, trap warnings and projection modelling — designed to support selection decisions before each round's lockout.",
+      },
+      {
+        q: "How are projections calculated?",
+        a: "Projections are built from a multi-factor model that combines historical fantasy scores, recent form velocity, opponent defensive ratings by position, and venue context. No single variable determines the output — the model weights each factor and produces a projected score range.",
+      },
+      {
+        q: "How often are rankings updated?",
+        a: "Rankings are updated weekly, after each round's data is processed. They reflect the most recent completed round and the upcoming fixture.",
+      },
+      {
+        q: "Do projections update weekly?",
+        a: "Yes. Projections are regenerated each round using the latest match data. Stale projections from prior rounds are not carried forward.",
+      },
+      {
+        q: "Does the platform cover sports other than AFL?",
+        a: "No. The platform is scoped entirely to AFL Fantasy.",
+      },
+      {
+        q: "Why are some players blurred or restricted?",
+        a: "Free users have access to a limited player set. Restricted content requires a Neeko+ subscription.",
+      },
+      {
+        q: "Does Neeko Sports Stats provide gambling or betting advice?",
+        a: "No. The platform provides AFL Fantasy analytics only. Nothing on the platform constitutes betting or financial advice.",
+      },
+      {
+        q: "Are projections guaranteed?",
+        a: "No. Projections are model outputs based on historical and current data. They represent likely ranges, not certainties. AFL is inherently variable.",
+      },
+      {
+        q: "Why don't all players have AI analysis?",
+        a: "AI analysis requires a minimum data threshold. Players with limited game history may not have enough data for the model to generate a reliable output.",
+      },
+    ],
   },
   {
-    question: "What is Neeko+?",
-    answer: "Neeko+ is our premium subscription that unlocks all AI insights, full player trend lists, advanced stats, and removes blurred content."
+    group: "Neeko+",
+    items: [
+      {
+        q: "What does Neeko+ include?",
+        a: "Neeko+ unlocks the full player pool across all rankings, captain recommendations, breakout and trap boards, AI-generated player analysis, and detailed projection data. Free access covers a limited subset of players.",
+      },
+      {
+        q: "How much does Neeko+ cost?",
+        a: "Neeko+ is $5.99 per week, billed weekly. No lock-in period.",
+      },
+      {
+        q: "Can I cancel anytime?",
+        a: "Yes. Cancel from your account settings at any time. Access continues until the end of the current billing period.",
+      },
+      {
+        q: "Can I use Neeko+ across multiple devices?",
+        a: "Yes. Your subscription is tied to your account. Log in from any device to access it.",
+      },
+      {
+        q: "Are refunds available?",
+        a: "Refund requests are reviewed on a case-by-case basis. Refer to the Refund Policy for full details.",
+      },
+    ],
   },
   {
-    question: "How much does Neeko+ cost?",
-    answer: "Neeko+ costs $5.99 per week and can be cancelled anytime."
-  },
-  {
-    question: "Do I need an account to use the site?",
-    answer: "You can browse some data without an account, but an account is required for Neeko+ and full feature access."
-  },
-  {
-    question: "How accurate are the AI insights?",
-    answer: "Our AI models use performance data, trends, and predictive analytics. They are not guarantees but serve as intelligent indicators."
-  },
-  {
-    question: "Which sports are supported?",
-    answer: "We currently support AFL, EPL, and NBA, with more leagues planned for future updates."
-  },
-  {
-    question: "How often are stats updated?",
-    answer: "Player and team statistics are updated daily, and AI insights are refreshed as new data becomes available."
-  },
-  {
-    question: "Can I cancel Neeko+ anytime?",
-    answer: "Yes. You can cancel your subscription at any time through your account settings."
-  },
-  {
-    question: "Why are some players blurred?",
-    answer: "Free users see limited data. Blurred players indicate Neeko+ exclusive content."
-  },
-  {
-    question: "Does Neeko's Sports Stats provide gambling or betting advice?",
-    answer: "No. We provide analytics, not financial or betting recommendations."
-  },
-  {
-    question: "Does the platform guarantee predictions?",
-    answer: "No predictions are guaranteed. All insights are based on historical and real-time data but are not certainties."
-  },
-  {
-    question: "Do you offer customer support?",
-    answer: "Yes. You can contact us via the Contact Us page or email us directly."
-  },
-  {
-    question: "What payment methods do you accept?",
-    answer: "All payments are handled securely via Stripe, supporting major debit and credit cards."
-  },
-  {
-    question: "Can I access Neeko+ across multiple devices?",
-    answer: "Yes. As long as you're logged in, your subscription works across any device."
-  },
-  {
-    question: "Are refunds available?",
-    answer: "Refunds are reviewed case-by-case based on Stripe payment policies."
-  },
-  {
-    question: "Does Neeko's Sports Stats store my personal data?",
-    answer: "Only essential account information is stored, and it is protected according to our Privacy Policy."
-  },
-  {
-    question: "Is my payment information safe?",
-    answer: "Payments are handled by Stripe, which uses industry-standard encryption and security."
-  },
-  {
-    question: "Will more sports or features be added?",
-    answer: "Yes. We are continually expanding the platform and will release updates regularly."
-  },
-  {
-    question: "Why don't I see AI insights for every player?",
-    answer: "Some insights require a minimum amount of player data before our system can generate trends."
-  },
-  {
-    question: "What should I do if I find a bug?",
-    answer: "Please report it through the Contact Us page so we can fix it in upcoming updates."
+    group: "Account & Privacy",
+    items: [
+      {
+        q: "Do I need an account to use the platform?",
+        a: "Some free content is accessible without an account. An account is required to access Neeko+ and to save preferences.",
+      },
+      {
+        q: "What payment methods are accepted?",
+        a: "Payments are processed via Stripe. Major debit and credit cards are supported.",
+      },
+      {
+        q: "Is my payment information secure?",
+        a: "Yes. Neeko does not store card details. All payment data is handled by Stripe using industry-standard encryption.",
+      },
+      {
+        q: "What personal data is stored?",
+        a: "Only essential account information is stored. See the Privacy Policy for full details on data handling.",
+      },
+      {
+        q: "What should I do if I find a bug?",
+        a: "Report it via the Contact page. Include a description of what happened and the device or browser you were using.",
+      },
+    ],
   },
 ];
 
 export default function FAQ() {
   const navigate = useNavigate();
 
-  const handleBack = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate('/');
-    }
-  };
-
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <Button
-        variant="ghost"
-        onClick={handleBack}
-        className="mb-6 hover:bg-primary/10"
-      >
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back
-      </Button>
+    <div className="min-h-screen bg-[#070707] text-white">
+      <div className="max-w-3xl mx-auto px-4 py-16">
 
-      <div className="mb-8 text-center">
-        <h1 className="text-4xl font-bold mb-2">Frequently Asked Questions</h1>
-        <p className="text-muted-foreground text-lg">
-          Everything you need to know about Neeko's Sports Stats
-        </p>
-      </div>
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-white/30 hover:text-white/60 text-sm mb-10 transition-colors"
+        >
+          <ArrowLeft size={14} />
+          Back
+        </button>
 
-      <Card className="p-6">
-        <Accordion type="single" collapsible className="w-full">
-          {faqs.map((faq, index) => (
-            <AccordionItem key={index} value={`item-${index}`}>
-              <AccordionTrigger className="text-left font-semibold">
-                {faq.question}
-              </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">
-                {faq.answer}
-              </AccordionContent>
-            </AccordionItem>
+        <div className="mb-12">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/25 mb-4">Support</p>
+          <h1 className="text-4xl font-extrabold mb-3">Frequently Asked Questions</h1>
+          <p className="text-white/40 text-base">
+            Questions about the platform, projections, subscriptions and accounts.
+          </p>
+        </div>
+
+        <div className="space-y-12">
+          {FAQ_GROUPS.map(({ group, items }) => (
+            <section key={group}>
+              <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-white/25 mb-4">{group}</p>
+              <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] overflow-hidden">
+                <Accordion type="single" collapsible>
+                  {items.map(({ q, a }, i) => (
+                    <AccordionItem
+                      key={i}
+                      value={`${group}-${i}`}
+                      className="border-white/[0.07] last:border-0"
+                    >
+                      <AccordionTrigger className="text-left text-sm font-semibold text-white/80 hover:text-white px-6 py-4 hover:no-underline [&[data-state=open]]:text-white transition-colors">
+                        {q}
+                      </AccordionTrigger>
+                      <AccordionContent className="text-sm text-white/40 leading-relaxed px-6 pb-5">
+                        {a}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </div>
+            </section>
           ))}
-        </Accordion>
-      </Card>
+        </div>
+
+        <div className="mt-14 rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-white mb-1">Still have a question?</p>
+            <p className="text-sm text-white/35">Use the contact page to get in touch.</p>
+          </div>
+          <Link
+            to="/contact"
+            className="inline-flex items-center gap-2 border border-white/15 text-white/60 hover:text-white hover:border-white/30 font-semibold text-sm px-5 py-2.5 rounded-xl transition-all whitespace-nowrap"
+          >
+            Contact us
+          </Link>
+        </div>
+
+      </div>
     </div>
   );
 }
