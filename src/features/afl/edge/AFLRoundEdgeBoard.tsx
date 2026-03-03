@@ -114,9 +114,9 @@ function sharpenSummary(text: string): string {
 }
 
 const SECTION_SIGNAL_LABEL: Record<Section, string> = {
-  captain: "CAPTAIN EDGE",
-  breakout: "BUY SIGNAL",
-  trap: "AVOID SIGNAL",
+  captain: "WHY THIS IS A CAPTAIN EDGE",
+  breakout: "VALUE ACCELERATION SIGNAL",
+  trap: "OVERPRICED RISK ALERT",
 };
 
 // ─── Color helpers ─────────────────────────────────────────────────────────────
@@ -163,10 +163,10 @@ function OpeningRoundBanner() {
       <Info size={14} className="text-[#F5C84C]/70 shrink-0 mt-0.5" />
       <div>
         <p className="text-xs font-semibold text-white/80">
-          2026 Performance Tracking Activates After Opening Round.
+          Edge performance results publish after Opening Round.
         </p>
         <p className="text-[11px] text-white/40 mt-0.5">
-          Edge results and model accuracy will be published weekly.
+          Every signal will be measured. Hit rate and rank impact updated weekly.
         </p>
       </div>
     </div>
@@ -268,54 +268,24 @@ function LockedCardOverlay({ section, stats, onUnlock }: LockedCardOverlayProps)
       </div>
       <p className="text-[11px] font-semibold text-white/60 group-hover:text-white/80 transition-colors">Neeko+ Only</p>
 
-      {section === "captain" && (
-        <div className="flex gap-4 mt-0.5">
-          {stats.avgProjection != null && (
-            <div className="text-center">
-              <p className="text-[10px] text-white/30 uppercase tracking-wider">Avg Projection</p>
-              <p className="text-xs font-bold text-[#F5C84C]/70">{stats.avgProjection}</p>
-            </div>
-          )}
-          {stats.maxCeiling != null && (
-            <div className="text-center">
-              <p className="text-[10px] text-white/30 uppercase tracking-wider">Highest Ceiling</p>
-              <p className="text-xs font-bold text-[#F5C84C]/70">{stats.maxCeiling}</p>
-            </div>
-          )}
+      {section === "captain" && stats.maxCeiling != null && (
+        <div className="mt-0.5 text-center">
+          <p className="text-[10px] text-white/30 uppercase tracking-wider">Highest Ceiling Remaining</p>
+          <p className="text-xs font-bold text-[#F5C84C]/70 tabular-nums">{stats.maxCeiling}</p>
         </div>
       )}
 
-      {section === "breakout" && (
-        <div className="flex gap-4 mt-0.5">
-          {stats.avgUpside != null && (
-            <div className="text-center">
-              <p className="text-[10px] text-white/30 uppercase tracking-wider">Avg Upside</p>
-              <p className="text-xs font-bold text-green-400/70">+{stats.avgUpside}%</p>
-            </div>
-          )}
-          {stats.maxValueScore != null && (
-            <div className="text-center">
-              <p className="text-[10px] text-white/30 uppercase tracking-wider">Best Value</p>
-              <p className="text-xs font-bold text-green-400/70">{stats.maxValueScore}</p>
-            </div>
-          )}
+      {section === "breakout" && stats.maxValueScore != null && (
+        <div className="mt-0.5 text-center">
+          <p className="text-[10px] text-white/30 uppercase tracking-wider">Best Value Remaining</p>
+          <p className="text-xs font-bold text-green-400/70 tabular-nums">{stats.maxValueScore}</p>
         </div>
       )}
 
-      {section === "trap" && (
-        <div className="flex gap-4 mt-0.5">
-          {stats.maxRisk != null && (
-            <div className="text-center">
-              <p className="text-[10px] text-white/30 uppercase tracking-wider">Highest Risk</p>
-              <p className="text-xs font-bold text-red-400/70">{stats.maxRisk}%</p>
-            </div>
-          )}
-          {stats.minValueScore != null && (
-            <div className="text-center">
-              <p className="text-[10px] text-white/30 uppercase tracking-wider">Worst Value</p>
-              <p className="text-xs font-bold text-red-400/70">{stats.minValueScore}</p>
-            </div>
-          )}
+      {section === "trap" && stats.maxRisk != null && (
+        <div className="mt-0.5 text-center">
+          <p className="text-[10px] text-white/30 uppercase tracking-wider">Highest Risk Remaining</p>
+          <p className="text-xs font-bold text-red-400/70 tabular-nums">{stats.maxRisk}%</p>
         </div>
       )}
     </div>
@@ -498,8 +468,8 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
 
       {sharpened && !locked && (
         <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2.5">
-          <p className="text-xs text-white/70 leading-relaxed">
-            <span className="font-semibold text-[#F5C84C]">{signalLabel}:</span>{" "}
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[#F5C84C]/70 mb-1.5">{signalLabel}</p>
+          <p className="text-xs text-white/65 leading-relaxed">
             {aiTwoLines}
           </p>
         </div>
@@ -507,12 +477,12 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
 
       {sharpened && locked && (
         <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2.5">
-          <p className="text-xs text-white/70 leading-relaxed">
-            <span className="font-semibold text-[#F5C84C]">{signalLabel}:</span>{" "}
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[#F5C84C]/70 mb-1.5">{signalLabel}</p>
+          <p className="text-xs text-white/65 leading-relaxed">
             {firstSentence}
           </p>
-          <p className="text-xs text-white/25 leading-relaxed mt-1.5 italic">
-            Ceiling projection, matchup grade and volatility breakdown locked.
+          <p className="text-[11px] text-white/25 mt-1.5 italic">
+            Ceiling differential, volatility score and matchup delta locked.
           </p>
           <button
             onClick={onUnlock}
@@ -714,10 +684,10 @@ export default function AFLRoundEdgeBoard() {
             )}
           </div>
           <p className="text-sm text-white/70 max-w-md font-medium">
-            Turn projections into round-winning decisions.
+            Built for coaches who want measurable edge — not opinions.
           </p>
-          <p className="text-[11px] text-white/25 mt-1 max-w-md tracking-wide">
-            Updated every round using 594 player intelligence models.
+          <p className="text-[11px] text-white/35 mt-1 max-w-md tracking-wide">
+            Signal-driven decisions. Ranked by impact.
           </p>
 
           <OpeningRoundBanner />
@@ -728,18 +698,23 @@ export default function AFLRoundEdgeBoard() {
               <Crown size={14} className="text-[#F5C84C] shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-white/80">
-                  4 high-impact signals locked.
+                  4 decision-shifting signals locked.
                 </p>
                 <p className="text-[11px] text-white/40 mt-0.5">
-                  These decisions swing rankings.
+                  Two flagged as captain leverage plays.
                 </p>
               </div>
-              <a
-                href="/neeko-plus"
-                className="text-xs font-bold text-black bg-[#F5C84C] rounded-lg px-3 py-1.5 hover:brightness-110 transition-all shrink-0 whitespace-nowrap border border-[#F5C84C]/60 animate-pulse-gold-border"
-              >
-                Unlock This Week's Full Edge →
-              </a>
+              <div className="shrink-0 flex flex-col items-end gap-1">
+                <a
+                  href="/neeko-plus"
+                  className="text-xs font-bold text-black bg-[#F5C84C] rounded-lg px-3 py-1.5 hover:brightness-110 transition-all whitespace-nowrap border border-[#F5C84C]/60 animate-pulse-gold-border"
+                >
+                  Unlock This Week's Full Edge
+                </a>
+                <p className="text-[10px] text-white/25 text-right leading-tight">
+                  Includes leverage pivots, overprice alerts & upside differentials.
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -804,7 +779,11 @@ export default function AFLRoundEdgeBoard() {
           })}
         </div>
 
-        <div className="h-16" />
+        <div className="mt-12 pb-8 border-t border-white/[0.04] pt-4">
+          <p className="text-[10px] text-white/20 text-center tracking-wide">
+            Edge signals derived from blended rolling baseline + dynamic round weighting.
+          </p>
+        </div>
       </div>
 
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
