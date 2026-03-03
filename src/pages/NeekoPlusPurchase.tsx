@@ -7,8 +7,6 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription }
 import { Badge } from "@/components/ui/badge";
 import { Check, Crown, Sparkles, Loader as Loader2, ArrowLeft, TrendingUp, Target, Zap, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY } from "@/config/stripePrices";
-
 type Plan = "monthly" | "yearly";
 
 const features = [
@@ -86,8 +84,7 @@ const NeekoPlusPurchase = () => {
         return;
       }
 
-      const priceId = plan === "monthly" ? STRIPE_PRICE_MONTHLY : STRIPE_PRICE_YEARLY;
-      const origin  = window.location.origin;
+      const origin = window.location.origin;
 
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`,
@@ -98,10 +95,9 @@ const NeekoPlusPurchase = () => {
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
-            price_id:    priceId,
+            plan,
             success_url: `${origin}/success`,
             cancel_url:  `${origin}/neeko-plus`,
-            mode:        "subscription",
           }),
         }
       );
@@ -246,7 +242,7 @@ function PlanCard({ plan, selected, onSelect, isPremium, loading, onSubscribe }:
       {isYearly && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
           <Badge className="bg-primary text-black font-bold px-3 py-0.5 text-xs">
-            Best Value — Save 24%
+            Best Value — Save 26%
           </Badge>
         </div>
       )}
@@ -264,7 +260,7 @@ function PlanCard({ plan, selected, onSelect, isPremium, loading, onSubscribe }:
       <CardContent>
         <div className="flex items-end gap-1.5 mb-1">
           <span className="text-4xl font-extrabold text-white">
-            {isYearly ? "$119" : "$12.99"}
+            {isYearly ? "$89" : "$9.99"}
           </span>
           <span className="text-muted-foreground mb-1 text-sm">
             AUD / {isYearly ? "year" : "month"}
@@ -272,7 +268,7 @@ function PlanCard({ plan, selected, onSelect, isPremium, loading, onSubscribe }:
         </div>
         {isYearly && (
           <p className="text-xs text-primary/80 font-medium">
-            Equivalent to $9.92/month
+            Equivalent to $7.42/month
           </p>
         )}
       </CardContent>

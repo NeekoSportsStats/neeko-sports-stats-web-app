@@ -1,2 +1,1 @@
-export const STRIPE_PRICE_MONTHLY = "price_1T70lqEKV8332a9YTnS3kZGQ";
-export const STRIPE_PRICE_YEARLY  = "price_1T70lqEKV8332a9Y1yiGTbCY";
+export {};

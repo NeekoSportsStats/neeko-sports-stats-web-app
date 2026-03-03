@@ -32,6 +32,35 @@ function err(message: string, status = 400, extra?: object) {
   });
 }
 
+async function resolvePriceId(plan: string): Promise<string | null> {
+  if (plan === 'monthly') {
+    const envPrice = Deno.env.get('STRIPE_PRICE_MONTHLY');
+    if (envPrice) return envPrice;
+  } else if (plan === 'yearly') {
+    const envPrice = Deno.env.get('STRIPE_PRICE_YEARLY');
+    if (envPrice) return envPrice;
+  }
+
+  if (plan === 'monthly' || plan === 'yearly') {
+    const { data: planRow, error: planErr } = await supabase
+      .from('stripe_products_config')
+      .select('price_id')
+      .eq('plan_key', plan)
+      .maybeSingle();
+
+    if (planErr) {
+      console.error('stripe-checkout: failed to load plan config', planErr);
+    }
+
+    if (planRow?.price_id) {
+      console.log(`stripe-checkout: resolved ${plan} price from DB: ${planRow.price_id}`);
+      return planRow.price_id;
+    }
+  }
+
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -48,7 +77,11 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { plan, price_id: rawPriceId, success_url, cancel_url, mode } = body;
+    const { plan, success_url, cancel_url } = body;
+
+    if (!plan || (plan !== 'monthly' && plan !== 'yearly')) {
+      return err('Invalid plan — must be "monthly" or "yearly"');
+    }
 
     if (!success_url || typeof success_url !== 'string') {
       return err('Missing required parameter: success_url');
@@ -56,35 +89,15 @@ Deno.serve(async (req) => {
     if (!cancel_url || typeof cancel_url !== 'string') {
       return err('Missing required parameter: cancel_url');
     }
-    if (mode !== 'subscription' && mode !== 'payment') {
-      return err('Invalid mode — must be "subscription" or "payment"');
-    }
 
-    let price_id: string | undefined = rawPriceId;
+    const price_id = await resolvePriceId(plan);
 
-    if (plan === 'monthly' || plan === 'yearly') {
-      const { data: planRow, error: planErr } = await supabase
-        .from('stripe_products_config')
-        .select('price_id')
-        .eq('plan_key', plan)
-        .maybeSingle();
-
-      if (planErr) {
-        console.error('stripe-checkout: failed to load plan config', planErr);
-      }
-
-      if (planRow?.price_id) {
-        price_id = planRow.price_id;
-        console.log(`stripe-checkout: resolved ${plan} price from DB: ${price_id}`);
-      }
-    }
-
-    if (!price_id || typeof price_id !== 'string') {
-      return err('Missing required parameter: price_id');
+    if (!price_id) {
+      console.error(`stripe-checkout: could not resolve price_id for plan "${plan}"`);
+      return err(`No price configured for plan: ${plan}`, 500);
     }
 
     console.log('stripe-checkout: inputs', {
-      mode,
       plan,
       price_id,
       success_url,
@@ -139,50 +152,46 @@ Deno.serve(async (req) => {
         return err('Failed to create customer record', 500);
       }
 
-      if (mode === 'subscription') {
-        const { error: subErr } = await supabase
-          .from('stripe_subscriptions')
-          .insert({ customer_id: newCustomer.id, status: 'not_started' });
+      const { error: subErr } = await supabase
+        .from('stripe_subscriptions')
+        .insert({ customer_id: newCustomer.id, status: 'not_started' });
 
-        if (subErr) {
-          console.error('stripe-checkout: failed to create subscription record', subErr);
-          try {
-            await stripe.customers.del(newCustomer.id);
-          } catch (_) { /* ignore */ }
-          return err('Failed to create subscription record', 500);
-        }
+      if (subErr) {
+        console.error('stripe-checkout: failed to create subscription record', subErr);
+        try {
+          await stripe.customers.del(newCustomer.id);
+        } catch (_) { /* ignore */ }
+        return err('Failed to create subscription record', 500);
       }
 
       customerId = newCustomer.id;
     } else {
       customerId = customer.customer_id;
 
-      if (mode === 'subscription') {
-        const { data: sub, error: subErr } = await supabase
+      const { data: sub, error: subErr } = await supabase
+        .from('stripe_subscriptions')
+        .select('status')
+        .eq('customer_id', customerId)
+        .maybeSingle();
+
+      if (subErr) {
+        console.error('stripe-checkout: failed to fetch subscription', subErr);
+        return err('Failed to fetch subscription information', 500);
+      }
+
+      if (!sub) {
+        const { error: createSubErr } = await supabase
           .from('stripe_subscriptions')
-          .select('status')
-          .eq('customer_id', customerId)
-          .maybeSingle();
+          .insert({ customer_id: customerId, status: 'not_started' });
 
-        if (subErr) {
-          console.error('stripe-checkout: failed to fetch subscription', subErr);
-          return err('Failed to fetch subscription information', 500);
-        }
-
-        if (!sub) {
-          const { error: createSubErr } = await supabase
-            .from('stripe_subscriptions')
-            .insert({ customer_id: customerId, status: 'not_started' });
-
-          if (createSubErr) {
-            console.error('stripe-checkout: failed to create sub record for existing customer', createSubErr);
-            return err('Failed to create subscription record', 500);
-          }
+        if (createSubErr) {
+          console.error('stripe-checkout: failed to create sub record for existing customer', createSubErr);
+          return err('Failed to create subscription record', 500);
         }
       }
     }
 
-    console.log('stripe-checkout: creating session', { customerId, price_id });
+    console.log('stripe-checkout: creating session', { customerId, price_id, plan });
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
