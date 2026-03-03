@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Crown, ArrowRight, Trophy, Zap, AlertTriangle,
-  Star, TrendingUp, BarChart2, GitCompare, Check,
-  Database, Cpu, Radio,
-} from "lucide-react";
+import { Crown, ArrowRight, Trophy, Zap, TriangleAlert as AlertTriangle, Star, TrendingUp, ChartBar as BarChart2, GitCompare, Check, Database, Cpu, Radio } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 
