@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Lock, Crown, X, Info, Search, ChevronUp, ChevronDown, Download } from "lucide-react";
+import { Lock, Crown, X, Info, Search, ChevronUp, ChevronDown } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Dot } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
@@ -57,6 +57,12 @@ const TAB_SORT_KEY: Record<RankingsTab, string> = {
   projection: "projection",
 };
 
+const TAB_DEFAULT_SORT: Record<RankingsTab, SortKey> = {
+  best: "neeko_rating",
+  value: "value_score",
+  projection: "projection_final",
+};
+
 const TAB_DESCRIPTIONS: Record<RankingsTab, string> = {
   best: "Neeko Rating combines projection, matchup difficulty, consistency, risk, and AI intelligence to identify the best fantasy picks each round.",
   value: "Most underpriced players based on price vs projected score — sorted by Value Score",
@@ -103,8 +109,7 @@ function fmtPrice(v: number | null | undefined): string {
   if (v == null) return "—";
   const n = Number(v);
   if (isNaN(n)) return "—";
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}m`;
-  return `$${Math.round(n / 1000)}k`;
+  return `$${(n / 1_000_000).toFixed(2)}m`;
 }
 
 function fmtValueScore(v: number | null | undefined): string {
@@ -855,35 +860,6 @@ function PremiumInsightsBar({ rows }: { rows: RankingRow[] }) {
   );
 }
 
-// ─── CSV Export ───────────────────────────────────────────────────────────────
-
-function exportToCSV(rows: RankingRow[]) {
-  const headers = ["Rank", "Player", "Team", "Position", "Neeko Rating", "Projection", "Confidence", "Risk", "Price", "Value Score", "AI Rec", "Why"];
-  const lines = rows.map((r, i) => [
-    i + 1,
-    r.player_name,
-    r.team,
-    r.position ?? "",
-    r.neeko_rating != null ? Number(r.neeko_rating).toFixed(1) : "",
-    r.projection_final != null ? Number(r.projection_final).toFixed(1) : "",
-    r.projection_confidence != null ? `${Math.round(Number(r.projection_confidence))}%` : "",
-    r.risk_rating != null ? `${Math.round(Number(r.risk_rating))}%` : "",
-    r.price != null ? (Number(r.price) >= 1_000_000 ? `$${(Number(r.price) / 1_000_000).toFixed(2)}m` : `$${Math.round(Number(r.price) / 1000)}k`) : "",
-    r.value_score != null ? Number(r.value_score).toFixed(2) : "",
-    r.ai_recommendation ?? "",
-    (r.recommendation_why ?? "").replace(/,/g, " "),
-  ].map(String).join(","));
-
-  const csv = [headers.join(","), ...lines].join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `neeko-rankings-${new Date().toISOString().split("T")[0]}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AFLRankingsPage() {
@@ -898,6 +874,7 @@ export default function AFLRankingsPage() {
   const [selected, setSelected] = useState<(RankingRow & { _rank: number; _unlocked: boolean; _tier: "premium" | "full" | "partial" | "locked" }) | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [ratingInfoOpen, setRatingInfoOpen] = useState(false);
+  const [activeSortKey, setActiveSortKey] = useState<SortKey>("neeko_rating");
   const [sortKey, setSortKey] = useState<SortKey>("neeko_rating");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -941,6 +918,9 @@ export default function AFLRankingsPage() {
 
   function handleTabChange(tab: RankingsTab) {
     setActiveTab(tab);
+    setActiveSortKey(TAB_DEFAULT_SORT[tab]);
+    setSortKey(TAB_DEFAULT_SORT[tab]);
+    setSortDir("desc");
     setSelected(null);
     setSearchTerm("");
   }
@@ -950,12 +930,24 @@ export default function AFLRankingsPage() {
       setSortDir((d) => (d === "desc" ? "asc" : "desc"));
     } else {
       setSortKey(key);
+      setActiveSortKey(key);
       setSortDir("desc");
     }
   }
 
+  const sortedPlayers = useMemo(() => {
+    const sorted = [...rows];
+    const key = activeSortKey;
+    sorted.sort((a, b) => {
+      const av = (a[key] as number | null) ?? -Infinity;
+      const bv = (b[key] as number | null) ?? -Infinity;
+      return bv - av;
+    });
+    return sorted;
+  }, [rows, activeSortKey]);
+
   const displayRows = useMemo(() => {
-    let filtered = [...rows];
+    let filtered = [...sortedPlayers];
 
     if (isPremium && searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
@@ -976,7 +968,7 @@ export default function AFLRankingsPage() {
       }
     }
 
-    if (isPremium) {
+    if (isPremium && sortKey !== activeSortKey) {
       filtered.sort((a, b) => {
         const av = (a[sortKey] as number | null) ?? -Infinity;
         const bv = (b[sortKey] as number | null) ?? -Infinity;
@@ -985,7 +977,7 @@ export default function AFLRankingsPage() {
     }
 
     return filtered;
-  }, [rows, searchTerm, isPremium, premiumFilter, sortKey, sortDir]);
+  }, [sortedPlayers, searchTerm, isPremium, premiumFilter, sortKey, sortDir, activeSortKey]);
 
   function isPremiumColumn(colKey: string): boolean {
     return ["price", "value_score", "value_tag", "ai_recommendation", "recommendation_why", "ai_summary"].includes(colKey);
@@ -1216,19 +1208,10 @@ export default function AFLRankingsPage() {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {isPremium && (
-              <>
-                <button
-                  onClick={() => exportToCSV(displayRows)}
-                  className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/60 hover:bg-white/10 hover:text-white/80 transition-colors whitespace-nowrap"
-                >
-                  <Download size={12} />
-                  Export CSV
-                </button>
-                <div className="flex items-center gap-1.5 rounded-lg border border-[#F5C84C]/30 bg-[#F5C84C]/10 px-3 py-2 whitespace-nowrap">
-                  <Crown size={12} className="text-[#F5C84C]" />
-                  <span className="text-xs font-semibold text-yellow-400">Neeko+ Active</span>
-                </div>
-              </>
+              <div className="flex items-center gap-1.5 rounded-lg border border-[#F5C84C]/30 bg-[#F5C84C]/10 px-3 py-2 whitespace-nowrap">
+                <Crown size={12} className="text-[#F5C84C]" />
+                <span className="text-xs font-semibold text-yellow-400">Neeko+ Active</span>
+              </div>
             )}
             {!isPremium && (
               <a
