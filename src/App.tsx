@@ -167,7 +167,9 @@ function App() {
       <Route path="/policies/refund"       element={<Layout><S fallback={Generic}><RefundPolicy /></S></Layout>} />
       <Route path="/policies/security"     element={<Layout><S fallback={Generic}><SecurityPolicy /></S></Layout>} />
       <Route path="/policies/terms"        element={<Layout><S fallback={Generic}><TermsConditions /></S></Layout>} />
+      <Route path="/policies/conduct"      element={<Layout><S fallback={Generic}><UserConductPolicy /></S></Layout>} />
       <Route path="/policies/user-conduct" element={<Layout><S fallback={Generic}><UserConductPolicy /></S></Layout>} />
+      <Route path="/user-conduct-policy"   element={<Layout><S fallback={Generic}><UserConductPolicy /></S></Layout>} />
 
       {/* =========================
          AFL
