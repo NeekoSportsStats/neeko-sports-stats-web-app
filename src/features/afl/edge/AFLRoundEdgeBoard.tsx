@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
   Lock, Crown, X, TrendingUp, TriangleAlert as AlertTriangle,
-  Star, ShieldCheck, Info,
+  Star, ShieldCheck, Info, ChevronDown,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
@@ -157,17 +157,70 @@ function getPositionBadgeStyle(pos: string | null): string {
 
 // ─── Opening Round Banner ─────────────────────────────────────────────────────
 
+const TRACKING_BULLETS = [
+  "Weekly projection vs actual score comparison",
+  "Captain accuracy tracking",
+  "Trap avoidance success rate",
+  "Breakout hit percentage",
+  "Model confidence grading",
+];
+
 function OpeningRoundBanner() {
+  const [open, setOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("edgeBannerOpen") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggle = () => {
+    setOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("edgeBannerOpen", String(next)); } catch {}
+      return next;
+    });
+  };
+
   return (
-    <div className="mt-4 rounded-xl border border-[#F5C84C]/20 bg-[#F5C84C]/[0.03] px-4 py-3 flex items-start gap-3">
-      <Info size={14} className="text-[#F5C84C]/70 shrink-0 mt-0.5" />
-      <div>
-        <p className="text-xs font-semibold text-white/80">
-          Edge performance results publish after Opening Round.
-        </p>
-        <p className="text-[11px] text-white/40 mt-0.5">
-          Every signal will be measured. Hit rate and rank impact updated weekly.
-        </p>
+    <div className="mt-4 rounded-xl border border-[#F5C84C]/20 bg-[#F5C84C]/[0.03] hover:border-[#F5C84C]/35 transition-colors">
+      <button
+        onClick={toggle}
+        className="w-full flex items-start gap-3 px-4 py-3 text-left"
+        aria-expanded={open}
+      >
+        <Info size={14} className="text-[#F5C84C]/70 shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold text-white/80">
+            2026 Performance Tracking Activates After Opening Round.
+          </p>
+          <p className="text-[11px] text-white/40 mt-0.5">
+            Edge results and model accuracy will publish weekly.
+          </p>
+        </div>
+        <ChevronDown
+          size={14}
+          className={`text-[#F5C84C]/60 shrink-0 mt-0.5 transition-transform duration-300 ${open ? "rotate-180" : "rotate-0"}`}
+        />
+      </button>
+
+      <div
+        className="overflow-hidden transition-all duration-300 ease-in-out"
+        style={{ maxHeight: open ? "260px" : "0px", opacity: open ? 1 : 0 }}
+      >
+        <div className="px-4 pb-4 border-t border-[#F5C84C]/10 pt-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-2.5">
+            How Edge Performance Tracking Works
+          </p>
+          <div className="space-y-1.5">
+            {TRACKING_BULLETS.map((bullet) => (
+              <div key={bullet} className="flex items-start gap-2">
+                <div className="w-1 h-1 rounded-full bg-[#F5C84C]/40 shrink-0 mt-1.5" />
+                <p className="text-[11px] text-white/50 leading-relaxed">{bullet}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
