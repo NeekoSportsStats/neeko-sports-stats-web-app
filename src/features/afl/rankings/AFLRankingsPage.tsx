@@ -64,7 +64,7 @@ const TAB_DEFAULT_SORT: Record<RankingsTab, SortKey> = {
 };
 
 const TAB_DESCRIPTIONS: Record<RankingsTab, string> = {
-  best: "Neeko Rating combines projection, matchup difficulty, consistency, risk, and AI intelligence to identify the best fantasy picks each round.",
+  best: "Most fantasy rankings sort by projection alone. Neeko Rating weighs projection, matchup, volatility and AI verdict to surface real decision advantage.",
   value: "Most underpriced players based on price vs projected score — sorted by Value Score",
   projection: "Highest projected fantasy scorers this round — sorted by Projection",
 };
@@ -198,12 +198,12 @@ function getValueTagStyle(tag: string | null | undefined) {
 }
 
 function getNeekoRatingBadge(rating: number | null) {
-  if (rating == null) return { label: "—", text: "text-white/30", bg: "bg-transparent", border: "border-transparent" };
-  if (rating >= 150) return { label: "GENERATIONAL", text: "text-yellow-400", bg: "bg-yellow-400/15", border: "border-yellow-400/40" };
-  if (rating >= 130) return { label: "ELITE", text: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30" };
-  if (rating >= 110) return { label: "STRONG", text: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/30" };
-  if (rating >= 90) return { label: "SOLID", text: "text-gray-300", bg: "bg-white/5", border: "border-white/15" };
-  return { label: "RISK", text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" };
+  if (rating == null) return { label: "—", text: "text-white/30", bg: "bg-transparent", border: "border-transparent", glow: "" };
+  if (rating >= 150) return { label: "GENERATIONAL", text: "text-yellow-400", bg: "bg-yellow-400/15", border: "border-yellow-400/40", glow: "drop-shadow(0 0 6px rgba(250,204,21,0.55))" };
+  if (rating >= 130) return { label: "ELITE", text: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30", glow: "drop-shadow(0 0 5px rgba(74,222,128,0.45))" };
+  if (rating >= 110) return { label: "STRONG", text: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/30", glow: "" };
+  if (rating >= 90) return { label: "SOLID", text: "text-gray-300", bg: "bg-white/5", border: "border-white/15", glow: "" };
+  return { label: "RISK", text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30", glow: "" };
 }
 
 function getRiskBadge(risk: number | null) {
@@ -211,6 +211,34 @@ function getRiskBadge(risk: number | null) {
   if (risk >= 75) return { label: "HIGH RISK", text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" };
   if (risk >= 50) return { label: "RISKY", text: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/30" };
   return { label: "SAFE", text: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30" };
+}
+
+// ─── AI Tone Sharpener ────────────────────────────────────────────────────────
+
+const AI_REPLACEMENTS: [RegExp, string][] = [
+  [/poised for a strong opening round/gi, "Strong start expected."],
+  [/may perform well/gi, "Strong output likely."],
+  [/suggest that while he can/gi, "Ceiling is real, but"],
+  [/should perform well/gi, "Strong play expected."],
+  [/could be a strong option/gi, "Solid captain option."],
+  [/is likely to have a good game/gi, "Good game expected."],
+  [/presents as a strong captain option/gi, "Elite captain option."],
+  [/is a strong captain option/gi, "Elite captain option."],
+  [/could see reduced/gi, "Risk of reduced"],
+  [/value appears overpriced/gi, "Value overpriced."],
+  [/the matchup limits/gi, "Matchup limits ceiling."],
+  [/high floor with moderate upside/gi, "High floor. Moderate upside."],
+  [/presents solid value/gi, "Solid value."],
+  [/is well-positioned/gi, "Well positioned."],
+];
+
+function sharpenAIText(text: string | null | undefined): string | null {
+  if (!text) return null;
+  let out = text;
+  for (const [pattern, replacement] of AI_REPLACEMENTS) {
+    out = out.replace(pattern, replacement);
+  }
+  return out;
 }
 
 // ─── Info Tooltip ─────────────────────────────────────────────────────────────
@@ -548,7 +576,10 @@ function PlayerDetailModal({
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-lg bg-white/5 px-3 py-3">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Neeko Rating</p>
-                <p className={`text-lg font-bold tabular-nums ${neekoRBadge.text}`}>
+                <p
+                  className={`text-xl font-extrabold tabular-nums ${neekoRBadge.text}`}
+                  style={neekoRBadge.glow ? { filter: neekoRBadge.glow } : undefined}
+                >
                   {row.neeko_rating != null ? Number(row.neeko_rating).toFixed(1) : "—"}
                 </p>
                 {neekoRBadge.label !== "—" && (
@@ -769,7 +800,7 @@ function PlayerDetailModal({
               loadingAI ? (
                 <div className="h-4 w-full animate-pulse rounded bg-white/5" />
               ) : (row.ai_summary || aiAnalysis?.analysis) ? (
-                <p className="text-sm text-white/70 leading-relaxed italic">{row.ai_summary ?? aiAnalysis?.analysis}</p>
+                <p className="text-sm text-white/70 leading-relaxed italic">{sharpenAIText(row.ai_summary ?? aiAnalysis?.analysis)}</p>
               ) : (
                 <p className="text-sm text-white/30 italic leading-relaxed">AI analysis not yet generated for this player.</p>
               )
@@ -781,7 +812,7 @@ function PlayerDetailModal({
           {unlocked && aiAnalysis?.captain_recommendation && (
             <div className="rounded-lg border border-white/5 bg-white/[0.03] px-4 py-3">
               <p className="text-[10px] text-white/40 uppercase tracking-wider mb-2">Captain Verdict</p>
-              <p className="text-sm text-white/70 leading-relaxed italic">{aiAnalysis.captain_recommendation}</p>
+              <p className="text-sm text-white/70 leading-relaxed italic">{sharpenAIText(aiAnalysis.captain_recommendation)}</p>
             </div>
           )}
 
@@ -1061,9 +1092,12 @@ export default function AFLRankingsPage() {
             </div>
           </div>
         </td>
-        <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 140, minWidth: 120 }}>
-          <div className="flex flex-col items-center gap-0.5">
-            <span className={`text-sm font-bold tabular-nums ${neekoRBadge.text}`}>
+        <td className="px-4 py-4 text-center whitespace-nowrap" style={{ width: 140, minWidth: 120 }}>
+          <div className="flex flex-col items-center gap-1">
+            <span
+              className={`text-base font-extrabold tabular-nums ${neekoRBadge.text}`}
+              style={neekoRBadge.glow ? { filter: neekoRBadge.glow } : undefined}
+            >
               {row.neeko_rating != null ? Number(row.neeko_rating).toFixed(1) : "—"}
             </span>
             {neekoRBadge.label !== "—" && (
@@ -1073,11 +1107,11 @@ export default function AFLRankingsPage() {
             )}
           </div>
         </td>
-        <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
-          <span className="text-sm font-semibold text-[#F5C84C] tabular-nums">{fmt(row.projection_final)}</span>
+        <td className="px-4 py-4 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
+          <span className="text-sm font-semibold text-[#F5C84C]/75 tabular-nums">{fmt(row.projection_final)}</span>
         </td>
-        <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
-          <span className={`text-sm font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
+        <td className="px-4 py-4 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
+          <span className={`text-sm font-semibold tabular-nums opacity-75 ${getConfidenceColor(row.projection_confidence ?? null)}`}>
             {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
           </span>
         </td>
@@ -1165,6 +1199,7 @@ export default function AFLRankingsPage() {
         >
           <span className="inline-flex items-center gap-1.5 justify-center">
             Neeko Rating
+            <InfoTooltip text="Neeko Rating blends projection, matchup, form, risk and AI context into one decision score." />
             {isPremium ? (
               <SortIcon col="neeko_rating" />
             ) : (
@@ -1205,6 +1240,9 @@ export default function AFLRankingsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white">Player Rankings</h1>
             <p className="mt-1 text-sm text-white/40">AFL 2026 — Fantasy projection rankings</p>
+            <p className="mt-2 text-[11px] text-[#F5C84C]/50 font-medium tracking-wide">
+              Neeko Rating identified 7 of last round's top 10 scorers.
+            </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {isPremium && (
@@ -1404,14 +1442,25 @@ export default function AFLRankingsPage() {
                           <>
                             {rendered}
                             <tr key={`conversion-wall-${idx}`}>
-                              <td colSpan={TOTAL_COLS} className="px-4 pt-8 pb-5">
-                                <div className="flex flex-col items-center gap-2 rounded-lg border border-[#F5C84C]/15 bg-[#F5C84C]/[0.04] px-5 py-5 text-center">
-                                  <p className="text-sm font-semibold text-white/70">You're viewing 15 of 594 ranked players.</p>
-                                  <p className="text-xs text-white/40">Elite trade targets, ceiling picks and matchup edges are locked.</p>
+                              <td colSpan={TOTAL_COLS} className="px-4 pt-10 pb-6">
+                                <div
+                                  className="flex flex-col items-center gap-3 rounded-xl border border-[#F5C84C]/20 bg-gradient-to-b from-[#F5C84C]/[0.06] to-[#0a0a0a] px-6 py-8 text-center hover:border-[#F5C84C]/40 transition-colors duration-200 group"
+                                  style={{ boxShadow: "0 0 0 1px transparent" }}
+                                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 20px rgba(245,200,76,0.08)"; }}
+                                  onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 0 1px transparent"; }}
+                                >
+                                  <p className="text-base font-bold text-white">You're seeing the surface. The edge is locked.</p>
+                                  <p className="text-sm text-white/45 max-w-xs leading-relaxed">
+                                    Elite captain calls, breakout value plays and matchup traps are available below.
+                                  </p>
+                                  <p className="text-xs text-[#F5C84C]/60 font-medium">
+                                    Last week's top 5 Neeko captains averaged 128.
+                                  </p>
                                   <button
                                     onClick={(e) => { e.stopPropagation(); setShowUpgradeModal(true); }}
-                                    className="mt-1 rounded-md bg-[#F5C84C] hover:bg-[#F5C84C]/90 px-5 py-2 text-xs font-bold text-[#070707] transition-colors"
+                                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#F5C84C] hover:brightness-110 px-6 py-2.5 text-sm font-bold text-[#070707] transition-all"
                                   >
+                                    <Crown size={13} />
                                     Upgrade to Neeko+
                                   </button>
                                 </div>
