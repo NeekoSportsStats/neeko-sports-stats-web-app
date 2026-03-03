@@ -11,6 +11,8 @@ interface RankingRow {
   player_name: string;
   team: string;
   position: string | null;
+  section: string;
+  section_rank: number;
   projection_final: number | null;
   ceiling_estimate: number | null;
   floor_estimate: number | null;
@@ -422,10 +424,8 @@ export default function AFLRoundEdgeBoard() {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: rpcErr } = await supabase.rpc("get_rankings_free", {
-        position_filter: "ALL",
-        sort_key: "best",
-        limit_n: 200,
+      const { data, error: rpcErr } = await supabase.rpc("get_edge_board_data", {
+        limit_n: PREMIUM_VISIBLE,
       });
       if (rpcErr) throw rpcErr;
       setRows((data as RankingRow[]) ?? []);
@@ -440,20 +440,17 @@ export default function AFLRoundEdgeBoard() {
     fetchData();
   }, [fetchData]);
 
-  const captainRows = [...rows]
-    .filter((r) => r.captain_score != null)
-    .sort((a, b) => (b.captain_score ?? 0) - (a.captain_score ?? 0))
-    .slice(0, PREMIUM_VISIBLE);
+  const captainRows = rows
+    .filter((r) => r.section === "captain")
+    .sort((a, b) => a.section_rank - b.section_rank);
 
-  const breakoutRows = [...rows]
-    .filter((r) => r.upside_rating != null && (r.value_score ?? 0) > 100)
-    .sort((a, b) => (b.upside_rating ?? 0) - (a.upside_rating ?? 0))
-    .slice(0, PREMIUM_VISIBLE);
+  const breakoutRows = rows
+    .filter((r) => r.section === "breakout")
+    .sort((a, b) => a.section_rank - b.section_rank);
 
-  const trapRows = [...rows]
-    .filter((r) => r.risk_rating != null && (r.value_score ?? 0) < 100)
-    .sort((a, b) => (b.risk_rating ?? 0) - (a.risk_rating ?? 0))
-    .slice(0, PREMIUM_VISIBLE);
+  const trapRows = rows
+    .filter((r) => r.section === "trap")
+    .sort((a, b) => a.section_rank - b.section_rank);
 
   if (loading) {
     return (
