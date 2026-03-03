@@ -150,12 +150,9 @@ function RankingsPreview() {
   useEffect(() => {
     (async () => {
       const { data } = await supabase.rpc("get_rankings_free", {
-        p_tab:      "best",
-        p_position: "ALL",
-        p_sort_key: "neeko_rating",
-        p_sort_dir: "desc",
-        p_limit:    5,
-        p_offset:   0,
+        position_filter: "ALL",
+        sort_key:        "neeko_rating",
+        limit_n:         10,
       });
       setRows((data ?? []).slice(0, 5));
       setLoading(false);
@@ -235,7 +232,7 @@ function EdgeBoardPreview() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.rpc("get_edge_board_data");
+      const { data } = await supabase.rpc("get_edge_board_data", { limit_n: 5 });
       const rows: EdgeRow[] = data ?? [];
       setCaptain(rows.find((r) => r.section === "captain")  ?? null);
       setBreakout(rows.find((r) => r.section === "breakout") ?? null);
