@@ -116,7 +116,7 @@ function sharpenSummary(text: string): string {
 const SECTION_SIGNAL_LABEL: Record<Section, string> = {
   captain: "WHY THIS IS A CAPTAIN EDGE",
   breakout: "VALUE ACCELERATION SIGNAL",
-  trap: "OVERPRICED RISK ALERT",
+  trap: "PREMIUM MISPRICING ALERT",
 };
 
 // ─── Color helpers ─────────────────────────────────────────────────────────────
