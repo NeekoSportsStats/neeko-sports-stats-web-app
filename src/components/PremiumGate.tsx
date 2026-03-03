@@ -1,7 +1,7 @@
 import { ReactNode, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useNavigate } from "react-router-dom";
-import { Lock, Crown, Loader2, X } from "lucide-react";
+import { Lock, Crown, Loader as Loader2, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY } from "@/config/stripePrices";
