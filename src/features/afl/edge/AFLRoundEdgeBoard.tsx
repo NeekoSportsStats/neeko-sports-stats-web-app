@@ -12,7 +12,7 @@ interface RankingRow {
   team: string;
   position: string | null;
   section: string;
-  section_rank: number;
+  section_rank: number | string;
   projection_final: number | null;
   ceiling_estimate: number | null;
   floor_estimate: number | null;
@@ -442,15 +442,15 @@ export default function AFLRoundEdgeBoard() {
 
   const captainRows = rows
     .filter((r) => r.section === "captain")
-    .sort((a, b) => a.section_rank - b.section_rank);
+    .sort((a, b) => Number(a.section_rank) - Number(b.section_rank));
 
   const breakoutRows = rows
     .filter((r) => r.section === "breakout")
-    .sort((a, b) => a.section_rank - b.section_rank);
+    .sort((a, b) => Number(a.section_rank) - Number(b.section_rank));
 
   const trapRows = rows
     .filter((r) => r.section === "trap")
-    .sort((a, b) => a.section_rank - b.section_rank);
+    .sort((a, b) => Number(a.section_rank) - Number(b.section_rank));
 
   if (loading) {
     return (
