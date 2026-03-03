@@ -4,9 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Lock, Crown, Loader2, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
-
-const MONTHLY_PRICE_ID = "price_1T70lqEKV8332a9YTnS3kZGQ";
-const YEARLY_PRICE_ID  = "price_1T70lqEKV8332a9Y1yiGTbCY";
+import { STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY } from "@/config/stripePrices";
 
 interface PremiumGateProps {
   children?: ReactNode;
@@ -92,7 +90,7 @@ function UnlockModal({ onClose }: { onClose: () => void }) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("No session");
 
-      const priceId = plan === "monthly" ? MONTHLY_PRICE_ID : YEARLY_PRICE_ID;
+      const priceId = plan === "monthly" ? STRIPE_PRICE_MONTHLY : STRIPE_PRICE_YEARLY;
       const origin  = window.location.origin;
 
       const res = await fetch(

@@ -7,9 +7,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription }
 import { Badge } from "@/components/ui/badge";
 import { Check, Crown, Sparkles, Loader2, ArrowLeft, TrendingUp, Target, Zap, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-const MONTHLY_PRICE_ID = "price_1T70lqEKV8332a9YTnS3kZGQ";
-const YEARLY_PRICE_ID  = "price_1T70lqEKV8332a9Y1yiGTbCY";
+import { STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY } from "@/config/stripePrices";
 
 type Plan = "monthly" | "yearly";
 
@@ -88,7 +86,7 @@ const NeekoPlusPurchase = () => {
         return;
       }
 
-      const priceId = plan === "monthly" ? MONTHLY_PRICE_ID : YEARLY_PRICE_ID;
+      const priceId = plan === "monthly" ? STRIPE_PRICE_MONTHLY : STRIPE_PRICE_YEARLY;
       const origin  = window.location.origin;
 
       const res = await fetch(

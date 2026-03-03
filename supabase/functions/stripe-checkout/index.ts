@@ -41,10 +41,18 @@ Deno.serve(async (req) => {
       return corsResponse({ error: 'Method not allowed' }, 405);
     }
 
-    const { price_id, success_url, cancel_url, mode } = await req.json();
+    const { plan, price_id: rawPriceId, success_url, cancel_url, mode } = await req.json();
+
+    let price_id = rawPriceId;
+    if (plan === "monthly") {
+      price_id = Deno.env.get("STRIPE_PRICE_MONTHLY") ?? rawPriceId;
+    } else if (plan === "yearly") {
+      price_id = Deno.env.get("STRIPE_PRICE_YEARLY") ?? rawPriceId;
+    }
 
     console.log("stripe-checkout inputs", {
       mode,
+      plan,
       price_id,
       success_url,
       cancel_url,
