@@ -65,7 +65,7 @@ const TAB_DESCRIPTIONS: Record<RankingsTab, string> = {
 
 const FREE_FULL_ROWS = 5;
 const FREE_PARTIAL_ROWS = 15;
-const FREE_FETCH_LIMIT = 30;
+const FREE_FETCH_LIMIT = 25;
 
 const LOCKED_WHY_TEASER = "Unlock matchup, role, ceiling analysis";
 
@@ -476,12 +476,14 @@ function PlayerDetailModal({
   rank,
   isPremium,
   isUnlocked,
+  tier,
   onClose,
 }: {
   row: RankingRow;
   rank: number;
   isPremium: boolean;
   isUnlocked: boolean;
+  tier: "premium" | "full" | "partial" | "locked";
   onClose: () => void;
 }) {
   const [aiAnalysis, setAiAnalysis] = useState<{ analysis: string | null; captain_recommendation: string | null } | null>(null);
@@ -508,9 +510,79 @@ function PlayerDetailModal({
 
   void rank;
   const unlocked = isPremium || isUnlocked;
+  const isPartial = tier === "partial";
   const consistencyBadge = getConsistencyBadge(row.consistency_score ?? null);
   const capStyle = getCaptainStyle(row.captain_rating ?? null);
   const recColor = row.recommendation_color ?? null;
+  const neekoRBadge = getNeekoRatingBadge(row.neeko_rating ?? null);
+  const riskBadge = getRiskBadge(Number(row.risk_rating) ?? null);
+
+  if (isPartial) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+        <div
+          className="relative w-full max-w-md rounded-xl border border-white/10 bg-[#0e0e0e] p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button onClick={onClose} className="absolute right-4 top-4 text-white/40 hover:text-white/80 transition-colors">
+            <X size={18} />
+          </button>
+          <div className="space-y-4">
+            <div className="pr-6">
+              <h2 className="text-lg font-semibold text-white">{row.player_name}</h2>
+              <p className="text-sm text-white/50">{row.team}{row.position ? ` · ${row.position}` : ""}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-lg bg-white/5 px-3 py-3">
+                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Neeko Rating</p>
+                <p className={`text-lg font-bold tabular-nums ${neekoRBadge.text}`}>
+                  {row.neeko_rating != null ? Number(row.neeko_rating).toFixed(1) : "—"}
+                </p>
+                {neekoRBadge.label !== "—" && (
+                  <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border mt-0.5 ${neekoRBadge.text} ${neekoRBadge.bg} ${neekoRBadge.border}`}>
+                    {neekoRBadge.label}
+                  </span>
+                )}
+              </div>
+              <div className="rounded-lg bg-white/5 px-3 py-3">
+                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Projection</p>
+                <p className="text-lg font-bold text-[#F5C84C] tabular-nums">{fmt(row.projection_final)}</p>
+              </div>
+              <div className="rounded-lg bg-white/5 px-3 py-3">
+                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Confidence</p>
+                <p className={`text-base font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
+                  {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
+                </p>
+              </div>
+              <div className="rounded-lg bg-white/5 px-3 py-3">
+                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Risk</p>
+                <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${riskBadge.text} ${riskBadge.bg} ${riskBadge.border}`}>
+                  {riskBadge.label}
+                </span>
+              </div>
+            </div>
+            <div className="rounded-xl border border-[#F5C84C]/30 bg-gradient-to-br from-[#1a1a1a] to-[#111] px-5 py-5">
+              <div className="flex items-center gap-2 mb-2">
+                <Crown size={15} className="text-[#F5C84C]" />
+                <p className="text-sm font-semibold text-white">Unlock Full Analysis</p>
+              </div>
+              <p className="text-xs text-white/50 mb-4 leading-relaxed">
+                Get ceiling, floor, price, value score, matchup rating, AI recommendation, and captain verdict for every player.
+              </p>
+              <a
+                href="/neeko-plus"
+                className="inline-flex items-center gap-1.5 bg-[#F5C84C] text-black font-semibold rounded-lg hover:brightness-110 transition-all duration-150 px-4 py-2 text-sm"
+              >
+                <Crown size={13} />
+                Upgrade to Neeko+
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -940,22 +1012,27 @@ export default function AFLRankingsPage() {
       : <ChevronUp size={11} className="text-[#F5C84C] inline-block ml-0.5" />;
   }
 
+  function getFreeTier(idx: number): "full" | "partial" | "locked" {
+    if (idx < FREE_FULL_ROWS) return "full";
+    if (idx < FREE_PARTIAL_ROWS) return "partial";
+    return "locked";
+  }
+
   function renderRow(row: RankingRow, idx: number) {
     const rank = idx + 1;
-    const rowUnlocked = isPremium || isFreeFullRow(idx);
+    const tier = isPremium ? "premium" : getFreeTier(idx);
+    const rowUnlocked = tier === "premium" || tier === "full";
 
     const handleRowClick = () => {
+      if (tier === "locked") {
+        setShowUpgradeModal(true);
+        return;
+      }
       setSelected({
         ...row,
         _rank: rank,
         _unlocked: rowUnlocked,
-        _tier: isPremium
-          ? "premium"
-          : isFreeFullRow(idx)
-          ? "full"
-          : isFreePartialRow(idx)
-          ? "partial"
-          : "locked",
+        _tier: tier,
       });
     };
 
@@ -1346,7 +1423,7 @@ export default function AFLRankingsPage() {
                                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-lg border border-[#F5C84C]/15 bg-[#F5C84C]/[0.04] px-5 py-3.5">
                                   <div className="flex items-center gap-2.5">
                                     <Lock size={13} className="text-[#F5C84C]/60 shrink-0" />
-                                    <span className="text-sm text-white/60">4 breakout candidates in the top 15 are hidden.</span>
+                                    <span className="text-sm text-white/60">{FREE_PARTIAL_ROWS - FREE_FULL_ROWS} breakout candidates in the top {FREE_PARTIAL_ROWS} are hidden.</span>
                                   </div>
                                   <button
                                     onClick={(e) => { e.stopPropagation(); setShowUpgradeModal(true); }}
@@ -1391,7 +1468,6 @@ export default function AFLRankingsPage() {
           </div>
         </div>
 
-        {!isPremium && !loading && <UpgradeCTABanner />}
       </div>
 
       {selected && (
@@ -1400,6 +1476,7 @@ export default function AFLRankingsPage() {
           rank={selected._rank}
           isPremium={isPremium}
           isUnlocked={selected._unlocked}
+          tier={selected._tier}
           onClose={() => setSelected(null)}
         />
       )}
