@@ -22,6 +22,8 @@ export interface MarketRow {
   upside_gap: number | null;
   trade_signal: "BUY" | "SELL" | "HOLD" | null;
   trade_score: number | null;
+  breakout_score: number | null;
+  breakout_flag: boolean | null;
 }
 
 export type MarketTab = "buy" | "sell" | "cashcow" | "trap";
@@ -44,6 +46,8 @@ export interface MWPlayerRow {
   projected_price_r1: number | null;
   projected_price_r2: number | null;
   projected_price_r3: number | null;
+  breakout_score: number | null;
+  breakout_flag: boolean | null;
   category: "buy" | "sell_now" | "sell_consider" | "cash_cow" | "fade" | "monitor";
   action: "BUY" | "SELL" | "HOLD";
   trade_score: number;
