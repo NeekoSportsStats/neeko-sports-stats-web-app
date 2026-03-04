@@ -28,6 +28,7 @@ const FAQ               = React.lazy(() => import("@/pages/FAQ"));
 const Contact           = React.lazy(() => import("@/pages/Contact"));
 const Admin             = React.lazy(() => import("@/pages/Admin"));
 const AdminQueue        = React.lazy(() => import("@/pages/AdminQueue"));
+const PipelineHistory   = React.lazy(() => import("@/pages/PipelineHistory"));
 const Success           = React.lazy(() => import("@/pages/Success"));
 const Cancel            = React.lazy(() => import("@/pages/Cancel"));
 const CreatePassword    = React.lazy(() => import("@/pages/CreatePassword"));
@@ -148,6 +149,17 @@ function App() {
           <RequireAuth>
             <Layout>
               <S fallback={Generic}><AdminQueue /></S>
+            </Layout>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/admin/pipeline-history"
+        element={
+          <RequireAuth>
+            <Layout>
+              <S fallback={Generic}><PipelineHistory /></S>
             </Layout>
           </RequireAuth>
         }

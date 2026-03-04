@@ -1751,6 +1751,15 @@ export default function Admin() {
               <Activity className="h-4 w-4 mr-2" />
               AI Queue Dashboard
             </Button>
+
+            <Button
+              onClick={() => navigate("/admin/pipeline-history")}
+              variant="outline"
+              className="w-full"
+            >
+              <History className="h-4 w-4 mr-2" />
+              Pipeline History
+            </Button>
           </div>
 
           {activeRun && (

@@ -81,12 +81,35 @@ Deno.serve(async (req: Request) => {
       console.log(`Pipeline step completed: ${stepName} (${completed}/${totalSteps})`);
     }
 
+    async function logStepStart(name: string): Promise<string | null> {
+      if (!runId) return null;
+      const { data } = await db.from("pipeline_steps").insert({
+        run_id: runId,
+        step_name: name,
+        step_label: STEP_LABELS[name] ?? name,
+        status: "running",
+      }).select("id").maybeSingle();
+      return data?.id ?? null;
+    }
+
+    async function logStepDone(stepId: string | null, durationMs: number, status: "completed" | "skipped" | "failed", error?: string): Promise<void> {
+      if (!stepId) return;
+      await db.from("pipeline_steps").update({
+        status,
+        completed_at: new Date().toISOString(),
+        duration_ms: durationMs,
+        ...(error ? { error } : {}),
+      }).eq("id", stepId);
+    }
+
     async function runStep(
       name: string,
       fn: () => Promise<unknown>,
       skip = false
     ): Promise<void> {
       if (skip) {
+        const stepId = await logStepStart(name);
+        await logStepDone(stepId, 0, "skipped");
         steps.push({ name, status: "skipped" });
         completedCount++;
         await updateRunProgress(name, completedCount);
@@ -94,17 +117,23 @@ Deno.serve(async (req: Request) => {
       }
       console.log(`Pipeline starting step: ${STEP_LABELS[name] ?? name}`);
       const t = Date.now();
+      const stepId = await logStepStart(name);
       try {
         const detail = await fn();
-        steps.push({ name, status: "ok", detail, duration_ms: Date.now() - t });
+        const dur = Date.now() - t;
+        await logStepDone(stepId, dur, "completed");
+        steps.push({ name, status: "ok", detail, duration_ms: dur });
         completedCount++;
         await updateRunProgress(name, completedCount);
       } catch (err) {
+        const dur = Date.now() - t;
+        const errMsg = err instanceof Error ? err.message : String(err);
+        await logStepDone(stepId, dur, "failed", errMsg);
         steps.push({
           name,
           status: "error",
-          detail: err instanceof Error ? err.message : String(err),
-          duration_ms: Date.now() - t,
+          detail: errMsg,
+          duration_ms: dur,
         });
         completedCount++;
         await updateRunProgress(name, completedCount);
