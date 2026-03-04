@@ -32,6 +32,7 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [premiumLoading, setPremiumLoading] = useState(true);
   const [isPremium, setIsPremium] = useState(false);
 
   // NEW: Track whether INITIAL_SESSION has occurred
@@ -41,6 +42,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    * Fetch premium status from `profiles` for a given user id.
    */
   const fetchPremiumStatus = useCallback(async (userId: string) => {
+    setPremiumLoading(true);
     try {
       const { data, error } = await supabase
         .from("profiles")
@@ -71,6 +73,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (err) {
       console.error("❌ Premium status exception:", err);
       setIsPremium(false);
+    } finally {
+      setPremiumLoading(false);
     }
   }, []);
 
@@ -125,13 +129,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       setUser(currentUser);
-      setLoading(false);
 
       if (currentUser?.id) {
         identifyUser({ id: currentUser.id, email: currentUser.email ?? undefined });
-        setTimeout(() => { fetchPremiumStatus(currentUser.id); }, 0);
+        (async () => {
+          await fetchPremiumStatus(currentUser.id);
+          if (isMounted) setLoading(false);
+        })();
       } else {
         setIsPremium(false);
+        setPremiumLoading(false);
+        setLoading(false);
       }
     };
 
@@ -176,17 +184,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
 
-    const safetyTimer = setTimeout(() => {
-      if (isMounted) {
-        console.warn("⚠️ Auth safety net: forcing loading=false");
-        setLoading(false);
-      }
-    }, 2000);
-
     return () => {
       console.log("🧹 AuthProvider: cleanup");
       isMounted = false;
-      clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, [fetchPremiumStatus]);
@@ -199,7 +199,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, isPremium, refreshPremiumStatus, signOut }}
+      value={{ user, loading: loading || premiumLoading, isPremium, refreshPremiumStatus, signOut }}
     >
       {children}
     </AuthContext.Provider>
