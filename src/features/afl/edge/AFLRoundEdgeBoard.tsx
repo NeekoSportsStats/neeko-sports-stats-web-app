@@ -404,7 +404,7 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
       {locked && <LockedCardOverlay section={section} stats={sectionStats} onUnlock={onUnlock} />}
 
 
-      <div className={`flex items-start justify-between gap-3 mb-3 ${locked ? "blur-[3px] select-none" : ""}`}>
+      <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${sectionAccent.badge}`}>
@@ -431,7 +431,7 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
       {section === "captain" && !locked && <CaptainStatsBar row={row} />}
 
       {section === "captain" && locked && (
-        <div className="grid grid-cols-3 gap-2 mb-3 blur-[3px] select-none">
+        <div className="grid grid-cols-3 gap-2 mb-3">
           <div className="rounded-lg bg-black/20 px-2.5 py-2">
             <p className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Price</p>
             <p className="text-xs font-semibold text-white/80">{fmtPrice(row.price)}</p>
@@ -452,7 +452,7 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
       )}
 
       {section !== "captain" && (
-        <div className={`grid grid-cols-3 gap-2 mb-3 ${locked ? "blur-[3px] select-none" : ""}`}>
+        <div className="grid grid-cols-3 gap-2 mb-3">
           <div className="rounded-lg bg-black/20 px-2.5 py-2">
             <p className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Price</p>
             <p className="text-xs font-semibold text-white/80">{fmtPrice(row.price)}</p>
@@ -473,7 +473,7 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
       )}
 
       {isTrap && (
-        <div className={`flex items-center gap-2 mb-3 ${locked ? "blur-[3px] select-none" : ""}`}>
+        <div className="flex items-center gap-2 mb-3">
           <div className="flex-1 rounded-lg bg-black/20 px-2.5 py-2">
             <p className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Risk</p>
             <p className={`text-xs font-semibold tabular-nums ${getRiskColor(row.risk_rating ?? null)}`}>
@@ -484,7 +484,7 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
       )}
 
       {section === "breakout" && row.upside_rating != null && (
-        <div className={`mb-3 ${locked ? "blur-[3px] select-none" : ""}`}>
+        <div className="mb-3">
           <div className="rounded-lg bg-black/20 px-2.5 py-2">
             <p className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Upside</p>
             <p className="text-xs font-semibold text-green-400 tabular-nums">+{fmtInt(row.upside_rating)}%</p>
@@ -811,8 +811,6 @@ function HeroSignalCard({ section, row, isPremium, onUnlock }: HeroSignalCardPro
     },
   }[section];
 
-  const statsLocked = !isPremium;
-
   return (
     <div
       className={`relative flex flex-col rounded-2xl border ${config.border} ${config.bg} shadow-lg ${config.glow} overflow-hidden p-5 transition-all duration-200 ${isPremium ? "hover:-translate-y-0.5 hover:shadow-xl" : ""}`}
@@ -836,34 +834,54 @@ function HeroSignalCard({ section, row, isPremium, onUnlock }: HeroSignalCardPro
         <p className="text-xs text-white/40 mt-0.5">{row.team}</p>
       </div>
 
-      {/* Primary stat — blurred for free users */}
-      <div className={`mb-4 ${statsLocked ? "relative" : ""}`}>
-        <div className={statsLocked ? "blur-sm select-none" : ""}>
-          <p className="text-[10px] text-white/30 uppercase tracking-widest mb-1">{config.statLabel}</p>
-          <p className={`text-3xl font-extrabold tabular-nums leading-none ${config.statColor}`}>
-            {config.statValue}
-          </p>
-        </div>
-        {statsLocked && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <button
-              onClick={onUnlock}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/70 border border-[#F5C84C]/30 text-[11px] font-bold text-[#F5C84C] hover:bg-black/85 transition-all backdrop-blur-sm"
-            >
-              <Lock size={9} />
-              Unlock Full Edge Analysis
-            </button>
-          </div>
-        )}
+      {/* Primary stat — always visible */}
+      <div className="mb-3">
+        <p className="text-[10px] text-white/30 uppercase tracking-widest mb-1">{config.statLabel}</p>
+        <p className={`text-3xl font-extrabold tabular-nums leading-none ${config.statColor}`}>
+          {config.statValue}
+        </p>
       </div>
 
-      {/* Price chip — always visible as teaser */}
+      {/* Secondary stats grid — always visible */}
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="rounded-lg bg-black/20 px-2 py-1.5">
+          <p className="text-[9px] text-white/30 uppercase tracking-wider mb-0.5">Confidence</p>
+          <p className={`text-xs font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
+            {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
+          </p>
+        </div>
+        <div className="rounded-lg bg-black/20 px-2 py-1.5">
+          <p className="text-[9px] text-white/30 uppercase tracking-wider mb-0.5">Risk</p>
+          <p className={`text-xs font-semibold tabular-nums ${getRiskColor(row.risk_rating ?? null)}`}>
+            {row.risk_rating != null ? `${fmtInt(row.risk_rating)}%` : "—"}
+          </p>
+        </div>
+        <div className="rounded-lg bg-black/20 px-2 py-1.5">
+          <p className="text-[9px] text-white/30 uppercase tracking-wider mb-0.5">Value</p>
+          <p className={`text-xs font-semibold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
+            {fmtValueScore(row.value_score)}
+          </p>
+        </div>
+      </div>
+
+      {/* Price chip — always visible */}
       {row.price != null && (
         <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
           <span className="text-[10px] text-white/25 uppercase tracking-wider">Price</span>
-          <span className={`text-xs font-semibold ${statsLocked ? "blur-sm select-none" : "text-white/60"}`}>
-            {fmtPrice(row.price)}
-          </span>
+          <span className="text-xs font-semibold text-white/60">{fmtPrice(row.price)}</span>
+        </div>
+      )}
+
+      {/* AI explanation — locked for free users */}
+      {!isPremium && (
+        <div className="mt-3 pt-3 border-t border-white/[0.06]">
+          <button
+            onClick={onUnlock}
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-[#F5C84C]/20 bg-[#F5C84C]/[0.05] text-[11px] font-semibold text-[#F5C84C]/70 hover:text-[#F5C84C] hover:border-[#F5C84C]/35 transition-all"
+          >
+            <Lock size={9} />
+            AI reasoning locked — Unlock with Neeko+
+          </button>
         </div>
       )}
     </div>
