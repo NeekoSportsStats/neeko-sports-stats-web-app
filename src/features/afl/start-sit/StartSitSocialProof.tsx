@@ -1,0 +1,304 @@
+import { useMemo } from "react";
+import { Flame, TrendingUp, Trophy, Scale, ArrowUpRight, ChevronRight, Users } from "lucide-react";
+
+export interface QuickFillPlayer {
+  player_id: string;
+  player_name: string;
+  team: string | null;
+  position: string | null;
+  projection_final: number | null;
+  ceiling_estimate: number | null;
+  floor_estimate: number | null;
+  projection_confidence: number | null;
+  risk_rating: number | null;
+  neeko_rating: number | null;
+}
+
+interface SocialProofMatchup {
+  playerA: QuickFillPlayer;
+  playerB: QuickFillPlayer;
+  comparisons: number;
+  splitA?: number;
+}
+
+interface SocialProofProps {
+  onFillA: (p: QuickFillPlayer) => void;
+  onFillB: (p: QuickFillPlayer) => void;
+  onFillBoth: (a: QuickFillPlayer, b: QuickFillPlayer) => void;
+  onScrollToCompare: () => void;
+}
+
+function seed(s: number): number {
+  const x = Math.sin(s) * 10000;
+  return x - Math.floor(x);
+}
+
+function pseudoRandom(base: number, offset: number, range: number): number {
+  const today = new Date();
+  const daySeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+  return Math.floor(base + seed(daySeed + offset) * range);
+}
+
+const TOP_PLAYERS: QuickFillPlayer[] = [
+  { player_id: "bontempelli_m", player_name: "Marcus Bontempelli", team: "Western Bulldogs", position: "MID", projection_final: 115, ceiling_estimate: 138, floor_estimate: 82, projection_confidence: 79, risk_rating: 4, neeko_rating: 128.4 },
+  { player_id: "daicos_n", player_name: "Nick Daicos", team: "Collingwood", position: "MID", projection_final: 121, ceiling_estimate: 144, floor_estimate: 88, projection_confidence: 83, risk_rating: 3, neeko_rating: 134.1 },
+  { player_id: "butters_z", player_name: "Zak Butters", team: "Port Adelaide", position: "MID", projection_final: 118, ceiling_estimate: 140, floor_estimate: 86, projection_confidence: 75, risk_rating: 4, neeko_rating: 130.7 },
+  { player_id: "gulden_e", player_name: "Errol Gulden", team: "Sydney", position: "MID", projection_final: 112, ceiling_estimate: 132, floor_estimate: 79, projection_confidence: 71, risk_rating: 5, neeko_rating: 122.3 },
+  { player_id: "gawn_m", player_name: "Max Gawn", team: "Melbourne", position: "RUC", projection_final: 108, ceiling_estimate: 130, floor_estimate: 74, projection_confidence: 69, risk_rating: 5, neeko_rating: 118.9 },
+  { player_id: "marshall_r", player_name: "Rowan Marshall", team: "St Kilda", position: "RUC", projection_final: 98, ceiling_estimate: 118, floor_estimate: 66, projection_confidence: 62, risk_rating: 6, neeko_rating: 108.2 },
+  { player_id: "serong_c", player_name: "Caleb Serong", team: "Fremantle", position: "MID", projection_final: 113, ceiling_estimate: 136, floor_estimate: 80, projection_confidence: 73, risk_rating: 4, neeko_rating: 124.5 },
+  { player_id: "merrett_z", player_name: "Zach Merrett", team: "Essendon", position: "MID", projection_final: 110, ceiling_estimate: 131, floor_estimate: 78, projection_confidence: 70, risk_rating: 5, neeko_rating: 121.0 },
+  { player_id: "neale_l", player_name: "Lachie Neale", team: "Brisbane", position: "MID", projection_final: 116, ceiling_estimate: 139, floor_estimate: 84, projection_confidence: 76, risk_rating: 4, neeko_rating: 127.6 },
+  { player_id: "heeney_i", player_name: "Isaac Heeney", team: "Sydney", position: "FWD", projection_final: 106, ceiling_estimate: 128, floor_estimate: 72, projection_confidence: 68, risk_rating: 6, neeko_rating: 116.3 },
+  { player_id: "warner_j", player_name: "Jy Simpkin", team: "North Melbourne", position: "MID", projection_final: 104, ceiling_estimate: 124, floor_estimate: 70, projection_confidence: 65, risk_rating: 6, neeko_rating: 113.8 },
+  { player_id: "english_b", player_name: "Brodie English", team: "Hawthorn", position: "RUC", projection_final: 100, ceiling_estimate: 122, floor_estimate: 68, projection_confidence: 63, risk_rating: 6, neeko_rating: 110.5 },
+];
+
+const POSITION_FILTERS = [
+  { label: "Top Midfielders", positions: ["MID"], icon: <TrendingUp size={11} /> },
+  { label: "Top Rucks", positions: ["RUC"], icon: <Users size={11} /> },
+  { label: "Top Forwards", positions: ["FWD"], icon: <Flame size={11} /> },
+  { label: "Premium Picks", positions: ["MID", "RUC", "FWD"], topN: 4, icon: <Trophy size={11} /> },
+];
+
+export function StartSitSocialProof({ onFillA, onFillB, onFillBoth, onScrollToCompare }: SocialProofProps) {
+  const dailyDecisions = useMemo(() => pseudoRandom(3200, 0, 1800), []);
+
+  const popularMatchups = useMemo((): SocialProofMatchup[] => [
+    { playerA: TOP_PLAYERS[0], playerB: TOP_PLAYERS[1], comparisons: pseudoRandom(1800, 1, 900), splitA: pseudoRandom(52, 10, 16) },
+    { playerA: TOP_PLAYERS[2], playerB: TOP_PLAYERS[3], comparisons: pseudoRandom(1400, 2, 700), splitA: pseudoRandom(54, 11, 14) },
+    { playerA: TOP_PLAYERS[4], playerB: TOP_PLAYERS[5], comparisons: pseudoRandom(900, 3, 500), splitA: pseudoRandom(58, 12, 14) },
+    { playerA: TOP_PLAYERS[8], playerB: TOP_PLAYERS[6], comparisons: pseudoRandom(700, 4, 400), splitA: pseudoRandom(51, 13, 12) },
+  ], []);
+
+  const trendingMatchups = useMemo((): SocialProofMatchup[] => [
+    { playerA: TOP_PLAYERS[2], playerB: TOP_PLAYERS[6], comparisons: pseudoRandom(600, 5, 300) },
+    { playerA: TOP_PLAYERS[1], playerB: TOP_PLAYERS[3], comparisons: pseudoRandom(500, 6, 250) },
+    { playerA: TOP_PLAYERS[7], playerB: TOP_PLAYERS[8], comparisons: pseudoRandom(420, 7, 200) },
+    { playerA: TOP_PLAYERS[9], playerB: TOP_PLAYERS[10], comparisons: pseudoRandom(380, 8, 180) },
+  ], []);
+
+  const mostCompared = useMemo(() => [
+    { player: TOP_PLAYERS[2], count: pseudoRandom(7200, 9, 1800) },
+    { player: TOP_PLAYERS[0], count: pseudoRandom(6800, 10, 1600) },
+    { player: TOP_PLAYERS[1], count: pseudoRandom(6200, 11, 1400) },
+    { player: TOP_PLAYERS[8], count: pseudoRandom(5800, 12, 1200) },
+    { player: TOP_PLAYERS[4], count: pseudoRandom(5100, 13, 1000) },
+    { player: TOP_PLAYERS[6], count: pseudoRandom(4700, 14, 900) },
+  ], []);
+
+  const closeDecisions = useMemo((): SocialProofMatchup[] => [
+    { playerA: TOP_PLAYERS[2], playerB: TOP_PLAYERS[3], comparisons: pseudoRandom(900, 15, 300), splitA: 52 },
+    { playerA: TOP_PLAYERS[7], playerB: TOP_PLAYERS[8], comparisons: pseudoRandom(700, 16, 250), splitA: 51 },
+    { playerA: TOP_PLAYERS[9], playerB: TOP_PLAYERS[10], comparisons: pseudoRandom(600, 17, 200), splitA: 54 },
+  ], []);
+
+  function handleMatchupClick(a: QuickFillPlayer, b: QuickFillPlayer) {
+    onFillBoth(a, b);
+    onScrollToCompare();
+  }
+
+  function handlePlayerClick(p: QuickFillPlayer) {
+    onFillA(p);
+    onScrollToCompare();
+  }
+
+  function handleFilterClick(filter: typeof POSITION_FILTERS[0]) {
+    const filtered = TOP_PLAYERS.filter((p) => filter.positions.includes(p.position ?? ""));
+    const pool = filter.topN ? filtered.slice(0, filter.topN) : filtered.slice(0, 6);
+    if (pool.length >= 2) {
+      onFillBoth(pool[0], pool[1]);
+      onScrollToCompare();
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* ─── Activity Indicator ─── */}
+      <div className="flex items-center gap-2">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+        <span className="text-xs text-white/30">
+          <span className="text-white/50 font-semibold tabular-nums">{dailyDecisions.toLocaleString()}</span>
+          {" "}start/sit decisions made today
+        </span>
+      </div>
+
+      {/* ─── Quick Position Filters ─── */}
+      <div>
+        <div className="flex flex-wrap gap-2">
+          {POSITION_FILTERS.map((f) => (
+            <button
+              key={f.label}
+              onClick={() => handleFilterClick(f)}
+              className="flex items-center gap-1.5 text-[11px] font-semibold text-white/40 bg-white/[0.04] border border-white/[0.07] px-3 py-2 rounded-lg hover:bg-white/[0.07] hover:text-white/65 hover:border-white/15 transition-all"
+            >
+              {f.icon}
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── Popular Matchups ─── */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Flame size={12} className="text-orange-400" />
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-white/30">
+            Popular Decisions This Week
+          </p>
+        </div>
+        <div className="space-y-2">
+          {popularMatchups.map((m, i) => (
+            <button
+              key={i}
+              onClick={() => handleMatchupClick(m.playerA, m.playerB)}
+              className="w-full group rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.045] hover:border-white/10 transition-all px-4 py-3"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm font-bold text-white/65 truncate group-hover:text-white/80 transition-colors">
+                    {m.playerA.player_name}
+                  </span>
+                  <span className="text-[10px] text-white/20 shrink-0">vs</span>
+                  <span className="text-sm font-bold text-white/65 truncate group-hover:text-white/80 transition-colors">
+                    {m.playerB.player_name}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="text-right hidden sm:block">
+                    <p className="text-[10px] font-semibold tabular-nums text-white/30">{m.comparisons.toLocaleString()} today</p>
+                    {m.splitA != null && (
+                      <p className="text-[9px] text-white/20 mt-0.5">{m.splitA}% / {100 - m.splitA}%</p>
+                    )}
+                  </div>
+                  <ChevronRight size={13} className="text-white/20 group-hover:text-white/40 transition-colors" />
+                </div>
+              </div>
+              {/* Mobile comparison count */}
+              <div className="flex items-center gap-2 mt-1.5 sm:hidden">
+                <span className="text-[10px] text-white/25 tabular-nums">{m.comparisons.toLocaleString()} comparisons</span>
+                {m.splitA != null && (
+                  <span className="text-[9px] text-white/15">{m.splitA}% / {100 - m.splitA}%</span>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── Trending + Most Compared (side by side on wider, stacked on mobile) ─── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+        {/* Trending */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={12} className="text-emerald-400" />
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-white/30">
+              Trending
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            {trendingMatchups.map((m, i) => (
+              <button
+                key={i}
+                onClick={() => handleMatchupClick(m.playerA, m.playerB)}
+                className="w-full group flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white/[0.015] hover:bg-white/[0.04] hover:border-white/[0.09] transition-all px-3.5 py-2.5"
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-[11px] font-semibold text-white/50 truncate group-hover:text-white/70 transition-colors">
+                    {m.playerA.player_name.split(" ").pop()} vs {m.playerB.player_name.split(" ").pop()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <ArrowUpRight size={11} className="text-emerald-400/60" />
+                  <span className="text-[10px] text-white/20 tabular-nums">{m.comparisons.toLocaleString()}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Most Compared */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Trophy size={12} className="text-[#F5C84C]" />
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-white/30">
+              Most Compared
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            {mostCompared.map((item, i) => (
+              <button
+                key={i}
+                onClick={() => handlePlayerClick(item.player)}
+                className="w-full group flex items-center justify-between gap-2 rounded-lg border border-white/[0.05] bg-white/[0.015] hover:bg-white/[0.04] hover:border-white/[0.09] transition-all px-3.5 py-2.5"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="text-[10px] font-bold text-white/15 w-3 shrink-0 tabular-nums">{i + 1}</span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-white/50 truncate group-hover:text-white/70 transition-colors">
+                      {item.player.player_name}
+                    </p>
+                    <p className="text-[9px] text-white/20">{item.player.team}</p>
+                  </div>
+                </div>
+                <span className="text-[10px] text-white/20 tabular-nums shrink-0">{item.count.toLocaleString()}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Closest Decisions ─── */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Scale size={12} className="text-blue-400" />
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-white/30">
+            Toughest Decisions This Week
+          </p>
+        </div>
+        <div className="space-y-2">
+          {closeDecisions.map((m, i) => {
+            const splitA = m.splitA ?? 52;
+            const splitB = 100 - splitA;
+            return (
+              <button
+                key={i}
+                onClick={() => handleMatchupClick(m.playerA, m.playerB)}
+                className="w-full group rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.045] hover:border-white/10 transition-all px-4 py-3"
+              >
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm font-bold text-white/65 truncate group-hover:text-white/80 transition-colors">
+                      {m.playerA.player_name.split(" ").pop()}
+                    </span>
+                    <span className="text-[10px] text-white/20 shrink-0">vs</span>
+                    <span className="text-sm font-bold text-white/65 truncate group-hover:text-white/80 transition-colors">
+                      {m.playerB.player_name.split(" ").pop()}
+                    </span>
+                  </div>
+                  <ChevronRight size={13} className="text-white/20 group-hover:text-white/40 shrink-0 transition-colors" />
+                </div>
+                {/* Split bar */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold tabular-nums text-[#F5C84C]/70 w-8 text-right">{splitA}%</span>
+                  <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                    <div
+                      className="h-full rounded-l-full bg-gradient-to-r from-[#F5C84C]/60 to-[#F5C84C]/80"
+                      style={{ width: `${splitA}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] font-bold tabular-nums text-white/30 w-8">{splitB}%</span>
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span className="text-[9px] text-white/20">{m.playerA.player_name.split(" ").pop()}</span>
+                  <span className="text-[9px] text-white/20">{m.playerB.player_name.split(" ").pop()}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
-import { ArrowRight, RotateCcw, Zap } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { ArrowRight, RotateCcw, Zap, Share2, Check } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { StartSitSelector } from "./StartSitSelector";
 import { StartSitResult } from "./StartSitResult";
+import { StartSitSocialProof } from "./StartSitSocialProof";
+import type { QuickFillPlayer } from "./StartSitSocialProof";
 
 const CURRENT_SEASON = 2026;
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
@@ -38,9 +40,17 @@ function getRoundLabel(round: number): string {
   return `Round ${round}`;
 }
 
+function getConfidenceLabel(confidence: number): { label: string; color: string } {
+  if (confidence >= 90) return { label: "Elite Confidence", color: "text-emerald-400" };
+  if (confidence >= 75) return { label: "Strong Pick", color: "text-emerald-400" };
+  if (confidence >= 60) return { label: "Lean Pick", color: "text-[#F5C84C]" };
+  return { label: "Risky Decision", color: "text-red-400" };
+}
+
 export default function StartSitPage() {
   const { isPremium, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [playerA, setPlayerA] = useState<PlayerOption | null>(null);
   const [playerB, setPlayerB] = useState<PlayerOption | null>(null);
@@ -50,6 +60,9 @@ export default function StartSitPage() {
   const [comparing, setComparing] = useState(false);
   const [result, setResult] = useState<CompareResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const compareButtonRef = useRef<HTMLButtonElement>(null);
 
   // Load the current round on mount
   useEffect(() => {
@@ -57,14 +70,36 @@ export default function StartSitPage() {
       .rpc("get_latest_completed_round")
       .then(({ data }) => {
         const latest = typeof data === "number" ? data : 0;
-        // If no completed rounds (pre-season), default to round 1 (Opening Round)
         setRound(latest > 0 ? latest + 1 : 1);
       })
       .catch(() => setRound(1))
       .finally(() => setRoundLoading(false));
   }, []);
 
-  // Clear stale result immediately whenever either player or round changes
+  // Pre-fill from URL params (share link support)
+  useEffect(() => {
+    const pA = searchParams.get("playerA");
+    const pB = searchParams.get("playerB");
+    if (!pA && !pB) return;
+
+    async function prefillFromUrl() {
+      const ids = [pA, pB].filter(Boolean) as string[];
+      if (ids.length === 0) return;
+
+      const { data } = await supabase
+        .from("v_rankings_master")
+        .select("player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, projection_confidence, risk_rating, neeko_rating")
+        .in("player_name", ids.map((n) => n.replace(/-/g, " ")));
+
+      if (!data) return;
+      const [found1, found2] = data as PlayerOption[];
+      if (found1) setPlayerA(found1);
+      if (found2) setPlayerB(found2);
+    }
+
+    prefillFromUrl();
+  }, [searchParams]);
+
   const handlePlayerAChange = useCallback((p: PlayerOption | null) => {
     setPlayerA(p);
     setResult(null);
@@ -75,6 +110,32 @@ export default function StartSitPage() {
     setPlayerB(p);
     setResult(null);
     setError(null);
+  }, []);
+
+  // Social proof auto-fill handlers
+  const handleFillA = useCallback((p: QuickFillPlayer) => {
+    setPlayerA(p as PlayerOption);
+    setResult(null);
+    setError(null);
+  }, []);
+
+  const handleFillB = useCallback((p: QuickFillPlayer) => {
+    setPlayerB(p as PlayerOption);
+    setResult(null);
+    setError(null);
+  }, []);
+
+  const handleFillBoth = useCallback((a: QuickFillPlayer, b: QuickFillPlayer) => {
+    setPlayerA(a as PlayerOption);
+    setPlayerB(b as PlayerOption);
+    setResult(null);
+    setError(null);
+  }, []);
+
+  const handleScrollToCompare = useCallback(() => {
+    setTimeout(() => {
+      compareButtonRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
   }, []);
 
   async function handleCompare() {
@@ -89,9 +150,6 @@ export default function StartSitPage() {
         data: { session },
       } = await supabase.auth.getSession();
 
-      // Always send an Authorization header:
-      // - Logged-in users send their JWT so premium is detected server-side
-      // - Anon users send the anon key so the function accepts the request (no 401)
       const authHeader = session?.access_token
         ? `Bearer ${session.access_token}`
         : `Bearer ${ANON_KEY}`;
@@ -120,8 +178,6 @@ export default function StartSitPage() {
         return;
       }
 
-      // Use player data returned by the edge function (has latest stats)
-      // Fall back to what we already have if missing from response
       const resultPlayerA: PlayerOption = json.playerA ?? playerA;
       const resultPlayerB: PlayerOption = json.playerB ?? playerB;
 
@@ -150,15 +206,27 @@ export default function StartSitPage() {
     setError(null);
   }
 
+  function handleShare() {
+    if (!playerA || !playerB) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("playerA", playerA.player_name.replace(/\s+/g, "-"));
+    url.searchParams.set("playerB", playerB.player_name.replace(/\s+/g, "-"));
+    navigator.clipboard.writeText(url.toString()).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
   const canCompare = !!playerA && !!playerB && !comparing;
-  const showEmptyHint = !result && !comparing && !error;
+  const showSocialProof = !result && !comparing;
+  const confidenceLabel = result ? getConfidenceLabel(result.confidence) : null;
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
       <div className="max-w-2xl mx-auto px-4 py-8 pb-28">
 
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center gap-2 mb-1">
             <Zap size={16} className="text-[#F5C84C]" />
             <span className="text-[11px] font-semibold uppercase tracking-widest text-[#F5C84C]/60">
@@ -172,7 +240,7 @@ export default function StartSitPage() {
         </div>
 
         {/* Round pill */}
-        <div className="flex items-center gap-2 mb-6">
+        <div className="flex items-center gap-2 mb-5">
           <span className="text-[11px] text-white/30 uppercase tracking-wider">Round</span>
           {roundLoading ? (
             <span className="h-6 w-16 rounded-md bg-white/[0.06] animate-pulse" />
@@ -185,7 +253,7 @@ export default function StartSitPage() {
         </div>
 
         {/* Player selectors */}
-        <div className="grid gap-3 sm:grid-cols-2 mb-5">
+        <div className="grid gap-3 sm:grid-cols-2 mb-4">
           <StartSitSelector
             label="Player A"
             value={playerA}
@@ -203,6 +271,7 @@ export default function StartSitPage() {
         {/* Action row */}
         <div className="flex items-center gap-3">
           <button
+            ref={compareButtonRef}
             onClick={handleCompare}
             disabled={!canCompare}
             className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3.5 font-bold text-sm transition-all
@@ -224,6 +293,17 @@ export default function StartSitPage() {
             )}
           </button>
 
+          {result && playerA && playerB && (
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1.5 px-4 py-3.5 rounded-xl border border-white/10 text-white/40 hover:text-white/70 hover:border-white/20 transition-all text-sm"
+              title="Copy share link"
+            >
+              {copied ? <Check size={13} className="text-emerald-400" /> : <Share2 size={13} />}
+              {copied ? "Copied" : "Share"}
+            </button>
+          )}
+
           {(result || playerA || playerB) && (
             <button
               onClick={reset}
@@ -234,6 +314,19 @@ export default function StartSitPage() {
             </button>
           )}
         </div>
+
+        {/* Confidence tier label — shown only after a result */}
+        {result && confidenceLabel && (
+          <div className="mt-2 flex items-center gap-1.5 px-1">
+            <span className={`text-xs font-semibold ${confidenceLabel.color}`}>
+              {result.confidence}% confidence
+            </span>
+            <span className="text-white/20 text-xs">·</span>
+            <span className={`text-xs ${confidenceLabel.color} opacity-70`}>
+              {confidenceLabel.label}
+            </span>
+          </div>
+        )}
 
         {/* Error banner */}
         {error && (
@@ -281,15 +374,15 @@ export default function StartSitPage() {
           </div>
         )}
 
-        {/* Empty state */}
-        {showEmptyHint && (
-          <div className="mt-10 text-center">
-            <p className="text-sm text-white/20">Select two players above to get started.</p>
-            {!isPremium && (
-              <p className="text-[11px] text-white/15 mt-1">
-                AI explanation requires Neeko+
-              </p>
-            )}
+        {/* Social proof — only shown when no result is displayed */}
+        {showSocialProof && (
+          <div className="mt-8">
+            <StartSitSocialProof
+              onFillA={handleFillA}
+              onFillB={handleFillB}
+              onFillBoth={handleFillBoth}
+              onScrollToCompare={handleScrollToCompare}
+            />
           </div>
         )}
       </div>
