@@ -158,10 +158,7 @@ export default function StartSitPage() {
       const json = await res.json();
 
       if (!res.ok || json.error) {
-        setError(
-          json.error ??
-            "Start/Sit data isn't available for this round yet. Try again shortly."
-        );
+        setError(json.error ?? "Unable to generate comparison. Please try again.");
         return;
       }
 
@@ -178,9 +175,7 @@ export default function StartSitPage() {
         playerB: resultPlayerB,
       });
     } catch {
-      setError(
-        "Start/Sit data isn't available for this round yet. Try again shortly."
-      );
+      setError("Unable to generate comparison. Please try again.");
     } finally {
       setComparing(false);
     }

@@ -211,11 +211,20 @@ Deno.serve(async (req: Request) => {
 
     const body: StartSitRequest = await req.json();
     const { season, playerAId, playerBId } = body;
-    const round_number = body.round_number ?? 1;
+    const round_number = body.round_number != null ? body.round_number : 0;
 
-    if (!playerAId || !playerBId || !season) {
+    console.log("StartSit request:", { playerAId, playerBId, round_number, season });
+
+    if (!playerAId || !playerBId) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: season, playerAId, playerBId" }),
+        JSON.stringify({ error: "Missing players" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!season) {
+      return new Response(
+        JSON.stringify({ error: "Missing season" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
