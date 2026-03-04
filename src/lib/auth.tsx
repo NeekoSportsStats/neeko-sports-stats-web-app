@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
+import { identifyUser, resetUser } from "@/lib/analytics";
 
 interface AuthContextType {
   user: User | null;
@@ -127,6 +128,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
 
       if (currentUser?.id) {
+        identifyUser({ id: currentUser.id, email: currentUser.email ?? undefined });
         setTimeout(() => { fetchPremiumStatus(currentUser.id); }, 0);
       } else {
         setIsPremium(false);
@@ -163,6 +165,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         case "SIGNED_OUT":
           console.log("🚪 AUTH EVENT: SIGNED_OUT");
+          resetUser();
           setUser(null);
           setIsPremium(false);
           setLoading(false);

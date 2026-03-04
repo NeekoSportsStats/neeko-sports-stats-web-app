@@ -45,11 +45,23 @@ export function logEvent(event: string, properties?: Record<string, unknown>) {
   });
 }
 
-export function identifyUser(userId: string, traits?: Record<string, unknown>) {
+export function identifyUser(user: { id: string; email?: string }) {
   if (typeof window === "undefined") return;
   try {
-    posthog.identify(userId, traits);
-  } catch {
-    // silently ignore
+    if (!user?.id) return;
+    posthog.identify(user.id, {
+      email: user.email ?? undefined,
+    });
+  } catch (err) {
+    console.warn("PostHog identify failed", err);
+  }
+}
+
+export function resetUser() {
+  if (typeof window === "undefined") return;
+  try {
+    posthog.reset();
+  } catch (err) {
+    console.warn("PostHog reset failed", err);
   }
 }
