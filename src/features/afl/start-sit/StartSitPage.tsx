@@ -54,7 +54,7 @@ export default function StartSitPage() {
 
   const [playerA, setPlayerA] = useState<PlayerOption | null>(null);
   const [playerB, setPlayerB] = useState<PlayerOption | null>(null);
-  const [round, setRound] = useState<number>(1);
+  const [round, setRound] = useState<number>(0);
   const [roundLoading, setRoundLoading] = useState(true);
 
   const [comparing, setComparing] = useState(false);
@@ -70,9 +70,9 @@ export default function StartSitPage() {
       .rpc("get_latest_completed_round")
       .then(({ data }) => {
         const latest = typeof data === "number" ? data : 0;
-        setRound(latest > 0 ? latest + 1 : 1);
+        setRound(latest);
       })
-      .catch(() => setRound(1))
+      .catch(() => setRound(0))
       .finally(() => setRoundLoading(false));
   }, []);
 

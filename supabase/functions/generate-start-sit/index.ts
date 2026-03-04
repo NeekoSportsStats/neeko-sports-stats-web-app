@@ -237,7 +237,7 @@ Deno.serve(async (req: Request) => {
     if (playersError || !players || players.length < 2) {
       return new Response(
         JSON.stringify({
-          error: "Start/Sit data isn't available for this round yet. Defaulting to Opening Round.",
+          error: "Player data unavailable. Please try again shortly.",
         }),
         { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
