@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Crown, ArrowRight, Star, TrendingUp, TriangleAlert as AlertTriangle, Check, Database, Cpu, Radio, Trophy, Users, ChartBar as BarChart2, Lock } from "lucide-react";
+import { Crown, ArrowRight, Star, TrendingUp, TriangleAlert as AlertTriangle, Check, Database, Cpu, Radio, Trophy, Users, ChartBar as BarChart2, Lock, Crosshair, Zap, ShieldAlert, LineChart } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { NEEKO_PRICING } from "@/config/neekoPricing";
@@ -255,7 +255,7 @@ function EdgeBoardPreview() {
             className="inline-flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3 rounded-xl hover:brightness-110 transition-all"
           >
             <Crown size={14} />
-            Unlock Full Edge Board
+            Unlock All Edge Signals
           </Link>
         </div>
       </div>
@@ -329,12 +329,19 @@ function RankingsPreview() {
                   {[6, 7].map((rank) => (
                     <div
                       key={rank}
-                      className="grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-4 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0 relative select-none"
+                      className="group grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-4 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0 relative select-none"
                     >
                       <span className="text-sm text-white/15 font-mono">{rank}</span>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 relative">
                         <Lock size={11} className="text-white/20 shrink-0" />
                         <span className="text-sm font-semibold text-white/20 blur-[3px]">Premium Player</span>
+                        <span className="ml-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#F5C84C]/10 border border-[#F5C84C]/20 text-[10px] font-bold text-[#F5C84C]/60 uppercase tracking-wide shrink-0">
+                          Neeko+ Insight
+                        </span>
+                        {/* Tooltip */}
+                        <div className="pointer-events-none absolute left-0 -top-9 w-64 bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-2 text-[11px] text-white/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-xl">
+                          Unlock full projections, value ratings and matchup analysis.
+                        </div>
                       </div>
                       <span className="text-xs text-white/15 text-center self-center blur-[3px]">XXX</span>
                       <span className="text-sm font-bold text-[#F5C84C]/20 text-right blur-[3px]">000</span>
@@ -428,6 +435,21 @@ export default function Index() {
           <p className="mt-6 text-[12px] text-[#F5C84C]/45 font-medium tracking-wide">
             Used weekly by serious AFL Fantasy coaches.
           </p>
+
+          {/* Feature bar */}
+          <div className="mt-8 flex flex-wrap justify-center gap-x-6 gap-y-2.5">
+            {[
+              { icon: Crosshair, label: "Weekly captain picks" },
+              { icon: Zap,       label: "Breakout alerts" },
+              { icon: ShieldAlert, label: "Trap warnings" },
+              { icon: LineChart, label: "Advanced player projections" },
+            ].map(({ icon: Icon, label }) => (
+              <div key={label} className="flex items-center gap-1.5">
+                <Icon size={12} className="text-[#F5C84C]/50 shrink-0" />
+                <span className="text-[12px] text-[#F5C84C]/50 font-medium">{label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -598,6 +620,10 @@ export default function Index() {
                 </div>
               ))}
             </div>
+
+            <p className="text-center text-xs text-white/20 mt-8">
+              No ads. No noise. Just structured fantasy insights.
+            </p>
           </div>
         </section>
       )}
@@ -616,7 +642,7 @@ export default function Index() {
               Ready to gain the edge this season?
             </h2>
             <p className="text-white/40 text-base mb-8 max-w-sm mx-auto">
-              Full AI analysis, captain signals and advanced rankings — updated every round.
+              Updated every round before lockout — so you can make smarter captain and trade decisions.
             </p>
             <Link
               to="/neeko-plus"
