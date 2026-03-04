@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, RefreshCw, Clock, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, Clock, CircleCheck as CheckCircle, Circle as XCircle, Loader as Loader2 } from "lucide-react";
 
 interface QueueStatus {
   sport: string;
