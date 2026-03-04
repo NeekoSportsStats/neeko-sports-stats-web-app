@@ -5,22 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import {
-  RefreshCw,
-  Shield,
-  Database,
-  Zap,
-  Activity,
-  CheckCircle,
-  AlertTriangle,
-  XCircle,
-  Clock,
-  TrendingUp,
-  Server,
-  Bot,
-  BarChart3,
-  Layers,
-} from "lucide-react";
+import { RefreshCw, Shield, Database, Zap, Activity, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, TrendingUp, Server, Bot, ChartBar as BarChart3, Layers } from "lucide-react";
 
 const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
 
