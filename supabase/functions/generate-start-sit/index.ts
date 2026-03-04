@@ -214,13 +214,24 @@ Deno.serve(async (req: Request) => {
     // Coerce IDs to numbers — v_rankings_master.player_id is an integer column
     const playerAId = Number(body.playerAId);
     const playerBId = Number(body.playerBId);
-    const round_number = body.round_number != null ? body.round_number : 0;
+    // round_number 0 = Opening Round — must not be treated as falsy
+    const round_number = body.round_number !== undefined && body.round_number !== null
+      ? body.round_number
+      : 0;
 
-    console.log("StartSit request:", { playerAId, playerBId, round_number, season });
+    console.log("StartSit request payload:", { playerAId, playerBId, round_number, season });
 
-    if (!playerAId || !playerBId) {
+    if (playerAId === undefined || playerAId === null || isNaN(playerAId) ||
+        playerBId === undefined || playerBId === null || isNaN(playerBId)) {
       return new Response(
         JSON.stringify({ error: "Missing players" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (round_number === undefined || round_number === null) {
+      return new Response(
+        JSON.stringify({ error: "Missing round_number" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
