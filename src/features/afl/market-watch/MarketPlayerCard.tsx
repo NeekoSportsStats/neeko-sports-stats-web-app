@@ -1,6 +1,7 @@
-import { Lock } from "lucide-react";
+import { Lock, Flame } from "lucide-react";
 import { MarketRow } from "./types";
 import { fmtPrice, fmtNum, signalColor, momentumColor, riskColor, positionBadge } from "./helpers";
+import { track } from "@/lib/analytics";
 
 interface Props {
   row: MarketRow;
@@ -13,13 +14,16 @@ interface Props {
 export function MarketPlayerCard({ row, locked, onUnlock, tab, rank }: Props) {
   const momentum = Number(row.price_momentum ?? 0);
   const momentumStr = momentum >= 0 ? `+${fmtNum(momentum, 1)}` : fmtNum(momentum, 1);
+  const isBreakout = row.breakout_flag === true;
 
   return (
     <div
       className={`relative rounded-xl border transition-all duration-200 ${
         locked
           ? "border-white/5 bg-white/[0.02] opacity-60 blur-[2px] pointer-events-none select-none"
-          : "border-white/8 bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/12"
+          : isBreakout
+            ? "border-orange-400/20 bg-orange-400/[0.02] hover:bg-orange-400/[0.04] hover:border-orange-400/30"
+            : "border-white/8 bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/12"
       }`}
     >
       <div className="p-4">
@@ -40,6 +44,15 @@ export function MarketPlayerCard({ row, locked, onUnlock, tab, rank }: Props) {
             {row.trade_signal && (
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${signalColor(row.trade_signal)}`}>
                 {row.trade_signal}
+              </span>
+            )}
+            {isBreakout && (
+              <span
+                className="flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded border text-orange-400 bg-orange-400/10 border-orange-400/25 cursor-pointer"
+                onClick={() => track("market_breakout_click", { player_name: row.player_name, breakout_score: row.breakout_score })}
+              >
+                <Flame className="h-2.5 w-2.5" />
+                BREAKOUT
               </span>
             )}
           </div>
@@ -71,6 +84,18 @@ export function MarketPlayerCard({ row, locked, onUnlock, tab, rank }: Props) {
             valueClass={riskColor(row.risk_rating)}
           />
         </div>
+
+        {isBreakout && row.breakout_score != null && (
+          <div className="mt-2 pt-2 border-t border-orange-400/10 flex items-center justify-between">
+            <div className="flex items-center gap-1 text-[10px] text-orange-400/70">
+              <Flame className="h-3 w-3" />
+              <span>Breakout Score</span>
+            </div>
+            <span className="text-sm font-bold tabular-nums text-orange-400">
+              {fmtNum(row.breakout_score, 0)}
+            </span>
+          </div>
+        )}
 
         {tab === "buy" || tab === "sell" ? (
           <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
