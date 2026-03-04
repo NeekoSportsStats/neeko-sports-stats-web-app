@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { TrendingUp, RefreshCw, Crown, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
@@ -30,10 +30,11 @@ interface V2Data {
 }
 
 export default function MarketWatchPage() {
-  const { isPremium } = useAuth();
+  const { isPremium, loading: authLoading } = useAuth();
 
   const [data, setData] = useState<V2Data>({ players: [], trades: [], summaryCards: [] });
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
+  const fetchedRef = useRef(false);
 
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -50,12 +51,12 @@ export default function MarketWatchPage() {
   const [showMoreCashCows, setShowMoreCashCows] = useState(false);
   const [showMoreFades, setShowMoreFades] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (premium: boolean) => {
+    setDataLoading(true);
     try {
       const [playersRes, tradesRes, cardsRes] = await Promise.all([
-        supabase.from("v_mw_premium").select("*").limit(isPremium ? 100 : 20),
-        supabase.from("v_mw_best_trades").select("*").limit(isPremium ? 10 : 4),
+        supabase.from("v_mw_premium").select("*").limit(premium ? 100 : 20),
+        supabase.from("v_mw_best_trades").select("*").limit(premium ? 10 : 4),
         supabase.from("v_mw_summary_cards").select("*"),
       ]);
 
@@ -65,9 +66,9 @@ export default function MarketWatchPage() {
         summaryCards: (cardsRes.data ?? []) as MWSummaryCard[],
       });
     } finally {
-      setLoading(false);
+      setDataLoading(false);
     }
-  }, [isPremium]);
+  }, []);
 
   const fetchCounts = useCallback(async () => {
     try {
@@ -83,16 +84,19 @@ export default function MarketWatchPage() {
 
   const handleRefresh = useCallback(() => {
     track("market_watch_refresh_click");
-    fetchData();
+    fetchData(isPremium);
     fetchCounts();
-  }, [fetchData, fetchCounts]);
+  }, [fetchData, fetchCounts, isPremium]);
 
   useEffect(() => { track("market_watch_view"); }, []);
 
   useEffect(() => {
-    fetchData().then(() => setLastUpdated(new Date()));
+    if (authLoading) return;
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+    fetchData(isPremium).then(() => setLastUpdated(new Date()));
     fetchCounts();
-  }, [fetchData, fetchCounts]);
+  }, [authLoading, isPremium, fetchData, fetchCounts]);
 
   useEffect(() => {
     const sectionIds = [
@@ -143,7 +147,7 @@ export default function MarketWatchPage() {
   const visibleCashCows     = limitFree(cashCows,     SECTION_LIMITS.cashCows,     showMoreCashCows);
   const visibleFades        = limitFree(fades,        SECTION_LIMITS.fades,        showMoreFades);
 
-  if (loading) {
+  if (authLoading || dataLoading) {
     return <MarketWatchSkeleton />;
   }
 
