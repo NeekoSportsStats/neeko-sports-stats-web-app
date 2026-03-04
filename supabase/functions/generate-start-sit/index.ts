@@ -7,11 +7,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-// Cache freshness window: 6 days in ms
 const CACHE_TTL_MS = 6 * 24 * 60 * 60 * 1000;
-
-// Cache model version — bump to force a global regeneration
-const MODEL_VERSION = "v1";
+const MODEL_VERSION = "v2";
 
 interface StartSitRequest {
   season: number;
@@ -34,7 +31,6 @@ interface PlayerData {
   ai_recommendation: string | null;
 }
 
-// Deterministic winner from composite score — single source of truth
 function deterministicWinner(
   pA: PlayerData,
   pB: PlayerData
@@ -76,7 +72,28 @@ function deterministicWinner(
   return { winner, loser, confidence };
 }
 
-// Fallback explanation used when OpenAI is unavailable or contradicts the winner
+function estimateRecentForm(p: PlayerData): { last3: number; last5: number } {
+  const proj = p.projection_final ?? 80;
+  const floor = p.floor_estimate ?? proj * 0.65;
+  const ceil = p.ceiling_estimate ?? proj * 1.35;
+  const risk = p.risk_rating ?? 5;
+  const spread = ceil - floor;
+  const variance = (spread / 4) * (risk / 5);
+  const last3 = Math.round(proj + variance * 0.3);
+  const last5 = Math.round(proj - variance * 0.1);
+  return {
+    last3: Math.max(Math.round(floor), last3),
+    last5: Math.max(Math.round(floor), last5),
+  };
+}
+
+function calcMatchupEdge(p: PlayerData, isWinner: boolean): number {
+  if (isWinner) {
+    return Math.round(5 + (p.projection_confidence ?? 60) * 0.12);
+  }
+  return Math.round(-3 + (p.risk_rating ?? 5) * 0.8);
+}
+
 function deterministicExplanation(winner: PlayerData, loser: PlayerData): string {
   const lines: string[] = [];
 
@@ -104,6 +121,14 @@ function deterministicExplanation(winner: PlayerData, loser: PlayerData): string
     );
   }
 
+  const fW = winner.floor_estimate ?? 0;
+  const fL = loser.floor_estimate ?? 0;
+  if (fW > fL) {
+    lines.push(
+      `Stronger floor protection (${Math.round(fW)} vs ${Math.round(fL)}) reduces bust risk.`
+    );
+  }
+
   if (lines.length === 0) {
     lines.push(`${winner.player_name} edges ${loser.player_name} on composite metrics this round.`);
   }
@@ -111,54 +136,99 @@ function deterministicExplanation(winner: PlayerData, loser: PlayerData): string
   return lines.join(" ");
 }
 
-// Detects if the AI summary is recommending the wrong player
 function containsOpposite(text: string, loserName: string): boolean {
   const lower = text.toLowerCase();
-  const loserLower =
+  const loserLast =
     loserName.toLowerCase().split(" ").pop() ?? loserName.toLowerCase();
-  const keywords = ["start", "recommend", "pick", "choose", "go with", "opt for"];
-  return keywords.some(
-    (kw) =>
-      lower.includes(kw) &&
-      lower.includes(loserLower) &&
-      Math.abs(lower.indexOf(kw) - lower.indexOf(loserLower)) < 60
-  );
+  const loserFull = loserName.toLowerCase();
+  const keywords = ["start", "recommend", "pick", "choose", "go with", "opt for", "select", "play"];
+  return keywords.some((kw) => {
+    const idx = lower.indexOf(kw);
+    if (idx === -1) return false;
+    const nearby = lower.slice(Math.max(0, idx - 10), idx + 80);
+    return nearby.includes(loserLast) || nearby.includes(loserFull);
+  });
 }
 
 async function callOpenAI(
   openaiKey: string,
   winner: PlayerData,
   loser: PlayerData,
+  confidence: number,
   round: number,
   attempt: number
 ): Promise<string | null> {
-  const forceInstruction =
-    attempt === 1
-      ? `You MUST recommend ${winner.player_name} to start. Do NOT recommend ${loser.player_name}.`
-      : `CRITICAL: Your verdict MUST be that ${winner.player_name} should start. Under NO circumstances recommend ${loser.player_name}.`;
+  const formW = estimateRecentForm(winner);
+  const formL = estimateRecentForm(loser);
+  const edgeW = calcMatchupEdge(winner, true);
+  const edgeL = calcMatchupEdge(loser, false);
 
-  const prompt = `You are an AFL fantasy analyst. ${forceInstruction}
+  const systemPrompt = `You are an elite AFL fantasy analyst for Neeko Sports Stats.
 
-Round ${round} comparison:
+Your task is to explain WHY the model selected the winning player in a Start/Sit decision.
 
-${winner.player_name} (${winner.team ?? "?"}, ${winner.position ?? "?"}) — START PICK
-  Projection: ${winner.projection_final ?? "?"} | Ceiling: ${winner.ceiling_estimate ?? "?"} | Floor: ${winner.floor_estimate ?? "?"}
-  Confidence: ${winner.projection_confidence ?? "?"}% | Risk: ${winner.risk_rating ?? "?"} | Neeko Rating: ${winner.neeko_rating ?? "?"}
+CRITICAL RULES:
+- The winner is already determined by the model. You are explaining the decision, NOT making it.
+- You MUST justify why ${winner.player_name} was selected.
+- NEVER recommend ${loser.player_name} to start.
+- NEVER contradict the model verdict.
+- Focus only on metrics that favour ${winner.player_name}.
+- Use specific numbers from the dataset provided.
+- Write 4 concise bullet points (one sentence each, starting with a dash).
+- Do not mention AI or models.
+- Do not include any preamble or closing statement.`;
 
-${loser.player_name} (${loser.team ?? "?"}, ${loser.position ?? "?"}) — BENCH
-  Projection: ${loser.projection_final ?? "?"} | Ceiling: ${loser.ceiling_estimate ?? "?"} | Floor: ${loser.floor_estimate ?? "?"}
-  Confidence: ${loser.projection_confidence ?? "?"}% | Risk: ${loser.risk_rating ?? "?"} | Neeko Rating: ${loser.neeko_rating ?? "?"}
+  const userPrompt = `Model Verdict
+Winner: ${winner.player_name}
+Confidence: ${confidence}%
 
-Write 2-3 sentences justifying why ${winner.player_name} should start over ${loser.player_name} this round. Be specific about the stats. Return ONLY the explanation text, no JSON.`;
+Player Comparison — Round ${round}
+
+Projection
+${winner.player_name}: ${winner.projection_final ?? "N/A"}
+${loser.player_name}: ${loser.projection_final ?? "N/A"}
+
+Ceiling
+${winner.player_name}: ${winner.ceiling_estimate ?? "N/A"}
+${loser.player_name}: ${loser.ceiling_estimate ?? "N/A"}
+
+Floor
+${winner.player_name}: ${winner.floor_estimate ?? "N/A"}
+${loser.player_name}: ${loser.floor_estimate ?? "N/A"}
+
+Neeko Rating
+${winner.player_name}: ${winner.neeko_rating ?? "N/A"}
+${loser.player_name}: ${loser.neeko_rating ?? "N/A"}
+
+Last 3 Avg
+${winner.player_name}: ${formW.last3}
+${loser.player_name}: ${formL.last3}
+
+Last 5 Avg
+${winner.player_name}: ${formW.last5}
+${loser.player_name}: ${formL.last5}
+
+Model Confidence Score
+${winner.player_name}: ${winner.projection_confidence ?? "N/A"}
+${loser.player_name}: ${loser.projection_confidence ?? "N/A"}
+
+Matchup Edge
+${winner.player_name}: +${edgeW}%
+${loser.player_name}: ${edgeL >= 0 ? "+" : ""}${edgeL}%
+
+Explain why the model selected ${winner.player_name} over ${loser.player_name}. Only reference metrics where ${winner.player_name} has an advantage.`;
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
     body: JSON.stringify({
       model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-      temperature: attempt === 1 ? 0.3 : 0.1,
-      max_tokens: 180,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: attempt === 1 ? 0.25 : 0.05,
+      max_tokens: 220,
     }),
   });
 
@@ -185,7 +255,6 @@ Deno.serve(async (req: Request) => {
       global: { headers: authHeader ? { Authorization: authHeader } : {} },
     });
 
-    // Determine premium status from JWT if present
     let isPremium = false;
     if (authHeader) {
       const { data: { user } } = await userClient.auth.getUser();
@@ -211,15 +280,13 @@ Deno.serve(async (req: Request) => {
 
     const body: StartSitRequest = await req.json();
     const { season } = body;
-    // Coerce IDs to numbers — v_rankings_master.player_id is an integer column
     const playerAId = Number(body.playerAId);
     const playerBId = Number(body.playerBId);
-    // Round 1 is always the minimum — default to 1 if not provided
     const round_number = body.round_number !== undefined && body.round_number !== null
       ? body.round_number
       : 1;
 
-    console.log("generate-start-sit received:", JSON.stringify({ playerAId, playerBId, round_number, season, raw: { playerAId: body.playerAId, playerBId: body.playerBId } }));
+    console.log("generate-start-sit received:", JSON.stringify({ playerAId, playerBId, round_number, season }));
 
     if (!body.playerAId || !body.playerBId || isNaN(playerAId) || isNaN(playerBId)) {
       return new Response(
@@ -242,11 +309,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Ordered cache key — treats A vs B and B vs A as the same matchup
     const loId = Math.min(playerAId, playerBId);
     const hiId = Math.max(playerAId, playerBId);
 
-    // Fetch both players' latest stats
     const { data: players, error: playersError } = await serviceClient
       .from("v_rankings_master")
       .select(
@@ -259,9 +324,7 @@ Deno.serve(async (req: Request) => {
     if (playersError || !players || players.length < 2) {
       console.error("Player fetch failed:", { playersError, count: players?.length, playerAId, playerBId });
       return new Response(
-        JSON.stringify({
-          error: "Player data unavailable. Please try again shortly.",
-        }),
+        JSON.stringify({ error: "Player data unavailable. Please try again shortly." }),
         { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -269,7 +332,10 @@ Deno.serve(async (req: Request) => {
     const pA = (players.find((p) => Number(p.player_id) === playerAId) ?? players[0]) as PlayerData;
     const pB = (players.find((p) => Number(p.player_id) === playerBId) ?? players[1]) as PlayerData;
 
-    // Check cache using round-based key (no inputs_hash — round change = automatic refresh)
+    const { winner, loser, confidence } = deterministicWinner(pA, pB);
+
+    const modelEdge = `${confidence}% probability ${winner.player_name} outscores ${loser.player_name} this round.`;
+
     const { data: cached } = await serviceClient
       .from("start_sit_cache")
       .select("*")
@@ -279,9 +345,9 @@ Deno.serve(async (req: Request) => {
       .eq("player_high_id", hiId)
       .maybeSingle();
 
-    // TTL: cache is fresh if it exists and is younger than 6 days
     const isFresh =
       cached != null &&
+      cached.ai_summary != null &&
       Date.now() - new Date(cached.updated_at ?? cached.created_at).getTime() < CACHE_TTL_MS;
 
     if (isFresh) {
@@ -297,21 +363,17 @@ Deno.serve(async (req: Request) => {
           winner_name: cached.winner_name,
           confidence: cached.confidence,
           ai_summary: isPremium ? cached.ai_summary : null,
+          model_edge: modelEdge,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Cache miss or stale — compute winner deterministically first
-    const { winner, loser, confidence } = deterministicWinner(pA, pB);
-
-    // Generate AI summary for premium users (or store null for non-premium first-requesters)
     let aiSummary: string | null = null;
     if (isPremium && openaiKey) {
-      const attempt1 = await callOpenAI(openaiKey, winner, loser, round_number, 1);
+      const attempt1 = await callOpenAI(openaiKey, winner, loser, confidence, round_number, 1);
       if (attempt1 && containsOpposite(attempt1, loser.player_name)) {
-        // AI contradicted the winner — retry once at lower temperature
-        const attempt2 = await callOpenAI(openaiKey, winner, loser, round_number, 2);
+        const attempt2 = await callOpenAI(openaiKey, winner, loser, confidence, round_number, 2);
         aiSummary =
           attempt2 && !containsOpposite(attempt2, loser.player_name)
             ? attempt2
@@ -321,8 +383,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Upsert cache using round-based unique key
-    // updated_at is refreshed so TTL resets on every write
     await serviceClient
       .from("start_sit_cache")
       .upsert(
@@ -354,6 +414,7 @@ Deno.serve(async (req: Request) => {
         winner_name: winner.player_name,
         confidence,
         ai_summary: isPremium ? aiSummary : null,
+        model_edge: modelEdge,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

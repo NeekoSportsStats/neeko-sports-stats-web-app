@@ -30,6 +30,7 @@ interface CompareResult {
   winner_name: string;
   confidence: number;
   ai_summary: string | null;
+  model_edge: string | null;
   is_cached: boolean;
   playerA: PlayerOption;
   playerB: PlayerOption;
@@ -183,6 +184,7 @@ export default function StartSitPage() {
         winner_name: json.winner_name,
         confidence: typeof json.confidence === "number" ? json.confidence : 60,
         ai_summary: json.ai_summary ?? null,
+        model_edge: json.model_edge ?? null,
         is_cached: json.is_cached ?? false,
         playerA: resultPlayerA,
         playerB: resultPlayerB,
@@ -357,6 +359,7 @@ export default function StartSitPage() {
             winnerPlayerId={result.winner_player_id}
             confidence={result.confidence}
             aiSummary={result.ai_summary}
+            modelEdge={result.model_edge}
             isPremium={isPremium}
             onUpgrade={() => navigate("/neeko-plus")}
           />

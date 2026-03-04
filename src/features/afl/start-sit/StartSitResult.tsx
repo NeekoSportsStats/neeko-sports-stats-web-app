@@ -26,6 +26,7 @@ interface StartSitResultProps {
   winnerPlayerId: string;
   confidence: number;
   aiSummary: string | null;
+  modelEdge: string | null;
   isPremium: boolean;
   onUpgrade: () => void;
 }
@@ -243,6 +244,7 @@ export function StartSitResult({
   winnerPlayerId,
   confidence,
   aiSummary,
+  modelEdge,
   isPremium,
   onUpgrade,
 }: StartSitResultProps) {
@@ -474,6 +476,12 @@ export function StartSitResult({
           <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-3">
             Why the model prefers {winner.player_name.split(" ").pop()}
           </p>
+          {modelEdge && (
+            <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-[#F5C84C]/[0.07] border border-[#F5C84C]/15">
+              <Zap size={10} className="text-[#F5C84C] shrink-0" />
+              <p className="text-xs font-semibold text-[#F5C84C]/80 leading-snug">{modelEdge}</p>
+            </div>
+          )}
           {bullets.length > 0 ? (
             <ul className="space-y-2">
               {bullets.map((b, i) => (
@@ -493,6 +501,12 @@ export function StartSitResult({
             <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-2">
               Why the model prefers {winner.player_name.split(" ").pop()}
             </p>
+            {modelEdge && (
+              <div className="flex items-center gap-2 mb-2.5 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.07]">
+                <Zap size={10} className="text-[#F5C84C] shrink-0" />
+                <p className="text-xs text-white/50 leading-snug">{modelEdge}</p>
+              </div>
+            )}
             <p className="text-sm text-white/55 leading-snug">{teaserLine}</p>
           </div>
           <div className="border-t border-white/[0.06] px-5 py-3 flex items-center gap-2">
