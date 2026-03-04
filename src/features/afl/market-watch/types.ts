@@ -26,8 +26,6 @@ export interface MarketRow {
   breakout_flag: boolean | null;
   volatility_score: number | null;
   volatility_level: "LOW" | "MEDIUM" | "HIGH" | null;
-  breakout_score: number | null;
-  breakout_flag: boolean | null;
 }
 
 export type MarketTab = "buy" | "sell" | "cashcow" | "trap";
@@ -48,14 +46,12 @@ export interface MWPlayerRow {
   expected_price_change: number;
   projected_price: number | null;
   projected_price_r1: number | null;
-  breakout_score: number | null;
-  breakout_flag: boolean | null;
-  volatility_score: number | null;
-  volatility_level: "LOW" | "MEDIUM" | "HIGH" | null;
   projected_price_r2: number | null;
   projected_price_r3: number | null;
   breakout_score: number | null;
   breakout_flag: boolean | null;
+  volatility_score: number | null;
+  volatility_level: "LOW" | "MEDIUM" | "HIGH" | null;
   category: "buy" | "sell_now" | "sell_consider" | "cash_cow" | "fade" | "monitor";
   action: "BUY" | "SELL" | "HOLD";
   trade_score: number;
@@ -110,3 +106,10 @@ export interface MWSummaryCard {
 }
 
 export type MWCategory = "buy" | "sell_now" | "sell_consider" | "cash_cow" | "fade" | "monitor";
+
+export interface MWAISummary {
+  season: number;
+  round_number: number;
+  generated_at: string;
+  summary: string;
+}
