@@ -5,10 +5,11 @@ export function initAnalytics() {
   if (typeof window === "undefined") return;
 
   const key = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
-  if (!key || key === "your_posthog_project_key") return;
+  const host = (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ?? "https://eu.i.posthog.com";
+  if (!key) return;
 
   posthog.init(key, {
-    api_host: "https://app.posthog.com",
+    api_host: host,
     capture_pageview: false,
     persistence: "localStorage",
   });
