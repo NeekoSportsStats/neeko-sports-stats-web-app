@@ -210,7 +210,10 @@ Deno.serve(async (req: Request) => {
     }
 
     const body: StartSitRequest = await req.json();
-    const { season, playerAId, playerBId } = body;
+    const { season } = body;
+    // Coerce IDs to numbers — v_rankings_master.player_id is an integer column
+    const playerAId = Number(body.playerAId);
+    const playerBId = Number(body.playerBId);
     const round_number = body.round_number != null ? body.round_number : 0;
 
     console.log("StartSit request:", { playerAId, playerBId, round_number, season });
@@ -230,8 +233,8 @@ Deno.serve(async (req: Request) => {
     }
 
     // Ordered cache key — treats A vs B and B vs A as the same matchup
-    const loId = playerAId < playerBId ? playerAId : playerBId;
-    const hiId = playerAId < playerBId ? playerBId : playerAId;
+    const loId = Math.min(playerAId, playerBId);
+    const hiId = Math.max(playerAId, playerBId);
 
     // Fetch both players' latest stats
     const { data: players, error: playersError } = await serviceClient
@@ -244,6 +247,7 @@ Deno.serve(async (req: Request) => {
       .in("player_id", [playerAId, playerBId]);
 
     if (playersError || !players || players.length < 2) {
+      console.error("Player fetch failed:", { playersError, count: players?.length, playerAId, playerBId });
       return new Response(
         JSON.stringify({
           error: "Player data unavailable. Please try again shortly.",
@@ -252,8 +256,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const pA = (players.find((p) => p.player_id === playerAId) ?? players[0]) as PlayerData;
-    const pB = (players.find((p) => p.player_id === playerBId) ?? players[1]) as PlayerData;
+    const pA = (players.find((p) => Number(p.player_id) === playerAId) ?? players[0]) as PlayerData;
+    const pB = (players.find((p) => Number(p.player_id) === playerBId) ?? players[1]) as PlayerData;
 
     // Check cache using round-based key (no inputs_hash — round change = automatic refresh)
     const { data: cached } = await serviceClient
