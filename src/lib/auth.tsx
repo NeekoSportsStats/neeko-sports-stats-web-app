@@ -162,7 +162,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           break;
 
         case "SIGNED_IN":
-          if (initialSessionSeenRef.current) break;
           applySession(session, event);
           break;
 
