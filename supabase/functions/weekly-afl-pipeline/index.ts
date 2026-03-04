@@ -135,13 +135,22 @@ Deno.serve(async (req: Request) => {
       return { rows_refreshed: data };
     });
 
-    // ── Step 9: Regenerate AI rankings & recommendations ─────────────────────
-    await runStep("9_generate_ai", async () => {
+    // ── Step 9: Refresh player volatility model ───────────────────────────────
+    await runStep("9_refresh_volatility", async () => {
+      const { data, error } = await db.schema("afl").rpc(
+        "fn_refresh_player_volatility"
+      );
+      if (error) throw new Error(error.message);
+      return { rows_upserted: data };
+    });
+
+    // ── Step 10: Regenerate AI rankings & recommendations ────────────────────
+    await runStep("10_generate_ai", async () => {
       return callFn("generate-all-ai", {});
     }, skipAI);
 
-    // ── Step 10: Clean up stale Start/Sit cache ───────────────────────────────
-    await runStep("10_cleanup_start_sit_cache", async () => {
+    // ── Step 11: Clean up stale Start/Sit cache ───────────────────────────────
+    await runStep("11_cleanup_start_sit_cache", async () => {
       const { data, error } = await db.rpc("fn_cleanup_stale_start_sit_cache");
       if (error) throw new Error(error.message);
       return { rows_deleted: data };
