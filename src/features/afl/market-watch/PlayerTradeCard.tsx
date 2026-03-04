@@ -54,7 +54,7 @@ export function PlayerTradeCard({ row, locked, onUnlock, onCompare, rank }: Prop
         <StatCell label="Price"      value={fmtPrice(row.price)} />
       </div>
 
-      <div className="grid grid-cols-3 gap-1.5 mb-3">
+      <div className="grid grid-cols-3 gap-1.5 mb-1.5">
         <StatCell
           label="Price Edge"
           value={`${edgePts >= 0 ? "+" : ""}${fmtNum(edgePts, 1)} pts`}
@@ -71,6 +71,16 @@ export function PlayerTradeCard({ row, locked, onUnlock, onCompare, rank }: Prop
           valueClass={riskColor(row.risk_pct)}
         />
       </div>
+
+      {row.projected_price != null && (
+        <div className="grid grid-cols-1 gap-1.5 mb-3">
+          <StatCell
+            label="Proj. Price After Round"
+            value={fmtPrice(row.projected_price)}
+            valueClass={priceChangeColor(expChange)}
+          />
+        </div>
+      )}
 
       <div className="border-t border-white/5 pt-2.5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">

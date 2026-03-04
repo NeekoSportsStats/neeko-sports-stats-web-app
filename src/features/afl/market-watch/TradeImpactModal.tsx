@@ -217,6 +217,13 @@ function ComparisonPanel({ out, inn }: { out: MWPlayerRow; inn: MWPlayerRow }) {
       higherIsBetter: true,
     },
     {
+      label: "Proj. Price After Round",
+      outVal: fmtPrice(out.projected_price ?? out.price),
+      inVal: fmtPrice(inn.projected_price ?? inn.price),
+      delta: (inn.projected_price ?? inn.price) - (out.projected_price ?? out.price),
+      higherIsBetter: true,
+    },
+    {
       label: "Risk %",
       outVal: `${fmtNum(out.risk_pct, 0)}%`,
       inVal: `${fmtNum(inn.risk_pct, 0)}%`,

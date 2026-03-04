@@ -40,6 +40,7 @@ export interface MWPlayerRow {
   risk_pct: number;
   price_edge_pts: number;
   expected_price_change: number;
+  projected_price: number | null;
   category: "buy" | "sell_now" | "sell_consider" | "cash_cow" | "fade" | "monitor";
   action: "BUY" | "SELL" | "HOLD";
   trade_score: number;
