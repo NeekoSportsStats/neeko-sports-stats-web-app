@@ -1053,7 +1053,7 @@ export default function AFLRoundEdgeBoard() {
 
       <div className="max-w-5xl mx-auto">
 
-        {/* Page header */}
+        {/* ── Page header ─────────────────────────────────────────────────── */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-1">
             <Zap size={15} className="text-[#F5C84C]" />
@@ -1074,7 +1074,6 @@ export default function AFLRoundEdgeBoard() {
             Captain edges, breakout value and trap alerts — ranked by impact.
           </p>
 
-          {/* Social proof */}
           <div className="flex items-center gap-1.5 mt-3">
             <Users size={11} className="text-white/25" />
             <p className="text-[11px] text-white/30">
@@ -1082,7 +1081,6 @@ export default function AFLRoundEdgeBoard() {
             </p>
           </div>
 
-          {/* Edge count indicator */}
           {rows.length > 0 && (
             <div className="mt-3 flex items-center gap-2">
               <div className="flex items-center gap-1.5 rounded-full border border-[#F5C84C]/25 bg-[#F5C84C]/[0.07] px-3 py-1">
@@ -1094,7 +1092,6 @@ export default function AFLRoundEdgeBoard() {
             </div>
           )}
 
-          {/* Model performance bar */}
           <div className="mt-4 flex items-center gap-3 flex-wrap">
             <p className="text-[10px] text-white/25 uppercase tracking-widest shrink-0">Edge Model Performance (2025)</p>
             <div className="flex items-center gap-2 flex-wrap">
@@ -1117,34 +1114,9 @@ export default function AFLRoundEdgeBoard() {
 
           <OpeningRoundBanner />
           <ModelAuthoritySection />
-
-          {!isPremium && (
-            <div className="mt-4 flex items-center gap-3 rounded-xl border border-[#F5C84C]/20 bg-[#F5C84C]/[0.04] px-4 py-3">
-              <Crown size={14} className="text-[#F5C84C] shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-white/80">
-                  4 decision-shifting signals locked.
-                </p>
-                <p className="text-[11px] text-white/40 mt-0.5">
-                  Two flagged as captain leverage plays.
-                </p>
-              </div>
-              <div className="shrink-0 flex flex-col items-end gap-1">
-                <a
-                  href="/neeko-plus"
-                  className="text-xs font-bold text-black bg-[#F5C84C] rounded-lg px-3 py-1.5 hover:brightness-110 transition-all whitespace-nowrap border border-[#F5C84C]/60 animate-pulse-gold-border"
-                >
-                  Unlock All Edge Signals
-                </a>
-                <p className="text-[10px] text-white/25 text-right leading-tight">
-                  Includes leverage pivots, overprice alerts &amp; upside differentials.
-                </p>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Edge Model Report */}
+        {/* ── Edge Model Report ────────────────────────────────────────────── */}
         {rows.length > 0 && (
           <div className="mb-8 rounded-xl border border-white/[0.07] bg-white/[0.02] p-5">
             <div className="flex items-center gap-2 mb-4">
@@ -1174,7 +1146,7 @@ export default function AFLRoundEdgeBoard() {
           </div>
         )}
 
-        {/* Hero signal panel */}
+        {/* ── Top 3 Edge Signals (all users) ──────────────────────────────── */}
         <HeroSignalPanel
           captainRow={captainRows[0] ?? null}
           breakoutRow={breakoutRows[0] ?? null}
@@ -1183,143 +1155,71 @@ export default function AFLRoundEdgeBoard() {
           onUnlock={() => setShowUpgrade(true)}
         />
 
-        {/* Full Edge Analysis header */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex items-center gap-2">
-            <div className="w-1 h-6 rounded-full bg-[#F5C84C]/60" />
-            <h2 className="text-sm font-bold text-white">Full Edge Analysis</h2>
-          </div>
-          <div className="flex-1 h-px bg-white/[0.06]" />
-          <span className="text-[10px] text-white/20 uppercase tracking-widest shrink-0">
-            {isPremium ? "All signals unlocked" : "AI reasoning locked"}
-          </span>
-        </div>
-
-        {/* Sections */}
-        <div className="space-y-10">
-          {sections.map(({ key, data }) => {
-            if (data.length === 0) return null;
-
-            const lockedCount = !isPremium ? Math.max(0, data.length - FREE_VISIBLE) : 0;
-
-            return (
-              <section key={key}>
-                <SectionHeader section={key} count={Math.min(data.length, PREMIUM_VISIBLE)} />
-
-                {/* Mobile: horizontal scroll carousel */}
-                <div className="md:hidden">
-                  <CardCarousel
-                    rows={data}
-                    section={key}
-                    visible={visible}
-                    isPremium={isPremium}
-                    onUnlock={() => setShowUpgrade(true)}
-                  />
-                </div>
-
-                {/* Desktop: stacked feature + 2-col grid */}
-                <div className="hidden md:block">
-                  <DesktopGrid
-                    rows={data}
-                    section={key}
-                    visible={visible}
-                    isPremium={isPremium}
-                    onUnlock={() => setShowUpgrade(true)}
-                  />
-                </div>
-
-                {!isPremium && lockedCount > 0 && (
-                  <SectionLockFooter
-                    count={lockedCount}
-                    section={key}
-                    onUnlock={() => setShowUpgrade(true)}
-                  />
-                )}
-              </section>
-            );
-          })}
-        </div>
-
-        {/* Additional locked signals — ghost cards for free users */}
+        {/* ── Paywall wall for free users ──────────────────────────────────── */}
         {!isPremium && (
-          <div className="mt-10">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-1 h-6 rounded-full bg-white/15" />
-                <h2 className="text-sm font-bold text-white/40">Additional Edge Signals</h2>
-              </div>
-              <div className="flex-1 h-px bg-white/[0.05]" />
-              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-[#F5C84C]/25 bg-[#F5C84C]/[0.06] shrink-0">
-                <Crown size={9} className="text-[#F5C84C]" />
-                <span className="text-[9px] font-bold text-[#F5C84C] tracking-wide uppercase">Neeko+ Only</span>
-              </div>
+          <div className="mb-10 rounded-2xl border border-[#F5C84C]/25 bg-[#F5C84C]/[0.04] p-6 text-center">
+            <div className="flex items-center justify-center w-11 h-11 rounded-full border border-[#F5C84C]/30 bg-[#F5C84C]/10 mx-auto mb-4">
+              <Crown size={20} className="text-[#F5C84C]" />
             </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {(
-                [
-                  { n: 4, type: "Captain Edge", pos: "MID", price: "$712k", posStyle: "bg-blue-500/20 text-blue-300" },
-                  { n: 5, type: "Breakout Watch", pos: "FWD", price: "$498k", posStyle: "bg-red-500/20 text-red-300" },
-                  { n: 6, type: "Trap Alert", pos: "DEF", price: "$634k", posStyle: "bg-emerald-500/20 text-emerald-300" },
-                ] as const
-              ).map(({ n, type, pos, price, posStyle }) => (
-                <div
-                  key={n}
-                  className="relative rounded-xl border border-white/[0.07] bg-white/[0.02] p-5 overflow-hidden cursor-pointer group"
-                  onClick={() => setShowUpgrade(true)}
-                >
-                  <div className="select-none blur-[5px] opacity-25 pointer-events-none">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border border-white/10 bg-white/5 text-white/40">
-                        {type}
-                      </span>
-                      <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${posStyle}`}>
-                        {pos}
-                      </span>
-                    </div>
-                    <div className="h-5 w-36 rounded bg-white/20 mb-1" />
-                    <div className="h-3 w-24 rounded bg-white/10 mb-4" />
-                    <div className="grid grid-cols-3 gap-2 mb-3">
-                      {(["Price", "Value", "Conf."] as const).map((label) => (
-                        <div key={label} className="rounded-lg bg-black/30 px-2.5 py-2">
-                          <p className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">{label}</p>
-                          <p className="text-xs font-semibold text-white/50">
-                            {label === "Price" ? price : label === "Value" ? "1.18" : "74%"}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="rounded-lg bg-black/20 px-3 py-2.5">
-                      <div className="h-2 w-16 rounded bg-white/15 mb-2" />
-                      <div className="h-2 w-full rounded bg-white/10 mb-1" />
-                      <div className="h-2 w-4/5 rounded bg-white/10" />
-                    </div>
-                  </div>
-
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/35 group-hover:bg-[#F5C84C]/25 transition-all">
-                      <Lock size={12} className="text-[#F5C84C]" />
-                    </div>
-                    <span className="text-[10px] font-bold text-[#F5C84C] tracking-wide">Edge Signal #{n}</span>
-                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-[#F5C84C]/25 bg-[#F5C84C]/[0.07]">
-                      <Crown size={8} className="text-[#F5C84C]" />
-                      <span className="text-[9px] font-bold text-[#F5C84C]">Neeko+ Only</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex items-center justify-center">
-              <a
-                href="/neeko-plus"
-                className="flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-5 py-2.5 rounded-xl hover:brightness-110 transition-all animate-pulse-gold-border shadow-lg shadow-[#F5C84C]/20"
-              >
-                <Crown size={13} />
-                Unlock Full AI Edge Analysis + 15 Signals This Round
-              </a>
-            </div>
+            <p className="text-sm font-bold text-white mb-1">
+              You're viewing 3 of {rows.length > 3 ? rows.length : 15} edge signals detected by the Neeko model this round.
+            </p>
+            <p className="text-xs text-white/40 mb-5 max-w-sm mx-auto">
+              12 additional edge signals available with Neeko+ — including full AI reasoning, confidence breakdowns and value analysis.
+            </p>
+            <a
+              href="/neeko-plus"
+              className="inline-flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-6 py-3 rounded-xl hover:brightness-110 transition-all animate-pulse-gold-border shadow-lg shadow-[#F5C84C]/20"
+            >
+              <Crown size={13} />
+              Unlock Neeko+
+            </a>
           </div>
+        )}
+
+        {/* ── Full Edge Analysis — Neeko+ only ────────────────────────────── */}
+        {isPremium && (
+          <>
+            <div className="flex items-center gap-4 mb-6">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-6 rounded-full bg-[#F5C84C]/60" />
+                <h2 className="text-sm font-bold text-white">Full Edge Analysis</h2>
+              </div>
+              <div className="flex-1 h-px bg-white/[0.06]" />
+              <span className="text-[10px] text-white/20 uppercase tracking-widest shrink-0">All signals unlocked</span>
+            </div>
+
+            <div className="space-y-10">
+              {sections.map(({ key, data }) => {
+                if (data.length === 0) return null;
+                return (
+                  <section key={key}>
+                    <SectionHeader section={key} count={Math.min(data.length, PREMIUM_VISIBLE)} />
+
+                    <div className="md:hidden">
+                      <CardCarousel
+                        rows={data}
+                        section={key}
+                        visible={PREMIUM_VISIBLE}
+                        isPremium={true}
+                        onUnlock={() => {}}
+                      />
+                    </div>
+
+                    <div className="hidden md:block">
+                      <DesktopGrid
+                        rows={data}
+                        section={key}
+                        visible={PREMIUM_VISIBLE}
+                        isPremium={true}
+                        onUnlock={() => {}}
+                      />
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          </>
         )}
 
         <div className="mt-12 pb-8 border-t border-white/[0.04] pt-4">
