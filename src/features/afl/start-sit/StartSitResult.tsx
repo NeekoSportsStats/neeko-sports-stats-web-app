@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
-import { Crown, Lock, Zap, ChevronDown, ChevronUp, Flame, TrendingUp, Target, TriangleAlert as AlertTriangle, Percent, Swords } from "lucide-react";
+import {
+  Crown, Lock, Zap, ChevronDown, ChevronUp,
+  Flame, TrendingUp, Target,
+  TriangleAlert as AlertTriangle, Percent, Swords,
+} from "lucide-react";
 import { StartProbabilityMeter } from "./StartProbabilityMeter";
 import { OutcomeDistributionChart } from "./OutcomeDistributionChart";
 
@@ -52,9 +56,10 @@ interface CompareBarProps {
   winnerIsA: boolean;
   large?: boolean;
   animated: boolean;
+  dimmed?: boolean;
 }
 
-function CompareBar({ label, aVal, bVal, winnerIsA, large, animated }: CompareBarProps) {
+function CompareBar({ label, aVal, bVal, winnerIsA, large, animated, dimmed }: CompareBarProps) {
   const a = aVal ?? 0;
   const b = bVal ?? 0;
   const max = Math.max(a, b, 1);
@@ -62,7 +67,7 @@ function CompareBar({ label, aVal, bVal, winnerIsA, large, animated }: CompareBa
   const bWins = b > a;
 
   return (
-    <div className="py-3 border-b border-white/[0.04] last:border-0">
+    <div className={`py-3 border-b border-white/[0.04] last:border-0 ${dimmed ? "opacity-40" : ""}`}>
       <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-2">{label}</p>
       <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col items-end gap-1">
@@ -128,16 +133,10 @@ function buildTeaserLine(winner: PlayerData, loser: PlayerData): string {
   const nDiff = (winner.neeko_rating ?? 0) - (loser.neeko_rating ?? 0);
   const confDiff = (winner.projection_confidence ?? 0) - (loser.projection_confidence ?? 0);
 
-  if (projDiff > 10 && nDiff > 0) {
-    return `Higher projection and stronger Neeko model score.`;
-  }
-  if (confDiff > 5 && nDiff > 0) {
-    return `Higher confidence rating and stronger Neeko score.`;
-  }
-  if (projDiff > 0) {
-    return `Stronger projected output this round.`;
-  }
-  return `Better model metrics across the board.`;
+  if (projDiff > 10 && nDiff > 0) return "Higher projection and stronger Neeko model score.";
+  if (confDiff > 5 && nDiff > 0) return "Higher confidence rating and stronger Neeko score.";
+  if (projDiff > 0) return "Stronger projected output this round.";
+  return "Better model metrics across the board.";
 }
 
 function calcBustRisk(p: PlayerData): number {
@@ -151,8 +150,16 @@ function calcBustRisk(p: PlayerData): number {
 }
 
 function calcOutscoreProb(a: PlayerData, b: PlayerData): { probA: number; probB: number } {
-  const scoreA = (a.projection_final ?? 0) * 0.6 + (a.ceiling_estimate ?? 0) * 0.2 + (a.projection_confidence ?? 0) * 0.1 + (a.neeko_rating ?? 0) * 0.1;
-  const scoreB = (b.projection_final ?? 0) * 0.6 + (b.ceiling_estimate ?? 0) * 0.2 + (b.projection_confidence ?? 0) * 0.1 + (b.neeko_rating ?? 0) * 0.1;
+  const scoreA =
+    (a.projection_final ?? 0) * 0.6 +
+    (a.ceiling_estimate ?? 0) * 0.2 +
+    (a.projection_confidence ?? 0) * 0.1 +
+    (a.neeko_rating ?? 0) * 0.1;
+  const scoreB =
+    (b.projection_final ?? 0) * 0.6 +
+    (b.ceiling_estimate ?? 0) * 0.2 +
+    (b.projection_confidence ?? 0) * 0.1 +
+    (b.neeko_rating ?? 0) * 0.1;
   const total = scoreA + scoreB;
   if (total === 0) return { probA: 50, probB: 50 };
   const raw = Math.round((scoreA / total) * 100);
@@ -175,7 +182,7 @@ export function StartSitResult({
   useEffect(() => {
     const t = setTimeout(() => setBarsAnimated(true), 200);
     return () => clearTimeout(t);
-  }, []);
+  }, [winnerPlayerId]);
 
   const winnerIsA = winnerPlayerId === playerA.player_id;
   const winner = winnerIsA ? playerA : playerB;
@@ -192,7 +199,7 @@ export function StartSitResult({
   return (
     <div className="space-y-4 mt-6 animate-in fade-in duration-500">
 
-      {/* ── HERO VERDICT ── */}
+      {/* ─── VERDICT HERO ─── */}
       <div className="rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-br from-[#F5C84C]/[0.07] to-[#F5C84C]/[0.02] overflow-hidden">
         <div className="px-5 pt-5 pb-4">
           <div className="flex items-center gap-2 mb-3">
@@ -217,7 +224,7 @@ export function StartSitResult({
           )}
 
           {!isTossUp && (
-            <div className="mt-3 mb-1">
+            <div className="mt-3">
               <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${tag.color}`}>
                 {tag.icon}
                 {tag.label}
@@ -240,7 +247,41 @@ export function StartSitResult({
         </div>
       </div>
 
-      {/* ── MODEL START PROBABILITY ── */}
+      {/* ─── UPGRADE TEASER (free users only, directly below verdict) ─── */}
+      {!isPremium && (
+        <div className="rounded-xl border border-[#F5C84C]/12 bg-[#F5C84C]/[0.025] overflow-hidden">
+          <div className="px-5 py-4">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-[#F5C84C]/40 mb-0.5">
+              Want deeper analysis?
+            </p>
+            <p className="text-sm font-bold text-white/55 mb-3">Unlock with Neeko+</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mb-4">
+              {[
+                "Bust risk analysis",
+                "Score distribution",
+                "Matchup modelling",
+                "Outscore probability",
+                "Model confidence %",
+                "Advanced AI reasoning",
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-1.5 text-[11px] text-white/30">
+                  <span className="h-1 w-1 rounded-full bg-[#F5C84C]/30 shrink-0" />
+                  {item}
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={onUpgrade}
+              className="w-full flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.97] transition-all"
+            >
+              <Crown size={13} />
+              Upgrade to Neeko+
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODEL START PROBABILITY ─── */}
       <StartProbabilityMeter
         playerA={playerA}
         playerB={playerB}
@@ -248,8 +289,9 @@ export function StartSitResult({
         confidence={confidence}
       />
 
-      {/* ── PLAYER IDENTITY ROW ── */}
+      {/* ─── PLAYER IDENTITY ROW ─── */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+        {/* Player A */}
         <div className={`flex flex-col items-center gap-2 rounded-xl border px-3 py-4 ${winnerIsA ? "border-[#F5C84C]/25 bg-[#F5C84C]/[0.05]" : "border-white/[0.06] bg-white/[0.02]"}`}>
           <div className={`h-12 w-12 rounded-full flex items-center justify-center text-sm font-extrabold border-2 ${winnerIsA ? "border-[#F5C84C]/60 bg-[#F5C84C]/10 text-[#F5C84C]" : "border-white/10 bg-white/[0.06] text-white/50"}`}>
             {getInitials(playerA.player_name)}
@@ -274,6 +316,7 @@ export function StartSitResult({
 
         <span className="text-[10px] uppercase tracking-widest text-white/20 font-bold">vs</span>
 
+        {/* Player B */}
         <div className={`flex flex-col items-center gap-2 rounded-xl border px-3 py-4 ${!winnerIsA && !isTossUp ? "border-[#F5C84C]/25 bg-[#F5C84C]/[0.05]" : "border-white/[0.06] bg-white/[0.02]"}`}>
           <div className={`h-12 w-12 rounded-full flex items-center justify-center text-sm font-extrabold border-2 ${!winnerIsA && !isTossUp ? "border-[#F5C84C]/60 bg-[#F5C84C]/10 text-[#F5C84C]" : "border-white/10 bg-white/[0.06] text-white/50"}`}>
             {getInitials(playerB.player_name)}
@@ -297,26 +340,55 @@ export function StartSitResult({
         </div>
       </div>
 
-      {/* ── PLAYER COMPARISON TABLE (always visible) ── */}
+      {/* ─── PLAYER COMPARISON TABLE (FREE: Projection/Ceiling/Floor/Neeko) ─── */}
       <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
-        <div className="grid grid-cols-2 border-b border-white/[0.06] px-4 py-2.5">
+        {/* Header names */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-white/[0.06] px-4 py-2.5 gap-2">
           <p className={`text-[11px] font-bold text-right ${winnerIsA ? "text-[#F5C84C]" : "text-white/30"}`}>
             {playerA.player_name.split(" ").pop()}
           </p>
-          <p className={`text-[11px] font-bold pl-2 ${!winnerIsA && !isTossUp ? "text-[#F5C84C]" : "text-white/30"}`}>
+          <span className="text-[9px] uppercase tracking-widest text-white/15 w-6 text-center">vs</span>
+          <p className={`text-[11px] font-bold ${!winnerIsA && !isTossUp ? "text-[#F5C84C]" : "text-white/30"}`}>
             {playerB.player_name.split(" ").pop()}
           </p>
         </div>
+
+        {/* Free rows */}
         <div className="px-4">
           <CompareBar label="Projection" aVal={playerA.projection_final} bVal={playerB.projection_final} winnerIsA={winnerIsA} large animated={barsAnimated} />
           <CompareBar label="Ceiling" aVal={playerA.ceiling_estimate} bVal={playerB.ceiling_estimate} winnerIsA={winnerIsA} animated={barsAnimated} />
           <CompareBar label="Floor" aVal={playerA.floor_estimate} bVal={playerB.floor_estimate} winnerIsA={winnerIsA} animated={barsAnimated} />
-          <CompareBar label="Confidence %" aVal={playerA.projection_confidence} bVal={playerB.projection_confidence} winnerIsA={winnerIsA} animated={barsAnimated} />
           <CompareBar label="Neeko Rating" aVal={playerA.neeko_rating} bVal={playerB.neeko_rating} winnerIsA={winnerIsA} animated={barsAnimated} />
         </div>
+
+        {/* Confidence % — premium only */}
+        {isPremium ? (
+          <div className="border-t border-white/[0.04] px-4">
+            <CompareBar label="Confidence %" aVal={playerA.projection_confidence} bVal={playerB.projection_confidence} winnerIsA={winnerIsA} animated={barsAnimated} />
+          </div>
+        ) : (
+          <div className="border-t border-white/[0.04] relative overflow-hidden">
+            <div className="px-4 pointer-events-none select-none" aria-hidden>
+              <CompareBar label="Confidence %" aVal={72} bVal={45} winnerIsA={winnerIsA} animated dimmed />
+            </div>
+            <div className="absolute inset-0 flex items-center justify-between px-4 bg-[#070707]/70 backdrop-blur-[2px]">
+              <div className="flex items-center gap-2">
+                <Lock size={11} className="text-white/20 shrink-0" />
+                <span className="text-xs text-white/30">Confidence metrics</span>
+              </div>
+              <button
+                onClick={onUpgrade}
+                className="flex items-center gap-1.5 bg-[#F5C84C]/10 border border-[#F5C84C]/20 text-[#F5C84C] font-bold text-[11px] px-3 py-1.5 rounded-lg hover:bg-[#F5C84C]/20 transition-all"
+              >
+                <Crown size={9} />
+                Unlock
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ── WHY THIS DECISION — TEASER (free) / FULL (premium) ── */}
+      {/* ─── WHY THIS DECISION ─── */}
       {isPremium ? (
         <div className="rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.03] px-5 py-4">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-3">
@@ -357,7 +429,7 @@ export function StartSitResult({
         </div>
       )}
 
-      {/* ── OUTCOME DISTRIBUTION ── */}
+      {/* ─── OUTCOME DISTRIBUTION ─── */}
       <OutcomeDistributionChart
         playerA={playerA}
         playerB={playerB}
@@ -366,7 +438,7 @@ export function StartSitResult({
         onUpgrade={onUpgrade}
       />
 
-      {/* ── PREMIUM DEEP ANALYSIS BLOCK ── */}
+      {/* ─── PREMIUM DEEP STATS (bust risk / outscore / matchup edge) ─── */}
       {isPremium ? (
         <div className="space-y-3">
           {/* Bust Risk */}
@@ -376,12 +448,17 @@ export function StartSitResult({
               <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30">Bust Risk</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              {[{ p: playerA, bust: bustA, isWinner: winnerIsA }, { p: playerB, bust: bustB, isWinner: !winnerIsA }].map(({ p, bust, isWinner }) => (
+              {[
+                { p: playerA, bust: bustA, isWinner: winnerIsA },
+                { p: playerB, bust: bustB, isWinner: !winnerIsA },
+              ].map(({ p, bust, isWinner }) => (
                 <div key={p.player_id}>
                   <p className={`text-xs font-semibold mb-1 ${isWinner ? "text-[#F5C84C]" : "text-white/40"}`}>
                     {p.player_name.split(" ").pop()}
                   </p>
-                  <p className={`text-2xl font-extrabold tabular-nums ${bust > 25 ? "text-red-400" : "text-white/60"}`}>{bust}%</p>
+                  <p className={`text-2xl font-extrabold tabular-nums ${bust > 25 ? "text-red-400" : "text-white/60"}`}>
+                    {bust}%
+                  </p>
                   <p className="text-[10px] text-white/20 mt-0.5">chance of &lt;80 pts</p>
                 </div>
               ))}
@@ -392,7 +469,9 @@ export function StartSitResult({
           <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
             <div className="flex items-center gap-2 mb-3">
               <Percent size={12} className="text-emerald-400" />
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30">Chance to Outscore Opponent</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30">
+                Chance to Outscore Opponent
+              </p>
             </div>
             <div className="space-y-2">
               {[
@@ -404,7 +483,9 @@ export function StartSitResult({
                     <span className={`text-xs font-semibold ${isWinner ? "text-[#F5C84C]" : "text-white/40"}`}>
                       {p.player_name}
                     </span>
-                    <span className={`text-sm font-extrabold tabular-nums ${isWinner ? "text-[#F5C84C]" : "text-white/35"}`}>{prob}%</span>
+                    <span className={`text-sm font-extrabold tabular-nums ${isWinner ? "text-[#F5C84C]" : "text-white/35"}`}>
+                      {prob}%
+                    </span>
                   </div>
                   <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
                     <div
@@ -448,35 +529,54 @@ export function StartSitResult({
           </div>
         </div>
       ) : (
-        /* Premium teaser card for non-premium users */
-        <div className="rounded-xl border border-[#F5C84C]/10 bg-[#F5C84C]/[0.02] overflow-hidden">
-          <div className="px-5 py-4">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-[#F5C84C]/40 mb-1">Want deeper analysis?</p>
-            <p className="text-sm font-bold text-white/60 mb-3">Unlock with Neeko+</p>
-            <ul className="space-y-1.5 mb-4">
-              {["Bust risk analysis", "Score distribution simulation", "Matchup modelling", "Outscore probability", "Advanced model insights"].map((item) => (
-                <li key={item} className="flex items-center gap-2 text-xs text-white/35">
-                  <span className="h-1 w-1 rounded-full bg-[#F5C84C]/30 shrink-0" />
-                  {item}
-                </li>
+        /* Locked preview for non-premium — blurred stats with single unlock CTA */
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+          <div className="px-5 pt-4 pb-2 flex items-center gap-2">
+            <Lock size={11} className="text-white/20" />
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25">
+              Advanced Stats
+            </p>
+            <span className="ml-auto text-[10px] font-bold text-[#F5C84C]/60 bg-[#F5C84C]/[0.08] px-2.5 py-1 rounded-full">
+              Neeko+
+            </span>
+          </div>
+          <div className="px-5 pb-1 pointer-events-none select-none blur-sm" aria-hidden>
+            <div className="grid grid-cols-2 gap-4 py-3 border-b border-white/[0.04]">
+              {[playerA, playerB].map((p, i) => (
+                <div key={i}>
+                  <p className="text-xs font-semibold text-white/30 mb-1">{p.player_name.split(" ").pop()}</p>
+                  <p className="text-2xl font-extrabold text-white/50">14%</p>
+                  <p className="text-[10px] text-white/20 mt-0.5">bust risk</p>
+                </div>
               ))}
-            </ul>
+            </div>
+            <div className="grid grid-cols-2 gap-4 py-3">
+              {[playerA, playerB].map((p, i) => (
+                <div key={i}>
+                  <p className="text-xs font-semibold text-white/30 mb-1">{p.player_name.split(" ").pop()}</p>
+                  <p className="text-xl font-extrabold text-emerald-400/50">+12%</p>
+                  <p className="text-[10px] text-white/20 mt-0.5">matchup edge</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="px-5 pb-4">
             <button
               onClick={onUpgrade}
-              className="w-full flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.97] transition-all"
+              className="w-full flex items-center justify-center gap-2 bg-white/[0.04] border border-white/[0.08] text-white/50 text-xs font-semibold py-3 rounded-xl hover:bg-white/[0.07] hover:text-white/70 transition-all"
             >
-              <Crown size={13} />
-              Upgrade to Neeko+
+              <Crown size={11} className="text-[#F5C84C]" />
+              Unlock Advanced Stats with Neeko+
             </button>
           </div>
         </div>
       )}
 
-      {/* ── ADVANCED MODEL INSIGHTS (premium collapsible) ── */}
+      {/* ─── ADVANCED MODEL INSIGHTS (premium collapsible) ─── */}
       <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
         <button
           onClick={() => isPremium && setAdvancedOpen((o) => !o)}
-          className="w-full flex items-center justify-between px-5 py-4"
+          className={`w-full flex items-center justify-between px-5 py-4 ${isPremium ? "cursor-pointer" : "cursor-default"}`}
         >
           <div className="flex items-center gap-2.5">
             {!isPremium && <Lock size={12} className="text-white/20" />}
@@ -485,7 +585,9 @@ export function StartSitResult({
             </span>
           </div>
           {isPremium ? (
-            advancedOpen ? <ChevronUp size={14} className="text-white/30" /> : <ChevronDown size={14} className="text-white/30" />
+            advancedOpen
+              ? <ChevronUp size={14} className="text-white/30" />
+              : <ChevronDown size={14} className="text-white/30" />
           ) : (
             <span className="text-[10px] font-bold text-[#F5C84C]/60 bg-[#F5C84C]/[0.08] px-2.5 py-1 rounded-full">
               Neeko+

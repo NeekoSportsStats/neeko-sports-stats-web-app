@@ -39,7 +39,7 @@ function getRoundLabel(round: number): string {
 }
 
 export default function StartSitPage() {
-  const { isPremium } = useAuth();
+  const { isPremium, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [playerA, setPlayerA] = useState<PlayerOption | null>(null);
@@ -261,8 +261,8 @@ export default function StartSitPage() {
           </div>
         )}
 
-        {/* Result */}
-        {!comparing && result && (
+        {/* Result — wait for auth to resolve before rendering so premium state is certain */}
+        {!comparing && result && !authLoading && (
           <StartSitResult
             playerA={result.playerA}
             playerB={result.playerB}
@@ -272,6 +272,13 @@ export default function StartSitPage() {
             isPremium={isPremium}
             onUpgrade={() => navigate("/neeko-plus")}
           />
+        )}
+        {!comparing && result && authLoading && (
+          <div className="mt-6 space-y-3 animate-pulse">
+            <div className="h-36 rounded-2xl bg-white/[0.04]" />
+            <div className="h-28 rounded-xl bg-white/[0.04]" />
+            <div className="h-24 rounded-xl bg-white/[0.04]" />
+          </div>
         )}
 
         {/* Empty state */}
