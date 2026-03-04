@@ -5,7 +5,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, Shield, Database, Zap, Activity, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, TrendingUp, Server, Bot, ChartBar as BarChart3, Layers } from "lucide-react";
+import { RefreshCw, Shield, Database, Zap, Activity, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, TrendingUp, Server, Bot, ChartBar as BarChart3, Layers, Bell, BellOff } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
 
@@ -61,6 +62,15 @@ interface StartSitCacheHealth {
   stale_rows: number;
   seasons_cached: number;
   rounds_cached: number;
+}
+
+interface PipelineAlert {
+  id: string;
+  alert_type: string;
+  alert_message: string;
+  severity: string;
+  created_at: string;
+  resolved: boolean;
 }
 
 interface DataIntegrityChecks {
@@ -185,6 +195,9 @@ export default function Admin() {
   const [aiHealth, setAiHealth] = useState<AIGenerationHealth | null>(null);
   const [cacheHealth, setCacheHealth] = useState<StartSitCacheHealth | null>(null);
   const [integrity, setIntegrity] = useState<DataIntegrityChecks | null>(null);
+  const [alerts, setAlerts] = useState<PipelineAlert[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState(true);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -197,6 +210,23 @@ export default function Admin() {
       return;
     }
   }, [user, loading, navigate]);
+
+  const fetchAlerts = useCallback(async () => {
+    setAlertsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("pipeline_alerts")
+        .select("id, alert_type, alert_message, severity, created_at, resolved")
+        .eq("resolved", false)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (!error && data) setAlerts(data as PipelineAlert[]);
+    } catch (err) {
+      console.error("Alerts fetch error:", err);
+    } finally {
+      setAlertsLoading(false);
+    }
+  }, []);
 
   const fetchAll = useCallback(async () => {
     setDataLoading(true);
@@ -233,13 +263,60 @@ export default function Admin() {
     } finally {
       setDataLoading(false);
     }
-  }, [toast]);
+    await fetchAlerts();
+  }, [toast, fetchAlerts]);
+
+  const handleResolveAlert = async (id: string) => {
+    setResolvingId(id);
+    try {
+      const { error } = await supabase
+        .from("pipeline_alerts")
+        .update({ resolved: true, resolved_at: new Date().toISOString(), resolved_by: user?.id })
+        .eq("id", id);
+      if (error) throw error;
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+      toast({ title: "Alert resolved" });
+    } catch (err) {
+      toast({
+        title: "Failed to resolve alert",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setResolvingId(null);
+    }
+  };
+
+  const handleRunAlertCheck = async () => {
+    setIsRefreshing(true);
+    toast({ title: "Running alert checks…" });
+    try {
+      const { error } = await supabase.functions.invoke("pipeline-alerts", { body: {} });
+      if (error) throw error;
+      await fetchAlerts();
+      toast({ title: "Alert check complete" });
+    } catch (err) {
+      toast({
+        title: "Alert check failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     if (!loading && user?.id === ADMIN_USER_ID) {
       fetchAll();
     }
   }, [loading, user, fetchAll]);
+
+  useEffect(() => {
+    if (!loading && user?.id === ADMIN_USER_ID) {
+      fetchAlerts();
+    }
+  }, [loading, user, fetchAlerts]);
 
   const handleRunPipeline = async () => {
     setIsRefreshing(true);
@@ -505,6 +582,95 @@ export default function Admin() {
           <StatRow label="Last volatility refresh" value={formatDate(integrity?.last_volatility_refresh ?? null)} />
         </SectionCard>
       </div>
+
+      {/* Pipeline Alerts */}
+      <Card className="mb-4">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between text-base">
+            <span className="flex items-center gap-2">
+              <Bell className="h-4 w-4 text-muted-foreground" />
+              Pipeline Alerts
+              {alerts.length > 0 && (
+                <Badge variant="destructive" className="text-xs px-1.5 py-0">
+                  {alerts.length}
+                </Badge>
+              )}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRunAlertCheck}
+              disabled={isRefreshing}
+              className="h-7 text-xs"
+            >
+              <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? "animate-spin" : ""}`} />
+              Run check
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {alertsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : alerts.length === 0 ? (
+            <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground">
+              <BellOff className="h-4 w-4" />
+              <span className="text-sm">No active alerts — all systems healthy</span>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {alerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className={`flex items-start justify-between gap-3 rounded-lg border p-3 ${
+                    alert.severity === "critical"
+                      ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950"
+                      : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950"
+                  }`}
+                >
+                  <div className="flex items-start gap-2 min-w-0">
+                    {alert.severity === "critical" ? (
+                      <XCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-xs font-semibold uppercase tracking-wide ${
+                          alert.severity === "critical"
+                            ? "text-red-700 dark:text-red-300"
+                            : "text-amber-700 dark:text-amber-300"
+                        }`}>
+                          {alert.severity}
+                        </span>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {alert.alert_type}
+                        </span>
+                      </div>
+                      <p className="text-sm mt-0.5 text-foreground">{alert.alert_message}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{formatDate(alert.created_at)}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs shrink-0"
+                    disabled={resolvingId === alert.id}
+                    onClick={() => handleResolveAlert(alert.id)}
+                  >
+                    {resolvingId === alert.id ? (
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                    ) : (
+                      "Resolve"
+                    )}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Actions */}
       <Card>
