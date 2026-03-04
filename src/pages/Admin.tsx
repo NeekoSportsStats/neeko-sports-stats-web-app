@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, Shield, Database, Zap, Activity, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, TrendingUp, Server, Bot, ChartBar as BarChart3, Layers, Bell, BellOff, History, Users, Gauge, Star, ArrowUpRight, CalendarDays } from "lucide-react";
+import { RefreshCw, Shield, Database, Zap, Activity, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, TrendingUp, Server, Bot, ChartBar as BarChart3, Layers, Bell, BellOff, History, Users, Gauge, Star, ArrowUpRight, CalendarDays, Target, Crosshair } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
@@ -221,6 +221,21 @@ interface AnalyticsDailyRow {
   subscriptions_started: number;
 }
 
+interface ModelPerformance {
+  projection_mae: number | null;
+  projection_within_10: number | null;
+  total_projections: number;
+  start_sit_accuracy: number | null;
+  total_start_sit_predictions: number;
+}
+
+interface CalibrationRow {
+  confidence_bucket: number;
+  predictions: number;
+  correct: number;
+  accuracy: number | null;
+}
+
 function formatDate(ts: string | null): string {
   if (!ts) return "—";
   return new Date(ts).toLocaleString("en-AU", {
@@ -361,6 +376,10 @@ export default function Admin() {
   const [dailyVisitors, setDailyVisitors] = useState<DailyVisitorRow[]>([]);
   const [analyticsDaily, setAnalyticsDaily] = useState<AnalyticsDailyRow[]>([]);
   const [v2MetricsLoading, setV2MetricsLoading] = useState(true);
+
+  const [modelPerformance, setModelPerformance] = useState<ModelPerformance | null>(null);
+  const [calibration, setCalibration] = useState<CalibrationRow[]>([]);
+  const [modelLoading, setModelLoading] = useState(true);
 
   const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -504,6 +523,22 @@ export default function Admin() {
     }
   }, []);
 
+  const fetchModelMetrics = useCallback(async () => {
+    setModelLoading(true);
+    try {
+      const [perfRes, calRes] = await Promise.all([
+        supabase.from("v_model_performance").select("*").maybeSingle(),
+        supabase.from("v_start_sit_calibration").select("*"),
+      ]);
+      if (perfRes.data) setModelPerformance(perfRes.data as ModelPerformance);
+      if (calRes.data) setCalibration(calRes.data as CalibrationRow[]);
+    } catch (err) {
+      console.error("Model metrics fetch error:", err);
+    } finally {
+      setModelLoading(false);
+    }
+  }, []);
+
   const fetchAll = useCallback(async () => {
     setDataLoading(true);
     try {
@@ -539,8 +574,8 @@ export default function Admin() {
     } finally {
       setDataLoading(false);
     }
-    await Promise.all([fetchAlerts(), fetchJobHistory(), fetchAnalytics(), fetchProductMetrics(), fetchV2Metrics()]);
-  }, [toast, fetchAlerts, fetchJobHistory, fetchAnalytics, fetchProductMetrics, fetchV2Metrics]);
+    await Promise.all([fetchAlerts(), fetchJobHistory(), fetchAnalytics(), fetchProductMetrics(), fetchV2Metrics(), fetchModelMetrics()]);
+  }, [toast, fetchAlerts, fetchJobHistory, fetchAnalytics, fetchProductMetrics, fetchV2Metrics, fetchModelMetrics]);
 
   const handleResolveAlert = async (id: string) => {
     setResolvingId(id);
@@ -595,8 +630,9 @@ export default function Admin() {
       fetchAnalytics();
       fetchProductMetrics();
       fetchV2Metrics();
+      fetchModelMetrics();
     }
-  }, [loading, user, fetchAlerts, fetchJobHistory, fetchAnalytics, fetchProductMetrics, fetchV2Metrics]);
+  }, [loading, user, fetchAlerts, fetchJobHistory, fetchAnalytics, fetchProductMetrics, fetchV2Metrics, fetchModelMetrics]);
 
   useEffect(() => {
     if (!loading && user?.id === ADMIN_USER_ID) {
@@ -1198,6 +1234,177 @@ export default function Admin() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Model Performance ────────────────────────────────────────────── */}
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 mt-6">
+        Model Performance
+      </h2>
+      <div className="grid gap-4 sm:grid-cols-2 mb-4">
+        <SectionCard icon={Target} title="Projection Accuracy" loading={modelLoading}>
+          {modelPerformance && modelPerformance.total_projections === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              No evaluated rounds yet. Scores are loaded after each round completes.
+            </div>
+          ) : (
+            <>
+              <StatRow
+                label="Mean Absolute Error (MAE)"
+                value={
+                  modelPerformance?.projection_mae != null
+                    ? `${modelPerformance.projection_mae} pts`
+                    : "—"
+                }
+                highlight={
+                  modelPerformance?.projection_mae == null
+                    ? "neutral"
+                    : modelPerformance.projection_mae <= 15
+                      ? "good"
+                      : modelPerformance.projection_mae <= 25
+                        ? "warn"
+                        : "bad"
+                }
+              />
+              <StatRow
+                label="Within ±10 pts"
+                value={
+                  modelPerformance?.projection_within_10 != null
+                    ? `${(modelPerformance.projection_within_10 * 100).toFixed(1)}%`
+                    : "—"
+                }
+                highlight={
+                  modelPerformance?.projection_within_10 == null
+                    ? "neutral"
+                    : modelPerformance.projection_within_10 >= 0.55
+                      ? "good"
+                      : modelPerformance.projection_within_10 >= 0.40
+                        ? "warn"
+                        : "bad"
+                }
+              />
+              <StatRow
+                label="Total evaluated rows"
+                value={modelPerformance?.total_projections?.toLocaleString() ?? "0"}
+                highlight="neutral"
+              />
+            </>
+          )}
+        </SectionCard>
+
+        <SectionCard icon={Crosshair} title="Start/Sit Accuracy" loading={modelLoading}>
+          {modelPerformance && modelPerformance.total_start_sit_predictions === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              No evaluated decisions yet. Accuracy is computed once actual scores arrive.
+            </div>
+          ) : (
+            <>
+              <StatRow
+                label="Overall accuracy"
+                value={
+                  modelPerformance?.start_sit_accuracy != null
+                    ? `${(modelPerformance.start_sit_accuracy * 100).toFixed(1)}%`
+                    : "—"
+                }
+                highlight={
+                  modelPerformance?.start_sit_accuracy == null
+                    ? "neutral"
+                    : modelPerformance.start_sit_accuracy >= 0.65
+                      ? "good"
+                      : modelPerformance.start_sit_accuracy >= 0.50
+                        ? "warn"
+                        : "bad"
+                }
+              />
+              <StatRow
+                label="Total decisions evaluated"
+                value={modelPerformance?.total_start_sit_predictions?.toLocaleString() ?? "0"}
+                highlight="neutral"
+              />
+              <div className="mt-3 text-xs text-muted-foreground">
+                Baseline expectation: ~50% (coin flip). Target: &gt;65%.
+              </div>
+            </>
+          )}
+        </SectionCard>
+      </div>
+
+      {/* ── Start/Sit Calibration ────────────────────────────────────────── */}
+      <Card className="mb-4">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between text-base">
+            <span className="flex items-center gap-2">
+              <Gauge className="h-4 w-4 text-muted-foreground" />
+              Start/Sit Confidence Calibration
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={fetchModelMetrics}
+              disabled={modelLoading}
+              className="h-7 text-xs"
+            >
+              <RefreshCw className={`h-3 w-3 mr-1 ${modelLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {modelLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : calibration.filter(r => r.predictions > 0).length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              No calibration data yet. Data populates after rounds are evaluated.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/40">
+                    <th className="text-left py-2 pr-4 text-xs font-medium text-muted-foreground">Confidence</th>
+                    <th className="text-right py-2 pr-4 text-xs font-medium text-muted-foreground">Predictions</th>
+                    <th className="text-right py-2 pr-4 text-xs font-medium text-muted-foreground">Correct</th>
+                    <th className="text-right py-2 text-xs font-medium text-muted-foreground">Accuracy</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {calibration.filter(r => r.predictions > 0).map((row) => {
+                    const accuracy = row.accuracy != null ? row.accuracy * 100 : null;
+                    const expected = row.confidence_bucket;
+                    const diff = accuracy != null ? accuracy - expected : null;
+                    const calibrationColor =
+                      diff == null
+                        ? "text-muted-foreground"
+                        : Math.abs(diff) <= 5
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : Math.abs(diff) <= 10
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-red-600 dark:text-red-400";
+                    return (
+                      <tr key={row.confidence_bucket} className="border-b border-border/30 last:border-0 hover:bg-muted/30">
+                        <td className="py-2 pr-4 font-medium">{row.confidence_bucket}%</td>
+                        <td className="py-2 pr-4 text-right tabular-nums">{row.predictions.toLocaleString()}</td>
+                        <td className="py-2 pr-4 text-right tabular-nums">{row.correct.toLocaleString()}</td>
+                        <td className={`py-2 text-right font-semibold tabular-nums ${calibrationColor}`}>
+                          {accuracy != null ? `${accuracy.toFixed(1)}%` : "—"}
+                          {diff != null && (
+                            <span className="ml-1 text-xs font-normal text-muted-foreground">
+                              ({diff > 0 ? "+" : ""}{diff.toFixed(1)})
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <p className="text-xs text-muted-foreground mt-3">
+                Calibration delta = actual accuracy minus stated confidence. Near 0 is ideal.
+              </p>
             </div>
           )}
         </CardContent>
