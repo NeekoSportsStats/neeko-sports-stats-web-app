@@ -24,6 +24,10 @@ export interface MarketRow {
   trade_score: number | null;
   breakout_score: number | null;
   breakout_flag: boolean | null;
+  volatility_score: number | null;
+  volatility_level: "LOW" | "MEDIUM" | "HIGH" | null;
+  breakout_score: number | null;
+  breakout_flag: boolean | null;
 }
 
 export type MarketTab = "buy" | "sell" | "cashcow" | "trap";
@@ -44,6 +48,10 @@ export interface MWPlayerRow {
   expected_price_change: number;
   projected_price: number | null;
   projected_price_r1: number | null;
+  breakout_score: number | null;
+  breakout_flag: boolean | null;
+  volatility_score: number | null;
+  volatility_level: "LOW" | "MEDIUM" | "HIGH" | null;
   projected_price_r2: number | null;
   projected_price_r3: number | null;
   breakout_score: number | null;

@@ -15,6 +15,12 @@ export function MarketPlayerCard({ row, locked, onUnlock, tab, rank }: Props) {
   const momentum = Number(row.price_momentum ?? 0);
   const momentumStr = momentum >= 0 ? `+${fmtNum(momentum, 1)}` : fmtNum(momentum, 1);
   const isBreakout = row.breakout_flag === true;
+  const volLevel = row.volatility_level ?? null;
+  const volColors: Record<string, string> = {
+    HIGH:   "text-red-400 bg-red-400/10 border-red-400/20",
+    MEDIUM: "text-amber-400 bg-amber-400/10 border-amber-400/20",
+    LOW:    "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
+  };
 
   return (
     <div
@@ -85,15 +91,21 @@ export function MarketPlayerCard({ row, locked, onUnlock, tab, rank }: Props) {
           />
         </div>
 
-        {isBreakout && row.breakout_score != null && (
-          <div className="mt-2 pt-2 border-t border-orange-400/10 flex items-center justify-between">
-            <div className="flex items-center gap-1 text-[10px] text-orange-400/70">
-              <Flame className="h-3 w-3" />
-              <span>Breakout Score</span>
-            </div>
-            <span className="text-sm font-bold tabular-nums text-orange-400">
-              {fmtNum(row.breakout_score, 0)}
-            </span>
+        {(isBreakout || volLevel) && (
+          <div className="mt-2 pt-2 border-t border-white/[0.05] flex items-center gap-2 flex-wrap">
+            {isBreakout && row.breakout_score != null && (
+              <div className="flex items-center gap-1 text-[10px] text-orange-400/70">
+                <Flame className="h-3 w-3 text-orange-400" />
+                <span>Breakout</span>
+                <span className="font-bold text-orange-400">{fmtNum(row.breakout_score, 0)}</span>
+              </div>
+            )}
+            {volLevel && (
+              <div className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded border ${volColors[volLevel]}`}>
+                <span className="uppercase tracking-wide">Volatility</span>
+                <span className="font-bold">{volLevel}</span>
+              </div>
+            )}
           </div>
         )}
 

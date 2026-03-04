@@ -210,6 +210,15 @@ function estimateRecentForm(p: PlayerData): { last3: number; last5: number } {
   return { last3: Math.max(floor, last3), last5: Math.max(floor, last5) };
 }
 
+function deriveVolatilityLevel(p: PlayerData): "LOW" | "MEDIUM" | "HIGH" {
+  const ceilUpside = (p.ceiling_estimate ?? 0) - (p.projection_final ?? 0);
+  const risk = p.risk_rating ?? 0;
+  const score = Math.min(100, ceilUpside * (risk / 100));
+  if (score >= 70) return "HIGH";
+  if (score >= 40) return "MEDIUM";
+  return "LOW";
+}
+
 function calcBustRisk(p: PlayerData): number {
   const mean = p.projection_final ?? 80;
   const floor = p.floor_estimate ?? mean * 0.6;
@@ -266,6 +275,14 @@ export function StartSitResult({
 
   const formA = estimateRecentForm(playerA);
   const formB = estimateRecentForm(playerB);
+  const volA = deriveVolatilityLevel(playerA);
+  const volB = deriveVolatilityLevel(playerB);
+  const volOrder = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+  const saferPlayer = volOrder[volA] < volOrder[volB]
+    ? playerA.player_name.split(" ").pop()
+    : volOrder[volB] < volOrder[volA]
+      ? playerB.player_name.split(" ").pop()
+      : null;
 
   const bustA = calcBustRisk(playerA);
   const bustB = calcBustRisk(playerB);
@@ -441,7 +458,36 @@ export function StartSitResult({
           <CompareBar label="Neeko Rating" aVal={playerA.neeko_rating} bVal={playerB.neeko_rating} winnerIsA={winnerIsA} animated={barsAnimated} />
           <CompareBar label="Last 3 Avg" aVal={formA.last3} bVal={formB.last3} winnerIsA={winnerIsA} animated={barsAnimated} />
           <CompareBar label="Last 5 Avg" aVal={formA.last5} bVal={formB.last5} winnerIsA={winnerIsA} animated={barsAnimated} />
+
+          {/* Volatility row */}
+          <div className="py-3 border-b border-white/[0.04] last:border-0">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-2">Volatility</p>
+            <div className="grid grid-cols-2 gap-2">
+              {([{ vol: volA, isWinner: winnerIsA }, { vol: volB, isWinner: !winnerIsA && !isTossUp }] as const).map(({ vol, isWinner }, i) => {
+                const colors: Record<string, string> = {
+                  HIGH:   "text-red-400 bg-red-400/10 border-red-400/20",
+                  MEDIUM: "text-amber-400 bg-amber-400/10 border-amber-400/20",
+                  LOW:    "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
+                };
+                return (
+                  <div key={i} className={`flex ${i === 0 ? "justify-end" : "justify-start"}`}>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${colors[vol]}`}>
+                      {vol}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
+
+        {/* Safer option callout */}
+        {saferPlayer && (
+          <div className="mx-4 mb-4 flex items-center gap-2 rounded-lg bg-emerald-400/[0.06] border border-emerald-400/15 px-3 py-2">
+            <span className="text-[10px] text-emerald-400/60">Safer option:</span>
+            <span className="text-[10px] font-bold text-emerald-400">{saferPlayer}</span>
+          </div>
+        )}
 
         {/* Confidence % — premium only */}
         {isPremium ? (
