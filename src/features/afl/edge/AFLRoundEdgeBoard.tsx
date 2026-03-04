@@ -1058,6 +1058,36 @@ export default function AFLRoundEdgeBoard() {
           )}
         </div>
 
+        {/* Edge Model Report */}
+        {rows.length > 0 && (
+          <div className="mb-8 rounded-xl border border-white/[0.07] bg-white/[0.02] p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center justify-center w-6 h-6 rounded-md bg-[#F5C84C]/10 border border-[#F5C84C]/25">
+                <Target size={11} className="text-[#F5C84C]" />
+              </div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">Edge Model Report — This Round</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-lg bg-black/20 border border-white/[0.05] px-3 py-2.5">
+                <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Signals Detected</p>
+                <p className="text-xl font-extrabold text-white tabular-nums">{rows.length}</p>
+              </div>
+              <div className="rounded-lg bg-yellow-400/[0.04] border border-yellow-400/15 px-3 py-2.5">
+                <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Captain Edges</p>
+                <p className="text-xl font-extrabold text-yellow-400 tabular-nums">{captainRows.length}</p>
+              </div>
+              <div className="rounded-lg bg-green-500/[0.04] border border-green-500/15 px-3 py-2.5">
+                <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Breakout Plays</p>
+                <p className="text-xl font-extrabold text-green-400 tabular-nums">{breakoutRows.length}</p>
+              </div>
+              <div className="rounded-lg bg-red-600/[0.05] border border-red-600/20 px-3 py-2.5">
+                <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Trap Alerts</p>
+                <p className="text-xl font-extrabold text-red-400 tabular-nums">{trapRows.length}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Hero signal panel */}
         <HeroSignalPanel
           captainRow={captainRows[0] ?? null}
