@@ -295,12 +295,12 @@ export function OutcomeDistributionChart({
 
           {/* Overlay CTA */}
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#070707]/60 px-6">
-            <div className="flex items-center gap-2 text-white/50">
-              <Lock size={14} />
-              <p className="text-sm font-semibold text-white/60">Unlock Outcome Distribution</p>
+            <div className="flex items-center gap-2">
+              <Lock size={14} className="text-white/40" />
+              <p className="text-sm font-semibold text-white/65">Scoring Range Probabilities</p>
             </div>
-            <p className="text-xs text-white/30 text-center">
-              See bust risk, ceiling chance and score distribution with Neeko+
+            <p className="text-xs text-white/35 text-center leading-relaxed">
+              See full scoring range probabilities — bust risk, ceiling chance and safe score floor — with Neeko+
             </p>
             <button
               onClick={onUpgrade}

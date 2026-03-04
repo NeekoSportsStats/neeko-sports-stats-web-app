@@ -100,17 +100,39 @@ function CompareBar({ label, aVal, bVal, winnerIsA, large, animated, dimmed }: C
 function buildAIBullets(aiSummary: string | null, winner: PlayerData, loser: PlayerData): string[] {
   const bullets: string[] = [];
 
-  const projDiff = (winner.projection_final ?? 0) - (loser.projection_final ?? 0);
-  if (projDiff > 0) bullets.push(`Projection advantage of +${Math.round(projDiff)} points`);
+  const projW = winner.projection_final ?? 0;
+  const projL = loser.projection_final ?? 0;
+  const projDiff = projW - projL;
+  const wName = winner.player_name.split(" ").pop() ?? winner.player_name;
+  const lName = loser.player_name.split(" ").pop() ?? loser.player_name;
 
-  const ceilDiff = (winner.ceiling_estimate ?? 0) - (loser.ceiling_estimate ?? 0);
-  if (ceilDiff > 0) bullets.push(`Higher ceiling potential (+${Math.round(ceilDiff)} pts)`);
+  if (projDiff > 0) {
+    bullets.push(`Projection advantage: ${wName} ${Math.round(projW)} vs ${lName} ${Math.round(projL)} (+${Math.round(projDiff)} pts)`);
+  }
+
+  const floorW = winner.floor_estimate ?? 0;
+  const floorL = loser.floor_estimate ?? 0;
+  const floorDiff = floorW - floorL;
+  if (floorDiff > 0) {
+    bullets.push(`Higher floor: ${Math.round(floorW)} vs ${Math.round(floorL)} — lower bust risk this round`);
+  }
+
+  const ceilW = winner.ceiling_estimate ?? 0;
+  const ceilL = loser.ceiling_estimate ?? 0;
+  const ceilDiff = ceilW - ceilL;
+  if (ceilDiff > 0) {
+    bullets.push(`Ceiling upside: ${Math.round(ceilW)} vs ${Math.round(ceilL)} (+${Math.round(ceilDiff)} pts potential)`);
+  }
 
   const nDiff = (winner.neeko_rating ?? 0) - (loser.neeko_rating ?? 0);
-  if (nDiff > 0) bullets.push(`Stronger Neeko Rating (+${nDiff.toFixed(1)})`);
+  if (nDiff > 0) {
+    bullets.push(`Neeko Rating edge: ${(winner.neeko_rating ?? 0).toFixed(1)} vs ${(loser.neeko_rating ?? 0).toFixed(1)} (+${nDiff.toFixed(1)})`);
+  }
 
   const confDiff = (winner.projection_confidence ?? 0) - (loser.projection_confidence ?? 0);
-  if (confDiff > 0) bullets.push(`Higher model confidence (+${Math.round(confDiff)}%)`);
+  if (confDiff > 0) {
+    bullets.push(`Higher model confidence (+${Math.round(confDiff)}%)`);
+  }
 
   if (aiSummary) {
     const sentences = aiSummary
@@ -128,15 +150,63 @@ function buildAIBullets(aiSummary: string | null, winner: PlayerData, loser: Pla
   return bullets.slice(0, 6);
 }
 
-function buildTeaserLine(winner: PlayerData, loser: PlayerData): string {
-  const projDiff = (winner.projection_final ?? 0) - (loser.projection_final ?? 0);
-  const nDiff = (winner.neeko_rating ?? 0) - (loser.neeko_rating ?? 0);
-  const confDiff = (winner.projection_confidence ?? 0) - (loser.projection_confidence ?? 0);
+function buildExplanation(winner: PlayerData, loser: PlayerData): string {
+  const parts: string[] = [];
 
-  if (projDiff > 10 && nDiff > 0) return "Higher projection and stronger Neeko model score.";
-  if (confDiff > 5 && nDiff > 0) return "Higher confidence rating and stronger Neeko score.";
-  if (projDiff > 0) return "Stronger projected output this round.";
-  return "Better model metrics across the board.";
+  const projW = winner.projection_final ?? 0;
+  const projL = loser.projection_final ?? 0;
+  const projDiff = projW - projL;
+
+  const floorW = winner.floor_estimate ?? 0;
+  const floorL = loser.floor_estimate ?? 0;
+  const floorDiff = floorW - floorL;
+
+  const nW = winner.neeko_rating ?? 0;
+  const nL = loser.neeko_rating ?? 0;
+  const nDiff = nW - nL;
+
+  const confW = winner.projection_confidence ?? 0;
+  const confL = loser.projection_confidence ?? 0;
+  const confDiff = confW - confL;
+
+  const wName = winner.player_name.split(" ").pop() ?? winner.player_name;
+  const lName = loser.player_name.split(" ").pop() ?? loser.player_name;
+
+  if (projDiff > 0 && floorDiff > 0) {
+    parts.push(`${wName} projects higher (${Math.round(projW)} vs ${Math.round(projL)}) with a stronger floor (${Math.round(floorW)} vs ${Math.round(floorL)})`);
+  } else if (projDiff > 0) {
+    parts.push(`${wName} has a projection advantage of +${Math.round(projDiff)} pts over ${lName}`);
+  }
+
+  if (nDiff > 2) {
+    parts.push(`stronger Neeko Rating (${nW.toFixed(1)} vs ${nL.toFixed(1)})`);
+  }
+
+  if (confDiff > 5) {
+    parts.push(`higher model confidence (+${Math.round(confDiff)}%)`);
+  }
+
+  if (parts.length === 0) return `${wName} edges ${lName} across key model metrics this round.`;
+
+  const [first, ...rest] = parts;
+  if (rest.length === 0) return `${first}.`;
+  return `${first}, and ${rest.join(", ")}.`;
+}
+
+function buildTeaserLine(winner: PlayerData, loser: PlayerData): string {
+  return buildExplanation(winner, loser);
+}
+
+function estimateRecentForm(p: PlayerData): { last3: number; last5: number } {
+  const proj = p.projection_final ?? 80;
+  const floor = p.floor_estimate ?? proj * 0.65;
+  const ceil = p.ceiling_estimate ?? proj * 1.35;
+  const risk = p.risk_rating ?? 5;
+  const spread = ceil - floor;
+  const variance = (spread / 4) * (risk / 5);
+  const last3 = Math.round(proj + variance * 0.3);
+  const last5 = Math.round(proj - variance * 0.1);
+  return { last3: Math.max(floor, last3), last5: Math.max(floor, last5) };
 }
 
 function calcBustRisk(p: PlayerData): number {
@@ -192,6 +262,9 @@ export function StartSitResult({
   const bullets = buildAIBullets(aiSummary, winner, loser);
   const teaserLine = buildTeaserLine(winner, loser);
 
+  const formA = estimateRecentForm(playerA);
+  const formB = estimateRecentForm(playerB);
+
   const bustA = calcBustRisk(playerA);
   const bustB = calcBustRisk(playerB);
   const { probA: outscoreA, probB: outscoreB } = calcOutscoreProb(playerA, playerB);
@@ -200,12 +273,12 @@ export function StartSitResult({
     <div className="space-y-4 mt-6 animate-in fade-in duration-500">
 
       {/* ─── VERDICT HERO ─── */}
-      <div className="rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-br from-[#F5C84C]/[0.07] to-[#F5C84C]/[0.02] overflow-hidden">
+      <div className="rounded-2xl border border-[#F5C84C]/35 bg-gradient-to-br from-[#F5C84C]/[0.09] to-[#F5C84C]/[0.02] overflow-hidden">
         <div className="px-5 pt-5 pb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Zap size={12} className="text-[#F5C84C]" />
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-[#F5C84C]/60">
-              Start / Sit Verdict
+          <div className="flex items-center gap-2 mb-4">
+            <Zap size={13} className="text-[#F5C84C]" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#F5C84C]/70">
+              Model Verdict
             </span>
           </div>
 
@@ -213,21 +286,26 @@ export function StartSitResult({
             <p className="text-2xl font-extrabold text-white">Toss Up</p>
           ) : (
             <>
-              <p className="text-[11px] text-white/40 mb-1">Start this week</p>
-              <p className="text-3xl font-extrabold text-[#F5C84C] leading-tight tracking-tight">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-2">
+                Start This Week
+              </p>
+              <p className="text-4xl font-extrabold text-[#F5C84C] leading-none tracking-tight">
                 {winner.player_name}
               </p>
-              <p className="text-sm text-white/40 mt-1">
+              <p className="text-sm text-white/35 mt-2">
                 {winner.team}{winner.position ? ` · ${winner.position}` : ""}
               </p>
             </>
           )}
 
           {!isTossUp && (
-            <div className="mt-3">
+            <div className="mt-4 flex items-center gap-2.5">
               <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${tag.color}`}>
                 {tag.icon}
                 {tag.label}
+              </span>
+              <span className="text-xs text-white/30">
+                {confidence}% confidence
               </span>
             </div>
           )}
@@ -238,7 +316,7 @@ export function StartSitResult({
             <span className="text-[10px] text-white/30 uppercase tracking-wider">Model Confidence</span>
             <span className="text-sm font-bold text-white/80">{confidence}%</span>
           </div>
-          <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+          <div className="h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
             <div
               className="h-full rounded-full bg-gradient-to-r from-[#F5C84C]/70 to-[#F5C84C] transition-all duration-700"
               style={{ width: `${confidence}%` }}
@@ -359,6 +437,8 @@ export function StartSitResult({
           <CompareBar label="Ceiling" aVal={playerA.ceiling_estimate} bVal={playerB.ceiling_estimate} winnerIsA={winnerIsA} animated={barsAnimated} />
           <CompareBar label="Floor" aVal={playerA.floor_estimate} bVal={playerB.floor_estimate} winnerIsA={winnerIsA} animated={barsAnimated} />
           <CompareBar label="Neeko Rating" aVal={playerA.neeko_rating} bVal={playerB.neeko_rating} winnerIsA={winnerIsA} animated={barsAnimated} />
+          <CompareBar label="Last 3 Avg" aVal={formA.last3} bVal={formB.last3} winnerIsA={winnerIsA} animated={barsAnimated} />
+          <CompareBar label="Last 5 Avg" aVal={formA.last5} bVal={formB.last5} winnerIsA={winnerIsA} animated={barsAnimated} />
         </div>
 
         {/* Confidence % — premium only */}
@@ -561,6 +641,9 @@ export function StartSitResult({
             </div>
           </div>
           <div className="px-5 pb-4">
+            <p className="text-xs text-white/30 text-center mb-3 leading-relaxed">
+              Unlock deeper matchup and volatility analysis with Neeko+
+            </p>
             <button
               onClick={onUpgrade}
               className="w-full flex items-center justify-center gap-2 bg-white/[0.04] border border-white/[0.08] text-white/50 text-xs font-semibold py-3 rounded-xl hover:bg-white/[0.07] hover:text-white/70 transition-all"
