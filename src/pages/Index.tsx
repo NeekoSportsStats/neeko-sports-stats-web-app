@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Crown, ArrowRight, Star, TrendingUp, TriangleAlert as AlertTriangle, Check, Database, Cpu, Radio, Trophy, Users, ChartBar as BarChart2 } from "lucide-react";
+import { Crown, ArrowRight, Star, TrendingUp, TriangleAlert as AlertTriangle, Check, Database, Cpu, Radio, Trophy, Users, ChartBar as BarChart2, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { NEEKO_PRICING } from "@/config/neekoPricing";
@@ -31,12 +31,12 @@ const FEATURES = [
   {
     icon: Cpu,
     title: "AI Player Analysis",
-    desc: "Each player is evaluated using matchup difficulty, recent form, historical scoring and projection ceilings.",
+    desc: "Each player is evaluated using matchup difficulty, recent form and historical scoring to project realistic fantasy outcomes.",
   },
   {
     icon: Radio,
     title: "Weekly Edge Signals",
-    desc: "Captain picks, breakout watches and trap warnings generated from projection models.",
+    desc: "Captain picks, breakout watches and trap warnings generated from projection mismatches.",
   },
   {
     icon: BarChart2,
@@ -138,87 +138,6 @@ function GoldDivider() {
     <div className="flex justify-center my-4">
       <div className="w-10 h-0.5 rounded-full bg-[#F5C84C]/30" />
     </div>
-  );
-}
-
-// ─── Rankings preview ─────────────────────────────────────────────────────────
-
-function RankingsPreview() {
-  const [rows, setRows] = useState<RankingRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase.rpc("get_rankings_free", {
-        position_filter: "ALL",
-        sort_key:        "neeko_rating",
-        limit_n:         10,
-      });
-      setRows((data ?? []).slice(0, 5));
-      setLoading(false);
-    })();
-  }, []);
-
-  return (
-    <section className="py-16 bg-[#070707] border-t border-white/[0.05]">
-      <div className="max-w-3xl mx-auto px-4">
-        <SectionLabel>Rankings Preview</SectionLabel>
-        <SectionHeading>This Week's Top Fantasy Projections</SectionHeading>
-        <GoldDivider />
-        <p className="text-center text-white/40 text-sm mb-8 max-w-md mx-auto">
-          Ranked by Neeko Rating — projection, matchup and AI verdict combined.
-        </p>
-
-        <div className="rounded-2xl border border-white/[0.07] overflow-hidden">
-          <div className="grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-3 text-[11px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
-            <span>#</span>
-            <span>Player</span>
-            <span className="text-center">Team</span>
-            <span className="text-right">Projection</span>
-          </div>
-
-          {loading
-            ? Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-4 border-b border-white/[0.04] bg-[#0c0c0c] animate-pulse last:border-0">
-                  <div className="h-4 w-4 bg-white/10 rounded" />
-                  <div className="h-4 w-36 bg-white/10 rounded" />
-                  <div className="h-4 w-10 bg-white/10 rounded mx-auto" />
-                  <div className="h-4 w-12 bg-white/10 rounded ml-auto" />
-                </div>
-              ))
-            : rows.length > 0
-              ? rows.map((row, idx) => (
-                  <div
-                    key={idx}
-                    className="grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-4 border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors last:border-0"
-                  >
-                    <span className="text-sm text-white/25 font-mono">{idx + 1}</span>
-                    <span className="text-sm font-semibold text-white truncate">{row.player_name}</span>
-                    <span className="text-xs text-white/40 text-center self-center">{teamAbbr(row.team)}</span>
-                    <span className="text-sm font-bold text-[#F5C84C] text-right">
-                      {row.projection_final != null ? Math.round(row.projection_final) : "—"}
-                    </span>
-                  </div>
-                ))
-              : (
-                <div className="px-5 py-8 text-center text-sm text-white/25 bg-[#0c0c0c]">
-                  Rankings will be available when round data is processed.
-                </div>
-              )
-          }
-        </div>
-
-        <div className="flex justify-center mt-6">
-          <Link
-            to="/sports/afl/rankings"
-            className="inline-flex items-center gap-2 border border-white/15 text-white/70 hover:text-white hover:border-white/30 font-semibold text-sm px-7 py-3 rounded-xl transition-all"
-          >
-            View Full Rankings
-            <ArrowRight size={14} />
-          </Link>
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -326,13 +245,122 @@ function EdgeBoardPreview() {
           ))}
         </div>
 
-        <div className="flex justify-center mt-6">
+        <p className="text-center text-white/25 text-xs mt-5">
+          Full edge board includes additional signals and matchup analysis.
+        </p>
+
+        <div className="flex justify-center mt-4">
           <Link
             to="/neeko-plus"
             className="inline-flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3 rounded-xl hover:brightness-110 transition-all"
           >
             <Crown size={14} />
             Unlock Full Edge Board
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Rankings preview ─────────────────────────────────────────────────────────
+
+function RankingsPreview() {
+  const [rows, setRows] = useState<RankingRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.rpc("get_rankings_free", {
+        position_filter: "ALL",
+        sort_key:        "neeko_rating",
+        limit_n:         10,
+      });
+      setRows((data ?? []).slice(0, 5));
+      setLoading(false);
+    })();
+  }, []);
+
+  return (
+    <section className="py-16 bg-[#070707] border-t border-white/[0.05]">
+      <div className="max-w-3xl mx-auto px-4">
+        <SectionLabel>Rankings Preview</SectionLabel>
+        <SectionHeading>This Week's Top Fantasy Projections</SectionHeading>
+        <GoldDivider />
+        <p className="text-center text-white/40 text-sm mb-8 max-w-md mx-auto">
+          Ranked by Neeko Rating — projection, matchup and AI verdict combined.
+        </p>
+
+        <div className="rounded-2xl border border-white/[0.07] overflow-hidden">
+          <div className="grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-3 text-[11px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
+            <span>#</span>
+            <span>Player</span>
+            <span className="text-center">Team</span>
+            <span className="text-right">Projection</span>
+          </div>
+
+          {loading
+            ? Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-4 border-b border-white/[0.04] bg-[#0c0c0c] animate-pulse last:border-0">
+                  <div className="h-4 w-4 bg-white/10 rounded" />
+                  <div className="h-4 w-36 bg-white/10 rounded" />
+                  <div className="h-4 w-10 bg-white/10 rounded mx-auto" />
+                  <div className="h-4 w-12 bg-white/10 rounded ml-auto" />
+                </div>
+              ))
+            : rows.length > 0
+              ? (
+                <>
+                  {rows.map((row, idx) => (
+                    <div
+                      key={idx}
+                      className="grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-4 border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors"
+                    >
+                      <span className="text-sm text-white/25 font-mono">{idx + 1}</span>
+                      <span className="text-sm font-semibold text-white truncate">{row.player_name}</span>
+                      <span className="text-xs text-white/40 text-center self-center">{teamAbbr(row.team)}</span>
+                      <span className="text-sm font-bold text-[#F5C84C] text-right">
+                        {row.projection_final != null ? Math.round(row.projection_final) : "—"}
+                      </span>
+                    </div>
+                  ))}
+
+                  {/* Blurred locked rows */}
+                  {[6, 7].map((rank) => (
+                    <div
+                      key={rank}
+                      className="grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-4 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0 relative select-none"
+                    >
+                      <span className="text-sm text-white/15 font-mono">{rank}</span>
+                      <div className="flex items-center gap-2">
+                        <Lock size={11} className="text-white/20 shrink-0" />
+                        <span className="text-sm font-semibold text-white/20 blur-[3px]">Premium Player</span>
+                      </div>
+                      <span className="text-xs text-white/15 text-center self-center blur-[3px]">XXX</span>
+                      <span className="text-sm font-bold text-[#F5C84C]/20 text-right blur-[3px]">000</span>
+                    </div>
+                  ))}
+                </>
+              )
+              : (
+                <div className="px-5 py-8 text-center text-sm text-white/25 bg-[#0c0c0c]">
+                  Rankings will be available when round data is processed.
+                </div>
+              )
+          }
+        </div>
+
+        <p className="text-center text-white/25 text-xs mt-5">
+          Full rankings include value ratings, ceiling projections and matchup grades.
+        </p>
+
+        <div className="flex justify-center mt-4">
+          <Link
+            to="/sports/afl/rankings"
+            className="inline-flex items-center gap-2 border border-white/15 text-white/70 hover:text-white hover:border-white/30 font-semibold text-sm px-7 py-3 rounded-xl transition-all"
+          >
+            View Full Rankings
+            <ArrowRight size={14} />
           </Link>
         </div>
       </div>
@@ -371,7 +399,7 @@ export default function Index() {
           </h1>
 
           <p className="text-lg md:text-xl text-white/55 font-medium mb-10 max-w-xl mx-auto leading-relaxed">
-            AI-powered projections, captain signals, breakout alerts and trap warnings — designed to help serious AFL Fantasy coaches make smarter decisions.
+            AI-powered projections, captain signals, breakout alerts and trap warnings — designed to help serious AFL Fantasy coaches make smarter weekly decisions.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
@@ -396,17 +424,21 @@ export default function Index() {
               <ArrowRight size={14} />
             </Link>
           </div>
+
+          <p className="mt-6 text-[12px] text-[#F5C84C]/45 font-medium tracking-wide">
+            Used weekly by serious AFL Fantasy coaches.
+          </p>
         </div>
       </section>
 
-      {/* ── SECTION 2: RANKINGS PREVIEW ───────────────────────────────────────── */}
-      <RankingsPreview />
-
-      {/* ── SECTION 3: EDGE SIGNALS PREVIEW ──────────────────────────────────── */}
+      {/* ── SECTION 2: EDGE SIGNALS PREVIEW ──────────────────────────────────── */}
       <EdgeBoardPreview />
 
+      {/* ── SECTION 3: RANKINGS PREVIEW ───────────────────────────────────────── */}
+      <RankingsPreview />
+
       {/* ── SECTION 4: WHY NEEKO WINS ─────────────────────────────────────────── */}
-      <section className="py-16 bg-[#070707] border-t border-white/[0.05]">
+      <section className="py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
         <div className="max-w-4xl mx-auto px-4">
           <SectionLabel>Why Neeko+</SectionLabel>
           <SectionHeading>Why Fantasy Coaches Use Neeko+</SectionHeading>
@@ -433,7 +465,7 @@ export default function Index() {
       </section>
 
       {/* ── SECTION 5: HOW IT WORKS ───────────────────────────────────────────── */}
-      <section className="py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
+      <section className="py-16 bg-[#070707] border-t border-white/[0.05]">
         <div className="max-w-4xl mx-auto px-4">
           <SectionLabel>How It Works</SectionLabel>
           <SectionHeading>From Raw Data to Weekly Edge Signals</SectionHeading>
@@ -459,7 +491,7 @@ export default function Index() {
       </section>
 
       {/* ── SECTION 6: WHO NEEKO IS FOR ───────────────────────────────────────── */}
-      <section className="py-16 bg-[#070707] border-t border-white/[0.05]">
+      <section className="py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
         <div className="max-w-4xl mx-auto px-4">
           <SectionLabel>Who It's For</SectionLabel>
           <SectionHeading>Built For Serious AFL Fantasy Coaches</SectionHeading>
@@ -482,6 +514,23 @@ export default function Index() {
         </div>
       </section>
 
+      {/* ── TRUST SIGNAL ──────────────────────────────────────────────────────── */}
+      {!isPremium && (
+        <section className="py-12 bg-[#070707] border-t border-white/[0.05]">
+          <div className="max-w-xl mx-auto px-4 text-center">
+            <p className="text-[11px] text-white/20 uppercase tracking-[0.18em] font-semibold mb-3">
+              Who Uses Neeko+
+            </p>
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-3">
+              Trusted by Competitive AFL Fantasy Coaches
+            </h2>
+            <p className="text-sm text-white/35 leading-relaxed max-w-sm mx-auto">
+              Designed for serious fantasy players who want structured insights — not noise.
+            </p>
+          </div>
+        </section>
+      )}
+
       {/* ── SECTION 7: PRICING ────────────────────────────────────────────────── */}
       {!isPremium && (
         <section className="py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
@@ -498,7 +547,7 @@ export default function Index() {
               <div className="rounded-2xl border border-white/[0.09] bg-[#0e0e0e] p-6">
                 <p className="text-xs font-bold uppercase tracking-widest text-white/30 mb-3">Monthly</p>
                 <div className="flex items-end gap-1.5 mb-1">
-                  <span className="text-4xl font-extrabold text-white">${NEEKO_PRICING.monthly.price}</span>
+                  <span className="text-4xl font-extrabold text-white">$9.99</span>
                   <span className="text-sm text-white/35 mb-1">AUD / month</span>
                 </div>
                 <p className="text-xs text-white/25 mb-6">{NEEKO_PRICING.monthly.billingNote}</p>
@@ -521,15 +570,15 @@ export default function Index() {
               >
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <span className="bg-[#F5C84C] text-black text-[11px] font-black px-3 py-0.5 rounded-full uppercase tracking-wide">
-                    Best Value — Save {NEEKO_PRICING.savingsPercent}%
+                    Best Value
                   </span>
                 </div>
                 <p className="text-xs font-bold uppercase tracking-widest text-[#F5C84C]/60 mb-3">Yearly</p>
                 <div className="flex items-end gap-1.5 mb-1">
-                  <span className="text-4xl font-extrabold text-white">${NEEKO_PRICING.yearly.price}</span>
+                  <span className="text-4xl font-extrabold text-white">$89</span>
                   <span className="text-sm text-white/35 mb-1">AUD / year</span>
                 </div>
-                <p className="text-xs text-[#F5C84C]/50 mb-6">Equivalent to ${NEEKO_PRICING.yearly.monthlyEquivalent}/month</p>
+                <p className="text-xs text-[#F5C84C]/50 mb-6">Equivalent to $7.42/month</p>
                 <Link
                   to="/neeko-plus"
                   className="block text-center bg-[#F5C84C] text-black font-bold text-sm py-2.5 rounded-xl hover:brightness-110 transition-all"
