@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowRight, Crown, RotateCcw, Zap } from "lucide-react";
+import { ArrowRight, RotateCcw, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
@@ -22,9 +22,11 @@ interface PlayerOption {
 }
 
 interface AIResult {
-  verdict: string;
-  confidence: number | null;
-  analysis: string | null;
+  winner_player_id: string;
+  winner_name: string;
+  confidence: number;
+  ai_summary: string | null;
+  is_cached: boolean;
 }
 
 async function fetchFullPlayer(id: string): Promise<PlayerOption | null> {
@@ -68,34 +70,42 @@ export default function StartSitPage() {
     setResult(null);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
+      if (!headers["Authorization"]) {
+        headers["Authorization"] = `Bearer ${anonKey}`;
+      }
+
       const res = await fetch(`${supabaseUrl}/functions/v1/generate-start-sit`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${anonKey}`,
-        },
+        headers,
         body: JSON.stringify({
-          playerA_id: playerA.player_id,
-          playerB_id: playerB.player_id,
           season: CURRENT_SEASON,
-          round,
+          round_number: round,
+          playerAId: playerA.player_id,
+          playerBId: playerB.player_id,
         }),
       });
 
       const json = await res.json();
+
       if (!res.ok || json.error) {
-        setError(json.error ?? "Something went wrong.");
+        setError(
+          json.error ??
+            "Start/Sit data isn't available for this round yet. Defaulting to Opening Round."
+        );
         return;
       }
-
-      const r = json.result;
-      const verdictFlipped =
-        r.player_a_id !== playerA.player_id && r.verdict !== "TOSS_UP"
-          ? r.verdict === "START_PLAYER_A" ? "START_PLAYER_B" : "START_PLAYER_A"
-          : r.verdict;
 
       const [fullA, fullB] = await Promise.all([
         fetchFullPlayer(playerA.player_id),
@@ -105,12 +115,16 @@ export default function StartSitPage() {
       if (fullB) setPlayerB(fullB);
 
       setResult({
-        verdict: verdictFlipped,
-        confidence: r.confidence ?? null,
-        analysis: r.analysis ?? null,
+        winner_player_id: json.winner_player_id,
+        winner_name: json.winner_name,
+        confidence: json.confidence ?? 60,
+        ai_summary: json.ai_summary ?? null,
+        is_cached: json.is_cached ?? false,
       });
     } catch (e) {
-      setError(String(e));
+      setError(
+        "Start/Sit data isn't available for this round yet. Defaulting to Opening Round."
+      );
     } finally {
       setLoading(false);
     }
@@ -129,7 +143,6 @@ export default function StartSitPage() {
     <div className="min-h-screen bg-[#070707] text-white">
       <div className="max-w-2xl mx-auto px-4 py-8 pb-24">
 
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-1">
             <Zap size={16} className="text-[#F5C84C]" />
@@ -141,7 +154,6 @@ export default function StartSitPage() {
           </p>
         </div>
 
-        {/* Round badge */}
         <div className="flex items-center gap-2 mb-6">
           <span className="text-[11px] text-white/30 uppercase tracking-wider">Round</span>
           <span className="rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1 text-sm font-bold text-white/70">
@@ -150,7 +162,6 @@ export default function StartSitPage() {
           <span className="text-[11px] text-white/20">{CURRENT_SEASON} season</span>
         </div>
 
-        {/* Selectors */}
         <div className="grid gap-3 sm:grid-cols-2 mb-5">
           <StartSitSelector
             label="Player A"
@@ -166,7 +177,6 @@ export default function StartSitPage() {
           />
         </div>
 
-        {/* Action row */}
         <div className="flex items-center gap-3">
           <button
             onClick={handleCompare}
@@ -202,31 +212,35 @@ export default function StartSitPage() {
         </div>
 
         {error && (
-          <p className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
-            {error}
-          </p>
+          <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 flex items-start justify-between gap-3">
+            <p className="text-sm text-red-400">{error}</p>
+            <button
+              onClick={handleCompare}
+              className="shrink-0 text-xs text-red-400/70 hover:text-red-400 underline underline-offset-2 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
         )}
 
-        {/* Result */}
         {result && playerA && playerB && (
           <StartSitResult
             playerA={playerA}
             playerB={playerB}
-            verdict={result.verdict}
+            winnerPlayerId={result.winner_player_id}
             confidence={result.confidence}
-            analysis={result.analysis}
+            aiSummary={result.ai_summary}
             isPremium={isPremium}
             onUpgrade={() => navigate("/neeko-plus")}
           />
         )}
 
-        {/* Empty state hint */}
         {!result && !loading && (
           <div className="mt-10 text-center">
             <p className="text-sm text-white/20">Select two players above to get started.</p>
             {!isPremium && (
               <p className="text-[11px] text-white/15 mt-1">
-                AI verdict &amp; explanation require Neeko+
+                AI explanation requires Neeko+
               </p>
             )}
           </div>

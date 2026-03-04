@@ -8,14 +8,14 @@ const corsHeaders = {
 };
 
 interface StartSitRequest {
-  playerA_id: string;
-  playerB_id: string;
   season: number;
-  round: number;
+  round_number: number;
+  playerAId: string;
+  playerBId: string;
 }
 
 interface PlayerData {
-  player_id: string | null;
+  player_id: string;
   player_name: string;
   team: string | null;
   position: string | null;
@@ -28,6 +28,145 @@ interface PlayerData {
   ai_recommendation: string | null;
 }
 
+async function sha256Hex(text: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function deterministicWinner(
+  pA: PlayerData,
+  pB: PlayerData
+): { winner: PlayerData; loser: PlayerData; confidence: number } {
+  const nA = pA.neeko_rating ?? 0;
+  const nB = pB.neeko_rating ?? 0;
+  const pjA = pA.projection_final ?? 0;
+  const pjB = pB.projection_final ?? 0;
+  const cA = pA.projection_confidence ?? 0;
+  const cB = pB.projection_confidence ?? 0;
+  const rA = (pA.ceiling_estimate ?? 0) - (pA.floor_estimate ?? 0);
+  const rB = (pB.ceiling_estimate ?? 0) - (pB.floor_estimate ?? 0);
+
+  let winner: PlayerData;
+  let loser: PlayerData;
+
+  if (nA !== nB) {
+    winner = nA > nB ? pA : pB;
+    loser = nA > nB ? pB : pA;
+  } else if (pjA !== pjB) {
+    winner = pjA > pjB ? pA : pB;
+    loser = pjA > pjB ? pB : pA;
+  } else if (cA !== cB) {
+    winner = cA > cB ? pA : pB;
+    loser = cA > cB ? pB : pA;
+  } else if (rA !== rB) {
+    winner = rA < rB ? pA : pB;
+    loser = rA < rB ? pB : pA;
+  } else {
+    winner = pA;
+    loser = pB;
+  }
+
+  const neekoDiff = Math.abs(nA - nB);
+  const projDiff = Math.abs(pjA - pjB);
+  const raw = 50 + neekoDiff * 0.8 + projDiff * 0.4;
+  const confidence = Math.round(Math.min(Math.max(raw, 55), 92));
+
+  return { winner, loser, confidence };
+}
+
+function deterministicExplanation(winner: PlayerData, loser: PlayerData): string {
+  const lines: string[] = [];
+
+  const nW = winner.neeko_rating ?? 0;
+  const nL = loser.neeko_rating ?? 0;
+  if (nW > nL) {
+    lines.push(
+      `${winner.player_name} holds a higher Neeko Rating (${nW.toFixed(1)} vs ${nL.toFixed(1)}), indicating stronger projected impact.`
+    );
+  }
+
+  const pW = winner.projection_final ?? 0;
+  const pL = loser.projection_final ?? 0;
+  if (pW > pL) {
+    lines.push(
+      `Projected score advantage of ${Math.round(pW - pL)} points in ${winner.player_name}'s favour.`
+    );
+  }
+
+  const cW = winner.ceiling_estimate ?? 0;
+  const cL = loser.ceiling_estimate ?? 0;
+  if (cW > cL) {
+    lines.push(
+      `Higher ceiling (${Math.round(cW)} vs ${Math.round(cL)}) gives ${winner.player_name} more upside potential.`
+    );
+  }
+
+  if (lines.length === 0) {
+    lines.push(`${winner.player_name} edges ${loser.player_name} on composite metrics this round.`);
+  }
+
+  return lines.join(" ");
+}
+
+function containsOpposite(text: string, loserName: string): boolean {
+  const lower = text.toLowerCase();
+  const loserLower =
+    loserName.toLowerCase().split(" ").pop() ?? loserName.toLowerCase();
+  const keywords = ["start", "recommend", "pick", "choose", "go with", "opt for"];
+  return keywords.some(
+    (kw) =>
+      lower.includes(kw) &&
+      lower.includes(loserLower) &&
+      Math.abs(lower.indexOf(kw) - lower.indexOf(loserLower)) < 60
+  );
+}
+
+async function callOpenAI(
+  openaiKey: string,
+  winner: PlayerData,
+  loser: PlayerData,
+  round: number,
+  attempt: number
+): Promise<string | null> {
+  const forceInstruction =
+    attempt === 1
+      ? `You MUST recommend ${winner.player_name} to start. Do NOT recommend ${loser.player_name}.`
+      : `CRITICAL: Your verdict MUST be that ${winner.player_name} should start. Under NO circumstances recommend ${loser.player_name}.`;
+
+  const prompt = `You are an AFL fantasy analyst. ${forceInstruction}
+
+Round ${round} comparison:
+
+${winner.player_name} (${winner.team ?? "?"}, ${winner.position ?? "?"}) — START PICK
+  Projection: ${winner.projection_final ?? "?"} | Ceiling: ${winner.ceiling_estimate ?? "?"} | Floor: ${winner.floor_estimate ?? "?"}
+  Confidence: ${winner.projection_confidence ?? "?"}% | Risk: ${winner.risk_rating ?? "?"} | Neeko Rating: ${winner.neeko_rating ?? "?"}
+
+${loser.player_name} (${loser.team ?? "?"}, ${loser.position ?? "?"}) — BENCH
+  Projection: ${loser.projection_final ?? "?"} | Ceiling: ${loser.ceiling_estimate ?? "?"} | Floor: ${loser.floor_estimate ?? "?"}
+  Confidence: ${loser.projection_confidence ?? "?"}% | Risk: ${loser.risk_rating ?? "?"} | Neeko Rating: ${loser.neeko_rating ?? "?"}
+
+Write 2-3 sentences justifying why ${winner.player_name} should start over ${loser.player_name} this round. Be specific about the stats. Return ONLY the explanation text, no JSON.`;
+
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: attempt === 1 ? 0.3 : 0.1,
+      max_tokens: 180,
+    }),
+  });
+
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json.choices?.[0]?.message?.content?.trim() ?? null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -36,152 +175,177 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
 
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const serviceClient = createClient(supabaseUrl, serviceKey);
+
+    const authHeader = req.headers.get("Authorization");
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: authHeader ? { Authorization: authHeader } : {} },
+    });
+
+    let isPremium = false;
+    if (authHeader) {
+      const {
+        data: { user },
+      } = await userClient.auth.getUser();
+      if (user) {
+        const { data: profile } = await serviceClient
+          .from("profiles")
+          .select("subscription_status, current_period_end, is_active")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profile) {
+          const notExpired =
+            !profile.current_period_end ||
+            new Date(profile.current_period_end) > new Date();
+          isPremium =
+            profile.is_active === true &&
+            notExpired &&
+            (profile.subscription_status === "active" ||
+              profile.subscription_status === "trialing");
+        }
+      }
+    }
 
     const body: StartSitRequest = await req.json();
-    const { playerA_id, playerB_id, season, round } = body;
+    const { season, playerAId, playerBId } = body;
+    const round_number = body.round_number ?? 1;
 
-    if (!playerA_id || !playerB_id || !season || !round) {
+    if (!playerAId || !playerBId || !season) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: playerA_id, playerB_id, season, round" }),
+        JSON.stringify({
+          error: "Missing required fields: season, playerAId, playerBId",
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const loId = playerA_id < playerB_id ? playerA_id : playerB_id;
-    const hiId = playerA_id < playerB_id ? playerB_id : playerA_id;
-
-    const { data: cached } = await supabase
-      .from("afl_ai_start_sit")
-      .select("*")
-      .eq("player_a_id", loId)
-      .eq("player_b_id", hiId)
-      .eq("season", season)
-      .eq("round", round)
-      .maybeSingle();
-
-    if (cached) {
-      return new Response(
-        JSON.stringify({ cached: true, result: cached }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const { data: players, error: playersError } = await supabase
+    const { data: players, error: playersError } = await serviceClient
       .from("v_rankings_master")
-      .select(`
-        player_id, player_name, team, position,
-        projection_final, ceiling_estimate, floor_estimate,
-        projection_confidence, risk_rating, neeko_rating, ai_recommendation
-      `)
-      .in("player_id", [playerA_id, playerB_id]);
+      .select(
+        `player_id, player_name, team, position,
+         projection_final, ceiling_estimate, floor_estimate,
+         projection_confidence, risk_rating, neeko_rating, ai_recommendation`
+      )
+      .in("player_id", [playerAId, playerBId]);
 
     if (playersError || !players || players.length < 2) {
       return new Response(
-        JSON.stringify({ error: "Could not load player data" }),
+        JSON.stringify({
+          error:
+            "Start/Sit data isn't available for this round yet. Defaulting to Opening Round.",
+        }),
         { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const pA: PlayerData = players.find((p) => p.player_id === playerA_id) ?? players[0];
-    const pB: PlayerData = players.find((p) => p.player_id === playerB_id) ?? players[1];
+    const pA = (players.find((p) => p.player_id === playerAId) ?? players[0]) as PlayerData;
+    const pB = (players.find((p) => p.player_id === playerBId) ?? players[1]) as PlayerData;
 
-    if (!openaiKey) {
-      const fallback = {
-        player_a_id: loId,
-        player_b_id: hiId,
-        player_a_name: pA.player_name,
-        player_b_name: pB.player_name,
-        season,
-        round,
-        verdict: "TOSS_UP",
-        confidence: 50,
-        analysis: "AI verdict unavailable — OpenAI key not configured.",
-      };
+    const loId = playerAId < playerBId ? playerAId : playerBId;
+    const hiId = playerAId < playerBId ? playerBId : playerAId;
+
+    const inputPayload = {
+      season,
+      round_number,
+      loId,
+      hiId,
+      statsA: {
+        neeko_rating: pA.neeko_rating,
+        projection_final: pA.projection_final,
+        ceiling_estimate: pA.ceiling_estimate,
+        floor_estimate: pA.floor_estimate,
+        projection_confidence: pA.projection_confidence,
+        risk_rating: pA.risk_rating,
+      },
+      statsB: {
+        neeko_rating: pB.neeko_rating,
+        projection_final: pB.projection_final,
+        ceiling_estimate: pB.ceiling_estimate,
+        floor_estimate: pB.floor_estimate,
+        projection_confidence: pB.projection_confidence,
+        risk_rating: pB.risk_rating,
+      },
+    };
+
+    const inputsHash = await sha256Hex(JSON.stringify(inputPayload));
+
+    const { data: cached } = await serviceClient
+      .from("start_sit_cache")
+      .select("*")
+      .eq("season", season)
+      .eq("round_number", round_number)
+      .eq("player_low_id", loId)
+      .eq("player_high_id", hiId)
+      .eq("inputs_hash", inputsHash)
+      .maybeSingle();
+
+    const { winner, loser, confidence } = deterministicWinner(pA, pB);
+
+    if (cached) {
       return new Response(
-        JSON.stringify({ cached: false, result: fallback }),
+        JSON.stringify({
+          season,
+          round_number,
+          playerA: pA,
+          playerB: pB,
+          winner_player_id: cached.winner_player_id,
+          winner_name: cached.winner_name,
+          confidence: cached.confidence,
+          ai_summary: isPremium ? cached.ai_summary : null,
+          is_cached: true,
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const prompt = `You are an elite AFL fantasy analyst.
+    let aiSummary: string | null = null;
 
-Compare these two players and decide who should START in fantasy.
-
-Player A: ${pA.player_name} (${pA.team ?? "?"}, ${pA.position ?? "?"})
-  Projection: ${pA.projection_final ?? "?"} | Ceiling: ${pA.ceiling_estimate ?? "?"} | Floor: ${pA.floor_estimate ?? "?"}
-  Confidence: ${pA.projection_confidence ?? "?"}% | Risk: ${pA.risk_rating ?? "?"} | Neeko Rating: ${pA.neeko_rating ?? "?"}
-  AI Label: ${pA.ai_recommendation ?? "none"}
-
-Player B: ${pB.player_name} (${pB.team ?? "?"}, ${pB.position ?? "?"})
-  Projection: ${pB.projection_final ?? "?"} | Ceiling: ${pB.ceiling_estimate ?? "?"} | Floor: ${pB.floor_estimate ?? "?"}
-  Confidence: ${pB.projection_confidence ?? "?"}% | Risk: ${pB.risk_rating ?? "?"} | Neeko Rating: ${pB.neeko_rating ?? "?"}
-  AI Label: ${pB.ai_recommendation ?? "none"}
-
-Evaluate projection, ceiling, floor, form, matchup risk and confidence. Be decisive.
-
-Return ONLY valid JSON, no extra text:
-{
-  "verdict": "START_PLAYER_A" | "START_PLAYER_B" | "TOSS_UP",
-  "confidence": <integer 50-99>,
-  "analysis": "<2-3 sentence explanation>"
-}`;
-
-    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
-        max_tokens: 200,
-      }),
-    });
-
-    if (!openaiRes.ok) {
-      const errText = await openaiRes.text();
-      return new Response(
-        JSON.stringify({ error: `OpenAI error: ${errText}` }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (isPremium && openaiKey) {
+      const attempt1 = await callOpenAI(openaiKey, winner, loser, round_number, 1);
+      if (attempt1 && containsOpposite(attempt1, loser.player_name)) {
+        const attempt2 = await callOpenAI(openaiKey, winner, loser, round_number, 2);
+        aiSummary =
+          attempt2 && !containsOpposite(attempt2, loser.player_name)
+            ? attempt2
+            : deterministicExplanation(winner, loser);
+      } else {
+        aiSummary = attempt1 ?? deterministicExplanation(winner, loser);
+      }
     }
 
-    const aiJson = await openaiRes.json();
-    const rawContent = aiJson.choices?.[0]?.message?.content ?? "{}";
-    let parsed: { verdict?: string; confidence?: number; analysis?: string } = {};
-    try {
-      parsed = JSON.parse(rawContent);
-    } catch {
-      parsed = { verdict: "TOSS_UP", confidence: 50, analysis: rawContent };
-    }
-
-    const record = {
-      player_a_id: loId,
-      player_b_id: hiId,
-      player_a_name: loId === playerA_id ? pA.player_name : pB.player_name,
-      player_b_name: hiId === playerB_id ? pB.player_name : pA.player_name,
+    const cacheRow = {
       season,
-      round,
-      verdict: parsed.verdict ?? "TOSS_UP",
-      confidence: parsed.confidence ?? 50,
-      analysis: parsed.analysis ?? "",
+      round_number,
+      player_low_id: loId,
+      player_high_id: hiId,
+      winner_player_id: winner.player_id,
+      winner_name: winner.player_name,
+      confidence,
+      ai_summary: aiSummary,
+      model_key: isPremium && openaiKey ? "gpt-4o-mini" : null,
+      inputs_hash: inputsHash,
     };
 
-    await supabase.from("afl_ai_start_sit").upsert(record, {
-      onConflict: "player_a_id,player_b_id,season,round",
+    await serviceClient.from("start_sit_cache").upsert(cacheRow, {
+      onConflict: "season,round_number,player_low_id,player_high_id,inputs_hash",
     });
 
-    const verdictFlipped =
-      loId !== playerA_id && record.verdict !== "TOSS_UP"
-        ? record.verdict === "START_PLAYER_A"
-          ? "START_PLAYER_B"
-          : "START_PLAYER_A"
-        : record.verdict;
-
     return new Response(
-      JSON.stringify({ cached: false, result: { ...record, verdict: verdictFlipped } }),
+      JSON.stringify({
+        season,
+        round_number,
+        playerA: pA,
+        playerB: pB,
+        winner_player_id: winner.player_id,
+        winner_name: winner.player_name,
+        confidence,
+        ai_summary: isPremium ? aiSummary : null,
+        is_cached: false,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
