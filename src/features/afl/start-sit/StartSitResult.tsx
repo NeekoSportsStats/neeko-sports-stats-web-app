@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Crown, Lock, Zap, ChevronDown, ChevronUp, Flame, TrendingUp, Target } from "lucide-react";
+import { StartProbabilityMeter } from "./StartProbabilityMeter";
 
 interface PlayerData {
   player_id: string;
@@ -217,6 +218,13 @@ export function StartSitResult({
           </div>
         </div>
       </div>
+
+      {/* ── PROBABILITY METER ── */}
+      <StartProbabilityMeter
+        playerA={playerA}
+        playerB={playerB}
+        winnerPlayerId={winnerPlayerId}
+      />
 
       {/* ── PLAYER IDENTITY ROW ── */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">

@@ -253,6 +253,7 @@ export default function StartSitPage() {
         {comparing && (
           <div className="mt-6 space-y-3 animate-pulse">
             <div className="h-36 rounded-2xl bg-white/[0.04]" />
+            <div className="h-28 rounded-xl bg-white/[0.04]" />
             <div className="h-24 rounded-xl bg-white/[0.04]" />
             <div className="h-48 rounded-xl bg-white/[0.04]" />
             <div className="h-28 rounded-xl bg-white/[0.04]" />
