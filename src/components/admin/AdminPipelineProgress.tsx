@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { CheckCircle, XCircle, Loader2, Clock } from "lucide-react";
+import { CircleCheck as CheckCircle, Circle as XCircle, Loader as Loader2, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
