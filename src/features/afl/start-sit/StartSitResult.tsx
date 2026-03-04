@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Crown, Lock, Zap, ChevronDown, ChevronUp, Flame, TrendingUp, Target, AlertTriangle, Percent, Swords } from "lucide-react";
+import { Crown, Lock, Zap, ChevronDown, ChevronUp, Flame, TrendingUp, Target, TriangleAlert as AlertTriangle, Percent, Swords } from "lucide-react";
 import { StartProbabilityMeter } from "./StartProbabilityMeter";
 import { OutcomeDistributionChart } from "./OutcomeDistributionChart";
 
