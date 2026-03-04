@@ -729,8 +729,11 @@ export default function Admin() {
     const runId = await createPipelineRun("weekly_pipeline", "Weekly Pipeline");
     if (runId) await fetchActiveRun(runId);
     try {
-      const { error } = await supabase.functions.invoke("weekly-afl-pipeline", { body: {} });
-      if (runId) await finishPipelineRun(runId, !error);
+      const { data, error } = await supabase.functions.invoke("weekly-afl-pipeline", {
+        body: runId ? { run_id: runId } : {},
+      });
+      const hasError = error || (data && !data.ok);
+      if (runId) await finishPipelineRun(runId, !hasError);
       if (error) throw error;
       toast({ title: "Pipeline complete", description: "All steps finished successfully." });
       await fetchAll();

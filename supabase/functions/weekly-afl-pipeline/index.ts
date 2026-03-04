@@ -14,6 +14,20 @@ interface PipelineStep {
   duration_ms?: number;
 }
 
+const STEP_LABELS: Record<string, string> = {
+  "1_ingest_matches":          "Ingesting AFL match data",
+  "2_ingest_player_stats":     "Ingesting player stats",
+  "3_ingest_team_stats":       "Ingesting team stats",
+  "4_detect_latest_round":     "Detecting latest round",
+  "5_transform_player_stats":  "Transforming player stats",
+  "6_transform_matches":       "Transforming match data",
+  "7_update_team_defense":     "Rebuilding team defence profile",
+  "8_refresh_neeko_intel":     "Refreshing Neeko intelligence",
+  "9_refresh_volatility":      "Refreshing player volatility",
+  "10_generate_ai":            "Generating AI rankings",
+  "11_cleanup_start_sit_cache":"Cleaning Start/Sit cache",
+};
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -33,8 +47,11 @@ Deno.serve(async (req: Request) => {
     const skipIngest: boolean   = body.skip_ingest   ?? false;
     const skipAI: boolean       = body.skip_ai       ?? false;
     const skipCache: boolean    = body.skip_cache     ?? false;
+    const runId: string | null  = body.run_id        ?? null;
 
     const steps: PipelineStep[] = [];
+    let completedCount = 0;
+    const totalSteps = 11;
 
     const fnHeaders = {
       "Authorization": `Bearer ${serviceKey}`,
@@ -50,6 +67,20 @@ Deno.serve(async (req: Request) => {
       return res.ok ? res.json().catch(() => ({ status: res.status })) : { http_status: res.status };
     }
 
+    async function updateRunProgress(stepName: string, completed: number): Promise<void> {
+      if (!runId) return;
+      const nextStepIndex = completed;
+      const stepKeys = Object.keys(STEP_LABELS);
+      const nextLabel = nextStepIndex < stepKeys.length
+        ? STEP_LABELS[stepKeys[nextStepIndex]]
+        : "Finalising…";
+      await db.from("pipeline_runs").update({
+        completed_tasks: completed,
+        current_step_label: completed >= totalSteps ? "Done" : nextLabel,
+      }).eq("id", runId);
+      console.log(`Pipeline step completed: ${stepName} (${completed}/${totalSteps})`);
+    }
+
     async function runStep(
       name: string,
       fn: () => Promise<unknown>,
@@ -57,12 +88,17 @@ Deno.serve(async (req: Request) => {
     ): Promise<void> {
       if (skip) {
         steps.push({ name, status: "skipped" });
+        completedCount++;
+        await updateRunProgress(name, completedCount);
         return;
       }
+      console.log(`Pipeline starting step: ${STEP_LABELS[name] ?? name}`);
       const t = Date.now();
       try {
         const detail = await fn();
         steps.push({ name, status: "ok", detail, duration_ms: Date.now() - t });
+        completedCount++;
+        await updateRunProgress(name, completedCount);
       } catch (err) {
         steps.push({
           name,
@@ -70,6 +106,8 @@ Deno.serve(async (req: Request) => {
           detail: err instanceof Error ? err.message : String(err),
           duration_ms: Date.now() - t,
         });
+        completedCount++;
+        await updateRunProgress(name, completedCount);
       }
     }
 
