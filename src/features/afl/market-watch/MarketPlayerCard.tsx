@@ -1,0 +1,126 @@
+import { Lock } from "lucide-react";
+import { MarketRow } from "./types";
+import { fmtPrice, fmtNum, signalColor, momentumColor, riskColor, positionBadge } from "./helpers";
+
+interface Props {
+  row: MarketRow;
+  locked?: boolean;
+  onUnlock?: () => void;
+  tab: string;
+  rank: number;
+}
+
+export function MarketPlayerCard({ row, locked, onUnlock, tab, rank }: Props) {
+  const momentum = Number(row.price_momentum ?? 0);
+  const momentumStr = momentum >= 0 ? `+${fmtNum(momentum, 1)}` : fmtNum(momentum, 1);
+
+  return (
+    <div
+      className={`relative rounded-xl border transition-all duration-200 ${
+        locked
+          ? "border-white/5 bg-white/[0.02] opacity-60 blur-[2px] pointer-events-none select-none"
+          : "border-white/8 bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/12"
+      }`}
+    >
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[11px] font-mono text-white/25 w-5 shrink-0">#{rank}</span>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm text-white truncate leading-tight">{row.player_name}</p>
+              <p className="text-[11px] text-white/40 truncate mt-0.5">{row.team}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {row.position && (
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border uppercase ${positionBadge(row.position)}`}>
+                {row.position}
+              </span>
+            )}
+            {row.trade_signal && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${signalColor(row.trade_signal)}`}>
+                {row.trade_signal}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <StatCell label="Price" value={fmtPrice(row.price)} />
+          <StatCell label="Breakeven" value={fmtNum(row.breakeven, 1)} />
+          <StatCell
+            label="Projection"
+            value={fmtNum(row.projection_final, 1)}
+            valueClass="text-[#F5C84C]"
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 mt-2">
+          <StatCell
+            label="Price Edge"
+            value={momentumStr + " pts"}
+            valueClass={momentumColor(momentum)}
+          />
+          <StatCell
+            label="Ceiling"
+            value={fmtNum(row.ceiling_estimate, 0)}
+          />
+          <StatCell
+            label="Risk"
+            value={fmtNum(row.risk_rating, 0) + "%"}
+            valueClass={riskColor(row.risk_rating)}
+          />
+        </div>
+
+        {tab === "buy" || tab === "sell" ? (
+          <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
+            <span className="text-[10px] text-white/30">Trade Score</span>
+            <span className="text-sm font-bold tabular-nums text-white">
+              {fmtNum(row.trade_score, 1)}
+            </span>
+          </div>
+        ) : null}
+
+        {row.recommendation_why && (
+          <p className="mt-2.5 text-[11px] text-white/35 leading-snug line-clamp-2">
+            {row.recommendation_why}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatCell({
+  label,
+  value,
+  valueClass = "text-white",
+}: {
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="rounded-lg bg-white/[0.025] px-2.5 py-2 text-center">
+      <p className="text-[9px] text-white/30 uppercase tracking-wider mb-0.5 truncate">{label}</p>
+      <p className={`text-xs font-semibold tabular-nums ${valueClass}`}>{value}</p>
+    </div>
+  );
+}
+
+export function LockedMarketCard({ rank, onUnlock }: { rank: number; onUnlock?: () => void }) {
+  return (
+    <div className="rounded-xl border border-[#F5C84C]/20 bg-[#F5C84C]/[0.03] p-4 flex items-center justify-center gap-3 min-h-[120px]">
+      <Lock className="h-4 w-4 text-[#F5C84C]/60 shrink-0" />
+      <div>
+        <p className="text-sm font-semibold text-white/70">#{rank} — Neeko+ Only</p>
+        <button
+          onClick={onUnlock}
+          className="text-[11px] text-[#F5C84C] hover:text-[#ffd95a] transition-colors mt-0.5"
+        >
+          Unlock full list
+        </button>
+      </div>
+    </div>
+  );
+}

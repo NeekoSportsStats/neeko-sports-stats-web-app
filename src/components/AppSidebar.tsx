@@ -14,7 +14,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-import { Chrome as Home, Trophy, Crown, Users, Share2, ChevronDown, User, Mail, CircleHelp as HelpCircle, FileText, X } from "lucide-react";
+import { Chrome as Home, Trophy, Crown, Users, Share2, ChevronDown, User, Mail, CircleHelp as HelpCircle, FileText, X, TrendingUp } from "lucide-react";
 
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -158,6 +158,19 @@ export function AppSidebar() {
                             onClick={handleLinkClick}
                           >
                             Start / Sit
+                          </NavLink>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild className="py-0.5">
+                          <NavLink
+                            to="/sports/afl/market-watch"
+                            className="hover:bg-muted/50 pl-8 text-xs"
+                            activeClassName="bg-muted text-primary font-medium"
+                            onClick={handleLinkClick}
+                          >
+                            Market Watch
                           </NavLink>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
