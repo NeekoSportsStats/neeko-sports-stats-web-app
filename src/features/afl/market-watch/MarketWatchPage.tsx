@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { TrendingUp, RefreshCw, Crown, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
@@ -32,6 +33,7 @@ interface V2Data {
 const preseasonMode = true;
 
 export default function MarketWatchPage() {
+  const navigate = useNavigate();
   const { isPremium, loading: authLoading } = useAuth();
 
   const [data, setData] = useState<V2Data>({ players: [], trades: [], summaryCards: [] });
@@ -212,6 +214,15 @@ export default function MarketWatchPage() {
                 style={{ animation: "pulse 2s cubic-bezier(0.4,0,0.6,1) infinite" }}
               />
               Activates Round 1
+            </div>
+
+            <div className="mt-5">
+              <button
+                onClick={() => navigate(-1)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-white/10 hover:bg-white/20 transition-colors text-white border border-white/20"
+              >
+                ← Back
+              </button>
             </div>
           </div>
         </div>
