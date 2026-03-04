@@ -12,15 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Loader2,
-  Crown,
-  User,
-  LogOut,
-  ArrowLeft,
-  CreditCard,
-  Shield,
-} from "lucide-react";
+import { Loader as Loader2, Crown, User, LogOut, ArrowLeft, CreditCard, Shield } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
 
