@@ -194,10 +194,20 @@ Deno.serve(async (req: Request) => {
       return { rows_deleted: data };
     }, skipCache);
 
-    // ── Log run to ai_generation_logs ─────────────────────────────────────────
+    // ── Finalise pipeline_runs row ────────────────────────────────────────────
     const totalDuration = Date.now() - pipelineStart;
     const allOk = steps.every((s) => s.status !== "error");
 
+    if (runId) {
+      await db.from("pipeline_runs").update({
+        status: allOk ? "completed" : "failed",
+        completed_tasks: completedCount,
+        current_step_label: allOk ? "Done" : "Failed",
+        finished_at: new Date().toISOString(),
+      }).eq("id", runId);
+    }
+
+    // ── Log run to ai_generation_logs ─────────────────────────────────────────
     await db.schema("afl").from("ai_generation_logs").insert({
       job_name: "weekly-afl-pipeline",
       job_type: "weekly_pipeline",

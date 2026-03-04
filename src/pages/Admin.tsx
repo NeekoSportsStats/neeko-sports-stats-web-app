@@ -728,25 +728,55 @@ export default function Admin() {
     toast({ title: "Triggering weekly pipeline…", description: "This may take 2–5 minutes." });
     const runId = await createPipelineRun("weekly_pipeline", "Weekly Pipeline");
     if (runId) await fetchActiveRun(runId);
-    try {
-      const { data, error } = await supabase.functions.invoke("weekly-afl-pipeline", {
-        body: runId ? { run_id: runId } : {},
-      });
-      const hasError = error || (data && !data.ok);
-      if (runId) await finishPipelineRun(runId, !hasError);
-      if (error) throw error;
-      toast({ title: "Pipeline complete", description: "All steps finished successfully." });
+    setIsRefreshing(false);
+
+    supabase.functions.invoke("weekly-afl-pipeline", {
+      body: runId ? { run_id: runId } : {},
+    }).then(async ({ data, error }) => {
+      const success = !error && data?.ok === true;
+      if (runId) {
+        const { data: finalRun } = await supabase
+          .from("v_pipeline_progress")
+          .select("*")
+          .eq("id", runId)
+          .maybeSingle();
+        const alreadyFinished = finalRun?.status === "completed" || finalRun?.status === "failed";
+        if (!alreadyFinished) {
+          await finishPipelineRun(runId, success);
+        } else {
+          await fetchActiveRun(runId);
+        }
+      }
+      if (success) {
+        toast({ title: "Pipeline complete", description: "All steps finished successfully." });
+      } else {
+        toast({
+          title: "Pipeline failed",
+          description: error instanceof Error ? error.message : "One or more steps failed — check job history.",
+          variant: "destructive",
+        });
+      }
       await fetchAll();
-    } catch (err) {
-      if (runId) await finishPipelineRun(runId, false);
+    }).catch(async (err) => {
+      if (runId) {
+        const { data: finalRun } = await supabase
+          .from("v_pipeline_progress")
+          .select("*")
+          .eq("id", runId)
+          .maybeSingle();
+        if (finalRun?.status === "running") {
+          await finishPipelineRun(runId, false);
+        } else {
+          await fetchActiveRun(runId);
+        }
+      }
       toast({
-        title: "Pipeline failed",
+        title: "Pipeline invocation error",
         description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
       });
-    } finally {
-      setIsRefreshing(false);
-    }
+      await fetchAll();
+    });
   };
 
   const handleRefreshVolatility = async () => {
