@@ -53,10 +53,12 @@ export default function StartSitPage() {
 
   useEffect(() => {
     supabase
-      .rpc("get_latest_completed_round", { p_season: CURRENT_SEASON })
+      .rpc("get_latest_completed_round")
       .then(({ data }) => {
-        if (data && data[0]) setRound((data[0].round_number ?? 0) + 1);
-      });
+        const latest = typeof data === "number" ? data : 0;
+        setRound(latest > 0 ? latest + 1 : 1);
+      })
+      .catch(() => setRound(1));
   }, []);
 
   async function handleCompare() {
