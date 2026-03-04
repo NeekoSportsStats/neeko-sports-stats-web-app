@@ -1,4 +1,4 @@
-import { MarketRow } from "./types";
+import { MarketRow, MWCategory } from "./types";
 
 export function fmtPrice(v: number | null | undefined): string {
   if (v == null) return "—";
@@ -77,3 +77,52 @@ export const TAB_META: Record<string, { label: string; view: string; icon: strin
 };
 
 export const FREE_VISIBLE = 3;
+
+export function fmtPriceChange(v: number | null | undefined): string {
+  if (v == null) return "—";
+  const n = Number(v);
+  if (isNaN(n)) return "—";
+  const abs = Math.abs(n);
+  const formatted = abs >= 1000 ? `$${(abs / 1000).toFixed(0)}k` : `$${abs.toFixed(0)}`;
+  return n >= 0 ? `+${formatted}` : `-${formatted}`;
+}
+
+export function priceChangeColor(v: number | null): string {
+  if (v == null) return "text-white/40";
+  if (v > 5000)  return "text-green-400";
+  if (v > 0)     return "text-green-300";
+  if (v > -5000) return "text-yellow-400";
+  return "text-red-400";
+}
+
+export function categoryLabel(cat: MWCategory): string {
+  switch (cat) {
+    case "buy":          return "BUY";
+    case "sell_now":     return "SELL NOW";
+    case "sell_consider":return "CONSIDER SELLING";
+    case "cash_cow":     return "CASH COW";
+    case "fade":         return "FADE";
+    default:             return "MONITOR";
+  }
+}
+
+export function categoryColor(cat: MWCategory): string {
+  switch (cat) {
+    case "buy":          return "text-green-400 bg-green-400/10 border-green-400/25";
+    case "sell_now":     return "text-red-400 bg-red-400/10 border-red-400/25";
+    case "sell_consider":return "text-orange-400 bg-orange-400/10 border-orange-400/25";
+    case "cash_cow":     return "text-[#F5C84C] bg-[#F5C84C]/10 border-[#F5C84C]/25";
+    case "fade":         return "text-orange-300 bg-orange-300/10 border-orange-300/25";
+    default:             return "text-white/40 bg-white/5 border-white/10";
+  }
+}
+
+export function confidenceBadge(v: number): string {
+  if (v >= 80) return "text-green-400 bg-green-400/10 border-green-400/25";
+  if (v >= 60) return "text-[#F5C84C] bg-[#F5C84C]/10 border-[#F5C84C]/25";
+  return "text-orange-400 bg-orange-400/10 border-orange-400/25";
+}
+
+export function tradeScoreExplanation(): string {
+  return "Trade Score = 40% projection strength + 35% price edge + 20% risk safety + 5% ceiling bonus. Higher is better.";
+}
