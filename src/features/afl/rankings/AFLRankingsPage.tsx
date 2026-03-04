@@ -8,7 +8,7 @@ import {
 } from "./components/types";
 import {
   TAB_SORT_KEY, TAB_DEFAULT_SORT, TAB_DESCRIPTIONS,
-  FREE_FULL_ROWS, FREE_PARTIAL_ROWS, FREE_FETCH_LIMIT,
+  FREE_PARTIAL_ROWS, FREE_FETCH_LIMIT,
   getFreeTier, normalisePosition, computeKpiTiles, fmtUpdatedAt,
 } from "./components/helpers";
 import {
@@ -17,9 +17,7 @@ import {
 import {
   TableHeader, TableRow, LockedTableRow, ConversionWallRow, LoadingSkeletonRows,
 } from "./components/RankingsTable";
-import {
-  MobilePlayerCard, LockedMobileRow, MobileConversionWall,
-} from "./components/MobilePlayerCard";
+import { MobileRankingsTable } from "./components/MobileRankingsTable";
 
 // ─── Position + filter constants ─────────────────────────────────────────────
 
@@ -423,56 +421,19 @@ export default function AFLRankingsPage() {
         {/* ── KPI Tiles (premium only) ──────────────────────────────────────── */}
         {isPremium && !loading && <KpiTiles rows={displayRows} />}
 
-        {/* ── MOBILE card list (< md) ───────────────────────────────────────── */}
+        {/* ── MOBILE sticky-column table (< md) ────────────────────────────── */}
         <div className="md:hidden">
-          {isPremium ? (
-            <p className="text-xs text-white/25 mb-2">{displayRows.length} players · Tap to expand · Tap name for full breakdown</p>
-          ) : (
-            <p className="text-xs text-white/30 mb-2">Tap any card for full breakdown</p>
+          {isPremium && (
+            <p className="text-xs text-white/25 mb-2">{displayRows.length} players · Tap any row for full breakdown</p>
           )}
-
-          <div className="rounded-xl border border-white/5 overflow-hidden">
-            {loading ? (
-              Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.04]">
-                  <div className="h-3 w-5 animate-pulse rounded bg-white/5 shrink-0" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-3 w-36 animate-pulse rounded bg-white/5" />
-                    <div className="h-2.5 w-20 animate-pulse rounded bg-white/[0.04]" />
-                  </div>
-                  <div className="h-4 w-12 animate-pulse rounded bg-white/5 shrink-0" />
-                </div>
-              ))
-            ) : (
-              displayRows.map((row, idx) => {
-                const tier = isPremium ? "premium" : getFreeTier(idx);
-
-                if (!isPremium && idx >= FREE_PARTIAL_ROWS) {
-                  if (idx === FREE_PARTIAL_ROWS) {
-                    return (
-                      <div key={`mobile-wall-${idx}`}>
-                        <MobileConversionWall onUpgrade={() => setShowUpgradeModal(true)} />
-                      </div>
-                    );
-                  }
-                  return <LockedMobileRow key={row.player_id ?? `locked-${idx}`} idx={idx} onUpgrade={() => setShowUpgradeModal(true)} />;
-                }
-
-                return (
-                  <MobilePlayerCard
-                    key={row.player_id ?? row.player_name}
-                    row={row}
-                    idx={idx}
-                    tier={tier}
-                    activeTab={activeTab}
-                    isPremium={isPremium}
-                    onOpenDetail={() => openRow(row, idx)}
-                    onUpgrade={() => setShowUpgradeModal(true)}
-                  />
-                );
-              })
-            )}
-          </div>
+          <MobileRankingsTable
+            rows={displayRows}
+            loading={loading}
+            isPremium={isPremium}
+            activeTab={activeTab}
+            onOpenRow={openRow}
+            onUpgrade={() => setShowUpgradeModal(true)}
+          />
         </div>
 
         {/* ── DESKTOP table (≥ md) ─────────────────────────────────────────── */}
