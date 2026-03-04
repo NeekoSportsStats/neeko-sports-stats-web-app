@@ -112,19 +112,6 @@ export default function StartSitPage() {
     setError(null);
   }, []);
 
-  // Social proof auto-fill handlers
-  const handleFillA = useCallback((p: QuickFillPlayer) => {
-    setPlayerA(p as PlayerOption);
-    setResult(null);
-    setError(null);
-  }, []);
-
-  const handleFillB = useCallback((p: QuickFillPlayer) => {
-    setPlayerB(p as PlayerOption);
-    setResult(null);
-    setError(null);
-  }, []);
-
   const handleFillBoth = useCallback((a: QuickFillPlayer, b: QuickFillPlayer) => {
     setPlayerA(a as PlayerOption);
     setPlayerB(b as PlayerOption);
@@ -378,8 +365,6 @@ export default function StartSitPage() {
         {showSocialProof && (
           <div className="mt-8">
             <StartSitSocialProof
-              onFillA={handleFillA}
-              onFillB={handleFillB}
               onFillBoth={handleFillBoth}
               onScrollToCompare={handleScrollToCompare}
             />
