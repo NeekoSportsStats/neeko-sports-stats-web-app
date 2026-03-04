@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("is_active, subscription_status, plan")
+        .select("is_active, subscription_status, current_period_end")
         .eq("id", userId)
         .maybeSingle();
 
@@ -53,11 +53,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      const active =
-        data?.is_active === true ||
+      const now = new Date();
+      const periodEnd = data?.current_period_end
+        ? new Date(data.current_period_end)
+        : null;
+      const notExpired = periodEnd !== null && periodEnd > now;
+
+      const statusOk =
         data?.subscription_status === "active" ||
         data?.subscription_status === "trialing" ||
-        data?.plan === "premium";
+        data?.is_active === true;
+
+      const active = statusOk && notExpired;
       console.log("⭐ Premium status:", active, "for user:", userId);
       setIsPremium(active);
     } catch (err) {

@@ -82,12 +82,23 @@ export function useSubscriptionStatus() {
         // Fall back to profiles.subscription_status
         const { data: profile } = await supabase
           .from('profiles')
-          .select('subscription_status')
+          .select('subscription_status, current_period_end, is_active')
           .eq('id', user.id)
           .maybeSingle();
 
-        if (profile?.subscription_status === 'active' || profile?.subscription_status === 'trialing') {
-          setStatus(profile.subscription_status as SubscriptionStatus);
+        const now = new Date();
+        const periodEnd = profile?.current_period_end
+          ? new Date(profile.current_period_end)
+          : null;
+        const notExpired = periodEnd !== null && periodEnd > now;
+
+        const statusOk =
+          profile?.subscription_status === 'active' ||
+          profile?.subscription_status === 'trialing' ||
+          profile?.is_active === true;
+
+        if (statusOk && notExpired) {
+          setStatus((profile.subscription_status ?? 'active') as SubscriptionStatus);
         } else {
           setStatus("free");
           setSubscriptionData(null);
