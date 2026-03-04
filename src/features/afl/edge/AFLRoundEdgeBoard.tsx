@@ -78,6 +78,84 @@ function fmtValueScore(v: number | null | undefined): string {
   return n.toFixed(2);
 }
 
+// ─── Edge Score ───────────────────────────────────────────────────────────────
+
+function computeEdgeScore(row: RankingRow): number | null {
+  const proj = row.projection_final;
+  const conf = row.projection_confidence;
+  const risk = row.risk_rating;
+  const val  = row.value_score;
+
+  if (proj == null && conf == null && risk == null && val == null) return null;
+
+  const projNorm  = proj  != null ? Math.min(Math.max((proj - 60) / 60, 0), 1)   : 0.5;
+  const confNorm  = conf  != null ? Math.min(Math.max(conf / 100, 0), 1)          : 0.5;
+  const riskNorm  = risk  != null ? Math.min(Math.max(1 - risk / 100, 0), 1)      : 0.5;
+  const valNorm   = val   != null ? Math.min(Math.max((val - 0.8) / 0.7, 0), 1)   : 0.5;
+
+  const raw = projNorm * 0.40 + valNorm * 0.25 + confNorm * 0.20 + riskNorm * 0.15;
+  return Math.round(Math.min(Math.max(raw * 100, 0), 100));
+}
+
+function getEdgeScoreColor(score: number | null): string {
+  if (score == null) return "text-white/30";
+  if (score >= 90)   return "text-[#F5C84C]";
+  if (score >= 75)   return "text-green-400";
+  if (score >= 60)   return "text-blue-400";
+  return "text-white/50";
+}
+
+function getEdgeScoreTierLabel(score: number | null): string {
+  if (score == null) return "";
+  if (score >= 90)   return "Elite Edge";
+  if (score >= 75)   return "Strong Edge";
+  if (score >= 60)   return "Playable Edge";
+  return "Monitor";
+}
+
+const EDGE_SCORE_TOOLTIP = "Edge Score combines projection, value, confidence and risk to highlight the strongest fantasy opportunities.";
+
+function EdgeScoreBadge({ row, large = false }: { row: RankingRow; large?: boolean }) {
+  const [showTip, setShowTip] = useState(false);
+  const score = computeEdgeScore(row);
+  const color = getEdgeScoreColor(score);
+  const tier  = getEdgeScoreTierLabel(score);
+
+  return (
+    <div className="relative inline-flex flex-col items-center">
+      <button
+        type="button"
+        onMouseEnter={() => setShowTip(true)}
+        onMouseLeave={() => setShowTip(false)}
+        onFocus={() => setShowTip(true)}
+        onBlur={() => setShowTip(false)}
+        className="flex flex-col items-center gap-0.5 focus:outline-none"
+        aria-label={EDGE_SCORE_TOOLTIP}
+      >
+        <div className="flex items-center gap-1">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-white/30">Edge Score</p>
+          <Info size={8} className="text-white/20" />
+        </div>
+        <p className={`${large ? "text-4xl" : "text-2xl"} font-extrabold tabular-nums leading-none ${color}`}>
+          {score ?? "—"}
+        </p>
+        {tier && (
+          <p className={`text-[9px] font-semibold uppercase tracking-wider leading-none mt-0.5 ${color} opacity-70`}>
+            {tier}
+          </p>
+        )}
+      </button>
+
+      {showTip && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-52 rounded-lg border border-white/10 bg-[#0e0e0e]/95 px-3 py-2 shadow-xl pointer-events-none">
+          <p className="text-[10px] text-white/60 leading-relaxed">{EDGE_SCORE_TOOLTIP}</p>
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0e0e0e]/95" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function sharpenSummary(text: string): string {
   return text
     .replace(/is expected to /gi, "")
@@ -355,11 +433,14 @@ function PlayerCard({ row, rank, section, locked, isPremium, onUnlock, isFeature
           <p className="text-xs text-white/40 mt-0.5">{row.team}</p>
         </div>
 
-        <div className="text-right shrink-0">
-          <p className={`font-bold text-white tabular-nums ${isFeature ? "text-2xl" : "text-xl"}`}>
-            {fmtInt(row.projection_final)}
-          </p>
-          <p className="text-[10px] text-white/30 mt-0.5">Round Projection</p>
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <div className="text-right">
+            <p className={`font-bold text-white tabular-nums ${isFeature ? "text-2xl" : "text-xl"}`}>
+              {fmtInt(row.projection_final)}
+            </p>
+            <p className="text-[10px] text-white/30 mt-0.5">Projection</p>
+          </div>
+          <EdgeScoreBadge row={row} />
         </div>
       </div>
 
@@ -748,10 +829,15 @@ function HeroSignalCard({ section, row, isPremium, onUnlock }: HeroSignalCardPro
         )}
       </div>
 
-      {/* Player info — always visible */}
-      <div className="mb-4">
-        <h3 className="text-base font-extrabold text-white leading-tight">{row.player_name}</h3>
-        <p className="text-xs text-white/40 mt-0.5">{row.team}</p>
+      {/* Player info + Edge Score — always visible */}
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-extrabold text-white leading-tight">{row.player_name}</h3>
+          <p className="text-xs text-white/40 mt-0.5">{row.team}</p>
+        </div>
+        <div className="shrink-0">
+          <EdgeScoreBadge row={row} large />
+        </div>
       </div>
 
       {/* Primary stat — always visible */}
