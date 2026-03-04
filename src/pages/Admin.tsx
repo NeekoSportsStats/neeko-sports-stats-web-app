@@ -1,444 +1,581 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, Shield, Database, Zap, Activity } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
+import {
+  RefreshCw,
+  Shield,
+  Database,
+  Zap,
+  Activity,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+  Clock,
+  TrendingUp,
+  Server,
+  Bot,
+  BarChart3,
+  Layers,
+} from "lucide-react";
+
+const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
+
+interface PipelineHealth {
+  last_pipeline_run: string | null;
+  successful_runs: number;
+  partial_runs: number;
+  failed_runs: number;
+  total_runs: number;
+  max_duration_ms: number | null;
+  avg_duration_ms: number | null;
+  last_error: string | null;
+  latest_status: string | null;
+}
+
+interface IngestHealth {
+  last_match_ingest: string | null;
+  total_matches: number;
+  latest_match_season: number | null;
+  latest_match_round: number | null;
+  last_player_stats_ingest: string | null;
+  total_player_stat_rows: number;
+  last_team_stats_ingest: string | null;
+  total_team_stat_rows: number;
+}
+
+interface CanonicalHealth {
+  latest_round_loaded: number | null;
+  total_player_round_rows: number;
+  unique_players: number;
+  seasons_covered: number;
+  earliest_season: number | null;
+  latest_season: number | null;
+  rows_missing_fantasy_points: number;
+  overall_avg_fantasy_points: number | null;
+}
+
+interface AIGenerationHealth {
+  player_ai_rows: number;
+  team_ai_rows: number;
+  player_ai_with_summary: number;
+  team_ai_with_summary: number;
+  last_player_ai_update: string | null;
+  last_team_ai_update: string | null;
+  unique_players_with_ai: number;
+  unique_teams_with_ai: number;
+}
+
+interface StartSitCacheHealth {
+  cache_rows: number;
+  last_cache_update: string | null;
+  oldest_cache_entry: string | null;
+  stale_rows: number;
+  seasons_cached: number;
+  rounds_cached: number;
+}
+
+interface DataIntegrityChecks {
+  players_missing_projection: number;
+  players_missing_neeko_rating: number;
+  players_missing_ceiling: number;
+  players_missing_floor: number;
+  players_missing_ai_reco: number;
+  players_missing_volatility: number;
+  total_volatility_rows: number;
+  last_volatility_refresh: string | null;
+}
+
+function formatDate(ts: string | null): string {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleString("en-AU", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatMs(ms: number | null): string {
+  if (ms === null || ms === undefined) return "—";
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function StatusDot({ ok }: { ok: boolean }) {
+  return (
+    <span
+      className={`inline-block w-2 h-2 rounded-full mr-2 ${ok ? "bg-emerald-500" : "bg-red-500"}`}
+    />
+  );
+}
+
+function StatRow({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: React.ReactNode;
+  highlight?: "good" | "warn" | "bad" | "neutral";
+}) {
+  const valueClass =
+    highlight === "good"
+      ? "text-emerald-600 dark:text-emerald-400 font-semibold"
+      : highlight === "warn"
+        ? "text-amber-600 dark:text-amber-400 font-semibold"
+        : highlight === "bad"
+          ? "text-red-600 dark:text-red-400 font-semibold"
+          : "font-medium";
+
+  return (
+    <div className="flex justify-between items-center py-1.5 border-b border-border/40 last:border-0">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className={`text-sm ${valueClass}`}>{value}</span>
+    </div>
+  );
+}
+
+function SectionCard({
+  icon: Icon,
+  title,
+  status,
+  children,
+  loading,
+}: {
+  icon: React.ElementType;
+  title: string;
+  status?: "ok" | "warn" | "error" | "loading";
+  children: React.ReactNode;
+  loading?: boolean;
+}) {
+  const statusIcon =
+    status === "ok" ? (
+      <CheckCircle className="h-4 w-4 text-emerald-500" />
+    ) : status === "warn" ? (
+      <AlertTriangle className="h-4 w-4 text-amber-500" />
+    ) : status === "error" ? (
+      <XCircle className="h-4 w-4 text-red-500" />
+    ) : null;
+
+  return (
+    <Card className="flex flex-col">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between text-base">
+          <span className="flex items-center gap-2">
+            <Icon className="h-4 w-4 text-muted-foreground" />
+            {title}
+          </span>
+          {statusIcon}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex-1">
+        {loading ? (
+          <div className="flex items-center justify-center h-24">
+            <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          children
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Admin() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [isAdmin, setIsAdmin] = useState(true); // TEMPORARILY ALWAYS TRUE FOR PREVIEW
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [checkingAdmin, setCheckingAdmin] = useState(false); // TEMPORARILY FALSE FOR PREVIEW
-  const [queueProgress, setQueueProgress] = useState<number>(0);
-  const [queueStats, setQueueStats] = useState({ pending: 0, processing: 0, done: 0, failed: 0, total: 0 });
 
-  // TEMPORARILY DISABLED FOR PREVIEW - RE-ENABLE AFTER TESTING
-  /*
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  const [pipeline, setPipeline] = useState<PipelineHealth | null>(null);
+  const [ingest, setIngest] = useState<IngestHealth | null>(null);
+  const [canonical, setCanonical] = useState<CanonicalHealth | null>(null);
+  const [aiHealth, setAiHealth] = useState<AIGenerationHealth | null>(null);
+  const [cacheHealth, setCacheHealth] = useState<StartSitCacheHealth | null>(null);
+  const [integrity, setIntegrity] = useState<DataIntegrityChecks | null>(null);
+
   useEffect(() => {
-    if (!loading && !user) {
+    if (loading) return;
+    if (!user) {
       navigate("/auth");
       return;
     }
-
-    if (user) {
-      checkAdminStatus();
+    if (user.id !== ADMIN_USER_ID) {
+      navigate("/");
+      return;
     }
   }, [user, loading, navigate]);
-  */
+
+  const fetchAll = useCallback(async () => {
+    setDataLoading(true);
+    try {
+      const [
+        pipelineRes,
+        ingestRes,
+        canonicalRes,
+        aiRes,
+        cacheRes,
+        integrityRes,
+      ] = await Promise.all([
+        supabase.from("v_pipeline_health").select("*").maybeSingle(),
+        supabase.from("v_ingest_health").select("*").maybeSingle(),
+        supabase.from("v_canonical_health").select("*").maybeSingle(),
+        supabase.from("v_ai_generation_health").select("*").maybeSingle(),
+        supabase.from("v_start_sit_cache_health").select("*").maybeSingle(),
+        supabase.from("v_data_integrity_checks").select("*").maybeSingle(),
+      ]);
+
+      if (pipelineRes.data) setPipeline(pipelineRes.data as PipelineHealth);
+      if (ingestRes.data) setIngest(ingestRes.data as IngestHealth);
+      if (canonicalRes.data) setCanonical(canonicalRes.data as CanonicalHealth);
+      if (aiRes.data) setAiHealth(aiRes.data as AIGenerationHealth);
+      if (cacheRes.data) setCacheHealth(cacheRes.data as StartSitCacheHealth);
+      if (integrityRes.data) setIntegrity(integrityRes.data as DataIntegrityChecks);
+    } catch (err) {
+      console.error("Admin fetch error:", err);
+      toast({
+        title: "Failed to load monitoring data",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setDataLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
-    // TEMPORARILY SKIP ADMIN CHECK FOR PREVIEW
-    // if (!isAdmin) return;
-
-    // Fetch queue progress
-    const fetchQueueProgress = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('ai_analysis_queue')
-          .select('status');
-
-        if (!error && data) {
-          const stats = data.reduce((acc: any, row: any) => {
-            acc[row.status]++;
-            acc.total++;
-            return acc;
-          }, { pending: 0, processing: 0, done: 0, failed: 0, total: 0 });
-
-          setQueueStats(stats);
-          const percent = stats.total > 0 ? Math.round((stats.done / stats.total) * 100 * 100) / 100 : 0;
-          setQueueProgress(percent);
-        }
-      } catch (error) {
-        console.error('Error fetching queue progress:', error);
-      }
-    };
-
-    fetchQueueProgress();
-
-    // Set up realtime subscription
-    const channel = supabase
-      .channel('admin-queue-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'ai_analysis_queue'
-        },
-        () => {
-          fetchQueueProgress();
-        }
-      )
-      .subscribe();
-
-    // Backup: auto-refresh every 15s
-    const interval = setInterval(fetchQueueProgress, 15000);
-
-    return () => {
-      supabase.removeChannel(channel);
-      clearInterval(interval);
-    };
-  }, []); // TEMPORARILY REMOVED isAdmin DEPENDENCY
-
-  // ORIGINAL AUTH CHECK - TEMPORARILY COMMENTED OUT FOR PREVIEW
-  // RE-ENABLE THIS AFTER TESTING BY UNCOMMENTING THE CODE BELOW
-  /*
-  const checkAdminStatus = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user!.id)
-        .single();
-
-      if (error) {
-        console.error('Error checking admin status:', error);
-        navigate("/");
-        return;
-      }
-
-      const role = data?.role as string;
-      if (role !== 'admin') {
-        toast({
-          title: "Access Denied",
-          description: "You don't have admin privileges.",
-          variant: "destructive"
-        });
-        navigate("/");
-        return;
-      }
-
-      setIsAdmin(true);
-    } catch (error) {
-      console.error('Error checking admin status:', error);
-      navigate("/");
-    } finally {
-      setCheckingAdmin(false);
+    if (!loading && user?.id === ADMIN_USER_ID) {
+      fetchAll();
     }
-  };
-  */
+  }, [loading, user, fetchAll]);
 
-  const handleMasterSync = async () => {
+  const handleRunPipeline = async () => {
     setIsRefreshing(true);
-
+    toast({ title: "Triggering weekly pipeline…", description: "This may take 2–5 minutes." });
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        throw new Error("No active session");
-      }
-
+      const { error } = await supabase.functions.invoke("weekly-afl-pipeline", { body: {} });
+      if (error) throw error;
+      toast({ title: "Pipeline complete", description: "All steps finished successfully." });
+      await fetchAll();
+    } catch (err) {
       toast({
-        title: "Starting Master Sync",
-        description: "Syncing all sports data, computing team stats, and queuing AI analysis jobs...",
-      });
-
-      const { data, error } = await supabase.functions.invoke('master-sync', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        }
-      });
-
-      if (error) {
-        console.error('Master sync error:', error);
-        throw error;
-      }
-
-      console.log('Master sync results:', data);
-
-      toast({
-        title: "Master Sync Complete",
-        description: `Data synced successfully! ${data?.queuedJobs || 0} AI jobs queued for background processing.`,
-      });
-    } catch (error) {
-      console.error('Error in master sync:', error);
-      toast({
-        title: "Master Sync Failed",
-        description: error instanceof Error ? error.message : "Failed to complete master sync. Check console for details.",
-        variant: "destructive"
+        title: "Pipeline failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
       });
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  const handleRefreshAllInsights = async () => {
+  const handleRefreshVolatility = async () => {
     setIsRefreshing(true);
-
+    toast({ title: "Refreshing volatility model…" });
     try {
-      const { data, error } = await supabase.functions.invoke('update-all-ai-analysis', {
-        body: {}
-      });
-
-      if (error) {
-        throw error;
-      }
-
+      const { error } = await supabase.schema("afl").rpc("fn_refresh_player_volatility");
+      if (error) throw error;
+      toast({ title: "Volatility model refreshed" });
+      await fetchAll();
+    } catch (err) {
       toast({
-        title: "Success",
-        description: "All AI insights have been refreshed successfully.",
-      });
-    } catch (error) {
-      console.error('Error refreshing insights:', error);
-      toast({
-        title: "Error",
-        description: "Failed to refresh AI insights. Please try again.",
-        variant: "destructive"
+        title: "Volatility refresh failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
       });
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  const handleProcessQueue = async () => {
+  const handleRefreshRankingAI = async () => {
     setIsRefreshing(true);
-
+    toast({ title: "Triggering AI ranking generation…" });
     try {
+      const { error } = await supabase.functions.invoke("generate-ranking-ai", { body: {} });
+      if (error) throw error;
+      toast({ title: "Ranking AI generation triggered" });
+      await fetchAll();
+    } catch (err) {
       toast({
-        title: "Processing Queue",
-        description: "Processing up to 50 queued AI jobs...",
-      });
-
-      const { data, error } = await supabase.functions.invoke('process-ai-queue-v2', {
-        body: { trigger: "manual" }
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      toast({
-        title: "Queue Processing Complete",
-        description: `Processed ${data.succeeded || 0} jobs successfully, ${data.failed || 0} failed.`,
-      });
-    } catch (error) {
-      console.error('Error processing queue:', error);
-      toast({
-        title: "Queue Processing Failed",
-        description: error instanceof Error ? error.message : "Failed to process queue.",
-        variant: "destructive"
+        title: "Ranking AI generation failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
       });
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  // TEMPORARILY DISABLED FOR PREVIEW - RE-ENABLE AFTER TESTING
-  /*
-  if (loading || checkingAdmin) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
-  if (!isAdmin) {
+  if (!user || user.id !== ADMIN_USER_ID) {
     return null;
   }
-  */
+
+  const pipelineStatus =
+    pipeline?.latest_status === "success"
+      ? "ok"
+      : pipeline?.latest_status === "partial"
+        ? "warn"
+        : pipeline?.latest_status === "failed"
+          ? "error"
+          : "loading";
+
+  const integrityIssues = integrity
+    ? integrity.players_missing_projection +
+      integrity.players_missing_neeko_rating +
+      integrity.players_missing_ceiling +
+      integrity.players_missing_floor +
+      integrity.players_missing_ai_reco +
+      integrity.players_missing_volatility
+    : 0;
+
+  const integrityStatus = integrityIssues === 0 ? "ok" : integrityIssues < 10 ? "warn" : "error";
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* PREVIEW MODE BANNER */}
-        <div className="p-4 bg-yellow-100 dark:bg-yellow-900 border-2 border-yellow-500 rounded-lg">
-          <p className="text-sm font-bold text-yellow-900 dark:text-yellow-100">
-            ⚠️ PREVIEW MODE: Authentication temporarily disabled. Re-enable auth after testing by uncommenting code in Admin.tsx lines 20-30, 88-120, and 227-237.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3 mb-8">
-          <Shield className="h-8 w-8 text-primary" />
+    <div className="container mx-auto py-8 px-4 max-w-7xl">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <Shield className="h-7 w-7 text-foreground" />
           <div>
-            <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-            <p className="text-muted-foreground">Manage system-wide operations</p>
+            <h1 className="text-2xl font-bold tracking-tight">Admin Monitoring</h1>
+            <p className="text-sm text-muted-foreground">{user.email}</p>
           </div>
         </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5" />
-                System Status
-              </CardTitle>
-              <CardDescription>Current system information</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Admin User:</span>
-                <span className="text-sm font-medium">{user?.email || "Preview Mode"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">User ID:</span>
-                <span className="text-sm font-mono">{user?.id?.slice(0, 8) || "preview"}...</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Role:</span>
-                <span className="text-sm font-medium text-primary">Admin (Preview)</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5" />
-                Quick Actions
-              </CardTitle>
-              <CardDescription>Common administrative tasks</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <Button
-                  onClick={handleMasterSync}
-                  disabled={isRefreshing}
-                  className="w-full"
-                  size="lg"
-                  variant="default"
-                >
-                  {isRefreshing ? (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                      Syncing All Data...
-                    </>
-                  ) : (
-                    <>
-                      <Database className="mr-2 h-4 w-4" />
-                      Master Sync (All Sports)
-                    </>
-                  )}
-                </Button>
-
-                {queueStats.total > 0 && (
-                  <div className="p-3 bg-muted rounded-lg space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">AI Queue Progress</span>
-                      <span className="text-muted-foreground">{queueStats.done}/{queueStats.total}</span>
-                    </div>
-                    <Progress value={queueProgress} className="h-2" />
-                    <p className="text-xs text-muted-foreground text-right font-semibold">{queueProgress}%</p>
-                  </div>
-                )}
-
-                <Button
-                  onClick={() => navigate('/admin/queue')}
-                  variant="outline"
-                  className="w-full"
-                  size="lg"
-                >
-                  <Activity className="mr-2 h-4 w-4" />
-                  View AI Queue Dashboard
-                </Button>
-
-                <Button
-                  onClick={handleProcessQueue}
-                  disabled={isRefreshing}
-                  variant="outline"
-                  className="w-full"
-                  size="sm"
-                >
-                  {isRefreshing ? (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="mr-2 h-4 w-4" />
-                      Process Queue Now
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  onClick={() => window.location.href = '/admin/stripe-test'}
-                  variant="outline"
-                  className="w-full"
-                  size="sm"
-                >
-                  Test Stripe Integration
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Master Sync Information</CardTitle>
-            <CardDescription>
-              Complete end-to-end data pipeline synchronization
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold">What Master Sync Does:</h3>
-              <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                <li><strong>Step 1:</strong> Syncs all sports data from Google Sheets (AFL, NBA, EPL)</li>
-                <li><strong>Step 2:</strong> Computes team statistics from player data</li>
-                <li><strong>Step 3:</strong> Generates 50 AI insights immediately, queues remaining 150 for background</li>
-                <li><strong>Step 4:</strong> Background queue processes remaining insights every 5 minutes automatically</li>
-                <li><strong>Step 5:</strong> Updates all frontend pages with new data</li>
-              </ul>
-            </div>
-            <div className="p-4 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <p className="text-sm text-yellow-900 dark:text-yellow-100">
-                <strong>⚠️ Important:</strong> Make sure <code>SPORTS_SHEET_ID</code> secret is set to your new Google Sheet ID: <code>1xSCRUHckiLhhn8F5lj6ict158VOH3SNstsweXKRW_E0</code>
-              </p>
-            </div>
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="text-sm">
-                <strong>Note:</strong> Master Sync now uses batching - 50 AI insights generate immediately (30-60s), remaining 150 queue for background processing every 5 minutes. You'll see results appear gradually over the next 15-20 minutes.
-              </p>
-            </div>
-            <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <p className="text-sm text-blue-900 dark:text-blue-100">
-                <strong>💡 Queue System:</strong> Use "Run Queue Manually" to process the next 50 queued jobs immediately if you don't want to wait for the automatic 5-minute cycle.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Troubleshooting</CardTitle>
-            <CardDescription>
-              Common issues and solutions
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div className="p-3 border rounded-lg">
-                <h4 className="font-semibold text-sm mb-1">❌ "Failed to fetch sheet: Not Found"</h4>
-                <p className="text-xs text-muted-foreground">
-                  Update <code>SPORTS_SHEET_ID</code> secret in Lovable Cloud backend settings with your new sheet ID.
-                </p>
-              </div>
-              <div className="p-3 border rounded-lg">
-                <h4 className="font-semibold text-sm mb-1">❌ No data appearing on frontend</h4>
-                <p className="text-xs text-muted-foreground">
-                  Run Master Sync first. All tables must be populated before frontend pages can display data.
-                </p>
-              </div>
-              <div className="p-3 border rounded-lg">
-                <h4 className="font-semibold text-sm mb-1">❌ AI Analysis pages empty</h4>
-                <p className="text-xs text-muted-foreground">
-                  AI insights depend on player stats. Make sure Master Sync completes successfully (Step 1 → Step 2 → Step 3).
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={fetchAll}
+          disabled={dataLoading}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${dataLoading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
       </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-8">
+
+        {/* Pipeline Health */}
+        <SectionCard
+          icon={Activity}
+          title="Pipeline Status"
+          status={pipelineStatus}
+          loading={dataLoading}
+        >
+          <StatRow
+            label="Latest run"
+            value={formatDate(pipeline?.last_pipeline_run ?? null)}
+          />
+          <StatRow
+            label="Status"
+            value={
+              <span className="flex items-center">
+                <StatusDot ok={pipeline?.latest_status === "success"} />
+                {pipeline?.latest_status ?? "—"}
+              </span>
+            }
+          />
+          <StatRow label="Total runs" value={pipeline?.total_runs ?? "—"} />
+          <StatRow
+            label="Successful"
+            value={pipeline?.successful_runs ?? "—"}
+            highlight="good"
+          />
+          <StatRow
+            label="Failed"
+            value={pipeline?.failed_runs ?? "—"}
+            highlight={(pipeline?.failed_runs ?? 0) > 0 ? "bad" : "neutral"}
+          />
+          <StatRow label="Avg duration" value={formatMs(pipeline?.avg_duration_ms ?? null)} />
+          {pipeline?.last_error && (
+            <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 rounded text-xs text-red-700 dark:text-red-300 break-words">
+              {pipeline.last_error}
+            </div>
+          )}
+        </SectionCard>
+
+        {/* Data Ingest */}
+        <SectionCard
+          icon={Database}
+          title="Data Ingest"
+          status={ingest?.total_matches ? "ok" : "warn"}
+          loading={dataLoading}
+        >
+          <StatRow label="Total matches ingested" value={ingest?.total_matches ?? "—"} />
+          <StatRow label="Latest match round" value={ingest?.latest_match_round ?? "—"} />
+          <StatRow label="Latest match season" value={ingest?.latest_match_season ?? "—"} />
+          <StatRow label="Last match ingest" value={formatDate(ingest?.last_match_ingest ?? null)} />
+          <StatRow label="Player stat rows" value={ingest?.total_player_stat_rows ?? "—"} />
+          <StatRow label="Team stat rows" value={ingest?.total_team_stat_rows ?? "—"} />
+          <StatRow label="Last player ingest" value={formatDate(ingest?.last_player_stats_ingest ?? null)} />
+        </SectionCard>
+
+        {/* Canonical Stats */}
+        <SectionCard
+          icon={Layers}
+          title="Canonical Stats"
+          status={canonical?.total_player_round_rows ? "ok" : "warn"}
+          loading={dataLoading}
+        >
+          <StatRow label="Latest round loaded" value={canonical?.latest_round_loaded ?? "—"} />
+          <StatRow label="Total player-round rows" value={canonical?.total_player_round_rows?.toLocaleString() ?? "—"} />
+          <StatRow label="Unique players" value={canonical?.unique_players ?? "—"} />
+          <StatRow label="Seasons covered" value={canonical?.seasons_covered ?? "—"} />
+          <StatRow label="Season range" value={
+            canonical?.earliest_season && canonical?.latest_season
+              ? `${canonical.earliest_season}–${canonical.latest_season}`
+              : "—"
+          } />
+          <StatRow
+            label="Rows missing fantasy pts"
+            value={canonical?.rows_missing_fantasy_points ?? "—"}
+            highlight={(canonical?.rows_missing_fantasy_points ?? 0) > 0 ? "warn" : "good"}
+          />
+          <StatRow label="Overall avg fantasy pts" value={canonical?.overall_avg_fantasy_points ?? "—"} />
+        </SectionCard>
+
+        {/* AI Generation */}
+        <SectionCard
+          icon={Bot}
+          title="AI Generation"
+          status={aiHealth?.player_ai_rows ? "ok" : "warn"}
+          loading={dataLoading}
+        >
+          <StatRow label="Player AI rows" value={aiHealth?.player_ai_rows ?? "—"} />
+          <StatRow label="Players with summary" value={aiHealth?.player_ai_with_summary ?? "—"} highlight="good" />
+          <StatRow label="Unique players covered" value={aiHealth?.unique_players_with_ai ?? "—"} />
+          <StatRow label="Last player AI update" value={formatDate(aiHealth?.last_player_ai_update ?? null)} />
+          <StatRow label="Team AI rows" value={aiHealth?.team_ai_rows ?? "—"} />
+          <StatRow label="Teams with summary" value={aiHealth?.team_ai_with_summary ?? "—"} highlight="good" />
+          <StatRow label="Last team AI update" value={formatDate(aiHealth?.last_team_ai_update ?? null)} />
+        </SectionCard>
+
+        {/* Start/Sit Cache */}
+        <SectionCard
+          icon={Clock}
+          title="Start/Sit Cache"
+          status={
+            (cacheHealth?.stale_rows ?? 0) > 0 ? "warn" : cacheHealth?.cache_rows ? "ok" : "warn"
+          }
+          loading={dataLoading}
+        >
+          <StatRow label="Cache rows" value={cacheHealth?.cache_rows ?? "—"} />
+          <StatRow label="Last update" value={formatDate(cacheHealth?.last_cache_update ?? null)} />
+          <StatRow label="Oldest entry" value={formatDate(cacheHealth?.oldest_cache_entry ?? null)} />
+          <StatRow
+            label="Stale rows (>24h)"
+            value={cacheHealth?.stale_rows ?? "—"}
+            highlight={(cacheHealth?.stale_rows ?? 0) > 0 ? "warn" : "good"}
+          />
+          <StatRow label="Seasons cached" value={cacheHealth?.seasons_cached ?? "—"} />
+          <StatRow label="Rounds cached" value={cacheHealth?.rounds_cached ?? "—"} />
+        </SectionCard>
+
+        {/* Data Integrity */}
+        <SectionCard
+          icon={TrendingUp}
+          title="Data Integrity"
+          status={integrityStatus}
+          loading={dataLoading}
+        >
+          <StatRow
+            label="Missing projections"
+            value={integrity?.players_missing_projection ?? "—"}
+            highlight={(integrity?.players_missing_projection ?? 0) > 0 ? "bad" : "good"}
+          />
+          <StatRow
+            label="Missing Neeko rating"
+            value={integrity?.players_missing_neeko_rating ?? "—"}
+            highlight={(integrity?.players_missing_neeko_rating ?? 0) > 0 ? "bad" : "good"}
+          />
+          <StatRow
+            label="Missing ceiling"
+            value={integrity?.players_missing_ceiling ?? "—"}
+            highlight={(integrity?.players_missing_ceiling ?? 0) > 0 ? "warn" : "good"}
+          />
+          <StatRow
+            label="Missing floor"
+            value={integrity?.players_missing_floor ?? "—"}
+            highlight={(integrity?.players_missing_floor ?? 0) > 0 ? "warn" : "good"}
+          />
+          <StatRow
+            label="Missing AI reco"
+            value={integrity?.players_missing_ai_reco ?? "—"}
+            highlight={(integrity?.players_missing_ai_reco ?? 0) > 0 ? "warn" : "good"}
+          />
+          <StatRow label="Volatility rows" value={integrity?.total_volatility_rows ?? "—"} highlight="good" />
+          <StatRow label="Last volatility refresh" value={formatDate(integrity?.last_volatility_refresh ?? null)} />
+        </SectionCard>
+      </div>
+
+      {/* Actions */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Server className="h-4 w-4 text-muted-foreground" />
+            Manual Actions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Button
+              onClick={handleRunPipeline}
+              disabled={isRefreshing}
+              variant="default"
+              className="w-full"
+            >
+              {isRefreshing ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4 mr-2" />
+              )}
+              Run Weekly Pipeline
+            </Button>
+
+            <Button
+              onClick={handleRefreshVolatility}
+              disabled={isRefreshing}
+              variant="outline"
+              className="w-full"
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Refresh Volatility
+            </Button>
+
+            <Button
+              onClick={handleRefreshRankingAI}
+              disabled={isRefreshing}
+              variant="outline"
+              className="w-full"
+            >
+              <Bot className="h-4 w-4 mr-2" />
+              Run Ranking AI
+            </Button>
+
+            <Button
+              onClick={() => navigate("/admin/queue")}
+              variant="outline"
+              className="w-full"
+            >
+              <Activity className="h-4 w-4 mr-2" />
+              AI Queue Dashboard
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
