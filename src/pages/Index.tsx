@@ -4,6 +4,7 @@ import { Crown, ArrowRight, Star, TrendingUp, TriangleAlert as AlertTriangle, Ch
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { NEEKO_PRICING } from "@/config/neekoPricing";
+import MobileUpgradeBar from "@/components/mobile/MobileUpgradeBar";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -430,7 +431,7 @@ export default function Index() {
   const { isPremium } = useAuth();
 
   return (
-    <div className="min-h-screen bg-[#070707] text-white">
+    <div className="min-h-screen bg-[#070707] text-white pb-[80px] sm:pb-0">
 
       {/* ── HERO ──────────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden min-h-[85vh] flex items-center">
@@ -710,6 +711,9 @@ export default function Index() {
           </div>
         </section>
       )}
+
+      {/* ── MOBILE STICKY UPGRADE BAR ─────────────────────────────────────────── */}
+      {!isPremium && <MobileUpgradeBar />}
 
       {/* ── FOOTER ────────────────────────────────────────────────────────────── */}
       <footer className="border-t border-white/[0.05] bg-[#070707] py-8">
