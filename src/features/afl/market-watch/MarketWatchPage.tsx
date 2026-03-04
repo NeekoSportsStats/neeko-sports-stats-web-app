@@ -3,9 +3,8 @@ import { TrendingUp, RefreshCw, Crown, ChevronDown, ChevronUp, Lock } from "luci
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
-import { MarketRow, MarketTab, MWPlayerRow, MWBestTrade, MWSummaryCard } from "./types";
-import { TAB_META, FREE_VISIBLE } from "./helpers";
-import { MarketSection } from "./MarketSection";
+import { MWPlayerRow, MWBestTrade, MWSummaryCard } from "./types";
+import { FREE_VISIBLE } from "./helpers";
 import { UpgradeModal } from "./UpgradeModal";
 import { MarketWatchSummaryCards } from "./MarketWatchSummaryCards";
 import { BestTradesRow } from "./BestTradesRow";
@@ -14,16 +13,7 @@ import { TradeImpactModal } from "./TradeImpactModal";
 import { MarketWatchAISummary } from "./MarketWatchAISummary";
 import { MarketWatchBanner, CategoryCounts } from "./MarketWatchBanner";
 import { HorizontalRail } from "./HorizontalRail";
-
-type DataMap = Partial<Record<MarketTab, MarketRow[]>>;
-type LoadMap = Partial<Record<MarketTab, boolean>>;
-
-const VIEW_MAP: Record<MarketTab, string> = {
-  buy:     "v_market_buy_targets",
-  sell:    "v_market_sell_targets",
-  cashcow: "v_market_cash_cows",
-  trap:    "v_market_traps",
-};
+import { MarketWatchSkeleton } from "./MarketWatchSkeleton";
 
 const SECTION_LIMITS = {
   buyTargets:   6,
@@ -42,12 +32,8 @@ interface V2Data {
 export default function MarketWatchPage() {
   const { isPremium } = useAuth();
 
-  const [v2Data, setV2Data] = useState<V2Data>({ players: [], trades: [], summaryCards: [] });
-  const [v2Loading, setV2Loading] = useState(true);
-  const [v2Empty, setV2Empty] = useState(false);
-
-  const [legacyData, setLegacyData] = useState<DataMap>({});
-  const [legacyLoading, setLegacyLoading] = useState<LoadMap>({});
+  const [data, setData] = useState<V2Data>({ players: [], trades: [], summaryCards: [] });
+  const [loading, setLoading] = useState(true);
 
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -64,8 +50,8 @@ export default function MarketWatchPage() {
   const [showMoreCashCows, setShowMoreCashCows] = useState(false);
   const [showMoreFades, setShowMoreFades] = useState(false);
 
-  const fetchV2 = useCallback(async () => {
-    setV2Loading(true);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
     try {
       const [playersRes, tradesRes, cardsRes] = await Promise.all([
         supabase.from("v_mw_premium").select("*").limit(isPremium ? 100 : 20),
@@ -73,50 +59,23 @@ export default function MarketWatchPage() {
         supabase.from("v_mw_summary_cards").select("*"),
       ]);
 
-      const players = (playersRes.data ?? []) as MWPlayerRow[];
-      const trades  = (tradesRes.data ?? []) as MWBestTrade[];
-      const cards   = (cardsRes.data ?? []) as MWSummaryCard[];
-
-      if (players.length === 0) {
-        setV2Empty(true);
-      } else {
-        setV2Data({ players, trades, summaryCards: cards });
-        setV2Empty(false);
-      }
-    } catch {
-      setV2Empty(true);
+      setData({
+        players: (playersRes.data ?? []) as MWPlayerRow[],
+        trades:  (tradesRes.data ?? []) as MWBestTrade[],
+        summaryCards: (cardsRes.data ?? []) as MWSummaryCard[],
+      });
     } finally {
-      setV2Loading(false);
+      setLoading(false);
     }
-  }, [isPremium]);
-
-  const fetchLegacy = useCallback(async () => {
-    const tabs: MarketTab[] = ["buy", "sell", "cashcow", "trap"];
-    setLegacyLoading(Object.fromEntries(tabs.map(t => [t, true])));
-    await Promise.all(
-      tabs.map(async (tab) => {
-        try {
-          const { data: rows } = await supabase
-            .from(VIEW_MAP[tab])
-            .select("*")
-            .limit(isPremium ? 30 : 8);
-          setLegacyData(prev => ({ ...prev, [tab]: (rows ?? []) as MarketRow[] }));
-        } catch {
-          setLegacyData(prev => ({ ...prev, [tab]: [] }));
-        } finally {
-          setLegacyLoading(prev => ({ ...prev, [tab]: false }));
-        }
-      })
-    );
   }, [isPremium]);
 
   const fetchCounts = useCallback(async () => {
     try {
-      const { data } = await supabase
+      const { data: row } = await supabase
         .from("v_mw_category_counts")
         .select("*")
         .maybeSingle();
-      if (data) setCategoryCounts(data as CategoryCounts);
+      if (row) setCategoryCounts(row as CategoryCounts);
     } catch {
       // non-critical
     }
@@ -124,21 +83,16 @@ export default function MarketWatchPage() {
 
   const handleRefresh = useCallback(() => {
     track("market_watch_refresh_click");
-    fetchV2();
+    fetchData();
     fetchCounts();
-    setLastUpdated(new Date());
-  }, [fetchV2, fetchCounts]);
+  }, [fetchData, fetchCounts]);
 
   useEffect(() => { track("market_watch_view"); }, []);
 
   useEffect(() => {
-    fetchV2().then(() => setLastUpdated(new Date()));
+    fetchData().then(() => setLastUpdated(new Date()));
     fetchCounts();
-  }, [fetchV2, fetchCounts]);
-
-  useEffect(() => {
-    if (v2Empty) fetchLegacy();
-  }, [v2Empty, fetchLegacy]);
+  }, [fetchData, fetchCounts]);
 
   useEffect(() => {
     const sectionIds = [
@@ -168,7 +122,7 @@ export default function MarketWatchPage() {
     return () => observer.disconnect();
   });
 
-  const { players, trades, summaryCards } = v2Data;
+  const { players, trades, summaryCards } = data;
 
   const sellNow      = players.filter(p => p.category === "sell_now");
   const sellConsider = players.filter(p => p.category === "sell_consider");
@@ -189,7 +143,9 @@ export default function MarketWatchPage() {
   const visibleCashCows     = limitFree(cashCows,     SECTION_LIMITS.cashCows,     showMoreCashCows);
   const visibleFades        = limitFree(fades,        SECTION_LIMITS.fades,        showMoreFades);
 
-  const useV2 = !v2Loading && !v2Empty && players.length > 0;
+  if (loading) {
+    return <MarketWatchSkeleton />;
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
@@ -258,65 +214,137 @@ export default function MarketWatchPage() {
           roundNumber={players.length > 0 ? players[0].round_number : null}
         />
 
-        {useV2 ? (
-          <>
-            <MarketWatchSummaryCards
-              cards={summaryCards}
-              loading={false}
-              onCompareTrade={(a, b) => setCompareModal({ outId: a, inId: b })}
-            />
+        <MarketWatchSummaryCards
+          cards={summaryCards}
+          loading={false}
+          onCompareTrade={(a, b) => setCompareModal({ outId: a, inId: b })}
+        />
 
-            <BestTradesRow
-              trades={trades}
-              loading={false}
-              onCompare={(trade) => setCompareModal({ outId: trade.out_player_id, inId: trade.in_player_id })}
-              isPremium={isPremium}
-              onShowUpgrade={() => setShowUpgrade(true)}
-            />
+        <BestTradesRow
+          trades={trades}
+          loading={false}
+          onCompare={(trade) => setCompareModal({ outId: trade.out_player_id, inId: trade.in_player_id })}
+          isPremium={isPremium}
+          onShowUpgrade={() => setShowUpgrade(true)}
+        />
 
-            {buyTargets.length > 0 && (
-              <HorizontalRail
-                id="section-buy-targets"
-                label="Buy Targets"
-                labelColor="text-green-400"
-                dot="bg-green-400"
-                description="Players projecting well above their price — strong value this round"
-                count={buyTargets.length}
-              >
-                {visibleBuyTargets.map((p, i) => (
-                  <div key={p.player_id} className="w-[260px] flex-shrink-0">
-                    <PlayerTradeCard
-                      row={p}
-                      rank={i + 1}
-                      locked={!isPremium && i >= FREE_VISIBLE}
-                      onUnlock={() => setShowUpgrade(true)}
-                      onCompare={(id) => setCompareModal({ inId: id })}
-                    />
-                  </div>
-                ))}
-                {!isPremium && buyTargets.length > FREE_VISIBLE && (
-                  <LockedMoreCard count={buyTargets.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
-                )}
-                {isPremium && buyTargets.length > SECTION_LIMITS.buyTargets && (
-                  <ShowMoreRailCard
-                    count={buyTargets.length - visibleBuyTargets.length}
-                    expanded={showMoreBuy}
-                    onToggle={() => setShowMoreBuy(e => !e)}
-                  />
-                )}
-              </HorizontalRail>
+        {buyTargets.length > 0 && (
+          <HorizontalRail
+            id="section-buy-targets"
+            label="Buy Targets"
+            labelColor="text-green-400"
+            dot="bg-green-400"
+            description="Players projecting well above their price — strong value this round"
+            count={buyTargets.length}
+          >
+            {visibleBuyTargets.map((p, i) => (
+              <div key={p.player_id} className="w-[260px] flex-shrink-0">
+                <PlayerTradeCard
+                  row={p}
+                  rank={i + 1}
+                  locked={!isPremium && i >= FREE_VISIBLE}
+                  onUnlock={() => setShowUpgrade(true)}
+                  onCompare={(id) => setCompareModal({ inId: id })}
+                />
+              </div>
+            ))}
+            {!isPremium && buyTargets.length > FREE_VISIBLE && (
+              <LockedMoreCard count={buyTargets.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
             )}
+            {isPremium && buyTargets.length > SECTION_LIMITS.buyTargets && (
+              <ShowMoreRailCard
+                count={buyTargets.length - visibleBuyTargets.length}
+                expanded={showMoreBuy}
+                onToggle={() => setShowMoreBuy(e => !e)}
+              />
+            )}
+          </HorizontalRail>
+        )}
 
-            {sellNow.length > 0 && (
+        {sellNow.length > 0 && (
+          <HorizontalRail
+            id="section-sell-now"
+            label="Sell Now"
+            labelColor="text-red-400"
+            dot="bg-red-400"
+            description="High-conviction sells — prices likely to fall"
+            count={sellNow.length}
+          >
+            {visibleSellNow.map((p, i) => (
+              <div key={p.player_id} className="w-[260px] flex-shrink-0">
+                <PlayerTradeCard
+                  row={p}
+                  rank={i + 1}
+                  locked={!isPremium && i >= FREE_VISIBLE}
+                  onUnlock={() => setShowUpgrade(true)}
+                  onCompare={(id) => setCompareModal({ outId: id })}
+                />
+              </div>
+            ))}
+            {!isPremium && sellNow.length > FREE_VISIBLE && (
+              <LockedMoreCard count={sellNow.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
+            )}
+            {isPremium && sellNow.length > SECTION_LIMITS.sellNow && (
+              <ShowMoreRailCard
+                count={sellNow.length - visibleSellNow.length}
+                expanded={showMoreSellNow}
+                onToggle={() => setShowMoreSellNow(e => !e)}
+              />
+            )}
+          </HorizontalRail>
+        )}
+
+        {sellConsider.length > 0 && (
+          <HorizontalRail
+            id="section-sell-consider"
+            label="Consider Selling"
+            labelColor="text-orange-400"
+            dot="bg-orange-400"
+            description="Monitor closely — borderline holds this round"
+            count={sellConsider.length}
+          >
+            {visibleSellConsider.map((p, i) => (
+              <div key={p.player_id} className="w-[260px] flex-shrink-0">
+                <PlayerTradeCard
+                  row={p}
+                  rank={i + 1}
+                  locked={!isPremium && i >= FREE_VISIBLE}
+                  onUnlock={() => setShowUpgrade(true)}
+                  onCompare={(id) => setCompareModal({ outId: id })}
+                />
+              </div>
+            ))}
+            {!isPremium && sellConsider.length > FREE_VISIBLE && (
+              <LockedMoreCard count={sellConsider.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
+            )}
+            {isPremium && sellConsider.length > SECTION_LIMITS.sellConsider && (
+              <ShowMoreRailCard
+                count={sellConsider.length - visibleSellConsider.length}
+                expanded={showMoreSellConsider}
+                onToggle={() => setShowMoreSellConsider(e => !e)}
+              />
+            )}
+          </HorizontalRail>
+        )}
+
+        {monitor.length > 0 && (
+          <div className="mb-4">
+            <button
+              onClick={() => setMonitorExpanded(e => !e)}
+              className="flex items-center gap-1.5 text-[10px] text-white/25 hover:text-white/45 transition-colors mb-2"
+            >
+              {monitorExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              MONITOR ({monitor.length}) — Borderline holds
+            </button>
+            {monitorExpanded && (
               <HorizontalRail
-                id="section-sell-now"
-                label="Sell Now"
-                labelColor="text-red-400"
-                dot="bg-red-400"
-                description="High-conviction sells — prices likely to fall"
-                count={sellNow.length}
+                label="Monitor"
+                labelColor="text-white/40"
+                dot="bg-white/20"
+                description="Borderline hold decisions"
+                count={monitor.length}
               >
-                {visibleSellNow.map((p, i) => (
+                {(isPremium ? monitor : monitor.slice(0, FREE_VISIBLE)).map((p, i) => (
                   <div key={p.player_id} className="w-[260px] flex-shrink-0">
                     <PlayerTradeCard
                       row={p}
@@ -327,221 +355,117 @@ export default function MarketWatchPage() {
                     />
                   </div>
                 ))}
-                {!isPremium && sellNow.length > FREE_VISIBLE && (
-                  <LockedMoreCard count={sellNow.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
-                )}
-                {isPremium && sellNow.length > SECTION_LIMITS.sellNow && (
-                  <ShowMoreRailCard
-                    count={sellNow.length - visibleSellNow.length}
-                    expanded={showMoreSellNow}
-                    onToggle={() => setShowMoreSellNow(e => !e)}
-                  />
+                {!isPremium && monitor.length > FREE_VISIBLE && (
+                  <LockedMoreCard count={monitor.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
                 )}
               </HorizontalRail>
             )}
+          </div>
+        )}
 
-            {sellConsider.length > 0 && (
-              <HorizontalRail
-                id="section-sell-consider"
-                label="Consider Selling"
-                labelColor="text-orange-400"
-                dot="bg-orange-400"
-                description="Monitor closely — borderline holds this round"
-                count={sellConsider.length}
-              >
-                {visibleSellConsider.map((p, i) => (
-                  <div key={p.player_id} className="w-[260px] flex-shrink-0">
-                    <PlayerTradeCard
-                      row={p}
-                      rank={i + 1}
-                      locked={!isPremium && i >= FREE_VISIBLE}
-                      onUnlock={() => setShowUpgrade(true)}
-                      onCompare={(id) => setCompareModal({ outId: id })}
-                    />
-                  </div>
-                ))}
-                {!isPremium && sellConsider.length > FREE_VISIBLE && (
-                  <LockedMoreCard count={sellConsider.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
-                )}
-                {isPremium && sellConsider.length > SECTION_LIMITS.sellConsider && (
-                  <ShowMoreRailCard
-                    count={sellConsider.length - visibleSellConsider.length}
-                    expanded={showMoreSellConsider}
-                    onToggle={() => setShowMoreSellConsider(e => !e)}
-                  />
-                )}
-              </HorizontalRail>
-            )}
-
-            {monitor.length > 0 && (
-              <div className="mb-4">
-                <button
-                  onClick={() => setMonitorExpanded(e => !e)}
-                  className="flex items-center gap-1.5 text-[10px] text-white/25 hover:text-white/45 transition-colors mb-2"
-                >
-                  {monitorExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                  MONITOR ({monitor.length}) — Borderline holds
-                </button>
-                {monitorExpanded && (
-                  <HorizontalRail
-                    label="Monitor"
-                    labelColor="text-white/40"
-                    dot="bg-white/20"
-                    description="Borderline hold decisions"
-                    count={monitor.length}
-                  >
-                    {(isPremium ? monitor : monitor.slice(0, FREE_VISIBLE)).map((p, i) => (
-                      <div key={p.player_id} className="w-[260px] flex-shrink-0">
-                        <PlayerTradeCard
-                          row={p}
-                          rank={i + 1}
-                          locked={!isPremium && i >= FREE_VISIBLE}
-                          onUnlock={() => setShowUpgrade(true)}
-                          onCompare={(id) => setCompareModal({ outId: id })}
-                        />
-                      </div>
-                    ))}
-                    {!isPremium && monitor.length > FREE_VISIBLE && (
-                      <LockedMoreCard count={monitor.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
-                    )}
-                  </HorizontalRail>
-                )}
+        {cashCows.length > 0 && (
+          <HorizontalRail
+            id="section-cash-cows"
+            label="Cash Cows"
+            labelColor="text-[#F5C84C]"
+            dot="bg-[#F5C84C]"
+            description="Budget picks with strong price-rise potential this round"
+            count={cashCows.length}
+          >
+            {visibleCashCows.map((p, i) => (
+              <div key={p.player_id} className="w-[260px] flex-shrink-0">
+                <PlayerTradeCard
+                  row={p}
+                  rank={i + 1}
+                  locked={!isPremium && i >= FREE_VISIBLE}
+                  onUnlock={() => setShowUpgrade(true)}
+                  onCompare={(id) => setCompareModal({ inId: id })}
+                />
               </div>
+            ))}
+            {!isPremium && cashCows.length > FREE_VISIBLE && (
+              <LockedMoreCard count={cashCows.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
             )}
-
-            {cashCows.length > 0 && (
-              <HorizontalRail
-                id="section-cash-cows"
-                label="Cash Cows"
-                labelColor="text-[#F5C84C]"
-                dot="bg-[#F5C84C]"
-                description="Budget picks with strong price-rise potential this round"
-                count={cashCows.length}
-              >
-                {visibleCashCows.map((p, i) => (
-                  <div key={p.player_id} className="w-[260px] flex-shrink-0">
-                    <PlayerTradeCard
-                      row={p}
-                      rank={i + 1}
-                      locked={!isPremium && i >= FREE_VISIBLE}
-                      onUnlock={() => setShowUpgrade(true)}
-                      onCompare={(id) => setCompareModal({ inId: id })}
-                    />
-                  </div>
-                ))}
-                {!isPremium && cashCows.length > FREE_VISIBLE && (
-                  <LockedMoreCard count={cashCows.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
-                )}
-                {isPremium && cashCows.length > SECTION_LIMITS.cashCows && (
-                  <ShowMoreRailCard
-                    count={cashCows.length - visibleCashCows.length}
-                    expanded={showMoreCashCows}
-                    onToggle={() => setShowMoreCashCows(e => !e)}
-                  />
-                )}
-              </HorizontalRail>
+            {isPremium && cashCows.length > SECTION_LIMITS.cashCows && (
+              <ShowMoreRailCard
+                count={cashCows.length - visibleCashCows.length}
+                expanded={showMoreCashCows}
+                onToggle={() => setShowMoreCashCows(e => !e)}
+              />
             )}
+          </HorizontalRail>
+        )}
 
-            {fades.length > 0 && (
-              <HorizontalRail
-                id="section-fade-traps"
-                label="Fade / Traps"
-                labelColor="text-white/50"
-                dot="bg-white/30"
-                description="Hyped players whose projections don't justify their current price"
-                count={fades.length}
-              >
-                {visibleFades.map((p, i) => (
-                  <div key={p.player_id} className="w-[260px] flex-shrink-0">
-                    <PlayerTradeCard
-                      row={p}
-                      rank={i + 1}
-                      locked={!isPremium && i >= FREE_VISIBLE}
-                      onUnlock={() => setShowUpgrade(true)}
-                      onCompare={(id) => setCompareModal({ outId: id })}
-                    />
-                  </div>
-                ))}
-                {!isPremium && fades.length > FREE_VISIBLE && (
-                  <LockedMoreCard count={fades.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
-                )}
-                {isPremium && fades.length > SECTION_LIMITS.fades && (
-                  <ShowMoreRailCard
-                    count={fades.length - visibleFades.length}
-                    expanded={showMoreFades}
-                    onToggle={() => setShowMoreFades(e => !e)}
-                  />
-                )}
-              </HorizontalRail>
-            )}
-
-            {breakouts.length > 0 && (
-              <HorizontalRail
-                id="section-breakouts"
-                label="Breakouts"
-                labelColor="text-blue-400"
-                dot="bg-blue-400"
-                description="Players flagged for a breakout performance this round"
-                count={breakouts.length}
-              >
-                {(isPremium ? breakouts : breakouts.slice(0, FREE_VISIBLE)).map((p, i) => (
-                  <div key={p.player_id} className="w-[260px] flex-shrink-0">
-                    <PlayerTradeCard
-                      row={p}
-                      rank={i + 1}
-                      locked={!isPremium && i >= FREE_VISIBLE}
-                      onUnlock={() => setShowUpgrade(true)}
-                      onCompare={(id) => setCompareModal({ inId: id })}
-                    />
-                  </div>
-                ))}
-                {!isPremium && breakouts.length > FREE_VISIBLE && (
-                  <LockedMoreCard count={breakouts.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
-                )}
-              </HorizontalRail>
-            )}
-
-            {v2Loading && (
-              <div className="flex gap-3 overflow-hidden mb-8">
-                {[0,1,2,3].map(i => (
-                  <div key={i} className="w-[260px] flex-shrink-0 rounded-xl border border-white/5 bg-white/[0.02] h-44 animate-pulse" />
-                ))}
+        {fades.length > 0 && (
+          <HorizontalRail
+            id="section-fade-traps"
+            label="Fade / Traps"
+            labelColor="text-white/50"
+            dot="bg-white/30"
+            description="Hyped players whose projections don't justify their current price"
+            count={fades.length}
+          >
+            {visibleFades.map((p, i) => (
+              <div key={p.player_id} className="w-[260px] flex-shrink-0">
+                <PlayerTradeCard
+                  row={p}
+                  rank={i + 1}
+                  locked={!isPremium && i >= FREE_VISIBLE}
+                  onUnlock={() => setShowUpgrade(true)}
+                  onCompare={(id) => setCompareModal({ outId: id })}
+                />
               </div>
+            ))}
+            {!isPremium && fades.length > FREE_VISIBLE && (
+              <LockedMoreCard count={fades.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
             )}
-          </>
-        ) : (
-          <>
-            <MarketWatchSummaryCards cards={[]} loading={v2Loading} />
-            <BestTradesRow
-              trades={[]}
-              loading={v2Loading}
-              onCompare={() => {}}
-              isPremium={isPremium}
-              onShowUpgrade={() => setShowUpgrade(true)}
-            />
+            {isPremium && fades.length > SECTION_LIMITS.fades && (
+              <ShowMoreRailCard
+                count={fades.length - visibleFades.length}
+                expanded={showMoreFades}
+                onToggle={() => setShowMoreFades(e => !e)}
+              />
+            )}
+          </HorizontalRail>
+        )}
 
-            {!v2Loading && (
-              <div className="space-y-6">
-                {(["buy", "sell", "cashcow", "trap"] as MarketTab[]).map((key) => {
-                  const meta = TAB_META[key];
-                  return (
-                    <MarketSection
-                      key={key}
-                      tab={key}
-                      title={meta.label}
-                      description={meta.description}
-                      rows={legacyData[key] ?? []}
-                      loading={legacyLoading[key] ?? false}
-                      icon={null}
-                      accentClass=""
-                      isPremium={isPremium}
-                      onShowUpgrade={() => setShowUpgrade(true)}
-                    />
-                  );
-                })}
+        {breakouts.length > 0 && (
+          <HorizontalRail
+            id="section-breakouts"
+            label="Breakouts"
+            labelColor="text-blue-400"
+            dot="bg-blue-400"
+            description="Players flagged for a breakout performance this round"
+            count={breakouts.length}
+          >
+            {(isPremium ? breakouts : breakouts.slice(0, FREE_VISIBLE)).map((p, i) => (
+              <div key={p.player_id} className="w-[260px] flex-shrink-0">
+                <PlayerTradeCard
+                  row={p}
+                  rank={i + 1}
+                  locked={!isPremium && i >= FREE_VISIBLE}
+                  onUnlock={() => setShowUpgrade(true)}
+                  onCompare={(id) => setCompareModal({ inId: id })}
+                />
               </div>
+            ))}
+            {!isPremium && breakouts.length > FREE_VISIBLE && (
+              <LockedMoreCard count={breakouts.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
             )}
-          </>
+          </HorizontalRail>
+        )}
+
+        {players.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-24 gap-3">
+            <TrendingUp className="h-8 w-8 text-white/15" />
+            <p className="text-sm text-white/30">No market data available for this round yet.</p>
+            <button
+              onClick={handleRefresh}
+              className="text-[11px] text-[#F5C84C] hover:text-[#ffd95a] transition-colors"
+            >
+              Try refreshing
+            </button>
+          </div>
         )}
 
         <p className="mt-10 text-center text-[11px] text-white/20 leading-relaxed max-w-lg mx-auto">
