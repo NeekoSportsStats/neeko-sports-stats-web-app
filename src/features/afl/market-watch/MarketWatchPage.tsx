@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { TrendingUp, RefreshCw, Crown, ChevronDown, ChevronUp } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { TrendingUp, RefreshCw, Crown, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
@@ -13,6 +13,7 @@ import { PlayerTradeCard } from "./PlayerTradeCard";
 import { TradeImpactModal } from "./TradeImpactModal";
 import { MarketWatchAISummary } from "./MarketWatchAISummary";
 import { MarketWatchBanner, CategoryCounts } from "./MarketWatchBanner";
+import { HorizontalRail } from "./HorizontalRail";
 
 type DataMap = Partial<Record<MarketTab, MarketRow[]>>;
 type LoadMap = Partial<Record<MarketTab, boolean>>;
@@ -62,8 +63,6 @@ export default function MarketWatchPage() {
   const [showMoreSellConsider, setShowMoreSellConsider] = useState(false);
   const [showMoreCashCows, setShowMoreCashCows] = useState(false);
   const [showMoreFades, setShowMoreFades] = useState(false);
-
-  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const fetchV2 = useCallback(async () => {
     setV2Loading(true);
@@ -156,16 +155,14 @@ export default function MarketWatchPage() {
         const visible = entries
           .filter(e => e.isIntersecting)
           .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible.length > 0) {
-          setActiveSection(visible[0].target.id);
-        }
+        if (visible.length > 0) setActiveSection(visible[0].target.id);
       },
       { rootMargin: "-80px 0px -60% 0px", threshold: 0 }
     );
 
     sectionIds.forEach(id => {
       const el = document.getElementById(id);
-      if (el) { sectionRefs.current[id] = el; observer.observe(el); }
+      if (el) observer.observe(el);
     });
 
     return () => observer.disconnect();
@@ -181,26 +178,23 @@ export default function MarketWatchPage() {
   const fades        = players.filter(p => p.category === "fade");
   const breakouts    = players.filter(p => p.breakout_flag === true);
 
-  const slicePremium = <T,>(arr: T[], limit: number, showMore: boolean): T[] => {
+  const limitFree = <T,>(arr: T[], limit: number, showMore: boolean): T[] => {
     if (isPremium) return arr;
     return showMore ? arr : arr.slice(0, limit);
   };
 
-  const visibleBuyTargets   = slicePremium(buyTargets,   SECTION_LIMITS.buyTargets,   showMoreBuy);
-  const visibleSellNow      = slicePremium(sellNow,      SECTION_LIMITS.sellNow,      showMoreSellNow);
-  const visibleSellConsider = slicePremium(sellConsider, SECTION_LIMITS.sellConsider, showMoreSellConsider);
-  const visibleCashCows     = slicePremium(cashCows,     SECTION_LIMITS.cashCows,     showMoreCashCows);
-  const visibleFades        = slicePremium(fades,        SECTION_LIMITS.fades,        showMoreFades);
+  const visibleBuyTargets   = limitFree(buyTargets,   SECTION_LIMITS.buyTargets,   showMoreBuy);
+  const visibleSellNow      = limitFree(sellNow,      SECTION_LIMITS.sellNow,      showMoreSellNow);
+  const visibleSellConsider = limitFree(sellConsider, SECTION_LIMITS.sellConsider, showMoreSellConsider);
+  const visibleCashCows     = limitFree(cashCows,     SECTION_LIMITS.cashCows,     showMoreCashCows);
+  const visibleFades        = limitFree(fades,        SECTION_LIMITS.fades,        showMoreFades);
 
   const useV2 = !v2Loading && !v2Empty && players.length > 0;
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
 
-      <MarketWatchBanner
-        counts={categoryCounts}
-        activeSection={activeSection}
-      />
+      <MarketWatchBanner counts={categoryCounts} activeSection={activeSection} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24">
 
@@ -280,241 +274,237 @@ export default function MarketWatchPage() {
               onShowUpgrade={() => setShowUpgrade(true)}
             />
 
-            {visibleBuyTargets.length > 0 && (
-              <section id="section-buy-targets" className="mb-10">
-                <SectionHeader
-                  label="Buy Targets"
-                  color="text-green-400"
-                  dot="bg-green-400"
-                  description="Players projecting well above their price — strong value this round"
-                  total={buyTargets.length}
-                  visible={visibleBuyTargets.length}
-                />
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {visibleBuyTargets.map((p, i) => (
+            {buyTargets.length > 0 && (
+              <HorizontalRail
+                id="section-buy-targets"
+                label="Buy Targets"
+                labelColor="text-green-400"
+                dot="bg-green-400"
+                description="Players projecting well above their price — strong value this round"
+                count={buyTargets.length}
+              >
+                {visibleBuyTargets.map((p, i) => (
+                  <div key={p.player_id} className="w-[260px] flex-shrink-0">
                     <PlayerTradeCard
-                      key={p.player_id}
                       row={p}
                       rank={i + 1}
                       locked={!isPremium && i >= FREE_VISIBLE}
                       onUnlock={() => setShowUpgrade(true)}
                       onCompare={(id) => setCompareModal({ inId: id })}
                     />
-                  ))}
-                  {!isPremium && buyTargets.length > FREE_VISIBLE && (
-                    <LockedCountCard count={buyTargets.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
-                  )}
-                </div>
-                {isPremium && !showMoreBuy && buyTargets.length > SECTION_LIMITS.buyTargets && (
-                  <ShowMoreButton
-                    count={buyTargets.length - SECTION_LIMITS.buyTargets}
-                    onShow={() => setShowMoreBuy(true)}
+                  </div>
+                ))}
+                {!isPremium && buyTargets.length > FREE_VISIBLE && (
+                  <LockedMoreCard count={buyTargets.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
+                )}
+                {isPremium && buyTargets.length > SECTION_LIMITS.buyTargets && (
+                  <ShowMoreRailCard
+                    count={buyTargets.length - visibleBuyTargets.length}
+                    expanded={showMoreBuy}
+                    onToggle={() => setShowMoreBuy(e => !e)}
                   />
                 )}
-                {isPremium && showMoreBuy && (
-                  <ShowLessButton onHide={() => setShowMoreBuy(false)} />
-                )}
-              </section>
+              </HorizontalRail>
             )}
 
-            {(sellNow.length > 0 || sellConsider.length > 0) && (
-              <div className="mb-10">
-                {visibleSellNow.length > 0 && (
-                  <section id="section-sell-now" className="mb-6">
-                    <SectionHeader
-                      label="Sell Now"
-                      color="text-red-400"
-                      dot="bg-red-400"
-                      description="High-conviction sells — prices likely to fall"
-                      total={sellNow.length}
-                      visible={visibleSellNow.length}
-                    />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {visibleSellNow.map((p, i) => (
-                        <PlayerTradeCard
-                          key={p.player_id}
-                          row={p}
-                          rank={i + 1}
-                          locked={!isPremium && i >= FREE_VISIBLE}
-                          onUnlock={() => setShowUpgrade(true)}
-                          onCompare={(id) => setCompareModal({ outId: id })}
-                        />
-                      ))}
-                      {!isPremium && sellNow.length > FREE_VISIBLE && (
-                        <LockedCountCard count={sellNow.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
-                      )}
-                    </div>
-                    {isPremium && !showMoreSellNow && sellNow.length > SECTION_LIMITS.sellNow && (
-                      <ShowMoreButton count={sellNow.length - SECTION_LIMITS.sellNow} onShow={() => setShowMoreSellNow(true)} />
-                    )}
-                    {isPremium && showMoreSellNow && (
-                      <ShowLessButton onHide={() => setShowMoreSellNow(false)} />
-                    )}
-                  </section>
-                )}
-
-                {visibleSellConsider.length > 0 && (
-                  <section id="section-sell-consider" className="mb-6">
-                    <SectionHeader
-                      label="Consider Selling"
-                      color="text-orange-400"
-                      dot="bg-orange-400"
-                      description="Monitor closely — borderline holds this round"
-                      total={sellConsider.length}
-                      visible={visibleSellConsider.length}
-                    />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {visibleSellConsider.map((p, i) => (
-                        <PlayerTradeCard
-                          key={p.player_id}
-                          row={p}
-                          rank={i + 1}
-                          locked={!isPremium && i >= FREE_VISIBLE}
-                          onUnlock={() => setShowUpgrade(true)}
-                          onCompare={(id) => setCompareModal({ outId: id })}
-                        />
-                      ))}
-                      {!isPremium && sellConsider.length > FREE_VISIBLE && (
-                        <LockedCountCard count={sellConsider.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
-                      )}
-                    </div>
-                    {isPremium && !showMoreSellConsider && sellConsider.length > SECTION_LIMITS.sellConsider && (
-                      <ShowMoreButton count={sellConsider.length - SECTION_LIMITS.sellConsider} onShow={() => setShowMoreSellConsider(true)} />
-                    )}
-                    {isPremium && showMoreSellConsider && (
-                      <ShowLessButton onHide={() => setShowMoreSellConsider(false)} />
-                    )}
-                  </section>
-                )}
-
-                {monitor.length > 0 && (
-                  <div>
-                    <button
-                      onClick={() => setMonitorExpanded(e => !e)}
-                      className="flex items-center gap-1.5 text-[10px] text-white/25 hover:text-white/45 transition-colors mb-2"
-                    >
-                      {monitorExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                      MONITOR ({monitor.length}) — Borderline holds
-                    </button>
-                    {monitorExpanded && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {(isPremium ? monitor : monitor.slice(0, FREE_VISIBLE)).map((p, i) => (
-                          <PlayerTradeCard
-                            key={p.player_id}
-                            row={p}
-                            rank={i + 1}
-                            locked={!isPremium && i >= FREE_VISIBLE}
-                            onUnlock={() => setShowUpgrade(true)}
-                            onCompare={(id) => setCompareModal({ outId: id })}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {visibleCashCows.length > 0 && (
-              <section id="section-cash-cows" className="mb-10">
-                <SectionHeader
-                  label="Cash Cows"
-                  color="text-[#F5C84C]"
-                  dot="bg-[#F5C84C]"
-                  description="Budget picks with strong price-rise potential this round"
-                  total={cashCows.length}
-                  visible={visibleCashCows.length}
-                />
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {visibleCashCows.map((p, i) => (
+            {sellNow.length > 0 && (
+              <HorizontalRail
+                id="section-sell-now"
+                label="Sell Now"
+                labelColor="text-red-400"
+                dot="bg-red-400"
+                description="High-conviction sells — prices likely to fall"
+                count={sellNow.length}
+              >
+                {visibleSellNow.map((p, i) => (
+                  <div key={p.player_id} className="w-[260px] flex-shrink-0">
                     <PlayerTradeCard
-                      key={p.player_id}
-                      row={p}
-                      rank={i + 1}
-                      locked={!isPremium && i >= FREE_VISIBLE}
-                      onUnlock={() => setShowUpgrade(true)}
-                      onCompare={(id) => setCompareModal({ inId: id })}
-                    />
-                  ))}
-                  {!isPremium && cashCows.length > FREE_VISIBLE && (
-                    <LockedCountCard count={cashCows.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
-                  )}
-                </div>
-                {isPremium && !showMoreCashCows && cashCows.length > SECTION_LIMITS.cashCows && (
-                  <ShowMoreButton count={cashCows.length - SECTION_LIMITS.cashCows} onShow={() => setShowMoreCashCows(true)} />
-                )}
-                {isPremium && showMoreCashCows && (
-                  <ShowLessButton onHide={() => setShowMoreCashCows(false)} />
-                )}
-              </section>
-            )}
-
-            {visibleFades.length > 0 && (
-              <section id="section-fade-traps" className="mb-10">
-                <SectionHeader
-                  label="Fade / Traps"
-                  color="text-white/50"
-                  dot="bg-white/30"
-                  description="Hyped players whose projections don't justify their current price"
-                  total={fades.length}
-                  visible={visibleFades.length}
-                />
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {visibleFades.map((p, i) => (
-                    <PlayerTradeCard
-                      key={p.player_id}
                       row={p}
                       rank={i + 1}
                       locked={!isPremium && i >= FREE_VISIBLE}
                       onUnlock={() => setShowUpgrade(true)}
                       onCompare={(id) => setCompareModal({ outId: id })}
                     />
-                  ))}
-                  {!isPremium && fades.length > FREE_VISIBLE && (
-                    <LockedCountCard count={fades.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
-                  )}
-                </div>
-                {isPremium && !showMoreFades && fades.length > SECTION_LIMITS.fades && (
-                  <ShowMoreButton count={fades.length - SECTION_LIMITS.fades} onShow={() => setShowMoreFades(true)} />
+                  </div>
+                ))}
+                {!isPremium && sellNow.length > FREE_VISIBLE && (
+                  <LockedMoreCard count={sellNow.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
                 )}
-                {isPremium && showMoreFades && (
-                  <ShowLessButton onHide={() => setShowMoreFades(false)} />
+                {isPremium && sellNow.length > SECTION_LIMITS.sellNow && (
+                  <ShowMoreRailCard
+                    count={sellNow.length - visibleSellNow.length}
+                    expanded={showMoreSellNow}
+                    onToggle={() => setShowMoreSellNow(e => !e)}
+                  />
                 )}
-              </section>
+              </HorizontalRail>
             )}
 
-            {breakouts.length > 0 && (
-              <section id="section-breakouts" className="mb-10">
-                <SectionHeader
-                  label="Breakouts"
-                  color="text-blue-400"
-                  dot="bg-blue-400"
-                  description="Players flagged for a breakout performance this round"
-                  total={breakouts.length}
-                  visible={breakouts.length}
-                />
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {(isPremium ? breakouts : breakouts.slice(0, FREE_VISIBLE)).map((p, i) => (
+            {sellConsider.length > 0 && (
+              <HorizontalRail
+                id="section-sell-consider"
+                label="Consider Selling"
+                labelColor="text-orange-400"
+                dot="bg-orange-400"
+                description="Monitor closely — borderline holds this round"
+                count={sellConsider.length}
+              >
+                {visibleSellConsider.map((p, i) => (
+                  <div key={p.player_id} className="w-[260px] flex-shrink-0">
                     <PlayerTradeCard
-                      key={p.player_id}
+                      row={p}
+                      rank={i + 1}
+                      locked={!isPremium && i >= FREE_VISIBLE}
+                      onUnlock={() => setShowUpgrade(true)}
+                      onCompare={(id) => setCompareModal({ outId: id })}
+                    />
+                  </div>
+                ))}
+                {!isPremium && sellConsider.length > FREE_VISIBLE && (
+                  <LockedMoreCard count={sellConsider.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
+                )}
+                {isPremium && sellConsider.length > SECTION_LIMITS.sellConsider && (
+                  <ShowMoreRailCard
+                    count={sellConsider.length - visibleSellConsider.length}
+                    expanded={showMoreSellConsider}
+                    onToggle={() => setShowMoreSellConsider(e => !e)}
+                  />
+                )}
+              </HorizontalRail>
+            )}
+
+            {monitor.length > 0 && (
+              <div className="mb-4">
+                <button
+                  onClick={() => setMonitorExpanded(e => !e)}
+                  className="flex items-center gap-1.5 text-[10px] text-white/25 hover:text-white/45 transition-colors mb-2"
+                >
+                  {monitorExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  MONITOR ({monitor.length}) — Borderline holds
+                </button>
+                {monitorExpanded && (
+                  <HorizontalRail
+                    label="Monitor"
+                    labelColor="text-white/40"
+                    dot="bg-white/20"
+                    description="Borderline hold decisions"
+                    count={monitor.length}
+                  >
+                    {(isPremium ? monitor : monitor.slice(0, FREE_VISIBLE)).map((p, i) => (
+                      <div key={p.player_id} className="w-[260px] flex-shrink-0">
+                        <PlayerTradeCard
+                          row={p}
+                          rank={i + 1}
+                          locked={!isPremium && i >= FREE_VISIBLE}
+                          onUnlock={() => setShowUpgrade(true)}
+                          onCompare={(id) => setCompareModal({ outId: id })}
+                        />
+                      </div>
+                    ))}
+                    {!isPremium && monitor.length > FREE_VISIBLE && (
+                      <LockedMoreCard count={monitor.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
+                    )}
+                  </HorizontalRail>
+                )}
+              </div>
+            )}
+
+            {cashCows.length > 0 && (
+              <HorizontalRail
+                id="section-cash-cows"
+                label="Cash Cows"
+                labelColor="text-[#F5C84C]"
+                dot="bg-[#F5C84C]"
+                description="Budget picks with strong price-rise potential this round"
+                count={cashCows.length}
+              >
+                {visibleCashCows.map((p, i) => (
+                  <div key={p.player_id} className="w-[260px] flex-shrink-0">
+                    <PlayerTradeCard
                       row={p}
                       rank={i + 1}
                       locked={!isPremium && i >= FREE_VISIBLE}
                       onUnlock={() => setShowUpgrade(true)}
                       onCompare={(id) => setCompareModal({ inId: id })}
                     />
-                  ))}
-                  {!isPremium && breakouts.length > FREE_VISIBLE && (
-                    <LockedCountCard count={breakouts.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
-                  )}
-                </div>
-              </section>
+                  </div>
+                ))}
+                {!isPremium && cashCows.length > FREE_VISIBLE && (
+                  <LockedMoreCard count={cashCows.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
+                )}
+                {isPremium && cashCows.length > SECTION_LIMITS.cashCows && (
+                  <ShowMoreRailCard
+                    count={cashCows.length - visibleCashCows.length}
+                    expanded={showMoreCashCows}
+                    onToggle={() => setShowMoreCashCows(e => !e)}
+                  />
+                )}
+              </HorizontalRail>
+            )}
+
+            {fades.length > 0 && (
+              <HorizontalRail
+                id="section-fade-traps"
+                label="Fade / Traps"
+                labelColor="text-white/50"
+                dot="bg-white/30"
+                description="Hyped players whose projections don't justify their current price"
+                count={fades.length}
+              >
+                {visibleFades.map((p, i) => (
+                  <div key={p.player_id} className="w-[260px] flex-shrink-0">
+                    <PlayerTradeCard
+                      row={p}
+                      rank={i + 1}
+                      locked={!isPremium && i >= FREE_VISIBLE}
+                      onUnlock={() => setShowUpgrade(true)}
+                      onCompare={(id) => setCompareModal({ outId: id })}
+                    />
+                  </div>
+                ))}
+                {!isPremium && fades.length > FREE_VISIBLE && (
+                  <LockedMoreCard count={fades.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
+                )}
+                {isPremium && fades.length > SECTION_LIMITS.fades && (
+                  <ShowMoreRailCard
+                    count={fades.length - visibleFades.length}
+                    expanded={showMoreFades}
+                    onToggle={() => setShowMoreFades(e => !e)}
+                  />
+                )}
+              </HorizontalRail>
+            )}
+
+            {breakouts.length > 0 && (
+              <HorizontalRail
+                id="section-breakouts"
+                label="Breakouts"
+                labelColor="text-blue-400"
+                dot="bg-blue-400"
+                description="Players flagged for a breakout performance this round"
+                count={breakouts.length}
+              >
+                {(isPremium ? breakouts : breakouts.slice(0, FREE_VISIBLE)).map((p, i) => (
+                  <div key={p.player_id} className="w-[260px] flex-shrink-0">
+                    <PlayerTradeCard
+                      row={p}
+                      rank={i + 1}
+                      locked={!isPremium && i >= FREE_VISIBLE}
+                      onUnlock={() => setShowUpgrade(true)}
+                      onCompare={(id) => setCompareModal({ inId: id })}
+                    />
+                  </div>
+                ))}
+                {!isPremium && breakouts.length > FREE_VISIBLE && (
+                  <LockedMoreCard count={breakouts.length - FREE_VISIBLE} onUnlock={() => setShowUpgrade(true)} />
+                )}
+              </HorizontalRail>
             )}
 
             {v2Loading && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
-                {[0,1,2,3,4,5].map(i => (
-                  <div key={i} className="rounded-xl border border-white/5 bg-white/[0.02] h-44 animate-pulse" />
+              <div className="flex gap-3 overflow-hidden mb-8">
+                {[0,1,2,3].map(i => (
+                  <div key={i} className="w-[260px] flex-shrink-0 rounded-xl border border-white/5 bg-white/[0.02] h-44 animate-pulse" />
                 ))}
               </div>
             )}
@@ -575,64 +565,36 @@ export default function MarketWatchPage() {
   );
 }
 
-function SectionHeader({
-  label, color, dot, description, total, visible,
-}: {
-  label: string;
-  color: string;
-  dot: string;
-  description: string;
-  total: number;
-  visible: number;
-}) {
+function LockedMoreCard({ count, onUnlock }: { count: number; onUnlock: () => void }) {
   return (
-    <div className="mb-4">
-      <div className="flex items-center gap-2 mb-0.5">
-        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
-        <h2 className={`text-sm font-bold ${color}`}>{label}</h2>
-        {total > 0 && (
-          <span className="text-[10px] text-white/20 font-semibold">
-            {visible < total ? `${visible} of ${total}` : total}
-          </span>
-        )}
-      </div>
-      <p className="text-[11px] text-white/30 pl-3.5">{description}</p>
+    <div
+      className="w-[200px] flex-shrink-0 rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.02] flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-[#F5C84C]/[0.05] transition-colors p-4"
+      onClick={onUnlock}
+    >
+      <Lock className="h-4 w-4 text-[#F5C84C]/50" />
+      <p className="text-sm font-bold text-white/50">+{count} more</p>
+      <p className="text-[11px] text-[#F5C84C]">Unlock Neeko+</p>
     </div>
   );
 }
 
-function ShowMoreButton({ count, onShow }: { count: number; onShow: () => void }) {
-  return (
-    <button
-      onClick={onShow}
-      className="mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-[11px] text-white/35 hover:text-white/55 font-semibold transition-all"
-    >
-      <ChevronDown className="h-3 w-3" />
-      Show {count} more
-    </button>
-  );
-}
-
-function ShowLessButton({ onHide }: { onHide: () => void }) {
-  return (
-    <button
-      onClick={onHide}
-      className="mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] text-[11px] text-white/25 hover:text-white/45 font-semibold transition-all"
-    >
-      <ChevronUp className="h-3 w-3" />
-      Show less
-    </button>
-  );
-}
-
-function LockedCountCard({ count, onUnlock }: { count: number; onUnlock: () => void }) {
+function ShowMoreRailCard({
+  count,
+  expanded,
+  onToggle,
+}: {
+  count: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  if (expanded) return null;
   return (
     <div
-      className="rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.02] flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:bg-[#F5C84C]/[0.05] transition-colors p-4 min-h-[120px]"
-      onClick={onUnlock}
+      className="w-[160px] flex-shrink-0 rounded-xl border border-white/[0.06] bg-white/[0.02] flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-white/[0.04] transition-colors p-4"
+      onClick={onToggle}
     >
-      <p className="text-sm font-bold text-white/50">+{count} more</p>
-      <p className="text-[11px] text-[#F5C84C]">Unlock Neeko+</p>
+      <ChevronDown className="h-4 w-4 text-white/30" />
+      <p className="text-[11px] text-white/40 font-semibold">+{count} more</p>
     </div>
   );
 }
