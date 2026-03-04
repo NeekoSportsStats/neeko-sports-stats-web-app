@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, Shield, Database, Zap, Activity, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, TrendingUp, Server, Bot, ChartBar as BarChart3, Layers, Bell, BellOff } from "lucide-react";
+import { RefreshCw, Shield, Database, Zap, Activity, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, TrendingUp, Server, Bot, ChartBar as BarChart3, Layers, Bell, BellOff, History } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
@@ -71,6 +71,17 @@ interface PipelineAlert {
   severity: string;
   created_at: string;
   resolved: boolean;
+}
+
+interface PipelineJobRun {
+  id: string;
+  job_name: string;
+  run_status: string;
+  attempt: number;
+  started_at: string;
+  completed_at: string | null;
+  duration_seconds: number | null;
+  error_message: string | null;
 }
 
 interface DataIntegrityChecks {
@@ -198,6 +209,8 @@ export default function Admin() {
   const [alerts, setAlerts] = useState<PipelineAlert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(true);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [jobHistory, setJobHistory] = useState<PipelineJobRun[]>([]);
+  const [jobHistoryLoading, setJobHistoryLoading] = useState(true);
 
   useEffect(() => {
     if (loading) return;
@@ -225,6 +238,22 @@ export default function Admin() {
       console.error("Alerts fetch error:", err);
     } finally {
       setAlertsLoading(false);
+    }
+  }, []);
+
+  const fetchJobHistory = useCallback(async () => {
+    setJobHistoryLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("v_pipeline_job_history")
+        .select("id, job_name, run_status, attempt, started_at, completed_at, duration_seconds, error_message")
+        .order("started_at", { ascending: false })
+        .limit(20);
+      if (!error && data) setJobHistory(data as PipelineJobRun[]);
+    } catch (err) {
+      console.error("Job history fetch error:", err);
+    } finally {
+      setJobHistoryLoading(false);
     }
   }, []);
 
@@ -263,8 +292,8 @@ export default function Admin() {
     } finally {
       setDataLoading(false);
     }
-    await fetchAlerts();
-  }, [toast, fetchAlerts]);
+    await Promise.all([fetchAlerts(), fetchJobHistory()]);
+  }, [toast, fetchAlerts, fetchJobHistory]);
 
   const handleResolveAlert = async (id: string) => {
     setResolvingId(id);
@@ -315,8 +344,9 @@ export default function Admin() {
   useEffect(() => {
     if (!loading && user?.id === ADMIN_USER_ID) {
       fetchAlerts();
+      fetchJobHistory();
     }
-  }, [loading, user, fetchAlerts]);
+  }, [loading, user, fetchAlerts, fetchJobHistory]);
 
   const handleRunPipeline = async () => {
     setIsRefreshing(true);
@@ -667,6 +697,85 @@ export default function Admin() {
                   </Button>
                 </div>
               ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Pipeline Job History */}
+      <Card className="mb-4">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between text-base">
+            <span className="flex items-center gap-2">
+              <History className="h-4 w-4 text-muted-foreground" />
+              Pipeline Run History
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={fetchJobHistory}
+              disabled={jobHistoryLoading}
+              className="h-7 text-xs"
+            >
+              <RefreshCw className={`h-3 w-3 mr-1 ${jobHistoryLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {jobHistoryLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : jobHistory.length === 0 ? (
+            <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground">
+              <History className="h-4 w-4" />
+              <span className="text-sm">No pipeline runs recorded yet</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/40">
+                    <th className="text-left py-2 pr-4 text-xs font-medium text-muted-foreground">Status</th>
+                    <th className="text-left py-2 pr-4 text-xs font-medium text-muted-foreground">Job</th>
+                    <th className="text-left py-2 pr-4 text-xs font-medium text-muted-foreground">Attempt</th>
+                    <th className="text-left py-2 pr-4 text-xs font-medium text-muted-foreground">Started</th>
+                    <th className="text-left py-2 pr-4 text-xs font-medium text-muted-foreground">Duration</th>
+                    <th className="text-left py-2 text-xs font-medium text-muted-foreground">Error</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {jobHistory.map((run) => {
+                    const statusColor =
+                      run.run_status === "success"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : run.run_status === "failed"
+                          ? "text-red-600 dark:text-red-400"
+                          : run.run_status === "retrying"
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-blue-600 dark:text-blue-400";
+                    return (
+                      <tr key={run.id} className="border-b border-border/30 last:border-0 hover:bg-muted/30">
+                        <td className="py-2 pr-4">
+                          <span className={`font-medium capitalize ${statusColor}`}>
+                            {run.run_status}
+                          </span>
+                        </td>
+                        <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">{run.job_name}</td>
+                        <td className="py-2 pr-4 text-center">{run.attempt}</td>
+                        <td className="py-2 pr-4 text-xs text-muted-foreground whitespace-nowrap">{formatDate(run.started_at)}</td>
+                        <td className="py-2 pr-4 text-xs">
+                          {run.duration_seconds != null ? `${run.duration_seconds}s` : run.completed_at ? "—" : "running…"}
+                        </td>
+                        <td className="py-2 text-xs text-red-600 dark:text-red-400 max-w-xs truncate">
+                          {run.error_message ?? "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </CardContent>
