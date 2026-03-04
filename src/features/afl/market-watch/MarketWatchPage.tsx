@@ -35,6 +35,7 @@ export default function MarketWatchPage() {
   const [data, setData] = useState<V2Data>({ players: [], trades: [], summaryCards: [] });
   const [dataLoading, setDataLoading] = useState(false);
   const fetchedRef = useRef(false);
+  const isPremiumRef = useRef(isPremium);
 
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -91,16 +92,20 @@ export default function MarketWatchPage() {
   useEffect(() => { track("market_watch_view"); }, []);
 
   useEffect(() => {
+    isPremiumRef.current = isPremium;
+  }, [isPremium]);
+
+  useEffect(() => {
     if (authLoading) return;
     if (fetchedRef.current) return;
     fetchedRef.current = true;
     const load = async () => {
-      await fetchData(isPremium);
+      await fetchData(isPremiumRef.current);
       await fetchCounts();
       setLastUpdated(new Date());
     };
     load();
-  }, [authLoading, isPremium, fetchData, fetchCounts]);
+  }, [authLoading, fetchData, fetchCounts]);
 
   useEffect(() => {
     const sectionIds = [

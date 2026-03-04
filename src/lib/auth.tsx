@@ -35,8 +35,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [premiumLoading, setPremiumLoading] = useState(true);
   const [isPremium, setIsPremium] = useState(false);
 
-  // NEW: Track whether INITIAL_SESSION has occurred
   const initialSessionSeenRef = useRef(false);
+  const premiumFetchInFlightRef = useRef(false);
 
   /**
    * Fetch premium status from `profiles` for a given user id.
@@ -132,8 +132,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (currentUser?.id) {
         identifyUser({ id: currentUser.id, email: currentUser.email ?? undefined });
+        if (premiumFetchInFlightRef.current) return;
+        premiumFetchInFlightRef.current = true;
         (async () => {
           await fetchPremiumStatus(currentUser.id);
+          premiumFetchInFlightRef.current = false;
           if (isMounted) setLoading(false);
         })();
       } else {
@@ -159,6 +162,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           break;
 
         case "SIGNED_IN":
+          if (initialSessionSeenRef.current) break;
+          applySession(session, event);
+          break;
+
         case "TOKEN_REFRESHED":
           applySession(session, event);
           break;
