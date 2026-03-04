@@ -55,38 +55,6 @@ function getConfidenceTierColor(v: number | null): string {
   return "text-orange-400";
 }
 
-// ─── Section stat teasers ─────────────────────────────────────────────────────
-
-interface SectionStats {
-  avgProjection: number | null;
-  maxCeiling: number | null;
-  avgUpside: number | null;
-  maxValueScore: number | null;
-  maxRisk: number | null;
-  minValueScore: number | null;
-}
-
-function computeSectionStats(rows: RankingRow[]): SectionStats {
-  const hidden = rows.slice(1);
-  if (hidden.length === 0) {
-    return { avgProjection: null, maxCeiling: null, avgUpside: null, maxValueScore: null, maxRisk: null, minValueScore: null };
-  }
-  const projections = hidden.map((r) => r.projection_final).filter((v): v is number => v != null);
-  const ceilings = hidden.map((r) => r.ceiling_estimate).filter((v): v is number => v != null);
-  const upsides = hidden.map((r) => r.upside_rating).filter((v): v is number => v != null);
-  const values = hidden.map((r) => r.value_score).filter((v): v is number => v != null);
-  const risks = hidden.map((r) => r.risk_rating).filter((v): v is number => v != null);
-
-  return {
-    avgProjection: projections.length ? Math.round(projections.reduce((a, b) => a + b, 0) / projections.length) : null,
-    maxCeiling: ceilings.length ? Math.round(Math.max(...ceilings)) : null,
-    avgUpside: upsides.length ? Math.round(upsides.reduce((a, b) => a + b, 0) / upsides.length) : null,
-    maxValueScore: values.length ? parseFloat(Math.max(...values).toFixed(2)) : null,
-    maxRisk: risks.length ? Math.round(Math.max(...risks)) : null,
-    minValueScore: values.length ? parseFloat(Math.min(...values).toFixed(2)) : null,
-  };
-}
-
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
 function fmtPrice(v: number | null | undefined): string {
@@ -287,35 +255,6 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── Locked Card Overlay ───────────────────────────────────────────────────────
-
-interface LockedCardOverlayProps {
-  section?: Section;
-  stats?: SectionStats;
-  onUnlock: () => void;
-}
-
-function LockedCardOverlay({ onUnlock }: LockedCardOverlayProps) {
-  return (
-    <div
-      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-xl cursor-pointer group"
-      style={{ backdropFilter: "blur(10px)", background: "rgba(7,7,7,0.82)" }}
-      onClick={onUnlock}
-    >
-      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/35 group-hover:bg-[#F5C84C]/25 transition-all shadow-lg shadow-[#F5C84C]/10">
-        <Lock size={13} className="text-[#F5C84C]" />
-      </div>
-      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#F5C84C]/30 bg-[#F5C84C]/10">
-        <Crown size={9} className="text-[#F5C84C]" />
-        <span className="text-[10px] font-bold text-[#F5C84C] tracking-wide">Neeko+ Only</span>
-      </div>
-      <p className="text-[10px] text-white/30 text-center px-6 group-hover:text-white/45 transition-colors">
-        Unlock this week's full edge signals
-      </p>
-    </div>
-  );
-}
-
 // ─── Captain structured stats bar ─────────────────────────────────────────────
 
 function CaptainStatsBar({ row }: { row: RankingRow }) {
@@ -367,12 +306,11 @@ interface PlayerCardProps {
   section: Section;
   locked: boolean;
   isPremium: boolean;
-  sectionStats: SectionStats;
   onUnlock: () => void;
   isFeature?: boolean;
 }
 
-function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnlock, isFeature = false }: PlayerCardProps) {
+function PlayerCard({ row, rank, section, locked, isPremium, onUnlock, isFeature = false }: PlayerCardProps) {
   const isTrap = section === "trap";
   const [expanded, setExpanded] = useState(false);
 
@@ -612,11 +550,10 @@ interface CardCarouselProps {
   section: Section;
   visible: number;
   isPremium: boolean;
-  sectionStats: SectionStats;
   onUnlock: () => void;
 }
 
-function CardCarousel({ rows, section, visible, isPremium, sectionStats, onUnlock }: CardCarouselProps) {
+function CardCarousel({ rows, section, visible, isPremium, onUnlock }: CardCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -651,7 +588,6 @@ function CardCarousel({ rows, section, visible, isPremium, sectionStats, onUnloc
                 section={section}
                 locked={locked}
                 isPremium={isPremium}
-                sectionStats={sectionStats}
                 onUnlock={onUnlock}
                 isFeature={rank === 1}
               />
@@ -696,11 +632,10 @@ interface DesktopGridProps {
   section: Section;
   visible: number;
   isPremium: boolean;
-  sectionStats: SectionStats;
   onUnlock: () => void;
 }
 
-function DesktopGrid({ rows, section, visible, isPremium, sectionStats, onUnlock }: DesktopGridProps) {
+function DesktopGrid({ rows, section, visible, isPremium, onUnlock }: DesktopGridProps) {
   const featureCard = rows[0];
   const remainingCards = rows.slice(1);
 
@@ -713,7 +648,6 @@ function DesktopGrid({ rows, section, visible, isPremium, sectionStats, onUnlock
           section={section}
           locked={false}
           isPremium={isPremium}
-          sectionStats={sectionStats}
           onUnlock={onUnlock}
           isFeature
         />
@@ -732,7 +666,6 @@ function DesktopGrid({ rows, section, visible, isPremium, sectionStats, onUnlock
                 section={section}
                 locked={locked}
                 isPremium={isPremium}
-                sectionStats={sectionStats}
                 onUnlock={onUnlock}
               />
             );
@@ -751,6 +684,12 @@ interface HeroSignalCardProps {
   isPremium: boolean;
   onUnlock: () => void;
 }
+
+const HERO_SOCIAL_PROOF: Record<Section, string> = {
+  captain: "Top captain choice among Neeko+ coaches this round",
+  breakout: "63% of Neeko+ coaches backing this breakout edge",
+  trap: "Flagged by Neeko AI as highest-risk selection this round",
+};
 
 function HeroSignalCard({ section, row, isPremium, onUnlock }: HeroSignalCardProps) {
   const config = {
@@ -843,6 +782,12 @@ function HeroSignalCard({ section, row, isPremium, onUnlock }: HeroSignalCardPro
             {fmtValueScore(row.value_score)}
           </p>
         </div>
+      </div>
+
+      {/* Social proof label */}
+      <div className="flex items-center gap-1.5 mb-3">
+        <Users size={9} className="text-[#F5C84C]/50 shrink-0" />
+        <p className="text-[10px] text-[#F5C84C]/60 leading-tight">{HERO_SOCIAL_PROOF[section]}</p>
       </div>
 
       {/* Price chip — always visible */}
@@ -1140,7 +1085,6 @@ export default function AFLRoundEdgeBoard() {
             if (data.length === 0) return null;
 
             const lockedCount = !isPremium ? Math.max(0, data.length - FREE_VISIBLE) : 0;
-            const sectionStats = computeSectionStats(data);
 
             return (
               <section key={key}>
@@ -1153,7 +1097,6 @@ export default function AFLRoundEdgeBoard() {
                     section={key}
                     visible={visible}
                     isPremium={isPremium}
-                    sectionStats={sectionStats}
                     onUnlock={() => setShowUpgrade(true)}
                   />
                 </div>
@@ -1165,7 +1108,6 @@ export default function AFLRoundEdgeBoard() {
                     section={key}
                     visible={visible}
                     isPremium={isPremium}
-                    sectionStats={sectionStats}
                     onUnlock={() => setShowUpgrade(true)}
                   />
                 </div>
@@ -1198,24 +1140,36 @@ export default function AFLRoundEdgeBoard() {
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {[4, 5, 6].map((n) => (
+              {(
+                [
+                  { n: 4, type: "Captain Edge", pos: "MID", price: "$712k", posStyle: "bg-blue-500/20 text-blue-300" },
+                  { n: 5, type: "Breakout Watch", pos: "FWD", price: "$498k", posStyle: "bg-red-500/20 text-red-300" },
+                  { n: 6, type: "Trap Alert", pos: "DEF", price: "$634k", posStyle: "bg-emerald-500/20 text-emerald-300" },
+                ] as const
+              ).map(({ n, type, pos, price, posStyle }) => (
                 <div
                   key={n}
                   className="relative rounded-xl border border-white/[0.07] bg-white/[0.02] p-5 overflow-hidden cursor-pointer group"
                   onClick={() => setShowUpgrade(true)}
                 >
-                  <div className="select-none blur-[4px] opacity-30 pointer-events-none">
+                  <div className="select-none blur-[5px] opacity-25 pointer-events-none">
                     <div className="flex items-center gap-2 mb-3">
-                      <div className="h-4 w-20 rounded bg-white/15" />
-                      <div className="h-4 w-10 rounded bg-white/10" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border border-white/10 bg-white/5 text-white/40">
+                        {type}
+                      </span>
+                      <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${posStyle}`}>
+                        {pos}
+                      </span>
                     </div>
-                    <div className="h-5 w-32 rounded bg-white/20 mb-1" />
-                    <div className="h-3 w-20 rounded bg-white/10 mb-4" />
+                    <div className="h-5 w-36 rounded bg-white/20 mb-1" />
+                    <div className="h-3 w-24 rounded bg-white/10 mb-4" />
                     <div className="grid grid-cols-3 gap-2 mb-3">
-                      {[0, 1, 2].map((i) => (
-                        <div key={i} className="rounded-lg bg-black/30 px-2.5 py-2">
-                          <div className="h-2 w-8 rounded bg-white/15 mb-1" />
-                          <div className="h-3 w-10 rounded bg-white/20" />
+                      {(["Price", "Value", "Conf."] as const).map((label) => (
+                        <div key={label} className="rounded-lg bg-black/30 px-2.5 py-2">
+                          <p className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">{label}</p>
+                          <p className="text-xs font-semibold text-white/50">
+                            {label === "Price" ? price : label === "Value" ? "1.18" : "74%"}
+                          </p>
                         </div>
                       ))}
                     </div>
