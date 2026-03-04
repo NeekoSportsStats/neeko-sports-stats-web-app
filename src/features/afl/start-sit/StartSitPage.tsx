@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ArrowRight, RotateCcw, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
@@ -7,6 +7,8 @@ import { StartSitSelector } from "./StartSitSelector";
 import { StartSitResult } from "./StartSitResult";
 
 const CURRENT_SEASON = 2026;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 interface PlayerOption {
   player_id: string;
@@ -21,25 +23,19 @@ interface PlayerOption {
   neeko_rating: number | null;
 }
 
-interface AIResult {
+interface CompareResult {
   winner_player_id: string;
   winner_name: string;
   confidence: number;
   ai_summary: string | null;
   is_cached: boolean;
+  playerA: PlayerOption;
+  playerB: PlayerOption;
 }
 
-async function fetchFullPlayer(id: string): Promise<PlayerOption | null> {
-  const { data } = await supabase
-    .from("v_rankings_master")
-    .select(`
-      player_id, player_name, team, position,
-      projection_final, ceiling_estimate, floor_estimate,
-      projection_confidence, risk_rating, neeko_rating
-    `)
-    .eq("player_id", id)
-    .maybeSingle();
-  return data as PlayerOption | null;
+function getRoundLabel(round: number): string {
+  if (round <= 0) return "Opening Round";
+  return `Round ${round}`;
 }
 
 export default function StartSitPage() {
@@ -49,46 +45,63 @@ export default function StartSitPage() {
   const [playerA, setPlayerA] = useState<PlayerOption | null>(null);
   const [playerB, setPlayerB] = useState<PlayerOption | null>(null);
   const [round, setRound] = useState<number>(1);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<AIResult | null>(null);
+  const [roundLoading, setRoundLoading] = useState(true);
+
+  const [comparing, setComparing] = useState(false);
+  const [result, setResult] = useState<CompareResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Load the current round on mount
   useEffect(() => {
     supabase
       .rpc("get_latest_completed_round")
       .then(({ data }) => {
         const latest = typeof data === "number" ? data : 0;
+        // If no completed rounds (pre-season), default to round 1 (Opening Round)
         setRound(latest > 0 ? latest + 1 : 1);
       })
-      .catch(() => setRound(1));
+      .catch(() => setRound(1))
+      .finally(() => setRoundLoading(false));
+  }, []);
+
+  // Clear stale result immediately whenever either player or round changes
+  const handlePlayerAChange = useCallback((p: PlayerOption | null) => {
+    setPlayerA(p);
+    setResult(null);
+    setError(null);
+  }, []);
+
+  const handlePlayerBChange = useCallback((p: PlayerOption | null) => {
+    setPlayerB(p);
+    setResult(null);
+    setError(null);
   }, []);
 
   async function handleCompare() {
     if (!playerA || !playerB) return;
-    setLoading(true);
-    setError(null);
+
+    setComparing(true);
     setResult(null);
+    setError(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      if (session?.access_token) {
-        headers["Authorization"] = `Bearer ${session.access_token}`;
-      }
+      // Always send an Authorization header:
+      // - Logged-in users send their JWT so premium is detected server-side
+      // - Anon users send the anon key so the function accepts the request (no 401)
+      const authHeader = session?.access_token
+        ? `Bearer ${session.access_token}`
+        : `Bearer ${ANON_KEY}`;
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-
-      if (!headers["Authorization"]) {
-        headers["Authorization"] = `Bearer ${anonKey}`;
-      }
-
-      const res = await fetch(`${supabaseUrl}/functions/v1/generate-start-sit`, {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-start-sit`, {
         method: "POST",
-        headers,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authHeader,
+        },
         body: JSON.stringify({
           season: CURRENT_SEASON,
           round_number: round,
@@ -102,31 +115,31 @@ export default function StartSitPage() {
       if (!res.ok || json.error) {
         setError(
           json.error ??
-            "Start/Sit data isn't available for this round yet. Defaulting to Opening Round."
+            "Start/Sit data isn't available for this round yet. Try again shortly."
         );
         return;
       }
 
-      const [fullA, fullB] = await Promise.all([
-        fetchFullPlayer(playerA.player_id),
-        fetchFullPlayer(playerB.player_id),
-      ]);
-      if (fullA) setPlayerA(fullA);
-      if (fullB) setPlayerB(fullB);
+      // Use player data returned by the edge function (has latest stats)
+      // Fall back to what we already have if missing from response
+      const resultPlayerA: PlayerOption = json.playerA ?? playerA;
+      const resultPlayerB: PlayerOption = json.playerB ?? playerB;
 
       setResult({
         winner_player_id: json.winner_player_id,
         winner_name: json.winner_name,
-        confidence: json.confidence ?? 60,
+        confidence: typeof json.confidence === "number" ? json.confidence : 60,
         ai_summary: json.ai_summary ?? null,
         is_cached: json.is_cached ?? false,
+        playerA: resultPlayerA,
+        playerB: resultPlayerB,
       });
-    } catch (e) {
+    } catch {
       setError(
-        "Start/Sit data isn't available for this round yet. Defaulting to Opening Round."
+        "Start/Sit data isn't available for this round yet. Try again shortly."
       );
     } finally {
-      setLoading(false);
+      setComparing(false);
     }
   }
 
@@ -137,46 +150,57 @@ export default function StartSitPage() {
     setError(null);
   }
 
-  const canCompare = !!playerA && !!playerB && !loading;
+  const canCompare = !!playerA && !!playerB && !comparing;
+  const showEmptyHint = !result && !comparing && !error;
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
-      <div className="max-w-2xl mx-auto px-4 py-8 pb-24">
+      <div className="max-w-2xl mx-auto px-4 py-8 pb-28">
 
+        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-1">
             <Zap size={16} className="text-[#F5C84C]" />
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-[#F5C84C]/60">AFL Fantasy</span>
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-[#F5C84C]/60">
+              AFL Fantasy
+            </span>
           </div>
           <h1 className="text-2xl font-extrabold text-white">Start / Sit</h1>
           <p className="text-sm text-white/40 mt-1">
-            Compare two players and get an AI-powered verdict on who to start.
+            Compare two players and get a verdict on who to start this round.
           </p>
         </div>
 
+        {/* Round pill */}
         <div className="flex items-center gap-2 mb-6">
           <span className="text-[11px] text-white/30 uppercase tracking-wider">Round</span>
-          <span className="rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1 text-sm font-bold text-white/70">
-            {round}
-          </span>
-          <span className="text-[11px] text-white/20">{CURRENT_SEASON} season</span>
+          {roundLoading ? (
+            <span className="h-6 w-16 rounded-md bg-white/[0.06] animate-pulse" />
+          ) : (
+            <span className="rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1 text-sm font-bold text-white/70">
+              {getRoundLabel(round)}
+            </span>
+          )}
+          <span className="text-[11px] text-white/20">{CURRENT_SEASON}</span>
         </div>
 
+        {/* Player selectors */}
         <div className="grid gap-3 sm:grid-cols-2 mb-5">
           <StartSitSelector
             label="Player A"
             value={playerA}
             excludeId={playerB?.player_id}
-            onChange={setPlayerA}
+            onChange={handlePlayerAChange}
           />
           <StartSitSelector
             label="Player B"
             value={playerB}
             excludeId={playerA?.player_id}
-            onChange={setPlayerB}
+            onChange={handlePlayerBChange}
           />
         </div>
 
+        {/* Action row */}
         <div className="flex items-center gap-3">
           <button
             onClick={handleCompare}
@@ -187,7 +211,7 @@ export default function StartSitPage() {
                 : "bg-white/[0.06] text-white/25 cursor-not-allowed"
               }`}
           >
-            {loading ? (
+            {comparing ? (
               <>
                 <span className="h-4 w-4 rounded-full border-2 border-black/30 border-t-black animate-spin" />
                 Analysing...
@@ -200,7 +224,7 @@ export default function StartSitPage() {
             )}
           </button>
 
-          {result && (
+          {(result || playerA || playerB) && (
             <button
               onClick={reset}
               className="flex items-center gap-1.5 px-4 py-3.5 rounded-xl border border-white/10 text-white/40 hover:text-white/70 hover:border-white/20 transition-all text-sm"
@@ -211,22 +235,33 @@ export default function StartSitPage() {
           )}
         </div>
 
+        {/* Error banner */}
         {error && (
-          <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 flex items-start justify-between gap-3">
-            <p className="text-sm text-red-400">{error}</p>
+          <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 flex items-start justify-between gap-3">
+            <p className="text-sm text-red-400 leading-snug">{error}</p>
             <button
               onClick={handleCompare}
-              className="shrink-0 text-xs text-red-400/70 hover:text-red-400 underline underline-offset-2 transition-colors"
+              disabled={!canCompare}
+              className="shrink-0 text-xs text-red-400/70 hover:text-red-400 underline underline-offset-2 transition-colors disabled:opacity-40"
             >
               Retry
             </button>
           </div>
         )}
 
-        {result && playerA && playerB && (
+        {/* Loading skeleton while fetching */}
+        {comparing && (
+          <div className="mt-6 space-y-3 animate-pulse">
+            <div className="h-32 rounded-xl bg-white/[0.04]" />
+            <div className="h-20 rounded-xl bg-white/[0.04]" />
+          </div>
+        )}
+
+        {/* Result */}
+        {!comparing && result && (
           <StartSitResult
-            playerA={playerA}
-            playerB={playerB}
+            playerA={result.playerA}
+            playerB={result.playerB}
             winnerPlayerId={result.winner_player_id}
             confidence={result.confidence}
             aiSummary={result.ai_summary}
@@ -235,7 +270,8 @@ export default function StartSitPage() {
           />
         )}
 
-        {!result && !loading && (
+        {/* Empty state */}
+        {showEmptyHint && (
           <div className="mt-10 text-center">
             <p className="text-sm text-white/20">Select two players above to get started.</p>
             {!isPremium && (
