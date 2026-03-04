@@ -1760,6 +1760,15 @@ export default function Admin() {
               <History className="h-4 w-4 mr-2" />
               Pipeline History
             </Button>
+
+            <Button
+              onClick={() => navigate("/admin/pipeline-status")}
+              variant="outline"
+              className="w-full"
+            >
+              <Database className="h-4 w-4 mr-2" />
+              Data Pipeline Status
+            </Button>
           </div>
 
           {activeRun && (
