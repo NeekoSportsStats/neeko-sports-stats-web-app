@@ -29,6 +29,8 @@ interface V2Data {
   summaryCards: MWSummaryCard[];
 }
 
+const preseasonMode = true;
+
 export default function MarketWatchPage() {
   const { isPremium, loading: authLoading } = useAuth();
 
@@ -167,6 +169,55 @@ export default function MarketWatchPage() {
 
       <MarketWatchBanner counts={categoryCounts} activeSection={activeSection} />
 
+      {preseasonMode && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center px-4"
+          style={{ background: "rgba(10,10,10,0.82)", backdropFilter: "blur(6px)" }}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl px-8 py-10 text-center"
+            style={{
+              background: "linear-gradient(135deg, rgba(245,200,76,0.07) 0%, rgba(255,255,255,0.03) 100%)",
+              border: "1px solid rgba(245,200,76,0.22)",
+              boxShadow: "0 0 60px rgba(245,200,76,0.06), 0 24px 48px rgba(0,0,0,0.5)",
+            }}
+          >
+            <div
+              className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-5"
+              style={{ background: "rgba(245,200,76,0.10)", border: "1px solid rgba(245,200,76,0.20)" }}
+            >
+              <TrendingUp className="h-6 w-6 text-[#F5C84C]" />
+            </div>
+
+            <h2 className="text-[22px] font-bold text-white tracking-tight mb-3">
+              Market Watch unlocks after Opening Round
+            </h2>
+
+            <p className="text-[14px] text-white/60 leading-relaxed mb-4">
+              Market Watch analyses player prices, projections and breakevens to identify
+              the best buy targets, sell signals and cash cows each round.
+            </p>
+
+            <p className="text-[13px] text-white/40 leading-relaxed">
+              Once Opening Round begins and price movement data becomes available,
+              this page will automatically activate with full trade intelligence.
+            </p>
+
+            <div
+              className="mt-7 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-semibold text-[#F5C84C]"
+              style={{ background: "rgba(245,200,76,0.08)", border: "1px solid rgba(245,200,76,0.18)" }}
+            >
+              <span
+                className="w-2 h-2 rounded-full bg-[#F5C84C] inline-block"
+                style={{ animation: "pulse 2s cubic-bezier(0.4,0,0.6,1) infinite" }}
+              />
+              Activates Round 1
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className={preseasonMode ? "opacity-25 pointer-events-none select-none" : ""}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24">
 
         <div className="mb-8">
@@ -500,6 +551,7 @@ export default function MarketWatchPage() {
           allPlayers={players}
         />
       )}
+      </div>
     </div>
   );
 }
