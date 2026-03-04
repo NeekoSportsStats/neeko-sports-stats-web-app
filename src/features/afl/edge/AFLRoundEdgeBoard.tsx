@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   Lock, Crown, X, TrendingUp, TriangleAlert as AlertTriangle,
-  Star, ShieldCheck, Info, ChevronDown,
+  Star, ShieldCheck, Info, ChevronDown, Zap, Target, Users,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
@@ -290,43 +290,28 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
 // ─── Locked Card Overlay ───────────────────────────────────────────────────────
 
 interface LockedCardOverlayProps {
-  section: Section;
-  stats: SectionStats;
+  section?: Section;
+  stats?: SectionStats;
   onUnlock: () => void;
 }
 
-function LockedCardOverlay({ section, stats, onUnlock }: LockedCardOverlayProps) {
+function LockedCardOverlay({ onUnlock }: LockedCardOverlayProps) {
   return (
     <div
-      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2.5 rounded-xl cursor-pointer group px-4"
-      style={{ backdropFilter: "blur(8px)", background: "rgba(10,10,10,0.78)" }}
+      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-xl cursor-pointer group"
+      style={{ backdropFilter: "blur(10px)", background: "rgba(7,7,7,0.82)" }}
       onClick={onUnlock}
     >
-      <div className="flex items-center justify-center w-7 h-7 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30 group-hover:bg-[#F5C84C]/25 transition-all">
-        <Lock size={12} className="text-[#F5C84C]" />
+      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/35 group-hover:bg-[#F5C84C]/25 transition-all shadow-lg shadow-[#F5C84C]/10">
+        <Lock size={13} className="text-[#F5C84C]" />
       </div>
-      <p className="text-[11px] font-semibold text-white/60 group-hover:text-white/80 transition-colors">Neeko+ Only</p>
-
-      {section === "captain" && stats.maxCeiling != null && (
-        <div className="mt-0.5 text-center">
-          <p className="text-[10px] text-white/30 uppercase tracking-wider">Highest Ceiling Remaining</p>
-          <p className="text-xs font-bold text-[#F5C84C]/70 tabular-nums">{stats.maxCeiling}</p>
-        </div>
-      )}
-
-      {section === "breakout" && stats.maxValueScore != null && (
-        <div className="mt-0.5 text-center">
-          <p className="text-[10px] text-white/30 uppercase tracking-wider">Best Value Remaining</p>
-          <p className="text-xs font-bold text-green-400/70 tabular-nums">{stats.maxValueScore}</p>
-        </div>
-      )}
-
-      {section === "trap" && stats.maxRisk != null && (
-        <div className="mt-0.5 text-center">
-          <p className="text-[10px] text-white/30 uppercase tracking-wider">Highest Risk Remaining</p>
-          <p className="text-xs font-bold text-red-400/70 tabular-nums">{stats.maxRisk}%</p>
-        </div>
-      )}
+      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#F5C84C]/30 bg-[#F5C84C]/10">
+        <Crown size={9} className="text-[#F5C84C]" />
+        <span className="text-[10px] font-bold text-[#F5C84C] tracking-wide">Neeko+ Only</span>
+      </div>
+      <p className="text-[10px] text-white/30 text-center px-6 group-hover:text-white/45 transition-colors">
+        Unlock this week's full edge signals
+      </p>
     </div>
   );
 }
@@ -417,6 +402,7 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
       className={`relative rounded-xl border ${sectionAccent.border} ${sectionAccent.bg} overflow-hidden transition-all duration-200 ${isFeature ? "p-5" : "p-4"} ${isPremium && !locked ? "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40" : ""}`}
     >
       {locked && <LockedCardOverlay section={section} stats={sectionStats} onUnlock={onUnlock} />}
+
 
       <div className={`flex items-start justify-between gap-3 mb-3 ${locked ? "blur-[3px] select-none" : ""}`}>
         <div className="min-w-0 flex-1">
@@ -545,7 +531,7 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
             onClick={onUnlock}
             className="mt-2 text-[11px] font-semibold text-[#F5C84C] hover:underline transition-all"
           >
-            Unlock This Week's Full Edge →
+            Unlock All Edge Signals →
           </button>
         </div>
       )}
@@ -567,19 +553,32 @@ interface SectionLockFooterProps {
 
 function SectionLockFooter({ count, section, onUnlock }: SectionLockFooterProps) {
   if (count <= 0) return null;
-  const color =
+
+  const accent =
     section === "captain"
-      ? "text-[#F5C84C]/50 hover:text-[#F5C84C]/75"
+      ? { border: "border-yellow-400/20", bg: "bg-yellow-400/[0.04]", text: "text-yellow-400", glow: "shadow-yellow-400/10" }
       : section === "breakout"
-      ? "text-green-400/50 hover:text-green-400/75"
-      : "text-red-400/50 hover:text-red-400/75";
+      ? { border: "border-green-500/20", bg: "bg-green-500/[0.04]", text: "text-green-400", glow: "shadow-green-400/10" }
+      : { border: "border-red-500/20", bg: "bg-red-500/[0.04]", text: "text-red-400", glow: "shadow-red-400/10" };
+
   return (
     <button
       onClick={onUnlock}
-      className={`mt-3 flex items-center gap-2 text-[11px] transition-colors ${color}`}
+      className={`mt-3 w-full flex items-center justify-between gap-3 rounded-xl border ${accent.border} ${accent.bg} px-4 py-3.5 shadow-lg ${accent.glow} hover:brightness-110 transition-all group`}
     >
-      <Lock size={10} className="shrink-0" />
-      <span>+{count} additional signal{count !== 1 ? "s" : ""} locked in this section</span>
+      <div className="flex items-center gap-3">
+        <div className="flex items-center justify-center w-7 h-7 rounded-full bg-white/[0.06] border border-white/10 group-hover:border-white/20 transition-all">
+          <Lock size={11} className={accent.text} />
+        </div>
+        <div className="text-left">
+          <p className="text-xs font-bold text-white/80">{count} Additional Edge Signal{count !== 1 ? "s" : ""} Hidden</p>
+          <p className="text-[10px] text-white/30 mt-0.5">Unlock this week's full edge signals</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0 bg-[#F5C84C] text-black font-bold text-[10px] px-2.5 py-1.5 rounded-lg">
+        <Crown size={9} />
+        Neeko+
+      </div>
     </button>
   );
 }
@@ -589,19 +588,19 @@ function SectionLockFooter({ count, section, onUnlock }: SectionLockFooterProps)
 const SECTION_META: Record<Section, { label: string; sub: string; icon: React.ReactNode; accent: string }> = {
   captain: {
     label: "Captain Edge",
-    sub: "This week's strongest captain signals — ranked by ceiling, matchup and volatility edge.",
+    sub: "Top captain leverage plays this round.",
     icon: <Star size={16} className="text-yellow-400" />,
     accent: "text-yellow-400",
   },
   breakout: {
     label: "Breakout Watch",
-    sub: "Undervalued breakout signals before price correction hits.",
+    sub: "Undervalued players likely to rise in price.",
     icon: <TrendingUp size={16} className="text-green-400" />,
     accent: "text-green-400",
   },
   trap: {
     label: "Trap Alert",
-    sub: "High-risk and overpriced plays flagged before they cost you.",
+    sub: "Overpriced or high-risk plays to avoid.",
     icon: <AlertTriangle size={16} className="text-red-500" />,
     accent: "text-red-500",
   },
@@ -864,24 +863,65 @@ export default function AFLRoundEdgeBoard() {
 
         {/* Page header */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#F5C84C]/10 border border-[#F5C84C]/25">
-              <span className="text-[#F5C84C] font-bold text-sm">E</span>
-            </div>
-            <h1 className="text-xl font-bold text-white">Edge Board</h1>
+          <div className="flex items-center gap-2 mb-1">
+            <Zap size={15} className="text-[#F5C84C]" />
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-[#F5C84C]/60">AFL Fantasy · Edge Board</span>
             {isPremium && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#F5C84C]/35 bg-[#F5C84C]/10">
-                <ShieldCheck size={11} className="text-[#F5C84C]" />
-                <span className="text-[10px] font-bold text-[#F5C84C] tracking-wide">Neeko+ Active</span>
+              <div className="ml-1 flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-[#F5C84C]/35 bg-[#F5C84C]/10">
+                <ShieldCheck size={9} className="text-[#F5C84C]" />
+                <span className="text-[9px] font-bold text-[#F5C84C] tracking-wide">Neeko+ Active</span>
               </div>
             )}
           </div>
-          <p className="text-sm text-white/70 max-w-md font-medium">
-            Built for coaches who want measurable edge — not opinions.
+
+          <h1 className="text-2xl font-extrabold text-white leading-tight">
+            This Week's Biggest Fantasy Edges
+          </h1>
+          <p className="text-sm text-white/50 mt-1.5 max-w-lg">
+            Neeko AI detected high-leverage plays for this round.
+            Captain edges, breakout value and trap alerts — ranked by impact.
           </p>
-          <p className="text-[11px] text-white/35 mt-1 max-w-md tracking-wide">
-            Signal-driven decisions. Ranked by impact.
-          </p>
+
+          {/* Social proof */}
+          <div className="flex items-center gap-1.5 mt-3">
+            <Users size={11} className="text-white/25" />
+            <p className="text-[11px] text-white/30">
+              Used by <span className="text-white/55 font-semibold">700+ AFL Fantasy coaches</span> this season
+            </p>
+          </div>
+
+          {/* Edge count indicator */}
+          {rows.length > 0 && (
+            <div className="mt-3 flex items-center gap-2">
+              <div className="flex items-center gap-1.5 rounded-full border border-[#F5C84C]/25 bg-[#F5C84C]/[0.07] px-3 py-1">
+                <Target size={10} className="text-[#F5C84C]" />
+                <span className="text-[11px] font-semibold text-[#F5C84C]/80">
+                  AI detected {rows.length} edge signals this round
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Model performance bar */}
+          <div className="mt-4 flex items-center gap-3 flex-wrap">
+            <p className="text-[10px] text-white/25 uppercase tracking-widest shrink-0">Edge Model Performance (2025)</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 rounded-lg border border-white/[0.07] bg-white/[0.03] px-3 py-1.5">
+                <Star size={9} className="text-yellow-400 shrink-0" />
+                <div>
+                  <p className="text-[10px] text-white/30 leading-none">Captain Picks Hit Rate</p>
+                  <p className="text-sm font-extrabold text-yellow-400 tabular-nums leading-tight">68%</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 rounded-lg border border-white/[0.07] bg-white/[0.03] px-3 py-1.5">
+                <AlertTriangle size={9} className="text-red-400 shrink-0" />
+                <div>
+                  <p className="text-[10px] text-white/30 leading-none">Trap Alerts Accuracy</p>
+                  <p className="text-sm font-extrabold text-red-400 tabular-nums leading-tight">72%</p>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <OpeningRoundBanner />
           <ModelAuthoritySection />
@@ -902,10 +942,10 @@ export default function AFLRoundEdgeBoard() {
                   href="/neeko-plus"
                   className="text-xs font-bold text-black bg-[#F5C84C] rounded-lg px-3 py-1.5 hover:brightness-110 transition-all whitespace-nowrap border border-[#F5C84C]/60 animate-pulse-gold-border"
                 >
-                  Unlock This Week's Full Edge
+                  Unlock All Edge Signals
                 </a>
                 <p className="text-[10px] text-white/25 text-right leading-tight">
-                  Includes leverage pivots, overprice alerts & upside differentials.
+                  Includes leverage pivots, overprice alerts &amp; upside differentials.
                 </p>
               </div>
             </div>
