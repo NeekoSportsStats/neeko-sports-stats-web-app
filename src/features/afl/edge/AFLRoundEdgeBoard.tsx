@@ -762,6 +762,168 @@ function DesktopGrid({ rows, section, visible, isPremium, sectionStats, onUnlock
   );
 }
 
+// ─── Hero Signal Panel ────────────────────────────────────────────────────────
+
+interface HeroSignalCardProps {
+  section: Section;
+  row: RankingRow;
+  isPremium: boolean;
+  onUnlock: () => void;
+}
+
+function HeroSignalCard({ section, row, isPremium, onUnlock }: HeroSignalCardProps) {
+  const config = {
+    captain: {
+      label: "Captain Edge",
+      icon: <Star size={12} className="text-yellow-400" />,
+      border: "border-yellow-400/30",
+      bg: "bg-yellow-400/[0.05]",
+      glow: "shadow-yellow-400/10",
+      badge: "bg-yellow-400/15 text-yellow-300 border-yellow-400/30",
+      accent: "text-yellow-400",
+      statLabel: "Projection",
+      statValue: fmtInt(row.projection_final),
+      statColor: "text-yellow-400",
+    },
+    breakout: {
+      label: "Breakout Watch",
+      icon: <TrendingUp size={12} className="text-green-400" />,
+      border: "border-green-500/30",
+      bg: "bg-green-500/[0.05]",
+      glow: "shadow-green-400/10",
+      badge: "bg-green-500/15 text-green-300 border-green-500/30",
+      accent: "text-green-400",
+      statLabel: "Expected Value",
+      statValue: fmtInt(row.projection_final),
+      statColor: "text-green-400",
+    },
+    trap: {
+      label: "Trap Alert",
+      icon: <AlertTriangle size={12} className="text-red-400" />,
+      border: "border-red-500/30",
+      bg: "bg-red-500/[0.05]",
+      glow: "shadow-red-400/10",
+      badge: "bg-red-500/15 text-red-300 border-red-500/30",
+      accent: "text-red-400",
+      statLabel: "Risk Level",
+      statValue: row.risk_rating != null && row.risk_rating >= 35 ? "High" : row.risk_rating != null && row.risk_rating >= 25 ? "Medium" : "Low",
+      statColor: row.risk_rating != null && row.risk_rating >= 35 ? "text-red-400" : row.risk_rating != null && row.risk_rating >= 25 ? "text-orange-400" : "text-green-400",
+    },
+  }[section];
+
+  const statsLocked = !isPremium;
+
+  return (
+    <div
+      className={`relative flex flex-col rounded-2xl border ${config.border} ${config.bg} shadow-lg ${config.glow} overflow-hidden p-5 transition-all duration-200 ${isPremium ? "hover:-translate-y-0.5 hover:shadow-xl" : ""}`}
+    >
+      {/* Category badge */}
+      <div className="flex items-center justify-between mb-4">
+        <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider ${config.badge}`}>
+          {config.icon}
+          {config.label}
+        </div>
+        {row.position && (
+          <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${getPositionBadgeStyle(row.position)}`}>
+            {row.position}
+          </span>
+        )}
+      </div>
+
+      {/* Player info — always visible */}
+      <div className="mb-4">
+        <h3 className="text-base font-extrabold text-white leading-tight">{row.player_name}</h3>
+        <p className="text-xs text-white/40 mt-0.5">{row.team}</p>
+      </div>
+
+      {/* Primary stat — blurred for free users */}
+      <div className={`mb-4 ${statsLocked ? "relative" : ""}`}>
+        <div className={statsLocked ? "blur-sm select-none" : ""}>
+          <p className="text-[10px] text-white/30 uppercase tracking-widest mb-1">{config.statLabel}</p>
+          <p className={`text-3xl font-extrabold tabular-nums leading-none ${config.statColor}`}>
+            {config.statValue}
+          </p>
+        </div>
+        {statsLocked && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <button
+              onClick={onUnlock}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/70 border border-[#F5C84C]/30 text-[11px] font-bold text-[#F5C84C] hover:bg-black/85 transition-all backdrop-blur-sm"
+            >
+              <Lock size={9} />
+              Unlock Full Edge Analysis
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Price chip — always visible as teaser */}
+      {row.price != null && (
+        <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
+          <span className="text-[10px] text-white/25 uppercase tracking-wider">Price</span>
+          <span className={`text-xs font-semibold ${statsLocked ? "blur-sm select-none" : "text-white/60"}`}>
+            {fmtPrice(row.price)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface HeroSignalPanelProps {
+  captainRow: RankingRow | null;
+  breakoutRow: RankingRow | null;
+  trapRow: RankingRow | null;
+  isPremium: boolean;
+  onUnlock: () => void;
+}
+
+function HeroSignalPanel({ captainRow, breakoutRow, trapRow, isPremium, onUnlock }: HeroSignalPanelProps) {
+  const cards: { section: Section; row: RankingRow }[] = [];
+  if (captainRow) cards.push({ section: "captain", row: captainRow });
+  if (breakoutRow) cards.push({ section: "breakout", row: breakoutRow });
+  if (trapRow) cards.push({ section: "trap", row: trapRow });
+
+  if (cards.length === 0) return null;
+
+  return (
+    <div className="mb-10">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-sm font-bold text-white">Top Edge Signals This Round</h2>
+          <p className="text-[11px] text-white/30 mt-0.5">Neeko AI detected the highest-impact plays across all models.</p>
+        </div>
+        <div className="h-px flex-1 mx-4 bg-white/[0.06]" />
+        <span className="text-[10px] text-white/20 uppercase tracking-widest shrink-0">#1 per category</span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {cards.map(({ section, row }) => (
+          <HeroSignalCard
+            key={section}
+            section={section}
+            row={row}
+            isPremium={isPremium}
+            onUnlock={onUnlock}
+          />
+        ))}
+      </div>
+
+      {!isPremium && (
+        <div className="mt-4 flex items-center justify-center">
+          <a
+            href="/neeko-plus"
+            className="flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-5 py-2.5 rounded-xl hover:brightness-110 transition-all animate-pulse-gold-border shadow-lg shadow-[#F5C84C]/20"
+          >
+            <Crown size={13} />
+            Unlock Full Analysis for All 3 Signals
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AFLRoundEdgeBoard() {
@@ -951,6 +1113,15 @@ export default function AFLRoundEdgeBoard() {
             </div>
           )}
         </div>
+
+        {/* Hero signal panel */}
+        <HeroSignalPanel
+          captainRow={captainRows[0] ?? null}
+          breakoutRow={breakoutRows[0] ?? null}
+          trapRow={trapRows[0] ?? null}
+          isPremium={isPremium}
+          onUnlock={() => setShowUpgrade(true)}
+        />
 
         {/* Sections */}
         <div className="space-y-10">
