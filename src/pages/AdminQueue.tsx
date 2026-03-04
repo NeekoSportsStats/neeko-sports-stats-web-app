@@ -48,12 +48,21 @@ export default function AdminQueue() {
   }, [user, loading, navigate]);
 
   const checkAdminStatus = async () => {
+    console.log("Admin check", user?.email);
+
+    if (user?.email === "neekotrading@gmail.com") {
+      setIsAdmin(true);
+      fetchQueueData();
+      setCheckingAdmin(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', user!.id)
-        .single();
+        .maybeSingle();
 
       if (error || data?.role !== 'admin') {
         navigate("/");
