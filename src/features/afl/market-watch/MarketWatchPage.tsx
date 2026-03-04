@@ -1,8 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  TrendingUp, TrendingDown, DollarSign,
-  AlertTriangle, RefreshCw, Crown,
-} from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, TriangleAlert as AlertTriangle, RefreshCw, Crown } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { MarketRow, MarketTab } from "./types";
