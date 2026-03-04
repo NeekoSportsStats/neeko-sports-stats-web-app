@@ -763,6 +763,8 @@ interface HeroSignalCardProps {
   section: Section;
   row: RankingRow;
   isPremium: boolean;
+  freeTeaser?: boolean;
+  isTopSignal?: boolean;
   onUnlock: () => void;
 }
 
@@ -772,7 +774,7 @@ const HERO_SOCIAL_PROOF: Record<Section, string> = {
   trap: "Flagged by Neeko AI as highest-risk selection this round",
 };
 
-function HeroSignalCard({ section, row, isPremium, onUnlock }: HeroSignalCardProps) {
+function HeroSignalCard({ section, row, isPremium, freeTeaser = false, isTopSignal = false, onUnlock }: HeroSignalCardProps) {
   const config = {
     captain: {
       label: "Captain Edge",
@@ -794,8 +796,8 @@ function HeroSignalCard({ section, row, isPremium, onUnlock }: HeroSignalCardPro
       glow: "shadow-green-400/10",
       badge: "bg-green-500/15 text-green-300 border-green-500/30",
       accent: "text-green-400",
-      statLabel: "Expected Value",
-      statValue: fmtInt(row.projection_final),
+      statLabel: "Upside",
+      statValue: row.upside_rating != null ? `+${fmtInt(row.upside_rating)}%` : fmtInt(row.projection_final),
       statColor: "text-green-400",
     },
     trap: {
@@ -812,11 +814,62 @@ function HeroSignalCard({ section, row, isPremium, onUnlock }: HeroSignalCardPro
     },
   }[section];
 
+  if (freeTeaser) {
+    return (
+      <div className={`relative flex flex-col rounded-2xl border ${config.border} ${config.bg} shadow-lg ${config.glow} overflow-hidden p-5 transition-all duration-200`}>
+        {isTopSignal && (
+          <div className="flex items-center gap-1 mb-2">
+            <Crown size={9} className="text-[#F5C84C]" />
+            <span className="text-[9px] font-bold uppercase tracking-widest text-[#F5C84C]">#1 Edge This Round</span>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mb-3">
+          <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider ${config.badge}`}>
+            {config.icon}
+            {config.label}
+          </div>
+          {row.position && (
+            <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${getPositionBadgeStyle(row.position)}`}>
+              {row.position}
+            </span>
+          )}
+        </div>
+
+        <h3 className="text-base font-extrabold text-white leading-tight mb-0.5">{row.player_name}</h3>
+        <p className="text-xs text-white/40 mb-4">{row.team}</p>
+
+        <div className="mb-3">
+          <p className="text-[10px] text-white/30 uppercase tracking-widest mb-1">{config.statLabel}</p>
+          <p className={`text-3xl font-extrabold tabular-nums leading-none ${config.statColor}`}>
+            {config.statValue}
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-black/20 px-2.5 py-2 mb-3 inline-flex items-center gap-2">
+          <p className="text-[9px] text-white/30 uppercase tracking-wider">Confidence</p>
+          <p className={`text-xs font-bold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
+            {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
+          </p>
+        </div>
+
+        <div className="mt-auto pt-3 border-t border-white/[0.06]">
+          <button
+            onClick={onUnlock}
+            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-[#F5C84C]/20 bg-[#F5C84C]/[0.05] text-[11px] font-semibold text-[#F5C84C]/70 hover:text-[#F5C84C] hover:border-[#F5C84C]/35 transition-all"
+          >
+            <Lock size={9} />
+            AI explanation available with Neeko+
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`relative flex flex-col rounded-2xl border ${config.border} ${config.bg} shadow-lg ${config.glow} overflow-hidden p-5 transition-all duration-200 ${isPremium ? "hover:-translate-y-0.5 hover:shadow-xl" : ""}`}
     >
-      {/* Category badge */}
       <div className="flex items-center justify-between mb-4">
         <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider ${config.badge}`}>
           {config.icon}
@@ -829,7 +882,6 @@ function HeroSignalCard({ section, row, isPremium, onUnlock }: HeroSignalCardPro
         )}
       </div>
 
-      {/* Player info + Edge Score — always visible */}
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0 flex-1">
           <h3 className="text-base font-extrabold text-white leading-tight">{row.player_name}</h3>
@@ -840,7 +892,6 @@ function HeroSignalCard({ section, row, isPremium, onUnlock }: HeroSignalCardPro
         </div>
       </div>
 
-      {/* Primary stat — always visible */}
       <div className="mb-3">
         <p className="text-[10px] text-white/30 uppercase tracking-widest mb-1">{config.statLabel}</p>
         <p className={`text-3xl font-extrabold tabular-nums leading-none ${config.statColor}`}>
@@ -848,7 +899,6 @@ function HeroSignalCard({ section, row, isPremium, onUnlock }: HeroSignalCardPro
         </p>
       </div>
 
-      {/* Secondary stats grid — always visible */}
       <div className="grid grid-cols-3 gap-2 mb-3">
         <div className="rounded-lg bg-black/20 px-2 py-1.5">
           <p className="text-[9px] text-white/30 uppercase tracking-wider mb-0.5">Confidence</p>
@@ -870,30 +920,15 @@ function HeroSignalCard({ section, row, isPremium, onUnlock }: HeroSignalCardPro
         </div>
       </div>
 
-      {/* Social proof label */}
       <div className="flex items-center gap-1.5 mb-3">
         <Users size={9} className="text-[#F5C84C]/50 shrink-0" />
         <p className="text-[10px] text-[#F5C84C]/60 leading-tight">{HERO_SOCIAL_PROOF[section]}</p>
       </div>
 
-      {/* Price chip — always visible */}
       {row.price != null && (
         <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
           <span className="text-[10px] text-white/25 uppercase tracking-wider">Price</span>
           <span className="text-xs font-semibold text-white/60">{fmtPrice(row.price)}</span>
-        </div>
-      )}
-
-      {/* AI explanation — locked for free users */}
-      {!isPremium && (
-        <div className="mt-3 pt-3 border-t border-white/[0.06]">
-          <button
-            onClick={onUnlock}
-            className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-[#F5C84C]/20 bg-[#F5C84C]/[0.05] text-[11px] font-semibold text-[#F5C84C]/70 hover:text-[#F5C84C] hover:border-[#F5C84C]/35 transition-all"
-          >
-            <Lock size={9} />
-            AI explanation available with Neeko+
-          </button>
         </div>
       )}
     </div>
@@ -917,7 +952,7 @@ function HeroSignalPanel({ captainRow, breakoutRow, trapRow, isPremium, onUnlock
   if (cards.length === 0) return null;
 
   return (
-    <div className="mb-10">
+    <div className="mb-8">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-sm font-bold text-white">Top Edge Signals This Round</h2>
@@ -928,28 +963,82 @@ function HeroSignalPanel({ captainRow, breakoutRow, trapRow, isPremium, onUnlock
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {cards.map(({ section, row }) => (
+        {cards.map(({ section, row }, i) => (
           <HeroSignalCard
             key={section}
             section={section}
             row={row}
             isPremium={isPremium}
+            freeTeaser={!isPremium}
+            isTopSignal={!isPremium && i === 0}
             onUnlock={onUnlock}
           />
         ))}
       </div>
+    </div>
+  );
+}
 
-      {!isPremium && (
-        <div className="mt-4 flex items-center justify-center">
-          <a
-            href="/neeko-plus"
-            className="flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-5 py-2.5 rounded-xl hover:brightness-110 transition-all animate-pulse-gold-border shadow-lg shadow-[#F5C84C]/20"
+// ─── Free Paywall Panel ───────────────────────────────────────────────────────
+
+function FreePaywallPanel({ totalSignals, onUnlock }: { totalSignals: number; onUnlock: () => void }) {
+  const extra = Math.max(0, totalSignals - 3);
+  const displayExtra = extra > 0 ? extra : 12;
+
+  return (
+    <div className="mb-10 rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-b from-[#F5C84C]/[0.07] to-[#F5C84C]/[0.02] p-7 text-center">
+      <div className="flex items-center justify-center w-12 h-12 rounded-full border border-[#F5C84C]/35 bg-[#F5C84C]/15 mx-auto mb-4">
+        <Crown size={22} className="text-[#F5C84C]" />
+      </div>
+
+      <h3 className="text-lg font-extrabold text-white mb-1.5">
+        Unlock {displayExtra} more edges this round
+      </h3>
+      <p className="text-sm text-white/50 mb-5 max-w-sm mx-auto leading-relaxed">
+        Full AI reasoning + captain edges + breakout targets + trap alerts
+      </p>
+
+      <div className="flex flex-wrap items-center justify-center gap-2 mb-5">
+        {[
+          { icon: <Zap size={9} />, label: "Full AI reasoning" },
+          { icon: <Target size={9} />, label: "15 signals weekly" },
+          { icon: <Star size={9} />, label: "Updated each round" },
+        ].map(({ icon, label }) => (
+          <div
+            key={label}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#F5C84C]/25 bg-[#F5C84C]/[0.08] text-[11px] font-semibold text-[#F5C84C]/80"
           >
-            <Crown size={13} />
-            Unlock Full AI Edge Analysis + 15 Signals This Round
-          </a>
-        </div>
-      )}
+            <span className="text-[#F5C84C]/60">{icon}</span>
+            {label}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-center gap-1.5 mb-6">
+        <Users size={11} className="text-white/25" />
+        <p className="text-[11px] text-white/35">
+          Used by <span className="text-white/55 font-semibold">700+ AFL Fantasy coaches</span> this season
+        </p>
+      </div>
+
+      <a
+        href="/neeko-plus"
+        className="inline-flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3.5 rounded-xl hover:brightness-110 transition-all animate-pulse-gold-border shadow-lg shadow-[#F5C84C]/25"
+      >
+        <Crown size={14} />
+        Unlock Neeko+
+      </a>
+
+      <div className="mt-3 flex items-center justify-center gap-3">
+        <button
+          onClick={onUnlock}
+          className="text-xs text-white/35 hover:text-white/60 transition-colors underline underline-offset-2"
+        >
+          See what's included
+        </button>
+        <span className="text-white/15 text-xs">·</span>
+        <span className="text-xs text-white/25">From $9.99/mo or $89/yr</span>
+      </div>
     </div>
   );
 }
@@ -1146,7 +1235,7 @@ export default function AFLRoundEdgeBoard() {
           </div>
         )}
 
-        {/* ── Top 3 Edge Signals (all users) ──────────────────────────────── */}
+        {/* ── Top 3 Edge Signals ──────────────────────────────────────────── */}
         <HeroSignalPanel
           captainRow={captainRows[0] ?? null}
           breakoutRow={breakoutRows[0] ?? null}
@@ -1155,29 +1244,15 @@ export default function AFLRoundEdgeBoard() {
           onUnlock={() => setShowUpgrade(true)}
         />
 
-        {/* ── Paywall wall for free users ──────────────────────────────────── */}
+        {/* ── Free: paywall conversion panel (immediately after 3 teasers) ── */}
         {!isPremium && (
-          <div className="mb-10 rounded-2xl border border-[#F5C84C]/25 bg-[#F5C84C]/[0.04] p-6 text-center">
-            <div className="flex items-center justify-center w-11 h-11 rounded-full border border-[#F5C84C]/30 bg-[#F5C84C]/10 mx-auto mb-4">
-              <Crown size={20} className="text-[#F5C84C]" />
-            </div>
-            <p className="text-sm font-bold text-white mb-1">
-              You're viewing 3 of {rows.length > 3 ? rows.length : 15} edge signals detected by the Neeko model this round.
-            </p>
-            <p className="text-xs text-white/40 mb-5 max-w-sm mx-auto">
-              12 additional edge signals available with Neeko+ — including full AI reasoning, confidence breakdowns and value analysis.
-            </p>
-            <a
-              href="/neeko-plus"
-              className="inline-flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-6 py-3 rounded-xl hover:brightness-110 transition-all animate-pulse-gold-border shadow-lg shadow-[#F5C84C]/20"
-            >
-              <Crown size={13} />
-              Unlock Neeko+
-            </a>
-          </div>
+          <FreePaywallPanel
+            totalSignals={rows.length}
+            onUnlock={() => setShowUpgrade(true)}
+          />
         )}
 
-        {/* ── Full Edge Analysis — Neeko+ only ────────────────────────────── */}
+        {/* ── Premium: Full Edge Analysis ──────────────────────────────────── */}
         {isPremium && (
           <>
             <div className="flex items-center gap-4 mb-6">
