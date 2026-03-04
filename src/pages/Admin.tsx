@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, Shield, Database, Zap, Activity, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, TrendingUp, Server, Bot, ChartBar as BarChart3, Layers, Bell, BellOff, History, Users } from "lucide-react";
+import { RefreshCw, Shield, Database, Zap, Activity, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, TrendingUp, Server, Bot, ChartBar as BarChart3, Layers, Bell, BellOff, History, Users, Gauge, Star, ArrowUpRight, CalendarDays } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
@@ -118,6 +118,58 @@ interface AnalyticsSummary7d {
   upgrade_clicks: number;
   subscriptions: number;
   unique_users_7d: number;
+}
+
+interface SubscriptionMetrics {
+  active_subscriptions: number;
+  trial_subscriptions: number;
+  canceled_subscriptions: number;
+  is_active_count: number;
+  total_profiles: number;
+}
+
+interface DAU {
+  daily_active_users: number;
+}
+
+interface WAU {
+  weekly_active_users: number;
+}
+
+interface FeatureUsageRow {
+  event_name: string;
+  usage_count: number;
+}
+
+interface ConversionFunnel {
+  rankings_views: number;
+  start_sit_views: number;
+  upgrade_clicks: number;
+  subscriptions: number;
+}
+
+interface AIUsage {
+  start_sit_runs: number;
+  player_ai_runs: number;
+  team_ai_runs: number;
+}
+
+interface PowerUser {
+  user_id: string;
+  start_sit_runs: number;
+}
+
+interface RealtimeUsers {
+  active_users_last_5_minutes: number;
+}
+
+interface DailyUsageRow {
+  day: string;
+  page_views: number;
+  start_sit_runs: number;
+  subscriptions: number;
+  upgrade_clicks: number;
+  unique_users: number;
 }
 
 function formatDate(ts: string | null): string {
@@ -240,6 +292,19 @@ export default function Admin() {
   const [analytics7d, setAnalytics7d] = useState<AnalyticsSummary7d | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
+  const [subMetrics, setSubMetrics] = useState<SubscriptionMetrics | null>(null);
+  const [dau, setDau] = useState<DAU | null>(null);
+  const [wau, setWau] = useState<WAU | null>(null);
+  const [featureUsage, setFeatureUsage] = useState<FeatureUsageRow[]>([]);
+  const [funnel, setFunnel] = useState<ConversionFunnel | null>(null);
+  const [aiUsage, setAiUsage] = useState<AIUsage | null>(null);
+  const [powerUsers, setPowerUsers] = useState<PowerUser[]>([]);
+  const [realtimeUsers, setRealtimeUsers] = useState<RealtimeUsers | null>(null);
+  const [dailyUsage, setDailyUsage] = useState<DailyUsageRow[]>([]);
+  const [productMetricsLoading, setProductMetricsLoading] = useState(true);
+
+  const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -301,6 +366,47 @@ export default function Admin() {
     }
   }, []);
 
+  const fetchProductMetrics = useCallback(async () => {
+    setProductMetricsLoading(true);
+    try {
+      const [
+        subRes,
+        dauRes,
+        wauRes,
+        featureRes,
+        funnelRes,
+        aiRes,
+        powerRes,
+        realtimeRes,
+        dailyRes,
+      ] = await Promise.all([
+        supabase.from("v_admin_subscription_metrics").select("*").maybeSingle(),
+        supabase.from("v_admin_dau").select("*").maybeSingle(),
+        supabase.from("v_admin_wau").select("*").maybeSingle(),
+        supabase.from("v_admin_feature_usage").select("*").limit(10),
+        supabase.from("v_admin_conversion_funnel").select("*").maybeSingle(),
+        supabase.from("v_admin_ai_usage").select("*").maybeSingle(),
+        supabase.from("v_admin_start_sit_power_users").select("*").limit(20),
+        supabase.from("v_admin_realtime_users").select("*").maybeSingle(),
+        supabase.from("v_admin_daily_usage").select("*").limit(14),
+      ]);
+
+      if (subRes.data) setSubMetrics(subRes.data as SubscriptionMetrics);
+      if (dauRes.data) setDau(dauRes.data as DAU);
+      if (wauRes.data) setWau(wauRes.data as WAU);
+      if (featureRes.data) setFeatureUsage(featureRes.data as FeatureUsageRow[]);
+      if (funnelRes.data) setFunnel(funnelRes.data as ConversionFunnel);
+      if (aiRes.data) setAiUsage(aiRes.data as AIUsage);
+      if (powerRes.data) setPowerUsers(powerRes.data as PowerUser[]);
+      if (realtimeRes.data) setRealtimeUsers(realtimeRes.data as RealtimeUsers);
+      if (dailyRes.data) setDailyUsage(dailyRes.data as DailyUsageRow[]);
+    } catch (err) {
+      console.error("Product metrics fetch error:", err);
+    } finally {
+      setProductMetricsLoading(false);
+    }
+  }, []);
+
   const fetchAll = useCallback(async () => {
     setDataLoading(true);
     try {
@@ -336,8 +442,8 @@ export default function Admin() {
     } finally {
       setDataLoading(false);
     }
-    await Promise.all([fetchAlerts(), fetchJobHistory(), fetchAnalytics()]);
-  }, [toast, fetchAlerts, fetchJobHistory, fetchAnalytics]);
+    await Promise.all([fetchAlerts(), fetchJobHistory(), fetchAnalytics(), fetchProductMetrics()]);
+  }, [toast, fetchAlerts, fetchJobHistory, fetchAnalytics, fetchProductMetrics]);
 
   const handleResolveAlert = async (id: string) => {
     setResolvingId(id);
@@ -390,8 +496,21 @@ export default function Admin() {
       fetchAlerts();
       fetchJobHistory();
       fetchAnalytics();
+      fetchProductMetrics();
     }
-  }, [loading, user, fetchAlerts, fetchJobHistory, fetchAnalytics]);
+  }, [loading, user, fetchAlerts, fetchJobHistory, fetchAnalytics, fetchProductMetrics]);
+
+  useEffect(() => {
+    if (!loading && user?.id === ADMIN_USER_ID) {
+      autoRefreshTimerRef.current = setInterval(() => {
+        fetchAnalytics();
+        fetchProductMetrics();
+      }, 30_000);
+    }
+    return () => {
+      if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
+    };
+  }, [loading, user, fetchAnalytics, fetchProductMetrics]);
 
   const handleRunPipeline = async () => {
     setIsRefreshing(true);
@@ -705,6 +824,154 @@ export default function Admin() {
           </div>
         </SectionCard>
       </div>
+
+      {/* ── Product Metrics ─────────────────────────────────────────────── */}
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 mt-2">
+        Product Metrics
+      </h2>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-4">
+        <SectionCard icon={Star} title="Subscriptions" loading={productMetricsLoading}>
+          <StatRow label="Active subscribers" value={subMetrics?.active_subscriptions ?? "—"} highlight={(subMetrics?.active_subscriptions ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Trial subscribers" value={subMetrics?.trial_subscriptions ?? "—"} highlight={(subMetrics?.trial_subscriptions ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Canceled" value={subMetrics?.canceled_subscriptions ?? "—"} highlight={(subMetrics?.canceled_subscriptions ?? 0) > 0 ? "warn" : "neutral"} />
+          <StatRow label="is_active = true" value={subMetrics?.is_active_count ?? "—"} highlight="neutral" />
+          <StatRow label="Total profiles" value={subMetrics?.total_profiles ?? "—"} highlight="neutral" />
+        </SectionCard>
+
+        <SectionCard icon={Users} title="Active Users" loading={productMetricsLoading}>
+          <StatRow label="Real-time (last 5 min)" value={realtimeUsers?.active_users_last_5_minutes ?? "—"} highlight={(realtimeUsers?.active_users_last_5_minutes ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Daily active users (DAU)" value={dau?.daily_active_users ?? "—"} highlight={(dau?.daily_active_users ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Weekly active users (WAU)" value={wau?.weekly_active_users ?? "—"} highlight={(wau?.weekly_active_users ?? 0) > 0 ? "good" : "neutral"} />
+        </SectionCard>
+
+        <SectionCard icon={ArrowUpRight} title="Conversion Funnel (7d)" loading={productMetricsLoading}>
+          <StatRow label="Rankings views" value={funnel?.rankings_views ?? "—"} highlight="neutral" />
+          <StatRow label="Start/Sit views" value={funnel?.start_sit_views ?? "—"} highlight="neutral" />
+          <StatRow label="Upgrade clicks" value={funnel?.upgrade_clicks ?? "—"} highlight={(funnel?.upgrade_clicks ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Subscriptions" value={funnel?.subscriptions ?? "—"} highlight={(funnel?.subscriptions ?? 0) > 0 ? "good" : "neutral"} />
+          {funnel && funnel.upgrade_clicks > 0 && (
+            <div className="mt-2 text-xs text-muted-foreground">
+              Conversion: {((funnel.subscriptions / funnel.upgrade_clicks) * 100).toFixed(1)}% of upgrade clicks
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard icon={Bot} title="AI Usage (24h)" loading={productMetricsLoading}>
+          <StatRow label="Start/Sit runs" value={aiUsage?.start_sit_runs ?? "—"} highlight={(aiUsage?.start_sit_runs ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Player AI generated" value={aiUsage?.player_ai_runs ?? "—"} highlight={(aiUsage?.player_ai_runs ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Team AI generated" value={aiUsage?.team_ai_runs ?? "—"} highlight={(aiUsage?.team_ai_runs ?? 0) > 0 ? "good" : "neutral"} />
+        </SectionCard>
+      </div>
+
+      {/* ── Feature Usage + Power Users ─────────────────────────────────── */}
+      <div className="grid gap-4 sm:grid-cols-2 mb-4">
+        <SectionCard icon={Gauge} title="Feature Usage — Top Events (7d)" loading={productMetricsLoading}>
+          {featureUsage.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">No events recorded yet</p>
+          ) : (
+            <div className="space-y-0">
+              {featureUsage.slice(0, 8).map((row, i) => (
+                <div key={row.event_name} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs text-muted-foreground w-4 shrink-0">{i + 1}</span>
+                    <span className="text-sm font-mono truncate">{row.event_name}</span>
+                  </div>
+                  <Badge variant="secondary" className="ml-2 shrink-0 text-xs tabular-nums">
+                    {row.usage_count.toLocaleString()}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard icon={TrendingUp} title="Start/Sit Power Users (7d, 3+ runs)" loading={productMetricsLoading}>
+          {powerUsers.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">No power users this week</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/40">
+                    <th className="text-left py-1.5 pr-4 text-xs font-medium text-muted-foreground">#</th>
+                    <th className="text-left py-1.5 pr-4 text-xs font-medium text-muted-foreground">User ID</th>
+                    <th className="text-right py-1.5 text-xs font-medium text-muted-foreground">Runs</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {powerUsers.map((u, i) => (
+                    <tr key={u.user_id} className="border-b border-border/30 last:border-0 hover:bg-muted/30">
+                      <td className="py-1.5 pr-4 text-xs text-muted-foreground">{i + 1}</td>
+                      <td className="py-1.5 pr-4 font-mono text-xs text-muted-foreground truncate max-w-[180px]">{u.user_id}</td>
+                      <td className="py-1.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">{u.start_sit_runs}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </SectionCard>
+      </div>
+
+      {/* ── Daily Analytics ─────────────────────────────────────────────── */}
+      <Card className="mb-4">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between text-base">
+            <span className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              Daily Analytics (last 14 days)
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={fetchProductMetrics}
+              disabled={productMetricsLoading}
+              className="h-7 text-xs"
+            >
+              <RefreshCw className={`h-3 w-3 mr-1 ${productMetricsLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {productMetricsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : dailyUsage.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">No daily data yet</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/40">
+                    <th className="text-left py-2 pr-4 text-xs font-medium text-muted-foreground">Day</th>
+                    <th className="text-right py-2 pr-4 text-xs font-medium text-muted-foreground">Page Views</th>
+                    <th className="text-right py-2 pr-4 text-xs font-medium text-muted-foreground">Start/Sit Runs</th>
+                    <th className="text-right py-2 pr-4 text-xs font-medium text-muted-foreground">Upgrade Clicks</th>
+                    <th className="text-right py-2 pr-4 text-xs font-medium text-muted-foreground">Subscriptions</th>
+                    <th className="text-right py-2 text-xs font-medium text-muted-foreground">Unique Users</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dailyUsage.map((row) => (
+                    <tr key={row.day} className="border-b border-border/30 last:border-0 hover:bg-muted/30">
+                      <td className="py-2 pr-4 font-mono text-xs">{row.day}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums">{row.page_views.toLocaleString()}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums">{row.start_sit_runs.toLocaleString()}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums">{row.upgrade_clicks.toLocaleString()}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">
+                        {row.subscriptions.toLocaleString()}
+                      </td>
+                      <td className="py-2 text-right tabular-nums">{row.unique_users.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Pipeline Alerts */}
       <Card className="mb-4">
