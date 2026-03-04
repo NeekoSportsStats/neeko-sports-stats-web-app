@@ -1,4 +1,4 @@
-import { ArrowRight, TrendingUp, DollarSign, AlertTriangle, Loader } from "lucide-react";
+import { ArrowRight, TrendingUp, DollarSign, TriangleAlert as AlertTriangle, Loader } from "lucide-react";
 import { MWSummaryCard } from "./types";
 import { fmtPrice, fmtNum, fmtPriceChange } from "./helpers";
 
