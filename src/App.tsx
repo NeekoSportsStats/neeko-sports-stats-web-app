@@ -1,5 +1,6 @@
-import React, { Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import React, { Suspense, useEffect } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { track } from "@/lib/analytics";
 import { Layout } from "@/components/Layout";
 import { RequireAuth } from "@/components/RequireAuth";
 import {
@@ -64,6 +65,12 @@ const AI      = <AIInsightsSkeleton />;
 const Generic = <GenericPageSkeleton />;
 
 function App() {
+  const location = useLocation();
+
+  useEffect(() => {
+    track("page_view", { page: location.pathname });
+  }, [location.pathname]);
+
   return (
     <Routes>
       {/* =========================

@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
+import { track } from "@/lib/analytics";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1081,6 +1082,8 @@ export default function AFLRoundEdgeBoard() {
   const [showUpgrade, setShowUpgrade] = useState(false);
 
   const visible = isPremium ? PREMIUM_VISIBLE : FREE_VISIBLE;
+
+  useEffect(() => { track("edge_board_view"); }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);

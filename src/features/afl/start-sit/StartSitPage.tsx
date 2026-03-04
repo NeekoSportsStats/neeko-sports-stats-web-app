@@ -3,6 +3,7 @@ import { ArrowRight, RotateCcw, Zap, Share2, Check } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
+import { track } from "@/lib/analytics";
 import { StartSitSelector } from "./StartSitSelector";
 import { StartSitResult } from "./StartSitResult";
 import { StartSitSocialProof } from "./StartSitSocialProof";
@@ -64,6 +65,8 @@ export default function StartSitPage() {
   const [copied, setCopied] = useState(false);
 
   const compareButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => { track("start_sit_view"); }, []);
 
   // Load the current round on mount
   useEffect(() => {
@@ -141,6 +144,11 @@ export default function StartSitPage() {
 
   async function handleCompare() {
     if (!playerA || !playerB) return;
+
+    track("start_sit_generate", {
+      player_a: playerA.player_name,
+      player_b: playerB.player_name,
+    });
 
     setComparing(true);
     setResult(null);

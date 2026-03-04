@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { NEEKO_PRICING } from "@/config/neekoPricing";
+import { track } from "@/lib/analytics";
 
 interface Props {
   onClose: () => void;
@@ -17,6 +18,7 @@ export function UpgradeModal({ onClose }: Props) {
   const [loading, setLoading] = useState<"monthly" | "yearly" | null>(null);
 
   const startCheckout = async (plan: "monthly" | "yearly") => {
+    track("upgrade_click", { plan, source: "market_watch" });
     if (!user) { onClose(); navigate("/auth?redirect=checkout"); return; }
     setLoading(plan);
     try {

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Lock, Crown, X, Search, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
+import { track } from "@/lib/analytics";
 
 import {
   RankingRow, RankingsTab, PositionFilter, PremiumFilter, SortKey, SortDir, SelectedRow,
@@ -130,6 +131,8 @@ export default function AFLRankingsPage() {
 
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { track("rankings_view"); }, []);
 
   useEffect(() => {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);

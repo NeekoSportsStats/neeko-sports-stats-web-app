@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { TrendingUp, TrendingDown, DollarSign, TriangleAlert as AlertTriangle, RefreshCw, Crown } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
+import { track } from "@/lib/analytics";
 import { MarketRow, MarketTab } from "./types";
 import { TAB_META } from "./helpers";
 import { MarketSection } from "./MarketSection";
@@ -69,6 +70,7 @@ export default function MarketWatchPage() {
     setLastUpdated(new Date());
   }, [fetchTab]);
 
+  useEffect(() => { track("market_watch_view"); }, []);
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const kpiRows = data.buy ?? [];

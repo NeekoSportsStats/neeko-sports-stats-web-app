@@ -1,5 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
+import { track } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -39,13 +40,15 @@ export default function Success() {
 
     refreshTriggeredRef.current = true;
 
+    track("subscription_started", { session_id: sessionId ?? undefined });
+
     supabase.auth.refreshSession()
       .then(() => refreshPremiumStatus())
       .catch((e) => {
         console.error("❌ Session/premium refresh error on Success page:", e);
         refreshPremiumStatus().catch(() => {});
       });
-  }, [loading, authTimedOut, user, refreshPremiumStatus]);
+  }, [loading, authTimedOut, user, refreshPremiumStatus, sessionId]);
 
   if (loading && !authTimedOut) {
     return (

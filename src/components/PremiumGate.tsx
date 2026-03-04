@@ -5,6 +5,7 @@ import { Lock, Crown, Loader as Loader2, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { NEEKO_PRICING } from "@/config/neekoPricing";
+import { track } from "@/lib/analytics";
 
 interface PremiumGateProps {
   children?: ReactNode;
@@ -78,6 +79,8 @@ function UnlockModal({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState<"monthly" | "yearly" | null>(null);
 
   const startCheckout = async (plan: "monthly" | "yearly") => {
+    track("upgrade_click", { plan, source: "premium_gate" });
+
     if (!user) {
       onClose();
       navigate("/auth?redirect=checkout");
