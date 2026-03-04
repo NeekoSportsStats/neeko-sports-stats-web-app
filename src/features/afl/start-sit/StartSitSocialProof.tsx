@@ -22,9 +22,23 @@ interface SocialProofMatchup {
 }
 
 interface SocialProofProps {
+  players: QuickFillPlayer[];
   onFillBoth: (a: QuickFillPlayer, b: QuickFillPlayer) => void;
   onScrollToCompare: () => void;
 }
+
+const POPULAR_PAIRS: [string, string][] = [
+  ["Marcus Bontempelli", "Nick Daicos"],
+  ["Zak Butters", "Errol Gulden"],
+  ["Max Gawn", "Rowan Marshall"],
+  ["Lachie Neale", "Caleb Serong"],
+];
+
+const CLOSE_PAIRS: [string, string, number][] = [
+  ["Zak Butters", "Errol Gulden", 52],
+  ["Zach Merrett", "Lachie Neale", 51],
+  ["Isaac Heeney", "Jy Simpkin", 54],
+];
 
 function seed(s: number): number {
   const x = Math.sin(s) * 10000;
@@ -37,41 +51,43 @@ function pseudoCount(offset: number): number {
   return Math.floor(40 + seed(daySeed + offset) * 380);
 }
 
-const TOP_PLAYERS: QuickFillPlayer[] = [
-  { player_id: "bontempelli_m", player_name: "Marcus Bontempelli", team: "Western Bulldogs", position: "MID", projection_final: 115, ceiling_estimate: 138, floor_estimate: 82, projection_confidence: 79, risk_rating: 4, neeko_rating: 128.4 },
-  { player_id: "daicos_n", player_name: "Nick Daicos", team: "Collingwood", position: "MID", projection_final: 121, ceiling_estimate: 144, floor_estimate: 88, projection_confidence: 83, risk_rating: 3, neeko_rating: 134.1 },
-  { player_id: "butters_z", player_name: "Zak Butters", team: "Port Adelaide", position: "MID", projection_final: 118, ceiling_estimate: 140, floor_estimate: 86, projection_confidence: 75, risk_rating: 4, neeko_rating: 130.7 },
-  { player_id: "gulden_e", player_name: "Errol Gulden", team: "Sydney", position: "MID", projection_final: 112, ceiling_estimate: 132, floor_estimate: 79, projection_confidence: 71, risk_rating: 5, neeko_rating: 122.3 },
-  { player_id: "gawn_m", player_name: "Max Gawn", team: "Melbourne", position: "RUC", projection_final: 108, ceiling_estimate: 130, floor_estimate: 74, projection_confidence: 69, risk_rating: 5, neeko_rating: 118.9 },
-  { player_id: "marshall_r", player_name: "Rowan Marshall", team: "St Kilda", position: "RUC", projection_final: 98, ceiling_estimate: 118, floor_estimate: 66, projection_confidence: 62, risk_rating: 6, neeko_rating: 108.2 },
-  { player_id: "serong_c", player_name: "Caleb Serong", team: "Fremantle", position: "MID", projection_final: 113, ceiling_estimate: 136, floor_estimate: 80, projection_confidence: 73, risk_rating: 4, neeko_rating: 124.5 },
-  { player_id: "merrett_z", player_name: "Zach Merrett", team: "Essendon", position: "MID", projection_final: 110, ceiling_estimate: 131, floor_estimate: 78, projection_confidence: 70, risk_rating: 5, neeko_rating: 121.0 },
-  { player_id: "neale_l", player_name: "Lachie Neale", team: "Brisbane", position: "MID", projection_final: 116, ceiling_estimate: 139, floor_estimate: 84, projection_confidence: 76, risk_rating: 4, neeko_rating: 127.6 },
-  { player_id: "heeney_i", player_name: "Isaac Heeney", team: "Sydney", position: "FWD", projection_final: 106, ceiling_estimate: 128, floor_estimate: 72, projection_confidence: 68, risk_rating: 6, neeko_rating: 116.3 },
-  { player_id: "simpkin_j", player_name: "Jy Simpkin", team: "North Melbourne", position: "MID", projection_final: 104, ceiling_estimate: 124, floor_estimate: 70, projection_confidence: 65, risk_rating: 6, neeko_rating: 113.8 },
-];
-
-export function StartSitSocialProof({ onFillBoth, onScrollToCompare }: SocialProofProps) {
+export function StartSitSocialProof({ players, onFillBoth, onScrollToCompare }: SocialProofProps) {
   const weeklyCount = useMemo(() => {
     const today = new Date();
     const daySeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
     return Math.floor(1100 + seed(daySeed) * 400);
   }, []);
 
-  const popularMatchups = useMemo((): SocialProofMatchup[] => [
-    { playerA: TOP_PLAYERS[0], playerB: TOP_PLAYERS[1], comparisons: pseudoCount(1) },
-    { playerA: TOP_PLAYERS[2], playerB: TOP_PLAYERS[3], comparisons: pseudoCount(2) },
-    { playerA: TOP_PLAYERS[4], playerB: TOP_PLAYERS[5], comparisons: pseudoCount(3) },
-    { playerA: TOP_PLAYERS[8], playerB: TOP_PLAYERS[6], comparisons: pseudoCount(4) },
-  ], []);
+  const playerMap = useMemo(() => {
+    const map = new Map<string, QuickFillPlayer>();
+    for (const p of players) map.set(p.player_name, p);
+    return map;
+  }, [players]);
 
-  const closeDecisions = useMemo((): SocialProofMatchup[] => [
-    { playerA: TOP_PLAYERS[2], playerB: TOP_PLAYERS[3], comparisons: 0, splitA: 52 },
-    { playerA: TOP_PLAYERS[7], playerB: TOP_PLAYERS[8], comparisons: 0, splitA: 51 },
-    { playerA: TOP_PLAYERS[9], playerB: TOP_PLAYERS[10], comparisons: 0, splitA: 54 },
-  ], []);
+  const popularMatchups = useMemo((): SocialProofMatchup[] =>
+    POPULAR_PAIRS
+      .map(([nameA, nameB], i) => {
+        const pA = playerMap.get(nameA);
+        const pB = playerMap.get(nameB);
+        if (!pA || !pB) return null;
+        return { playerA: pA, playerB: pB, comparisons: pseudoCount(i + 1) };
+      })
+      .filter((m): m is SocialProofMatchup => m !== null),
+    [playerMap]);
+
+  const closeDecisions = useMemo((): SocialProofMatchup[] =>
+    CLOSE_PAIRS
+      .map(([nameA, nameB, split]) => {
+        const pA = playerMap.get(nameA);
+        const pB = playerMap.get(nameB);
+        if (!pA || !pB) return null;
+        return { playerA: pA, playerB: pB, comparisons: 0, splitA: split };
+      })
+      .filter((m): m is SocialProofMatchup => m !== null),
+    [playerMap]);
 
   function handleMatchupClick(a: QuickFillPlayer, b: QuickFillPlayer) {
+    console.log("StartSit quick-fill payload", { playerAId: a.player_id, playerBId: b.player_id, playerA: a.player_name, playerB: b.player_name });
     onFillBoth(a, b);
     onScrollToCompare();
   }

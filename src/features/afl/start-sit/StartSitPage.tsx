@@ -55,6 +55,7 @@ export default function StartSitPage() {
   const [playerB, setPlayerB] = useState<PlayerOption | null>(null);
   const [round, setRound] = useState<number>(1);
   const [roundLoading, setRoundLoading] = useState(true);
+  const [topPlayers, setTopPlayers] = useState<PlayerOption[]>([]);
 
   const [comparing, setComparing] = useState(false);
   const [result, setResult] = useState<CompareResult | null>(null);
@@ -73,6 +74,19 @@ export default function StartSitPage() {
       })
       .catch(() => setRound(1))
       .finally(() => setRoundLoading(false));
+  }, []);
+
+  // Pre-fetch top players so social proof quick-fill cards have real IDs
+  useEffect(() => {
+    supabase
+      .from("v_rankings_master")
+      .select("player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, projection_confidence, risk_rating, neeko_rating")
+      .not("player_id", "is", null)
+      .order("neeko_rating", { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        if (data) setTopPlayers(data as PlayerOption[]);
+      });
   }, []);
 
   // Pre-fill from URL params (share link support)
@@ -359,6 +373,7 @@ export default function StartSitPage() {
         {showSocialProof && (
           <div className="mt-8">
             <StartSitSocialProof
+              players={topPlayers}
               onFillBoth={handleFillBoth}
               onScrollToCompare={handleScrollToCompare}
             />
