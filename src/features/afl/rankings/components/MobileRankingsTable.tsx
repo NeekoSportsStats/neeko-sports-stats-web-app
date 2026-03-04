@@ -10,21 +10,22 @@ import {
 
 // ─── Column widths ─────────────────────────────────────────────────────────────
 const COL = {
-  rank: 36,
-  player: 160,
-  rating: 110,
-  projection: 110,
-  confidence: 110,
-  risk: 100,
-  price: 110,
-  value: 120,
-  aiRec: 140,
-  why: 260,
+  rank: 32,
+  player: 170,
+  rating: 90,
+  projection: 90,
+  confidence: 90,
+  risk: 80,
+  price: 100,
+  value: 110,
+  aiRec: 130,
+  why: 240,
 } as const;
 
-const FIXED_W = COL.rank + COL.player + COL.rating;
+// Only rank + player are sticky now
+const FIXED_W = COL.rank + COL.player;
 const SCROLL_W =
-  COL.projection + COL.confidence + COL.risk +
+  COL.rating + COL.projection + COL.confidence + COL.risk +
   COL.price + COL.value + COL.aiRec + COL.why;
 const TABLE_W = FIXED_W + SCROLL_W;
 
@@ -56,6 +57,7 @@ function LockedPlaceholder({ onUpgrade }: { onUpgrade: () => void }) {
 
 function TableHeader({ isPremium }: { isPremium: boolean }) {
   const scrollCols: { key: string; label: string; premium: boolean; width: number }[] = [
+    { key: "rating",     label: "Neeko",  premium: false, width: COL.rating },
     { key: "projection", label: "Proj",   premium: false, width: COL.projection },
     { key: "confidence", label: "Conf",   premium: false, width: COL.confidence },
     { key: "risk",       label: "Risk",   premium: false, width: COL.risk },
@@ -70,27 +72,31 @@ function TableHeader({ isPremium }: { isPremium: boolean }) {
       className="flex bg-[#0a0a0a] border-b border-[#222] sticky top-0 z-20"
       style={{ width: TABLE_W, minWidth: TABLE_W }}
     >
-      {/* Fixed sticky columns */}
+      {/* Fixed sticky columns — rank + player only */}
       <div
         className="flex shrink-0 sticky left-0 z-30 bg-[#0a0a0a]"
         style={{ width: FIXED_W }}
       >
         <div className={`${HEADER_BASE} pl-3`} style={{ width: COL.rank }}>#</div>
         <div className={`${HEADER_BASE} pl-2`} style={{ width: COL.player }}>Player</div>
-        <div className={`${HEADER_BASE} justify-center`} style={{ width: COL.rating }}>
-          <span className="text-[#F5C84C]">Neeko</span>
-        </div>
       </div>
 
-      {/* Scrollable columns */}
+      {/* Scrollable columns — Neeko is now first scrollable col */}
       {scrollCols.map(({ key, label, premium, width }) => (
         <div
           key={key}
           className={`${HEADER_BASE} justify-center px-2`}
           style={{ width, minWidth: width }}
         >
-          {premium && !isPremium && <Lock size={8} className="text-[#F5C84C]/50 mr-1 shrink-0" />}
-          <span className={premium && !isPremium ? "text-white/20" : ""}>{label}</span>
+          {key === "rating" && (
+            <span className="text-[#F5C84C]">{label}</span>
+          )}
+          {key !== "rating" && (
+            <>
+              {premium && !isPremium && <Lock size={8} className="text-[#F5C84C]/50 mr-1 shrink-0" />}
+              <span className={premium && !isPremium ? "text-white/20" : ""}>{label}</span>
+            </>
+          )}
         </div>
       ))}
     </div>
@@ -129,7 +135,7 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
       style={{ width: TABLE_W, minWidth: TABLE_W }}
       onClick={onTap}
     >
-      {/* Sticky left pane */}
+      {/* Sticky left pane — rank + player only */}
       <div
         className="flex shrink-0 sticky left-0 z-10 bg-[#070707] cursor-pointer active:bg-white/[0.05] transition-colors"
         style={{ width: FIXED_W }}
@@ -137,22 +143,30 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
         <div className={`${CELL_BASE} pl-3 text-xs text-white/30 tabular-nums`} style={{ width: COL.rank }}>
           {idx + 1}
         </div>
-        <div className={`${CELL_BASE} pl-2 min-w-0`} style={{ width: COL.player }}>
-          <div className="min-w-0">
+        <div className={`${CELL_BASE} pl-2 min-w-0`} style={{ width: COL.player, maxWidth: COL.player }}>
+          <div className="min-w-0 w-full">
             <div className="flex items-center gap-1 min-w-0">
-              <span className="text-[13px] font-semibold text-white truncate leading-tight">{row.player_name}</span>
+              <span className="text-[13px] font-semibold text-white truncate leading-tight max-w-[140px]">{row.player_name}</span>
               {!isPremium && isUnlocked && (
                 <span className="shrink-0 rounded-sm bg-[#F5C84C]/15 px-1 py-px text-[8px] font-semibold text-[#F5C84C] uppercase">
                   Free
                 </span>
               )}
             </div>
-            <div className="text-[10px] text-white/35 truncate mt-px">
+            <div className="text-[10px] text-white/35 truncate mt-px max-w-[150px]">
               {row.team}{row.position ? ` · ${row.position}` : ""}
             </div>
           </div>
         </div>
-        <div className={`${CELL_BASE} justify-center flex-col gap-0.5`} style={{ width: COL.rating }}>
+      </div>
+
+      {/* Scrollable columns — Neeko first, then stats */}
+      <div
+        className="flex cursor-pointer active:bg-white/[0.03] transition-colors"
+        onClick={onTap}
+      >
+        {/* Neeko rating — no longer sticky */}
+        <div className={`${CELL_BASE} justify-center flex-col gap-0.5`} style={{ width: COL.rating, minWidth: COL.rating }}>
           <span
             className={`text-sm font-extrabold tabular-nums ${neekoRBadge.text}`}
             style={neekoRBadge.glow ? { filter: neekoRBadge.glow } : undefined}
@@ -165,13 +179,7 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
             </span>
           )}
         </div>
-      </div>
 
-      {/* Scrollable columns */}
-      <div
-        className="flex cursor-pointer active:bg-white/[0.03] transition-colors"
-        onClick={onTap}
-      >
         <div className={`${CELL_BASE} justify-center`} style={{ width: COL.projection, minWidth: COL.projection }}>
           <span className="text-sm font-semibold text-[#F5C84C]/80 tabular-nums">{fmt(row.projection_final, 0)}</span>
         </div>
@@ -248,12 +256,9 @@ function BlurredRow({ idx, onUpgrade }: { idx: number; onUpgrade: () => void }) 
             <div className="h-2 w-14 bg-white/10 rounded" />
           </div>
         </div>
-        <div className={`${CELL_BASE} justify-center`} style={{ width: COL.rating }}>
-          <div className="h-4 w-10 bg-white/15 rounded" />
-        </div>
       </div>
       <div className="flex opacity-25 blur-[3px] select-none pointer-events-none">
-        {[COL.projection, COL.confidence, COL.risk, COL.price, COL.value, COL.aiRec].map((w, i) => (
+        {[COL.rating, COL.projection, COL.confidence, COL.risk, COL.price, COL.value, COL.aiRec].map((w, i) => (
           <div key={i} className={`${CELL_BASE} justify-center px-2`} style={{ width: w, minWidth: w }}>
             <div className="h-3 w-10 bg-white/10 rounded" />
           </div>
@@ -263,11 +268,11 @@ function BlurredRow({ idx, onUpgrade }: { idx: number; onUpgrade: () => void }) 
   );
 }
 
-// ─── Conversion wall ───────────────────────────────────────────────────────────
+// ─── Conversion wall — full viewport width, outside scroll container ───────────
 
 export function MobileConversionWall({ onUpgrade }: { onUpgrade: () => void }) {
   return (
-    <div className="px-4 pt-6 pb-4" style={{ width: TABLE_W, minWidth: TABLE_W }}>
+    <div className="px-4 pt-6 pb-4">
       <div className="flex items-center justify-between gap-3 rounded-xl border border-[#F5C84C]/25 bg-gradient-to-r from-[#F5C84C]/[0.07] to-transparent px-4 py-4">
         <div className="min-w-0">
           <p className="text-sm font-bold text-white leading-tight">Unlock AI captain picks, value scores and matchup insights.</p>
@@ -275,7 +280,7 @@ export function MobileConversionWall({ onUpgrade }: { onUpgrade: () => void }) {
         </div>
         <button
           onClick={onUpgrade}
-          className="shrink-0 flex items-center gap-1.5 bg-[#F5C84C] text-black font-bold text-xs px-4 py-2.5 rounded-xl hover:brightness-110 transition-all min-w-[110px] justify-center"
+          className="shrink-0 flex items-center gap-1.5 bg-[#F5C84C] text-black font-bold text-xs px-4 py-2.5 rounded-xl hover:brightness-110 transition-all min-w-[100px] justify-center"
         >
           <Crown size={11} />
           Upgrade
@@ -314,12 +319,9 @@ function LoadingSkeleton() {
                 <div className="h-2 w-16 animate-pulse rounded bg-white/5" />
               </div>
             </div>
-            <div className={`${CELL_BASE} justify-center`} style={{ width: COL.rating }}>
-              <div className="h-4 w-10 animate-pulse rounded bg-white/8" />
-            </div>
           </div>
           <div className="flex">
-            {[COL.projection, COL.confidence, COL.risk].map((w, j) => (
+            {[COL.rating, COL.projection, COL.confidence, COL.risk].map((w, j) => (
               <div key={j} className={`${CELL_BASE} justify-center px-3`} style={{ width: w, minWidth: w }}>
                 <div className="h-3 w-10 animate-pulse rounded bg-white/6" />
               </div>
@@ -362,12 +364,15 @@ export function MobileRankingsTable({
 
   const visibleRows = rows.slice(0, isPremium ? visibleCount : Math.min(visibleCount, rows.length));
 
+  // Separate wall-trigger rows from table rows
+  const wallTriggerIdx = !isPremium ? FREE_PARTIAL_ROWS : -1;
+
   return (
-    <div className="w-full max-w-full">
+    <div className="w-full max-w-full pb-[80px]">
       <SwipeHint />
 
       <div className="rounded-xl border border-white/5 overflow-hidden w-full max-w-full">
-        {/* Single scrollable container — header + body share one X scroll */}
+        {/* Scrollable table — header + rows share one X scroll */}
         <div
           className="w-full overflow-x-auto overflow-y-auto"
           style={{ maxHeight: "70vh", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
@@ -388,12 +393,7 @@ export function MobileRankingsTable({
                 if (!isPremium && idx >= FREE_PARTIAL_ROWS) {
                   if (!wallInserted.current) {
                     wallInserted.current = true;
-                    return (
-                      <div key={`wall-${idx}`}>
-                        <MobileConversionWall onUpgrade={onUpgrade} />
-                        <BlurredRow idx={idx} onUpgrade={onUpgrade} />
-                      </div>
-                    );
+                    return <BlurredRow key={row.player_id ?? `locked-${idx}`} idx={idx} onUpgrade={onUpgrade} />;
                   }
                   return <BlurredRow key={row.player_id ?? `locked-${idx}`} idx={idx} onUpgrade={onUpgrade} />;
                 }
@@ -419,6 +419,11 @@ export function MobileRankingsTable({
           </div>
         </div>
       </div>
+
+      {/* Conversion wall outside scroll container — full viewport width */}
+      {!isPremium && !loading && wallTriggerIdx >= 0 && rows.length > wallTriggerIdx && (
+        <MobileConversionWall onUpgrade={onUpgrade} />
+      )}
     </div>
   );
 }
