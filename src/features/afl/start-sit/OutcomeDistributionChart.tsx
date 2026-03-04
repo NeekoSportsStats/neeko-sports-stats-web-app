@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Crown, Lock, BarChart2 } from "lucide-react";
+import { Crown, Lock, ChartBar as BarChart2 } from "lucide-react";
 
 interface PlayerData {
   player_id: string;
