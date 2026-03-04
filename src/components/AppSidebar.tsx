@@ -152,12 +152,12 @@ export function AppSidebar() {
                       <SidebarMenuSubItem>
                         <SidebarMenuSubButton asChild className="py-0.5">
                           <NavLink
-                            to="/sports/afl/compare"
+                            to="/sports/afl/start-sit"
                             className="hover:bg-muted/50 pl-8 text-xs"
                             activeClassName="bg-muted text-primary font-medium"
                             onClick={handleLinkClick}
                           >
-                            Player v Player
+                            Start / Sit
                           </NavLink>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
