@@ -132,12 +132,9 @@ interface InsightPillProps {
   aVal: number;
   bVal: number;
   aIsWinner: boolean;
-  aLower?: boolean;
 }
 
-function InsightRow({ label, aName, bName, aVal, bVal, aIsWinner, aLower }: InsightPillProps) {
-  const aBetter = aLower ? aVal <= bVal : aVal >= bVal;
-
+function InsightRow({ label, aName, bName, aVal, bVal, aIsWinner }: InsightPillProps) {
   return (
     <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-3">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-2">{label}</p>
@@ -219,8 +216,8 @@ export function OutcomeDistributionChart({
             Projected fantasy score range based on model simulation.
           </p>
 
-          {/* Two-column distributions */}
-          <div className="grid grid-cols-2 gap-6 sm:gap-8">
+          {/* Two-column distributions — stack on mobile */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
             <PlayerDistribution
               name={playerA.player_name}
               buckets={bucketsA}
@@ -247,7 +244,6 @@ export function OutcomeDistributionChart({
               aVal={insightsA.bustRisk}
               bVal={insightsB.bustRisk}
               aIsWinner={winnerIsA}
-              aLower
             />
             <InsightRow
               label="Ceiling Chance (score 120+)"
