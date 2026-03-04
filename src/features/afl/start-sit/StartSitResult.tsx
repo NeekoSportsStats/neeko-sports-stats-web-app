@@ -265,7 +265,7 @@ export function StartSitResult({
     return () => clearTimeout(t);
   }, [winnerPlayerId]);
 
-  const winnerIsA = winnerPlayerId === playerA.player_id;
+  const winnerIsA = String(winnerPlayerId) === String(playerA.player_id);
   const winner = winnerIsA ? playerA : playerB;
   const loser = winnerIsA ? playerB : playerA;
   const isTossUp = !winnerPlayerId;

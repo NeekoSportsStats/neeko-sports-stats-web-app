@@ -191,7 +191,7 @@ export function OutcomeDistributionChart({
     playerB.projection_final,
   ]);
 
-  const winnerIsA = winnerPlayerId === playerA.player_id;
+  const winnerIsA = String(winnerPlayerId) === String(playerA.player_id);
 
   return (
     <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">

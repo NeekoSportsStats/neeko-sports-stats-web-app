@@ -56,7 +56,7 @@ export function StartProbabilityMeter({
     return () => clearTimeout(t);
   }, []);
 
-  const winnerIsA = winnerPlayerId === playerA.player_id;
+  const winnerIsA = String(winnerPlayerId) === String(playerA.player_id);
   const isTossUp = !winnerPlayerId;
 
   // Probability is derived directly from the model confidence — always aligned with the verdict

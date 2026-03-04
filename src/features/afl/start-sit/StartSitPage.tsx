@@ -188,7 +188,7 @@ export default function StartSitPage() {
       const resultPlayerB: PlayerOption = json.playerB ?? playerB;
 
       setResult({
-        winner_player_id: json.winner_player_id,
+        winner_player_id: String(json.winner_player_id),
         winner_name: json.winner_name,
         confidence: typeof json.confidence === "number" ? json.confidence : 60,
         ai_summary: json.ai_summary ?? null,
