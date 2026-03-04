@@ -36,7 +36,6 @@ interface CompareResult {
 }
 
 function getRoundLabel(round: number): string {
-  if (round <= 0) return "Opening Round";
   return `Round ${round}`;
 }
 
@@ -54,7 +53,7 @@ export default function StartSitPage() {
 
   const [playerA, setPlayerA] = useState<PlayerOption | null>(null);
   const [playerB, setPlayerB] = useState<PlayerOption | null>(null);
-  const [round, setRound] = useState<number>(0);
+  const [round, setRound] = useState<number>(1);
   const [roundLoading, setRoundLoading] = useState(true);
 
   const [comparing, setComparing] = useState(false);
@@ -69,10 +68,10 @@ export default function StartSitPage() {
     supabase
       .rpc("get_latest_completed_round")
       .then(({ data }) => {
-        const latest = typeof data === "number" ? data : 0;
-        setRound(latest);
+        const activeRound = typeof data === "number" && data >= 1 ? data : 1;
+        setRound(activeRound);
       })
-      .catch(() => setRound(0))
+      .catch(() => setRound(1))
       .finally(() => setRoundLoading(false));
   }, []);
 
@@ -149,7 +148,7 @@ export default function StartSitPage() {
         },
         body: JSON.stringify({
           season: CURRENT_SEASON,
-          round_number: round,
+          round_number: round || 1,
           playerAId: playerA.player_id,
           playerBId: playerB.player_id,
         }),
