@@ -8,6 +8,7 @@ import { StartSitSelector } from "./StartSitSelector";
 import { StartSitResult } from "./StartSitResult";
 import { StartSitSocialProof } from "./StartSitSocialProof";
 import type { QuickFillPlayer } from "./StartSitSocialProof";
+import { getAflRoundLabel } from "@/features/afl/shared/data/getAflRoundLabel";
 
 const CURRENT_SEASON = 2026;
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
@@ -37,9 +38,6 @@ interface CompareResult {
   playerB: PlayerOption;
 }
 
-function getRoundLabel(round: number): string {
-  return `Round ${round}`;
-}
 
 function getConfidenceLabel(confidence: number): { label: string; color: string } {
   if (confidence >= 90) return { label: "Elite Confidence", color: "text-emerald-400" };
@@ -73,10 +71,10 @@ export default function StartSitPage() {
     supabase
       .rpc("get_latest_completed_round")
       .then(({ data }) => {
-        const activeRound = typeof data === "number" && data >= 1 ? data : 1;
+        const activeRound = typeof data === "number" && data >= 0 ? data : 0;
         setRound(activeRound);
       })
-      .catch(() => setRound(1))
+      .catch(() => setRound(0))
       .finally(() => setRoundLoading(false));
   }, []);
 
@@ -171,7 +169,7 @@ export default function StartSitPage() {
         },
         body: JSON.stringify({
           season: CURRENT_SEASON,
-          round_number: round || 1,
+          round_number: round ?? 0,
           playerAId: playerA.player_id,
           playerBId: playerB.player_id,
         }),
@@ -251,7 +249,7 @@ export default function StartSitPage() {
             <span className="h-6 w-16 rounded-md bg-white/[0.06] animate-pulse" />
           ) : (
             <span className="rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1 text-sm font-bold text-white/70">
-              {getRoundLabel(round)}
+              {getAflRoundLabel(round)}
             </span>
           )}
           <span className="text-[11px] text-white/20">{CURRENT_SEASON}</span>

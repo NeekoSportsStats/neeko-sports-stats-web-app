@@ -396,7 +396,7 @@ Deno.serve(async (req: Request) => {
           confidence,
           ai_summary: aiSummary,
           model_key: MODEL_VERSION,
-          inputs_hash: `${season}-${round_number}-${loId}-${hiId}`,
+          inputs_hash: `${season}-${round_number}-${loId}-${hiId}-${MODEL_VERSION}`,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "season,round_number,player_low_id,player_high_id" }
