@@ -5,21 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  RefreshCw,
-  Shield,
-  Database,
-  Bot,
-  Activity,
-  TrendingUp,
-  Calendar,
-  ChevronDown,
-  ChevronUp,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  Clock,
-} from "lucide-react";
+import { RefreshCw, Shield, Database, Bot, Activity, TrendingUp, Calendar, ChevronDown, ChevronUp, CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, Circle as XCircle, Clock } from "lucide-react";
 
 const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
 
