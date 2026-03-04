@@ -94,8 +94,12 @@ export default function MarketWatchPage() {
     if (authLoading) return;
     if (fetchedRef.current) return;
     fetchedRef.current = true;
-    fetchData(isPremium).then(() => setLastUpdated(new Date()));
-    fetchCounts();
+    const load = async () => {
+      await fetchData(isPremium);
+      await fetchCounts();
+      setLastUpdated(new Date());
+    };
+    load();
   }, [authLoading, isPremium, fetchData, fetchCounts]);
 
   useEffect(() => {
@@ -124,7 +128,7 @@ export default function MarketWatchPage() {
     });
 
     return () => observer.disconnect();
-  });
+  }, []);
 
   const { players, trades, summaryCards } = data;
 
@@ -147,7 +151,9 @@ export default function MarketWatchPage() {
   const visibleCashCows     = limitFree(cashCows,     SECTION_LIMITS.cashCows,     showMoreCashCows);
   const visibleFades        = limitFree(fades,        SECTION_LIMITS.fades,        showMoreFades);
 
-  if (authLoading || dataLoading) {
+  const ready = !authLoading && !dataLoading;
+
+  if (!ready) {
     return <MarketWatchSkeleton />;
   }
 
