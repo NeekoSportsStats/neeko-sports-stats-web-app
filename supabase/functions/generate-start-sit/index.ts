@@ -219,9 +219,9 @@ Deno.serve(async (req: Request) => {
       ? body.round_number
       : 1;
 
-    console.log("StartSit request payload:", { playerAId, playerBId, round_number, season });
+    console.log("generate-start-sit received:", JSON.stringify({ playerAId, playerBId, round_number, season, raw: { playerAId: body.playerAId, playerBId: body.playerBId } }));
 
-    if (isNaN(playerAId) || isNaN(playerBId) || playerAId <= 0 || playerBId <= 0) {
+    if (!body.playerAId || !body.playerBId || isNaN(playerAId) || isNaN(playerBId)) {
       return new Response(
         JSON.stringify({ error: "Missing players" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
