@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { RefreshCw, Shield, Database, Zap, Activity, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, TrendingUp, Server, Bot, ChartBar as BarChart3, Layers, Bell, BellOff, History, Users, Gauge, Star, ArrowUpRight, CalendarDays, Target, Crosshair } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { AdminPipelineProgress, PipelineRun } from "@/components/admin/AdminPipelineProgress";
 
 const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
 
@@ -383,6 +384,8 @@ export default function Admin() {
 
   const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const [activeRun, setActiveRun] = useState<PipelineRun | null>(null);
+
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -647,15 +650,92 @@ export default function Admin() {
     };
   }, [loading, user, fetchAnalytics, fetchProductMetrics, fetchV2Metrics]);
 
+  const PIPELINE_STAGES: Record<string, string[]> = {
+    weekly_pipeline: [
+      "Ingesting AFL match data",
+      "Ingesting player stats",
+      "Ingesting team stats",
+      "Detecting latest round",
+      "Transforming player stats",
+      "Transforming match data",
+      "Rebuilding team defence profile",
+      "Refreshing Neeko intelligence",
+      "Refreshing player volatility",
+      "Generating AI rankings",
+      "Cleaning Start/Sit cache",
+    ],
+    ranking_ai: [
+      "Loading player data",
+      "Generating AI analysis",
+      "Generating captain recommendations",
+      "Saving results",
+    ],
+    volatility: [
+      "Loading player history",
+      "Computing volatility scores",
+      "Saving results",
+    ],
+  };
+
+  const fetchActiveRun = async (runId: string) => {
+    const { data } = await supabase
+      .from("v_pipeline_progress")
+      .select("*")
+      .eq("id", runId)
+      .maybeSingle();
+    if (data) setActiveRun(data as PipelineRun);
+  };
+
+  const createPipelineRun = async (
+    pipelineKey: string,
+    label: string,
+  ): Promise<string | null> => {
+    const stages = PIPELINE_STAGES[pipelineKey] ?? [];
+    const { data, error } = await supabase
+      .from("pipeline_runs")
+      .insert({
+        pipeline_key: pipelineKey,
+        label,
+        total_tasks: stages.length || 1,
+        completed_tasks: 0,
+        current_step_label: stages[0] ?? "Starting…",
+        status: "running",
+      })
+      .select("id")
+      .single();
+    if (error || !data) return null;
+    return data.id as string;
+  };
+
+  const finishPipelineRun = async (runId: string, success: boolean) => {
+    const stages = PIPELINE_STAGES;
+    const run = activeRun;
+    await supabase
+      .from("pipeline_runs")
+      .update({
+        status: success ? "completed" : "failed",
+        completed_tasks: success ? (run?.total_tasks ?? 1) : (run?.completed_tasks ?? 0),
+        current_step_label: success ? "Done" : "Failed",
+        finished_at: new Date().toISOString(),
+      })
+      .eq("id", runId);
+    void stages;
+    await fetchActiveRun(runId);
+  };
+
   const handleRunPipeline = async () => {
     setIsRefreshing(true);
     toast({ title: "Triggering weekly pipeline…", description: "This may take 2–5 minutes." });
+    const runId = await createPipelineRun("weekly_pipeline", "Weekly Pipeline");
+    if (runId) await fetchActiveRun(runId);
     try {
       const { error } = await supabase.functions.invoke("weekly-afl-pipeline", { body: {} });
+      if (runId) await finishPipelineRun(runId, !error);
       if (error) throw error;
       toast({ title: "Pipeline complete", description: "All steps finished successfully." });
       await fetchAll();
     } catch (err) {
+      if (runId) await finishPipelineRun(runId, false);
       toast({
         title: "Pipeline failed",
         description: err instanceof Error ? err.message : "Unknown error",
@@ -669,12 +749,16 @@ export default function Admin() {
   const handleRefreshVolatility = async () => {
     setIsRefreshing(true);
     toast({ title: "Refreshing volatility model…" });
+    const runId = await createPipelineRun("volatility", "Refresh Volatility Model");
+    if (runId) await fetchActiveRun(runId);
     try {
       const { error } = await supabase.schema("afl").rpc("fn_refresh_player_volatility");
+      if (runId) await finishPipelineRun(runId, !error);
       if (error) throw error;
       toast({ title: "Volatility model refreshed" });
       await fetchAll();
     } catch (err) {
+      if (runId) await finishPipelineRun(runId, false);
       toast({
         title: "Volatility refresh failed",
         description: err instanceof Error ? err.message : "Unknown error",
@@ -688,12 +772,16 @@ export default function Admin() {
   const handleRefreshRankingAI = async () => {
     setIsRefreshing(true);
     toast({ title: "Triggering AI ranking generation…" });
+    const runId = await createPipelineRun("ranking_ai", "Generate Ranking AI");
+    if (runId) await fetchActiveRun(runId);
     try {
       const { error } = await supabase.functions.invoke("generate-ranking-ai", { body: {} });
+      if (runId) await finishPipelineRun(runId, !error);
       if (error) throw error;
       toast({ title: "Ranking AI generation triggered" });
       await fetchAll();
     } catch (err) {
+      if (runId) await finishPipelineRun(runId, false);
       toast({
         title: "Ranking AI generation failed",
         description: err instanceof Error ? err.message : "Unknown error",
@@ -1586,7 +1674,7 @@ export default function Admin() {
             Manual Actions
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Button
               onClick={handleRunPipeline}
@@ -1631,6 +1719,13 @@ export default function Admin() {
               AI Queue Dashboard
             </Button>
           </div>
+
+          {activeRun && (
+            <AdminPipelineProgress
+              run={activeRun}
+              onPollTick={() => fetchActiveRun(activeRun.id)}
+            />
+          )}
         </CardContent>
       </Card>
     </div>
