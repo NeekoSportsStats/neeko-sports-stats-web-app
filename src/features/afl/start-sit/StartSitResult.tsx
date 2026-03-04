@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Crown, Lock, Zap, ChevronDown, ChevronUp, Flame, TrendingUp, Target } from "lucide-react";
 import { StartProbabilityMeter } from "./StartProbabilityMeter";
+import { OutcomeDistributionChart } from "./OutcomeDistributionChart";
 
 interface PlayerData {
   player_id: string;
@@ -319,6 +320,15 @@ export function StartSitResult({
           />
         </div>
       </div>
+
+      {/* ── OUTCOME DISTRIBUTION ── */}
+      <OutcomeDistributionChart
+        playerA={playerA}
+        playerB={playerB}
+        winnerPlayerId={winnerPlayerId}
+        isPremium={isPremium}
+        onUpgrade={onUpgrade}
+      />
 
       {/* ── WHY THIS DECISION (AI bullets / free bullets) ── */}
       {isPremium ? (
