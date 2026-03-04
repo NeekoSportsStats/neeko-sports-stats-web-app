@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, Shield, Database, Zap, Activity, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, TrendingUp, Server, Bot, ChartBar as BarChart3, Layers, Bell, BellOff, History } from "lucide-react";
+import { RefreshCw, Shield, Database, Zap, Activity, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, TrendingUp, Server, Bot, ChartBar as BarChart3, Layers, Bell, BellOff, History, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
@@ -93,6 +93,31 @@ interface DataIntegrityChecks {
   players_missing_volatility: number;
   total_volatility_rows: number;
   last_volatility_refresh: string | null;
+}
+
+interface AnalyticsSummary {
+  total_events_24h: number;
+  page_views_24h: number;
+  rankings_views: number;
+  start_sit_views: number;
+  start_sit_runs: number;
+  edge_views: number;
+  market_watch_views: number;
+  upgrade_clicks: number;
+  subscriptions: number;
+  unique_users_24h: number;
+}
+
+interface AnalyticsSummary7d {
+  total_events_7d: number;
+  page_views_7d: number;
+  rankings_views: number;
+  start_sit_runs: number;
+  edge_views: number;
+  market_watch_views: number;
+  upgrade_clicks: number;
+  subscriptions: number;
+  unique_users_7d: number;
 }
 
 function formatDate(ts: string | null): string {
@@ -211,6 +236,9 @@ export default function Admin() {
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [jobHistory, setJobHistory] = useState<PipelineJobRun[]>([]);
   const [jobHistoryLoading, setJobHistoryLoading] = useState(true);
+  const [analytics24h, setAnalytics24h] = useState<AnalyticsSummary | null>(null);
+  const [analytics7d, setAnalytics7d] = useState<AnalyticsSummary7d | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
   useEffect(() => {
     if (loading) return;
@@ -257,6 +285,22 @@ export default function Admin() {
     }
   }, []);
 
+  const fetchAnalytics = useCallback(async () => {
+    setAnalyticsLoading(true);
+    try {
+      const [res24h, res7d] = await Promise.all([
+        supabase.from("v_admin_analytics_summary").select("*").maybeSingle(),
+        supabase.from("v_admin_analytics_7d").select("*").maybeSingle(),
+      ]);
+      if (res24h.data) setAnalytics24h(res24h.data as AnalyticsSummary);
+      if (res7d.data) setAnalytics7d(res7d.data as AnalyticsSummary7d);
+    } catch (err) {
+      console.error("Analytics fetch error:", err);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, []);
+
   const fetchAll = useCallback(async () => {
     setDataLoading(true);
     try {
@@ -292,8 +336,8 @@ export default function Admin() {
     } finally {
       setDataLoading(false);
     }
-    await Promise.all([fetchAlerts(), fetchJobHistory()]);
-  }, [toast, fetchAlerts, fetchJobHistory]);
+    await Promise.all([fetchAlerts(), fetchJobHistory(), fetchAnalytics()]);
+  }, [toast, fetchAlerts, fetchJobHistory, fetchAnalytics]);
 
   const handleResolveAlert = async (id: string) => {
     setResolvingId(id);
@@ -345,8 +389,9 @@ export default function Admin() {
     if (!loading && user?.id === ADMIN_USER_ID) {
       fetchAlerts();
       fetchJobHistory();
+      fetchAnalytics();
     }
-  }, [loading, user, fetchAlerts, fetchJobHistory]);
+  }, [loading, user, fetchAlerts, fetchJobHistory, fetchAnalytics]);
 
   const handleRunPipeline = async () => {
     setIsRefreshing(true);
@@ -610,6 +655,54 @@ export default function Admin() {
           />
           <StatRow label="Volatility rows" value={integrity?.total_volatility_rows ?? "—"} highlight="good" />
           <StatRow label="Last volatility refresh" value={formatDate(integrity?.last_volatility_refresh ?? null)} />
+        </SectionCard>
+      </div>
+
+      {/* Site Usage — Analytics */}
+      <div className="grid gap-4 sm:grid-cols-2 mb-4">
+        <SectionCard
+          icon={BarChart3}
+          title="Site Usage — Last 24 Hours"
+          status={analyticsLoading ? "loading" : "ok"}
+          loading={analyticsLoading}
+        >
+          <StatRow label="Page views" value={analytics24h?.page_views_24h?.toLocaleString() ?? "0"} highlight="neutral" />
+          <StatRow label="Rankings views" value={analytics24h?.rankings_views?.toLocaleString() ?? "0"} highlight="neutral" />
+          <StatRow label="Start/Sit views" value={analytics24h?.start_sit_views?.toLocaleString() ?? "0"} highlight="neutral" />
+          <StatRow label="Start/Sit runs (AI)" value={analytics24h?.start_sit_runs?.toLocaleString() ?? "0"} highlight={(analytics24h?.start_sit_runs ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Edge Board views" value={analytics24h?.edge_views?.toLocaleString() ?? "0"} highlight="neutral" />
+          <StatRow label="Market Watch views" value={analytics24h?.market_watch_views?.toLocaleString() ?? "0"} highlight="neutral" />
+          <StatRow label="Upgrade clicks" value={analytics24h?.upgrade_clicks?.toLocaleString() ?? "0"} highlight={(analytics24h?.upgrade_clicks ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Subscriptions started" value={analytics24h?.subscriptions?.toLocaleString() ?? "0"} highlight={(analytics24h?.subscriptions ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Unique logged-in users" value={analytics24h?.unique_users_24h?.toLocaleString() ?? "0"} highlight="neutral" />
+        </SectionCard>
+
+        <SectionCard
+          icon={Users}
+          title="Site Usage — Last 7 Days"
+          status={analyticsLoading ? "loading" : "ok"}
+          loading={analyticsLoading}
+        >
+          <StatRow label="Page views" value={analytics7d?.page_views_7d?.toLocaleString() ?? "0"} highlight="neutral" />
+          <StatRow label="Rankings views" value={analytics7d?.rankings_views?.toLocaleString() ?? "0"} highlight="neutral" />
+          <StatRow label="Start/Sit runs (AI)" value={analytics7d?.start_sit_runs?.toLocaleString() ?? "0"} highlight={(analytics7d?.start_sit_runs ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Edge Board views" value={analytics7d?.edge_views?.toLocaleString() ?? "0"} highlight="neutral" />
+          <StatRow label="Market Watch views" value={analytics7d?.market_watch_views?.toLocaleString() ?? "0"} highlight="neutral" />
+          <StatRow label="Upgrade clicks" value={analytics7d?.upgrade_clicks?.toLocaleString() ?? "0"} highlight={(analytics7d?.upgrade_clicks ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Subscriptions started" value={analytics7d?.subscriptions?.toLocaleString() ?? "0"} highlight={(analytics7d?.subscriptions ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Unique logged-in users" value={analytics7d?.unique_users_7d?.toLocaleString() ?? "0"} highlight="neutral" />
+          <div className="mt-3 flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={fetchAnalytics}
+              disabled={analyticsLoading}
+            >
+              <RefreshCw className={`h-3 w-3 mr-1 ${analyticsLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
         </SectionCard>
       </div>
 
