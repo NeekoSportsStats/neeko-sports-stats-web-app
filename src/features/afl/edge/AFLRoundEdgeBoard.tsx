@@ -844,6 +844,9 @@ function HeroSignalCard({ section, row, isPremium, freeTeaser = false, isTopSign
           <p className={`text-3xl font-extrabold tabular-nums leading-none ${config.statColor}`}>
             {config.statValue}
           </p>
+          {section === "breakout" && (
+            <p className="text-[10px] text-white/30 mt-1 leading-none">vs positional expectation</p>
+          )}
         </div>
 
         <div className="rounded-lg bg-black/20 px-2.5 py-2 mb-3 inline-flex items-center gap-2">
@@ -981,9 +984,27 @@ function HeroSignalPanel({ captainRow, breakoutRow, trapRow, isPremium, onUnlock
 
 // ─── Free Paywall Panel ───────────────────────────────────────────────────────
 
-function FreePaywallPanel({ totalSignals, onUnlock }: { totalSignals: number; onUnlock: () => void }) {
-  const extra = Math.max(0, totalSignals - 3);
-  const displayExtra = extra > 0 ? extra : 12;
+function FreePaywallPanel({ captainCount, breakoutCount, trapCount, onUnlock }: {
+  captainCount: number;
+  breakoutCount: number;
+  trapCount: number;
+  onUnlock: () => void;
+}) {
+  const extraCaptain  = Math.max(0, captainCount - 1);
+  const extraBreakout = Math.max(0, breakoutCount - 1);
+  const extraTrap     = Math.max(0, trapCount - 1);
+  const totalExtra    = extraCaptain + extraBreakout + extraTrap;
+  const displayExtra  = totalExtra > 0 ? totalExtra : 12;
+
+  const categoryLines = [
+    extraCaptain  > 0 && `${extraCaptain} additional captain edge${extraCaptain !== 1 ? "s" : ""}`,
+    extraBreakout > 0 && `${extraBreakout} breakout target${extraBreakout !== 1 ? "s" : ""}`,
+    extraTrap     > 0 && `${extraTrap} trap alert${extraTrap !== 1 ? "s" : ""}`,
+  ].filter(Boolean) as string[];
+
+  if (categoryLines.length === 0) {
+    categoryLines.push("4 additional captain edges", "4 breakout targets", "4 trap alerts");
+  }
 
   return (
     <div className="mb-10 rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-b from-[#F5C84C]/[0.07] to-[#F5C84C]/[0.02] p-7 text-center">
@@ -991,12 +1012,19 @@ function FreePaywallPanel({ totalSignals, onUnlock }: { totalSignals: number; on
         <Crown size={22} className="text-[#F5C84C]" />
       </div>
 
-      <h3 className="text-lg font-extrabold text-white mb-1.5">
+      <h3 className="text-lg font-extrabold text-white mb-2">
         Unlock {displayExtra} more edges this round
       </h3>
-      <p className="text-sm text-white/50 mb-5 max-w-sm mx-auto leading-relaxed">
-        Full AI reasoning + captain edges + breakout targets + trap alerts
-      </p>
+
+      <div className="mb-5 space-y-1">
+        <p className="text-xs text-white/35 uppercase tracking-widest mb-2">Includes</p>
+        {categoryLines.map((line) => (
+          <div key={line} className="flex items-center justify-center gap-2">
+            <div className="w-1 h-1 rounded-full bg-[#F5C84C]/50 shrink-0" />
+            <p className="text-sm text-white/60">{line}</p>
+          </div>
+        ))}
+      </div>
 
       <div className="flex flex-wrap items-center justify-center gap-2 mb-5">
         {[
@@ -1156,19 +1184,21 @@ export default function AFLRoundEdgeBoard() {
           </div>
 
           <h1 className="text-2xl font-extrabold text-white leading-tight">
-            This Week's Biggest Fantasy Edges
+            The Model's 3 Biggest AFL Fantasy Edges This Round
           </h1>
           <p className="text-sm text-white/50 mt-1.5 max-w-lg">
             Neeko AI detected high-leverage plays for this round.
             Captain edges, breakout value and trap alerts — ranked by impact.
           </p>
 
-          <div className="flex items-center gap-1.5 mt-3">
-            <Users size={11} className="text-white/25" />
-            <p className="text-[11px] text-white/30">
-              Used by <span className="text-white/55 font-semibold">700+ AFL Fantasy coaches</span> this season
-            </p>
-          </div>
+          {isPremium && (
+            <div className="flex items-center gap-1.5 mt-3">
+              <Users size={11} className="text-white/25" />
+              <p className="text-[11px] text-white/30">
+                Used by <span className="text-white/55 font-semibold">700+ AFL Fantasy coaches</span> this season
+              </p>
+            </div>
+          )}
 
           {rows.length > 0 && (
             <div className="mt-3 flex items-center gap-2">
@@ -1232,6 +1262,11 @@ export default function AFLRoundEdgeBoard() {
                 <p className="text-xl font-extrabold text-red-400 tabular-nums">{trapRows.length}</p>
               </div>
             </div>
+            <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+              <ShieldCheck size={11} className="text-[#F5C84C]/60 shrink-0" />
+              <p className="text-[10px] text-white/30 uppercase tracking-wider">Model Accuracy Last Season</p>
+              <span className="ml-auto text-sm font-extrabold text-[#F5C84C] tabular-nums">72%</span>
+            </div>
           </div>
         )}
 
@@ -1247,7 +1282,9 @@ export default function AFLRoundEdgeBoard() {
         {/* ── Free: paywall conversion panel (immediately after 3 teasers) ── */}
         {!isPremium && (
           <FreePaywallPanel
-            totalSignals={rows.length}
+            captainCount={captainRows.length}
+            breakoutCount={breakoutRows.length}
+            trapCount={trapRows.length}
             onUnlock={() => setShowUpgrade(true)}
           />
         )}
