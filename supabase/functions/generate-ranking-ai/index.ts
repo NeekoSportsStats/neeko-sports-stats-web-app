@@ -8,6 +8,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+const BATCH_SIZE = 10;
+
 interface PlayerInput {
   player_id: number;
   player_name: string;
@@ -18,6 +20,56 @@ interface PlayerInput {
   consistency_score: number;
   trend_3_vs_10: number;
   matchup_delta: number;
+}
+
+interface AIResult {
+  analysis: string;
+  captain_recommendation: string;
+}
+
+async function generateForPlayer(
+  openai: OpenAI,
+  player: PlayerInput
+): Promise<AIResult> {
+  const prompt = `You are an elite AFL fantasy analyst writing premium analysis for Neeko Sports Stats.
+
+Player: ${player.player_name}
+Team: ${player.team}
+Projection: ${player.projection_final}
+Ceiling: ${player.ceiling_estimate}
+Floor: ${player.floor_estimate}
+Consistency Score: ${player.consistency_score}
+3-Game vs 10-Game Trend: ${player.trend_3_vs_10}
+Matchup Delta: ${player.matchup_delta}
+
+Respond with a JSON object containing exactly two fields:
+- "analysis": 2-3 sentence premium analysis covering expected scoring, ceiling potential and risk, and consistency. Plain prose only, no bullet points.
+- "captain": ONE short sentence (max 20 words) on captain suitability.
+
+Return only valid JSON, no markdown.`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a professional AFL fantasy analyst. Return only valid JSON with 'analysis' and 'captain' fields.",
+      },
+      { role: "user", content: prompt },
+    ],
+    temperature: 0.4,
+    max_tokens: 400,
+    response_format: { type: "json_object" },
+  });
+
+  const raw = completion.choices[0]?.message?.content ?? "{}";
+  const parsed = JSON.parse(raw);
+
+  return {
+    analysis: parsed.analysis ?? "",
+    captain_recommendation: parsed.captain ?? "",
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -33,14 +85,19 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const openai = new OpenAI({ apiKey: openaiKey });
 
+    const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+    const offset = typeof body.offset === "number" ? body.offset : 0;
+    const limit = typeof body.limit === "number" ? body.limit : 60;
+
     const { data: players, error: fetchError } = await supabase
       .from("v_ai_player_analysis_input")
-      .select("*");
+      .select("*")
+      .range(offset, offset + limit - 1);
 
     if (fetchError) throw fetchError;
     if (!players || players.length === 0) {
       return new Response(
-        JSON.stringify({ message: "No players found in input view", count: 0 }),
+        JSON.stringify({ message: "No players in range", offset, count: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -48,74 +105,53 @@ Deno.serve(async (req: Request) => {
     let processed = 0;
     let errors = 0;
 
-    for (const player of players as PlayerInput[]) {
-      try {
-        const prompt = `You are an elite AFL fantasy analyst writing premium analysis for Neeko Sports Stats.
+    for (let i = 0; i < players.length; i += BATCH_SIZE) {
+      const batch = (players as PlayerInput[]).slice(i, i + BATCH_SIZE);
 
-Player: ${player.player_name}
-Team: ${player.team}
-Projection: ${player.projection_final}
-Ceiling: ${player.ceiling_estimate}
-Floor: ${player.floor_estimate}
-Consistency Score: ${player.consistency_score}
-3-Game vs 10-Game Trend: ${player.trend_3_vs_10}
-Matchup Delta: ${player.matchup_delta}
+      const results = await Promise.allSettled(
+        batch.map((player) => generateForPlayer(openai, player))
+      );
 
-Write a concise 2-3 sentence premium analysis covering:
-1. Expected scoring and consistency
-2. Ceiling potential and risk level
-3. Captain suitability
-
-Be confident, direct, and professional. No bullet points. Plain prose only.`;
-
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: [
-            { role: "system", content: "You are a professional AFL fantasy analyst. Write concise, confident, premium analysis." },
-            { role: "user", content: prompt },
-          ],
-          temperature: 0.4,
-          max_tokens: 300,
-        });
-
-        const analysis = completion.choices[0]?.message?.content ?? "";
-
-        const captainPrompt = `Based on this data for ${player.player_name} (Projection: ${player.projection_final}, Consistency: ${player.consistency_score}, Ceiling: ${player.ceiling_estimate}, Matchup Delta: ${player.matchup_delta}), write exactly ONE short sentence (max 20 words) on their captain suitability.`;
-
-        const captainCompletion = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: [
-            { role: "system", content: "You are a professional AFL fantasy analyst." },
-            { role: "user", content: captainPrompt },
-          ],
-          temperature: 0.3,
-          max_tokens: 60,
-        });
-
-        const captain_recommendation = captainCompletion.choices[0]?.message?.content ?? "";
-
-        await supabase
-          .from("ai_player_analysis")
-          .upsert({
+      const upsertRows = [];
+      for (let j = 0; j < batch.length; j++) {
+        const result = results[j];
+        const player = batch[j];
+        if (result.status === "fulfilled") {
+          upsertRows.push({
             player_id: player.player_id,
             player_name: player.player_name,
             team: player.team,
             projection_final: player.projection_final,
-            analysis,
-            captain_recommendation,
+            analysis: result.value.analysis,
+            captain_recommendation: result.value.captain_recommendation,
             generated_at: new Date().toISOString(),
           });
+          processed++;
+        } else {
+          console.error(
+            `Error processing ${player.player_name}:`,
+            result.reason
+          );
+          errors++;
+        }
+      }
 
-        processed++;
-      } catch (playerErr) {
-        console.error(`Error processing player ${player.player_name}:`, playerErr);
-        errors++;
+      if (upsertRows.length > 0) {
+        const { error: upsertError } = await supabase
+          .from("ai_player_analysis")
+          .upsert(upsertRows, { onConflict: "player_id" });
+        if (upsertError) {
+          console.error("Batch upsert error:", upsertError);
+          errors += upsertRows.length;
+          processed -= upsertRows.length;
+        }
       }
     }
 
     return new Response(
       JSON.stringify({
         message: "generate-ranking-ai complete",
+        offset,
         processed,
         errors,
         total_input: players.length,
