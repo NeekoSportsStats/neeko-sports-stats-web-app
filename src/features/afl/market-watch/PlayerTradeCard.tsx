@@ -72,13 +72,26 @@ export function PlayerTradeCard({ row, locked, onUnlock, onCompare, rank }: Prop
         />
       </div>
 
-      {row.projected_price != null && (
-        <div className="grid grid-cols-1 gap-1.5 mb-3">
-          <StatCell
-            label="Proj. Price After Round"
-            value={fmtPrice(row.projected_price)}
-            valueClass={priceChangeColor(expChange)}
-          />
+      {(row.projected_price_r1 != null || row.projected_price_r2 != null || row.projected_price_r3 != null) && (
+        <div className="mb-3">
+          <p className="text-[9px] text-white/20 uppercase tracking-wider mb-1.5 px-0.5">Price Growth</p>
+          <div className="grid grid-cols-3 gap-1.5">
+            <StatCell
+              label="Next Round"
+              value={fmtPrice(row.projected_price_r1 ?? row.projected_price)}
+              valueClass={priceChangeColor(expChange)}
+            />
+            <StatCell
+              label="2 Rounds"
+              value={fmtPrice(row.projected_price_r2)}
+              valueClass={priceChangeColor(expChange)}
+            />
+            <StatCell
+              label="3 Rounds"
+              value={fmtPrice(row.projected_price_r3)}
+              valueClass={priceChangeColor(expChange)}
+            />
+          </div>
         </div>
       )}
 

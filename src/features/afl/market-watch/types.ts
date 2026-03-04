@@ -41,6 +41,9 @@ export interface MWPlayerRow {
   price_edge_pts: number;
   expected_price_change: number;
   projected_price: number | null;
+  projected_price_r1: number | null;
+  projected_price_r2: number | null;
+  projected_price_r3: number | null;
   category: "buy" | "sell_now" | "sell_consider" | "cash_cow" | "fade" | "monitor";
   action: "BUY" | "SELL" | "HOLD";
   trade_score: number;
