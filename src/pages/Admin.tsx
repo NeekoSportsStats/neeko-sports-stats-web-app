@@ -172,6 +172,55 @@ interface DailyUsageRow {
   unique_users: number;
 }
 
+interface UniqueVisitors24h {
+  unique_visitors: number;
+  logged_in_users: number;
+}
+
+interface LiveUsers {
+  live_users: number;
+}
+
+interface MAU {
+  mau: number;
+}
+
+interface TopPageRow {
+  path: string;
+  visitors: number;
+}
+
+interface ConversionFunnelV2 {
+  upgrade_click_users: number;
+  subscription_started_users: number;
+  conversion_rate: number;
+}
+
+interface MarketWatchUsage {
+  market_watch_views: number;
+  compare_runs: number;
+  best_trade_clicks: number;
+  unique_users: number;
+}
+
+interface DailyVisitorRow {
+  day: string;
+  visitors: number;
+  logged_in: number;
+}
+
+interface AnalyticsDailyRow {
+  day: string;
+  visitors: number;
+  logged_in_users: number;
+  dau: number;
+  start_sit_runs: number;
+  market_watch_views: number;
+  rankings_views: number;
+  upgrade_clicks: number;
+  subscriptions_started: number;
+}
+
 function formatDate(ts: string | null): string {
   if (!ts) return "—";
   return new Date(ts).toLocaleString("en-AU", {
@@ -303,6 +352,16 @@ export default function Admin() {
   const [dailyUsage, setDailyUsage] = useState<DailyUsageRow[]>([]);
   const [productMetricsLoading, setProductMetricsLoading] = useState(true);
 
+  const [uniqueVisitors24h, setUniqueVisitors24h] = useState<UniqueVisitors24h | null>(null);
+  const [liveUsers, setLiveUsers] = useState<LiveUsers | null>(null);
+  const [mau, setMau] = useState<MAU | null>(null);
+  const [topPages, setTopPages] = useState<TopPageRow[]>([]);
+  const [funnelV2, setFunnelV2] = useState<ConversionFunnelV2 | null>(null);
+  const [marketWatchUsage, setMarketWatchUsage] = useState<MarketWatchUsage | null>(null);
+  const [dailyVisitors, setDailyVisitors] = useState<DailyVisitorRow[]>([]);
+  const [analyticsDaily, setAnalyticsDaily] = useState<AnalyticsDailyRow[]>([]);
+  const [v2MetricsLoading, setV2MetricsLoading] = useState(true);
+
   const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -407,6 +466,44 @@ export default function Admin() {
     }
   }, []);
 
+  const fetchV2Metrics = useCallback(async () => {
+    setV2MetricsLoading(true);
+    try {
+      const [
+        uvRes,
+        liveRes,
+        mauRes,
+        pagesRes,
+        funnelRes,
+        mwRes,
+        dvRes,
+        adRes,
+      ] = await Promise.all([
+        supabase.schema("admin" as never).from("v_unique_visitors_24h").select("*").maybeSingle(),
+        supabase.schema("admin" as never).from("v_live_users").select("*").maybeSingle(),
+        supabase.schema("admin" as never).from("v_mau").select("*").maybeSingle(),
+        supabase.schema("admin" as never).from("v_top_pages_7d").select("*").limit(20),
+        supabase.schema("admin" as never).from("v_conversion_funnel_30d").select("*").maybeSingle(),
+        supabase.schema("admin" as never).from("v_market_watch_usage_7d").select("*").maybeSingle(),
+        supabase.schema("admin" as never).from("v_unique_visitors_daily").select("*").limit(30),
+        supabase.schema("admin" as never).from("v_analytics_daily").select("*").limit(30),
+      ]);
+
+      if (uvRes.data) setUniqueVisitors24h(uvRes.data as UniqueVisitors24h);
+      if (liveRes.data) setLiveUsers(liveRes.data as LiveUsers);
+      if (mauRes.data) setMau(mauRes.data as MAU);
+      if (pagesRes.data) setTopPages(pagesRes.data as TopPageRow[]);
+      if (funnelRes.data) setFunnelV2(funnelRes.data as ConversionFunnelV2);
+      if (mwRes.data) setMarketWatchUsage(mwRes.data as MarketWatchUsage);
+      if (dvRes.data) setDailyVisitors(dvRes.data as DailyVisitorRow[]);
+      if (adRes.data) setAnalyticsDaily(adRes.data as AnalyticsDailyRow[]);
+    } catch (err) {
+      console.error("V2 metrics fetch error:", err);
+    } finally {
+      setV2MetricsLoading(false);
+    }
+  }, []);
+
   const fetchAll = useCallback(async () => {
     setDataLoading(true);
     try {
@@ -442,8 +539,8 @@ export default function Admin() {
     } finally {
       setDataLoading(false);
     }
-    await Promise.all([fetchAlerts(), fetchJobHistory(), fetchAnalytics(), fetchProductMetrics()]);
-  }, [toast, fetchAlerts, fetchJobHistory, fetchAnalytics, fetchProductMetrics]);
+    await Promise.all([fetchAlerts(), fetchJobHistory(), fetchAnalytics(), fetchProductMetrics(), fetchV2Metrics()]);
+  }, [toast, fetchAlerts, fetchJobHistory, fetchAnalytics, fetchProductMetrics, fetchV2Metrics]);
 
   const handleResolveAlert = async (id: string) => {
     setResolvingId(id);
@@ -497,20 +594,22 @@ export default function Admin() {
       fetchJobHistory();
       fetchAnalytics();
       fetchProductMetrics();
+      fetchV2Metrics();
     }
-  }, [loading, user, fetchAlerts, fetchJobHistory, fetchAnalytics, fetchProductMetrics]);
+  }, [loading, user, fetchAlerts, fetchJobHistory, fetchAnalytics, fetchProductMetrics, fetchV2Metrics]);
 
   useEffect(() => {
     if (!loading && user?.id === ADMIN_USER_ID) {
       autoRefreshTimerRef.current = setInterval(() => {
         fetchAnalytics();
         fetchProductMetrics();
+        fetchV2Metrics();
       }, 30_000);
     }
     return () => {
       if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
     };
-  }, [loading, user, fetchAnalytics, fetchProductMetrics]);
+  }, [loading, user, fetchAnalytics, fetchProductMetrics, fetchV2Metrics]);
 
   const handleRunPipeline = async () => {
     setIsRefreshing(true);
@@ -964,6 +1063,137 @@ export default function Admin() {
                         {row.subscriptions.toLocaleString()}
                       </td>
                       <td className="py-2 text-right tabular-nums">{row.unique_users.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Visitor Intelligence ─────────────────────────────────────────── */}
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 mt-6">
+        Visitor Intelligence
+      </h2>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-4">
+        <SectionCard icon={Activity} title="Live Now (5 min)" loading={v2MetricsLoading}>
+          <div className="flex flex-col items-center justify-center py-4 gap-1">
+            <span className="text-4xl font-bold tabular-nums">{liveUsers?.live_users ?? "—"}</span>
+            <span className="text-xs text-muted-foreground">active sessions</span>
+          </div>
+        </SectionCard>
+
+        <SectionCard icon={Users} title="Unique Visitors (24h)" loading={v2MetricsLoading}>
+          <StatRow label="Unique visitors" value={uniqueVisitors24h?.unique_visitors?.toLocaleString() ?? "—"} highlight="neutral" />
+          <StatRow label="Logged-in users" value={uniqueVisitors24h?.logged_in_users?.toLocaleString() ?? "—"} highlight={(uniqueVisitors24h?.logged_in_users ?? 0) > 0 ? "good" : "neutral"} />
+        </SectionCard>
+
+        <SectionCard icon={Users} title="User Engagement" loading={v2MetricsLoading}>
+          <StatRow label="MAU (30 days)" value={mau?.mau?.toLocaleString() ?? "—"} highlight={(mau?.mau ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="WAU (7 days)" value={wau?.weekly_active_users?.toLocaleString() ?? "—"} highlight={(wau?.weekly_active_users ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="DAU (24 hours)" value={dau?.daily_active_users?.toLocaleString() ?? "—"} highlight={(dau?.daily_active_users ?? 0) > 0 ? "good" : "neutral"} />
+        </SectionCard>
+
+        <SectionCard icon={TrendingUp} title="Market Watch (7d)" loading={v2MetricsLoading}>
+          <StatRow label="Page views" value={marketWatchUsage?.market_watch_views?.toLocaleString() ?? "—"} highlight="neutral" />
+          <StatRow label="Compare opens" value={marketWatchUsage?.compare_runs?.toLocaleString() ?? "—"} highlight={(marketWatchUsage?.compare_runs ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Best trade clicks" value={marketWatchUsage?.best_trade_clicks?.toLocaleString() ?? "—"} highlight={(marketWatchUsage?.best_trade_clicks ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Unique users" value={marketWatchUsage?.unique_users?.toLocaleString() ?? "—"} highlight="neutral" />
+        </SectionCard>
+      </div>
+
+      {/* ── Conversion Funnel v2 + Top Pages ────────────────────────────── */}
+      <div className="grid gap-4 sm:grid-cols-2 mb-4">
+        <SectionCard icon={ArrowUpRight} title="Conversion Funnel (30d)" loading={v2MetricsLoading}>
+          <StatRow label="Upgrade click users" value={funnelV2?.upgrade_click_users?.toLocaleString() ?? "—"} highlight={(funnelV2?.upgrade_click_users ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Subscriptions started" value={funnelV2?.subscription_started_users?.toLocaleString() ?? "—"} highlight={(funnelV2?.subscription_started_users ?? 0) > 0 ? "good" : "neutral"} />
+          {funnelV2 && (
+            <div className="mt-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-center">
+              <span className="text-xl font-bold text-emerald-400 tabular-nums">
+                {funnelV2.conversion_rate}%
+              </span>
+              <p className="text-xs text-muted-foreground mt-0.5">click → subscription conversion</p>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard icon={BarChart3} title="Top Pages (7d)" loading={v2MetricsLoading}>
+          {topPages.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">No page view data yet</p>
+          ) : (
+            <div className="space-y-0">
+              {topPages.slice(0, 8).map((row, i) => (
+                <div key={row.path} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs text-muted-foreground w-4 shrink-0">{i + 1}</span>
+                    <span className="text-xs font-mono truncate text-muted-foreground">{row.path || "/"}</span>
+                  </div>
+                  <Badge variant="secondary" className="ml-2 shrink-0 text-xs tabular-nums">
+                    {row.visitors.toLocaleString()}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      </div>
+
+      {/* ── Analytics Daily Chart ────────────────────────────────────────── */}
+      <Card className="mb-4">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between text-base">
+            <span className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              Full Daily Analytics (30 days)
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={fetchV2Metrics}
+              disabled={v2MetricsLoading}
+              className="h-7 text-xs"
+            >
+              <RefreshCw className={`h-3 w-3 mr-1 ${v2MetricsLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {v2MetricsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : analyticsDaily.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">No analytics data yet</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/40">
+                    <th className="text-left py-2 pr-3 text-xs font-medium text-muted-foreground">Day</th>
+                    <th className="text-right py-2 pr-3 text-xs font-medium text-muted-foreground">Visitors</th>
+                    <th className="text-right py-2 pr-3 text-xs font-medium text-muted-foreground">Logged In</th>
+                    <th className="text-right py-2 pr-3 text-xs font-medium text-muted-foreground">DAU</th>
+                    <th className="text-right py-2 pr-3 text-xs font-medium text-muted-foreground">Rankings</th>
+                    <th className="text-right py-2 pr-3 text-xs font-medium text-muted-foreground">Market Watch</th>
+                    <th className="text-right py-2 pr-3 text-xs font-medium text-muted-foreground">Start/Sit</th>
+                    <th className="text-right py-2 pr-3 text-xs font-medium text-muted-foreground">Upgrades</th>
+                    <th className="text-right py-2 text-xs font-medium text-muted-foreground">Subs</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {analyticsDaily.map((row) => (
+                    <tr key={row.day} className="border-b border-border/30 last:border-0 hover:bg-muted/30">
+                      <td className="py-2 pr-3 font-mono text-xs">{new Date(row.day).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums">{row.visitors?.toLocaleString() ?? "0"}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums">{row.logged_in_users?.toLocaleString() ?? "0"}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums">{row.dau?.toLocaleString() ?? "0"}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums">{row.rankings_views?.toLocaleString() ?? "0"}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums">{row.market_watch_views?.toLocaleString() ?? "0"}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums">{row.start_sit_runs?.toLocaleString() ?? "0"}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums">{row.upgrade_clicks?.toLocaleString() ?? "0"}</td>
+                      <td className="py-2 text-right tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">{row.subscriptions_started?.toLocaleString() ?? "0"}</td>
                     </tr>
                   ))}
                 </tbody>
