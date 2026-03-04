@@ -19,9 +19,12 @@ import {
   LogOut,
   ArrowLeft,
   CreditCard,
+  Shield,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
+
+const ADMIN_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
 
 export default function Account() {
   const { user, loading: authLoading, signOut, isPremium, refreshPremiumStatus } =
@@ -299,6 +302,32 @@ export default function Account() {
             )}
           </CardContent>
         </Card>
+
+        {/* Admin Controls — only visible to the admin user */}
+        {user.id === ADMIN_ID && (
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-3">
+                <Shield className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <CardTitle className="text-base">Admin Controls</CardTitle>
+                  <CardDescription>Internal dashboard access</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate("/admin")}
+                className="w-full"
+              >
+                <Shield className="h-4 w-4 mr-2" />
+                Open Admin Dashboard
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Actions */}
         <Card>
