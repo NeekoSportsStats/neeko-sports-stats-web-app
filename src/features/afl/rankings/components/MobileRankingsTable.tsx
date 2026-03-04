@@ -22,43 +22,68 @@ const COL = {
   why: 260,
 } as const;
 
+const FIXED_W = COL.rank + COL.player + COL.rating;
+const SCROLL_W =
+  COL.projection + COL.confidence + COL.risk +
+  COL.price + COL.value + COL.aiRec + COL.why;
+const TABLE_W = FIXED_W + SCROLL_W;
+
 const CELL_H = "h-[52px]";
 const CELL_BASE = `${CELL_H} flex items-center`;
-const HEADER_BASE = "h-9 flex items-center text-[10px] font-semibold uppercase tracking-wider text-white/35 select-none whitespace-nowrap";
+const HEADER_BASE =
+  "h-9 flex items-center text-[10px] font-semibold uppercase tracking-wider text-white/35 select-none whitespace-nowrap";
 const PREMIUM_COLS = ["price", "value", "aiRec", "why"] as const;
 
-function isPremiumCol(col: (typeof PREMIUM_COLS)[number] | string): boolean {
+function isPremiumCol(col: string): boolean {
   return (PREMIUM_COLS as readonly string[]).includes(col);
 }
 
-// ─── Header row ───────────────────────────────────────────────────────────────
+// ─── Locked placeholder ────────────────────────────────────────────────────────
 
-function HeaderFixed() {
+function LockedPlaceholder({ onUpgrade }: { onUpgrade: () => void }) {
   return (
-    <div className="flex shrink-0" style={{ width: COL.rank + COL.player + COL.rating }}>
-      <div className={`${HEADER_BASE} pl-3`} style={{ width: COL.rank }}>#</div>
-      <div className={`${HEADER_BASE} pl-2`} style={{ width: COL.player }}>Player</div>
-      <div className={`${HEADER_BASE} justify-center`} style={{ width: COL.rating }}>
-        <span className="text-[#F5C84C]">Neeko</span>
-      </div>
+    <div
+      className="flex items-center justify-center gap-1 cursor-pointer"
+      onClick={(e) => { e.stopPropagation(); onUpgrade(); }}
+    >
+      <Lock size={9} className="text-[#F5C84C]/40" />
+      <div className="h-2 w-10 rounded-full bg-white/10 blur-[2px]" />
     </div>
   );
 }
 
-function HeaderScroll({ isPremium }: { isPremium: boolean }) {
-  const cols: { key: string; label: string; premium: boolean; width: number }[] = [
-    { key: "projection", label: "Proj", premium: false, width: COL.projection },
-    { key: "confidence", label: "Conf", premium: false, width: COL.confidence },
-    { key: "risk", label: "Risk", premium: false, width: COL.risk },
-    { key: "price", label: "Price", premium: true, width: COL.price },
-    { key: "value", label: "Value", premium: true, width: COL.value },
-    { key: "aiRec", label: "AI Rec", premium: true, width: COL.aiRec },
-    { key: "why", label: "Why", premium: true, width: COL.why },
+// ─── Header ────────────────────────────────────────────────────────────────────
+
+function TableHeader({ isPremium }: { isPremium: boolean }) {
+  const scrollCols: { key: string; label: string; premium: boolean; width: number }[] = [
+    { key: "projection", label: "Proj",   premium: false, width: COL.projection },
+    { key: "confidence", label: "Conf",   premium: false, width: COL.confidence },
+    { key: "risk",       label: "Risk",   premium: false, width: COL.risk },
+    { key: "price",      label: "Price",  premium: true,  width: COL.price },
+    { key: "value",      label: "Value",  premium: true,  width: COL.value },
+    { key: "aiRec",      label: "AI Rec", premium: true,  width: COL.aiRec },
+    { key: "why",        label: "Why",    premium: true,  width: COL.why },
   ];
 
   return (
-    <div className="flex">
-      {cols.map(({ key, label, premium, width }) => (
+    <div
+      className="flex bg-[#0a0a0a] border-b border-[#222] sticky top-0 z-20"
+      style={{ width: TABLE_W, minWidth: TABLE_W }}
+    >
+      {/* Fixed sticky columns */}
+      <div
+        className="flex shrink-0 sticky left-0 z-30 bg-[#0a0a0a]"
+        style={{ width: FIXED_W }}
+      >
+        <div className={`${HEADER_BASE} pl-3`} style={{ width: COL.rank }}>#</div>
+        <div className={`${HEADER_BASE} pl-2`} style={{ width: COL.player }}>Player</div>
+        <div className={`${HEADER_BASE} justify-center`} style={{ width: COL.rating }}>
+          <span className="text-[#F5C84C]">Neeko</span>
+        </div>
+      </div>
+
+      {/* Scrollable columns */}
+      {scrollCols.map(({ key, label, premium, width }) => (
         <div
           key={key}
           className={`${HEADER_BASE} justify-center px-2`}
@@ -72,9 +97,9 @@ function HeaderScroll({ isPremium }: { isPremium: boolean }) {
   );
 }
 
-// ─── Row cells ─────────────────────────────────────────────────────────────────
+// ─── Data row ──────────────────────────────────────────────────────────────────
 
-interface RowProps {
+interface DataRowProps {
   row: RankingRow;
   idx: number;
   tier: RowTier;
@@ -84,54 +109,11 @@ interface RowProps {
   onUpgrade: () => void;
 }
 
-function FixedCells({ row, idx, tier, isPremium, onTap }: Pick<RowProps, "row" | "idx" | "tier" | "isPremium" | "onTap">) {
-  const rank = idx + 1;
-  const neekoRBadge = getNeekoRatingBadge(row.neeko_rating ?? null);
+function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: DataRowProps) {
   const isUnlocked = tier === "full" || tier === "premium";
-
-  return (
-    <div
-      className="flex shrink-0 cursor-pointer active:bg-white/[0.05] transition-colors"
-      style={{ width: COL.rank + COL.player + COL.rating }}
-      onClick={onTap}
-    >
-      <div className={`${CELL_BASE} pl-3 text-xs text-white/30 tabular-nums`} style={{ width: COL.rank }}>
-        {rank}
-      </div>
-      <div className={`${CELL_BASE} pl-2 min-w-0`} style={{ width: COL.player }}>
-        <div className="min-w-0">
-          <div className="flex items-center gap-1 min-w-0">
-            <span className="text-[13px] font-semibold text-white truncate leading-tight">{row.player_name}</span>
-            {!isPremium && isUnlocked && (
-              <span className="shrink-0 rounded-sm bg-[#F5C84C]/15 px-1 py-px text-[8px] font-semibold text-[#F5C84C] uppercase">Free</span>
-            )}
-          </div>
-          <div className="text-[10px] text-white/35 truncate mt-px">
-            {row.team}{row.position ? ` · ${row.position}` : ""}
-          </div>
-        </div>
-      </div>
-      <div className={`${CELL_BASE} justify-center flex-col gap-0.5`} style={{ width: COL.rating }}>
-        <span
-          className={`text-sm font-extrabold tabular-nums ${neekoRBadge.text}`}
-          style={neekoRBadge.glow ? { filter: neekoRBadge.glow } : undefined}
-        >
-          {row.neeko_rating != null ? Number(row.neeko_rating).toFixed(1) : "—"}
-        </span>
-        {neekoRBadge.label !== "—" && (
-          <span className={`rounded px-1 py-px text-[8px] font-semibold border ${neekoRBadge.text} ${neekoRBadge.bg} ${neekoRBadge.border}`}>
-            {neekoRBadge.label}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ScrollCells({ row, idx, tier, isPremium, activeTab, onUpgrade, onTap }: RowProps) {
+  const neekoRBadge = getNeekoRatingBadge(row.neeko_rating ?? null);
   const riskBadge = getRiskBadge(Number(row.risk_rating) ?? null);
   const vtStyle = getValueTagStyle(row.value_tag);
-  const isUnlocked = tier === "full" || tier === "premium";
   const displayRec = getDisplayRecommendation(row, activeTab);
 
   const locked = (col: string) => {
@@ -141,70 +123,106 @@ function ScrollCells({ row, idx, tier, isPremium, activeTab, onUpgrade, onTap }:
     return true;
   };
 
-  function LockedPlaceholder() {
-    return (
-      <div
-        className="flex items-center justify-center gap-1 cursor-pointer"
-        onClick={(e) => { e.stopPropagation(); onUpgrade(); }}
-      >
-        <Lock size={9} className="text-[#F5C84C]/40" />
-        <div className="h-2 w-10 rounded-full bg-white/10 blur-[2px]" />
-      </div>
-    );
-  }
-
   return (
-    <div className="flex cursor-pointer active:bg-white/[0.03] transition-colors" onClick={onTap}>
-      <div className={`${CELL_BASE} justify-center`} style={{ width: COL.projection, minWidth: COL.projection }}>
-        <span className="text-sm font-semibold text-[#F5C84C]/80 tabular-nums">{fmt(row.projection_final, 0)}</span>
-      </div>
-      <div className={`${CELL_BASE} justify-center`} style={{ width: COL.confidence, minWidth: COL.confidence }}>
-        <span className={`text-sm font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
-          {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
-        </span>
-      </div>
-      <div className={`${CELL_BASE} justify-center`} style={{ width: COL.risk, minWidth: COL.risk }}>
-        <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${riskBadge.text} ${riskBadge.bg} ${riskBadge.border}`}>
-          {riskBadge.label}
-        </span>
-      </div>
-      <div className={`${CELL_BASE} justify-center`} style={{ width: COL.price, minWidth: COL.price }}>
-        {locked("price") ? <LockedPlaceholder /> : (
-          <span className="text-sm font-semibold text-white/65 tabular-nums">{fmtPrice(row.price)}</span>
-        )}
-      </div>
-      <div className={`${CELL_BASE} justify-center flex-col gap-0.5`} style={{ width: COL.value, minWidth: COL.value }}>
-        {locked("value") ? <LockedPlaceholder /> : (
-          <>
-            <span className={`text-sm font-bold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
-              {fmtValueScore(row.value_score)}
-            </span>
-            {row.value_tag && (
-              <span className={`rounded px-1 py-px text-[8px] font-semibold border ${vtStyle.text} ${vtStyle.bg} ${vtStyle.border}`}>
-                {row.value_tag}
-              </span>
-            )}
-          </>
-        )}
-      </div>
-      <div className={`${CELL_BASE} justify-center px-2`} style={{ width: COL.aiRec, minWidth: COL.aiRec }}>
-        {locked("aiRec") ? <LockedPlaceholder /> : displayRec ? (
+    <div
+      className="flex border-b border-white/[0.04]"
+      style={{ width: TABLE_W, minWidth: TABLE_W }}
+      onClick={onTap}
+    >
+      {/* Sticky left pane */}
+      <div
+        className="flex shrink-0 sticky left-0 z-10 bg-[#070707] cursor-pointer active:bg-white/[0.05] transition-colors"
+        style={{ width: FIXED_W }}
+      >
+        <div className={`${CELL_BASE} pl-3 text-xs text-white/30 tabular-nums`} style={{ width: COL.rank }}>
+          {idx + 1}
+        </div>
+        <div className={`${CELL_BASE} pl-2 min-w-0`} style={{ width: COL.player }}>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1 min-w-0">
+              <span className="text-[13px] font-semibold text-white truncate leading-tight">{row.player_name}</span>
+              {!isPremium && isUnlocked && (
+                <span className="shrink-0 rounded-sm bg-[#F5C84C]/15 px-1 py-px text-[8px] font-semibold text-[#F5C84C] uppercase">
+                  Free
+                </span>
+              )}
+            </div>
+            <div className="text-[10px] text-white/35 truncate mt-px">
+              {row.team}{row.position ? ` · ${row.position}` : ""}
+            </div>
+          </div>
+        </div>
+        <div className={`${CELL_BASE} justify-center flex-col gap-0.5`} style={{ width: COL.rating }}>
           <span
-            className="inline-block rounded-md border px-1.5 py-0.5 text-[9px] font-semibold whitespace-nowrap"
-            style={row.recommendation_color ? {
-              color: row.recommendation_color,
-              background: `${row.recommendation_color}18`,
-              borderColor: `${row.recommendation_color}40`,
-            } : { color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)" }}
+            className={`text-sm font-extrabold tabular-nums ${neekoRBadge.text}`}
+            style={neekoRBadge.glow ? { filter: neekoRBadge.glow } : undefined}
           >
-            {displayRec}
+            {row.neeko_rating != null ? Number(row.neeko_rating).toFixed(1) : "—"}
           </span>
-        ) : <span className="text-white/20 text-xs">—</span>}
+          {neekoRBadge.label !== "—" && (
+            <span className={`rounded px-1 py-px text-[8px] font-semibold border ${neekoRBadge.text} ${neekoRBadge.bg} ${neekoRBadge.border}`}>
+              {neekoRBadge.label}
+            </span>
+          )}
+        </div>
       </div>
-      <div className={`${CELL_BASE} px-3`} style={{ width: COL.why, minWidth: COL.why }}>
-        {locked("why") ? <LockedPlaceholder /> : (
-          <span className="text-xs text-white/50 leading-snug line-clamp-2">{row.recommendation_why ?? "—"}</span>
-        )}
+
+      {/* Scrollable columns */}
+      <div
+        className="flex cursor-pointer active:bg-white/[0.03] transition-colors"
+        onClick={onTap}
+      >
+        <div className={`${CELL_BASE} justify-center`} style={{ width: COL.projection, minWidth: COL.projection }}>
+          <span className="text-sm font-semibold text-[#F5C84C]/80 tabular-nums">{fmt(row.projection_final, 0)}</span>
+        </div>
+        <div className={`${CELL_BASE} justify-center`} style={{ width: COL.confidence, minWidth: COL.confidence }}>
+          <span className={`text-sm font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
+            {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
+          </span>
+        </div>
+        <div className={`${CELL_BASE} justify-center`} style={{ width: COL.risk, minWidth: COL.risk }}>
+          <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${riskBadge.text} ${riskBadge.bg} ${riskBadge.border}`}>
+            {riskBadge.label}
+          </span>
+        </div>
+        <div className={`${CELL_BASE} justify-center`} style={{ width: COL.price, minWidth: COL.price }}>
+          {locked("price") ? <LockedPlaceholder onUpgrade={onUpgrade} /> : (
+            <span className="text-sm font-semibold text-white/65 tabular-nums">{fmtPrice(row.price)}</span>
+          )}
+        </div>
+        <div className={`${CELL_BASE} justify-center flex-col gap-0.5`} style={{ width: COL.value, minWidth: COL.value }}>
+          {locked("value") ? <LockedPlaceholder onUpgrade={onUpgrade} /> : (
+            <>
+              <span className={`text-sm font-bold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
+                {fmtValueScore(row.value_score)}
+              </span>
+              {row.value_tag && (
+                <span className={`rounded px-1 py-px text-[8px] font-semibold border ${vtStyle.text} ${vtStyle.bg} ${vtStyle.border}`}>
+                  {row.value_tag}
+                </span>
+              )}
+            </>
+          )}
+        </div>
+        <div className={`${CELL_BASE} justify-center px-2`} style={{ width: COL.aiRec, minWidth: COL.aiRec }}>
+          {locked("aiRec") ? <LockedPlaceholder onUpgrade={onUpgrade} /> : displayRec ? (
+            <span
+              className="inline-block rounded-md border px-1.5 py-0.5 text-[9px] font-semibold whitespace-nowrap"
+              style={row.recommendation_color ? {
+                color: row.recommendation_color,
+                background: `${row.recommendation_color}18`,
+                borderColor: `${row.recommendation_color}40`,
+              } : { color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)" }}
+            >
+              {displayRec}
+            </span>
+          ) : <span className="text-white/20 text-xs">—</span>}
+        </div>
+        <div className={`${CELL_BASE} px-3`} style={{ width: COL.why, minWidth: COL.why }}>
+          {locked("why") ? <LockedPlaceholder onUpgrade={onUpgrade} /> : (
+            <span className="text-xs text-white/50 leading-snug line-clamp-2">{row.recommendation_why ?? "—"}</span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -216,12 +234,12 @@ function BlurredRow({ idx, onUpgrade }: { idx: number; onUpgrade: () => void }) 
   return (
     <div
       className="flex border-b border-white/[0.03] cursor-pointer"
-      style={{ touchAction: "manipulation" }}
+      style={{ width: TABLE_W, minWidth: TABLE_W, touchAction: "manipulation" }}
       onClick={onUpgrade}
     >
       <div
-        className="flex shrink-0 opacity-25 blur-[3px] select-none pointer-events-none"
-        style={{ width: COL.rank + COL.player + COL.rating }}
+        className="flex shrink-0 sticky left-0 z-10 bg-[#070707] opacity-25 blur-[3px] select-none pointer-events-none"
+        style={{ width: FIXED_W }}
       >
         <div className={`${CELL_BASE} pl-3 text-xs text-white/30 tabular-nums`} style={{ width: COL.rank }}>{idx + 1}</div>
         <div className={`${CELL_BASE} pl-2`} style={{ width: COL.player }}>
@@ -245,11 +263,11 @@ function BlurredRow({ idx, onUpgrade }: { idx: number; onUpgrade: () => void }) 
   );
 }
 
-// ─── Conversion wall (inline, not full-page) ───────────────────────────────────
+// ─── Conversion wall ───────────────────────────────────────────────────────────
 
 export function MobileConversionWall({ onUpgrade }: { onUpgrade: () => void }) {
   return (
-    <div className="px-4 pt-6 pb-4">
+    <div className="px-4 pt-6 pb-4" style={{ width: TABLE_W, minWidth: TABLE_W }}>
       <div className="flex items-center justify-between gap-3 rounded-xl border border-[#F5C84C]/25 bg-gradient-to-r from-[#F5C84C]/[0.07] to-transparent px-4 py-4">
         <div className="min-w-0">
           <p className="text-sm font-bold text-white leading-tight">Unlock AI captain picks, value scores and matchup insights.</p>
@@ -285,8 +303,8 @@ function LoadingSkeleton() {
   return (
     <>
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="flex border-b border-white/[0.04]">
-          <div className="flex shrink-0" style={{ width: COL.rank + COL.player + COL.rating }}>
+        <div key={i} className="flex border-b border-white/[0.04]" style={{ width: TABLE_W, minWidth: TABLE_W }}>
+          <div className="flex shrink-0 sticky left-0 bg-[#070707]" style={{ width: FIXED_W }}>
             <div className={`${CELL_BASE} pl-3`} style={{ width: COL.rank }}>
               <div className="h-3 w-4 animate-pulse rounded bg-white/8" />
             </div>
@@ -332,108 +350,73 @@ export function MobileRankingsTable({
   onOpenRow,
   onUpgrade,
 }: MobileRankingsTableProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(25);
+  const wallInserted = useRef(false);
 
-  const handleScroll = useCallback(() => {
-    if (!scrollRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    if (scrollTop + clientHeight >= scrollHeight - 80) {
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80) {
       setVisibleCount((c) => c + 20);
     }
   }, []);
 
-  const FREE_PARTIAL_ROWS_LOCAL = FREE_PARTIAL_ROWS;
-  const wallInserted = useRef(false);
-
   const visibleRows = rows.slice(0, isPremium ? visibleCount : Math.min(visibleCount, rows.length));
 
   return (
-    <div>
+    <div className="w-full max-w-full">
       <SwipeHint />
 
-      <div className="rounded-xl border border-white/5 overflow-hidden">
-        {/* Header */}
-        <div className="flex bg-[#0a0a0a] border-b border-[#222] sticky top-0 z-20">
-          <div className="flex shrink-0 sticky left-0 z-30 bg-[#0a0a0a]" style={{ width: COL.rank + COL.player + COL.rating }}>
-            <HeaderFixed />
-          </div>
-          <div
-            className="overflow-x-auto scrollbar-none"
-            style={{ WebkitOverflowScrolling: "touch" }}
-          >
-            <HeaderScroll isPremium={isPremium} />
-          </div>
-        </div>
-
-        {/* Body — two-pane scroll */}
+      <div className="rounded-xl border border-white/5 overflow-hidden w-full max-w-full">
+        {/* Single scrollable container — header + body share one X scroll */}
         <div
-          className="relative overflow-y-auto"
-          style={{ maxHeight: "70vh" }}
-          ref={scrollRef}
+          className="w-full overflow-x-auto overflow-y-auto"
+          style={{ maxHeight: "70vh", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
           onScroll={handleScroll}
         >
-          {loading ? (
-            <LoadingSkeleton />
-          ) : (() => {
-            wallInserted.current = false;
-            return visibleRows.map((row, idx) => {
-              const tier: RowTier = isPremium ? "premium" : (
-                idx < FREE_FULL_ROWS ? "full" : idx < FREE_PARTIAL_ROWS_LOCAL ? "partial" : "locked"
-              );
+          <div style={{ width: TABLE_W, minWidth: TABLE_W }}>
+            <TableHeader isPremium={isPremium} />
 
-              if (!isPremium && idx >= FREE_PARTIAL_ROWS_LOCAL) {
-                if (!wallInserted.current) {
-                  wallInserted.current = true;
-                  return (
-                    <div key={`wall-${idx}`}>
-                      <MobileConversionWall onUpgrade={onUpgrade} />
-                      <BlurredRow idx={idx} onUpgrade={onUpgrade} />
-                    </div>
-                  );
+            {loading ? (
+              <LoadingSkeleton />
+            ) : (() => {
+              wallInserted.current = false;
+              return visibleRows.map((row, idx) => {
+                const tier: RowTier = isPremium ? "premium" : (
+                  idx < FREE_FULL_ROWS ? "full" : idx < FREE_PARTIAL_ROWS ? "partial" : "locked"
+                );
+
+                if (!isPremium && idx >= FREE_PARTIAL_ROWS) {
+                  if (!wallInserted.current) {
+                    wallInserted.current = true;
+                    return (
+                      <div key={`wall-${idx}`}>
+                        <MobileConversionWall onUpgrade={onUpgrade} />
+                        <BlurredRow idx={idx} onUpgrade={onUpgrade} />
+                      </div>
+                    );
+                  }
+                  return <BlurredRow key={row.player_id ?? `locked-${idx}`} idx={idx} onUpgrade={onUpgrade} />;
                 }
-                return <BlurredRow key={row.player_id ?? `locked-${idx}`} idx={idx} onUpgrade={onUpgrade} />;
-              }
 
-              return (
-                <div
-                  key={row.player_id ?? row.player_name}
-                  className="flex border-b border-white/[0.04]"
-                >
-                  <div
-                    className="sticky left-0 z-10 bg-[#070707] shrink-0"
-                    style={{ width: COL.rank + COL.player + COL.rating }}
-                  >
-                    <FixedCells
-                      row={row}
-                      idx={idx}
-                      tier={tier}
-                      isPremium={isPremium}
-                      onTap={() => onOpenRow(row, idx)}
-                    />
-                  </div>
-                  <div
-                    className="overflow-x-auto scrollbar-none"
-                    style={{ WebkitOverflowScrolling: "touch" }}
-                  >
-                    <ScrollCells
-                      row={row}
-                      idx={idx}
-                      tier={tier}
-                      isPremium={isPremium}
-                      activeTab={activeTab}
-                      onUpgrade={onUpgrade}
-                      onTap={() => onOpenRow(row, idx)}
-                    />
-                  </div>
-                </div>
-              );
-            });
-          })()}
+                return (
+                  <DataRow
+                    key={row.player_id ?? row.player_name}
+                    row={row}
+                    idx={idx}
+                    tier={tier}
+                    isPremium={isPremium}
+                    activeTab={activeTab}
+                    onTap={() => onOpenRow(row, idx)}
+                    onUpgrade={onUpgrade}
+                  />
+                );
+              });
+            })()}
 
-          {!loading && isPremium && visibleCount < rows.length && (
-            <div className="py-4 text-center text-xs text-white/25">Loading more...</div>
-          )}
+            {!loading && isPremium && visibleCount < rows.length && (
+              <div className="py-4 text-center text-xs text-white/25">Loading more...</div>
+            )}
+          </div>
         </div>
       </div>
     </div>
