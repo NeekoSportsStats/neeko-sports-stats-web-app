@@ -395,15 +395,12 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
   const sentences = sharpened ? sharpened.split(". ").filter(s => s.trim().length > 0) : [];
   const isLong = sentences.length > 2;
   const previewText = isLong ? sentences.slice(0, 2).join(". ").trim() + "." : sharpened;
-  const firstSentence = sharpened ? sentences[0] + "." : null;
 
   return (
     <div
-      className={`relative rounded-xl border ${sectionAccent.border} ${sectionAccent.bg} overflow-hidden transition-all duration-200 ${isFeature ? "p-5" : "p-4"} ${isPremium && !locked ? "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40" : ""}`}
+      className={`relative rounded-xl border ${sectionAccent.border} ${sectionAccent.bg} overflow-hidden transition-all duration-200 ${isFeature ? "p-5" : "p-4"} ${isPremium ? "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40" : ""}`}
     >
-      {locked && <LockedCardOverlay section={section} stats={sectionStats} onUnlock={onUnlock} />}
-
-
+      {/* Player name and projection — always visible */}
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -428,49 +425,27 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
         </div>
       </div>
 
+      {/* Stats grid — always visible regardless of lock state */}
       {section === "captain" && !locked && <CaptainStatsBar row={row} />}
 
-      {section === "captain" && locked && (
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <div className="rounded-lg bg-black/20 px-2.5 py-2">
-            <p className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Price</p>
-            <p className="text-xs font-semibold text-white/80">{fmtPrice(row.price)}</p>
-          </div>
-          <div className="rounded-lg bg-black/20 px-2.5 py-2">
-            <p className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Value</p>
-            <p className={`text-xs font-semibold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
-              {fmtValueScore(row.value_score)}
-            </p>
-          </div>
-          <div className="rounded-lg bg-black/20 px-2.5 py-2">
-            <p className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Conf.</p>
-            <p className={`text-xs font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
-              {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
-            </p>
-          </div>
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="rounded-lg bg-black/20 px-2.5 py-2">
+          <p className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Price</p>
+          <p className="text-xs font-semibold text-white/80">{fmtPrice(row.price)}</p>
         </div>
-      )}
-
-      {section !== "captain" && (
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <div className="rounded-lg bg-black/20 px-2.5 py-2">
-            <p className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Price</p>
-            <p className="text-xs font-semibold text-white/80">{fmtPrice(row.price)}</p>
-          </div>
-          <div className="rounded-lg bg-black/20 px-2.5 py-2">
-            <p className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Value</p>
-            <p className={`text-xs font-semibold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
-              {fmtValueScore(row.value_score)}
-            </p>
-          </div>
-          <div className="rounded-lg bg-black/20 px-2.5 py-2">
-            <p className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Conf.</p>
-            <p className={`text-xs font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
-              {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
-            </p>
-          </div>
+        <div className="rounded-lg bg-black/20 px-2.5 py-2">
+          <p className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Value</p>
+          <p className={`text-xs font-semibold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
+            {fmtValueScore(row.value_score)}
+          </p>
         </div>
-      )}
+        <div className="rounded-lg bg-black/20 px-2.5 py-2">
+          <p className="text-[10px] text-white/35 uppercase tracking-wider mb-0.5">Conf.</p>
+          <p className={`text-xs font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
+            {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
+          </p>
+        </div>
+      </div>
 
       {isTrap && (
         <div className="flex items-center gap-2 mb-3">
@@ -492,47 +467,53 @@ function PlayerCard({ row, rank, section, locked, isPremium, sectionStats, onUnl
         </div>
       )}
 
-      {sharpened && !locked && (
-        <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[#F5C84C]/70 mb-1.5">{signalLabel}</p>
-          <div
-            className="overflow-hidden transition-all duration-300 ease-in-out"
-            style={{ maxHeight: expanded ? "600px" : "4rem" }}
-          >
-            <p className="text-xs text-white/65 leading-relaxed whitespace-normal break-words">
-              {expanded ? sharpened : previewText}
+      {/* AI explanation — locked for non-premium, or shown in full for premium */}
+      {!locked ? (
+        sharpened && (
+          <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[#F5C84C]/70 mb-1.5">{signalLabel}</p>
+            <div
+              className="overflow-hidden transition-all duration-300 ease-in-out"
+              style={{ maxHeight: expanded ? "600px" : "4rem" }}
+            >
+              <p className="text-xs text-white/65 leading-relaxed whitespace-normal break-words">
+                {expanded ? sharpened : previewText}
+              </p>
+            </div>
+            {isLong && (
+              <button
+                onClick={() => setExpanded(prev => !prev)}
+                className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-white/40 hover:text-white/70 transition-colors"
+              >
+                <ChevronDown
+                  size={12}
+                  className={`transition-transform duration-300 ${expanded ? "rotate-180" : "rotate-0"}`}
+                />
+                {expanded ? "Show Less" : "Show More"}
+              </button>
+            )}
+          </div>
+        )
+      ) : (
+        <div className="rounded-lg border border-[#F5C84C]/15 bg-[#F5C84C]/[0.03] px-3 py-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[#F5C84C]/60 mb-1.5">{signalLabel}</p>
+          <div className="relative">
+            <p className="text-xs text-white/20 leading-relaxed select-none blur-[3px] line-clamp-2">
+              This signal has been detected based on advanced ceiling modelling and matchup delta scoring. Volatility scores indicate significant upside leverage.
             </p>
           </div>
-          {isLong && (
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/[0.05]">
+            <div className="flex items-center gap-1.5">
+              <Lock size={9} className="text-[#F5C84C]/50" />
+              <span className="text-[11px] text-white/35">AI explanation available with Neeko+</span>
+            </div>
             <button
-              onClick={() => setExpanded(prev => !prev)}
-              className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-white/40 hover:text-white/70 transition-colors"
+              onClick={onUnlock}
+              className="text-[10px] font-bold text-[#F5C84C] hover:text-[#F5C84C]/80 transition-colors shrink-0"
             >
-              <ChevronDown
-                size={12}
-                className={`transition-transform duration-300 ${expanded ? "rotate-180" : "rotate-0"}`}
-              />
-              {expanded ? "Show Less" : "Show More"}
+              Unlock →
             </button>
-          )}
-        </div>
-      )}
-
-      {sharpened && locked && (
-        <div className="rounded-lg border border-white/5 bg-black/20 px-3 py-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[#F5C84C]/70 mb-1.5">{signalLabel}</p>
-          <p className="text-xs text-white/65 leading-relaxed whitespace-normal break-words">
-            {firstSentence}
-          </p>
-          <p className="text-[11px] text-white/25 mt-1.5 italic">
-            Ceiling differential, volatility score and matchup delta locked.
-          </p>
-          <button
-            onClick={onUnlock}
-            className="mt-2 text-[11px] font-semibold text-[#F5C84C] hover:underline transition-all"
-          >
-            Unlock All Edge Signals →
-          </button>
+          </div>
         </div>
       )}
 
@@ -880,7 +861,7 @@ function HeroSignalCard({ section, row, isPremium, onUnlock }: HeroSignalCardPro
             className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-[#F5C84C]/20 bg-[#F5C84C]/[0.05] text-[11px] font-semibold text-[#F5C84C]/70 hover:text-[#F5C84C] hover:border-[#F5C84C]/35 transition-all"
           >
             <Lock size={9} />
-            AI reasoning locked — Unlock with Neeko+
+            AI explanation available with Neeko+
           </button>
         </div>
       )}
@@ -934,7 +915,7 @@ function HeroSignalPanel({ captainRow, breakoutRow, trapRow, isPremium, onUnlock
             className="flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-5 py-2.5 rounded-xl hover:brightness-110 transition-all animate-pulse-gold-border shadow-lg shadow-[#F5C84C]/20"
           >
             <Crown size={13} />
-            Unlock Full Analysis for All 3 Signals
+            Unlock Full AI Edge Analysis + 15 Signals This Round
           </a>
         </div>
       )}
@@ -1141,6 +1122,18 @@ export default function AFLRoundEdgeBoard() {
           onUnlock={() => setShowUpgrade(true)}
         />
 
+        {/* Full Edge Analysis header */}
+        <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-6 rounded-full bg-[#F5C84C]/60" />
+            <h2 className="text-sm font-bold text-white">Full Edge Analysis</h2>
+          </div>
+          <div className="flex-1 h-px bg-white/[0.06]" />
+          <span className="text-[10px] text-white/20 uppercase tracking-widest shrink-0">
+            {isPremium ? "All signals unlocked" : "AI reasoning locked"}
+          </span>
+        </div>
+
         {/* Sections */}
         <div className="space-y-10">
           {sections.map(({ key, data }) => {
@@ -1188,6 +1181,76 @@ export default function AFLRoundEdgeBoard() {
             );
           })}
         </div>
+
+        {/* Additional locked signals — ghost cards for free users */}
+        {!isPremium && (
+          <div className="mt-10">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-6 rounded-full bg-white/15" />
+                <h2 className="text-sm font-bold text-white/40">Additional Edge Signals</h2>
+              </div>
+              <div className="flex-1 h-px bg-white/[0.05]" />
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-[#F5C84C]/25 bg-[#F5C84C]/[0.06] shrink-0">
+                <Crown size={9} className="text-[#F5C84C]" />
+                <span className="text-[9px] font-bold text-[#F5C84C] tracking-wide uppercase">Neeko+ Only</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {[4, 5, 6].map((n) => (
+                <div
+                  key={n}
+                  className="relative rounded-xl border border-white/[0.07] bg-white/[0.02] p-5 overflow-hidden cursor-pointer group"
+                  onClick={() => setShowUpgrade(true)}
+                >
+                  <div className="select-none blur-[4px] opacity-30 pointer-events-none">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="h-4 w-20 rounded bg-white/15" />
+                      <div className="h-4 w-10 rounded bg-white/10" />
+                    </div>
+                    <div className="h-5 w-32 rounded bg-white/20 mb-1" />
+                    <div className="h-3 w-20 rounded bg-white/10 mb-4" />
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {[0, 1, 2].map((i) => (
+                        <div key={i} className="rounded-lg bg-black/30 px-2.5 py-2">
+                          <div className="h-2 w-8 rounded bg-white/15 mb-1" />
+                          <div className="h-3 w-10 rounded bg-white/20" />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="rounded-lg bg-black/20 px-3 py-2.5">
+                      <div className="h-2 w-16 rounded bg-white/15 mb-2" />
+                      <div className="h-2 w-full rounded bg-white/10 mb-1" />
+                      <div className="h-2 w-4/5 rounded bg-white/10" />
+                    </div>
+                  </div>
+
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/35 group-hover:bg-[#F5C84C]/25 transition-all">
+                      <Lock size={12} className="text-[#F5C84C]" />
+                    </div>
+                    <span className="text-[10px] font-bold text-[#F5C84C] tracking-wide">Edge Signal #{n}</span>
+                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-[#F5C84C]/25 bg-[#F5C84C]/[0.07]">
+                      <Crown size={8} className="text-[#F5C84C]" />
+                      <span className="text-[9px] font-bold text-[#F5C84C]">Neeko+ Only</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex items-center justify-center">
+              <a
+                href="/neeko-plus"
+                className="flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-5 py-2.5 rounded-xl hover:brightness-110 transition-all animate-pulse-gold-border shadow-lg shadow-[#F5C84C]/20"
+              >
+                <Crown size={13} />
+                Unlock Full AI Edge Analysis + 15 Signals This Round
+              </a>
+            </div>
+          </div>
+        )}
 
         <div className="mt-12 pb-8 border-t border-white/[0.04] pt-4">
           <p className="text-[10px] text-white/20 text-center tracking-wide">
