@@ -7,6 +7,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+// Cache freshness window: 6 days in ms
+const CACHE_TTL_MS = 6 * 24 * 60 * 60 * 1000;
+
+// Cache model version — bump to force a global regeneration
+const MODEL_VERSION = "v1";
+
 interface StartSitRequest {
   season: number;
   round_number: number;
@@ -28,15 +34,7 @@ interface PlayerData {
   ai_recommendation: string | null;
 }
 
-async function sha256Hex(text: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(text);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
+// Deterministic winner from composite score — single source of truth
 function deterministicWinner(
   pA: PlayerData,
   pB: PlayerData
@@ -78,6 +76,7 @@ function deterministicWinner(
   return { winner, loser, confidence };
 }
 
+// Fallback explanation used when OpenAI is unavailable or contradicts the winner
 function deterministicExplanation(winner: PlayerData, loser: PlayerData): string {
   const lines: string[] = [];
 
@@ -112,6 +111,7 @@ function deterministicExplanation(winner: PlayerData, loser: PlayerData): string
   return lines.join(" ");
 }
 
+// Detects if the AI summary is recommending the wrong player
 function containsOpposite(text: string, loserName: string): boolean {
   const lower = text.toLowerCase();
   const loserLower =
@@ -185,11 +185,10 @@ Deno.serve(async (req: Request) => {
       global: { headers: authHeader ? { Authorization: authHeader } : {} },
     });
 
+    // Determine premium status from JWT if present
     let isPremium = false;
     if (authHeader) {
-      const {
-        data: { user },
-      } = await userClient.auth.getUser();
+      const { data: { user } } = await userClient.auth.getUser();
       if (user) {
         const { data: profile } = await serviceClient
           .from("profiles")
@@ -216,13 +215,16 @@ Deno.serve(async (req: Request) => {
 
     if (!playerAId || !playerBId || !season) {
       return new Response(
-        JSON.stringify({
-          error: "Missing required fields: season, playerAId, playerBId",
-        }),
+        JSON.stringify({ error: "Missing required fields: season, playerAId, playerBId" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    // Ordered cache key — treats A vs B and B vs A as the same matchup
+    const loId = playerAId < playerBId ? playerAId : playerBId;
+    const hiId = playerAId < playerBId ? playerBId : playerAId;
+
+    // Fetch both players' latest stats
     const { data: players, error: playersError } = await serviceClient
       .from("v_rankings_master")
       .select(
@@ -235,8 +237,7 @@ Deno.serve(async (req: Request) => {
     if (playersError || !players || players.length < 2) {
       return new Response(
         JSON.stringify({
-          error:
-            "Start/Sit data isn't available for this round yet. Defaulting to Opening Round.",
+          error: "Start/Sit data isn't available for this round yet. Defaulting to Opening Round.",
         }),
         { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -245,34 +246,7 @@ Deno.serve(async (req: Request) => {
     const pA = (players.find((p) => p.player_id === playerAId) ?? players[0]) as PlayerData;
     const pB = (players.find((p) => p.player_id === playerBId) ?? players[1]) as PlayerData;
 
-    const loId = playerAId < playerBId ? playerAId : playerBId;
-    const hiId = playerAId < playerBId ? playerBId : playerAId;
-
-    const inputPayload = {
-      season,
-      round_number,
-      loId,
-      hiId,
-      statsA: {
-        neeko_rating: pA.neeko_rating,
-        projection_final: pA.projection_final,
-        ceiling_estimate: pA.ceiling_estimate,
-        floor_estimate: pA.floor_estimate,
-        projection_confidence: pA.projection_confidence,
-        risk_rating: pA.risk_rating,
-      },
-      statsB: {
-        neeko_rating: pB.neeko_rating,
-        projection_final: pB.projection_final,
-        ceiling_estimate: pB.ceiling_estimate,
-        floor_estimate: pB.floor_estimate,
-        projection_confidence: pB.projection_confidence,
-        risk_rating: pB.risk_rating,
-      },
-    };
-
-    const inputsHash = await sha256Hex(JSON.stringify(inputPayload));
-
+    // Check cache using round-based key (no inputs_hash — round change = automatic refresh)
     const { data: cached } = await serviceClient
       .from("start_sit_cache")
       .select("*")
@@ -280,14 +254,18 @@ Deno.serve(async (req: Request) => {
       .eq("round_number", round_number)
       .eq("player_low_id", loId)
       .eq("player_high_id", hiId)
-      .eq("inputs_hash", inputsHash)
       .maybeSingle();
 
-    const { winner, loser, confidence } = deterministicWinner(pA, pB);
+    // TTL: cache is fresh if it exists and is younger than 6 days
+    const isFresh =
+      cached != null &&
+      Date.now() - new Date(cached.updated_at ?? cached.created_at).getTime() < CACHE_TTL_MS;
 
-    if (cached) {
+    if (isFresh) {
       return new Response(
         JSON.stringify({
+          ok: true,
+          cached: true,
           season,
           round_number,
           playerA: pA,
@@ -296,17 +274,20 @@ Deno.serve(async (req: Request) => {
           winner_name: cached.winner_name,
           confidence: cached.confidence,
           ai_summary: isPremium ? cached.ai_summary : null,
-          is_cached: true,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    let aiSummary: string | null = null;
+    // Cache miss or stale — compute winner deterministically first
+    const { winner, loser, confidence } = deterministicWinner(pA, pB);
 
+    // Generate AI summary for premium users (or store null for non-premium first-requesters)
+    let aiSummary: string | null = null;
     if (isPremium && openaiKey) {
       const attempt1 = await callOpenAI(openaiKey, winner, loser, round_number, 1);
       if (attempt1 && containsOpposite(attempt1, loser.player_name)) {
+        // AI contradicted the winner — retry once at lower temperature
         const attempt2 = await callOpenAI(openaiKey, winner, loser, round_number, 2);
         aiSummary =
           attempt2 && !containsOpposite(attempt2, loser.player_name)
@@ -317,25 +298,31 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const cacheRow = {
-      season,
-      round_number,
-      player_low_id: loId,
-      player_high_id: hiId,
-      winner_player_id: winner.player_id,
-      winner_name: winner.player_name,
-      confidence,
-      ai_summary: aiSummary,
-      model_key: isPremium && openaiKey ? "gpt-4o-mini" : null,
-      inputs_hash: inputsHash,
-    };
-
-    await serviceClient.from("start_sit_cache").upsert(cacheRow, {
-      onConflict: "season,round_number,player_low_id,player_high_id,inputs_hash",
-    });
+    // Upsert cache using round-based unique key
+    // updated_at is refreshed so TTL resets on every write
+    await serviceClient
+      .from("start_sit_cache")
+      .upsert(
+        {
+          season,
+          round_number,
+          player_low_id: loId,
+          player_high_id: hiId,
+          winner_player_id: winner.player_id,
+          winner_name: winner.player_name,
+          confidence,
+          ai_summary: aiSummary,
+          model_key: MODEL_VERSION,
+          inputs_hash: `${season}-${round_number}-${loId}-${hiId}`,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "season,round_number,player_low_id,player_high_id" }
+      );
 
     return new Response(
       JSON.stringify({
+        ok: true,
+        cached: false,
         season,
         round_number,
         playerA: pA,
@@ -344,7 +331,6 @@ Deno.serve(async (req: Request) => {
         winner_name: winner.player_name,
         confidence,
         ai_summary: isPremium ? aiSummary : null,
-        is_cached: false,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
