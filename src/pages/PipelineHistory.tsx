@@ -5,16 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  ArrowLeft,
-  RefreshCw,
-  CheckCircle,
-  XCircle,
-  Clock,
-  ChevronDown,
-  ChevronRight,
-  Activity,
-} from "lucide-react";
+import { ArrowLeft, RefreshCw, CircleCheck as CheckCircle, Circle as XCircle, Clock, ChevronDown, ChevronRight, Activity } from "lucide-react";
 
 const ADMIN_EMAIL = "neekotrading@gmail.com";
 
