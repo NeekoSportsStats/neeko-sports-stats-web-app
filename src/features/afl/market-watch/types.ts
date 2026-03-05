@@ -70,6 +70,9 @@ export interface MWPlayerRow {
   price_range_bottom: number | null;
   value_momentum: number | null;
   momentum_label: "breakout" | "rising" | "improving" | "stable" | "cooling" | "falling" | null;
+  peak_price: number | null;
+  peak_round: "now" | "round_plus_1" | "round_plus_2" | "round_plus_3" | null;
+  peak_status: "sell" | "sell_soon" | "hold" | "strong_hold" | null;
 }
 
 export interface MWBestTrade {
