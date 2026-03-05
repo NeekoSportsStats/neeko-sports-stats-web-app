@@ -23,7 +23,7 @@ import {
   type LayoutOffsets,
   DEFAULT_LAYOUT_OFFSETS,
 } from "../marketing/GraphicTemplates";
-import { StockMediaPicker, getBackgroundSourceLabel } from "../marketing/StockMediaPicker";
+import { StockMediaPicker, StarterPackInstaller, getBackgroundSourceLabel, STOCK_IMAGES, STOCK_VIDEOS } from "../marketing/StockMediaPicker";
 import { exportCarouselSlides } from "../marketing/CarouselExport";
 import { AddToPlannerModal } from "../marketing/AddToPlannerModal";
 
@@ -465,6 +465,7 @@ export default function AdminContentEngine() {
   const [ctaPosition, setCtaPosition]             = useState<CtaPosition>("bottom_center");
   const [accentMode, setAccentMode]               = useState<AccentColourMode>("neeko_gold");
   const [customAccent, setCustomAccent]           = useState("#F59E0B");
+  const [autoTeamAccent, setAutoTeamAccent]       = useState(false);
   const [rankHighlight, setRankHighlight]         = useState<RankHighlight>("top_player");
   const [appendHashtags, setAppendHashtags]       = useState(true);
 
@@ -517,9 +518,10 @@ export default function AdminContentEngine() {
     customAccentColour: accentMode === "custom" ? customAccent : undefined,
     rankHighlight,
     layoutOffsets: layoutEditorOpen ? layoutOffsets : undefined,
+    autoTeamAccent,
   };
 
-  const accentColor = resolveAccentColor(selectedAngle, graphicOptions);
+  const accentColor = resolveAccentColor(selectedAngle, graphicOptions, undefined, players[0]?.team);
 
   const exportW  = selectedExportSize.w;
   const exportH  = selectedExportSize.h;
@@ -1062,6 +1064,35 @@ export default function AdminContentEngine() {
                         />
                       </div>
                     )}
+
+                    {/* Auto Team Colour Accent */}
+                    <label
+                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border cursor-pointer transition-all"
+                      style={
+                        autoTeamAccent
+                          ? { borderColor: `${accentColor}55`, background: `${accentColor}0c` }
+                          : { borderColor: "hsl(var(--border))" }
+                      }
+                    >
+                      <input
+                        type="checkbox"
+                        checked={autoTeamAccent}
+                        onChange={(e) => setAutoTeamAccent(e.target.checked)}
+                        className="rounded"
+                      />
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold">Auto Team Colour Accent</p>
+                        <p className="text-[10px] text-muted-foreground/55 mt-0.5">
+                          Accent colour follows the top player's AFL team
+                        </p>
+                      </div>
+                      {autoTeamAccent && (
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ background: accentColor }}
+                        />
+                      )}
+                    </label>
                   </div>
 
                   {/* Rank Highlight */}
@@ -1211,6 +1242,20 @@ export default function AdminContentEngine() {
                         </button>
                       </div>
                     )}
+                  </div>
+
+                  {/* Starter Media Pack */}
+                  <div className="border-t border-border/30 pt-2.5">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[11px] font-medium text-muted-foreground">Media Library</p>
+                      <span
+                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                        style={{ background: `${accentColor}18`, color: accentColor }}
+                      >
+                        {STOCK_IMAGES.length + STOCK_VIDEOS.length} assets
+                      </span>
+                    </div>
+                    <StarterPackInstaller accentColor={accentColor} />
                   </div>
                 </SideSection>
 

@@ -1,5 +1,6 @@
 import React from "react";
 import { getTeamBackgroundTheme } from "@/config/teamBackgroundThemes";
+import { getTeamAccentColour } from "@/config/aflTeamColours";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -85,6 +86,7 @@ export interface GraphicOptions {
   customAccentColour?: string;
   rankHighlight?: RankHighlight;
   layoutOffsets?: LayoutOffsets;
+  autoTeamAccent?: boolean;
 }
 
 // ─── Team colours (expanded) ───────────────────────────────────────────────────
@@ -119,7 +121,12 @@ export function resolveAccentColor(
   angle: StatAngle,
   options: GraphicOptions,
   teamColour?: { primary: string; secondary: string },
+  firstTeamName?: string,
 ): string {
+  if (options.autoTeamAccent && firstTeamName) {
+    const teamAccent = getTeamAccentColour(firstTeamName);
+    if (teamAccent) return teamAccent;
+  }
   switch (options.accentColourMode) {
     case "custom":      return options.customAccentColour ?? angle.accentColor;
     case "white":       return "#FFFFFF";
@@ -575,7 +582,7 @@ export function LayoutStatCard({
   const isWide = w > h;
   const isTall = h > w;
   const teamColour = getTeamColour(top.team);
-  const ac = resolveAccentColor(angle, options, teamColour);
+  const ac = resolveAccentColor(angle, options, teamColour, players[0]?.team);
 
   const proj   = Math.round(Number(top.projection_final ?? 0));
   const ceil   = Math.round(Number(top.ceiling_estimate ?? 0));
@@ -720,7 +727,7 @@ export function LayoutLeaderboard({
   const maxRows = isTall ? 10 : isWide ? 8 : 8;
   const rows = players.slice(0, maxRows);
   const teamColour = rows[0] ? getTeamColour(rows[0].team) : { primary: "#1e293b", secondary: "#64748b" };
-  const ac = resolveAccentColor(angle, options, teamColour);
+  const ac = resolveAccentColor(angle, options, teamColour, players[0]?.team);
 
   const rankHighlight = options.rankHighlight ?? "top_player";
   const isHighlighted = (i: number) => {
@@ -843,7 +850,7 @@ export function LayoutBattle({
   const isTall = h > w;
   const teamColour1 = getTeamColour(p1.team);
   const teamColour2 = getTeamColour(p2.team);
-  const ac = resolveAccentColor(angle, options, teamColour1);
+  const ac = resolveAccentColor(angle, options, teamColour1, p1?.team);
 
   const battleStats = [
     { label: "Projection",  v1: p1.projection_final,  v2: p2.projection_final,  fmt: (n: number | null) => n != null ? `${Math.round(Number(n))} pts` : "—" },
@@ -1024,7 +1031,7 @@ export function CarouselTitleSlide({
   angle: StatAngle; w: number; h: number; options: GraphicOptions; totalPlayers: number;
 }) {
   const teamColour = { primary: "#1e293b", secondary: "#64748b" };
-  const ac = resolveAccentColor(angle, options, teamColour);
+  const ac = resolveAccentColor(angle, options, teamColour, players[0]?.team);
   const isTall = h > w;
 
   return (
@@ -1100,7 +1107,7 @@ export function CarouselPlayerSlide({
   angle: StatAngle; player: ContentPlayer; rank: number; w: number; h: number; options: GraphicOptions;
 }) {
   const teamColour = getTeamColour(player.team);
-  const ac = resolveAccentColor(angle, options, teamColour);
+  const ac = resolveAccentColor(angle, options, teamColour, players[0]?.team);
   const isTall = h > w;
   const isWide = w > h;
   const nameParts = player.player_name.split(" ");
@@ -1241,7 +1248,7 @@ export function LayoutCaptainPick({
   const isTall = h > w;
   const isWide = w > h;
   const teamColour = getTeamColour(top.team);
-  const ac = resolveAccentColor(angle, options, teamColour);
+  const ac = resolveAccentColor(angle, options, teamColour, players[0]?.team);
   const proj = Math.round(Number(top.projection_final ?? 0));
   const captScore = Math.round(Number(top.captain_score ?? 0));
   const nameParts = top.player_name.split(" ");
@@ -1374,7 +1381,7 @@ export function LayoutBreakoutAlert({
   const isTall = h > w;
   const isWide = w > h;
   const teamColour = getTeamColour(top.team);
-  const ac = resolveAccentColor(angle, options, teamColour);
+  const ac = resolveAccentColor(angle, options, teamColour, players[0]?.team);
   const upside = Number(top.upside_rating ?? 0).toFixed(1);
   const proj   = Math.round(Number(top.projection_final ?? 0));
   const ceil   = Math.round(Number(top.ceiling_estimate ?? 0));
@@ -1534,7 +1541,7 @@ export function LayoutTradeTarget({
   const isTall = h > w;
   const isWide = w > h;
   const teamColour = getTeamColour(top.team);
-  const ac = resolveAccentColor(angle, options, teamColour);
+  const ac = resolveAccentColor(angle, options, teamColour, players[0]?.team);
   const proj    = Math.round(Number(top.projection_final ?? 0));
   const upside  = Number(top.upside_rating ?? 0).toFixed(1);
   const ceil    = Math.round(Number(top.ceiling_estimate ?? 0));
@@ -1665,7 +1672,7 @@ export function LayoutAvoidPlayer({
   const isTall = h > w;
   const isWide = w > h;
   const teamColour = getTeamColour(top.team);
-  const ac = resolveAccentColor(angle, options, teamColour);
+  const ac = resolveAccentColor(angle, options, teamColour, players[0]?.team);
   const proj    = Math.round(Number(top.projection_final ?? 0));
   const risk    = Math.round(Number(top.risk_rating ?? 0));
   const matchup = Math.round(Number(top.matchup_rating ?? 0));
@@ -1800,7 +1807,7 @@ export function LayoutMatchupAdvantage({
   const isTall = h > w;
   const isWide = w > h;
   const teamColour = getTeamColour(top.team);
-  const ac = resolveAccentColor(angle, options, teamColour);
+  const ac = resolveAccentColor(angle, options, teamColour, players[0]?.team);
   const matchup = Math.round(Number(top.matchup_rating ?? 0));
   const proj    = Math.round(Number(top.projection_final ?? 0));
   const ceil    = Math.round(Number(top.ceiling_estimate ?? 0));
