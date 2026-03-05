@@ -32,92 +32,88 @@ const MAX_GENERATION = 200;
 const BATCH_SIZE     = 4;
 const BATCH_DELAY_MS = 500;
 
-// ─── STRICT AFL STADIUM MASTER PROMPT ─────────────────────────────────────────
-// Enforces correct AFL field geometry, goal post layout, and oval shape.
+// ─── AFL STADIUM MASTER PROMPT — no goalposts, real venue references ──────────
 
 const AFL_STADIUM_GLOBAL_BASE = [
   "Ultra realistic Australian Rules Football stadium",
-  "Correct AFL oval shaped field geometry — NOT rectangular",
-  "At EACH END of the field there are FOUR posts: two tall central goal posts and two shorter outer behind posts",
-  "FOUR posts per end clearly visible and correctly spaced",
-  "Large oval grass field with AFL centre square and centre circle markings",
+  "Oval shaped AFL field with centre circle and centre square markings clearly visible",
   "Massive Australian football stadium filled with spectators",
-  "Realistic architecture similar to MCG or Marvel Stadium",
   "Photorealistic lighting, ultra detailed turf, realistic crowd",
   "Broadcast quality sports photography",
+  "Goal posts are NOT visible in the frame — camera angle excludes both ends of the field",
   "photorealistic, ultra detailed, 8k sports photography, broadcast camera quality, realistic stadium lighting, cinematic sports lighting, realistic grass texture, high detail crowd",
 ].join(". ");
 
 const AFL_NEGATIVE = [
-  "NO rugby goalposts", "NO soccer goals", "NO American football markings",
-  "NO rectangular field", "NO incorrect post layouts",
+  "no goalposts", "no goal posts", "no posts", "no rugby goalposts", "no soccer goals",
+  "no American football markings", "no rectangular field",
   "no soccer field", "no rectangular pitch", "no goal nets",
   "no rugby posts", "no NFL field", "no text", "no watermarks", "no logos",
 ].join(", ");
 
-// ─── 30 unique AFL stadium scene prompts ──────────────────────────────────────
+// ─── 30 unique AFL stadium scene prompts — no goalposts, real venue references ─
 
 const AFL_STADIUM_SCENES = [
-  // 1 — Broadcast TV angle
-  "Camera positioned high in the grandstand broadcast position looking diagonally across the oval. Evening match under bright stadium floodlights. Both ends of the field visible with correct four AFL posts. Large packed crowd.",
-  // 2 — Behind the goals ground level
-  "Camera positioned just behind the goal line at ground level looking toward the centre of the oval. The four AFL posts dominate the foreground. Bright sunny afternoon match. Ultra detailed grass texture.",
-  // 3 — Midfield field-level perspective
-  "Camera positioned directly on the grass at the centre square looking toward the goal square. Large oval stadium bowl visible. Golden sunset lighting across the field. Goal posts visible in the distance.",
-  // 4 — Night rain match
-  "Heavy rain falling during a night match. Floodlights reflecting across wet grass. Water droplets visible in the stadium lighting. Four AFL posts visible through the rain.",
-  // 5 — Foggy morning stadium
-  "Early morning fog rolling across the oval. Soft diffused sunlight. Goal posts emerging through the mist. Quiet atmospheric stadium.",
-  // 6 — Grand final atmosphere
-  "Completely packed stadium with roaring crowd. Bright daylight grand final match. Camera positioned from centre wing broadcast view. Confetti and banners in the crowd.",
-  // 7 — High aerial drone view
-  "High aerial drone shot above a large oval AFL stadium. Entire oval field visible with centre square markings. Four AFL posts clearly visible at both ends.",
-  // 8 — Empty training stadium
-  "Empty AFL stadium during afternoon training session. Camera from ground level near the centre circle. Highly detailed grass surface and stadium seating.",
-  // 9 — Golden sunset behind goals
-  "Camera positioned directly behind the goal posts looking toward midfield. Low golden sunset light casting long shadows across the oval.",
-  // 10 — Storm clouds rolling in
-  "Dark storm clouds approaching above the stadium. Floodlights beginning to illuminate the field. Dramatic sky and lighting contrast.",
-  // 11 — Centre bounce perspective
-  "Camera positioned slightly above the centre circle looking toward both ends of the field. Both sets of four AFL posts visible in the distance.",
-  // 12 — Player tunnel entrance
-  "Camera from inside the player tunnel looking out onto the oval. Massive crowd-filled stadium beyond the tunnel opening.",
-  // 13 — Crowd seat perspective
-  "Camera from inside the grandstand seating area looking over the railing toward the field. Fans partially visible in the foreground.",
-  // 14 — Close goal square view
-  "Camera positioned near the goal square looking upward toward the four AFL posts. Night match under intense floodlights.",
-  // 15 — Early morning dew
-  "Morning sunlight reflecting off dew covered grass. Camera from wing position across the oval.",
-  // 16 — Windy stadium
-  "Flags and banners blowing strongly in the wind. Clouds moving across the stadium sky.",
-  // 17 — Foggy night match
-  "Night match with thick fog illuminated by bright stadium lights. Goal posts glowing through the mist.",
-  // 18 — Halftime empty oval
-  "Field temporarily empty during halftime break. Crowd sitting and waiting in the stands.",
-  // 19 — Pre-game warmup
-  "Players warming up across the oval. Camera from ground level near the boundary line.",
-  // 20 — Rivalry derby atmosphere
-  "Huge intense crowd atmosphere. Fans waving team flags and colours.",
-  // 21 — Rain clearing sunset
-  "Storm clouds clearing while sunlight breaks through. Wet reflective grass surface.",
-  // 22 — Boundary line perspective
-  "Camera positioned along the boundary line looking diagonally across the oval field.",
-  // 23 — Stadium roof framing
-  "Camera positioned under the stadium roof structure. Roof framing the top of the image while the oval field sits below.",
-  // 24 — Kick-in perspective
-  "Camera positioned inside the goal square looking outward across the oval. Goal posts towering above the camera.",
-  // 25 — Massive stadium bowl
-  "Huge oval stadium with massive multi-tier grandstands. MCG scale architecture.",
-  // 26 — Night game with fireworks
-  "Night match with fireworks exploding above the stadium. Floodlit oval below.",
-  // 27 — Afternoon shadows
-  "Strong afternoon sunlight casting long shadows from the grandstand across the oval.",
-  // 28 — Overcast cloudy match
-  "Grey overcast sky covering the stadium. Soft diffused lighting.",
-  // 29 — High stand wide view
-  "Camera from the highest grandstand tier looking down across the entire oval.",
-  // 30 — Players running onto field
-  "Players running onto the field before the match begins. Huge crowd cheering.",
+  // 1 — MCG midfield broadcast
+  "Ultra realistic AFL stadium similar to the Melbourne Cricket Ground. Massive multi-tier grandstand bowl. Camera from the grandstand looking across the centre circle and centre square. Golden afternoon lighting. Packed spectators. Goal ends completely out of frame. Midfield focus only.",
+  // 2 — Marvel Stadium night game
+  "Ultra realistic AFL stadium similar to Marvel Stadium with a modern retractable roof structure. Night match under bright floodlights. Camera looking across the midfield oval area. Packed crowd visible under glowing roof structure. Goal ends not visible. Photorealistic broadcast sports photography.",
+  // 3 — Optus Stadium aerial midfield
+  "Ultra realistic AFL stadium inspired by Optus Stadium in Perth. High aerial drone view showing the oval stadium bowl from above. Centre circle and centre square visible in the midfield. Sunset lighting reflecting off the modern stadium architecture. Goal ends not in frame. 8k photorealistic.",
+  // 4 — Adelaide Oval sunset midfield
+  "Ultra realistic AFL stadium similar to Adelaide Oval with recognisable heritage scoreboard architecture. Golden sunset lighting across the centre square. Camera positioned from the wing looking across midfield. Packed crowd atmosphere. Goal posts not visible in frame.",
+  // 5 — Gabba rainy night
+  "Ultra realistic AFL stadium inspired by the Gabba in Brisbane. Rain falling under bright stadium floodlights. Wet reflective turf around the centre circle. Crowd under stadium roof. Camera looking across the midfield. Goal ends not visible in frame.",
+  // 6 — Sydney Cricket Ground broadcast
+  "Ultra realistic AFL stadium similar to the Sydney Cricket Ground. Camera from grandstand looking toward midfield. Historic colonial-era stadium architecture with modern seating. Large oval field with centre circle visible. Camera angle excludes both goal ends.",
+  // 7 — GMHBA Stadium close midfield
+  "Ultra realistic AFL stadium similar to GMHBA Stadium in Geelong with a close intimate oval atmosphere. Camera near boundary line looking across midfield. Packed crowd cheering. Detailed turf and stadium seating. Goal ends outside frame.",
+  // 8 — MCG grand final atmosphere
+  "Ultra realistic MCG-scale AFL stadium completely packed for a grand final. Broadcast camera angle from high grandstand. Confetti falling across the stadium bowl. Centre field brightly lit. Camera frame captures only midfield, not the goal ends.",
+  // 9 — Marvel Stadium roof interior
+  "Ultra realistic modern oval stadium similar to Marvel Stadium from inside. Dramatic roof structure framing the sky above the oval. Camera angle shows midfield and the grandstand structure. Floodlit night atmosphere. No goal ends visible.",
+  // 10 — Optus Stadium blue dusk
+  "Ultra realistic Optus Stadium-inspired AFL venue at blue dusk. Stadium lights illuminating the oval. Deep blue sky above the modern architecture. Camera framed on midfield and the grandstand bowl. Goal ends excluded from frame.",
+  // 11 — Adelaide Oval overcast morning
+  "Ultra realistic Adelaide Oval-inspired AFL stadium on an overcast grey morning. Camera from the riverbank grandstand side. Soft diffused light across the oval. Heritage scoreboard architecture visible in background. Centre circle and midfield in focus. No goalposts in frame.",
+  // 12 — Gabba afternoon broadcast
+  "Ultra realistic Gabba-inspired AFL stadium in afternoon sunlight. Broadcast camera positioned high in the grandstand looking across the oval. Tropical blue sky above. Fully packed crowd. Midfield in focus. Goal ends outside camera frame.",
+  // 13 — SCG historic atmosphere
+  "Ultra realistic SCG-inspired AFL stadium with historic sandstone grandstand architecture. Camera from the Members Stand looking across the midfield. Heritage and modern architecture side by side. Afternoon light across the turf. No goal posts in frame.",
+  // 14 — MCG rainy night match
+  "Ultra realistic MCG-inspired AFL stadium in heavy rain at night. Floodlights blazing across wet turf. Raindrops catching stadium light. Camera from mid-grandstand looking across midfield. Crowd under stadium roof. Goal ends not visible.",
+  // 15 — Marvel Stadium crowd energy
+  "Ultra realistic Marvel Stadium-inspired oval stadium with electric crowd energy. Camera from behind the boundary fence looking across midfield. Fans on their feet cheering. Modern stadium architecture all around. Goal ends outside frame.",
+  // 16 — Optus Stadium golden afternoon
+  "Ultra realistic Optus Stadium-inspired AFL venue in golden afternoon light. Camera from the wing grandstand looking across the oval centre circle. Highly detailed turf with AFL markings. Swan River visible beyond the stadium in the background. No goalposts in frame.",
+  // 17 — Adelaide Oval twilight
+  "Ultra realistic Adelaide Oval-inspired AFL stadium at twilight. Stadium lights beginning to activate against a deep orange sky. Camera positioned from the Cathedral End grandstand looking toward midfield. No goal ends visible in frame.",
+  // 18 — Gabba fog
+  "Ultra realistic Gabba-inspired AFL stadium with early morning fog rolling across the oval. Camera from the Clem Jones Stand looking across midfield. Grass glistening with dew. Soft atmospheric light. Goal ends outside frame.",
+  // 19 — MCG empty training
+  "Ultra realistic MCG-inspired AFL stadium empty during a morning training session. Camera from ground level near the centre circle. Highly detailed turf. Empty grandstands in the background. No goalposts visible.",
+  // 20 — Marvel Stadium matchday warmup
+  "Ultra realistic Marvel Stadium-inspired AFL stadium with players warming up on the oval. Camera from the elevated grandstand looking across midfield. Stadium beginning to fill with spectators. Roof structure visible above. Goal ends not in frame.",
+  // 21 — SCG sunset broadcast
+  "Ultra realistic SCG-inspired AFL stadium in golden sunset light. Broadcast camera angle from the Doug Walters Stand looking toward the centre circle. Long shadows from the grandstand across the turf. Goal ends outside frame.",
+  // 22 — Optus Stadium fireworks night
+  "Ultra realistic Optus Stadium-inspired AFL stadium at night with fireworks exploding above the venue. Camera looking across the midfield from the grandstand. Floodlit oval below the bursting fireworks. Goal ends not visible.",
+  // 23 — Adelaide Oval stormy atmosphere
+  "Ultra realistic Adelaide Oval-inspired AFL stadium with dramatic storm clouds building above. Wind whipping banners in the crowd. Floodlights beginning to activate against the dark sky. Camera focused on midfield. No goalposts in frame.",
+  // 24 — Gabba electric crowd
+  "Ultra realistic Gabba-inspired AFL stadium with an electric sold-out crowd atmosphere. Camera from the upper grandstand. Fans waving team colours across the packed bowl. Night match under floodlights. Midfield visible below. No goal ends in frame.",
+  // 25 — MCG aerial oval overview
+  "Ultra realistic MCG-inspired AFL stadium from a high aerial perspective. Oval turf below with AFL markings clearly visible. Massive multi-tier grandstands surrounding the oval. Camera captures midfield area only, both goal ends outside frame.",
+  // 26 — Marvel Stadium corporate rooftop
+  "Ultra realistic Marvel Stadium-inspired AFL stadium from the elevated club deck looking down across the oval. Corporate crowd watching. Modern stadium architecture. Night match atmosphere. Midfield in focus. No goal ends visible.",
+  // 27 — SCG heritage mix
+  "Ultra realistic SCG-inspired AFL stadium showing the contrast between heritage sandstone stands and modern facilities. Afternoon match. Camera looking across centre square. Classic atmosphere. No goalposts in frame.",
+  // 28 — Optus Stadium drone midfield
+  "Ultra realistic Optus Stadium-inspired AFL stadium from drone camera height above midfield. Oval field visible below with AFL markings. Modern architectural grandstands. Camera excludes both goal ends.",
+  // 29 — Adelaide Oval River Torrens view
+  "Ultra realistic Adelaide Oval-inspired AFL stadium with the River Torrens and park lands visible beyond the open ends of the ground. Camera from the Riverbank Stand looking across midfield. Afternoon sun. Heritage scoreboard architecture. No goalposts in frame.",
+  // 30 — MCG night broadcast wide
+  "Ultra realistic MCG-inspired AFL stadium in a wide broadcast shot from the highest grandstand tier. Entire stadium bowl visible under full floodlights. Packed 90000 seat crowd. Midfield and centre circle visible. Both goal ends deliberately outside frame.",
 ];
 
 const CROWD_STATES = [
