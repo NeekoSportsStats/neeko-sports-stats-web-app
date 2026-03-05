@@ -180,8 +180,9 @@ function bgStyle(theme: BackgroundTheme, accentColor: string, teamPrimary: strin
 function AccentBar({ color }: { color: string }) {
   return (
     <div style={{
-      position: "absolute", top: 0, left: 0, right: 0, height: 5,
-      background: `linear-gradient(90deg, ${color} 0%, ${color}66 65%, transparent 100%)`,
+      position: "absolute", top: 0, left: 0, right: 0, height: 8,
+      background: color,
+      zIndex: 10,
     }} />
   );
 }

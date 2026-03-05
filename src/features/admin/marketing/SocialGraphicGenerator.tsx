@@ -117,7 +117,7 @@ function GraphicCanvas({ type, players }: { type: GraphicType; players: GraphicP
       }}
     >
       <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)", backgroundSize: "80px 80px", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 5, background: `linear-gradient(90deg, ${type.accentColor} 0%, ${type.accentColor}88 60%, transparent 100%)` }} />
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, background: type.accentColor, zIndex: 10 }} />
       <div style={{ position: "absolute", top: -180, right: -180, width: 480, height: 480, borderRadius: "50%", background: `radial-gradient(circle, ${type.accentColor}18 0%, transparent 70%)`, pointerEvents: "none" }} />
 
       <div style={{ marginBottom: 28, position: "relative" }}>
