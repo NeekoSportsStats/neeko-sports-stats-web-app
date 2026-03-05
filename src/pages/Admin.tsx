@@ -1,24 +1,16 @@
-import { useState, useEffect, lazy, Suspense } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, lazy, Suspense } from "react";
+import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { RefreshCw, Shield, LayoutDashboard, Server, ChartBar as BarChart3, Megaphone, Zap } from "lucide-react";
 
-const AdminDashboard = lazy(() => import("@/features/admin/pages/AdminDashboard"));
-const AdminSystemHealth = lazy(() => import("@/features/admin/pages/AdminSystemHealth"));
-const AdminAnalytics = lazy(() => import("@/features/admin/pages/AdminAnalytics"));
-const AdminMarketingHub = lazy(() => import("@/features/admin/pages/AdminMarketingHub"));
-const AdminContentEngine = lazy(() => import("@/features/admin/pages/AdminContentEngine"));
-
 const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
 
-type TabId = "dashboard" | "system" | "analytics" | "marketing" | "content";
-
-const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "system", label: "System Health", icon: Server },
-  { id: "analytics", label: "Analytics", icon: BarChart3 },
-  { id: "marketing", label: "Marketing Hub", icon: Megaphone },
-  { id: "content", label: "Content Engine", icon: Zap },
+const TABS: { path: string; label: string; icon: React.ElementType }[] = [
+  { path: "/admin/dashboard",      label: "Dashboard",       icon: LayoutDashboard },
+  { path: "/admin/system-health",  label: "System Health",   icon: Server },
+  { path: "/admin/analytics",      label: "Analytics",       icon: BarChart3 },
+  { path: "/admin/marketing",      label: "Marketing Hub",   icon: Megaphone },
+  { path: "/admin/content-engine", label: "Content Engine",  icon: Zap },
 ];
 
 function TabLoadingFallback() {
@@ -29,22 +21,19 @@ function TabLoadingFallback() {
   );
 }
 
-export default function Admin() {
+export function AdminShell() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabId>("dashboard");
-  const [mounted, setMounted] = useState<Set<TabId>>(new Set(["dashboard"]));
+  const location = useLocation();
 
   useEffect(() => {
     if (loading) return;
     if (!user) { navigate("/auth"); return; }
     if (user.id !== ADMIN_USER_ID) { navigate("/"); return; }
-  }, [user, loading, navigate]);
-
-  const handleTabSelect = (id: TabId) => {
-    setActiveTab(id);
-    setMounted((prev) => new Set([...prev, id]));
-  };
+    if (location.pathname === "/admin" || location.pathname === "/admin/") {
+      navigate("/admin/dashboard", { replace: true });
+    }
+  }, [user, loading, navigate, location.pathname]);
 
   if (loading) {
     return (
@@ -58,7 +47,6 @@ export default function Admin() {
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
-      {/* Page header */}
       <div className="flex items-center gap-3 mb-6">
         <Shield className="h-6 w-6 text-foreground" />
         <div>
@@ -67,47 +55,38 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* Tab bar */}
       <div className="border-b border-border mb-6">
-        <nav className="flex gap-0 -mb-px overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: "none" }}>
-          {TABS.map(({ id, label, icon: Icon }) => {
-            const isActive = activeTab === id;
-            return (
-              <button
-                key={id}
-                onClick={() => handleTabSelect(id)}
-                className={`
-                  flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors
-                  ${isActive
-                    ? "border-foreground text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-                  }
-                `}
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </button>
-            );
-          })}
+        <nav className="flex gap-0 -mb-px overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+          {TABS.map(({ path, label, icon: Icon }) => (
+            <NavLink
+              key={path}
+              to={path}
+              className={({ isActive }) => `
+                flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors
+                ${isActive
+                  ? "border-foreground text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                }
+              `}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </NavLink>
+          ))}
         </nav>
       </div>
 
-      {/* Tab content — lazy loaded, keep mounted once visited */}
-      <div>
-        {TABS.map(({ id }) => (
-          <div key={id} className={activeTab === id ? "block" : "hidden"}>
-            {mounted.has(id) && (
-              <Suspense fallback={<TabLoadingFallback />}>
-                {id === "dashboard" && <AdminDashboard />}
-                {id === "system" && <AdminSystemHealth />}
-                {id === "analytics" && <AdminAnalytics />}
-                {id === "marketing" && <AdminMarketingHub />}
-                {id === "content" && <AdminContentEngine />}
-              </Suspense>
-            )}
-          </div>
-        ))}
-      </div>
+      <Suspense fallback={<TabLoadingFallback />}>
+        <Outlet />
+      </Suspense>
     </div>
   );
 }
+
+export const AdminDashboard    = lazy(() => import("@/features/admin/pages/AdminDashboard"));
+export const AdminSystemHealth = lazy(() => import("@/features/admin/pages/AdminSystemHealth"));
+export const AdminAnalytics    = lazy(() => import("@/features/admin/pages/AdminAnalytics"));
+export const AdminMarketingHub = lazy(() => import("@/features/admin/pages/AdminMarketingHub"));
+export const AdminContentEngine = lazy(() => import("@/features/admin/pages/AdminContentEngine"));
+
+export default AdminShell;

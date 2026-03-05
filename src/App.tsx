@@ -19,6 +19,15 @@ import NotFound from "@/pages/NotFound";
 /* =========================
    Core Pages — lazy
 ========================= */
+import {
+  AdminShell,
+  AdminDashboard,
+  AdminSystemHealth,
+  AdminAnalytics,
+  AdminMarketingHub,
+  AdminContentEngine,
+} from "@/pages/Admin";
+
 const NeekoPlusPurchase = React.lazy(() => import("@/pages/NeekoPlusPurchase"));
 const Account           = React.lazy(() => import("@/pages/Account"));
 const Billing           = React.lazy(() => import("@/pages/Billing"));
@@ -26,7 +35,6 @@ const About             = React.lazy(() => import("@/pages/About"));
 const Socials           = React.lazy(() => import("@/pages/Socials"));
 const FAQ               = React.lazy(() => import("@/pages/FAQ"));
 const Contact           = React.lazy(() => import("@/pages/Contact"));
-const Admin             = React.lazy(() => import("@/pages/Admin"));
 const AdminQueue        = React.lazy(() => import("@/pages/AdminQueue"));
 const PipelineHistory        = React.lazy(() => import("@/pages/PipelineHistory"));
 const DataPipelineStatusPage = React.lazy(() => import("@/features/admin/DataPipelineStatusPage"));
@@ -138,11 +146,18 @@ function App() {
         element={
           <RequireAuth>
             <Layout>
-              <S fallback={Generic}><Admin /></S>
+              <AdminShell />
             </Layout>
           </RequireAuth>
         }
-      />
+      >
+        <Route index element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="dashboard"      element={<S fallback={Generic}><AdminDashboard /></S>} />
+        <Route path="system-health"  element={<S fallback={Generic}><AdminSystemHealth /></S>} />
+        <Route path="analytics"      element={<S fallback={Generic}><AdminAnalytics /></S>} />
+        <Route path="marketing"      element={<S fallback={Generic}><AdminMarketingHub /></S>} />
+        <Route path="content-engine" element={<S fallback={Generic}><AdminContentEngine /></S>} />
+      </Route>
 
       <Route
         path="/admin/queue"
