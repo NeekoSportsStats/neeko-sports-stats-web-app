@@ -4,8 +4,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Flame, Video, Play, Image as ImageIcon, Layers, Palette } from "lucide-react";
-import { generateVideo, type VideoSlideData } from "./VideoGenerator";
+import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Image as ImageIcon, Layers, Palette } from "lucide-react";
+import { VideoGeneratorPanel } from "../marketing/VideoGeneratorPanel";
 import {
   GraphicCanvas,
   CarouselTitleSlide,
@@ -343,12 +343,6 @@ export default function AdminContentEngine() {
   const [caption, setCaption]               = useState("");
   const [captionLoading, setCaptionLoading] = useState(false);
 
-  // Video
-  const [generatingVideo, setGeneratingVideo]   = useState(false);
-  const [videoProgress, setVideoProgress]       = useState(0);
-  const [videoBlob, setVideoBlob]               = useState<Blob | null>(null);
-  const [videoUrl, setVideoUrl]                 = useState<string | null>(null);
-
   // Copy feedback
   const [copiedInsight, setCopiedInsight] = useState(false);
   const [copiedCaption, setCopiedCaption] = useState(false);
@@ -512,52 +506,6 @@ export default function AdminContentEngine() {
       setDownloading(false);
       setCarouselProgress(null);
     }
-  };
-
-  const handleGenerateVideo = async () => {
-    if (players.length === 0) return;
-    setGeneratingVideo(true);
-    setVideoProgress(0);
-    if (videoUrl) { URL.revokeObjectURL(videoUrl); setVideoUrl(null); }
-    setVideoBlob(null);
-    const top = players[0];
-    const fmtLocal = (n: number | null, suffix = "") => n != null ? `${Math.round(Number(n))}${suffix}` : "—";
-    const slideData: VideoSlideData = {
-      angleTitle: selectedAngle.title,
-      angleSubtitle: selectedAngle.subtitle,
-      statLabel: selectedAngle.statLabel,
-      statValue: selectedAngle.statFn(top),
-      playerName: top.player_name,
-      team: top.team,
-      position: top.position ?? null,
-      accentColor: selectedAngle.accentColor,
-      secondaryStats: [
-        { label: "Projection",  value: fmtLocal(top.projection_final, " pts") },
-        { label: "Ceiling",     value: fmtLocal(top.ceiling_estimate, " pts") },
-        { label: "Consistency", value: top.consistency_score != null ? `${Math.round(Number(top.consistency_score))}%` : "—" },
-      ],
-    };
-    try {
-      const blob = await generateVideo(slideData, (pct) => setVideoProgress(pct));
-      const url = URL.createObjectURL(blob);
-      setVideoBlob(blob);
-      setVideoUrl(url);
-      setVideoProgress(100);
-      toast({ title: "Video ready", description: "Preview and download below" });
-    } catch (err) {
-      toast({ title: "Video generation failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
-    } finally {
-      setGeneratingVideo(false);
-    }
-  };
-
-  const handleDownloadVideo = () => {
-    if (!videoBlob || !videoUrl) return;
-    const link = document.createElement("a");
-    link.download = `neeko-${selectedAngle.id}-video.webm`;
-    link.href = videoUrl;
-    link.click();
-    toast({ title: "Video downloading", description: "WebM format — playable on all modern devices" });
   };
 
   const handleCopyInsight = () => {
@@ -950,58 +898,11 @@ export default function AdminContentEngine() {
           </Button>
 
           {/* ── Video Generator ──────────────────────────────────────────── */}
-          <div className="pt-2 border-t border-border space-y-3">
-            <div className="flex items-center gap-2">
-              <Video className="h-3.5 w-3.5" style={{ color: selectedAngle.accentColor }} />
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Video Generator</p>
-            </div>
-            <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
-              Generates a 1080×1920 vertical video (4 animated slides, ~7s) for TikTok and Instagram Reels.
-            </p>
-
-            <Button
-              variant="outline"
-              className="w-full h-9 text-xs font-semibold"
-              onClick={handleGenerateVideo}
-              disabled={generatingVideo || players.length === 0 || dataLoading}
-              style={players.length > 0 && !generatingVideo ? { borderColor: `${selectedAngle.accentColor}55`, color: selectedAngle.accentColor } : {}}
-            >
-              {generatingVideo
-                ? <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />Generating… {videoProgress}%</>
-                : <><Play className="h-3.5 w-3.5 mr-1.5" />Generate Video</>
-              }
-            </Button>
-
-            {generatingVideo && (
-              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-200"
-                  style={{ width: `${videoProgress}%`, background: selectedAngle.accentColor }}
-                />
-              </div>
-            )}
-
-            {videoUrl && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Video Preview</p>
-                <div className="rounded-xl overflow-hidden border border-border bg-black" style={{ aspectRatio: "9/16", maxWidth: 180 }}>
-                  <video src={videoUrl} controls autoPlay loop muted playsInline className="w-full h-full object-cover" />
-                </div>
-                <Button
-                  variant="outline" size="sm"
-                  className="w-full h-8 text-xs"
-                  onClick={handleDownloadVideo}
-                  style={{ borderColor: `${selectedAngle.accentColor}44`, color: selectedAngle.accentColor }}
-                >
-                  <Download className="h-3.5 w-3.5 mr-1.5" />
-                  Download Video (.webm)
-                </Button>
-                <p className="text-[10px] text-muted-foreground/45 leading-relaxed">
-                  WebM format. Compatible with TikTok, Instagram Reels, and all modern devices.
-                </p>
-              </div>
-            )}
-          </div>
+          <VideoGeneratorPanel
+            players={players}
+            selectedAngle={selectedAngle}
+            dataLoading={dataLoading}
+          />
         </div>
       </div>
     </div>
