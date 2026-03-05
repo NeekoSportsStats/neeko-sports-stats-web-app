@@ -165,6 +165,7 @@ interface SseEvent {
 async function runGeneration(
   target: string,
   onEvent: (evt: SseEvent) => void,
+  accessToken: string,
 ): Promise<void> {
   const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL as string;
   const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -173,7 +174,7 @@ async function runGeneration(
     method:  "POST",
     headers: {
       "Content-Type":  "application/json",
-      "Authorization": `Bearer ${supabaseAnon}`,
+      "Authorization": `Bearer ${accessToken}`,
       "Apikey":        supabaseAnon,
     },
     body: JSON.stringify({ target }),
@@ -228,6 +229,10 @@ function GenModal({ job, onClose, onComplete }: GenModalProps) {
     setLogs([]);
     setError(null);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("Admin authentication required. Please sign in again.");
+      }
       await runGeneration(job.target, (evt) => {
         setProgress(evt);
         setLogs((prev) => [...prev, evt.message]);
@@ -235,7 +240,7 @@ function GenModal({ job, onClose, onComplete }: GenModalProps) {
           setPhase("complete");
           clearMediaCaches();
         }
-      });
+      }, session.access_token);
       setPhase((p) => p === "generating" ? "complete" : p);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
