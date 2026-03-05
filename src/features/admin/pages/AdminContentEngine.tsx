@@ -464,6 +464,7 @@ export default function AdminContentEngine() {
   const [layoutOffsets, setLayoutOffsets]       = useState<LayoutOffsets>({ ...DEFAULT_LAYOUT_OFFSETS });
 
   // Graphic options
+  const [logoUrl, setLogoUrl]                     = useState<string>("");
   const [logoPosition, setLogoPosition]           = useState<LogoPosition>("none");
   const [roundLabel, setRoundLabel]               = useState("");
   const [statHighlight, setStatHighlight]         = useState("");
@@ -539,6 +540,7 @@ export default function AdminContentEngine() {
       if (s.backgroundSource)   setBackgroundSource(s.backgroundSource);
       if (s.backgroundMediaUrl) setBackgroundMediaUrl(s.backgroundMediaUrl);
       if (s.customUploadUrl)    setCustomUploadUrl(s.customUploadUrl);
+      if (s.logoUrl)            setLogoUrl(s.logoUrl);
       if (s.logoPosition)       setLogoPosition(s.logoPosition);
       if (s.roundLabel != null) setRoundLabel(s.roundLabel);
       if (s.statHighlight != null) setStatHighlight(s.statHighlight);
@@ -584,6 +586,7 @@ export default function AdminContentEngine() {
         backgroundSource,
         backgroundMediaUrl,
         customUploadUrl,
+        logoUrl,
         logoPosition,
         roundLabel,
         statHighlight,
@@ -606,7 +609,7 @@ export default function AdminContentEngine() {
     }
   }, [
     selectedAngle, contentMode, selectedLayout, selectedBackground, backgroundSource,
-    backgroundMediaUrl, customUploadUrl, logoPosition, roundLabel, statHighlight,
+    backgroundMediaUrl, customUploadUrl, logoUrl, logoPosition, roundLabel, statHighlight,
     ctaText, ctaPosition, playerImageUrl, accentMode, customAccent, rankHighlight,
     playerMode, selectedExportSize, appendHashtags, autoTeamAccent, showTeamAccent,
   ]);
@@ -651,6 +654,7 @@ export default function AdminContentEngine() {
     backgroundMediaUrl: resolvedMediaUrl,
     showTeamAccent,
     playerImageUrl: playerImageUrl.trim() || undefined,
+    logoUrl: logoUrl.trim() || undefined,
     logoPosition: logoPosition !== "none" ? logoPosition : undefined,
     roundLabel:    roundLabel.trim()    || undefined,
     statHighlight: statHighlight.trim() || undefined,
@@ -1381,9 +1385,47 @@ export default function AdminContentEngine() {
                     />
                   </div>
 
+                  {/* Logo Upload */}
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-medium text-muted-foreground">Logo</p>
+                    <div className="flex gap-2 items-center">
+                      <label
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-border text-[11px] text-muted-foreground cursor-pointer hover:border-border/80 hover:bg-muted/20 transition-colors"
+                        style={logoUrl ? { borderColor: `${accentColor}55`, color: accentColor } : {}}
+                      >
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (ev) => { if (ev.target?.result) setLogoUrl(ev.target.result as string); };
+                            reader.readAsDataURL(file);
+                          }}
+                        />
+                        {logoUrl ? "Logo selected — click to replace" : "Upload logo image"}
+                      </label>
+                      {logoUrl && (
+                        <button
+                          onClick={() => setLogoUrl("")}
+                          className="px-2 py-2 rounded-lg border border-border text-[11px] text-muted-foreground hover:bg-muted/20 transition-colors"
+                          title="Remove logo"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                    {logoUrl && (
+                      <img src={logoUrl} alt="Logo preview" className="h-8 object-contain rounded" />
+                    )}
+                    <p className="text-[10px] text-muted-foreground/50">No logo selected = no logo on graphic.</p>
+                  </div>
+
                   {/* Logo Position */}
                   <div className="space-y-1.5">
-                    <p className="text-[11px] font-medium text-muted-foreground">Neeko Logo Position</p>
+                    <p className="text-[11px] font-medium text-muted-foreground">Logo Position</p>
                     <DropSelect
                       value={logoPosition}
                       options={LOGO_POSITIONS}

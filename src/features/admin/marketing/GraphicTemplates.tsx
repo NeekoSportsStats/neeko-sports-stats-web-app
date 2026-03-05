@@ -78,6 +78,7 @@ export interface GraphicOptions {
   backgroundMediaUrl?: string;
   showTeamAccent: boolean;
   playerImageUrl?: string;
+  logoUrl?: string;
   logoPosition?: LogoPosition;
   roundLabel?: string;
   statHighlight?: string;
@@ -192,11 +193,9 @@ function AccentBar({ color }: { color: string }) {
 function BrandBar({ accentColor, right }: { accentColor: string; right?: React.ReactNode }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <img
-        src="/logo.png"
-        alt="Neeko Sports"
-        style={{ width: 32, height: 32, borderRadius: 8, objectFit: "contain", flexShrink: 0 }}
-      />
+      <span style={{ fontSize: 13, fontWeight: 800, color: accentColor, letterSpacing: "0.02em", lineHeight: 1 }}>
+        neekostats
+      </span>
       {right && <><div style={{ flex: 1 }} />{right}</>}
     </div>
   );
@@ -254,9 +253,9 @@ function PlayerGhostImage({ url, w, h }: { url: string; w: number; h: number }) 
 
 // ─── Logo overlay ──────────────────────────────────────────────────────────────
 
-function LogoOverlay({ position, w, h }: { position: LogoPosition; w: number; h: number }) {
+function LogoOverlay({ position, logoUrl, w, h }: { position: LogoPosition; logoUrl: string; w: number; h: number }) {
   const [ok, setOk] = React.useState(true);
-  if (!ok || position === "none") return null;
+  if (!ok || !logoUrl || position === "none") return null;
 
   const size = position === "watermark" ? Math.round(w * 0.12) : Math.round(w * 0.09);
   const style: React.CSSProperties = { position: "absolute", width: size, height: size, pointerEvents: "none", zIndex: 10 };
@@ -274,8 +273,8 @@ function LogoOverlay({ position, w, h }: { position: LogoPosition; w: number; h:
   return (
     <div style={style}>
       <img
-        src="/logo.png"
-        alt="Neeko"
+        src={logoUrl}
+        alt="Logo"
         onError={() => setOk(false)}
         style={{ width: "100%", height: "100%", objectFit: "contain" }}
       />
@@ -582,8 +581,8 @@ function CanvasShell({
           h={Math.round(h * (offsets?.playerImageScale ?? 1))}
         />
       )}
-      {options.logoPosition && options.logoPosition !== "none" && (
-        <LogoOverlay position={options.logoPosition} w={w} h={h} />
+      {options.logoUrl && options.logoPosition && options.logoPosition !== "none" && (
+        <LogoOverlay position={options.logoPosition} logoUrl={options.logoUrl} w={w} h={h} />
       )}
       {options.roundLabel && (
         <RoundLabelBadge label={options.roundLabel} accentColor={resolvedAccent} w={w} />
