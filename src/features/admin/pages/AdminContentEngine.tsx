@@ -25,11 +25,9 @@ interface ContentPlayer {
   floor_estimate: number | null;
   captain_score: number | null;
   matchup_rating: number | null;
-  value_score: number | null;
   upside_rating: number | null;
   consistency_score: number | null;
   risk_rating: number | null;
-  price: number | null;
 }
 
 interface StatAngle {
@@ -50,8 +48,6 @@ const fmt = (n: number | null, suffix = "") =>
   n != null ? `${Math.round(Number(n))}${suffix}` : "—";
 const fmtDec = (n: number | null, dp = 1, suffix = "") =>
   n != null ? `${Number(n).toFixed(dp)}${suffix}` : "—";
-const fmtPrice = (n: number | null) =>
-  n != null ? `$${(Number(n) / 1000).toFixed(0)}k` : "—";
 
 const STAT_ANGLES: StatAngle[] = [
   {
@@ -113,20 +109,19 @@ const STAT_ANGLES: StatAngle[] = [
     id: "undervalued_players",
     label: "Undervalued Players",
     title: "Most Undervalued Players",
-    subtitle: "Value Score Model · Neeko Analytics",
-    orderBy: "value_score",
+    subtitle: "Upside Model · Neeko Analytics",
+    orderBy: "upside_rating",
     orderDir: "desc",
     limit: 5,
-    statLabel: "Value",
-    statFn: (p) => `${fmtDec(p.value_score, 1)} @ ${fmtPrice(p.price)}`,
+    statLabel: "Upside",
+    statFn: (p) => fmtDec(p.upside_rating, 1, " / 10"),
     accentColor: "#60A5FA",
     insightFn: (players) => {
       const top = players[0];
       if (!top) return "";
-      const val = Number(top.value_score ?? 0).toFixed(1);
-      const price = fmtPrice(top.price);
+      const upside = Number(top.upside_rating ?? 0).toFixed(1);
       const proj = Math.round(Number(top.projection_final ?? 0));
-      return `STAT INSIGHT\n\n${top.player_name} is the most undervalued player right now.\n\nValue score: ${val} — priced at only ${price} with a projection of ${proj} pts.\n\nThis is a trade-in target.\n\nData by Neeko Sports Stats — neekostats.com.au`;
+      return `STAT INSIGHT\n\n${top.player_name} is the most undervalued player right now.\n\nUpside rating: ${upside}/10 — projecting ${proj} pts.\n\nThis is a trade-in target.\n\nData by Neeko Sports Stats — neekostats.com.au`;
     },
   },
   {
@@ -336,7 +331,7 @@ export default function AdminContentEngine() {
     try {
       const { data, error } = await supabase
         .from("v_rankings_master_no_limit")
-        .select("player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, captain_score, matchup_rating, value_score, upside_rating, consistency_score, risk_rating, price")
+        .select("player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, captain_score, matchup_rating, upside_rating, consistency_score, risk_rating")
         .order(angle.orderBy as string, { ascending: angle.orderDir === "asc", nullsFirst: false })
         .limit(angle.limit);
 
