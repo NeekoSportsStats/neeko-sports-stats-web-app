@@ -9,7 +9,6 @@ const corsHeaders = {
 };
 
 const BATCH_SIZE = 30;
-const MAX_BATCHES = 50;
 
 interface PlayerInput {
   player_id: number;
@@ -88,101 +87,155 @@ Deno.serve(async (req: Request) => {
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const runId: string | null = body.run_id ?? null;
+    const batchNumber: number = body.batch_number ?? 1;
 
-    const { count: totalMissing } = await supabase
-      .from("v_ai_player_analysis_input")
-      .select("player_id", { count: "exact", head: true });
+    if (batchNumber === 1 && runId) {
+      const { count: totalMissing } = await supabase
+        .from("v_ai_player_analysis_input")
+        .select("player_id", { count: "exact", head: true });
 
-    const totalTasks = totalMissing ?? 0;
-
-    if (runId) {
       await supabase
         .from("pipeline_runs")
         .update({
           status: "running",
-          total_tasks: totalTasks,
+          total_tasks: totalMissing ?? 0,
           completed_tasks: 0,
-          current_step_label: "Generating player AI analysis",
+          current_step_label: `Starting AI analysis — batch ${batchNumber}`,
         })
         .eq("id", runId);
     }
 
-    let totalProcessed = 0;
-    let totalErrors = 0;
-    let batchCount = 0;
+    const { data: players, error: fetchError } = await supabase
+      .from("v_ai_player_analysis_input")
+      .select("*")
+      .limit(BATCH_SIZE);
 
-    while (batchCount < MAX_BATCHES) {
-      const { data: players, error: fetchError } = await supabase
-        .from("v_ai_player_analysis_input")
-        .select("*")
-        .limit(BATCH_SIZE);
+    if (fetchError) throw fetchError;
 
-      if (fetchError) throw fetchError;
-      if (!players || players.length === 0) break;
-
-      const results = await Promise.allSettled(
-        (players as PlayerInput[]).map((player) =>
-          generateForPlayer(openai, player)
-        )
-      );
-
-      const upsertRows = [];
-      for (let j = 0; j < players.length; j++) {
-        const result = results[j];
-        const player = (players as PlayerInput[])[j];
-        if (result.status === "fulfilled") {
-          upsertRows.push({
-            player_id: player.player_id,
-            player_name: player.player_name,
-            team: player.team,
-            projection_final: player.projection_final,
-            analysis: result.value.analysis,
-            captain_recommendation: result.value.captain_recommendation,
-            generated_at: new Date().toISOString(),
-          });
-          totalProcessed++;
-        } else {
-          console.error(
-            `Error processing ${player.player_name}:`,
-            result.reason
-          );
-          totalErrors++;
-        }
-      }
-
-      if (upsertRows.length > 0) {
-        const { error: upsertError } = await supabase
-          .from("ai_player_analysis")
-          .upsert(upsertRows, { onConflict: "player_id" });
-        if (upsertError) {
-          console.error("Batch upsert error:", upsertError);
-          totalErrors += upsertRows.length;
-          totalProcessed -= upsertRows.length;
-        }
-      }
-
-      batchCount++;
-
+    if (!players || players.length === 0) {
       if (runId) {
+        const { data: runData } = await supabase
+          .from("pipeline_runs")
+          .select("total_tasks")
+          .eq("id", runId)
+          .maybeSingle();
+
         await supabase
           .from("pipeline_runs")
-          .update({ completed_tasks: totalProcessed })
+          .update({
+            status: "completed",
+            completed_tasks: runData?.total_tasks ?? 0,
+            current_step_label: "Done",
+            completed_at: new Date().toISOString(),
+          })
           .eq("id", runId);
+      }
+
+      return new Response(
+        JSON.stringify({
+          message: "generate-ranking-ai complete — all players analysed",
+          batch_number: batchNumber,
+          processed_this_batch: 0,
+          remaining: 0,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const results = await Promise.allSettled(
+      (players as PlayerInput[]).map((player) =>
+        generateForPlayer(openai, player)
+      )
+    );
+
+    const upsertRows = [];
+    let batchProcessed = 0;
+    let batchErrors = 0;
+
+    for (let j = 0; j < players.length; j++) {
+      const result = results[j];
+      const player = (players as PlayerInput[])[j];
+      if (result.status === "fulfilled") {
+        upsertRows.push({
+          player_id: player.player_id,
+          player_name: player.player_name,
+          team: player.team,
+          projection_final: player.projection_final,
+          analysis: result.value.analysis,
+          captain_recommendation: result.value.captain_recommendation,
+          generated_at: new Date().toISOString(),
+        });
+        batchProcessed++;
+      } else {
+        console.error(`Error processing ${player.player_name}:`, result.reason);
+        batchErrors++;
       }
     }
 
-    const hitLimit = batchCount >= MAX_BATCHES;
+    if (upsertRows.length > 0) {
+      const { error: upsertError } = await supabase
+        .from("ai_player_analysis")
+        .upsert(upsertRows, { onConflict: "player_id" });
+
+      if (upsertError) {
+        console.error("Batch upsert error:", upsertError);
+        throw upsertError;
+      }
+    }
+
+    const { count: remainingCount } = await supabase
+      .from("v_ai_player_analysis_input")
+      .select("player_id", { count: "exact", head: true });
+
+    const remaining = remainingCount ?? 0;
 
     if (runId) {
+      const { data: runData } = await supabase
+        .from("pipeline_runs")
+        .select("completed_tasks, total_tasks")
+        .eq("id", runId)
+        .maybeSingle();
+
+      const newCompleted = (runData?.completed_tasks ?? 0) + batchProcessed;
+
       await supabase
         .from("pipeline_runs")
         .update({
-          status: hitLimit ? "partial" : "completed",
-          completed_tasks: totalProcessed,
-          total_tasks: totalProcessed + totalErrors,
-          current_step_label: hitLimit
-            ? `Batch limit reached (${MAX_BATCHES} batches)`
+          completed_tasks: newCompleted,
+          current_step_label: remaining > 0
+            ? `Processing AI batch ${batchNumber} — ${remaining} remaining`
             : "Done",
+        })
+        .eq("id", runId);
+    }
+
+    if (remaining > 0) {
+      EdgeRuntime.waitUntil(
+        fetch(`${supabaseUrl}/functions/v1/generate-ranking-ai`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${serviceRoleKey}`,
+          },
+          body: JSON.stringify({
+            run_id: runId,
+            batch_number: batchNumber + 1,
+          }),
+        }).catch((err) => console.error("Failed to trigger next batch:", err))
+      );
+    } else if (runId) {
+      const { data: runData } = await supabase
+        .from("pipeline_runs")
+        .select("total_tasks")
+        .eq("id", runId)
+        .maybeSingle();
+
+      await supabase
+        .from("pipeline_runs")
+        .update({
+          status: "completed",
+          completed_tasks: runData?.total_tasks ?? 0,
+          current_step_label: "Done",
           completed_at: new Date().toISOString(),
         })
         .eq("id", runId);
@@ -190,13 +243,13 @@ Deno.serve(async (req: Request) => {
 
     return new Response(
       JSON.stringify({
-        message: hitLimit
-          ? `generate-ranking-ai hit MAX_BATCHES limit (${MAX_BATCHES})`
+        message: remaining > 0
+          ? `Batch ${batchNumber} complete — triggering next batch`
           : "generate-ranking-ai complete — all players analysed",
-        batches_run: batchCount,
-        total_processed: totalProcessed,
-        total_errors: totalErrors,
-        hit_limit: hitLimit,
+        batch_number: batchNumber,
+        processed_this_batch: batchProcessed,
+        errors_this_batch: batchErrors,
+        remaining,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
