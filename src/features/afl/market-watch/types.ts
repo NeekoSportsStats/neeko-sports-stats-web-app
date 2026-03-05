@@ -68,6 +68,8 @@ export interface MWPlayerRow {
   value_score: number | null;
   price_range_top: number | null;
   price_range_bottom: number | null;
+  value_momentum: number | null;
+  momentum_label: "breakout" | "rising" | "improving" | "stable" | "cooling" | "falling" | null;
 }
 
 export interface MWBestTrade {
