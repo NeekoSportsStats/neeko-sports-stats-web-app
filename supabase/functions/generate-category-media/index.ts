@@ -208,13 +208,40 @@ async function countExisting(
   category: string,
   isVideo: boolean,
 ): Promise<number> {
-  const { count } = await adminClient
-    .from("ai_media_library")
-    .select("asset_id", { count: "exact", head: true })
-    .eq("source", "ai_generated")
+  const folder = isVideo
+    ? `videos/ai-generated/${category}`
+    : `images/ai-generated/${category}`;
+
+  const { data: storageFiles } = await adminClient.storage
+    .from(STORAGE_BUCKET)
+    .list(folder, { limit: 500 });
+
+  return storageFiles?.filter((f) => f.name && !f.name.startsWith(".")).length ?? 0;
+}
+
+async function isPathDeleted(
+  adminClient: ReturnType<typeof createClient>,
+  filePath: string,
+): Promise<boolean> {
+  const { data } = await adminClient
+    .from("media_deleted_files")
+    .select("id")
+    .eq("file_path", filePath)
+    .maybeSingle();
+  return data !== null;
+}
+
+async function getDeletedPathsForCategory(
+  adminClient: ReturnType<typeof createClient>,
+  category: string,
+  isVideo: boolean,
+): Promise<Set<string>> {
+  const { data } = await adminClient
+    .from("media_deleted_files")
+    .select("file_path")
     .eq("category", category)
     .eq("media_type", isVideo ? "video" : "image");
-  return count ?? 0;
+  return new Set((data ?? []).map((r: { file_path: string }) => r.file_path));
 }
 
 async function updateJob(
@@ -287,6 +314,16 @@ async function generateImages(
       const rand        = Math.random().toString(36).slice(2, 6);
       const filename    = `${category}-${ts}-${rand}.png`;
       const storagePath = `images/ai-generated/${category}/${filename}`;
+
+      // Guard: skip if this exact path was manually deleted
+      if (await isPathDeleted(adminClient, storagePath)) {
+        await writer.write(sseEvent({
+          phase: "images", category,
+          message: `Skipping ${filename} — marked as deleted`,
+          generated: existingCount + generated, total: targetCount, failed,
+        }));
+        continue;
+      }
 
       const { error: upErr } = await adminClient.storage
         .from(STORAGE_BUCKET)
@@ -405,6 +442,16 @@ async function generateVideos(
       const rand        = Math.random().toString(36).slice(2, 6);
       const filename    = `${category}-video-${ts}-${rand}.png`;
       const storagePath = `videos/ai-generated/${category}/${filename}`;
+
+      // Guard: skip if this exact path was manually deleted
+      if (await isPathDeleted(adminClient, storagePath)) {
+        await writer.write(sseEvent({
+          phase: "videos", category,
+          message: `Skipping ${filename} — marked as deleted`,
+          generated: existingCount + generated, total: targetCount, failed,
+        }));
+        continue;
+      }
 
       const { error: upErr } = await adminClient.storage
         .from(STORAGE_BUCKET)

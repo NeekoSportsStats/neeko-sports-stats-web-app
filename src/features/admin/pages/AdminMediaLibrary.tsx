@@ -110,18 +110,22 @@ async function listFolder(path: string, subcat: Category): Promise<MediaItem[]> 
   return items;
 }
 
-async function loadImages(): Promise<MediaItem[]> {
-  const cached = readCache(CACHE_KEY_IMAGES);
-  if (cached) return cached;
+async function loadImages(force = false): Promise<MediaItem[]> {
+  if (!force) {
+    const cached = readCache(CACHE_KEY_IMAGES);
+    if (cached) return cached;
+  }
   const results = await Promise.all(IMAGE_SUBCATEGORIES.map((cat) => listFolder(`${IMAGE_BASE}/${cat}`, cat)));
   const flat = results.flat();
   writeCache(CACHE_KEY_IMAGES, flat);
   return flat;
 }
 
-async function loadVideos(): Promise<MediaItem[]> {
-  const cached = readCache(CACHE_KEY_VIDEOS);
-  if (cached) return cached;
+async function loadVideos(force = false): Promise<MediaItem[]> {
+  if (!force) {
+    const cached = readCache(CACHE_KEY_VIDEOS);
+    if (cached) return cached;
+  }
   const results = await Promise.all(IMAGE_SUBCATEGORIES.map((cat) => listFolder(`${VIDEO_BASE}/${cat}`, cat)));
   const flat = results.flat();
   writeCache(CACHE_KEY_VIDEOS, flat);
@@ -725,7 +729,7 @@ export default function AdminMediaLibrary() {
     setLoading(true);
     try {
       if (force) clearMediaCaches();
-      const [imgs, vids] = await Promise.all([loadImages(), loadVideos()]);
+      const [imgs, vids] = await Promise.all([loadImages(force), loadVideos(force)]);
       setImages(imgs);
       setVideos(vids);
     } finally {
@@ -734,7 +738,11 @@ export default function AdminMediaLibrary() {
   }, []);
 
   useEffect(() => {
-    if (!hasLoaded.current) { hasLoaded.current = true; fetchAll(); }
+    if (!hasLoaded.current) {
+      hasLoaded.current = true;
+      clearMediaCaches();
+      fetchAll(true);
+    }
   }, [fetchAll]);
 
   // ── Poll job status (survives page refresh) ─────────────────────────────────
@@ -794,16 +802,68 @@ export default function AdminMediaLibrary() {
   const handleDelete = async (item: MediaItem) => {
     setDeleting(true);
     try {
-      const base = mode === "graphic" ? IMAGE_BASE : VIDEO_BASE;
-      await supabase.storage.from(BUCKET).remove([`${base}/${item.category}/${item.filename}`]);
+      const base         = mode === "graphic" ? IMAGE_BASE : VIDEO_BASE;
+      const storagePath  = `${base}/${item.category}/${item.filename}`;
+      const folderPath   = `${base}/${item.category}`;
+
+      // 1. Remove file from storage
+      const { error: removeErr } = await supabase.storage.from(BUCKET).remove([storagePath]);
+      if (removeErr) throw new Error(removeErr.message);
+
+      // 2. Verify removal — list folder and confirm file is gone
+      const { data: listing } = await supabase.storage
+        .from(BUCKET)
+        .list(folderPath, { limit: 500 });
+      const stillExists = listing?.some((f) => f.name === item.filename);
+      if (stillExists) throw new Error(`File still exists after delete: ${item.filename}`);
+
+      // 3. Record in media_deleted_files so generator skips this path
+      await supabase.from("media_deleted_files").upsert(
+        {
+          file_path:  storagePath,
+          category:   item.category,
+          media_type: mode === "graphic" ? "image" : "video",
+          deleted_at: new Date().toISOString(),
+        },
+        { onConflict: "file_path" },
+      );
+
+      // 4. Clear ALL local caches — belt and braces
+      clearMediaCaches();
+
+      // 5. Remove from UI state immediately
       if (mode === "graphic") {
         setImages((prev) => prev.filter((i) => i.id !== item.id));
-        localStorage.removeItem(CACHE_KEY_IMAGES);
       } else {
         setVideos((prev) => prev.filter((i) => i.id !== item.id));
-        localStorage.removeItem(CACHE_KEY_VIDEOS);
       }
-      invalidateAIMediaCache();
+
+      // 6. Re-fetch from storage to guarantee UI matches reality
+      const isImage = mode === "graphic";
+      const fresh = isImage
+        ? await listFolder(folderPath, item.category)
+        : await listFolder(folderPath, item.category);
+
+      if (isImage) {
+        setImages((prev) => {
+          const otherCats = prev.filter((i) => i.category !== item.category);
+          return [...otherCats, ...fresh];
+        });
+        writeCache(CACHE_KEY_IMAGES, [
+          ...images.filter((i) => i.category !== item.category),
+          ...fresh,
+        ]);
+      } else {
+        setVideos((prev) => {
+          const otherCats = prev.filter((i) => i.category !== item.category);
+          return [...otherCats, ...fresh];
+        });
+        writeCache(CACHE_KEY_VIDEOS, [
+          ...videos.filter((i) => i.category !== item.category),
+          ...fresh,
+        ]);
+      }
+
     } finally {
       setDeleting(false);
       setDeleteConfirm(null);
