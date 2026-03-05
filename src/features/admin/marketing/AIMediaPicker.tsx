@@ -1,89 +1,126 @@
 import { useState, useEffect, useRef } from "react";
-import { Check, Image as ImageIcon, Video, Loader, RefreshCw, Database } from "lucide-react";
+import { Check, Image as ImageIcon, Video, Loader, RefreshCw, FolderOpen } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import type { BackgroundSource } from "./GraphicTemplates";
 
-export type MediaCategory = "stadium" | "crowd" | "abstract" | "field" | "players" | "lights" | "all";
+export type MediaCategory = "all" | "stadium" | "crowd" | "abstract" | "field" | "players" | "lights";
 
 export interface AIMediaItem {
   id: string;
-  asset_id: string;
   label: string;
   url: string;
   thumbnail_url: string;
   media_type: "image" | "video";
-  category: string;
-  sport: string;
-  pack_id: string;
+  category: MediaCategory;
 }
 
-const CACHE_KEY = "neeko_ai_media_cache";
-const CACHE_TTL_MS = 10 * 60 * 1000;
+const STORAGE_BUCKET = "content-assets";
+const IMAGES_PATH    = "images/ai-generated";
+const VIDEOS_PATH    = "videos/ai-generated";
+
+const MEDIA_CACHE_KEY   = "neeko_ai_media_cache_v2";
+const MEDIA_CACHE_TTL   = 10 * 60 * 1000;
 
 interface MediaCache {
-  images: AIMediaItem[];
-  videos: AIMediaItem[];
-  loadedAt: number;
+  images:    AIMediaItem[];
+  videos:    AIMediaItem[];
+  loadedAt:  number;
 }
 
 let inMemoryCache: MediaCache | null = null;
 
-function loadCacheFromStorage(): MediaCache | null {
+function readStorageCache(): MediaCache | null {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(MEDIA_CACHE_KEY);
     if (!raw) return null;
     const parsed: MediaCache = JSON.parse(raw);
-    if (Date.now() - parsed.loadedAt > CACHE_TTL_MS) return null;
+    if (Date.now() - parsed.loadedAt > MEDIA_CACHE_TTL) return null;
     return parsed;
   } catch {
     return null;
   }
 }
 
-function saveCache(cache: MediaCache) {
+function writeStorageCache(cache: MediaCache) {
   inMemoryCache = cache;
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-  } catch {
-    /* quota exceeded — in-memory only */
+  try { localStorage.setItem(MEDIA_CACHE_KEY, JSON.stringify(cache)); } catch { /* quota full */ }
+}
+
+export function invalidateAIMediaCache() {
+  inMemoryCache = null;
+  try { localStorage.removeItem(MEDIA_CACHE_KEY); } catch { /* ignore */ }
+}
+
+function categoryFromName(name: string): MediaCategory {
+  const n = name.toLowerCase();
+  if (n.includes("stadium") || n.includes("ground") || n.includes("oval"))  return "stadium";
+  if (n.includes("crowd")   || n.includes("fans")   || n.includes("stand")) return "crowd";
+  if (n.includes("field")   || n.includes("grass")  || n.includes("pitch")) return "field";
+  if (n.includes("player")  || n.includes("athlete"))                        return "players";
+  if (n.includes("light")   || n.includes("floodlit"))                       return "lights";
+  if (n.includes("abstract")|| n.includes("pattern")|| n.includes("data"))  return "abstract";
+  return "stadium";
+}
+
+function labelFromName(name: string): string {
+  return name
+    .replace(/\.[^.]+$/, "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+async function listStorageFolder(path: string): Promise<AIMediaItem[]> {
+  const { data, error } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .list(path, { limit: 200, sortBy: { column: "name", order: "asc" } });
+
+  if (error || !data) return [];
+
+  const items: AIMediaItem[] = [];
+  for (const file of data) {
+    if (!file.name || file.name.startsWith(".")) continue;
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    const isImage = ["jpg", "jpeg", "png", "webp", "avif"].includes(ext);
+    const isVideo = ["mp4", "webm", "mov"].includes(ext);
+    if (!isImage && !isVideo) continue;
+
+    const { data: urlData } = supabase.storage
+      .from(STORAGE_BUCKET)
+      .getPublicUrl(`${path}/${file.name}`);
+
+    const url = urlData?.publicUrl ?? "";
+    if (!url) continue;
+
+    items.push({
+      id:           `${path}/${file.name}`,
+      label:        labelFromName(file.name),
+      url,
+      thumbnail_url: url,
+      media_type:   isImage ? "image" : "video",
+      category:     categoryFromName(file.name),
+    });
   }
+  return items;
 }
 
 export async function loadAIMedia(): Promise<MediaCache> {
-  if (inMemoryCache && Date.now() - inMemoryCache.loadedAt < CACHE_TTL_MS) {
+  if (inMemoryCache && Date.now() - inMemoryCache.loadedAt < MEDIA_CACHE_TTL) {
     return inMemoryCache;
   }
-  const stored = loadCacheFromStorage();
+  const stored = readStorageCache();
   if (stored) {
     inMemoryCache = stored;
     return stored;
   }
 
-  const { data, error } = await supabase
-    .from("ai_media_library")
-    .select("id, asset_id, label, url, thumbnail_url, media_type, category, sport, pack_id")
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true });
+  const [images, videos] = await Promise.all([
+    listStorageFolder(IMAGES_PATH),
+    listStorageFolder(VIDEOS_PATH),
+  ]);
 
-  if (error || !data) {
-    const empty: MediaCache = { images: [], videos: [], loadedAt: Date.now() };
-    saveCache(empty);
-    return empty;
-  }
-
-  const all = data as AIMediaItem[];
-  const cache: MediaCache = {
-    images:    all.filter((i) => i.media_type === "image"),
-    videos:    all.filter((i) => i.media_type === "video"),
-    loadedAt:  Date.now(),
-  };
-  saveCache(cache);
+  const cache: MediaCache = { images, videos, loadedAt: Date.now() };
+  writeStorageCache(cache);
   return cache;
-}
-
-export function invalidateAIMediaCache() {
-  inMemoryCache = null;
-  try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
 }
 
 const IMAGE_CATEGORIES: MediaCategory[] = ["all", "stadium", "crowd", "abstract", "field", "players"];
@@ -101,44 +138,45 @@ export function AIMediaPicker({ type, selected, onSelect, accentColor = "#F59E0B
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState<string | null>(null);
   const [category, setCategory] = useState<MediaCategory>("all");
-  const fetchedRef = useRef(false);
+  const loadedRef = useRef(false);
 
   useEffect(() => {
-    if (fetchedRef.current) return;
-    fetchedRef.current = true;
-    load();
+    loadedRef.current = false;
   }, [type]);
 
-  async function load() {
+  useEffect(() => {
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    fetchMedia();
+  });
+
+  async function fetchMedia() {
     setLoading(true);
     setError(null);
     try {
       const cache = await loadAIMedia();
       setItems(type === "image" ? cache.images : cache.videos);
     } catch {
-      setError("Failed to load media library.");
+      setError("Could not load media library. Check storage configuration.");
     } finally {
       setLoading(false);
     }
   }
 
   async function handleRefresh() {
-    fetchedRef.current = false;
     invalidateAIMediaCache();
-    load();
+    loadedRef.current = false;
+    fetchMedia();
   }
 
   const categories = type === "image" ? IMAGE_CATEGORIES : VIDEO_CATEGORIES;
-
-  const filtered = category === "all"
-    ? items
-    : items.filter((i) => i.category === category);
+  const filtered   = category === "all" ? items : items.filter((i) => i.category === category);
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2.5 py-6 justify-center">
+      <div className="flex items-center justify-center gap-2.5 py-8">
         <Loader className="h-4 w-4 animate-spin text-muted-foreground" />
-        <p className="text-xs text-muted-foreground">Loading AI media library…</p>
+        <span className="text-xs text-muted-foreground">Loading AI media…</span>
       </div>
     );
   }
@@ -147,7 +185,7 @@ export function AIMediaPicker({ type, selected, onSelect, accentColor = "#F59E0B
     return (
       <div className="py-4 text-center space-y-2">
         <p className="text-xs text-red-400">{error}</p>
-        <button onClick={load} className="text-[11px] underline text-muted-foreground hover:text-foreground">
+        <button onClick={fetchMedia} className="text-[11px] underline text-muted-foreground hover:text-foreground">
           Retry
         </button>
       </div>
@@ -157,11 +195,19 @@ export function AIMediaPicker({ type, selected, onSelect, accentColor = "#F59E0B
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border/40 p-5 text-center space-y-2">
-        <Database className="h-5 w-5 mx-auto text-muted-foreground/40" />
-        <p className="text-xs text-muted-foreground/60">No AI media registered yet.</p>
-        <p className="text-[10px] text-muted-foreground/40">
-          Use the Media Library section below to register the AFL Balanced Media Pack.
+        <FolderOpen className="h-5 w-5 mx-auto text-muted-foreground/30" />
+        <p className="text-xs font-medium text-muted-foreground/60">No AI {type}s uploaded yet.</p>
+        <p className="text-[10px] text-muted-foreground/40 leading-relaxed">
+          Upload {type === "image" ? "images" : "videos"} to the Supabase Storage bucket
+          at <code className="font-mono opacity-70">{STORAGE_BUCKET}/{type === "image" ? IMAGES_PATH : VIDEOS_PATH}</code>
         </p>
+        <button
+          onClick={handleRefresh}
+          className="mt-1 flex items-center gap-1.5 mx-auto text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        >
+          <RefreshCw className="h-3 w-3" />
+          Refresh
+        </button>
       </div>
     );
   }
@@ -187,23 +233,24 @@ export function AIMediaPicker({ type, selected, onSelect, accentColor = "#F59E0B
         </div>
         <button
           onClick={handleRefresh}
-          className="text-muted-foreground/40 hover:text-muted-foreground transition-colors"
-          title="Refresh media library"
+          title="Refresh"
+          className="text-muted-foreground/30 hover:text-muted-foreground transition-colors"
         >
           <RefreshCw className="h-3 w-3" />
         </button>
       </div>
 
-      <div className="text-[10px] text-muted-foreground/40">
+      <p className="text-[10px] text-muted-foreground/40">
         {filtered.length} {type === "image" ? "images" : "videos"}
-      </div>
+        {category !== "all" ? ` · ${category}` : ""}
+      </p>
 
       <div className="grid grid-cols-3 gap-1.5 max-h-64 overflow-y-auto pr-0.5">
         {filtered.map((item) => {
           const isSelected = selected === item.url;
           return (
             <button
-              key={item.asset_id}
+              key={item.id}
               onClick={() => onSelect(item.url)}
               className="text-left rounded-lg overflow-hidden border transition-all duration-150"
               style={{
@@ -211,18 +258,17 @@ export function AIMediaPicker({ type, selected, onSelect, accentColor = "#F59E0B
                 boxShadow:   isSelected ? `0 0 0 2px ${accentColor}44` : undefined,
               }}
             >
-              <div className="relative aspect-video bg-black">
-                <img
-                  src={item.thumbnail_url || item.url}
-                  alt={item.label}
-                  loading="lazy"
-                  className="w-full h-full object-cover opacity-80"
-                />
-                {type === "video" && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-6 h-6 rounded-full bg-black/60 flex items-center justify-center">
-                      <Video className="h-3 w-3 text-white" />
-                    </div>
+              <div className="relative aspect-video bg-black/60">
+                {item.media_type === "image" ? (
+                  <img
+                    src={item.thumbnail_url}
+                    alt={item.label}
+                    loading="lazy"
+                    className="w-full h-full object-cover opacity-85"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-black/80">
+                    <Video className="h-5 w-5 text-muted-foreground/40" />
                   </div>
                 )}
                 {isSelected && (
@@ -235,15 +281,15 @@ export function AIMediaPicker({ type, selected, onSelect, accentColor = "#F59E0B
                 )}
               </div>
               <div
-                className="px-2 py-1.5 text-[10px]"
+                className="px-2 py-1.5"
                 style={{ background: isSelected ? `${accentColor}12` : "hsl(var(--muted)/0.4)" }}
               >
                 <div className="flex items-center gap-1">
-                  {type === "image"
-                    ? <ImageIcon className="h-2.5 w-2.5 opacity-50" />
-                    : <Video className="h-2.5 w-2.5 opacity-50" />
+                  {item.media_type === "image"
+                    ? <ImageIcon className="h-2.5 w-2.5 shrink-0 opacity-40" />
+                    : <Video     className="h-2.5 w-2.5 shrink-0 opacity-40" />
                   }
-                  <span className="truncate font-medium">{item.label}</span>
+                  <span className="text-[10px] font-medium truncate">{item.label}</span>
                 </div>
                 <span className="text-[9px] opacity-40 capitalize">{item.category}</span>
               </div>

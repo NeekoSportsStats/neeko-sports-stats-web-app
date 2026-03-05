@@ -433,6 +433,8 @@ function DropSelect<T extends string>({
   );
 }
 
+const CE_STORAGE_KEY = "neeko_content_engine_state";
+
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function AdminContentEngine() {
@@ -498,11 +500,9 @@ export default function AdminContentEngine() {
   const [manualPlayer1, setManualPlayer1] = useState<ContentPlayer | null>(null);
   const [manualPlayer2, setManualPlayer2] = useState<ContentPlayer | null>(null);
 
-  const previewRef   = useRef<HTMLDivElement>(null);
-  const scrollRef    = useRef<HTMLDivElement>(null);
+  const previewRef    = useRef<HTMLDivElement>(null);
+  const scrollRef     = useRef<HTMLDivElement>(null);
   const didRestoreRef = useRef(false);
-
-  const CE_STORAGE_KEY = "neeko_content_engine_state";
 
   // ── Restore state from localStorage on mount ─────────────────────────────
   useEffect(() => {
@@ -537,9 +537,14 @@ export default function AdminContentEngine() {
 
       const scrollY = s.scrollY ?? 0;
       if (scrollY > 0) {
-        requestAnimationFrame(() => {
-          scrollRef.current?.scrollTo({ top: scrollY, behavior: "instant" });
-        });
+        const restore = () => {
+          if (scrollRef.current) {
+            scrollRef.current.scrollTo({ top: scrollY, behavior: "instant" });
+          } else {
+            requestAnimationFrame(restore);
+          }
+        };
+        requestAnimationFrame(restore);
       }
     } catch {
       /* ignore malformed state */
@@ -581,19 +586,26 @@ export default function AdminContentEngine() {
 
   // ── Preserve scroll position ─────────────────────────────────────────────
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
+    let el: HTMLDivElement | null = null;
     const handleScroll = () => {
+      if (!el) return;
       try {
         const raw = localStorage.getItem(CE_STORAGE_KEY);
-        if (!raw) return;
-        const s = JSON.parse(raw);
+        const s = raw ? JSON.parse(raw) : {};
         s.scrollY = el.scrollTop;
         localStorage.setItem(CE_STORAGE_KEY, JSON.stringify(s));
       } catch { /* ignore */ }
     };
-    el.addEventListener("scroll", handleScroll, { passive: true });
-    return () => el.removeEventListener("scroll", handleScroll);
+    const attach = () => {
+      el = scrollRef.current;
+      if (el) {
+        el.addEventListener("scroll", handleScroll, { passive: true });
+      } else {
+        requestAnimationFrame(attach);
+      }
+    };
+    requestAnimationFrame(attach);
+    return () => { el?.removeEventListener("scroll", handleScroll); };
   }, []);
 
   // ── Derived ────────────────────────────────────────────────────────────────
