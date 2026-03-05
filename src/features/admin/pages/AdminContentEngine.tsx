@@ -516,6 +516,7 @@ export default function AdminContentEngine() {
         const a = STAT_ANGLES.find((x) => x.id === s.selectedAngleId);
         if (a) setSelectedAngle(a);
       }
+      if (s.contentMode)        setContentMode(s.contentMode);
       if (s.selectedLayout)     setSelectedLayout(s.selectedLayout);
       if (s.selectedBackground) setSelectedBackground(s.selectedBackground);
       if (s.backgroundSource)   setBackgroundSource(s.backgroundSource);
@@ -523,10 +524,14 @@ export default function AdminContentEngine() {
       if (s.customUploadUrl)    setCustomUploadUrl(s.customUploadUrl);
       if (s.logoPosition)       setLogoPosition(s.logoPosition);
       if (s.roundLabel != null) setRoundLabel(s.roundLabel);
+      if (s.statHighlight != null) setStatHighlight(s.statHighlight);
       if (s.ctaText != null)    setCtaText(s.ctaText);
+      if (s.ctaPosition)        setCtaPosition(s.ctaPosition);
+      if (s.playerImageUrl != null) setPlayerImageUrl(s.playerImageUrl);
       if (s.accentMode)         setAccentMode(s.accentMode);
       if (s.customAccent)       setCustomAccent(s.customAccent);
       if (s.rankHighlight)      setRankHighlight(s.rankHighlight);
+      if (s.playerMode)         setPlayerMode(s.playerMode);
       if (s.exportSizeId) {
         const sz = EXPORT_SIZES.find((x) => x.id === s.exportSizeId);
         if (sz) setSelectedExportSize(sz);
@@ -556,6 +561,7 @@ export default function AdminContentEngine() {
     try {
       const s = {
         selectedAngleId:  selectedAngle.id,
+        contentMode,
         selectedLayout,
         selectedBackground,
         backgroundSource,
@@ -563,10 +569,14 @@ export default function AdminContentEngine() {
         customUploadUrl,
         logoPosition,
         roundLabel,
+        statHighlight,
         ctaText,
+        ctaPosition,
+        playerImageUrl,
         accentMode,
         customAccent,
         rankHighlight,
+        playerMode,
         exportSizeId:   selectedExportSize.id,
         appendHashtags,
         autoTeamAccent,
@@ -578,10 +588,10 @@ export default function AdminContentEngine() {
       /* ignore quota errors */
     }
   }, [
-    selectedAngle, selectedLayout, selectedBackground, backgroundSource,
-    backgroundMediaUrl, customUploadUrl, logoPosition, roundLabel, ctaText,
-    accentMode, customAccent, rankHighlight, selectedExportSize, appendHashtags,
-    autoTeamAccent, showTeamAccent,
+    selectedAngle, contentMode, selectedLayout, selectedBackground, backgroundSource,
+    backgroundMediaUrl, customUploadUrl, logoPosition, roundLabel, statHighlight,
+    ctaText, ctaPosition, playerImageUrl, accentMode, customAccent, rankHighlight,
+    playerMode, selectedExportSize, appendHashtags, autoTeamAccent, showTeamAccent,
   ]);
 
   // ── Preserve scroll position ─────────────────────────────────────────────
@@ -652,6 +662,36 @@ export default function AdminContentEngine() {
         ),
       ]
     : players;
+
+  // ── Reset all persisted state ─────────────────────────────────────────────
+
+  const handleResetState = () => {
+    try { localStorage.removeItem(CE_STORAGE_KEY); } catch { /* ignore */ }
+    setContentMode("graphic");
+    setSelectedAngle(STAT_ANGLES[0]);
+    setSelectedLayout("leaderboard");
+    setSelectedBackground("dark_gradient");
+    setBackgroundSource("gradient");
+    setBackgroundMediaUrl(null);
+    setCustomUploadUrl("");
+    setLogoPosition("none");
+    setRoundLabel("");
+    setStatHighlight("");
+    setCtaText("");
+    setCtaPosition("bottom_center");
+    setPlayerImageUrl("");
+    setAccentMode("neeko_gold");
+    setCustomAccent("#F59E0B");
+    setRankHighlight("top_player");
+    setPlayerMode("auto");
+    setSelectedExportSize(EXPORT_SIZES[0]);
+    setAppendHashtags(true);
+    setAutoTeamAccent(false);
+    setShowTeamAccent(false);
+    setInsight("");
+    setCaption("");
+    toast({ title: "Content Engine reset", description: "All settings restored to defaults." });
+  };
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -863,12 +903,22 @@ export default function AdminContentEngine() {
               Select a stat angle, customise the graphic, then download and post.
             </p>
           </div>
-          {(insight || caption) && (
-            <Button variant="outline" size="sm" className="h-8 text-xs shrink-0" onClick={handleCopyPost}>
-              {copiedPost ? <Check className="h-3.5 w-3.5 mr-1.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
-              Copy Post
-            </Button>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleResetState}
+              className="flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted/40"
+              title="Reset all Content Engine settings to defaults"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Reset
+            </button>
+            {(insight || caption) && (
+              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleCopyPost}>
+                {copiedPost ? <Check className="h-3.5 w-3.5 mr-1.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
+                Copy Post
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Stat Angle Selector */}
