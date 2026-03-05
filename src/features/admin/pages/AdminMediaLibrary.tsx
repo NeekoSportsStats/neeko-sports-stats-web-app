@@ -48,7 +48,7 @@ const VIDEO_BASE           = "videos/ai-generated";
 const IMAGE_SUBCATEGORIES: Category[] = ["stadium", "crowd", "field", "abstract", "players"];
 const CATEGORIES: Category[]          = ["all", "stadium", "crowd", "field", "abstract", "players"];
 
-const CACHE_KEY_ALL = "neeko_media_lib_all_v3";
+const CACHE_KEY_ALL = "neeko_media_lib_all_v4";
 const CACHE_TTL     = 5 * 60 * 1000;
 
 const POLL_INTERVAL_MS  = 5000;
