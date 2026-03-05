@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 import {
   Image as ImageIcon, Video, RefreshCw, X, Download, Trash2, Play, Search,
   Grid3x3, Sparkles, CircleCheck as CheckCircle2, CircleAlert as AlertCircle,
-  Loader as Loader2, DollarSign,
+  Loader as Loader2, DollarSign, Lock,
 } from "lucide-react";
 import { invalidateAIMediaCache } from "../marketing/AIMediaPicker";
 
@@ -13,19 +13,32 @@ type MediaMode = "graphic" | "video";
 type Category  = "all" | "stadium" | "crowd" | "field" | "abstract" | "players";
 
 interface MediaItem {
-  id: string;
-  label: string;
-  url: string;
+  id:        string;
+  label:     string;
+  url:       string;
   thumbnail: string;
-  category: Category;
-  filename: string;
+  category:  Category;
+  filename:  string;
+}
+
+interface GenerationJob {
+  id:                string;
+  status:            "pending" | "running" | "complete" | "failed";
+  target:            string;
+  target_count:      number;
+  generated_count:   number;
+  failed_count:      number;
+  category_progress: Record<string, { generated: number; failed: number; target: number }>;
+  error_message:     string | null;
+  started_at:        string;
+  completed_at:      string | null;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const BUCKET              = "content-assets";
-const IMAGE_BASE          = "images/ai-generated";
-const VIDEO_BASE          = "videos/ai-generated";
+const BUCKET               = "content-assets";
+const IMAGE_BASE           = "images/ai-generated";
+const VIDEO_BASE           = "videos/ai-generated";
 const IMAGE_SUBCATEGORIES: Category[] = ["stadium", "crowd", "field", "abstract", "players"];
 const CATEGORIES: Category[]          = ["all", "stadium", "crowd", "field", "abstract", "players"];
 
@@ -33,61 +46,36 @@ const CACHE_KEY_IMAGES = "neeko_media_lib_images_v1";
 const CACHE_KEY_VIDEOS = "neeko_media_lib_videos_v1";
 const CACHE_TTL        = 5 * 60 * 1000;
 
-const ACCENT = "#F59E0B";
+const POLL_INTERVAL_MS = 3000;
+const ACCENT           = "#F59E0B";
 
-// ─── Generation job configs ───────────────────────────────────────────────────
+// ─── Job configs ─────────────────────────────────────────────────────────────
 
 interface JobConfig {
-  target:       string;
-  label:        string;
-  description:  string;
-  assetLine:    string;
-  costLow:      string;
-  costHigh:     string;
-  totalAssets:  number;
-  isVideo:      boolean;
+  target:      string;
+  label:       string;
+  description: string;
+  assetLine:   string;
+  costLow:     string;
+  costHigh:    string;
+  totalAssets: number;
+  isVideo:     boolean;
 }
 
 const JOB_CONFIGS: JobConfig[] = [
-  {
-    target: "stadium", label: "Regenerate Stadiums", description: "Regenerate all stadium background images.",
-    assetLine: "30 images", costLow: "$1.20", costHigh: "$2.50", totalAssets: 30, isVideo: false,
-  },
-  {
-    target: "crowd", label: "Regenerate Crowd", description: "Regenerate all crowd & supporter images.",
-    assetLine: "30 images", costLow: "$1.20", costHigh: "$2.50", totalAssets: 30, isVideo: false,
-  },
-  {
-    target: "abstract", label: "Regenerate Abstract", description: "Regenerate all abstract broadcast backgrounds.",
-    assetLine: "30 images", costLow: "$1.20", costHigh: "$2.50", totalAssets: 30, isVideo: false,
-  },
-  {
-    target: "players", label: "Regenerate Players", description: "Regenerate all player silhouette images.",
-    assetLine: "30 images", costLow: "$1.20", costHigh: "$2.50", totalAssets: 30, isVideo: false,
-  },
-  {
-    target: "field", label: "Regenerate Field", description: "Regenerate all playing field images.",
-    assetLine: "30 images", costLow: "$1.20", costHigh: "$2.50", totalAssets: 30, isVideo: false,
-  },
-  {
-    target: "videos", label: "Regenerate Videos", description: "Regenerate all video motion assets across all categories.",
-    assetLine: "20 videos (6 stadium · 4 crowd · 3 field · 3 abstract · 4 players)",
-    costLow: "$4.00", costHigh: "$8.00", totalAssets: 20, isVideo: true,
-  },
-  {
-    target: "full", label: "Regenerate Full Pack", description: "Regenerate the entire AI media pack — all images and videos.",
-    assetLine: "150 images + 20 videos",
-    costLow: "$10.00", costHigh: "$18.00", totalAssets: 170, isVideo: false,
-  },
+  { target: "stadium",  label: "Regenerate Stadiums", description: "Regenerate all stadium background images.", assetLine: "30 images", costLow: "$1.20", costHigh: "$2.50", totalAssets: 30, isVideo: false },
+  { target: "crowd",    label: "Regenerate Crowd",    description: "Regenerate all crowd & supporter images.", assetLine: "30 images", costLow: "$1.20", costHigh: "$2.50", totalAssets: 30, isVideo: false },
+  { target: "abstract", label: "Regenerate Abstract", description: "Regenerate all abstract broadcast backgrounds.", assetLine: "30 images", costLow: "$1.20", costHigh: "$2.50", totalAssets: 30, isVideo: false },
+  { target: "players",  label: "Regenerate Players",  description: "Regenerate all player silhouette images.", assetLine: "30 images", costLow: "$1.20", costHigh: "$2.50", totalAssets: 30, isVideo: false },
+  { target: "field",    label: "Regenerate Field",    description: "Regenerate all playing field images.", assetLine: "30 images", costLow: "$1.20", costHigh: "$2.50", totalAssets: 30, isVideo: false },
+  { target: "videos",   label: "Regenerate Videos",   description: "Regenerate all video motion assets.", assetLine: "20 videos", costLow: "$4.00", costHigh: "$8.00", totalAssets: 20, isVideo: true },
+  { target: "full",     label: "Regenerate Full Pack", description: "Regenerate the entire AI media pack.", assetLine: "150 images + 20 videos", costLow: "$10.00", costHigh: "$18.00", totalAssets: 170, isVideo: false },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function labelFromFilename(name: string): string {
-  return name
-    .replace(/\.[^.]+$/, "")
-    .replace(/[-_]+/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function readCache(key: string): MediaItem[] | null {
@@ -109,14 +97,11 @@ async function listFolder(path: string, subcat: Category): Promise<MediaItem[]> 
     .from(BUCKET)
     .list(path, { limit: 300, sortBy: { column: "name", order: "asc" } });
   if (error || !data) return [];
-
   const items: MediaItem[] = [];
   for (const file of data) {
     if (!file.name || file.name.startsWith(".")) continue;
-    const ext     = file.name.split(".").pop()?.toLowerCase() ?? "";
-    const isImage = ["jpg", "jpeg", "png", "webp", "avif"].includes(ext);
-    const isVideo = ["mp4", "webm", "mov"].includes(ext);
-    if (!isImage && !isVideo) continue;
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!["jpg", "jpeg", "png", "webp", "avif", "mp4", "webm", "mov"].includes(ext)) continue;
     const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(`${path}/${file.name}`);
     const url = urlData?.publicUrl ?? "";
     if (!url) continue;
@@ -152,14 +137,16 @@ function clearMediaCaches() {
 // ─── SSE runner ───────────────────────────────────────────────────────────────
 
 interface SseEvent {
-  phase:           string;
-  message:         string;
-  generated?:      number;
-  total?:          number;
-  failed?:         number;
-  total_generated?: number;
-  total_failed?:   number;
-  results?:        Record<string, { generated: number; failed: number }>;
+  phase:             string;
+  message:           string;
+  category?:         string;
+  generated?:        number;
+  total?:            number;
+  failed?:           number;
+  total_generated?:  number;
+  total_failed?:     number;
+  job_id?:           string;
+  results?:          Record<string, { generated: number; failed: number }>;
 }
 
 async function runGeneration(
@@ -182,13 +169,15 @@ async function runGeneration(
 
   if (!res.ok || !res.body) {
     const text = await res.text().catch(() => "Unknown error");
-    throw new Error(text);
+    let parsed: { error?: string; job?: unknown } = {};
+    try { parsed = JSON.parse(text); } catch { /* not json */ }
+    if (res.status === 409) throw new Error(`locked:${JSON.stringify(parsed.job ?? {})}`);
+    throw new Error(parsed.error ?? text);
   }
 
   const reader  = res.body.getReader();
   const decoder = new TextDecoder();
   let   buffer  = "";
-
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -203,21 +192,173 @@ async function runGeneration(
   }
 }
 
+// ─── Progress Bar component ───────────────────────────────────────────────────
+
+interface ProgressBarProps {
+  label:     string;
+  generated: number;
+  target:    number;
+  color?:    string;
+}
+
+function ProgressBar({ label, generated, target, color = ACCENT }: ProgressBarProps) {
+  const pct = target > 0 ? Math.min(100, Math.round((generated / target) * 100)) : 0;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-[11px]">
+        <span className="text-zinc-300 font-medium capitalize">{label}</span>
+        <span className="text-zinc-500 tabular-nums">{generated} / {target}</span>
+      </div>
+      <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: color }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── Active job banner (persistent, survives refresh) ─────────────────────────
+
+interface ActiveJobBannerProps {
+  job:       GenerationJob;
+  onDismiss: () => void;
+}
+
+function ActiveJobBanner({ job, onDismiss }: ActiveJobBannerProps) {
+  const isRunning  = job.status === "running";
+  const isComplete = job.status === "complete";
+  const isFailed   = job.status === "failed";
+  const pct        = job.target_count > 0 ? Math.min(100, Math.round((job.generated_count / job.target_count) * 100)) : 0;
+
+  const cp = job.category_progress ?? {};
+
+  const imageCats: Category[] = ["stadium", "crowd", "field", "abstract", "players"];
+  const imageEntries = imageCats.filter((c) => cp[c]);
+  const videoEntries = imageCats.filter((c) => cp[`video_${c}`]);
+
+  const elapsedSecs = job.started_at
+    ? Math.round((Date.now() - new Date(job.started_at).getTime()) / 1000)
+    : 0;
+  const rate = elapsedSecs > 0 ? job.generated_count / elapsedSecs : 0;
+  const remaining = rate > 0 ? Math.round((job.target_count - job.generated_count) / rate) : null;
+
+  return (
+    <div
+      className="rounded-2xl border overflow-hidden"
+      style={{
+        borderColor: isComplete ? "#10b98140" : isFailed ? "#ef444440" : `${ACCENT}40`,
+        background:  isComplete ? "#10b98108" : isFailed ? "#ef444408" : `${ACCENT}08`,
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "inherit" }}>
+        <div className="flex items-center gap-2.5">
+          {isRunning && <Loader2 className="h-4 w-4 animate-spin shrink-0" style={{ color: ACCENT }} />}
+          {isComplete && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />}
+          {isFailed   && <AlertCircle  className="h-4 w-4 shrink-0 text-red-400" />}
+          <div>
+            <p className="text-sm font-semibold text-white">
+              {isRunning  && "Media generation in progress"}
+              {isComplete && "Media generation complete"}
+              {isFailed   && "Media generation failed"}
+            </p>
+            <p className="text-[11px] text-zinc-500 mt-0.5">
+              Target: <span className="capitalize">{job.target}</span>
+              {isRunning && remaining !== null && ` · ~${remaining}s remaining`}
+              {isComplete && ` · ${job.generated_count} assets generated`}
+            </p>
+          </div>
+        </div>
+        {!isRunning && (
+          <button onClick={onDismiss} className="w-7 h-7 flex items-center justify-center rounded-lg bg-zinc-800/60 hover:bg-zinc-700 transition-colors">
+            <X className="h-3.5 w-3.5 text-zinc-400" />
+          </button>
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="p-4 space-y-4">
+
+        {/* Overall progress */}
+        <ProgressBar
+          label={`Overall — ${job.target}`}
+          generated={job.generated_count}
+          target={job.target_count}
+          color={isComplete ? "#10b981" : isFailed ? "#ef4444" : ACCENT}
+        />
+
+        {/* Per-category image progress */}
+        {imageEntries.length > 0 && (
+          <div className="space-y-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-600">Images</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+              {imageEntries.map((cat) => {
+                const prog = cp[cat];
+                return (
+                  <ProgressBar
+                    key={cat}
+                    label={cat}
+                    generated={prog.generated}
+                    target={prog.target}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Per-category video progress */}
+        {videoEntries.length > 0 && (
+          <div className="space-y-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-600">Videos</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+              {videoEntries.map((cat) => {
+                const prog = cp[`video_${cat}`];
+                return (
+                  <ProgressBar
+                    key={cat}
+                    label={`${cat} video`}
+                    generated={prog.generated}
+                    target={prog.target}
+                    color="#38BDF8"
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {isFailed && job.error_message && (
+          <p className="text-[11px] text-red-400 bg-red-900/10 rounded-lg px-3 py-2 break-all">{job.error_message}</p>
+        )}
+
+        {isRunning && (
+          <p className="text-[10px] text-zinc-600 text-center">Generation is running in the background — safe to close this browser tab</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Generation modal ─────────────────────────────────────────────────────────
 
-type GenPhase = "confirm" | "generating" | "complete" | "error";
+type GenPhase = "confirm" | "generating" | "complete" | "error" | "locked";
 
 interface GenModalProps {
   job:        JobConfig;
   onClose:    () => void;
   onComplete: () => void;
+  onJobStart: (jobId: string) => void;
 }
 
-function GenModal({ job, onClose, onComplete }: GenModalProps) {
+function GenModal({ job, onClose, onComplete, onJobStart }: GenModalProps) {
   const [phase, setPhase]       = useState<GenPhase>("confirm");
   const [logs, setLogs]         = useState<string[]>([]);
   const [progress, setProgress] = useState<SseEvent | null>(null);
   const [error, setError]       = useState<string | null>(null);
+  const [lockedJob, setLockedJob] = useState<{ target: string; started_at: string } | null>(null);
   const logsEndRef              = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -230,28 +371,32 @@ function GenModal({ job, onClose, onComplete }: GenModalProps) {
     setError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        throw new Error("Admin authentication required. Please sign in again.");
-      }
+      if (!session?.access_token) throw new Error("Admin authentication required.");
+
       await runGeneration(job.target, (evt) => {
         setProgress(evt);
         setLogs((prev) => [...prev, evt.message]);
-        if (evt.phase === "complete") {
-          setPhase("complete");
-          clearMediaCaches();
-        }
+        if (evt.job_id) onJobStart(evt.job_id);
+        if (evt.phase === "complete") { setPhase("complete"); clearMediaCaches(); }
       }, session.access_token);
+
       setPhase((p) => p === "generating" ? "complete" : p);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-      setPhase("error");
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      if (msg.startsWith("locked:")) {
+        try { setLockedJob(JSON.parse(msg.slice(7))); } catch { /* ignore */ }
+        setPhase("locked");
+      } else {
+        setError(msg);
+        setPhase("error");
+      }
     }
   };
 
-  const generated  = progress?.generated ?? 0;
-  const total      = progress?.total ?? job.totalAssets;
-  const pct        = total > 0 ? Math.round((generated / total) * 100) : 0;
-  const barColour  = job.isVideo ? "#38BDF8" : ACCENT;
+  const generated = progress?.generated ?? 0;
+  const total     = progress?.total ?? job.totalAssets;
+  const pct       = total > 0 ? Math.round((generated / total) * 100) : 0;
+  const barColour = job.isVideo ? "#38BDF8" : ACCENT;
 
   return (
     <div
@@ -286,7 +431,6 @@ function GenModal({ job, onClose, onComplete }: GenModalProps) {
           {phase === "confirm" && (
             <>
               <p className="text-sm text-zinc-300 leading-relaxed">{job.description}</p>
-
               <div className="bg-zinc-800/60 rounded-xl p-4 space-y-2">
                 <div className="flex items-center gap-2 text-xs text-zinc-400">
                   <ImageIcon className="h-3.5 w-3.5 shrink-0" />
@@ -312,16 +456,11 @@ function GenModal({ job, onClose, onComplete }: GenModalProps) {
                   <p className="text-[11px] text-zinc-500 mt-0.5">{generated} / {total} assets · {pct}%</p>
                 </div>
               </div>
-
               <div className="space-y-1">
                 <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${pct}%`, background: barColour }}
-                  />
+                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: barColour }} />
                 </div>
               </div>
-
               <div className="bg-zinc-950 rounded-xl p-3 h-28 overflow-y-auto font-mono text-[10px] text-zinc-500 space-y-0.5">
                 {logs.map((log, i) => (
                   <div key={i} className={i === logs.length - 1 ? "text-zinc-300" : ""}>{log}</div>
@@ -358,32 +497,40 @@ function GenModal({ job, onClose, onComplete }: GenModalProps) {
               </div>
             </div>
           )}
+
+          {phase === "locked" && (
+            <div className="space-y-3 text-center py-2">
+              <div className="w-10 h-10 mx-auto rounded-xl flex items-center justify-center" style={{ background: `${ACCENT}20` }}>
+                <Lock className="h-5 w-5" style={{ color: ACCENT }} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">Media generation already running</p>
+                <p className="text-[11px] text-zinc-500 mt-1">
+                  Another generation job is active
+                  {lockedJob?.target && <> for <span className="capitalize text-zinc-300">{lockedJob.target}</span></>}.
+                  Check the progress panel below.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="px-5 py-4 border-t border-zinc-800 flex gap-2">
           {phase === "confirm" && (
             <>
-              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-zinc-700 text-xs font-medium text-zinc-300 hover:bg-zinc-800 transition-colors">
-                Cancel
-              </button>
-              <button onClick={start} className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-black transition-colors" style={{ background: ACCENT }}>
-                Generate
-              </button>
+              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-zinc-700 text-xs font-medium text-zinc-300 hover:bg-zinc-800 transition-colors">Cancel</button>
+              <button onClick={start} className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-black transition-colors" style={{ background: ACCENT }}>Generate</button>
             </>
           )}
-          {(phase === "complete" || phase === "error") && (
-            <button
-              onClick={() => { onClose(); onComplete(); }}
-              className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-black"
-              style={{ background: ACCENT }}
-            >
+          {(phase === "complete" || phase === "error" || phase === "locked") && (
+            <button onClick={() => { onClose(); if (phase === "complete") onComplete(); }} className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-black" style={{ background: ACCENT }}>
               {phase === "complete" ? "View Media Library" : "Close"}
             </button>
           )}
           {phase === "generating" && (
             <div className="flex-1 text-center text-[11px] text-zinc-600 py-2.5">
-              Generation in progress — please keep this window open
+              Generation is running in the background — safe to close this window
             </div>
           )}
         </div>
@@ -395,10 +542,11 @@ function GenModal({ job, onClose, onComplete }: GenModalProps) {
 // ─── Generation panel ─────────────────────────────────────────────────────────
 
 interface GenPanelProps {
-  onSelectJob: (job: JobConfig) => void;
+  onSelectJob:     (job: JobConfig) => void;
+  generationLocked: boolean;
 }
 
-function GenPanel({ onSelectJob }: GenPanelProps) {
+function GenPanel({ onSelectJob, generationLocked }: GenPanelProps) {
   const imagJobs = JOB_CONFIGS.filter((j) => !j.isVideo && j.target !== "full");
   const vidJob   = JOB_CONFIGS.find((j) => j.isVideo)!;
   const fullJob  = JOB_CONFIGS.find((j) => j.target === "full")!;
@@ -408,20 +556,21 @@ function GenPanel({ onSelectJob }: GenPanelProps) {
       <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-zinc-800">
         <Sparkles className="h-3.5 w-3.5" style={{ color: ACCENT }} />
         <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: ACCENT }}>Media Generation</span>
+        {generationLocked && (
+          <span className="ml-auto flex items-center gap-1.5 text-[10px] font-semibold text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-full">
+            <Lock className="h-3 w-3" /> Running
+          </span>
+        )}
       </div>
-
       <div className="p-4 space-y-3">
-        {/* Image category jobs — 2-col grid */}
         <div className="grid grid-cols-2 gap-2">
           {imagJobs.map((job) => (
-            <GenJobButton key={job.target} job={job} onSelect={onSelectJob} />
+            <GenJobButton key={job.target} job={job} onSelect={onSelectJob} locked={generationLocked} />
           ))}
         </div>
-
-        {/* Video + Full Pack */}
         <div className="grid grid-cols-2 gap-2">
-          <GenJobButton job={vidJob} onSelect={onSelectJob} highlight />
-          <GenJobButton job={fullJob} onSelect={onSelectJob} highlight accent />
+          <GenJobButton job={vidJob}  onSelect={onSelectJob} highlight locked={generationLocked} />
+          <GenJobButton job={fullJob} onSelect={onSelectJob} highlight accent locked={generationLocked} />
         </div>
       </div>
     </div>
@@ -429,17 +578,19 @@ function GenPanel({ onSelectJob }: GenPanelProps) {
 }
 
 interface GenJobButtonProps {
-  job:       JobConfig;
-  onSelect:  (job: JobConfig) => void;
+  job:        JobConfig;
+  onSelect:   (job: JobConfig) => void;
   highlight?: boolean;
   accent?:    boolean;
+  locked?:    boolean;
 }
 
-function GenJobButton({ job, onSelect, highlight = false, accent = false }: GenJobButtonProps) {
+function GenJobButton({ job, onSelect, highlight = false, accent = false, locked = false }: GenJobButtonProps) {
   return (
     <button
       onClick={() => onSelect(job)}
-      className="group flex flex-col gap-1.5 p-3 rounded-xl border text-left transition-all hover:border-zinc-600"
+      disabled={locked}
+      className="group flex flex-col gap-1.5 p-3 rounded-xl border text-left transition-all hover:border-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed"
       style={
         accent
           ? { background: `${ACCENT}15`, borderColor: `${ACCENT}40` }
@@ -448,14 +599,9 @@ function GenJobButton({ job, onSelect, highlight = false, accent = false }: GenJ
           : { borderColor: "hsl(var(--border))", background: "hsl(var(--muted)/0.15)" }
       }
     >
-      <div className="flex items-start justify-between gap-1">
-        <span
-          className="text-[11px] font-semibold leading-tight"
-          style={{ color: accent ? ACCENT : highlight ? "#38BDF8" : "hsl(var(--foreground))" }}
-        >
-          {job.label}
-        </span>
-      </div>
+      <span className="text-[11px] font-semibold leading-tight" style={{ color: accent ? ACCENT : highlight ? "#38BDF8" : "hsl(var(--foreground))" }}>
+        {job.label}
+      </span>
       <span className="text-[10px] text-zinc-500 leading-snug">{job.assetLine}</span>
       <div className="flex items-center gap-1 mt-0.5">
         <DollarSign className="h-2.5 w-2.5 text-emerald-500 shrink-0" />
@@ -479,7 +625,6 @@ function PreviewModal({ item, mode, onClose, onDelete }: PreviewModalProps) {
     const a = document.createElement("a");
     a.href = item.url; a.download = item.filename; a.target = "_blank"; a.click();
   };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
       <div className="relative bg-zinc-900 border border-zinc-700 rounded-2xl overflow-hidden max-w-3xl w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -500,19 +645,13 @@ function PreviewModal({ item, mode, onClose, onDelete }: PreviewModalProps) {
             </button>
           </div>
         </div>
-
         <div className="bg-black flex items-center justify-center" style={{ minHeight: 360, maxHeight: 560 }}>
-          {mode === "graphic" ? (
-            <img src={item.url} alt={item.label} className="max-w-full max-h-[540px] object-contain" />
-          ) : (
-            <video src={item.url} controls autoPlay loop className="max-w-full max-h-[540px]" style={{ maxWidth: "100%" }} />
-          )}
+          {mode === "graphic"
+            ? <img src={item.url} alt={item.label} className="max-w-full max-h-[540px] object-contain" />
+            : <video src={item.url} controls autoPlay loop className="max-w-full max-h-[540px]" />}
         </div>
-
         <div className="px-5 py-3 flex items-center gap-3 border-t border-zinc-800">
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold capitalize" style={{ background: `${ACCENT}18`, color: ACCENT }}>
-            {item.category}
-          </span>
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold capitalize" style={{ background: `${ACCENT}18`, color: ACCENT }}>{item.category}</span>
           <span className="text-[11px] text-zinc-500">{mode === "graphic" ? "Image" : "Video"}</span>
         </div>
       </div>
@@ -530,7 +669,6 @@ interface MediaCardProps {
 
 function MediaCard({ item, mode, onClick }: MediaCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-
   return (
     <button
       className="group relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 hover:border-zinc-600 transition-all text-left"
@@ -539,22 +677,20 @@ function MediaCard({ item, mode, onClick }: MediaCardProps) {
       onMouseLeave={() => { if (mode === "video" && videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0; } }}
     >
       <div className="relative aspect-video bg-zinc-950">
-        {mode === "graphic" ? (
-          <img src={item.thumbnail} alt={item.label} loading="lazy" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
-        ) : (
-          <>
-            <video ref={videoRef} src={item.url} muted loop playsInline preload="none" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-            <div className="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity">
-              <div className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
-                <Play className="h-3.5 w-3.5 text-white ml-0.5" />
+        {mode === "graphic"
+          ? <img src={item.thumbnail} alt={item.label} loading="lazy" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+          : (
+            <>
+              <video ref={videoRef} src={item.url} muted loop playsInline preload="none" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity">
+                <div className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
+                  <Play className="h-3.5 w-3.5 text-white ml-0.5" />
+                </div>
               </div>
-            </div>
-          </>
-        )}
+            </>
+          )}
         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-1.5" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)" }}>
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold capitalize" style={{ background: `${ACCENT}25`, color: ACCENT }}>
-            {item.category}
-          </span>
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold capitalize" style={{ background: `${ACCENT}25`, color: ACCENT }}>{item.category}</span>
         </div>
       </div>
       <div className="px-2.5 py-2 bg-zinc-900/80">
@@ -568,17 +704,22 @@ function MediaCard({ item, mode, onClick }: MediaCardProps) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AdminMediaLibrary() {
-  const [mode, setMode]               = useState<MediaMode>("graphic");
-  const [category, setCategory]       = useState<Category>("all");
-  const [images, setImages]           = useState<MediaItem[]>([]);
-  const [videos, setVideos]           = useState<MediaItem[]>([]);
-  const [loading, setLoading]         = useState(false);
-  const [preview, setPreview]         = useState<MediaItem | null>(null);
-  const [search, setSearch]           = useState("");
-  const [deleteConfirm, setDeleteConfirm] = useState<MediaItem | null>(null);
-  const [deleting, setDeleting]       = useState(false);
-  const [activeJob, setActiveJob]     = useState<JobConfig | null>(null);
-  const hasLoaded                     = useRef(false);
+  const [mode, setMode]                         = useState<MediaMode>("graphic");
+  const [category, setCategory]                 = useState<Category>("all");
+  const [images, setImages]                     = useState<MediaItem[]>([]);
+  const [videos, setVideos]                     = useState<MediaItem[]>([]);
+  const [loading, setLoading]                   = useState(false);
+  const [preview, setPreview]                   = useState<MediaItem | null>(null);
+  const [search, setSearch]                     = useState("");
+  const [deleteConfirm, setDeleteConfirm]       = useState<MediaItem | null>(null);
+  const [deleting, setDeleting]                 = useState(false);
+  const [activeJob, setActiveJob]               = useState<JobConfig | null>(null);
+  const [runningDbJob, setRunningDbJob]         = useState<GenerationJob | null>(null);
+  const [dismissedJobId, setDismissedJobId]     = useState<string | null>(null);
+  const hasLoaded                               = useRef(false);
+  const pollRef                                 = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Load media ──────────────────────────────────────────────────────────────
 
   const fetchAll = useCallback(async (force = false) => {
     setLoading(true);
@@ -596,13 +737,59 @@ export default function AdminMediaLibrary() {
     if (!hasLoaded.current) { hasLoaded.current = true; fetchAll(); }
   }, [fetchAll]);
 
-  const activeItems = mode === "graphic" ? images : videos;
+  // ── Poll job status (survives page refresh) ─────────────────────────────────
 
-  const filtered = activeItems.filter((item) => {
+  const fetchLatestJob = useCallback(async () => {
+    const { data } = await supabase
+      .from("media_generation_jobs")
+      .select("*")
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!data) { setRunningDbJob(null); return; }
+
+    const job = data as GenerationJob;
+
+    if (job.id === dismissedJobId) { setRunningDbJob(null); return; }
+
+    if (job.status === "running" || job.status === "complete" || job.status === "failed") {
+      setRunningDbJob(job);
+    } else {
+      setRunningDbJob(null);
+    }
+
+    if (job.status === "complete") {
+      clearMediaCaches();
+      fetchAll(true);
+    }
+  }, [dismissedJobId, fetchAll]);
+
+  // Start polling on mount and whenever dismissedJobId changes
+  useEffect(() => {
+    fetchLatestJob();
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(fetchLatestJob, POLL_INTERVAL_MS);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [fetchLatestJob]);
+
+  // ── Derived state ────────────────────────────────────────────────────────────
+
+  const isGenerationLocked = runningDbJob?.status === "running";
+
+  const activeItems = mode === "graphic" ? images : videos;
+  const filtered    = activeItems.filter((item) => {
     const matchesCat    = category === "all" || item.category === category;
     const matchesSearch = !search || item.label.toLowerCase().includes(search.toLowerCase()) || item.filename.toLowerCase().includes(search.toLowerCase());
     return matchesCat && matchesSearch;
   });
+
+  const countsByCategory: Record<string, number> = { all: activeItems.length };
+  for (const cat of IMAGE_SUBCATEGORIES) {
+    countsByCategory[cat] = activeItems.filter((i) => i.category === cat).length;
+  }
+
+  // ── Delete ────────────────────────────────────────────────────────────────
 
   const handleDelete = async (item: MediaItem) => {
     setDeleting(true);
@@ -623,11 +810,6 @@ export default function AdminMediaLibrary() {
     }
   };
 
-  const countsByCategory: Record<string, number> = { all: activeItems.length };
-  for (const cat of IMAGE_SUBCATEGORIES) {
-    countsByCategory[cat] = activeItems.filter((i) => i.category === cat).length;
-  }
-
   return (
     <div className="space-y-6">
 
@@ -635,9 +817,7 @@ export default function AdminMediaLibrary() {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-lg font-bold tracking-tight">Media Library</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {images.length} images · {videos.length} videos
-          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">{images.length} images · {videos.length} videos</p>
         </div>
         <button
           onClick={() => fetchAll(true)}
@@ -649,8 +829,16 @@ export default function AdminMediaLibrary() {
         </button>
       </div>
 
+      {/* Active job banner — visible after page refresh if job is running */}
+      {runningDbJob && runningDbJob.id !== dismissedJobId && (
+        <ActiveJobBanner
+          job={runningDbJob}
+          onDismiss={() => setDismissedJobId(runningDbJob.id)}
+        />
+      )}
+
       {/* Generation panel */}
-      <GenPanel onSelectJob={setActiveJob} />
+      <GenPanel onSelectJob={setActiveJob} generationLocked={isGenerationLocked} />
 
       {/* Mode tabs */}
       <div className="flex gap-1 p-1 rounded-xl bg-muted/30 w-fit border border-border">
@@ -661,8 +849,7 @@ export default function AdminMediaLibrary() {
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
             style={mode === id ? { background: ACCENT, color: "#000" } : { color: "hsl(var(--muted-foreground))" }}
           >
-            <Icon className="h-4 w-4" />
-            {label}
+            <Icon className="h-4 w-4" />{label}
           </button>
         ))}
       </div>
@@ -688,19 +875,13 @@ export default function AdminMediaLibrary() {
             </button>
           ))}
         </div>
-
         <div className="flex items-center gap-2 ml-auto border border-border rounded-lg px-3 py-1.5 bg-background">
           <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search media..."
+            type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search media..."
             className="text-xs bg-transparent outline-none w-40 placeholder:text-muted-foreground/50"
           />
-          {search && (
-            <button onClick={() => setSearch("")}><X className="h-3 w-3 text-muted-foreground" /></button>
-          )}
+          {search && <button onClick={() => setSearch("")}><X className="h-3 w-3 text-muted-foreground" /></button>}
         </div>
       </div>
 
@@ -713,15 +894,9 @@ export default function AdminMediaLibrary() {
         <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
           <Grid3x3 className="h-10 w-10 text-muted-foreground/30" />
           <p className="text-sm font-medium text-muted-foreground">
-            {activeItems.length === 0
-              ? `No ${mode === "graphic" ? "images" : "videos"} found in storage`
-              : "No results match your filter"}
+            {activeItems.length === 0 ? `No ${mode === "graphic" ? "images" : "videos"} found in storage` : "No results match your filter"}
           </p>
-          {activeItems.length === 0 && (
-            <p className="text-xs text-muted-foreground/50 max-w-xs">
-              Use the Media Generation panel above to generate new assets.
-            </p>
-          )}
+          {activeItems.length === 0 && <p className="text-xs text-muted-foreground/50 max-w-xs">Use the Media Generation panel above to generate new assets.</p>}
         </div>
       ) : (
         <>
@@ -729,21 +904,14 @@ export default function AdminMediaLibrary() {
             <span>{filtered.length} {mode === "graphic" ? "images" : "videos"}</span>
           </div>
           <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}>
-            {filtered.map((item) => (
-              <MediaCard key={item.id} item={item} mode={mode} onClick={setPreview} />
-            ))}
+            {filtered.map((item) => <MediaCard key={item.id} item={item} mode={mode} onClick={setPreview} />)}
           </div>
         </>
       )}
 
       {/* Preview Modal */}
       {preview && (
-        <PreviewModal
-          item={preview}
-          mode={mode}
-          onClose={() => setPreview(null)}
-          onDelete={(item) => { setPreview(null); setDeleteConfirm(item); }}
-        />
+        <PreviewModal item={preview} mode={mode} onClose={() => setPreview(null)} onDelete={(item) => { setPreview(null); setDeleteConfirm(item); }} />
       )}
 
       {/* Generation Modal */}
@@ -752,15 +920,13 @@ export default function AdminMediaLibrary() {
           job={activeJob}
           onClose={() => setActiveJob(null)}
           onComplete={() => fetchAll(true)}
+          onJobStart={() => { fetchLatestJob(); }}
         />
       )}
 
       {/* Delete Confirm */}
       {deleteConfirm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-          onClick={() => setDeleteConfirm(null)}
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setDeleteConfirm(null)}>
           <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-red-900/30 flex items-center justify-center shrink-0">
@@ -773,9 +939,7 @@ export default function AdminMediaLibrary() {
             </div>
             <p className="text-xs text-zinc-400">This will permanently remove the file from storage. This action cannot be undone.</p>
             <div className="flex gap-2">
-              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2 rounded-lg border border-zinc-700 text-xs font-medium text-zinc-300 hover:bg-zinc-800 transition-colors">
-                Cancel
-              </button>
+              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2 rounded-lg border border-zinc-700 text-xs font-medium text-zinc-300 hover:bg-zinc-800 transition-colors">Cancel</button>
               <button onClick={() => handleDelete(deleteConfirm)} disabled={deleting} className="flex-1 py-2 rounded-lg bg-red-600 text-xs font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50">
                 {deleting ? "Deleting…" : "Delete"}
               </button>

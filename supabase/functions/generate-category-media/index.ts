@@ -8,7 +8,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const STORAGE_BUCKET = "content-assets";
+const STORAGE_BUCKET   = "content-assets";
 const IMAGE_CATEGORIES = ["stadium", "crowd", "field", "abstract", "players"] as const;
 const VIDEO_CATEGORIES = ["stadium", "crowd", "field", "abstract", "players"] as const;
 type ImageCategory = typeof IMAGE_CATEGORIES[number];
@@ -26,191 +26,125 @@ const VIDEO_COUNTS: Record<VideoCategory, number> = {
 // ─── Safety limits ────────────────────────────────────────────────────────────
 
 const MAX_GENERATION = 200;
-const BATCH_SIZE     = 5;
+const BATCH_SIZE     = 4;
 const BATCH_DELAY_MS = 500;
 
-// ─── AFL structured variation pools ──────────────────────────────────────────
+// ─── STRICT AFL STADIUM MASTER PROMPT ─────────────────────────────────────────
+// Enforces correct AFL field geometry, goal post layout, and oval shape.
 
-const AFL_BASE = "Ultra realistic Australian Rules Football stadium, large oval grass field, correct AFL goal post layout, exactly four tall central goal posts and two shorter behind posts on each side, total six posts per end, packed crowd, professional sports broadcast lighting, ESPN sports photography style, cinematic stadium atmosphere, high detail grass oval";
+const AFL_STADIUM_MASTER = [
+  "Ultra realistic Australian Rules Football stadium",
+  "Massive OVAL shaped grass field — NOT rectangular",
+  "Correct AFL goal post layout: FOUR tall central goal posts and TWO shorter behind posts on each side, total SIX posts per end",
+  "Wide oval field proportions",
+  "Packed stadium crowd in grandstands",
+  "Professional sports broadcast lighting",
+  "Cinematic sports photography",
+  "ESPN / Fox Footy broadcast style",
+  "Ultra detailed grass oval",
+].join(", ");
 
-const AFL_NEGATIVE = "soccer field, rectangular pitch, NFL field, rugby posts, extra goal posts, goal nets, eight goal posts, six central posts, text, watermarks, logos";
+const AFL_NEGATIVE = [
+  "soccer field", "rectangular pitch", "rectangular field",
+  "NFL field", "rugby field", "rugby posts",
+  "goal nets", "extra goal posts", "eight goal posts",
+  "wrong stadium shape", "training ground", "empty park",
+  "text", "watermarks", "logos",
+].join(", ");
+
+// ─── Variation pools ──────────────────────────────────────────────────────────
 
 const CAMERA_ANGLES = [
   "aerial broadcast view from high grandstand",
+  "mid-level broadcast camera angle centre wing",
   "tunnel entrance view looking onto the oval",
-  "wide panoramic shot from behind the goals",
-  "centre wing broadcast camera angle",
+  "aerial stadium drone shot pulling back",
   "scoreboard end elevated perspective",
-  "low angle ground-level sideline view",
-  "elevated press box wide shot",
-  "crowd perspective from upper tier stands",
-  "behind the goal posts view facing crowd",
-  "drone pull-back revealing full stadium scale",
+  "wide panoramic from behind the goals",
+  "low sideline broadcast angle",
+  "upper tier crowd perspective",
 ];
 
-const TIME_OF_DAY = [
-  "night match under full stadium floodlights",
-  "golden sunset match with warm orange hues",
-  "twilight stadium with lights just coming on",
-  "daytime match under bright clear sunlight",
-  "overcast grey afternoon atmospheric lighting",
-  "pre-game warmup golden morning atmosphere",
+const LIGHTING = [
+  "night match under full stadium floodlights blazing",
+  "golden sunset warm stadium lighting",
+  "stadium lights just switching on twilight",
+  "foggy night stadium lights glowing through mist",
+  "bright daytime broadcast stadium lighting",
+  "deep blue dusk with stadium glow",
+  "MCG style massive floodlight towers",
+  "Marvel Stadium indoor dome lighting",
+];
+
+const CROWD_DENSITY = [
+  "packed grand final sold-out crowd roaring",
+  "massive AFL finals crowd cheering in unison",
+  "regular season packed stands atmosphere",
+  "50000 fans stadium atmosphere buzzing",
+  "halftime crowd energy packed grandstands",
+  "spontaneous standing ovation stadium moment",
 ];
 
 const WEATHER = [
   "clear sky perfect conditions",
-  "light rain glistening on the field",
+  "light rain glistening on the oval",
   "misty foggy evening atmosphere",
-  "dramatic overcast storm clouds building",
-  "crisp winter morning frost atmosphere",
-  "hazy warm summer day heat shimmer",
+  "crisp winter night atmosphere",
+  "hazy warm summer afternoon",
+  "overcast dramatic storm clouds building",
 ];
 
-const CROWD_DENSITY = [
-  "sold-out packed grand final crowd roaring",
-  "massive AFL finals crowd cheering in unison",
-  "packed stadium stands waving team scarves",
-  "50000 fans stadium atmosphere buzzing",
-  "halftime crowd energy packed stands",
-  "spontaneous standing ovation crowd moment",
+const CROWD_STATES = [
+  "massive AFL crowd cheering inside stadium",
+  "fans waving team colours at AFL match",
+  "packed stadium stands night match",
+  "AFL crowd celebration moment stadium erupting",
+  "stadium roar moment during AFL match",
+  "sea of fans waving scarves in unison",
+  "50000 fans packed AFL stadium",
 ];
 
-const LIGHTING_STYLES = [
-  "dramatic LED floodlights blazing",
-  "cinematic sports broadcast lighting",
-  "golden sunset glow across the oval",
-  "bright daytime broadcast stadium lighting",
-  "deep blue dusk with stadium glow",
-  "high contrast split broadcast lighting",
-  "MCG style stadium lighting atmosphere",
-  "Marvel Stadium indoor lighting glow",
+const FIELD_SCENES = [
+  "empty AFL oval field night under stadium lights",
+  "perfect grass AFL oval broadcast camera angle",
+  "centre field AFL stadium overhead broadcast view",
+  "low fog over stadium grass AFL oval",
+  "clean professional AFL oval field lighting",
+  "AFL oval centre circle close-up stadium background",
 ];
 
-const STADIUM_VENUES = [
-  "MCG style massive stadium",
-  "Marvel Stadium indoor dome atmosphere",
-  "modern sports arena oval field",
-  "iconic Australian football ground",
-  "large metropolitan AFL stadium",
-  "heritage football oval grandstand",
+const PLAYER_ACTIONS = [
+  "Australian Rules Football player kicking ball mid action stadium crowd background",
+  "AFL midfielder handball action sports photography stadium lights",
+  "AFL ruck contest centre bounce dramatic lighting stadium crowd",
+  "AFL mark contest high jump football catch silhouette stadium background",
+  "AFL player running through stadium lights dynamic motion",
+  "AFL player silhouette celebrating goal arms raised stadium crowd roaring",
+  "Australian football player leaping for spectacular mark crowd background",
+  "AFL player handpass in traffic stadium crowd backdrop",
 ];
 
-// ─── Stadium-specific prompt pack ─────────────────────────────────────────────
-
-const STADIUM_PROMPTS = [
-  (angle: string, time: string, wx: string, light: string, venue: string) =>
-    `${AFL_BASE}, ${venue}, ${time}, ${wx}, ${angle}, ${light}, no text, no logos`,
-  (angle: string, time: string, wx: string, light: string, venue: string) =>
-    `${AFL_BASE}, ${venue} broadcast view from high grandstand, ${time}, ${wx}, ${light}, packed crowd, no text, no logos`,
-  (angle: string, time: string, wx: string, light: string, venue: string) =>
-    `${AFL_BASE}, ${venue} tunnel entrance view looking onto the oval, players warming up, ${time}, ${light}, no text, no logos`,
-  (angle: string, time: string, wx: string, light: string, _venue: string) =>
-    `Wide panoramic AFL stadium during ${time}, ${wx}, ${angle}, ${light}, broadcast quality photography, no text, no logos`,
-  (angle: string, time: string, wx: string, light: string, _venue: string) =>
-    `Pre-game AFL stadium warmup atmosphere, ${time}, ${wx}, ${angle}, ${light}, broadcast style, no text, no logos`,
-  (_angle: string, _time: string, _wx: string, _light: string, venue: string) =>
-    `${AFL_BASE}, ${venue}, foggy night match stadium lights glowing through mist, cinematic atmosphere, no text, no logos`,
-  (_angle: string, _time: string, _wx: string, _light: string, _venue: string) =>
-    `${AFL_BASE}, sunset golden hour stadium lighting, packed crowd, cinematic broadcast photography, no text, no logos`,
-  (_angle: string, _time: string, _wx: string, light: string, venue: string) =>
-    `Massive crowd AFL grand final atmosphere, ${venue}, ${light}, sold-out stadium, broadcast wide shot, no text, no logos`,
+const ABSTRACT_STYLES = [
+  "sports broadcast graphic background gold and navy dynamic diagonal streaks",
+  "dynamic stadium lighting abstract sports theme dark background cinematic glow",
+  "professional sports graphic background broadcast style dark dramatic atmosphere",
+  "dark blue and gold sports broadcast template background premium digital aesthetic",
+  "cinematic sports graphics abstract motion blur dark field textures",
+  "dark sports broadcast background stadium lighting glow subtle turf textures stats overlay style",
+  "abstract sports data visualisation glowing geometric lines dynamic motion broadcast aesthetic",
 ];
 
-// ─── Crowd-specific prompt pack ───────────────────────────────────────────────
-
-const CROWD_PROMPTS = [
-  (crowd: string, time: string, light: string) =>
-    `${crowd} inside AFL stadium, ${time}, ${light}, dramatic broadcast sports photography, no text, no logos`,
-  (crowd: string, time: string, light: string) =>
-    `AFL fans ${crowd} waving team colours at live match, stadium atmosphere, ${time}, ${light}, no text, no logos`,
-  (crowd: string, time: string, light: string) =>
-    `Packed stadium stands AFL match, ${crowd}, ${time}, ${light}, sports photography, no text, no logos`,
-  (_crowd: string, time: string, light: string) =>
-    `AFL crowd celebration moment stadium erupting, fans cheering, ${time}, ${light}, broadcast angle, no text, no logos`,
-  (crowd: string, time: string, light: string) =>
-    `Stadium roar moment during AFL match, ${crowd}, ${time}, ${light}, ESPN style broadcast, no text, no logos`,
-  (_crowd: string, time: string, light: string) =>
-    `Sea of AFL fans in stadium stands, close-up crowd energy, ${time}, ${light}, no text, no logos`,
-];
-
-// ─── Field-specific prompt pack ───────────────────────────────────────────────
-
-const FIELD_PROMPTS = [
-  (time: string, wx: string) =>
-    `Empty AFL oval field at ${time} under stadium lights, ${wx}, broadcast camera angle, perfect grass, no players, no text`,
-  (time: string, wx: string) =>
-    `Perfect grass AFL oval broadcast camera angle, ${time}, ${wx}, clean professional sports field, no players, no text`,
-  (time: string, _wx: string) =>
-    `Centre field AFL stadium broadcast view, ${time}, stadium lights glowing, overhead shot, no players, no text`,
-  (_time: string, _wx: string) =>
-    `Low fog over stadium grass AFL oval, stadium lights cutting through mist, cinematic, no players, no text`,
-  (time: string, wx: string) =>
-    `Clean professional AFL sports field lighting, ${time}, ${wx}, broadcast camera angle, empty oval, no players, no text`,
-  (_time: string, _wx: string) =>
-    `AFL oval field centre circle close-up, stadium atmosphere in background, broadcast quality, no players, no text`,
-];
-
-// ─── Players-specific prompt pack ────────────────────────────────────────────
-
-const PLAYER_PROMPTS = [
-  (time: string, light: string) =>
-    `Australian Rules Football player kicking ball mid action, stadium crowd in background, ${time}, ${light}, dramatic sports photography, no text, no logos`,
-  (time: string, light: string) =>
-    `AFL midfielder handball action sports photography, stadium lights, ${time}, ${light}, broadcast style, no text, no logos`,
-  (time: string, light: string) =>
-    `AFL ruck contest centre bounce dramatic lighting, stadium crowd, ${time}, ${light}, no text, no logos`,
-  (time: string, light: string) =>
-    `AFL mark contest high jump football catch silhouette, stadium background, ${time}, ${light}, dramatic, no text, no logos`,
-  (time: string, light: string) =>
-    `AFL player running through stadium lights, dynamic blur motion, ${time}, ${light}, broadcast photography, no text, no logos`,
-  (time: string, light: string) =>
-    `AFL player silhouette celebrating a goal arms raised, stadium crowd roaring, ${time}, ${light}, no text, no logos`,
-  (time: string, light: string) =>
-    `Australian football player leaping for spectacular mark, crowd in background, ${time}, ${light}, cinematic sports, no text, no logos`,
-];
-
-// ─── Abstract-specific prompt pack ───────────────────────────────────────────
-
-const ABSTRACT_PROMPTS = [
-  (light: string) =>
-    `Sports broadcast graphic background gold and navy, ${light}, dynamic diagonal streaks, no text, no logos`,
-  (light: string) =>
-    `Dynamic stadium lighting abstract sports theme, ${light}, dark background, cinematic glow, no text, no logos`,
-  (light: string) =>
-    `Professional sports graphic background broadcast style, ${light}, dark dramatic atmosphere, no text, no logos`,
-  (light: string) =>
-    `Dark blue and gold sports broadcast template background, ${light}, premium digital aesthetic, no text, no logos`,
-  (light: string) =>
-    `Cinematic sports graphics lighting background, ${light}, abstract motion blur, dark field textures, no text, no logos`,
-  (light: string) =>
-    `Dark sports broadcast background stadium lighting glow subtle turf textures, ${light}, stats overlay style, no text, no logos`,
-  (light: string) =>
-    `Abstract sports data visualisation glowing geometric lines dynamic motion, ${light}, premium broadcast aesthetic, no text, no logos`,
-];
-
-// ─── Video prompt pack ────────────────────────────────────────────────────────
-
-const VIDEO_PROMPTS = [
-  (time: string) =>
-    `Cinematic aerial shot flying into massive AFL stadium at night with bright stadium lights and cheering crowd, ${time}, loopable broadcast footage, ultra realistic`,
-  (time: string) =>
-    `Slow motion tunnel entrance walk onto AFL oval field under stadium lights, ${time}, cinematic broadcast intro, loopable`,
-  (time: string) =>
-    `Crowd stadium wave moment during AFL match night game, ${time}, packed stands, slow motion broadcast, loopable`,
-  (time: string) =>
-    `Broadcast camera sweeping across packed AFL stadium, ${time}, cinematic sports coverage, loopable`,
-  (_time: string) =>
-    `Stadium lights turning on before AFL night match, dramatic floodlight activation, broadcast quality, loopable`,
-  (time: string) =>
-    `Golden sunset AFL stadium wide aerial shot, ${time}, cinematic broadcast wide, loopable`,
-  (_time: string) =>
-    `Crowd cheering slow motion stadium atmosphere AFL match, broadcast close-up, cinematic, loopable`,
-  (_time: string) =>
-    `Centre bounce moment AFL match with dramatic stadium lighting, broadcast angle, cinematic, loopable`,
-  (_time: string) =>
-    `Rain falling over AFL stadium during match, wet field glistening, cinematic atmosphere, loopable`,
-  (_time: string) =>
-    `Foggy stadium lights glowing over AFL oval, misty night atmosphere, broadcast style, loopable`,
+const VIDEO_SCENES = [
+  "cinematic aerial shot flying into massive AFL stadium at night bright stadium lights cheering crowd loopable broadcast",
+  "slow motion tunnel entrance walk onto AFL oval field under stadium lights cinematic broadcast intro loopable",
+  "crowd stadium wave moment during AFL match night game packed stands slow motion broadcast loopable",
+  "broadcast camera sweeping across packed AFL stadium cinematic sports coverage loopable",
+  "stadium lights turning on before AFL night match dramatic floodlight activation broadcast quality loopable",
+  "golden sunset AFL stadium wide aerial shot cinematic broadcast loopable",
+  "crowd cheering slow motion stadium atmosphere AFL match broadcast close-up cinematic loopable",
+  "centre bounce moment AFL match dramatic stadium lighting broadcast angle cinematic loopable",
+  "rain falling over AFL stadium during match wet field glistening cinematic atmosphere loopable",
+  "foggy stadium lights glowing over AFL oval misty night atmosphere broadcast style loopable",
 ];
 
 // ─── Seeded RNG ───────────────────────────────────────────────────────────────
@@ -226,41 +160,27 @@ function pick<T>(arr: T[], rng: () => number): T { return arr[Math.floor(rng() *
 function buildImagePrompt(category: ImageCategory, seed: number, i: number): string {
   const rng    = seededRng(seed + i * 7919);
   const angle  = pick(CAMERA_ANGLES, rng);
-  const time   = pick(TIME_OF_DAY, rng);
-  const wx     = pick(WEATHER, rng);
-  const light  = pick(LIGHTING_STYLES, rng);
+  const light  = pick(LIGHTING, rng);
   const crowd  = pick(CROWD_DENSITY, rng);
-  const venue  = pick(STADIUM_VENUES, rng);
+  const wx     = pick(WEATHER, rng);
 
   switch (category) {
-    case "stadium": {
-      const builder = pick(STADIUM_PROMPTS, rng);
-      return builder(angle, time, wx, light, venue);
-    }
-    case "crowd": {
-      const builder = pick(CROWD_PROMPTS, rng);
-      return builder(crowd, time, light);
-    }
-    case "field": {
-      const builder = pick(FIELD_PROMPTS, rng);
-      return builder(time, wx);
-    }
-    case "abstract": {
-      const builder = pick(ABSTRACT_PROMPTS, rng);
-      return builder(light);
-    }
-    case "players": {
-      const builder = pick(PLAYER_PROMPTS, rng);
-      return builder(time, light);
-    }
+    case "stadium":
+      return `${AFL_STADIUM_MASTER}, ${angle}, ${light}, ${crowd}, ${wx}, no text, no logos. Avoid: ${AFL_NEGATIVE}`;
+    case "crowd":
+      return `${pick(CROWD_STATES, rng)}, AFL stadium, ${light}, ${wx}, dramatic broadcast sports photography, no text, no logos`;
+    case "field":
+      return `${pick(FIELD_SCENES, rng)}, ${light}, ${wx}, broadcast quality photography, no players, no text`;
+    case "abstract":
+      return `${pick(ABSTRACT_STYLES, rng)}, ${light}, no text, no logos`;
+    case "players":
+      return `${pick(PLAYER_ACTIONS, rng)}, ${light}, ${wx}, dramatic sports photography style, no text, no logos`;
   }
 }
 
-function buildVideoPrompt(category: VideoCategory, seed: number, i: number): string {
-  const rng  = seededRng(seed + i * 3571);
-  const time = pick(TIME_OF_DAY, rng);
-  const builder = pick(VIDEO_PROMPTS, rng);
-  return builder(time);
+function buildVideoPrompt(_category: VideoCategory, seed: number, i: number): string {
+  const rng = seededRng(seed + i * 3571);
+  return pick(VIDEO_SCENES, rng);
 }
 
 function promptHash(str: string): string {
@@ -269,13 +189,19 @@ function promptHash(str: string): string {
   return h.toString(16).padStart(8, "0");
 }
 
-// ─── SSE helper ───────────────────────────────────────────────────────────────
+// ─── SSE ──────────────────────────────────────────────────────────────────────
 
 function sseEvent(data: object): Uint8Array {
   return new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`);
 }
 
-// ─── Count existing items in storage for a category ──────────────────────────
+// ─── Delay ────────────────────────────────────────────────────────────────────
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function countExisting(
   adminClient: ReturnType<typeof createClient>,
@@ -291,13 +217,15 @@ async function countExisting(
   return count ?? 0;
 }
 
-// ─── Delay helper ─────────────────────────────────────────────────────────────
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+async function updateJob(
+  adminClient: ReturnType<typeof createClient>,
+  jobId: string,
+  patch: Record<string, unknown>,
+) {
+  await adminClient.from("media_generation_jobs").update(patch).eq("id", jobId);
 }
 
-// ─── Generate images for a single category ────────────────────────────────────
+// ─── Generate images for one category ────────────────────────────────────────
 
 async function generateImages(
   category: ImageCategory,
@@ -307,7 +235,9 @@ async function generateImages(
   adminClient: ReturnType<typeof createClient>,
   writer: WritableStreamDefaultWriter<Uint8Array>,
   packId: string,
+  jobId: string,
   generationCounter: { total: number },
+  categoryProgress: Record<string, { generated: number; failed: number; target: number }>,
 ): Promise<{ generated: number; failed: number; skipped: number }> {
   let generated = 0;
   let failed    = 0;
@@ -316,17 +246,19 @@ async function generateImages(
   if (existingCount >= targetCount) {
     await writer.write(sseEvent({
       phase: "images", category,
-      message: `Skipping ${category} images — already have ${existingCount}/${targetCount}`,
+      message: `Skipping ${category} — already have ${existingCount}/${targetCount}`,
       generated: 0, total: targetCount, failed: 0, skipped: existingCount,
     }));
     return { generated: 0, failed: 0, skipped: existingCount };
   }
 
   const remaining = targetCount - existingCount;
+  categoryProgress[category] = { generated: existingCount, failed: 0, target: targetCount };
+
   await writer.write(sseEvent({
     phase: "images", category,
     message: `Generating ${category} images — ${existingCount} existing, need ${remaining} more`,
-    generated: 0, total: remaining, failed: 0,
+    generated: existingCount, total: targetCount, failed: 0,
   }));
 
   let batchCount = 0;
@@ -334,7 +266,7 @@ async function generateImages(
     if (generationCounter.total >= MAX_GENERATION) {
       await writer.write(sseEvent({
         phase: "images", category,
-        message: `Generation limit reached (${MAX_GENERATION} total). Stopping.`,
+        message: `Generation limit reached (${MAX_GENERATION}). Stopping.`,
         generated, total: remaining, failed,
       }));
       break;
@@ -376,33 +308,40 @@ async function generateImages(
       generated++;
       generationCounter.total++;
       batchCount++;
+      categoryProgress[category].generated = existingCount + generated;
 
       await writer.write(sseEvent({
         phase: "images", category,
         message: `Generating ${category} images ${existingCount + generated} / ${targetCount}`,
-        generated, total: remaining, failed,
+        generated: existingCount + generated, total: targetCount, failed,
       }));
+
+      await updateJob(adminClient, jobId, {
+        generated_count: generationCounter.total,
+        category_progress: categoryProgress,
+      });
 
       if (batchCount >= BATCH_SIZE) {
         batchCount = 0;
-        await writer.write(sseEvent({ phase: "images", category, message: "Batch complete — pausing…", generated, total: remaining, failed }));
+        await writer.write(sseEvent({ phase: "batch", category, message: `Batch complete — pausing 500ms`, generated: existingCount + generated, total: targetCount, failed }));
         await delay(BATCH_DELAY_MS);
       }
     } catch (err) {
       failed++;
       generationCounter.total++;
+      categoryProgress[category].failed = (categoryProgress[category].failed ?? 0) + 1;
       console.error(`generate-category-media: image ${category}[${i}] error:`, err);
       await writer.write(sseEvent({
         phase: "images", category,
-        message: `Failed: ${category} image ${i + 1} — ${err instanceof Error ? err.message : "unknown error"}`,
-        generated, total: remaining, failed,
+        message: `Failed: ${category} image ${i + 1} — ${err instanceof Error ? err.message : "unknown"}`,
+        generated: existingCount + generated, total: targetCount, failed,
       }));
     }
   }
   return { generated, failed, skipped: existingCount };
 }
 
-// ─── Generate video frames for a single category ──────────────────────────────
+// ─── Generate video frames for one category ───────────────────────────────────
 
 async function generateVideos(
   category: VideoCategory,
@@ -412,11 +351,14 @@ async function generateVideos(
   adminClient: ReturnType<typeof createClient>,
   writer: WritableStreamDefaultWriter<Uint8Array>,
   packId: string,
+  jobId: string,
   generationCounter: { total: number },
+  categoryProgress: Record<string, { generated: number; failed: number; target: number }>,
 ): Promise<{ generated: number; failed: number; skipped: number }> {
   let generated = 0;
   let failed    = 0;
 
+  const key           = `video_${category}`;
   const existingCount = await countExisting(adminClient, category, true);
   if (existingCount >= targetCount) {
     await writer.write(sseEvent({
@@ -428,10 +370,12 @@ async function generateVideos(
   }
 
   const remaining = targetCount - existingCount;
+  categoryProgress[key] = { generated: existingCount, failed: 0, target: targetCount };
+
   await writer.write(sseEvent({
     phase: "videos", category,
     message: `Generating ${category} videos — ${existingCount} existing, need ${remaining} more`,
-    generated: 0, total: remaining, failed: 0,
+    generated: existingCount, total: targetCount, failed: 0,
   }));
 
   let batchCount = 0;
@@ -439,7 +383,7 @@ async function generateVideos(
     if (generationCounter.total >= MAX_GENERATION) {
       await writer.write(sseEvent({
         phase: "videos", category,
-        message: `Generation limit reached (${MAX_GENERATION} total). Stopping.`,
+        message: `Generation limit reached (${MAX_GENERATION}). Stopping.`,
         generated, total: remaining, failed,
       }));
       break;
@@ -482,26 +426,33 @@ async function generateVideos(
       generated++;
       generationCounter.total++;
       batchCount++;
+      categoryProgress[key].generated = existingCount + generated;
 
       await writer.write(sseEvent({
         phase: "videos", category,
         message: `Generating ${category} videos ${existingCount + generated} / ${targetCount}`,
-        generated, total: remaining, failed,
+        generated: existingCount + generated, total: targetCount, failed,
       }));
+
+      await updateJob(adminClient, jobId, {
+        generated_count: generationCounter.total,
+        category_progress: categoryProgress,
+      });
 
       if (batchCount >= BATCH_SIZE) {
         batchCount = 0;
-        await writer.write(sseEvent({ phase: "videos", category, message: "Batch complete — pausing…", generated, total: remaining, failed }));
+        await writer.write(sseEvent({ phase: "batch", category, message: `Batch complete — pausing 500ms`, generated: existingCount + generated, total: targetCount, failed }));
         await delay(BATCH_DELAY_MS);
       }
     } catch (err) {
       failed++;
       generationCounter.total++;
+      categoryProgress[key].failed = (categoryProgress[key].failed ?? 0) + 1;
       console.error(`generate-category-media: video ${category}[${i}] error:`, err);
       await writer.write(sseEvent({
         phase: "videos", category,
-        message: `Failed: ${category} video ${i + 1} — ${err instanceof Error ? err.message : "unknown error"}`,
-        generated, total: remaining, failed,
+        message: `Failed: ${category} video ${i + 1} — ${err instanceof Error ? err.message : "unknown"}`,
+        generated: existingCount + generated, total: targetCount, failed,
       }));
     }
   }
@@ -531,43 +482,86 @@ Deno.serve(async (req: Request) => {
     const adminClient = createClient(supabaseUrl, serviceKey);
     const openai      = new OpenAI({ apiKey: openaiKey });
 
-    const { readable, writable } = new TransformStream<Uint8Array>();
-    const writer = writable.getWriter();
+    // ── Generation lock: block if a job is already running ────────────────────
+    const { data: runningJobs } = await adminClient
+      .from("media_generation_jobs")
+      .select("id, target, started_at")
+      .eq("status", "running")
+      .limit(1);
 
-    const generationCounter = { total: 0 };
+    if (runningJobs && runningJobs.length > 0) {
+      return new Response(
+        JSON.stringify({ error: "Media generation already running", job: runningJobs[0] }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ── Calculate target count ─────────────────────────────────────────────────
+    let totalTarget = 0;
+    if (target === "full") {
+      totalTarget = Object.values(IMAGE_COUNTS).reduce((a, b) => a + b, 0)
+                  + Object.values(VIDEO_COUNTS).reduce((a, b) => a + b, 0);
+    } else if (target === "videos") {
+      totalTarget = Object.values(VIDEO_COUNTS).reduce((a, b) => a + b, 0);
+    } else if (IMAGE_CATEGORIES.includes(target as ImageCategory)) {
+      totalTarget = IMAGE_COUNTS[target as ImageCategory];
+    }
+
+    // ── Create job record ─────────────────────────────────────────────────────
+    const { data: jobData, error: jobErr } = await adminClient
+      .from("media_generation_jobs")
+      .insert({
+        status:          "running",
+        target,
+        target_count:    totalTarget,
+        generated_count: 0,
+        failed_count:    0,
+        category_progress: {},
+        started_at:      new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+
+    if (jobErr || !jobData) {
+      return new Response(JSON.stringify({ error: "Failed to create generation job" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const jobId = jobData.id;
+
+    // ── SSE stream setup ──────────────────────────────────────────────────────
+    const { readable, writable } = new TransformStream<Uint8Array>();
+    const writer                 = writable.getWriter();
+    const generationCounter      = { total: 0 };
+    const categoryProgress: Record<string, { generated: number; failed: number; target: number }> = {};
 
     EdgeRuntime.waitUntil((async () => {
       try {
         const results: Record<string, { generated: number; failed: number; skipped: number }> = {};
 
         await writer.write(sseEvent({
-          phase: "start",
+          phase: "start", job_id: jobId,
           message: `Starting AFL media generation — target: ${target}`,
-          max_generation: MAX_GENERATION,
-          batch_size: BATCH_SIZE,
+          max_generation: MAX_GENERATION, batch_size: BATCH_SIZE,
         }));
 
         if (target === "full") {
-          await writer.write(sseEvent({ phase: "images", message: "Starting image generation — all categories", generated: 0, total: 150, failed: 0 }));
           for (const cat of IMAGE_CATEGORIES) {
             if (generationCounter.total >= MAX_GENERATION) break;
-            results[`img_${cat}`] = await generateImages(cat, IMAGE_COUNTS[cat], seed, openai, adminClient, writer, packId, generationCounter);
+            results[`img_${cat}`] = await generateImages(cat, IMAGE_COUNTS[cat], seed, openai, adminClient, writer, packId, jobId, generationCounter, categoryProgress);
           }
-          await writer.write(sseEvent({ phase: "videos", message: "Starting video generation — all categories", generated: 0, total: 20, failed: 0 }));
           for (const cat of VIDEO_CATEGORIES) {
             if (generationCounter.total >= MAX_GENERATION) break;
-            results[`vid_${cat}`] = await generateVideos(cat, VIDEO_COUNTS[cat], seed, openai, adminClient, writer, packId, generationCounter);
+            results[`vid_${cat}`] = await generateVideos(cat, VIDEO_COUNTS[cat], seed, openai, adminClient, writer, packId, jobId, generationCounter, categoryProgress);
           }
         } else if (target === "videos") {
-          await writer.write(sseEvent({ phase: "videos", message: "Starting video generation — all categories", generated: 0, total: 20, failed: 0 }));
           for (const cat of VIDEO_CATEGORIES) {
             if (generationCounter.total >= MAX_GENERATION) break;
-            results[`vid_${cat}`] = await generateVideos(cat, VIDEO_COUNTS[cat], seed, openai, adminClient, writer, packId, generationCounter);
+            results[`vid_${cat}`] = await generateVideos(cat, VIDEO_COUNTS[cat], seed, openai, adminClient, writer, packId, jobId, generationCounter, categoryProgress);
           }
         } else if (IMAGE_CATEGORIES.includes(target as ImageCategory)) {
-          const cat   = target as ImageCategory;
-          const count = IMAGE_COUNTS[cat];
-          results[`img_${cat}`] = await generateImages(cat, count, seed, openai, adminClient, writer, packId, generationCounter);
+          const cat = target as ImageCategory;
+          results[`img_${cat}`] = await generateImages(cat, IMAGE_COUNTS[cat], seed, openai, adminClient, writer, packId, jobId, generationCounter, categoryProgress);
         } else {
           await writer.write(sseEvent({ phase: "error", message: `Unknown target: ${target}` }));
         }
@@ -575,18 +569,29 @@ Deno.serve(async (req: Request) => {
         const totalGenerated = Object.values(results).reduce((a, r) => a + r.generated, 0);
         const totalFailed    = Object.values(results).reduce((a, r) => a + r.failed, 0);
         const totalSkipped   = Object.values(results).reduce((a, r) => a + r.skipped, 0);
+        const limitReached   = generationCounter.total >= MAX_GENERATION;
+
+        await updateJob(adminClient, jobId, {
+          status:          "complete",
+          generated_count: totalGenerated,
+          failed_count:    totalFailed,
+          category_progress: categoryProgress,
+          completed_at:    new Date().toISOString(),
+        });
 
         await writer.write(sseEvent({
-          phase: "complete",
-          message: generationCounter.total >= MAX_GENERATION
-            ? `Generation limit reached (${MAX_GENERATION}). Total generated: ${totalGenerated}`
+          phase: "complete", job_id: jobId,
+          message: limitReached
+            ? `Generation limit reached (${MAX_GENERATION}). Generated: ${totalGenerated}`
             : `Generation complete. Generated: ${totalGenerated}, Failed: ${totalFailed}, Skipped: ${totalSkipped}`,
-          target, results, total_generated: totalGenerated, total_failed: totalFailed, total_skipped: totalSkipped,
-          limit_reached: generationCounter.total >= MAX_GENERATION,
+          target, results, total_generated: totalGenerated, total_failed: totalFailed,
+          total_skipped: totalSkipped, limit_reached: limitReached,
         }));
       } catch (innerErr) {
+        const msg = innerErr instanceof Error ? innerErr.message : "unknown";
         console.error("generate-category-media: inner error", innerErr);
-        await writer.write(sseEvent({ phase: "error", message: `Fatal error: ${innerErr instanceof Error ? innerErr.message : "unknown"}` }));
+        await updateJob(adminClient, jobId, { status: "failed", error_message: msg, completed_at: new Date().toISOString() });
+        await writer.write(sseEvent({ phase: "error", message: `Fatal error: ${msg}` }));
       } finally {
         await writer.close();
       }
