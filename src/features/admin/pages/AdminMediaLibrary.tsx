@@ -845,9 +845,12 @@ export default function AdminMediaLibrary() {
   const handleDelete = async (item: MediaItem) => {
     setDeleting(true);
     try {
-      const base         = mode === "graphic" ? IMAGE_BASE : VIDEO_BASE;
-      const storagePath  = `${base}/${item.category}/${item.filename}`;
-      const folderPath   = `${base}/${item.category}`;
+      const bucketMarker = `/${BUCKET}/`;
+      const markerIdx    = item.url.indexOf(bucketMarker);
+      const storagePath  = markerIdx !== -1
+        ? item.url.slice(markerIdx + bucketMarker.length)
+        : `${mode === "graphic" ? IMAGE_BASE : VIDEO_BASE}/${item.category}/${item.filename}`;
+      const folderPath   = storagePath.split("/").slice(0, -1).join("/");
 
       // 1. Remove file from storage
       const { error: removeErr } = await supabase.storage.from(BUCKET).remove([storagePath]);
