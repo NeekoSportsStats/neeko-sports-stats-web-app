@@ -14,11 +14,12 @@ export interface AIMediaItem {
   category: MediaCategory;
 }
 
-const STORAGE_BUCKET = "content-assets";
-const IMAGES_PATH    = "images/ai-generated";
-const VIDEOS_PATH    = "videos/ai-generated";
+const STORAGE_BUCKET      = "content-assets";
+const AI_IMAGES_PATH      = "ai-generated";
+const STOCK_IMAGES_PATH   = "images/ai-generated";
+const VIDEOS_PATH         = "videos/ai-generated";
 
-const MEDIA_CACHE_KEY   = "neeko_ai_media_cache_v2";
+const MEDIA_CACHE_KEY   = "neeko_ai_media_cache_v3";
 const MEDIA_CACHE_TTL   = 10 * 60 * 1000;
 
 interface MediaCache {
@@ -69,6 +70,27 @@ function labelFromName(name: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+async function loadAIGeneratedFromDB(): Promise<AIMediaItem[]> {
+  const { data, error } = await supabase
+    .from("ai_media_library")
+    .select("asset_id, label, url, thumbnail_url, media_type, category")
+    .eq("source", "ai_generated")
+    .eq("is_active", true)
+    .order("registered_at", { ascending: false })
+    .limit(200);
+
+  if (error || !data) return [];
+
+  return data.map((row) => ({
+    id:           row.asset_id as string,
+    label:        (row.label as string) ?? "",
+    url:          (row.url as string) ?? "",
+    thumbnail_url:(row.thumbnail_url as string) ?? (row.url as string) ?? "",
+    media_type:   ((row.media_type as string) === "video" ? "video" : "image") as "image" | "video",
+    category:     ((row.category as string) ?? "stadium") as MediaCategory,
+  }));
+}
+
 async function listStorageFolder(path: string): Promise<AIMediaItem[]> {
   const { data, error } = await supabase.storage
     .from(STORAGE_BUCKET)
@@ -103,6 +125,14 @@ async function listStorageFolder(path: string): Promise<AIMediaItem[]> {
   return items;
 }
 
+async function listAIGeneratedFromStorage(): Promise<AIMediaItem[]> {
+  const CATEGORIES = ["stadium", "crowd", "field", "players", "abstract"] as const;
+  const results = await Promise.all(
+    CATEGORIES.map((cat) => listStorageFolder(`${AI_IMAGES_PATH}/${cat}`))
+  );
+  return results.flat();
+}
+
 export async function loadAIMedia(): Promise<MediaCache> {
   if (inMemoryCache && Date.now() - inMemoryCache.loadedAt < MEDIA_CACHE_TTL) {
     return inMemoryCache;
@@ -113,12 +143,22 @@ export async function loadAIMedia(): Promise<MediaCache> {
     return stored;
   }
 
-  const [images, videos] = await Promise.all([
-    listStorageFolder(IMAGES_PATH),
+  const [dbImages, storageAIImages, stockImages, videos] = await Promise.all([
+    loadAIGeneratedFromDB(),
+    listAIGeneratedFromStorage(),
+    listStorageFolder(STOCK_IMAGES_PATH),
     listStorageFolder(VIDEOS_PATH),
   ]);
 
-  const cache: MediaCache = { images, videos, loadedAt: Date.now() };
+  const seenUrls = new Set<string>();
+  const mergedImages: AIMediaItem[] = [];
+  for (const item of [...dbImages, ...storageAIImages, ...stockImages]) {
+    if (!item.url || seenUrls.has(item.url)) continue;
+    seenUrls.add(item.url);
+    mergedImages.push(item);
+  }
+
+  const cache: MediaCache = { images: mergedImages, videos, loadedAt: Date.now() };
   writeStorageCache(cache);
   return cache;
 }
