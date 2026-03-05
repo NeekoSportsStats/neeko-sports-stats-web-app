@@ -23,7 +23,7 @@ import {
   type LayoutOffsets,
   DEFAULT_LAYOUT_OFFSETS,
 } from "../marketing/GraphicTemplates";
-import { StockMediaPicker, getBackgroundSourceLabel, STOCK_IMAGES, STOCK_VIDEOS } from "../marketing/StockMediaPicker";
+import { AIMediaPicker, getBackgroundSourceLabel } from "../marketing/AIMediaPicker";
 import { AIMediaPackGenerator } from "../marketing/AIMediaPackGenerator";
 import { exportCarouselSlides } from "../marketing/CarouselExport";
 import { AddToPlannerModal } from "../marketing/AddToPlannerModal";
@@ -498,7 +498,103 @@ export default function AdminContentEngine() {
   const [manualPlayer1, setManualPlayer1] = useState<ContentPlayer | null>(null);
   const [manualPlayer2, setManualPlayer2] = useState<ContentPlayer | null>(null);
 
-  const previewRef = useRef<HTMLDivElement>(null);
+  const previewRef   = useRef<HTMLDivElement>(null);
+  const scrollRef    = useRef<HTMLDivElement>(null);
+  const didRestoreRef = useRef(false);
+
+  const CE_STORAGE_KEY = "neeko_content_engine_state";
+
+  // ── Restore state from localStorage on mount ─────────────────────────────
+  useEffect(() => {
+    if (didRestoreRef.current) return;
+    didRestoreRef.current = true;
+    try {
+      const raw = localStorage.getItem(CE_STORAGE_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      if (s.selectedAngleId) {
+        const a = STAT_ANGLES.find((x) => x.id === s.selectedAngleId);
+        if (a) setSelectedAngle(a);
+      }
+      if (s.selectedLayout)     setSelectedLayout(s.selectedLayout);
+      if (s.selectedBackground) setSelectedBackground(s.selectedBackground);
+      if (s.backgroundSource)   setBackgroundSource(s.backgroundSource);
+      if (s.backgroundMediaUrl) setBackgroundMediaUrl(s.backgroundMediaUrl);
+      if (s.customUploadUrl)    setCustomUploadUrl(s.customUploadUrl);
+      if (s.logoPosition)       setLogoPosition(s.logoPosition);
+      if (s.roundLabel != null) setRoundLabel(s.roundLabel);
+      if (s.ctaText != null)    setCtaText(s.ctaText);
+      if (s.accentMode)         setAccentMode(s.accentMode);
+      if (s.customAccent)       setCustomAccent(s.customAccent);
+      if (s.rankHighlight)      setRankHighlight(s.rankHighlight);
+      if (s.exportSizeId) {
+        const sz = EXPORT_SIZES.find((x) => x.id === s.exportSizeId);
+        if (sz) setSelectedExportSize(sz);
+      }
+      if (typeof s.appendHashtags === "boolean") setAppendHashtags(s.appendHashtags);
+      if (typeof s.autoTeamAccent === "boolean") setAutoTeamAccent(s.autoTeamAccent);
+      if (typeof s.showTeamAccent === "boolean") setShowTeamAccent(s.showTeamAccent);
+
+      const scrollY = s.scrollY ?? 0;
+      if (scrollY > 0) {
+        requestAnimationFrame(() => {
+          scrollRef.current?.scrollTo({ top: scrollY, behavior: "instant" });
+        });
+      }
+    } catch {
+      /* ignore malformed state */
+    }
+  }, []);
+
+  // ── Persist state to localStorage on change ───────────────────────────────
+  useEffect(() => {
+    try {
+      const s = {
+        selectedAngleId:  selectedAngle.id,
+        selectedLayout,
+        selectedBackground,
+        backgroundSource,
+        backgroundMediaUrl,
+        customUploadUrl,
+        logoPosition,
+        roundLabel,
+        ctaText,
+        accentMode,
+        customAccent,
+        rankHighlight,
+        exportSizeId:   selectedExportSize.id,
+        appendHashtags,
+        autoTeamAccent,
+        showTeamAccent,
+        scrollY:        scrollRef.current?.scrollTop ?? 0,
+      };
+      localStorage.setItem(CE_STORAGE_KEY, JSON.stringify(s));
+    } catch {
+      /* ignore quota errors */
+    }
+  }, [
+    selectedAngle, selectedLayout, selectedBackground, backgroundSource,
+    backgroundMediaUrl, customUploadUrl, logoPosition, roundLabel, ctaText,
+    accentMode, customAccent, rankHighlight, selectedExportSize, appendHashtags,
+    autoTeamAccent, showTeamAccent,
+  ]);
+
+  // ── Preserve scroll position ─────────────────────────────────────────────
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      try {
+        const raw = localStorage.getItem(CE_STORAGE_KEY);
+        if (!raw) return;
+        const s = JSON.parse(raw);
+        s.scrollY = el.scrollTop;
+        localStorage.setItem(CE_STORAGE_KEY, JSON.stringify(s));
+      } catch { /* ignore */ }
+    };
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
@@ -819,12 +915,13 @@ export default function AdminContentEngine() {
       </div>
 
       {/* ── WORKSPACE: Left Panel + Right Panel ────────────────────────────── */}
-      <div className="flex flex-1 gap-0 overflow-hidden" style={{ minHeight: 0 }}>
+      <div className="flex flex-col lg:flex-row flex-1 gap-0 overflow-hidden lg:overflow-hidden overflow-y-auto" style={{ minHeight: 0 }}>
 
         {/* LEFT PANEL — Controls */}
         <div
-          className="shrink-0 border-r border-border overflow-y-auto"
-          style={{ width: 420, scrollbarWidth: "thin" }}
+          ref={scrollRef}
+          className="lg:shrink-0 lg:border-r border-b lg:border-b-0 border-border lg:overflow-y-auto w-full lg:w-[420px]"
+          style={{ scrollbarWidth: "thin" } as Record<string, string>}
         >
           <div className="p-4 space-y-3">
 
@@ -1010,9 +1107,9 @@ export default function AdminContentEngine() {
                       />
                     )}
 
-                    {/* Stock image picker */}
+                    {/* AI image picker */}
                     {backgroundSource === "stock_image" && (
-                      <StockMediaPicker
+                      <AIMediaPicker
                         type="image"
                         selected={backgroundMediaUrl}
                         onSelect={setBackgroundMediaUrl}
@@ -1020,9 +1117,9 @@ export default function AdminContentEngine() {
                       />
                     )}
 
-                    {/* Stock video picker */}
+                    {/* AI video picker */}
                     {backgroundSource === "stock_video" && (
-                      <StockMediaPicker
+                      <AIMediaPicker
                         type="video"
                         selected={backgroundMediaUrl}
                         onSelect={setBackgroundMediaUrl}
@@ -1287,7 +1384,7 @@ export default function AdminContentEngine() {
                         className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
                         style={{ background: `${accentColor}18`, color: accentColor }}
                       >
-                        {STOCK_IMAGES.length + STOCK_VIDEOS.length} assets
+                        AI media library
                       </span>
                     </div>
                     <AIMediaPackGenerator accentColor={accentColor} />
@@ -1475,13 +1572,13 @@ export default function AdminContentEngine() {
         </div>
 
         {/* RIGHT PANEL — Live Preview */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-black/40" style={{ minWidth: 0 }}>
+        <div className="flex-1 flex flex-col overflow-hidden bg-black/40 min-w-0 min-h-0" style={{ minWidth: 0 }}>
 
           {contentMode === "graphic" ? (
             <>
               {/* Quick Action Bar */}
-              <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b border-border/50 bg-background/60 backdrop-blur-sm">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mr-1">Quick Actions</p>
+              <div className="shrink-0 flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-border/50 bg-background/60 backdrop-blur-sm">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mr-1 hidden sm:block">Quick Actions</p>
                 <Button
                   variant="outline" size="sm"
                   className="h-7 text-xs gap-1.5"
@@ -1538,7 +1635,7 @@ export default function AdminContentEngine() {
               </div>
 
               {/* Graphic Preview Area */}
-              <div className="flex-1 overflow-auto flex items-start justify-center p-6" style={{ minHeight: 0 }}>
+              <div className="flex-1 overflow-auto flex items-start justify-center p-3 sm:p-6" style={{ minHeight: 0 }}>
                 {effectivePlayers.length === 0 ? (
                   <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground h-full">
                     <LayoutTemplate className="h-12 w-12 opacity-15" />
@@ -1548,15 +1645,16 @@ export default function AdminContentEngine() {
                   (() => {
                     const maxW = exportW;
                     const maxH = exportH;
-                    const containerMaxW = 700;
-                    const containerMaxH = 700;
+                    const vw = typeof window !== "undefined" ? Math.min(window.innerWidth - 24, 700) : 700;
+                    const containerMaxW = vw;
+                    const containerMaxH = typeof window !== "undefined" ? Math.min(window.innerHeight * 0.65, 700) : 700;
                     const scaleByW = containerMaxW / maxW;
                     const scaleByH = containerMaxH / maxH;
                     const scale = Math.min(scaleByW, scaleByH, 1);
                     const scaledW = Math.round(maxW * scale);
                     const scaledH = Math.round(maxH * scale);
                     return (
-                      <div style={{ width: scaledW, height: scaledH, position: "relative", flexShrink: 0, overflow: "hidden" }}>
+                      <div style={{ width: scaledW, height: scaledH, position: "relative", flexShrink: 0, overflow: "hidden", maxWidth: "100%" }}>
                         <div
                           ref={previewRef}
                           style={{
