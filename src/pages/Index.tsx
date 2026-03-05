@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Crown, ArrowRight, Star, TrendingUp, TriangleAlert as AlertTriangle, Check, Database, Cpu, Radio, Trophy, Users, ChartBar as BarChart2, Lock, Crosshair, Zap, ShieldAlert, ChartLine as LineChart } from "lucide-react";
+import { Crown, ArrowRight, Star, TrendingUp, TriangleAlert as AlertTriangle, Check, Database, Cpu, Radio, Trophy, Users, ChartBar as BarChart2, Lock, Crosshair, Zap, ShieldAlert, ChartLine as LineChart, Target } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { NEEKO_PRICING } from "@/config/neekoPricing";
@@ -146,6 +146,152 @@ function GoldDivider() {
     <div className="flex justify-center my-4">
       <div className="w-10 h-0.5 rounded-full bg-[#F5C84C]/30" />
     </div>
+  );
+}
+
+// ─── Model Accuracy ───────────────────────────────────────────────────────────
+
+interface AccuracyRow {
+  players_analysed: number | null;
+  avg_error: number | null;
+  within_10: number | null;
+  within_15: number | null;
+  within_20: number | null;
+  source: string | null;
+}
+
+function confidenceLevel(err: number | null): { label: string; color: string; bg: string; border: string } {
+  if (err == null) return { label: "—", color: "text-white/30", bg: "bg-white/5", border: "border-white/10" };
+  if (err <= 14)   return { label: "HIGH",   color: "text-green-400",    bg: "bg-green-400/10",    border: "border-green-400/25" };
+  if (err <= 17)   return { label: "MEDIUM", color: "text-yellow-400",   bg: "bg-yellow-400/10",   border: "border-yellow-400/25" };
+  return             { label: "LOW",    color: "text-orange-400",  bg: "bg-orange-400/10",  border: "border-orange-400/25" };
+}
+
+function ModelAccuracySection() {
+  const [row, setRow]       = useState<AccuracyRow | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("v_projection_accuracy_homepage")
+        .select("*")
+        .maybeSingle();
+      setRow(data as AccuracyRow | null);
+      setLoading(false);
+    })();
+  }, []);
+
+  const conf = confidenceLevel(row?.avg_error ?? null);
+  const sourceLabel =
+    row?.source === "automatic" ? "2026 Season Accuracy" : "Opening Round Accuracy";
+
+  const metrics = [
+    {
+      label: "Players Analysed",
+      value: row?.players_analysed != null ? row.players_analysed.toLocaleString() : "—",
+      suffix: "",
+      color: "text-white",
+    },
+    {
+      label: "Average Error",
+      value: row?.avg_error != null ? row.avg_error.toFixed(2) : "—",
+      suffix: " pts",
+      color: "text-[#F5C84C]",
+    },
+    {
+      label: "Within 15 Points",
+      value: row?.within_15 != null ? Math.round(row.within_15).toString() : "—",
+      suffix: "%",
+      color: "text-green-400",
+    },
+    {
+      label: "Within 20 Points",
+      value: row?.within_20 != null ? Math.round(row.within_20).toString() : "—",
+      suffix: "%",
+      color: "text-green-300",
+    },
+  ];
+
+  return (
+    <section className="py-12 md:py-16 bg-[#070707] border-t border-white/[0.05]">
+      <div className="max-w-4xl mx-auto px-4">
+        <SectionLabel>Model Accuracy</SectionLabel>
+        <SectionHeading>How Accurate Are Neeko Projections?</SectionHeading>
+        <GoldDivider />
+        <p className="text-center text-white/40 text-sm mb-8 max-w-md mx-auto">
+          Built on statistical modelling of historical player performance, matchup difficulty and scoring volatility.
+        </p>
+
+        <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] overflow-hidden">
+          {/* Header bar */}
+          <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-white/[0.06] bg-[#0a0a0a] flex-wrap">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#F5C84C]/10 border border-[#F5C84C]/20">
+                <Target size={14} className="text-[#F5C84C]" />
+              </div>
+              <span className="text-[11px] font-bold uppercase tracking-widest text-white/40">
+                {loading ? "Loading…" : sourceLabel}
+              </span>
+            </div>
+            {!loading && row && (
+              <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg border ${conf.color} ${conf.bg} ${conf.border}`}>
+                <span className="text-[9px] font-semibold text-white/40">Model Confidence</span>
+                {conf.label}
+              </span>
+            )}
+          </div>
+
+          {/* Metrics grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/[0.04]">
+            {metrics.map(({ label, value, suffix, color }) => (
+              <div key={label} className="bg-[#0e0e0e] px-5 py-6 flex flex-col gap-1">
+                <p className="text-[10px] text-white/30 uppercase tracking-widest font-semibold leading-tight">
+                  {label}
+                </p>
+                {loading ? (
+                  <div className="h-8 w-20 bg-white/[0.06] rounded animate-pulse mt-1" />
+                ) : (
+                  <p className={`text-3xl font-extrabold tabular-nums leading-none mt-1 ${color}`}>
+                    {value}<span className="text-lg font-bold text-white/30">{value !== "—" ? suffix : ""}</span>
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Credibility footer */}
+          <div className="px-5 py-4 border-t border-white/[0.06] bg-[#0a0a0a] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 flex-wrap">
+            <div className="text-[12px] text-white/35 leading-relaxed max-w-lg">
+              {!loading && row
+                ? "Opening Round results demonstrate strong early season accuracy. Projections are refined each round as more match data becomes available."
+                : "Accuracy data will populate after Opening Round statistics are processed."}
+            </div>
+            <div className="shrink-0 flex items-center gap-2 text-[11px] text-white/25">
+              <Database size={12} className="text-white/20" />
+              <span>Based on 9,866 historical projections · Avg error 16.03 pts</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Selling point */}
+        <div className="mt-5 rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.03] px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-white mb-0.5">Why this matters</p>
+            <p className="text-[13px] text-white/40 leading-relaxed max-w-md">
+              More accurate projections mean better captain choices, smarter trades and stronger fantasy performance.
+            </p>
+          </div>
+          <Link
+            to="/neeko-plus"
+            className="shrink-0 inline-flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-5 py-2.5 rounded-xl hover:brightness-110 transition-all whitespace-nowrap"
+          >
+            <Crown size={13} />
+            Gain an Edge
+          </Link>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -509,7 +655,10 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ── SECTION 2: EDGE SIGNALS PREVIEW ──────────────────────────────────── */}
+      {/* ── SECTION 2: MODEL ACCURACY ─────────────────────────────────────────── */}
+      <ModelAccuracySection />
+
+      {/* ── SECTION 3: EDGE SIGNALS PREVIEW ──────────────────────────────────── */}
       <EdgeBoardPreview />
 
       {/* ── SECTION 3: RANKINGS PREVIEW ───────────────────────────────────────── */}
