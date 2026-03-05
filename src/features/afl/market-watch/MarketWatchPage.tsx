@@ -11,7 +11,6 @@ import { MarketWatchSummaryCards } from "./MarketWatchSummaryCards";
 import { BestTradesRow } from "./BestTradesRow";
 import { PlayerTradeCard } from "./PlayerTradeCard";
 import { TradeImpactModal } from "./TradeImpactModal";
-import { MarketWatchAISummary } from "./MarketWatchAISummary";
 import { MarketWatchBanner, CategoryCounts } from "./MarketWatchBanner";
 import { HorizontalRail } from "./HorizontalRail";
 import { MarketWatchSkeleton } from "./MarketWatchSkeleton";
@@ -285,11 +284,6 @@ export default function MarketWatchPage() {
             </button>
           </div>
         )}
-
-        <MarketWatchAISummary
-          season={players.length > 0 ? players[0].season : null}
-          roundNumber={players.length > 0 ? players[0].round_number : null}
-        />
 
         <MarketWatchSummaryCards
           cards={summaryCards}
