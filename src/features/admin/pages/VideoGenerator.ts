@@ -40,6 +40,7 @@ export interface VideoConfig {
   showIntro: boolean;
   showOutro: boolean;
   soundEffectsEnabled: boolean;
+  aiVideoUrl?: string;
 }
 
 export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
@@ -112,6 +113,7 @@ function drawBackground(
   accentColor: string,
   vw: number,
   vh: number,
+  aiVideoEl?: HTMLVideoElement,
 ) {
   switch (bg) {
     case "stadium_lights": {
@@ -182,11 +184,27 @@ function drawBackground(
     case "ai_crowd":
     case "ai_field":
     case "ai_players": {
-      const grad = ctx.createLinearGradient(0, 0, vw, vh);
-      grad.addColorStop(0, "#08111a");
-      grad.addColorStop(1, "#040a10");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, vw, vh);
+      if (aiVideoEl && aiVideoEl.readyState >= 2) {
+        const vAspect = aiVideoEl.videoWidth / aiVideoEl.videoHeight;
+        const cAspect = vw / vh;
+        let sx = 0, sy = 0, sw = aiVideoEl.videoWidth, sh = aiVideoEl.videoHeight;
+        if (vAspect > cAspect) {
+          sw = aiVideoEl.videoHeight * cAspect;
+          sx = (aiVideoEl.videoWidth - sw) / 2;
+        } else {
+          sh = aiVideoEl.videoWidth / cAspect;
+          sy = (aiVideoEl.videoHeight - sh) / 2;
+        }
+        ctx.drawImage(aiVideoEl, sx, sy, sw, sh, 0, 0, vw, vh);
+        ctx.fillStyle = "rgba(0,0,0,0.45)";
+        ctx.fillRect(0, 0, vw, vh);
+      } else {
+        const grad = ctx.createLinearGradient(0, 0, vw, vh);
+        grad.addColorStop(0, "#08111a");
+        grad.addColorStop(1, "#040a10");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, vw, vh);
+      }
       const overlay = ctx.createRadialGradient(vw / 2, vh * 0.4, 0, vw / 2, vh * 0.4, vw * 0.65);
       overlay.addColorStop(0, accentColor + "18");
       overlay.addColorStop(1, "transparent");
@@ -195,15 +213,31 @@ function drawBackground(
       break;
     }
     case "ai_abstract": {
-      ctx.fillStyle = "#050810";
-      ctx.fillRect(0, 0, vw, vh);
-      ctx.strokeStyle = accentColor + "12";
-      ctx.lineWidth = 1;
-      for (let x = 0; x <= vw; x += 100) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, vh); ctx.stroke();
-      }
-      for (let y = 0; y <= vh; y += 100) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(vw, y); ctx.stroke();
+      if (aiVideoEl && aiVideoEl.readyState >= 2) {
+        const vAspect = aiVideoEl.videoWidth / aiVideoEl.videoHeight;
+        const cAspect = vw / vh;
+        let sx = 0, sy = 0, sw = aiVideoEl.videoWidth, sh = aiVideoEl.videoHeight;
+        if (vAspect > cAspect) {
+          sw = aiVideoEl.videoHeight * cAspect;
+          sx = (aiVideoEl.videoWidth - sw) / 2;
+        } else {
+          sh = aiVideoEl.videoWidth / cAspect;
+          sy = (aiVideoEl.videoHeight - sh) / 2;
+        }
+        ctx.drawImage(aiVideoEl, sx, sy, sw, sh, 0, 0, vw, vh);
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillRect(0, 0, vw, vh);
+      } else {
+        ctx.fillStyle = "#050810";
+        ctx.fillRect(0, 0, vw, vh);
+        ctx.strokeStyle = accentColor + "12";
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= vw; x += 100) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, vh); ctx.stroke();
+        }
+        for (let y = 0; y <= vh; y += 100) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(vw, y); ctx.stroke();
+        }
       }
       const glow = ctx.createRadialGradient(vw / 2, vh / 2, 0, vw / 2, vh / 2, vw * 0.7);
       glow.addColorStop(0, accentColor + "20");
@@ -213,21 +247,37 @@ function drawBackground(
       break;
     }
     case "ai_stadium": {
-      const grad = ctx.createLinearGradient(0, 0, vw, vh);
-      grad.addColorStop(0, "#060c1a");
-      grad.addColorStop(1, "#030710");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, vw, vh);
-      const s1 = ctx.createRadialGradient(vw * 0.3, vh * 0.15, 0, vw * 0.3, vh * 0.15, vw * 0.5);
-      s1.addColorStop(0, "rgba(255,240,180,0.08)");
-      s1.addColorStop(1, "transparent");
-      ctx.fillStyle = s1;
-      ctx.fillRect(0, 0, vw, vh);
-      const s2 = ctx.createRadialGradient(vw * 0.7, vh * 0.12, 0, vw * 0.7, vh * 0.12, vw * 0.45);
-      s2.addColorStop(0, "rgba(255,240,180,0.06)");
-      s2.addColorStop(1, "transparent");
-      ctx.fillStyle = s2;
-      ctx.fillRect(0, 0, vw, vh);
+      if (aiVideoEl && aiVideoEl.readyState >= 2) {
+        const vAspect = aiVideoEl.videoWidth / aiVideoEl.videoHeight;
+        const cAspect = vw / vh;
+        let sx = 0, sy = 0, sw = aiVideoEl.videoWidth, sh = aiVideoEl.videoHeight;
+        if (vAspect > cAspect) {
+          sw = aiVideoEl.videoHeight * cAspect;
+          sx = (aiVideoEl.videoWidth - sw) / 2;
+        } else {
+          sh = aiVideoEl.videoWidth / cAspect;
+          sy = (aiVideoEl.videoHeight - sh) / 2;
+        }
+        ctx.drawImage(aiVideoEl, sx, sy, sw, sh, 0, 0, vw, vh);
+        ctx.fillStyle = "rgba(0,0,0,0.45)";
+        ctx.fillRect(0, 0, vw, vh);
+      } else {
+        const grad = ctx.createLinearGradient(0, 0, vw, vh);
+        grad.addColorStop(0, "#060c1a");
+        grad.addColorStop(1, "#030710");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, vw, vh);
+        const s1 = ctx.createRadialGradient(vw * 0.3, vh * 0.15, 0, vw * 0.3, vh * 0.15, vw * 0.5);
+        s1.addColorStop(0, "rgba(255,240,180,0.08)");
+        s1.addColorStop(1, "transparent");
+        ctx.fillStyle = s1;
+        ctx.fillRect(0, 0, vw, vh);
+        const s2 = ctx.createRadialGradient(vw * 0.7, vh * 0.12, 0, vw * 0.7, vh * 0.12, vw * 0.45);
+        s2.addColorStop(0, "rgba(255,240,180,0.06)");
+        s2.addColorStop(1, "transparent");
+        ctx.fillStyle = s2;
+        ctx.fillRect(0, 0, vw, vh);
+      }
       const accentGlow = ctx.createLinearGradient(0, vh * 0.6, 0, vh);
       accentGlow.addColorStop(0, accentColor + "15");
       accentGlow.addColorStop(1, "transparent");
@@ -355,6 +405,7 @@ interface SlideCtx {
   progress: number;
   vw: number;
   vh: number;
+  aiVideoEl?: HTMLVideoElement;
 }
 
 function applyTransitionEffect(
@@ -393,12 +444,12 @@ function applyTransitionEffect(
   }
 }
 
-function slideTitle({ ctx, data, config, progress, vw, vh }: SlideCtx) {
+function slideTitle({ ctx, data, config, progress, vw, vh, aiVideoEl }: SlideCtx) {
   const sm = speedMult(config.animationSpeed);
   const fadeIn  = Math.min(progress * 3 * sm, 1);
   const slideUp = easeOutCubic(Math.min(progress * 2 * sm, 1));
 
-  drawBackground(ctx, config.background, data.accentColor, vw, vh);
+  drawBackground(ctx, config.background, data.accentColor, vw, vh, aiVideoEl);
   drawAccentBar(ctx, data.accentColor, vw);
   drawBrand(ctx, data.accentColor, fadeIn, vw);
   drawFooter(ctx, data.accentColor, fadeIn, vw, vh, data.ctaText);
@@ -427,12 +478,12 @@ function slideTitle({ ctx, data, config, progress, vw, vh }: SlideCtx) {
   ctx.globalAlpha = 1;
 }
 
-function slideBigStat({ ctx, data, config, progress, vw, vh }: SlideCtx) {
+function slideBigStat({ ctx, data, config, progress, vw, vh, aiVideoEl }: SlideCtx) {
   const sm    = speedMult(config.animationSpeed);
   const fadeIn = easeOutCubic(Math.min(progress * 2 * sm, 1));
   const scale  = 0.6 + easeOutCubic(Math.min(progress * 1.5 * sm, 1)) * 0.4;
 
-  drawBackground(ctx, config.background, data.accentColor, vw, vh);
+  drawBackground(ctx, config.background, data.accentColor, vw, vh, aiVideoEl);
   drawAccentBar(ctx, data.accentColor, vw);
   drawBrand(ctx, data.accentColor, fadeIn, vw);
   drawFooter(ctx, data.accentColor, fadeIn, vw, vh, data.ctaText);
@@ -471,12 +522,12 @@ function slideBigStat({ ctx, data, config, progress, vw, vh }: SlideCtx) {
   ctx.globalAlpha = 1;
 }
 
-function slidePlayerSpotlight({ ctx, data, config, progress, vw, vh }: SlideCtx) {
+function slidePlayerSpotlight({ ctx, data, config, progress, vw, vh, aiVideoEl }: SlideCtx) {
   const sm      = speedMult(config.animationSpeed);
   const fadeIn  = easeOutCubic(Math.min(progress * 2 * sm, 1));
   const cardsIn = easeOutCubic(Math.max(0, Math.min((progress - 0.25 / sm) * 2 * sm, 1)));
 
-  drawBackground(ctx, config.background, data.accentColor, vw, vh);
+  drawBackground(ctx, config.background, data.accentColor, vw, vh, aiVideoEl);
   drawAccentBar(ctx, data.accentColor, vw);
   drawBrand(ctx, data.accentColor, fadeIn, vw);
   drawFooter(ctx, data.accentColor, fadeIn, vw, vh, data.ctaText);
@@ -556,12 +607,12 @@ function slidePlayerSpotlight({ ctx, data, config, progress, vw, vh }: SlideCtx)
   ctx.globalAlpha = 1;
 }
 
-function slideLeaderboard({ ctx, data, config, progress, vw, vh }: SlideCtx) {
+function slideLeaderboard({ ctx, data, config, progress, vw, vh, aiVideoEl }: SlideCtx) {
   const sm     = speedMult(config.animationSpeed);
   const fadeIn = easeOutCubic(Math.min(progress * 2 * sm, 1));
   const rows   = data.leaderboardRows ?? [];
 
-  drawBackground(ctx, config.background, data.accentColor, vw, vh);
+  drawBackground(ctx, config.background, data.accentColor, vw, vh, aiVideoEl);
   drawAccentBar(ctx, data.accentColor, vw);
   drawBrand(ctx, data.accentColor, fadeIn, vw);
   drawFooter(ctx, data.accentColor, fadeIn, vw, vh, data.ctaText);
@@ -618,11 +669,11 @@ function slideLeaderboard({ ctx, data, config, progress, vw, vh }: SlideCtx) {
   ctx.globalAlpha = 1;
 }
 
-function slideIntro({ ctx, data, config, progress, vw, vh }: SlideCtx) {
+function slideIntro({ ctx, data, config, progress, vw, vh, aiVideoEl }: SlideCtx) {
   const sm = speedMult(config.animationSpeed);
   const fadeIn = easeOutCubic(Math.min(progress * 2 * sm, 1));
 
-  drawBackground(ctx, config.background, data.accentColor, vw, vh);
+  drawBackground(ctx, config.background, data.accentColor, vw, vh, aiVideoEl);
 
   const cx = vw / 2;
   const cy = vh / 2;
@@ -664,13 +715,13 @@ function slideIntro({ ctx, data, config, progress, vw, vh }: SlideCtx) {
   ctx.globalAlpha = 1;
 }
 
-function slideOutro({ ctx, data, config, progress, vw, vh }: SlideCtx) {
+function slideOutro({ ctx, data, config, progress, vw, vh, aiVideoEl }: SlideCtx) {
   const sm = speedMult(config.animationSpeed);
   const fadeIn = easeOutCubic(Math.min(progress * 2 * sm, 1));
   const fadeOut = progress > 0.6 ? easeInCubic((progress - 0.6) / 0.4) : 0;
   const alpha = fadeIn * (1 - fadeOut * 0.2);
 
-  drawBackground(ctx, config.background, data.accentColor, vw, vh);
+  drawBackground(ctx, config.background, data.accentColor, vw, vh, aiVideoEl);
   drawAccentBar(ctx, data.accentColor, vw);
 
   ctx.globalAlpha = alpha;
@@ -707,13 +758,13 @@ function slideOutro({ ctx, data, config, progress, vw, vh }: SlideCtx) {
   ctx.globalAlpha = 1;
 }
 
-function slideBranding({ ctx, data, config, progress, vw, vh }: SlideCtx) {
+function slideBranding({ ctx, data, config, progress, vw, vh, aiVideoEl }: SlideCtx) {
   const sm     = speedMult(config.animationSpeed);
   const fadeIn = easeOutCubic(Math.min(progress * 3 * sm, 1));
   const fadeOut = progress > 0.6 ? easeInCubic((progress - 0.6) / 0.4) : 0;
   const alpha  = fadeIn * (1 - fadeOut * 0.15);
 
-  drawBackground(ctx, config.background, data.accentColor, vw, vh);
+  drawBackground(ctx, config.background, data.accentColor, vw, vh, aiVideoEl);
   drawAccentBar(ctx, data.accentColor, vw);
 
   ctx.globalAlpha = alpha;
@@ -789,6 +840,23 @@ export async function generateVideo(
   onProgress: (pct: number) => void,
   config: VideoConfig = DEFAULT_VIDEO_CONFIG,
 ): Promise<Blob> {
+  const isAIBg = config.background.startsWith("ai_");
+  let aiVideoEl: HTMLVideoElement | undefined;
+
+  if (isAIBg && config.aiVideoUrl) {
+    await new Promise<void>((res) => {
+      const vid = document.createElement("video");
+      vid.src = config.aiVideoUrl!;
+      vid.muted = true;
+      vid.loop = true;
+      vid.playsInline = true;
+      vid.crossOrigin = "anonymous";
+      vid.oncanplay = () => { vid.play().catch(() => {}); res(); };
+      vid.onerror = () => res();
+      aiVideoEl = vid;
+    });
+  }
+
   return new Promise((resolve, reject) => {
     const { w: vw, h: vh } = getDimensions(config.exportSize);
     const canvas = document.createElement("canvas");
@@ -814,7 +882,10 @@ export async function generateVideo(
     const chunks: Blob[] = [];
 
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+    recorder.onstop = () => {
+      if (aiVideoEl) { aiVideoEl.pause(); aiVideoEl.src = ""; }
+      resolve(new Blob(chunks, { type: mimeType }));
+    };
     recorder.onerror = (e) => reject(new Error(`MediaRecorder error: ${(e as ErrorEvent).message ?? "unknown"}`));
 
     recorder.start();
@@ -870,7 +941,7 @@ export async function generateVideo(
         }
       }
 
-      slidePainters[slideIdx]({ ctx, data, config, progress, vw, vh });
+      slidePainters[slideIdx]({ ctx, data, config, progress, vw, vh, aiVideoEl });
       ctx.restore();
 
       globalFrame++;

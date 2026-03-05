@@ -14,6 +14,7 @@ import {
   type SlideTransition,
 } from "../pages/VideoGenerator";
 import type { ContentPlayer, StatAngle } from "./GraphicTemplates";
+import { AIVideoLibrary } from "./AIVideoLibrary";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -259,6 +260,7 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading, onPre
   const [squareBlob, setSquareBlob]     = useState<Blob | null>(null);
   const [squareUrl, setSquareUrl]       = useState<string | null>(null);
   const [showNarrationWarning, setShowNarrationWarning] = useState(false);
+  const [selectedAIVideoUrl, setSelectedAIVideoUrl] = useState<string | null>(null);
 
   // Content overlay fields
   const [roundLabel, setRoundLabel]       = useState("");
@@ -308,14 +310,14 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading, onPre
     try {
       const data = buildSlideData(players, selectedAngle, roundLabel, statHighlight, ctaText);
 
-      const reelsConfig: VideoConfig = { ...config, exportSize: "tiktok_reels" };
+      const reelsConfig: VideoConfig = { ...config, exportSize: "tiktok_reels", aiVideoUrl: selectedAIVideoUrl ?? undefined };
       const blob = await generateVideo(data, setProgress, reelsConfig);
       const url  = URL.createObjectURL(blob);
       setVideoBlob(blob);
       setVideoUrl(url);
 
       if (dualPreview) {
-        const squareConfig: VideoConfig = { ...config, exportSize: "instagram_post" };
+        const squareConfig: VideoConfig = { ...config, exportSize: "instagram_post", aiVideoUrl: selectedAIVideoUrl ?? undefined };
         const sBlob = await generateVideo(data, () => {}, squareConfig);
         const sUrl  = URL.createObjectURL(sBlob);
         setSquareBlob(sBlob);
@@ -409,7 +411,7 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading, onPre
         <Dropdown
           value={config.background}
           options={BACKGROUNDS}
-          onChange={(v) => update("background", v)}
+          onChange={(v) => { update("background", v); if (!v.startsWith("ai_")) setSelectedAIVideoUrl(null); }}
           accentColor={accentColor}
           label="Background Style"
         />
@@ -477,6 +479,24 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading, onPre
           </div>
         </div>
       </div>
+
+      {/* AI Video Library — shown when an AI background is selected */}
+      {config.background.startsWith("ai_") && (
+        <div className="rounded-xl border border-border bg-card p-3.5">
+          <AIVideoLibrary
+            selectedUrl={selectedAIVideoUrl}
+            accentColor={accentColor}
+            onSelect={setSelectedAIVideoUrl}
+          />
+          {selectedAIVideoUrl && (
+            <div className="mt-3 pt-3 border-t border-border/50">
+              <p className="text-[10px] text-muted-foreground/60 leading-relaxed">
+                Selected video will be used as the live background when generating.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Intro / Outro / Sound toggles */}
       <div className="rounded-xl border border-border bg-card p-3.5 space-y-3">
