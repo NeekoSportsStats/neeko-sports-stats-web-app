@@ -1,10 +1,3 @@
-// ─── Video Generator ──────────────────────────────────────────────────────────
-// Generates vertical social video using Canvas 2D + MediaRecorder.
-// Exported as WebM (native browser video encoding — no server cost).
-// Supports configurable slide count, duration, animation speed, template,
-// and background style.
-// ─────────────────────────────────────────────────────────────────────────────
-
 export interface VideoSlideData {
   angleTitle: string;
   angleSubtitle: string;
@@ -16,6 +9,9 @@ export interface VideoSlideData {
   accentColor: string;
   secondaryStats: Array<{ label: string; value: string }>;
   leaderboardRows?: Array<{ rank: number; name: string; stat: string }>;
+  roundLabel?: string;
+  statHighlight?: string;
+  ctaText?: string;
 }
 
 export type VideoTemplate =
@@ -30,6 +26,7 @@ export type VideoTemplate =
 export type AnimationSpeed = "slow" | "medium" | "fast";
 export type VideoBackground = "dark_gradient" | "stadium_lights" | "grass_texture" | "analytics_grid" | "team_colour";
 export type ExportSize = "tiktok_reels" | "instagram_post";
+export type SlideTransition = "fade" | "slide" | "zoom" | "bounce";
 
 export interface VideoConfig {
   template: VideoTemplate;
@@ -39,6 +36,10 @@ export interface VideoConfig {
   background: VideoBackground;
   exportSize: ExportSize;
   narrationEnabled: boolean;
+  transition: SlideTransition;
+  showIntro: boolean;
+  showOutro: boolean;
+  soundEffectsEnabled: boolean;
 }
 
 export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
@@ -49,9 +50,11 @@ export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
   background: "dark_gradient",
   exportSize: "tiktok_reels",
   narrationEnabled: false,
+  transition: "fade",
+  showIntro: false,
+  showOutro: false,
+  soundEffectsEnabled: false,
 };
-
-// ─── Dimensions ────────────────────────────────────────────────────────────────
 
 function getDimensions(size: ExportSize): { w: number; h: number } {
   if (size === "instagram_post") return { w: 1080, h: 1080 };
@@ -59,8 +62,7 @@ function getDimensions(size: ExportSize): { w: number; h: number } {
 }
 
 const FPS = 30;
-
-// ─── Animation speed multipliers ─────────────────────────────────────────────
+const TRANSITION_FRAMES = 12;
 
 function speedMult(speed: AnimationSpeed): number {
   if (speed === "slow")   return 0.55;
@@ -68,16 +70,12 @@ function speedMult(speed: AnimationSpeed): number {
   return 1.0;
 }
 
-// ─── Easing ───────────────────────────────────────────────────────────────────
-
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
 function easeInCubic(t: number): number {
   return t * t * t;
 }
-
-// ─── Text helpers ─────────────────────────────────────────────────────────────
 
 function fillCenteredText(ctx: CanvasRenderingContext2D, text: string, cx: number, y: number) {
   ctx.fillText(text, cx, y);
@@ -108,8 +106,6 @@ function wrapText(
   return currentY;
 }
 
-// ─── Background painters ─────────────────────────────────────────────────────
-
 function drawBackground(
   ctx: CanvasRenderingContext2D,
   bg: VideoBackground,
@@ -124,7 +120,6 @@ function drawBackground(
       grad.addColorStop(1, "#080c18");
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, vw, vh);
-      // spotlight blobs
       const s1 = ctx.createRadialGradient(vw * 0.25, vh * 0.1, 0, vw * 0.25, vh * 0.1, vw * 0.55);
       s1.addColorStop(0, "rgba(255,255,200,0.06)");
       s1.addColorStop(1, "transparent");
@@ -144,7 +139,6 @@ function drawBackground(
       grad.addColorStop(1, "#091408");
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, vw, vh);
-      // subtle stripe pattern
       ctx.strokeStyle = "rgba(255,255,255,0.025)";
       ctx.lineWidth = 60;
       for (let y = -60; y < vh + 60; y += 120) {
@@ -164,7 +158,6 @@ function drawBackground(
       for (let y = 0; y <= vh; y += step) {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(vw, y); ctx.stroke();
       }
-      // centre glow
       const glow = ctx.createRadialGradient(vw / 2, vh / 2, 0, vw / 2, vh / 2, vw * 0.7);
       glow.addColorStop(0, accentColor + "18");
       glow.addColorStop(1, "transparent");
@@ -187,13 +180,11 @@ function drawBackground(
       break;
     }
     default: {
-      // dark_gradient
       const grad = ctx.createLinearGradient(0, 0, vw, vh);
       grad.addColorStop(0, "#0f172a");
       grad.addColorStop(1, "#020617");
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, vw, vh);
-      // subtle grid
       ctx.strokeStyle = "rgba(255,255,255,0.018)";
       ctx.lineWidth = 1;
       for (let x = 0; x <= vw; x += 90) {
@@ -241,31 +232,109 @@ function drawBrand(ctx: CanvasRenderingContext2D, accentColor: string, alpha: nu
   void vw;
 }
 
-function drawFooter(ctx: CanvasRenderingContext2D, accentColor: string, alpha: number, vw: number, vh: number) {
+function drawFooter(ctx: CanvasRenderingContext2D, accentColor: string, alpha: number, vw: number, vh: number, ctaText?: string) {
   ctx.globalAlpha = alpha;
   ctx.fillStyle = "rgba(255,255,255,0.1)";
   ctx.fillRect(0, vh - 100, vw, 1);
-  ctx.fillStyle = accentColor;
-  ctx.font = "bold 30px Inter, Arial, sans-serif";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillText("neekostats.com.au", 72, vh - 56);
-  ctx.fillStyle = "rgba(255,255,255,0.28)";
-  ctx.font = "24px Inter, Arial, sans-serif";
-  ctx.textAlign = "right";
-  ctx.fillText("#AFLFantasy · #FantasyFooty", vw - 72, vh - 56);
+
+  if (ctaText) {
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.font = "400 26px Inter, Arial, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(ctaText, 72, vh - 72);
+
+    ctx.fillStyle = accentColor;
+    ctx.font = "bold 28px Inter, Arial, sans-serif";
+    ctx.fillText("neekostats.com.au", 72, vh - 42);
+  } else {
+    ctx.fillStyle = accentColor;
+    ctx.font = "bold 30px Inter, Arial, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText("neekostats.com.au", 72, vh - 56);
+    ctx.fillStyle = "rgba(255,255,255,0.28)";
+    ctx.font = "24px Inter, Arial, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("#AFLFantasy · #FantasyFooty", vw - 72, vh - 56);
+  }
   ctx.globalAlpha = 1;
 }
 
-// ─── Slide painters ────────────────────────────────────────────────────────────
+function drawRoundLabel(ctx: CanvasRenderingContext2D, roundLabel: string, accentColor: string, alpha: number, vw: number) {
+  ctx.globalAlpha = alpha;
+  const labelW = ctx.measureText(roundLabel).width + 32;
+  const x = vw - 72 - labelW;
+  const y = 72;
+  ctx.fillStyle = accentColor + "20";
+  ctx.strokeStyle = accentColor + "55";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(x, y, labelW, 40, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = accentColor;
+  ctx.font = "600 22px Inter, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(roundLabel, x + labelW / 2, y + 20);
+  ctx.globalAlpha = 1;
+}
+
+function drawStatHighlight(ctx: CanvasRenderingContext2D, label: string, accentColor: string, alpha: number, cx: number, y: number) {
+  ctx.globalAlpha = alpha * 0.7;
+  ctx.fillStyle = "rgba(255,255,255,0.3)";
+  ctx.font = "700 28px Inter, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(label.toUpperCase(), cx, y);
+  ctx.globalAlpha = 1;
+  void accentColor;
+}
 
 interface SlideCtx {
   ctx: CanvasRenderingContext2D;
   data: VideoSlideData;
   config: VideoConfig;
-  progress: number; // 0–1 within this slide
+  progress: number;
   vw: number;
   vh: number;
+}
+
+function applyTransitionEffect(
+  ctx: CanvasRenderingContext2D,
+  transition: SlideTransition,
+  tProgress: number,
+  isExit: boolean,
+  vw: number,
+  vh: number,
+) {
+  const t = isExit ? tProgress : 1 - tProgress;
+  switch (transition) {
+    case "fade":
+      ctx.globalAlpha = 1 - t;
+      break;
+    case "slide": {
+      const offset = isExit ? -vw * t : vw * (1 - t);
+      ctx.translate(offset, 0);
+      break;
+    }
+    case "zoom": {
+      const scale = isExit ? 1 - t * 0.15 : 0.85 + t * 0.15;
+      ctx.translate(vw / 2, vh / 2);
+      ctx.scale(scale, scale);
+      ctx.translate(-vw / 2, -vh / 2);
+      ctx.globalAlpha = 1 - t * 0.5;
+      break;
+    }
+    case "bounce": {
+      const bounce = isExit
+        ? -vh * easeInCubic(t)
+        : vh * (1 - easeOutCubic(t));
+      ctx.translate(0, bounce);
+      break;
+    }
+  }
 }
 
 function slideTitle({ ctx, data, config, progress, vw, vh }: SlideCtx) {
@@ -276,7 +345,8 @@ function slideTitle({ ctx, data, config, progress, vw, vh }: SlideCtx) {
   drawBackground(ctx, config.background, data.accentColor, vw, vh);
   drawAccentBar(ctx, data.accentColor, vw);
   drawBrand(ctx, data.accentColor, fadeIn, vw);
-  drawFooter(ctx, data.accentColor, fadeIn, vw, vh);
+  drawFooter(ctx, data.accentColor, fadeIn, vw, vh, data.ctaText);
+  if (data.roundLabel) drawRoundLabel(ctx, data.roundLabel, data.accentColor, fadeIn, vw);
 
   const cx = vw / 2;
   const cy = vh / 2;
@@ -309,12 +379,16 @@ function slideBigStat({ ctx, data, config, progress, vw, vh }: SlideCtx) {
   drawBackground(ctx, config.background, data.accentColor, vw, vh);
   drawAccentBar(ctx, data.accentColor, vw);
   drawBrand(ctx, data.accentColor, fadeIn, vw);
-  drawFooter(ctx, data.accentColor, fadeIn, vw, vh);
+  drawFooter(ctx, data.accentColor, fadeIn, vw, vh, data.ctaText);
+  if (data.roundLabel) drawRoundLabel(ctx, data.roundLabel, data.accentColor, fadeIn, vw);
 
   const cx = vw / 2;
   const cy = vh / 2;
 
   ctx.globalAlpha = fadeIn;
+
+  const statLabel = data.statHighlight ?? data.statLabel;
+  if (statLabel) drawStatHighlight(ctx, statLabel, data.accentColor, fadeIn, cx, cy - 130);
 
   ctx.fillStyle = data.accentColor;
   ctx.font = "700 38px Inter, Arial, sans-serif";
@@ -349,7 +423,8 @@ function slidePlayerSpotlight({ ctx, data, config, progress, vw, vh }: SlideCtx)
   drawBackground(ctx, config.background, data.accentColor, vw, vh);
   drawAccentBar(ctx, data.accentColor, vw);
   drawBrand(ctx, data.accentColor, fadeIn, vw);
-  drawFooter(ctx, data.accentColor, fadeIn, vw, vh);
+  drawFooter(ctx, data.accentColor, fadeIn, vw, vh, data.ctaText);
+  if (data.roundLabel) drawRoundLabel(ctx, data.roundLabel, data.accentColor, fadeIn, vw);
 
   const cx = vw / 2;
   ctx.globalAlpha = fadeIn;
@@ -433,7 +508,8 @@ function slideLeaderboard({ ctx, data, config, progress, vw, vh }: SlideCtx) {
   drawBackground(ctx, config.background, data.accentColor, vw, vh);
   drawAccentBar(ctx, data.accentColor, vw);
   drawBrand(ctx, data.accentColor, fadeIn, vw);
-  drawFooter(ctx, data.accentColor, fadeIn, vw, vh);
+  drawFooter(ctx, data.accentColor, fadeIn, vw, vh, data.ctaText);
+  if (data.roundLabel) drawRoundLabel(ctx, data.roundLabel, data.accentColor, fadeIn, vw);
 
   ctx.globalAlpha = fadeIn;
   const cx = vw / 2;
@@ -458,7 +534,6 @@ function slideLeaderboard({ ctx, data, config, progress, vw, vh }: SlideCtx) {
 
     ctx.globalAlpha = alpha;
 
-    // Row background
     const isTop = i === 0;
     ctx.fillStyle = isTop ? data.accentColor + "22" : "rgba(255,255,255,0.035)";
     ctx.strokeStyle = isTop ? data.accentColor + "44" : "rgba(255,255,255,0.06)";
@@ -468,24 +543,110 @@ function slideLeaderboard({ ctx, data, config, progress, vw, vh }: SlideCtx) {
     ctx.fill();
     ctx.stroke();
 
-    // Rank
     ctx.fillStyle = isTop ? data.accentColor : "rgba(255,255,255,0.3)";
     ctx.font = isTop ? "800 40px Inter, Arial, sans-serif" : "600 36px Inter, Arial, sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText(`${row.rank}`, 110, yBase + rowH / 2);
 
-    // Name
     ctx.fillStyle = "#ffffff";
     ctx.font = isTop ? "700 42px Inter, Arial, sans-serif" : "500 36px Inter, Arial, sans-serif";
     ctx.fillText(row.name, 180, yBase + rowH / 2);
 
-    // Stat
     ctx.fillStyle = isTop ? data.accentColor : "rgba(255,255,255,0.7)";
     ctx.font = isTop ? "800 42px Inter, Arial, sans-serif" : "700 36px Inter, Arial, sans-serif";
     ctx.textAlign = "right";
     ctx.fillText(row.stat, vw - 110, yBase + rowH / 2);
   }
+
+  ctx.globalAlpha = 1;
+}
+
+function slideIntro({ ctx, data, config, progress, vw, vh }: SlideCtx) {
+  const sm = speedMult(config.animationSpeed);
+  const fadeIn = easeOutCubic(Math.min(progress * 2 * sm, 1));
+
+  drawBackground(ctx, config.background, data.accentColor, vw, vh);
+
+  const cx = vw / 2;
+  const cy = vh / 2;
+
+  ctx.globalAlpha = fadeIn;
+
+  const glowG = ctx.createRadialGradient(cx, cy, 0, cx, cy, vw * 0.6);
+  glowG.addColorStop(0, data.accentColor + "25");
+  glowG.addColorStop(1, "transparent");
+  ctx.fillStyle = glowG;
+  ctx.fillRect(0, 0, vw, vh);
+
+  ctx.fillStyle = data.accentColor;
+  ctx.beginPath();
+  ctx.roundRect(cx - 72, cy - 240, 144, 144, 28);
+  ctx.fill();
+
+  ctx.fillStyle = "#000";
+  ctx.font = "900 80px Inter, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("N", cx, cy - 240 + 72);
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "800 52px Inter, Arial, sans-serif";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("NEEKO SPORTS STATS", cx, cy - 40);
+
+  ctx.fillStyle = "rgba(255,255,255,0.38)";
+  ctx.font = "400 34px Inter, Arial, sans-serif";
+  ctx.fillText(data.angleSubtitle || "AFL Fantasy Intelligence", cx, cy + 20);
+
+  if (data.roundLabel) {
+    ctx.fillStyle = data.accentColor;
+    ctx.font = "700 38px Inter, Arial, sans-serif";
+    ctx.fillText(data.roundLabel, cx, cy + 80);
+  }
+
+  ctx.globalAlpha = 1;
+}
+
+function slideOutro({ ctx, data, config, progress, vw, vh }: SlideCtx) {
+  const sm = speedMult(config.animationSpeed);
+  const fadeIn = easeOutCubic(Math.min(progress * 2 * sm, 1));
+  const fadeOut = progress > 0.6 ? easeInCubic((progress - 0.6) / 0.4) : 0;
+  const alpha = fadeIn * (1 - fadeOut * 0.2);
+
+  drawBackground(ctx, config.background, data.accentColor, vw, vh);
+  drawAccentBar(ctx, data.accentColor, vw);
+
+  ctx.globalAlpha = alpha;
+  const cx = vw / 2;
+  const cy = vh / 2;
+
+  ctx.fillStyle = data.accentColor;
+  ctx.beginPath();
+  ctx.roundRect(cx - 80, cy - 220, 160, 160, 28);
+  ctx.fill();
+  ctx.fillStyle = "#000";
+  ctx.font = "900 90px Inter, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("N", cx, cy - 220 + 80);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "800 56px Inter, Arial, sans-serif";
+  ctx.textBaseline = "alphabetic";
+  fillCenteredText(ctx, "NEEKO SPORTS STATS", cx, cy + 20);
+
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.font = "400 34px Inter, Arial, sans-serif";
+  fillCenteredText(ctx, "AFL Fantasy Intelligence", cx, cy + 80);
+
+  ctx.fillStyle = data.accentColor;
+  ctx.font = "700 40px Inter, Arial, sans-serif";
+  fillCenteredText(ctx, "Full rankings at neekostats.com.au", cx, cy + 160);
+
+  ctx.fillStyle = "rgba(255,255,255,0.25)";
+  ctx.font = "500 28px Inter, Arial, sans-serif";
+  fillCenteredText(ctx, "#AFLFantasy  #FantasyFooty  #AFLStats", cx, cy + 220);
 
   ctx.globalAlpha = 1;
 }
@@ -529,49 +690,43 @@ function slideBranding({ ctx, data, config, progress, vw, vh }: SlideCtx) {
   ctx.globalAlpha = 1;
 }
 
-// ─── Slide selection by template ─────────────────────────────────────────────
-
 type SlidePainter = (s: SlideCtx) => void;
 
-function getSlidePlan(template: VideoTemplate, numSlides: number): SlidePainter[] {
-  const plans: Record<VideoTemplate, SlidePainter[]> = {
-    stat_video: [
-      slideTitle, slideBigStat, slidePlayerSpotlight, slideBranding,
-    ],
-    projection_battle: [
-      slideTitle, slideBigStat, slideLeaderboard, slideBranding,
-    ],
-    leaderboard_video: [
-      slideTitle, slideLeaderboard, slideLeaderboard, slideBranding,
-    ],
-    player_spotlight: [
-      slideTitle, slidePlayerSpotlight, slideBigStat, slideBranding,
-    ],
-    breakout_alert: [
-      slideTitle, slideBigStat, slidePlayerSpotlight, slideBranding,
-    ],
-    captain_picks: [
-      slideTitle, slideLeaderboard, slidePlayerSpotlight, slideBranding,
-    ],
-    trade_targets: [
-      slideTitle, slideLeaderboard, slideBigStat, slideBranding,
-    ],
-  };
-  const base = plans[template] ?? plans.stat_video;
-  const clamped = Math.max(2, Math.min(numSlides, 6));
-  if (clamped <= base.length) return base.slice(0, clamped);
-  // Pad with extra stat / leaderboard slides
-  const extra: SlidePainter[] = [slideBigStat, slideLeaderboard, slidePlayerSpotlight];
-  const result = [...base];
-  let ei = 0;
-  while (result.length < clamped) {
-    result.splice(result.length - 1, 0, extra[ei % extra.length]);
-    ei++;
-  }
-  return result.slice(0, clamped);
-}
+function getSlidePlan(config: VideoConfig): SlidePainter[] {
+  const { template, numSlides, showIntro, showOutro } = config;
 
-// ─── Main generator ───────────────────────────────────────────────────────────
+  const corePlans: Record<VideoTemplate, SlidePainter[]> = {
+    stat_video:        [slideTitle, slideBigStat, slidePlayerSpotlight, slideBranding],
+    projection_battle: [slideTitle, slideBigStat, slideLeaderboard, slideBranding],
+    leaderboard_video: [slideTitle, slideLeaderboard, slideLeaderboard, slideBranding],
+    player_spotlight:  [slideTitle, slidePlayerSpotlight, slideBigStat, slideBranding],
+    breakout_alert:    [slideTitle, slideBigStat, slidePlayerSpotlight, slideBranding],
+    captain_picks:     [slideTitle, slideLeaderboard, slidePlayerSpotlight, slideBranding],
+    trade_targets:     [slideTitle, slideLeaderboard, slideBigStat, slideBranding],
+  };
+
+  const clamped = Math.max(2, Math.min(numSlides, 6));
+  let base = corePlans[template] ?? corePlans.stat_video;
+  if (clamped <= base.length) {
+    base = base.slice(0, clamped);
+  } else {
+    const extra: SlidePainter[] = [slideBigStat, slideLeaderboard, slidePlayerSpotlight];
+    const result = [...base];
+    let ei = 0;
+    while (result.length < clamped) {
+      result.splice(result.length - 1, 0, extra[ei % extra.length]);
+      ei++;
+    }
+    base = result.slice(0, clamped);
+  }
+
+  const plan: SlidePainter[] = [];
+  if (showIntro) plan.push(slideIntro);
+  plan.push(...base);
+  if (showOutro) plan.push(slideOutro);
+
+  return plan;
+}
 
 export async function generateVideo(
   data: VideoSlideData,
@@ -586,7 +741,8 @@ export async function generateVideo(
     const ctx = canvas.getContext("2d");
     if (!ctx) { reject(new Error("Canvas 2D not available")); return; }
 
-    const slidePainters = getSlidePlan(config.template, config.numSlides);
+    const slidePainters = getSlidePlan(config);
+
     const framesPerSlide = Math.round(config.slideDurationSec * FPS);
     const slideFrames = slidePainters.map(() => framesPerSlide);
     const totalFrames = slideFrames.reduce((a, b) => a + b, 0);
@@ -608,11 +764,13 @@ export async function generateVideo(
     recorder.start();
 
     let globalFrame = 0;
+    const frameDurationMs = 1000 / FPS;
 
-    function tick() {
+    function renderFrame() {
       if (globalFrame > totalFrames) {
         recorder.stop();
         stream.getTracks().forEach((t) => t.stop());
+        onProgress(100);
         return;
       }
 
@@ -628,16 +786,41 @@ export async function generateVideo(
           break;
         }
         remaining -= slideFrames[i];
+        if (i === slideFrames.length - 1) {
+          slideIdx = i;
+          slideFrame = slideFrames[i] - 1;
+        }
       }
 
-      ctx.clearRect(0, 0, vw, vh);
       const progress = slideFrames[slideIdx] > 0 ? slideFrame / slideFrames[slideIdx] : 1;
+
+      ctx.clearRect(0, 0, vw, vh);
+      ctx.save();
+
+      const isTransitionIn  = slideFrame < TRANSITION_FRAMES;
+      const isTransitionOut = slideFrame > slideFrames[slideIdx] - TRANSITION_FRAMES - 1;
+
+      if (config.transition !== "fade" && isTransitionIn && slideIdx > 0) {
+        const tProg = 1 - slideFrame / TRANSITION_FRAMES;
+        applyTransitionEffect(ctx, config.transition, tProg, false, vw, vh);
+      } else if (config.transition !== "fade" && isTransitionOut && slideIdx < slidePainters.length - 1) {
+        const tProg = (slideFrame - (slideFrames[slideIdx] - TRANSITION_FRAMES)) / TRANSITION_FRAMES;
+        applyTransitionEffect(ctx, config.transition, tProg, true, vw, vh);
+      } else if (config.transition === "fade") {
+        if (isTransitionIn && slideIdx > 0) {
+          ctx.globalAlpha = slideFrame / TRANSITION_FRAMES;
+        } else if (isTransitionOut && slideIdx < slidePainters.length - 1) {
+          ctx.globalAlpha = 1 - (slideFrame - (slideFrames[slideIdx] - TRANSITION_FRAMES)) / TRANSITION_FRAMES;
+        }
+      }
+
       slidePainters[slideIdx]({ ctx, data, config, progress, vw, vh });
+      ctx.restore();
 
       globalFrame++;
-      requestAnimationFrame(tick);
+      setTimeout(renderFrame, frameDurationMs);
     }
 
-    requestAnimationFrame(tick);
+    setTimeout(renderFrame, 0);
   });
 }

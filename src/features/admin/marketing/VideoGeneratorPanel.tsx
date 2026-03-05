@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Video, Play, Download, RefreshCw, TriangleAlert as AlertTriangle, X, Check, ChevronDown, Zap } from "lucide-react";
+import { Video, Play, Download, RefreshCw, TriangleAlert as AlertTriangle, X, Check, ChevronDown, Zap, Smartphone, Square } from "lucide-react";
 import {
   generateVideo,
   DEFAULT_VIDEO_CONFIG,
@@ -11,6 +11,7 @@ import {
   type AnimationSpeed,
   type VideoBackground,
   type ExportSize,
+  type SlideTransition,
 } from "../pages/VideoGenerator";
 import type { ContentPlayer, StatAngle } from "./GraphicTemplates";
 
@@ -32,6 +33,13 @@ const TEMPLATES: { id: VideoTemplate; label: string; desc: string }[] = [
   { id: "breakout_alert",    label: "Breakout Alert",    desc: "Upside + spotlight" },
   { id: "captain_picks",     label: "Captain Picks",     desc: "Leaderboard + spotlight" },
   { id: "trade_targets",     label: "Trade Targets",     desc: "Leaderboard + big stat" },
+];
+
+const TRANSITIONS: { id: SlideTransition; label: string; desc: string }[] = [
+  { id: "fade",   label: "Fade",   desc: "Smooth cross-dissolve" },
+  { id: "slide",  label: "Slide",  desc: "Horizontal pan" },
+  { id: "zoom",   label: "Zoom",   desc: "Scale in/out" },
+  { id: "bounce", label: "Bounce", desc: "Vertical bounce" },
 ];
 
 const SLIDE_COUNTS  = [3, 4, 5, 6];
@@ -66,12 +74,20 @@ const WEEKLY_TEMPLATES: { label: string; template: VideoTemplate; angleId: strin
   { label: "Best Matchups",    template: "projection_battle", angleId: "best_matchups"     },
 ];
 
+const AUTO_HASHTAGS = "#aflfantasy #aflfantasy2026 #fantasyfooty #aflstats #fantasysports";
+
 const fmt    = (n: number | null, suffix = "") => n != null ? `${Math.round(Number(n))}${suffix}` : "—";
 const fmtDec = (n: number | null, dp = 1, suffix = "") => n != null ? `${Number(n).toFixed(dp)}${suffix}` : "—";
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 
-function buildSlideData(players: ContentPlayer[], angle: StatAngle): VideoSlideData {
+function buildSlideData(
+  players: ContentPlayer[],
+  angle: StatAngle,
+  roundLabel?: string,
+  statHighlight?: string,
+  ctaText?: string,
+): VideoSlideData {
   const top = players[0];
   return {
     angleTitle:    angle.title,
@@ -82,6 +98,9 @@ function buildSlideData(players: ContentPlayer[], angle: StatAngle): VideoSlideD
     team:          top?.team ?? "—",
     position:      top?.position ?? null,
     accentColor:   angle.accentColor,
+    roundLabel:    roundLabel?.trim() || undefined,
+    statHighlight: statHighlight?.trim() || undefined,
+    ctaText:       ctaText?.trim() || undefined,
     secondaryStats: [
       { label: "Projection",  value: top ? fmt(top.projection_final, " pts") : "—" },
       { label: "Ceiling",     value: top ? fmt(top.ceiling_estimate, " pts") : "—" },
@@ -137,6 +156,26 @@ function Dropdown<T extends string>({ value, options, onChange, accentColor, lab
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Toggle helper ───────────────────────────────────────────────────────────
+
+function Toggle({ checked, onChange, accentColor }: { checked: boolean; onChange: (v: boolean) => void; accentColor: string }) {
+  return (
+    <button
+      onClick={() => onChange(!checked)}
+      className="shrink-0 w-10 h-6 rounded-full border-2 transition-all relative"
+      style={checked
+        ? { background: accentColor, borderColor: accentColor }
+        : { background: "transparent", borderColor: "hsl(var(--border))" }
+      }
+    >
+      <span
+        className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
+        style={{ left: checked ? "calc(100% - 1.1rem)" : "2px" }}
+      />
+    </button>
   );
 }
 
@@ -205,33 +244,58 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
   const [progress, setProgress]         = useState(0);
   const [videoBlob, setVideoBlob]       = useState<Blob | null>(null);
   const [videoUrl, setVideoUrl]         = useState<string | null>(null);
+  const [squareBlob, setSquareBlob]     = useState<Blob | null>(null);
+  const [squareUrl, setSquareUrl]       = useState<string | null>(null);
   const [showNarrationWarning, setShowNarrationWarning] = useState(false);
   const [weeklyRunning, setWeeklyRunning]               = useState(false);
   const [weeklyDone, setWeeklyDone]                     = useState(0);
   const [weeklyTotal, setWeeklyTotal]                   = useState(0);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  // Content overlay fields
+  const [roundLabel, setRoundLabel]       = useState("");
+  const [statHighlight, setStatHighlight] = useState("");
+  const [ctaText, setCtaText]             = useState("See full rankings at neekostats.com.au");
+
+  // Dual preview toggle
+  const [dualPreview, setDualPreview] = useState(false);
+
+  const videoRef       = useRef<HTMLVideoElement>(null);
+  const squareVideoRef = useRef<HTMLVideoElement>(null);
 
   const accentColor = selectedAngle.accentColor;
 
   const update = <K extends keyof VideoConfig>(key: K, val: VideoConfig[K]) =>
     setConfig((prev) => ({ ...prev, [key]: val }));
 
-  const estimatedDuration = config.numSlides * config.slideDurationSec;
+  const totalSlides     = config.numSlides + (config.showIntro ? 1 : 0) + (config.showOutro ? 1 : 0);
+  const estimatedDuration = totalSlides * config.slideDurationSec;
 
   const handleGenerate = async () => {
     if (players.length === 0) return;
     setGenerating(true);
     setProgress(0);
     if (videoUrl) { URL.revokeObjectURL(videoUrl); setVideoUrl(null); }
+    if (squareUrl) { URL.revokeObjectURL(squareUrl); setSquareUrl(null); }
     setVideoBlob(null);
+    setSquareBlob(null);
 
     try {
-      const data = buildSlideData(players, selectedAngle);
-      const blob = await generateVideo(data, setProgress, config);
+      const data = buildSlideData(players, selectedAngle, roundLabel, statHighlight, ctaText);
+
+      const reelsConfig: VideoConfig = { ...config, exportSize: "tiktok_reels" };
+      const blob = await generateVideo(data, setProgress, reelsConfig);
       const url  = URL.createObjectURL(blob);
       setVideoBlob(blob);
       setVideoUrl(url);
+
+      if (dualPreview) {
+        const squareConfig: VideoConfig = { ...config, exportSize: "instagram_post" };
+        const sBlob = await generateVideo(data, () => {}, squareConfig);
+        const sUrl  = URL.createObjectURL(sBlob);
+        setSquareBlob(sBlob);
+        setSquareUrl(sUrl);
+      }
+
       setProgress(100);
       toast({ title: "Video ready", description: "Preview and download below." });
     } catch (err) {
@@ -241,12 +305,13 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
     }
   };
 
-  const handleDownload = () => {
-    if (!videoBlob || !videoUrl) return;
+  const handleDownload = (blob: Blob | null, suffix = "") => {
+    if (!blob) return;
     const link = document.createElement("a");
-    link.download = `neeko-${selectedAngle.id}-${config.template}.webm`;
-    link.href = videoUrl;
+    link.download = `neeko-${selectedAngle.id}-${config.template}${suffix}.webm`;
+    link.href = URL.createObjectURL(blob);
     link.click();
+    URL.revokeObjectURL(link.href);
     toast({ title: "Video downloading", description: "WebM — compatible with TikTok, Reels, and all modern devices." });
   };
 
@@ -267,7 +332,7 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
     for (let i = 0; i < WEEKLY_TEMPLATES.length; i++) {
       const wt = WEEKLY_TEMPLATES[i];
       try {
-        const data = buildSlideData(players, selectedAngle);
+        const data = buildSlideData(players, selectedAngle, roundLabel, statHighlight, ctaText);
         data.angleTitle = wt.label;
         const cfg: VideoConfig = { ...config, template: wt.template };
         const blob = await generateVideo(data, () => {}, cfg);
@@ -308,7 +373,7 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
       <p className="text-[11px] text-muted-foreground/60 leading-relaxed -mt-3">
         Creates animated social videos from the active stat angle data.
         Rendered locally in your browser — no server costs.
-        Export size: {config.exportSize === "tiktok_reels" ? "1080×1920 (TikTok / Reels)" : "1080×1080 (Instagram)"}.
+        Estimated length: ~{estimatedDuration}s.
       </p>
 
       {/* Settings grid */}
@@ -324,6 +389,15 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
             label="Video Template"
           />
         </div>
+
+        {/* Slide Transition */}
+        <Dropdown
+          value={config.transition}
+          options={TRANSITIONS}
+          onChange={(v) => update("transition", v)}
+          accentColor={accentColor}
+          label="Slide Transition"
+        />
 
         {/* Export Size */}
         <Dropdown
@@ -342,6 +416,27 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
           accentColor={accentColor}
           label="Background Style"
         />
+
+        {/* Animation Speed */}
+        <div>
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Animation Speed</p>
+          <div className="grid grid-cols-3 gap-1.5">
+            {ANIM_SPEEDS.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => update("animationSpeed", s.id)}
+                className="py-2 rounded-lg border text-xs font-semibold transition-all"
+                style={
+                  config.animationSpeed === s.id
+                    ? { background: `${accentColor}20`, borderColor: `${accentColor}55`, color: accentColor }
+                    : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }
+                }
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Number of Slides */}
         <div>
@@ -365,7 +460,7 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
         </div>
 
         {/* Slide Duration */}
-        <div>
+        <div className="sm:col-span-2">
           <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Slide Duration</p>
           <div className="grid grid-cols-4 gap-1.5">
             {SLIDE_DURATIONS.map((d) => (
@@ -384,38 +479,102 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
             ))}
           </div>
         </div>
+      </div>
 
-        {/* Animation Speed */}
-        <div className="sm:col-span-2">
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Animation Speed</p>
-          <div className="grid grid-cols-3 gap-1.5">
-            {ANIM_SPEEDS.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => update("animationSpeed", s.id)}
-                className="py-2 rounded-lg border text-xs font-semibold transition-all"
-                style={
-                  config.animationSpeed === s.id
-                    ? { background: `${accentColor}20`, borderColor: `${accentColor}55`, color: accentColor }
-                    : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }
-                }
-              >
-                {s.label}
-              </button>
-            ))}
+      {/* Intro / Outro / Sound toggles */}
+      <div className="rounded-xl border border-border bg-card p-3.5 space-y-3">
+        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Slide Options</p>
+
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold">Intro Slide</p>
+            <p className="text-[11px] text-muted-foreground/60 mt-0.5">Neeko branding + round label opener</p>
           </div>
+          <Toggle checked={config.showIntro} onChange={(v) => update("showIntro", v)} accentColor={accentColor} />
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold">Outro Slide</p>
+            <p className="text-[11px] text-muted-foreground/60 mt-0.5">CTA + neekostats.com.au call to action</p>
+          </div>
+          <Toggle checked={config.showOutro} onChange={(v) => update("showOutro", v)} accentColor={accentColor} />
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold flex items-center gap-1.5">
+              Sound Effects
+              <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium text-muted-foreground border-border">Default OFF</span>
+            </p>
+            <p className="text-[11px] text-muted-foreground/60 mt-0.5">Whoosh / transition sounds (browser only)</p>
+          </div>
+          <Toggle checked={config.soundEffectsEnabled} onChange={(v) => update("soundEffectsEnabled", v)} accentColor={accentColor} />
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold">Dual Preview</p>
+            <p className="text-[11px] text-muted-foreground/60 mt-0.5">Generate both Phone (9:16) + Square (1:1)</p>
+          </div>
+          <Toggle checked={dualPreview} onChange={setDualPreview} accentColor={accentColor} />
         </div>
       </div>
 
-      {/* Estimated duration */}
-      <p className="text-[11px] text-muted-foreground/50">
-        Estimated video length: ~{estimatedDuration}s ({config.numSlides} slides × {config.slideDurationSec}s)
-      </p>
+      {/* Content Overlay Fields */}
+      <div className="rounded-xl border border-border bg-card p-3.5 space-y-3">
+        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Content Overlays</p>
 
-      {/* Slide layout summary */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium">Round Label</label>
+          <input
+            type="text"
+            value={roundLabel}
+            onChange={(e) => setRoundLabel(e.target.value)}
+            placeholder="e.g. Round 12"
+            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-1 placeholder:text-muted-foreground/40"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium">Stat Highlight Label</label>
+          <input
+            type="text"
+            value={statHighlight}
+            onChange={(e) => setStatHighlight(e.target.value)}
+            placeholder="e.g. Highest Projection, Captain Pick"
+            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-1 placeholder:text-muted-foreground/40"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium">CTA Text</label>
+          <input
+            type="text"
+            value={ctaText}
+            onChange={(e) => setCtaText(e.target.value)}
+            placeholder="See full rankings at neekostats.com.au"
+            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-1 placeholder:text-muted-foreground/40"
+          />
+          <p className="text-[10px] text-muted-foreground/50">Shown on outro slide and in video footer</p>
+        </div>
+      </div>
+
+      {/* Estimated duration + slide plan */}
       <div className="rounded-xl bg-muted/20 border border-border/50 p-3.5 space-y-2">
-        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Slide Layout Preview</p>
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Slide Layout</p>
+          <p className="text-[11px] text-muted-foreground/50 tabular-nums">~{estimatedDuration}s total</p>
+        </div>
         <div className="flex gap-1.5 flex-wrap">
+          {config.showIntro && (
+            <div
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium"
+              style={{ borderColor: `${accentColor}30`, color: "hsl(var(--muted-foreground))", background: `${accentColor}08` }}
+            >
+              <span className="text-muted-foreground/40">0.</span> Intro
+            </div>
+          )}
           {Array.from({ length: config.numSlides }, (_, i) => {
             const labels = ["Title", "Big Stat", "Player / Leaderboard", "Outro"];
             const label = labels[Math.min(i, labels.length - 1)];
@@ -430,6 +589,14 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
               </div>
             );
           })}
+          {config.showOutro && (
+            <div
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium"
+              style={{ borderColor: `${accentColor}30`, color: "hsl(var(--muted-foreground))", background: `${accentColor}08` }}
+            >
+              <span className="text-muted-foreground/40">{config.numSlides + (config.showIntro ? 1 : 0) + 1}.</span> Outro
+            </div>
+          )}
         </div>
       </div>
 
@@ -479,7 +646,7 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
       >
         {generating
           ? <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />Generating… {progress}%</>
-          : <><Play className="h-3.5 w-3.5 mr-1.5" />Generate Video</>
+          : <><Play className="h-3.5 w-3.5 mr-1.5" />Generate Video{dualPreview ? " (Phone + Square)" : ""}</>
         }
       </Button>
 
@@ -493,44 +660,97 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
         </div>
       )}
 
-      {/* Video Preview */}
-      {videoUrl && (
+      {/* Video Preview — dual or single */}
+      {(videoUrl || squareUrl) && (
         <div className="space-y-3">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Video Preview</p>
-          <div
-            className="rounded-xl overflow-hidden border border-border bg-black mx-auto"
-            style={
-              config.exportSize === "instagram_post"
-                ? { aspectRatio: "1/1", maxWidth: 200 }
-                : { aspectRatio: "9/16", maxWidth: 160 }
-            }
-          >
-            <video
-              ref={videoRef}
-              src={videoUrl}
-              controls
-              autoPlay
-              loop
-              muted
-              playsInline
-              className="w-full h-full object-cover"
-            />
+
+          <div className={`flex gap-4 ${dualPreview && squareUrl ? "flex-row items-start justify-center" : "justify-center"}`}>
+            {/* Phone preview */}
+            {videoUrl && (
+              <div className="space-y-2 flex-1 max-w-[160px]">
+                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
+                  <Smartphone className="h-3 w-3" />
+                  Phone (9:16)
+                </div>
+                <div
+                  className="rounded-xl overflow-hidden border border-border bg-black"
+                  style={{ aspectRatio: "9/16" }}
+                >
+                  <video
+                    ref={videoRef}
+                    src={videoUrl}
+                    controls
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-8 text-xs"
+                  onClick={() => handleDownload(videoBlob, "-reels")}
+                  style={{ borderColor: `${accentColor}44`, color: accentColor }}
+                >
+                  <Download className="h-3.5 w-3.5 mr-1.5" />
+                  Download
+                </Button>
+              </div>
+            )}
+
+            {/* Square preview */}
+            {dualPreview && squareUrl && (
+              <div className="space-y-2 flex-1 max-w-[160px]">
+                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
+                  <Square className="h-3 w-3" />
+                  Square (1:1)
+                </div>
+                <div
+                  className="rounded-xl overflow-hidden border border-border bg-black"
+                  style={{ aspectRatio: "1/1" }}
+                >
+                  <video
+                    ref={squareVideoRef}
+                    src={squareUrl}
+                    controls
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-8 text-xs"
+                  onClick={() => handleDownload(squareBlob, "-square")}
+                  style={{ borderColor: `${accentColor}44`, color: accentColor }}
+                >
+                  <Download className="h-3.5 w-3.5 mr-1.5" />
+                  Download
+                </Button>
+              </div>
+            )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full h-9 text-xs"
-            onClick={handleDownload}
-            style={{ borderColor: `${accentColor}44`, color: accentColor }}
-          >
-            <Download className="h-3.5 w-3.5 mr-1.5" />
-            Download Video (.webm)
-          </Button>
-          <p className="text-[10px] text-muted-foreground/45 leading-relaxed">
+
+          <p className="text-[10px] text-muted-foreground/45 leading-relaxed text-center">
             WebM format. Compatible with TikTok, Instagram Reels, and all modern browsers.
           </p>
         </div>
       )}
+
+      {/* Auto Hashtags Info */}
+      <div className="rounded-xl bg-muted/10 border border-border/40 px-3.5 py-3 space-y-1">
+        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Auto Hashtags</p>
+        <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
+          Appended to all generated captions and outro slides:
+        </p>
+        <p className="text-[11px] font-medium" style={{ color: accentColor }}>{AUTO_HASHTAGS}</p>
+      </div>
 
       {/* Weekly Video Generator */}
       <div className="rounded-xl bg-muted/10 border border-border/50 p-4 space-y-3">

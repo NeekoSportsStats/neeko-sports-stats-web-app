@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Image as ImageIcon, Layers, Palette } from "lucide-react";
+import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Image as ImageIcon, Layers, Palette, Type, Hash, Calendar } from "lucide-react";
 import { VideoGeneratorPanel } from "../marketing/VideoGeneratorPanel";
 import {
   GraphicCanvas,
@@ -15,6 +15,10 @@ import {
   type LayoutEngine,
   type BackgroundTheme,
   type GraphicOptions,
+  type LogoPosition,
+  type AccentColourMode,
+  type RankHighlight,
+  type CtaPosition,
 } from "../marketing/GraphicTemplates";
 import { exportCarouselSlides } from "../marketing/CarouselExport";
 
@@ -30,11 +34,43 @@ interface ExportSize {
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 const EXPORT_SIZES: ExportSize[] = [
-  { id: "instagram", label: "Instagram Post (1080×1080)", w: 1080, h: 1080 },
-  { id: "twitter",   label: "Twitter / X (1200×675)",    w: 1200, h: 675  },
-  { id: "story",     label: "Story (1080×1920)",          w: 1080, h: 1920 },
-  { id: "carousel",  label: "Carousel Slides (1080×1080)", w: 1080, h: 1080 },
+  { id: "instagram",  label: "Instagram Square (1080×1080)",  w: 1080, h: 1080 },
+  { id: "portrait",   label: "Portrait / Reels (1080×1350)",  w: 1080, h: 1350 },
+  { id: "landscape",  label: "Landscape / Banner (1920×1080)", w: 1920, h: 1080 },
+  { id: "twitter",    label: "Twitter / X (1200×675)",         w: 1200, h: 675  },
+  { id: "story",      label: "Story / TikTok (1080×1920)",     w: 1080, h: 1920 },
+  { id: "carousel",   label: "Carousel Slides (1080×1080)",    w: 1080, h: 1080 },
 ];
+
+const LOGO_POSITIONS: { id: LogoPosition; label: string }[] = [
+  { id: "none",          label: "None"          },
+  { id: "top_left",      label: "Top Left"      },
+  { id: "top_center",    label: "Top Centre"    },
+  { id: "bottom_center", label: "Bottom Centre" },
+  { id: "watermark",     label: "Watermark (subtle)" },
+];
+
+const ACCENT_MODES: { id: AccentColourMode; label: string; color: string }[] = [
+  { id: "neeko_gold",  label: "Neeko Gold",   color: "#F59E0B" },
+  { id: "team_colour", label: "Team Colour",  color: "#60A5FA" },
+  { id: "white",       label: "White",        color: "#FFFFFF" },
+  { id: "custom",      label: "Custom",       color: "#EF4444" },
+];
+
+const RANK_HIGHLIGHTS: { id: RankHighlight; label: string }[] = [
+  { id: "top_player", label: "Top Player Only" },
+  { id: "top_3",      label: "Top 3"           },
+  { id: "all",        label: "All Rows"        },
+  { id: "none",       label: "None"            },
+];
+
+const CTA_POSITIONS: { id: CtaPosition; label: string }[] = [
+  { id: "bottom_center", label: "Bottom Centre" },
+  { id: "bottom_right",  label: "Bottom Right"  },
+  { id: "hidden",        label: "Hidden"        },
+];
+
+const AUTO_HASHTAGS = "#aflfantasy #aflfantasy2026 #fantasyfooty #aflstats #fantasysports";
 
 const LAYOUTS: { id: LayoutEngine; label: string; description: string; icon: string; group: "core" | "template" }[] = [
   { id: "leaderboard",        label: "Leaderboard",         description: "Ranked player list",          icon: "🏆", group: "core"     },
@@ -337,6 +373,20 @@ export default function AdminContentEngine() {
   const [playerImageUrl, setPlayerImageUrl]           = useState("");
   const [bgOpen, setBgOpen]                           = useState(false);
 
+  // New graphic options
+  const [logoPosition, setLogoPosition]           = useState<LogoPosition>("none");
+  const [logoOpen, setLogoOpen]                   = useState(false);
+  const [roundLabel, setRoundLabel]               = useState("");
+  const [statHighlight, setStatHighlight]         = useState("");
+  const [ctaText, setCtaText]                     = useState("");
+  const [ctaPosition, setCtaPosition]             = useState<CtaPosition>("bottom_center");
+  const [ctaPositionOpen, setCtaPositionOpen]     = useState(false);
+  const [accentMode, setAccentMode]               = useState<AccentColourMode>("neeko_gold");
+  const [customAccent, setCustomAccent]           = useState("#F59E0B");
+  const [rankHighlight, setRankHighlight]         = useState<RankHighlight>("top_player");
+  const [rankHighlightOpen, setRankHighlightOpen] = useState(false);
+  const [appendHashtags, setAppendHashtags]       = useState(true);
+
   // Export
   const [selectedExportSize, setSelectedExportSize]   = useState<ExportSize>(EXPORT_SIZES[0]);
   const [exportSizeOpen, setExportSizeOpen]           = useState(false);
@@ -359,11 +409,21 @@ export default function AdminContentEngine() {
 
   const isCarouselMode  = selectedExportSize.id === "carousel";
   const effectiveLayout = isCarouselMode ? "leaderboard" : selectedLayout;
+  const resolvedAccentColor = accentMode === "custom" ? customAccent : accentMode === "white" ? "#FFFFFF" : undefined;
+
   const graphicOptions: GraphicOptions = {
     layout: effectiveLayout,
     background: selectedBackground,
     showTeamAccent,
     playerImageUrl: playerImageUrl.trim() || undefined,
+    logoPosition: logoPosition !== "none" ? logoPosition : undefined,
+    roundLabel:    roundLabel.trim()    || undefined,
+    statHighlight: statHighlight.trim() || undefined,
+    ctaText:       ctaText.trim()       || undefined,
+    ctaPosition:   ctaText.trim() ? ctaPosition : "hidden",
+    accentColourMode:    accentMode,
+    customAccentColour:  resolvedAccentColor,
+    rankHighlight,
   };
 
   const exportW        = selectedExportSize.w;
@@ -444,7 +504,8 @@ export default function AdminContentEngine() {
         throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
       }
       const result = await res.json() as { caption: string };
-      setCaption(result.caption ?? "");
+      const base = result.caption ?? "";
+      setCaption(appendHashtags ? `${base}\n\n${AUTO_HASHTAGS}` : base);
     } catch (err) {
       toast({ title: "Caption generation failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
     } finally {
@@ -831,6 +892,191 @@ export default function AdminContentEngine() {
               style={{ focusRingColor: selectedAngle.accentColor } as React.CSSProperties}
             />
             <p className="text-[10px] text-muted-foreground/50">Rendered at 18% opacity behind the player name. Leave blank for text-only.</p>
+          </div>
+
+          {/* Logo Position */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <ImageIcon className="h-3.5 w-3.5" />
+              Neeko Logo Position
+            </p>
+            <div className="relative">
+              <button
+                onClick={() => setLogoOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-border bg-background text-xs font-medium transition-colors hover:bg-muted/40"
+              >
+                <span>{LOGO_POSITIONS.find((p) => p.id === logoPosition)?.label ?? "None"}</span>
+                <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${logoOpen ? "rotate-180" : ""}`} />
+              </button>
+              {logoOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-border bg-popover shadow-lg z-20 overflow-hidden">
+                  {LOGO_POSITIONS.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => { setLogoPosition(p.id); setLogoOpen(false); }}
+                      className="w-full flex items-center justify-between px-3 py-2.5 text-xs hover:bg-muted/40 transition-colors"
+                      style={p.id === logoPosition ? { color: selectedAngle.accentColor } : {}}
+                    >
+                      <span className="font-medium">{p.label}</span>
+                      {p.id === logoPosition && <span className="w-1.5 h-1.5 rounded-full" style={{ background: selectedAngle.accentColor }} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <p className="text-[10px] text-muted-foreground/50">Uses /public/neeko-logo-transparent.png. Watermark renders at ~12% opacity.</p>
+          </div>
+
+          {/* Round Label + Stat Highlight */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5" />
+              Content Overlays
+            </p>
+            <input
+              type="text"
+              value={roundLabel}
+              onChange={(e) => setRoundLabel(e.target.value)}
+              placeholder="Round Label (e.g. Round 12)"
+              className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-1 placeholder:text-muted-foreground/40"
+            />
+            <input
+              type="text"
+              value={statHighlight}
+              onChange={(e) => setStatHighlight(e.target.value)}
+              placeholder="Stat Highlight (e.g. Captain Pick, Highest Projection)"
+              className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-1 placeholder:text-muted-foreground/40"
+            />
+          </div>
+
+          {/* CTA Overlay */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <Type className="h-3.5 w-3.5" />
+              CTA Overlay
+            </p>
+            <input
+              type="text"
+              value={ctaText}
+              onChange={(e) => setCtaText(e.target.value)}
+              placeholder="e.g. See full rankings at neekostats.com.au"
+              className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-xs focus:outline-none focus:ring-1 placeholder:text-muted-foreground/40"
+            />
+            {ctaText.trim() && (
+              <div className="relative">
+                <button
+                  onClick={() => setCtaPositionOpen((v) => !v)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-border bg-background text-xs font-medium transition-colors hover:bg-muted/40"
+                >
+                  <span>{CTA_POSITIONS.find((p) => p.id === ctaPosition)?.label}</span>
+                  <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${ctaPositionOpen ? "rotate-180" : ""}`} />
+                </button>
+                {ctaPositionOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-border bg-popover shadow-lg z-20 overflow-hidden">
+                    {CTA_POSITIONS.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => { setCtaPosition(p.id); setCtaPositionOpen(false); }}
+                        className="w-full flex items-center justify-between px-3 py-2.5 text-xs hover:bg-muted/40 transition-colors"
+                        style={p.id === ctaPosition ? { color: selectedAngle.accentColor } : {}}
+                      >
+                        <span className="font-medium">{p.label}</span>
+                        {p.id === ctaPosition && <span className="w-1.5 h-1.5 rounded-full" style={{ background: selectedAngle.accentColor }} />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Accent Colour Mode */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <Palette className="h-3.5 w-3.5" />
+              Accent Colour
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {ACCENT_MODES.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setAccentMode(m.id)}
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg border text-xs font-medium transition-all"
+                  style={
+                    accentMode === m.id
+                      ? { background: `${m.color}18`, borderColor: `${m.color}55`, color: m.color }
+                      : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }
+                  }
+                >
+                  <span className="w-3 h-3 rounded-full shrink-0" style={{ background: m.color }} />
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            {accentMode === "custom" && (
+              <div className="flex items-center gap-2.5">
+                <input
+                  type="color"
+                  value={customAccent}
+                  onChange={(e) => setCustomAccent(e.target.value)}
+                  className="w-9 h-9 rounded-lg border border-border cursor-pointer p-0.5 bg-transparent"
+                />
+                <input
+                  type="text"
+                  value={customAccent}
+                  onChange={(e) => setCustomAccent(e.target.value)}
+                  placeholder="#F59E0B"
+                  className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none font-mono placeholder:text-muted-foreground/40"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Rank Highlight */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Rank Highlight</p>
+            <div className="relative">
+              <button
+                onClick={() => setRankHighlightOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-border bg-background text-xs font-medium transition-colors hover:bg-muted/40"
+              >
+                <span>{RANK_HIGHLIGHTS.find((r) => r.id === rankHighlight)?.label}</span>
+                <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${rankHighlightOpen ? "rotate-180" : ""}`} />
+              </button>
+              {rankHighlightOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-border bg-popover shadow-lg z-20 overflow-hidden">
+                  {RANK_HIGHLIGHTS.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => { setRankHighlight(r.id); setRankHighlightOpen(false); }}
+                      className="w-full flex items-center justify-between px-3 py-2.5 text-xs hover:bg-muted/40 transition-colors"
+                      style={r.id === rankHighlight ? { color: selectedAngle.accentColor } : {}}
+                    >
+                      <span className="font-medium">{r.label}</span>
+                      {r.id === rankHighlight && <span className="w-1.5 h-1.5 rounded-full" style={{ background: selectedAngle.accentColor }} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Auto Hashtags */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <Hash className="h-3.5 w-3.5" />
+              Auto Hashtags
+            </p>
+            <label className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-border cursor-pointer hover:bg-muted/20 transition-colors">
+              <input
+                type="checkbox"
+                checked={appendHashtags}
+                onChange={(e) => setAppendHashtags(e.target.checked)}
+                className="rounded"
+              />
+              <span className="text-xs font-medium">Append to all captions</span>
+            </label>
+            <p className="text-[10px] text-muted-foreground/50">{AUTO_HASHTAGS}</p>
           </div>
 
           {/* Export Size selector (moved here, above generate button) */}

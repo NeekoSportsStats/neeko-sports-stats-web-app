@@ -42,12 +42,24 @@ export type LayoutEngine =
   | "avoid_player"
   | "matchup_advantage";
 export type BackgroundTheme = "dark_gradient" | "stadium" | "grass" | "team_colour" | "analytics_grid";
+export type LogoPosition = "top_left" | "top_center" | "bottom_center" | "watermark" | "none";
+export type AccentColourMode = "neeko_gold" | "team_colour" | "white" | "custom";
+export type RankHighlight = "top_player" | "top_3" | "all" | "none";
+export type CtaPosition = "bottom_center" | "bottom_right" | "hidden";
 
 export interface GraphicOptions {
   layout: LayoutEngine;
   background: BackgroundTheme;
   showTeamAccent: boolean;
   playerImageUrl?: string;
+  logoPosition?: LogoPosition;
+  roundLabel?: string;
+  statHighlight?: string;
+  ctaText?: string;
+  ctaPosition?: CtaPosition;
+  accentColourMode?: AccentColourMode;
+  customAccentColour?: string;
+  rankHighlight?: RankHighlight;
 }
 
 // ─── Team colours (expanded) ───────────────────────────────────────────────────
@@ -196,6 +208,111 @@ function PlayerGhostImage({ url, w, h }: { url: string; w: number; h: number }) 
   );
 }
 
+// ─── Logo overlay ──────────────────────────────────────────────────────────────
+
+function LogoOverlay({ position, w, h }: { position: LogoPosition; w: number; h: number }) {
+  const [ok, setOk] = React.useState(true);
+  if (!ok || position === "none") return null;
+
+  const size = position === "watermark" ? Math.round(w * 0.12) : Math.round(w * 0.09);
+  const style: React.CSSProperties = { position: "absolute", width: size, height: size, pointerEvents: "none", zIndex: 10 };
+
+  if (position === "top_left") {
+    style.top = 18; style.left = 18;
+  } else if (position === "top_center") {
+    style.top = 18; style.left = "50%"; style.transform = "translateX(-50%)";
+  } else if (position === "bottom_center") {
+    style.bottom = 18; style.left = "50%"; style.transform = "translateX(-50%)";
+  } else if (position === "watermark") {
+    style.bottom = 18; style.right = 18; style.opacity = 0.12;
+  }
+
+  return (
+    <div style={style}>
+      <img
+        src="/neeko-logo-transparent.png"
+        alt="Neeko"
+        onError={() => setOk(false)}
+        style={{ width: "100%", height: "100%", objectFit: "contain" }}
+      />
+    </div>
+  );
+}
+
+// ─── Round label badge ─────────────────────────────────────────────────────────
+
+function RoundLabelBadge({ label, accentColor, w }: { label: string; accentColor: string; w: number }) {
+  const fontSize = Math.max(13, Math.round(w * 0.014));
+  return (
+    <div style={{
+      position: "absolute", top: 18, right: 18,
+      background: `${accentColor}22`,
+      border: `1px solid ${accentColor}55`,
+      borderRadius: 6, padding: "4px 10px",
+      fontSize, fontWeight: 700, color: accentColor,
+      letterSpacing: "0.06em", textTransform: "uppercase",
+      pointerEvents: "none", zIndex: 10,
+    }}>
+      {label}
+    </div>
+  );
+}
+
+// ─── CTA overlay ───────────────────────────────────────────────────────────────
+
+function CtaOverlay({ text, position, accentColor, w, h }: { text: string; position: CtaPosition; accentColor: string; w: number; h: number }) {
+  if (position === "hidden" || !text) return null;
+
+  const fontSize = Math.max(13, Math.round(w * 0.013));
+  const style: React.CSSProperties = {
+    position: "absolute",
+    background: "rgba(0,0,0,0.65)",
+    backdropFilter: "blur(4px)",
+    padding: "7px 16px",
+    borderRadius: 8,
+    fontSize, fontWeight: 600,
+    color: "rgba(255,255,255,0.85)",
+    pointerEvents: "none", zIndex: 10,
+  };
+
+  if (position === "bottom_center") {
+    style.bottom = 22;
+    style.left = "50%";
+    style.transform = "translateX(-50%)";
+    style.whiteSpace = "nowrap";
+  } else if (position === "bottom_right") {
+    style.bottom = 22;
+    style.right = 22;
+    style.textAlign = "right";
+  }
+
+  return (
+    <div style={style}>
+      <span style={{ color: accentColor, fontWeight: 700 }}>→ </span>
+      {text}
+    </div>
+  );
+}
+
+// ─── Stat highlight label ──────────────────────────────────────────────────────
+
+function StatHighlightLabel({ label, accentColor }: { label: string; accentColor: string }) {
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center", gap: 6,
+      background: `${accentColor}18`,
+      border: `1px solid ${accentColor}44`,
+      borderRadius: 20, padding: "4px 12px",
+      fontSize: 14, fontWeight: 700, color: accentColor,
+      letterSpacing: "0.08em", textTransform: "uppercase",
+      marginBottom: 8,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: accentColor, display: "inline-block" }} />
+      {label}
+    </div>
+  );
+}
+
 // ─── Team colour left-border accent ───────────────────────────────────────────
 
 function TeamAccentBorder({ teamPrimary }: { teamPrimary: string }) {
@@ -261,6 +378,21 @@ function CanvasShell({
       {options.showTeamAccent && <TeamAccentBorder teamPrimary={teamColour.primary} />}
       {options.playerImageUrl && (
         <PlayerGhostImage url={options.playerImageUrl} w={w} h={h} />
+      )}
+      {options.logoPosition && options.logoPosition !== "none" && (
+        <LogoOverlay position={options.logoPosition} w={w} h={h} />
+      )}
+      {options.roundLabel && (
+        <RoundLabelBadge label={options.roundLabel} accentColor={angle.accentColor} w={w} />
+      )}
+      {options.ctaText && options.ctaPosition && options.ctaPosition !== "hidden" && (
+        <CtaOverlay
+          text={options.ctaText}
+          position={options.ctaPosition}
+          accentColor={angle.accentColor}
+          w={w}
+          h={h}
+        />
       )}
       <div style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100%" }}>
         {children}
@@ -349,6 +481,11 @@ export function LayoutStatCard({
           }}>
             {firstName}
           </div>
+
+          {/* Stat Highlight Label */}
+          {options.statHighlight && (
+            <StatHighlightLabel label={options.statHighlight} accentColor={angle.accentColor} />
+          )}
 
           {/* Big hero stat */}
           <div style={{
