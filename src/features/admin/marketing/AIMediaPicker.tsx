@@ -3,7 +3,7 @@ import { Check, Image as ImageIcon, Video, Loader, RefreshCw, FolderOpen } from 
 import { supabase } from "@/lib/supabaseClient";
 import type { BackgroundSource } from "./GraphicTemplates";
 
-export type MediaCategory = "all" | "stadium" | "crowd" | "abstract" | "field" | "players" | "lights";
+export type MediaCategory = "all" | "stadium" | "crowd" | "abstract" | "field" | "players" | "lights" | "videos";
 
 export interface AIMediaItem {
   id: string;
@@ -123,8 +123,19 @@ export async function loadAIMedia(): Promise<MediaCache> {
   return cache;
 }
 
-const IMAGE_CATEGORIES: MediaCategory[] = ["all", "stadium", "crowd", "abstract", "field", "players"];
+const IMAGE_CATEGORIES: MediaCategory[] = ["all", "stadium", "crowd", "field", "abstract", "players", "videos"];
 const VIDEO_CATEGORIES: MediaCategory[] = ["all", "stadium", "crowd", "abstract", "lights"];
+
+const CATEGORY_LABELS: Record<MediaCategory, string> = {
+  all:      "All",
+  stadium:  "Stadium",
+  crowd:    "Crowd",
+  field:    "Field",
+  abstract: "Abstract",
+  players:  "Players",
+  lights:   "Lights",
+  videos:   "Videos",
+};
 
 interface AIMediaPickerProps {
   type: "image" | "video";
@@ -134,7 +145,8 @@ interface AIMediaPickerProps {
 }
 
 export function AIMediaPicker({ type, selected, onSelect, accentColor = "#F59E0B" }: AIMediaPickerProps) {
-  const [items,    setItems]    = useState<AIMediaItem[]>([]);
+  const [images,   setImages]   = useState<AIMediaItem[]>([]);
+  const [videos,   setVideos]   = useState<AIMediaItem[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState<string | null>(null);
   const [category, setCategory] = useState<MediaCategory>("all");
@@ -142,6 +154,7 @@ export function AIMediaPicker({ type, selected, onSelect, accentColor = "#F59E0B
 
   useEffect(() => {
     loadedRef.current = false;
+    setCategory("all");
   }, [type]);
 
   useEffect(() => {
@@ -155,7 +168,8 @@ export function AIMediaPicker({ type, selected, onSelect, accentColor = "#F59E0B
     setError(null);
     try {
       const cache = await loadAIMedia();
-      setItems(type === "image" ? cache.images : cache.videos);
+      setImages(cache.images);
+      setVideos(cache.videos);
     } catch {
       setError("Could not load media library. Check storage configuration.");
     } finally {
@@ -169,8 +183,22 @@ export function AIMediaPicker({ type, selected, onSelect, accentColor = "#F59E0B
     fetchMedia();
   }
 
+  const baseItems  = type === "image" ? images : videos;
+
   const categories = type === "image" ? IMAGE_CATEGORIES : VIDEO_CATEGORIES;
-  const filtered   = category === "all" ? items : items.filter((i) => i.category === category);
+
+  function getFiltered(cat: MediaCategory): AIMediaItem[] {
+    if (cat === "all")    return baseItems;
+    if (cat === "videos") return videos;
+    return baseItems.filter((i) => i.category === cat);
+  }
+
+  const filtered = getFiltered(category);
+  const items    = baseItems;
+
+  function countFor(cat: MediaCategory): number {
+    return getFiltered(cat).length;
+  }
 
   if (loading) {
     return (
@@ -213,90 +241,144 @@ export function AIMediaPicker({ type, selected, onSelect, accentColor = "#F59E0B
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
+    <div className="space-y-2.5">
+
+      {/* ── Category filter bar ─────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-2">
         <div className="flex gap-1 flex-wrap">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setCategory(cat)}
-              className="text-[10px] font-medium px-2 py-0.5 rounded-full capitalize transition-colors"
-              style={
-                category === cat
-                  ? { background: accentColor, color: "#000" }
-                  : { background: "hsl(var(--muted)/0.4)", color: "hsl(var(--muted-foreground))" }
-              }
-            >
-              {cat}
-            </button>
-          ))}
+          {categories.map((cat) => {
+            const count     = countFor(cat);
+            const isActive  = category === cat;
+            if (cat !== "all" && count === 0) return null;
+            return (
+              <button
+                key={cat}
+                onClick={() => setCategory(cat)}
+                className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full transition-all duration-150"
+                style={
+                  isActive
+                    ? { background: accentColor, color: "#000" }
+                    : { background: "hsl(var(--muted)/0.5)", color: "hsl(var(--muted-foreground))" }
+                }
+              >
+                {cat === "videos" && <Video className="h-2.5 w-2.5" />}
+                <span className="capitalize">{CATEGORY_LABELS[cat]}</span>
+                {cat !== "all" && (
+                  <span
+                    className="rounded-full px-1 text-[9px] font-semibold"
+                    style={{
+                      background: isActive ? "rgba(0,0,0,0.2)" : "hsl(var(--muted-foreground)/0.15)",
+                    }}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
         <button
           onClick={handleRefresh}
-          title="Refresh"
-          className="text-muted-foreground/30 hover:text-muted-foreground transition-colors"
+          title="Refresh media"
+          className="shrink-0 mt-0.5 text-muted-foreground/30 hover:text-muted-foreground transition-colors"
         >
           <RefreshCw className="h-3 w-3" />
         </button>
       </div>
 
+      {/* ── Result count ───────────────────────────────────────────────── */}
       <p className="text-[10px] text-muted-foreground/40">
-        {filtered.length} {type === "image" ? "images" : "videos"}
-        {category !== "all" ? ` · ${category}` : ""}
+        {filtered.length === 0
+          ? "No items match this filter"
+          : `${filtered.length} ${filtered.length === 1 ? "item" : "items"}${category !== "all" ? ` · ${CATEGORY_LABELS[category]}` : ""}`
+        }
       </p>
 
-      <div className="grid grid-cols-3 gap-1.5 max-h-64 overflow-y-auto pr-0.5">
-        {filtered.map((item) => {
-          const isSelected = selected === item.url;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onSelect(item.url)}
-              className="text-left rounded-lg overflow-hidden border transition-all duration-150"
-              style={{
-                borderColor: isSelected ? accentColor : "hsl(var(--border)/0.4)",
-                boxShadow:   isSelected ? `0 0 0 2px ${accentColor}44` : undefined,
-              }}
-            >
-              <div className="relative aspect-video bg-black/60">
-                {item.media_type === "image" ? (
-                  <img
-                    src={item.thumbnail_url}
-                    alt={item.label}
-                    loading="lazy"
-                    className="w-full h-full object-cover opacity-85"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-black/80">
-                    <Video className="h-5 w-5 text-muted-foreground/40" />
-                  </div>
-                )}
-                {isSelected && (
-                  <div
-                    className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center"
-                    style={{ background: accentColor }}
-                  >
-                    <Check className="h-3 w-3 text-black" />
-                  </div>
-                )}
-              </div>
-              <div
-                className="px-2 py-1.5"
-                style={{ background: isSelected ? `${accentColor}12` : "hsl(var(--muted)/0.4)" }}
+      {/* ── Media grid ─────────────────────────────────────────────────── */}
+      {filtered.length > 0 ? (
+        <div className="grid grid-cols-3 gap-1.5 max-h-72 overflow-y-auto pr-0.5">
+          {filtered.map((item) => {
+            const isSelected = selected === item.url;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onSelect(item.url)}
+                className="group text-left rounded-lg overflow-hidden border transition-all duration-150 focus:outline-none"
+                style={{
+                  borderColor: isSelected ? accentColor : "hsl(var(--border)/0.4)",
+                  boxShadow:   isSelected ? `0 0 0 2px ${accentColor}44` : undefined,
+                }}
               >
-                <div className="flex items-center gap-1">
-                  {item.media_type === "image"
-                    ? <ImageIcon className="h-2.5 w-2.5 shrink-0 opacity-40" />
-                    : <Video     className="h-2.5 w-2.5 shrink-0 opacity-40" />
-                  }
-                  <span className="text-[10px] font-medium truncate">{item.label}</span>
+                {/* Thumbnail */}
+                <div className="relative aspect-video bg-black/60">
+                  {item.media_type === "image" ? (
+                    <img
+                      src={item.thumbnail_url}
+                      alt={item.label}
+                      loading="lazy"
+                      className="w-full h-full object-cover opacity-85 group-hover:opacity-100 transition-opacity duration-150"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-black/80">
+                      <Video className="h-4 w-4 text-muted-foreground/40" />
+                    </div>
+                  )}
+
+                  {/* Category overlay tag */}
+                  <div className="absolute bottom-1 left-1">
+                    <span
+                      className="text-[8px] font-semibold capitalize px-1.5 py-0.5 rounded"
+                      style={{
+                        background: item.media_type === "video" ? "rgba(0,0,0,0.75)" : "rgba(0,0,0,0.55)",
+                        color:      item.media_type === "video" ? "#a3e635" : "rgba(255,255,255,0.85)",
+                        backdropFilter: "blur(4px)",
+                      }}
+                    >
+                      {item.media_type === "video" ? "video" : item.category}
+                    </span>
+                  </div>
+
+                  {/* Selected checkmark */}
+                  {isSelected && (
+                    <div
+                      className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center shadow"
+                      style={{ background: accentColor }}
+                    >
+                      <Check className="h-3 w-3 text-black" />
+                    </div>
+                  )}
                 </div>
-                <span className="text-[9px] opacity-40 capitalize">{item.category}</span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+
+                {/* Label row */}
+                <div
+                  className="px-2 py-1.5"
+                  style={{ background: isSelected ? `${accentColor}12` : "hsl(var(--muted)/0.4)" }}
+                >
+                  <div className="flex items-center gap-1">
+                    {item.media_type === "image"
+                      ? <ImageIcon className="h-2.5 w-2.5 shrink-0 opacity-40" />
+                      : <Video     className="h-2.5 w-2.5 shrink-0 opacity-40" />
+                    }
+                    <span className="text-[10px] font-medium truncate leading-tight">{item.label}</span>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="py-4 text-center">
+          <p className="text-[11px] text-muted-foreground/40">
+            No {CATEGORY_LABELS[category].toLowerCase()} media found.
+          </p>
+          <button
+            onClick={() => setCategory("all")}
+            className="mt-1.5 text-[10px] underline text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+          >
+            Show all
+          </button>
+        </div>
+      )}
     </div>
   );
 }
