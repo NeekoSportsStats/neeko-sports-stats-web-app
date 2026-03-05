@@ -1,9 +1,11 @@
-import { useState, useRef, useCallback, useEffect, createElement } from "react";
+import { useState, useRef, useCallback, useEffect, createElement, lazy, Suspense } from "react";
+
+const AdminMediaLibraryPanel = lazy(() => import("./AdminMediaLibrary"));
 import { toPng } from "html-to-image";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Image as ImageIcon, Layers, Palette, Type, Hash, Calendar, Video, Play, ChevronRight, Shuffle, ChartBar as BarChart2, CalendarPlus, Smartphone, Square, SlidersHorizontal, Upload } from "lucide-react";
+import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Image as ImageIcon, Layers, Palette, Type, Hash, Calendar, Video, Play, ChevronRight, Shuffle, ChartBar as BarChart2, CalendarPlus, Smartphone, Square, SlidersHorizontal, Upload, Library } from "lucide-react";
 import { VideoGeneratorPanel, type VideoPreviewState } from "../marketing/VideoGeneratorPanel";
 import {
   GraphicCanvas,
@@ -38,7 +40,7 @@ interface ExportSize {
   h: number;
 }
 
-type ContentMode = "graphic" | "video";
+type ContentMode = "graphic" | "video" | "media";
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -995,11 +997,32 @@ export default function AdminContentEngine() {
             <Video className="h-3.5 w-3.5" />
             Video Mode
           </button>
+          <button
+            onClick={() => setContentMode("media")}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            style={
+              contentMode === "media"
+                ? { background: accentColor, color: "#000" }
+                : { color: "hsl(var(--muted-foreground))" }
+            }
+          >
+            <Library className="h-3.5 w-3.5" />
+            Media Library
+          </button>
         </div>
       </div>
 
+      {/* ── MEDIA LIBRARY MODE ──────────────────────────────────────────────── */}
+      {contentMode === "media" && (
+        <div className="flex-1 overflow-y-auto p-6" style={{ minHeight: 0 }}>
+          <Suspense fallback={<div className="flex items-center justify-center py-24"><RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
+            <AdminMediaLibraryPanel />
+          </Suspense>
+        </div>
+      )}
+
       {/* ── WORKSPACE: Left Panel + Right Panel ────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row flex-1 gap-0 overflow-hidden lg:overflow-hidden overflow-y-auto" style={{ minHeight: 0 }}>
+      <div className={`flex flex-col lg:flex-row flex-1 gap-0 overflow-hidden lg:overflow-hidden overflow-y-auto${contentMode === "media" ? " hidden" : ""}`} style={{ minHeight: 0 }}>
 
         {/* LEFT PANEL — Controls */}
         <div

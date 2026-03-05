@@ -1,7 +1,7 @@
 import { useEffect, lazy, Suspense } from "react";
 import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { RefreshCw, Shield, LayoutDashboard, Server, ChartBar as BarChart3, Zap, Calendar, ListTodo, Library } from "lucide-react";
+import { RefreshCw, Shield, LayoutDashboard, Server, ChartBar as BarChart3, Zap, Calendar, ListTodo } from "lucide-react";
 
 const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
 
@@ -10,7 +10,6 @@ const TABS: { path: string; label: string; icon: React.ElementType }[] = [
   { path: "/admin/system-health",    label: "System Health",    icon: Server },
   { path: "/admin/analytics",        label: "Analytics",        icon: BarChart3 },
   { path: "/admin/content-engine",   label: "Content Engine",   icon: Zap },
-  { path: "/admin/media-library",    label: "Media Library",    icon: Library },
   { path: "/admin/content-planner",  label: "Content Planner",  icon: Calendar },
   { path: "/admin/founder-tasks",    label: "Founder Tasks",    icon: ListTodo },
 ];
@@ -89,7 +88,6 @@ export const AdminDashboard      = lazy(() => import("@/features/admin/pages/Adm
 export const AdminSystemHealth   = lazy(() => import("@/features/admin/pages/AdminSystemHealth"));
 export const AdminAnalytics      = lazy(() => import("@/features/admin/pages/AdminAnalytics"));
 export const AdminContentEngine  = lazy(() => import("@/features/admin/pages/AdminContentEngine"));
-export const AdminMediaLibrary   = lazy(() => import("@/features/admin/pages/AdminMediaLibrary"));
 export const AdminContentPlanner = lazy(() => import("@/features/admin/pages/AdminContentPlanner"));
 export const AdminFounderTasks   = lazy(() => import("@/features/admin/pages/AdminFounderTasks"));
 
