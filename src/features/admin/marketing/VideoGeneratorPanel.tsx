@@ -1,10 +1,7 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Video, Play, Download, RefreshCw, AlertTriangle, X, Check,
-  ChevronDown, Zap,
-} from "lucide-react";
+import { Video, Play, Download, RefreshCw, TriangleAlert as AlertTriangle, X, Check, ChevronDown, Zap } from "lucide-react";
 import {
   generateVideo,
   DEFAULT_VIDEO_CONFIG,
