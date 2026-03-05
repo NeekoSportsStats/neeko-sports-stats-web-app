@@ -88,6 +88,10 @@ export interface MWBestTrade {
   in_position: string;
   out_price: number;
   in_price: number;
+  out_projection?: number | null;
+  in_projection?: number | null;
+  out_expected_change?: number | null;
+  in_expected_change?: number | null;
   projected_points_gain: number;
   expected_price_gain: number;
   risk_change: number;
