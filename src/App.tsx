@@ -24,7 +24,6 @@ import {
   AdminDashboard,
   AdminSystemHealth,
   AdminAnalytics,
-  AdminMarketingHub,
   AdminContentEngine,
 } from "@/pages/Admin";
 
@@ -155,7 +154,6 @@ function App() {
         <Route path="dashboard"      element={<S fallback={Generic}><AdminDashboard /></S>} />
         <Route path="system-health"  element={<S fallback={Generic}><AdminSystemHealth /></S>} />
         <Route path="analytics"      element={<S fallback={Generic}><AdminAnalytics /></S>} />
-        <Route path="marketing"      element={<S fallback={Generic}><AdminMarketingHub /></S>} />
         <Route path="content-engine" element={<S fallback={Generic}><AdminContentEngine /></S>} />
       </Route>
 

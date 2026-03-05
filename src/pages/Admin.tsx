@@ -1,16 +1,15 @@
 import { useEffect, lazy, Suspense } from "react";
 import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { RefreshCw, Shield, LayoutDashboard, Server, ChartBar as BarChart3, Megaphone, Zap } from "lucide-react";
+import { RefreshCw, Shield, LayoutDashboard, Server, ChartBar as BarChart3, Zap } from "lucide-react";
 
 const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
 
 const TABS: { path: string; label: string; icon: React.ElementType }[] = [
-  { path: "/admin/dashboard",      label: "Dashboard",       icon: LayoutDashboard },
-  { path: "/admin/system-health",  label: "System Health",   icon: Server },
-  { path: "/admin/analytics",      label: "Analytics",       icon: BarChart3 },
-  { path: "/admin/marketing",      label: "Marketing Hub",   icon: Megaphone },
-  { path: "/admin/content-engine", label: "Content Engine",  icon: Zap },
+  { path: "/admin/dashboard",      label: "Dashboard",      icon: LayoutDashboard },
+  { path: "/admin/system-health",  label: "System Health",  icon: Server },
+  { path: "/admin/analytics",      label: "Analytics",      icon: BarChart3 },
+  { path: "/admin/content-engine", label: "Content Engine", icon: Zap },
 ];
 
 function TabLoadingFallback() {
@@ -86,7 +85,6 @@ export function AdminShell() {
 export const AdminDashboard    = lazy(() => import("@/features/admin/pages/AdminDashboard"));
 export const AdminSystemHealth = lazy(() => import("@/features/admin/pages/AdminSystemHealth"));
 export const AdminAnalytics    = lazy(() => import("@/features/admin/pages/AdminAnalytics"));
-export const AdminMarketingHub = lazy(() => import("@/features/admin/pages/AdminMarketingHub"));
 export const AdminContentEngine = lazy(() => import("@/features/admin/pages/AdminContentEngine"));
 
 export default AdminShell;
