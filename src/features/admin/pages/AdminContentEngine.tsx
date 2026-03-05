@@ -3,7 +3,7 @@ import { toPng } from "html-to-image";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Image as ImageIcon, Layers, Palette, Type, Hash, Calendar, Video, Play, ChevronRight, Shuffle, ChartBar as BarChart2, CalendarPlus, Smartphone, Square } from "lucide-react";
+import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Image as ImageIcon, Layers, Palette, Type, Hash, Calendar, Video, Play, ChevronRight, Shuffle, ChartBar as BarChart2, CalendarPlus, Smartphone, Square, SlidersHorizontal, Upload } from "lucide-react";
 import { VideoGeneratorPanel, type VideoPreviewState } from "../marketing/VideoGeneratorPanel";
 import {
   GraphicCanvas,
@@ -14,12 +14,16 @@ import {
   type StatAngle,
   type LayoutEngine,
   type BackgroundTheme,
+  type BackgroundSource,
   type GraphicOptions,
   type LogoPosition,
   type AccentColourMode,
   type RankHighlight,
   type CtaPosition,
+  type LayoutOffsets,
+  DEFAULT_LAYOUT_OFFSETS,
 } from "../marketing/GraphicTemplates";
+import { StockMediaPicker, getBackgroundSourceLabel } from "../marketing/StockMediaPicker";
 import { exportCarouselSlides } from "../marketing/CarouselExport";
 import { AddToPlannerModal } from "../marketing/AddToPlannerModal";
 
@@ -443,8 +447,15 @@ export default function AdminContentEngine() {
   // Layout / style
   const [selectedLayout, setSelectedLayout]           = useState<LayoutEngine>("leaderboard");
   const [selectedBackground, setSelectedBackground]   = useState<BackgroundTheme>("dark_gradient");
+  const [backgroundSource, setBackgroundSource]       = useState<BackgroundSource>("gradient");
+  const [backgroundMediaUrl, setBackgroundMediaUrl]   = useState<string | null>(null);
+  const [customUploadUrl, setCustomUploadUrl]         = useState("");
   const [showTeamAccent, setShowTeamAccent]           = useState(false);
   const [playerImageUrl, setPlayerImageUrl]           = useState("");
+
+  // Layout editor
+  const [layoutEditorOpen, setLayoutEditorOpen] = useState(false);
+  const [layoutOffsets, setLayoutOffsets]       = useState<LayoutOffsets>({ ...DEFAULT_LAYOUT_OFFSETS });
 
   // Graphic options
   const [logoPosition, setLogoPosition]           = useState<LogoPosition>("none");
@@ -486,9 +497,15 @@ export default function AdminContentEngine() {
   const isCarouselMode  = selectedExportSize.id === "carousel";
   const effectiveLayout = isCarouselMode ? "leaderboard" : selectedLayout;
 
+  const resolvedMediaUrl = backgroundSource === "upload"
+    ? (customUploadUrl.trim() || undefined)
+    : (backgroundMediaUrl ?? undefined);
+
   const graphicOptions: GraphicOptions = {
     layout: effectiveLayout,
     background: selectedBackground,
+    backgroundSource,
+    backgroundMediaUrl: resolvedMediaUrl,
     showTeamAccent,
     playerImageUrl: playerImageUrl.trim() || undefined,
     logoPosition: logoPosition !== "none" ? logoPosition : undefined,
@@ -499,6 +516,7 @@ export default function AdminContentEngine() {
     accentColourMode:   accentMode,
     customAccentColour: accentMode === "custom" ? customAccent : undefined,
     rankHighlight,
+    layoutOffsets: layoutEditorOpen ? layoutOffsets : undefined,
   };
 
   const accentColor = resolveAccentColor(selectedAngle, graphicOptions);
@@ -916,15 +934,86 @@ export default function AdminContentEngine() {
                   accentColor={accentColor}
                   defaultOpen={false}
                 >
-                  {/* Background Theme */}
+                  {/* Background Source */}
                   <div className="space-y-1.5">
-                    <p className="text-[11px] font-medium text-muted-foreground">Background Theme</p>
-                    <DropSelect
-                      value={selectedBackground}
-                      options={BACKGROUNDS}
-                      onChange={(v) => setSelectedBackground(v as BackgroundTheme)}
-                      accentColor={accentColor}
-                    />
+                    <p className="text-[11px] font-medium text-muted-foreground">Background Source</p>
+                    <div className="grid grid-cols-1 gap-1">
+                      {(["gradient", "stock_image", "stock_video", "team_theme", "upload"] as BackgroundSource[]).map((src) => (
+                        <button
+                          key={src}
+                          onClick={() => {
+                            setBackgroundSource(src);
+                            if (src !== "stock_image" && src !== "stock_video") setBackgroundMediaUrl(null);
+                          }}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium text-left transition-all"
+                          style={
+                            backgroundSource === src
+                              ? { background: `${accentColor}14`, borderColor: `${accentColor}55`, color: accentColor }
+                              : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }
+                          }
+                        >
+                          {src === "gradient"    && <Palette className="h-3 w-3 shrink-0" />}
+                          {src === "stock_image" && <ImageIcon className="h-3 w-3 shrink-0" />}
+                          {src === "stock_video" && <Video className="h-3 w-3 shrink-0" />}
+                          {src === "team_theme"  && <span className="w-3 h-3 rounded-full shrink-0" style={{ background: accentColor }} />}
+                          {src === "upload"      && <Upload className="h-3 w-3 shrink-0" />}
+                          {getBackgroundSourceLabel(src)}
+                          {backgroundSource === src && <span className="ml-auto w-1.5 h-1.5 rounded-full" style={{ background: accentColor }} />}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Gradient sub-theme (only when gradient selected) */}
+                    {backgroundSource === "gradient" && (
+                      <DropSelect
+                        value={selectedBackground}
+                        options={BACKGROUNDS}
+                        onChange={(v) => setSelectedBackground(v as BackgroundTheme)}
+                        accentColor={accentColor}
+                      />
+                    )}
+
+                    {/* Stock image picker */}
+                    {backgroundSource === "stock_image" && (
+                      <StockMediaPicker
+                        type="image"
+                        selected={backgroundMediaUrl}
+                        onSelect={setBackgroundMediaUrl}
+                        accentColor={accentColor}
+                      />
+                    )}
+
+                    {/* Stock video picker */}
+                    {backgroundSource === "stock_video" && (
+                      <StockMediaPicker
+                        type="video"
+                        selected={backgroundMediaUrl}
+                        onSelect={setBackgroundMediaUrl}
+                        accentColor={accentColor}
+                      />
+                    )}
+
+                    {/* Team theme info */}
+                    {backgroundSource === "team_theme" && (
+                      <p className="text-[10px] text-muted-foreground/60 px-1">
+                        Background will use the team colour scheme of the top-ranked player.
+                      </p>
+                    )}
+
+                    {/* Custom upload URL */}
+                    {backgroundSource === "upload" && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] text-muted-foreground/60">Paste an image or video URL</p>
+                        <input
+                          type="text"
+                          value={customUploadUrl}
+                          onChange={(e) => setCustomUploadUrl(e.target.value)}
+                          placeholder="https://…"
+                          className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none placeholder:text-muted-foreground/40"
+                        />
+                      </div>
+                    )}
+
                     <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border cursor-pointer hover:bg-muted/20 transition-colors">
                       <input
                         type="checkbox"
@@ -1012,6 +1101,116 @@ export default function AdminContentEngine() {
                       className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none placeholder:text-muted-foreground/40"
                     />
                     <p className="text-[10px] text-muted-foreground/50">Rendered at 18% opacity behind player name.</p>
+                  </div>
+
+                  {/* Layout Editor toggle */}
+                  <div className="border-t border-border/30 pt-2.5 space-y-2.5">
+                    <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border cursor-pointer hover:bg-muted/20 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={layoutEditorOpen}
+                        onChange={(e) => {
+                          setLayoutEditorOpen(e.target.checked);
+                          if (!e.target.checked) setLayoutOffsets({ ...DEFAULT_LAYOUT_OFFSETS });
+                        }}
+                        className="rounded"
+                      />
+                      <SlidersHorizontal className="h-3.5 w-3.5 opacity-60" />
+                      <span className="text-xs font-medium">Enable Layout Editor</span>
+                    </label>
+
+                    {layoutEditorOpen && (
+                      <div className="space-y-3 px-1">
+                        {/* Title offset */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <p className="text-[10px] text-muted-foreground/70 font-medium">Title Offset X</p>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="range" min={-80} max={80} step={1}
+                                value={layoutOffsets.titleX}
+                                onChange={(e) => setLayoutOffsets((o) => ({ ...o, titleX: Number(e.target.value) }))}
+                                className="flex-1 h-1.5 accent-current"
+                                style={{ accentColor }}
+                              />
+                              <span className="text-[10px] tabular-nums w-7 text-right text-muted-foreground/60">{layoutOffsets.titleX}</span>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[10px] text-muted-foreground/70 font-medium">Title Offset Y</p>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="range" min={-80} max={80} step={1}
+                                value={layoutOffsets.titleY}
+                                onChange={(e) => setLayoutOffsets((o) => ({ ...o, titleY: Number(e.target.value) }))}
+                                className="flex-1 h-1.5"
+                                style={{ accentColor }}
+                              />
+                              <span className="text-[10px] tabular-nums w-7 text-right text-muted-foreground/60">{layoutOffsets.titleY}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Scale controls */}
+                        {[
+                          { key: "playerImageScale", label: "Player Image Scale", min: 0.5, max: 2 },
+                          { key: "logoScale",        label: "Logo Scale",         min: 0.5, max: 2 },
+                        ].map(({ key, label, min, max }) => (
+                          <div key={key} className="space-y-1">
+                            <p className="text-[10px] text-muted-foreground/70 font-medium">{label}</p>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="range" min={min} max={max} step={0.05}
+                                value={layoutOffsets[key as keyof LayoutOffsets] as number}
+                                onChange={(e) => setLayoutOffsets((o) => ({ ...o, [key]: Number(e.target.value) }))}
+                                className="flex-1 h-1.5"
+                                style={{ accentColor }}
+                              />
+                              <span className="text-[10px] tabular-nums w-8 text-right text-muted-foreground/60">
+                                {(layoutOffsets[key as keyof LayoutOffsets] as number).toFixed(2)}x
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Opacity + Blur */}
+                        <div className="space-y-1">
+                          <p className="text-[10px] text-muted-foreground/70 font-medium">Overlay Opacity</p>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="range" min={0} max={1} step={0.05}
+                              value={layoutOffsets.overlayOpacity}
+                              onChange={(e) => setLayoutOffsets((o) => ({ ...o, overlayOpacity: Number(e.target.value) }))}
+                              className="flex-1 h-1.5"
+                              style={{ accentColor }}
+                            />
+                            <span className="text-[10px] tabular-nums w-8 text-right text-muted-foreground/60">
+                              {Math.round(layoutOffsets.overlayOpacity * 100)}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] text-muted-foreground/70 font-medium">Background Blur</p>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="range" min={0} max={20} step={1}
+                              value={layoutOffsets.backgroundBlur}
+                              onChange={(e) => setLayoutOffsets((o) => ({ ...o, backgroundBlur: Number(e.target.value) }))}
+                              className="flex-1 h-1.5"
+                              style={{ accentColor }}
+                            />
+                            <span className="text-[10px] tabular-nums w-7 text-right text-muted-foreground/60">{layoutOffsets.backgroundBlur}px</span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => setLayoutOffsets({ ...DEFAULT_LAYOUT_OFFSETS })}
+                          className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground underline underline-offset-2 transition-colors"
+                        >
+                          Reset to defaults
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </SideSection>
 

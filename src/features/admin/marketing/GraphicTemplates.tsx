@@ -1,4 +1,5 @@
 import React from "react";
+import { getTeamBackgroundTheme } from "@/config/teamBackgroundThemes";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -42,14 +43,37 @@ export type LayoutEngine =
   | "avoid_player"
   | "matchup_advantage";
 export type BackgroundTheme = "dark_gradient" | "stadium" | "grass" | "team_colour" | "analytics_grid";
+export type BackgroundSource = "gradient" | "stock_image" | "stock_video" | "team_theme" | "upload";
 export type LogoPosition = "top_left" | "top_center" | "bottom_center" | "watermark" | "none";
 export type AccentColourMode = "neeko_gold" | "team_colour" | "white" | "custom";
 export type RankHighlight = "top_player" | "top_3" | "all" | "none";
 export type CtaPosition = "bottom_center" | "bottom_right" | "hidden";
 
+export interface LayoutOffsets {
+  titleX: number;
+  titleY: number;
+  statCardScale: number;
+  playerImageScale: number;
+  logoScale: number;
+  overlayOpacity: number;
+  backgroundBlur: number;
+}
+
+export const DEFAULT_LAYOUT_OFFSETS: LayoutOffsets = {
+  titleX: 0,
+  titleY: 0,
+  statCardScale: 1,
+  playerImageScale: 1,
+  logoScale: 1,
+  overlayOpacity: 1,
+  backgroundBlur: 0,
+};
+
 export interface GraphicOptions {
   layout: LayoutEngine;
   background: BackgroundTheme;
+  backgroundSource?: BackgroundSource;
+  backgroundMediaUrl?: string;
   showTeamAccent: boolean;
   playerImageUrl?: string;
   logoPosition?: LogoPosition;
@@ -60,6 +84,7 @@ export interface GraphicOptions {
   accentColourMode?: AccentColourMode;
   customAccentColour?: string;
   rankHighlight?: RankHighlight;
+  layoutOffsets?: LayoutOffsets;
 }
 
 // ─── Team colours (expanded) ───────────────────────────────────────────────────
@@ -341,10 +366,90 @@ function TeamAccentBorder({ teamPrimary }: { teamPrimary: string }) {
   );
 }
 
+// ─── Stock / team background layer ────────────────────────────────────────────
+
+function BackgroundLayer({
+  options, w, h, resolvedAccent, teamPrimary, firstTeam,
+}: {
+  options: GraphicOptions;
+  w: number;
+  h: number;
+  resolvedAccent: string;
+  teamPrimary: string;
+  firstTeam: string;
+}) {
+  const source = options.backgroundSource ?? "gradient";
+  const offsets = options.layoutOffsets;
+  const blur = offsets?.backgroundBlur ?? 0;
+
+  if (source === "stock_image" && options.backgroundMediaUrl) {
+    return (
+      <div style={{
+        position: "absolute", inset: 0, zIndex: 0, overflow: "hidden",
+      }}>
+        <img
+          src={options.backgroundMediaUrl}
+          alt=""
+          style={{
+            width: "100%", height: "100%",
+            objectFit: "cover",
+            filter: `blur(${blur}px) brightness(0.4) saturate(0.7)`,
+            transform: blur > 0 ? `scale(${1 + blur * 0.02})` : undefined,
+          }}
+        />
+        <div style={{
+          position: "absolute", inset: 0,
+          background: `linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.6) 100%)`,
+        }} />
+      </div>
+    );
+  }
+
+  if (source === "stock_video" && options.backgroundMediaUrl) {
+    return (
+      <div style={{
+        position: "absolute", inset: 0, zIndex: 0, overflow: "hidden",
+      }}>
+        <video
+          src={options.backgroundMediaUrl}
+          autoPlay
+          loop
+          muted
+          playsInline
+          style={{
+            width: "100%", height: "100%",
+            objectFit: "cover",
+            filter: `blur(${Math.max(blur, 2)}px) brightness(0.35) saturate(0.6)`,
+            transform: `scale(${1 + Math.max(blur, 2) * 0.02})`,
+          }}
+        />
+        <div style={{
+          position: "absolute", inset: 0,
+          background: `linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.65) 100%)`,
+        }} />
+      </div>
+    );
+  }
+
+  if (source === "team_theme") {
+    const theme = getTeamBackgroundTheme(firstTeam);
+    if (theme) {
+      return (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 0,
+          ...theme.bgStyle,
+        }} />
+      );
+    }
+  }
+
+  return null;
+}
+
 // ─── Shared wrapper ────────────────────────────────────────────────────────────
 
 function CanvasShell({
-  w, h, angle, options, teamColour, resolvedAccent, children,
+  w, h, angle, options, teamColour, resolvedAccent, children, firstTeam,
 }: {
   w: number; h: number;
   angle: StatAngle;
@@ -352,12 +457,20 @@ function CanvasShell({
   teamColour: { primary: string; secondary: string };
   resolvedAccent: string;
   children: React.ReactNode;
+  firstTeam?: string;
 }) {
   const isWide = w > h;
   const pad = isWide ? "40px 60px" : "52px 60px";
+  const source = options.backgroundSource ?? "gradient";
+  const offsets = options.layoutOffsets;
+
+  const useGradientBg = source === "gradient" || source === "upload" || (!options.backgroundMediaUrl && source !== "team_theme");
+
   const gridOverlay = options.background !== "analytics_grid"
     ? "linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px)"
     : undefined;
+
+  const overlayOpacity = offsets?.overlayOpacity ?? 1;
 
   return (
     <div style={{
@@ -370,8 +483,21 @@ function CanvasShell({
       padding: pad,
       boxSizing: "border-box",
       zIndex: 0,
-      ...bgStyle(options.background, resolvedAccent, teamColour.primary),
+      ...(useGradientBg ? bgStyle(options.background, resolvedAccent, teamColour.primary) : { background: "#000" }),
     }}>
+
+      {/* Custom background layer (stock image/video/team theme) */}
+      {!useGradientBg && (
+        <BackgroundLayer
+          options={options}
+          w={w}
+          h={h}
+          resolvedAccent={resolvedAccent}
+          teamPrimary={teamColour.primary}
+          firstTeam={firstTeam ?? ""}
+        />
+      )}
+
       {/* Grid overlay for non-grid themes */}
       {gridOverlay && (
         <div style={{
@@ -379,6 +505,8 @@ function CanvasShell({
           backgroundImage: gridOverlay,
           backgroundSize: "72px 72px",
           pointerEvents: "none",
+          opacity: overlayOpacity,
+          zIndex: 1,
         }} />
       )}
       {/* Radial glow */}
@@ -387,11 +515,16 @@ function CanvasShell({
         width: 560, height: 560, borderRadius: "50%",
         background: `radial-gradient(circle,${resolvedAccent}14 0%,transparent 65%)`,
         pointerEvents: "none",
+        zIndex: 1,
       }} />
       <AccentBar color={resolvedAccent} />
       {options.showTeamAccent && <TeamAccentBorder teamPrimary={teamColour.primary} />}
       {options.playerImageUrl && (
-        <PlayerGhostImage url={options.playerImageUrl} w={w} h={h} />
+        <PlayerGhostImage
+          url={options.playerImageUrl}
+          w={Math.round(w * (offsets?.playerImageScale ?? 1))}
+          h={Math.round(h * (offsets?.playerImageScale ?? 1))}
+        />
       )}
       {options.logoPosition && options.logoPosition !== "none" && (
         <LogoOverlay position={options.logoPosition} w={w} h={h} />
@@ -408,7 +541,17 @@ function CanvasShell({
           h={h}
         />
       )}
-      <div style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{
+        position: "relative",
+        zIndex: 2,
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        transform: (offsets?.titleX || offsets?.titleY)
+          ? `translate(${offsets.titleX}px, ${offsets.titleY}px)`
+          : undefined,
+        transformOrigin: "top left",
+      }}>
         {children}
       </div>
     </div>
@@ -453,7 +596,7 @@ export function LayoutStatCard({
   const firstName = nameParts.slice(0, -1).join(" ");
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac}>
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac} firstTeam={players[0]?.team ?? ""}>
       {/* Header */}
       <div style={{ flexShrink: 0, marginBottom: isWide ? 20 : 28 }}>
         <BrandBar accentColor={ac} right={
@@ -591,7 +734,7 @@ export function LayoutLeaderboard({
     i === 0 ? "#F59E0B" : i === 1 ? "#94A3B8" : i === 2 ? "#CD7C37" : "rgba(255,255,255,0.2)";
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac}>
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac} firstTeam={players[0]?.team ?? ""}>
       {/* Header */}
       <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 22 }}>
         <BrandBar accentColor={ac} right={
@@ -715,7 +858,7 @@ export function LayoutBattle({
   const vsSize = isTall ? 60 : 52;
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={{ ...options, playerImageUrl: undefined }} teamColour={teamColour1} resolvedAccent={ac}>
+    <CanvasShell w={w} h={h} angle={angle} options={{ ...options, playerImageUrl: undefined }} teamColour={teamColour1} resolvedAccent={ac} firstTeam={p1?.team ?? ""}>
       <div style={{ flexShrink: 0, marginBottom: isTall ? 32 : 22 }}>
         <BrandBar accentColor={ac} />
         <div style={{ width: 44, height: 3, background: ac, borderRadius: 2, marginTop: 16, marginBottom: 12 }} />
@@ -885,7 +1028,7 @@ export function CarouselTitleSlide({
   const isTall = h > w;
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={{ ...options, playerImageUrl: undefined }} teamColour={teamColour} resolvedAccent={ac}>
+    <CanvasShell w={w} h={h} angle={angle} options={{ ...options, playerImageUrl: undefined }} teamColour={teamColour} resolvedAccent={ac} firstTeam={players[0]?.team ?? ""}>
       <div style={{ flexShrink: 0, marginBottom: 24 }}>
         <BrandBar accentColor={ac} />
       </div>
@@ -977,7 +1120,7 @@ export function CarouselPlayerSlide({
   ];
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac}>
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac} firstTeam={players[0]?.team ?? ""}>
       <div style={{ flexShrink: 0, marginBottom: isTall ? 24 : 18 }}>
         <BrandBar accentColor={ac} right={
           <div style={{
@@ -1106,7 +1249,7 @@ export function LayoutCaptainPick({
   const firstName = nameParts.slice(0, -1).join(" ");
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac}>
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac} firstTeam={players[0]?.team ?? ""}>
       {/* Header */}
       <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
         <BrandBar accentColor={ac} />
@@ -1241,7 +1384,7 @@ export function LayoutBreakoutAlert({
   const firstName = nameParts.slice(0, -1).join(" ");
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac}>
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac} firstTeam={players[0]?.team ?? ""}>
       {/* Glow pulse */}
       <div style={{
         position: "absolute",
@@ -1401,7 +1544,7 @@ export function LayoutTradeTarget({
   const firstName = nameParts.slice(0, -1).join(" ");
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac}>
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac} firstTeam={players[0]?.team ?? ""}>
       {/* Header */}
       <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
         <BrandBar accentColor={ac} />
@@ -1532,7 +1675,7 @@ export function LayoutAvoidPlayer({
   const warnColor = "#EF4444";
 
   return (
-    <CanvasShell w={w} h={h} angle={{ ...angle, accentColor: warnColor }} options={options} teamColour={teamColour} resolvedAccent={ac}>
+    <CanvasShell w={w} h={h} angle={{ ...angle, accentColor: warnColor }} options={options} teamColour={teamColour} resolvedAccent={ac} firstTeam={top.team}>
       {/* Header */}
       <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
         <BrandBar accentColor={warnColor} />
@@ -1666,7 +1809,7 @@ export function LayoutMatchupAdvantage({
   const firstName = nameParts.slice(0, -1).join(" ");
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac}>
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac} firstTeam={players[0]?.team ?? ""}>
       {/* Header */}
       <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
         <BrandBar accentColor={ac} />
