@@ -90,6 +90,19 @@ export function getTeamColour(team: string): { primary: string; secondary: strin
   return TEAM_COLOURS[key] ?? { primary: "#1e293b", secondary: "#64748b" };
 }
 
+export function resolveAccentColor(
+  angle: StatAngle,
+  options: GraphicOptions,
+  teamColour?: { primary: string; secondary: string },
+): string {
+  switch (options.accentColourMode) {
+    case "custom":      return options.customAccentColour ?? angle.accentColor;
+    case "white":       return "#FFFFFF";
+    case "team_colour": return teamColour?.primary ?? angle.accentColor;
+    default:            return angle.accentColor;
+  }
+}
+
 // ─── Background helpers ────────────────────────────────────────────────────────
 
 function bgStyle(theme: BackgroundTheme, accentColor: string, teamPrimary: string): React.CSSProperties {
@@ -331,12 +344,13 @@ function TeamAccentBorder({ teamPrimary }: { teamPrimary: string }) {
 // ─── Shared wrapper ────────────────────────────────────────────────────────────
 
 function CanvasShell({
-  w, h, angle, options, teamColour, children,
+  w, h, angle, options, teamColour, resolvedAccent, children,
 }: {
   w: number; h: number;
   angle: StatAngle;
   options: GraphicOptions;
   teamColour: { primary: string; secondary: string };
+  resolvedAccent: string;
   children: React.ReactNode;
 }) {
   const isWide = w > h;
@@ -356,7 +370,7 @@ function CanvasShell({
       padding: pad,
       boxSizing: "border-box",
       zIndex: 0,
-      ...bgStyle(options.background, angle.accentColor, teamColour.primary),
+      ...bgStyle(options.background, resolvedAccent, teamColour.primary),
     }}>
       {/* Grid overlay for non-grid themes */}
       {gridOverlay && (
@@ -371,10 +385,10 @@ function CanvasShell({
       <div style={{
         position: "absolute", top: -200, right: -160,
         width: 560, height: 560, borderRadius: "50%",
-        background: `radial-gradient(circle,${angle.accentColor}14 0%,transparent 65%)`,
+        background: `radial-gradient(circle,${resolvedAccent}14 0%,transparent 65%)`,
         pointerEvents: "none",
       }} />
-      <AccentBar color={angle.accentColor} />
+      <AccentBar color={resolvedAccent} />
       {options.showTeamAccent && <TeamAccentBorder teamPrimary={teamColour.primary} />}
       {options.playerImageUrl && (
         <PlayerGhostImage url={options.playerImageUrl} w={w} h={h} />
@@ -383,13 +397,13 @@ function CanvasShell({
         <LogoOverlay position={options.logoPosition} w={w} h={h} />
       )}
       {options.roundLabel && (
-        <RoundLabelBadge label={options.roundLabel} accentColor={angle.accentColor} w={w} />
+        <RoundLabelBadge label={options.roundLabel} accentColor={resolvedAccent} w={w} />
       )}
       {options.ctaText && options.ctaPosition && options.ctaPosition !== "hidden" && (
         <CtaOverlay
           text={options.ctaText}
           position={options.ctaPosition}
-          accentColor={angle.accentColor}
+          accentColor={resolvedAccent}
           w={w}
           h={h}
         />
@@ -418,6 +432,7 @@ export function LayoutStatCard({
   const isWide = w > h;
   const isTall = h > w;
   const teamColour = getTeamColour(top.team);
+  const ac = resolveAccentColor(angle, options, teamColour);
 
   const proj   = Math.round(Number(top.projection_final ?? 0));
   const ceil   = Math.round(Number(top.ceiling_estimate ?? 0));
@@ -438,11 +453,11 @@ export function LayoutStatCard({
   const firstName = nameParts.slice(0, -1).join(" ");
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour}>
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac}>
       {/* Header */}
       <div style={{ flexShrink: 0, marginBottom: isWide ? 20 : 28 }}>
-        <BrandBar accentColor={angle.accentColor} right={
-          <span style={{ fontSize: 12, fontWeight: 700, color: angle.accentColor, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+        <BrandBar accentColor={ac} right={
+          <span style={{ fontSize: 12, fontWeight: 700, color: ac, textTransform: "uppercase", letterSpacing: "0.1em" }}>
             {angle.label}
           </span>
         } />
@@ -460,7 +475,7 @@ export function LayoutStatCard({
         {/* Player info */}
         <div style={{ textAlign: isWide ? "left" : "center", width: isWide ? undefined : "100%", ...(isWide ? { flex: 1 } : {}) }}>
           <div style={{
-            fontSize: 12, fontWeight: 700, color: angle.accentColor,
+            fontSize: 12, fontWeight: 700, color: ac,
             textTransform: "uppercase", letterSpacing: "0.12em",
             marginBottom: isWide ? 8 : 12,
           }}>
@@ -484,13 +499,13 @@ export function LayoutStatCard({
 
           {/* Stat Highlight Label */}
           {options.statHighlight && (
-            <StatHighlightLabel label={options.statHighlight} accentColor={angle.accentColor} />
+            <StatHighlightLabel label={options.statHighlight} accentColor={ac} />
           )}
 
           {/* Big hero stat */}
           <div style={{
             fontSize: isWide ? 44 : (isTall ? 64 : 56),
-            fontWeight: 900, color: angle.accentColor,
+            fontWeight: 900, color: ac,
             lineHeight: 1, fontVariantNumeric: "tabular-nums",
             marginBottom: 8,
           }}>
@@ -506,14 +521,14 @@ export function LayoutStatCard({
           {/* Team / position pill */}
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 8,
-            background: `${angle.accentColor}12`, border: `1px solid ${angle.accentColor}30`,
+            background: `${ac}12`, border: `1px solid ${ac}30`,
             borderRadius: 20, padding: "5px 14px",
           }}>
             <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>{top.team}</span>
             {top.position && (
               <>
-                <span style={{ width: 3, height: 3, borderRadius: "50%", background: angle.accentColor, display: "inline-block" }} />
-                <span style={{ fontSize: 14, color: angle.accentColor, fontWeight: 700 }}>{top.position}</span>
+                <span style={{ width: 3, height: 3, borderRadius: "50%", background: ac, display: "inline-block" }} />
+                <span style={{ fontSize: 14, color: ac, fontWeight: 700 }}>{top.position}</span>
               </>
             )}
           </div>
@@ -522,8 +537,8 @@ export function LayoutStatCard({
         {/* Stats card */}
         <div style={{ ...(isWide ? { width: 320, flexShrink: 0 } : { width: "100%", marginTop: 28 }) }}>
           <div style={{
-            background: `${angle.accentColor}10`,
-            border: `1.5px solid ${angle.accentColor}28`,
+            background: `${ac}10`,
+            border: `1.5px solid ${ac}28`,
             borderRadius: 20,
             padding: isWide ? "24px 28px" : "22px 28px",
             display: "flex", flexDirection: "column", gap: 13,
@@ -539,7 +554,7 @@ export function LayoutStatCard({
       </div>
 
       <div style={{ flexShrink: 0, marginTop: isWide ? 20 : 24 }}>
-        <Footer accentColor={angle.accentColor} />
+        <Footer accentColor={ac} />
       </div>
     </CanvasShell>
   );
@@ -562,25 +577,34 @@ export function LayoutLeaderboard({
   const maxRows = isTall ? 10 : isWide ? 8 : 8;
   const rows = players.slice(0, maxRows);
   const teamColour = rows[0] ? getTeamColour(rows[0].team) : { primary: "#1e293b", secondary: "#64748b" };
+  const ac = resolveAccentColor(angle, options, teamColour);
+
+  const rankHighlight = options.rankHighlight ?? "top_player";
+  const isHighlighted = (i: number) => {
+    if (rankHighlight === "none")       return false;
+    if (rankHighlight === "top_player") return i === 0;
+    if (rankHighlight === "top_3")      return i < 3;
+    return true;
+  };
 
   const rankColor = (i: number) =>
     i === 0 ? "#F59E0B" : i === 1 ? "#94A3B8" : i === 2 ? "#CD7C37" : "rgba(255,255,255,0.2)";
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour}>
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac}>
       {/* Header */}
       <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 22 }}>
-        <BrandBar accentColor={angle.accentColor} right={
+        <BrandBar accentColor={ac} right={
           <div style={{
-            background: `${angle.accentColor}1a`, border: `1px solid ${angle.accentColor}40`,
+            background: `${ac}1a`, border: `1px solid ${ac}40`,
             borderRadius: 8, padding: "5px 14px",
-            fontSize: 13, fontWeight: 700, color: angle.accentColor,
+            fontSize: 13, fontWeight: 700, color: ac,
             textTransform: "uppercase", letterSpacing: "0.07em",
           }}>
             {angle.statLabel}
           </div>
         } />
-        <div style={{ width: 44, height: 3, background: angle.accentColor, borderRadius: 2, marginTop: 18, marginBottom: 12 }} />
+        <div style={{ width: 44, height: 3, background: ac, borderRadius: 2, marginTop: 18, marginBottom: 12 }} />
         <h1 style={{
           fontSize: isWide ? 36 : (isTall ? 52 : 42),
           fontWeight: 900, color: "#fff",
@@ -603,24 +627,24 @@ export function LayoutLeaderboard({
         alignContent: "flex-start",
       }}>
         {rows.map((p, i) => {
-          const isFirst = i === 0;
+          const highlighted = isHighlighted(i);
           const tc = options.showTeamAccent ? getTeamColour(p.team) : null;
           return (
             <div key={i} style={{
               display: "flex", alignItems: "center",
-              padding: isFirst ? "14px 20px" : "10px 20px",
+              padding: highlighted ? "14px 20px" : "10px 20px",
               borderRadius: 10,
-              background: isFirst
-                ? `linear-gradient(90deg,${angle.accentColor}1c 0%,${angle.accentColor}06 100%)`
+              background: highlighted
+                ? `linear-gradient(90deg,${ac}1c 0%,${ac}06 100%)`
                 : i < 3 ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.022)",
-              border: isFirst
-                ? `1px solid ${angle.accentColor}40`
+              border: highlighted
+                ? `1px solid ${ac}40`
                 : "1px solid rgba(255,255,255,0.05)",
               borderLeft: tc ? `3px solid ${tc.primary}` : undefined,
               ...(isWide ? { width: "calc(50% - 3px)", flexShrink: 0 } : {}),
             }}>
               <span style={{
-                fontSize: isFirst ? 22 : 17,
+                fontSize: highlighted ? 22 : 17,
                 fontWeight: 900, color: rankColor(i),
                 width: 38, flexShrink: 0, fontVariantNumeric: "tabular-nums",
               }}>
@@ -628,7 +652,7 @@ export function LayoutLeaderboard({
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
-                  fontSize: isFirst ? 22 : 18,
+                  fontSize: highlighted ? 22 : 18,
                   fontWeight: 700, color: "#fff",
                   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                 }}>
@@ -639,9 +663,9 @@ export function LayoutLeaderboard({
                 </div>
               </div>
               <div style={{
-                fontSize: isFirst ? 26 : 20,
+                fontSize: highlighted ? 26 : 20,
                 fontWeight: 800,
-                color: isFirst ? angle.accentColor : "#fff",
+                color: highlighted ? ac : "#fff",
                 fontVariantNumeric: "tabular-nums", flexShrink: 0,
               }}>
                 {angle.statFn(p)}
@@ -652,7 +676,7 @@ export function LayoutLeaderboard({
       </div>
 
       <div style={{ flexShrink: 0, marginTop: 18 }}>
-        <Footer accentColor={angle.accentColor} />
+        <Footer accentColor={ac} />
       </div>
     </CanvasShell>
   );
@@ -676,6 +700,7 @@ export function LayoutBattle({
   const isTall = h > w;
   const teamColour1 = getTeamColour(p1.team);
   const teamColour2 = getTeamColour(p2.team);
+  const ac = resolveAccentColor(angle, options, teamColour1);
 
   const battleStats = [
     { label: "Projection",  v1: p1.projection_final,  v2: p2.projection_final,  fmt: (n: number | null) => n != null ? `${Math.round(Number(n))} pts` : "—" },
@@ -690,10 +715,10 @@ export function LayoutBattle({
   const vsSize = isTall ? 60 : 52;
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={{ ...options, playerImageUrl: undefined }} teamColour={teamColour1}>
+    <CanvasShell w={w} h={h} angle={angle} options={{ ...options, playerImageUrl: undefined }} teamColour={teamColour1} resolvedAccent={ac}>
       <div style={{ flexShrink: 0, marginBottom: isTall ? 32 : 22 }}>
-        <BrandBar accentColor={angle.accentColor} />
-        <div style={{ width: 44, height: 3, background: angle.accentColor, borderRadius: 2, marginTop: 16, marginBottom: 12 }} />
+        <BrandBar accentColor={ac} />
+        <div style={{ width: 44, height: 3, background: ac, borderRadius: 2, marginTop: 16, marginBottom: 12 }} />
         <h1 style={{
           fontSize: isWide ? 34 : (isTall ? 54 : 44),
           fontWeight: 900, color: "#fff", margin: 0, letterSpacing: "-0.025em",
@@ -724,10 +749,10 @@ export function LayoutBattle({
                 ? (isTall ? "16px 16px 0 0" : "16px 0 0 16px")
                 : (isTall ? "0 0 16px 16px" : "0 16px 16px 0"),
               background: side === 0
-                ? `linear-gradient(155deg,${angle.accentColor}1a 0%,${angle.accentColor}07 100%)`
+                ? `linear-gradient(155deg,${ac}1a 0%,${ac}07 100%)`
                 : "rgba(255,255,255,0.03)",
               border: side === 0
-                ? `1.5px solid ${angle.accentColor}44`
+                ? `1.5px solid ${ac}44`
                 : "1.5px solid rgba(255,255,255,0.07)",
               borderTop: tc ? `4px solid ${tc.primary}` : undefined,
               position: "relative",
@@ -735,7 +760,7 @@ export function LayoutBattle({
               {side === 0 && (
                 <div style={{
                   position: "absolute", top: 12, left: 12,
-                  background: angle.accentColor, borderRadius: 6,
+                  background: ac, borderRadius: 6,
                   padding: "3px 10px", fontSize: 10, fontWeight: 800,
                   color: "#000", textTransform: "uppercase", letterSpacing: "0.06em",
                 }}>
@@ -744,7 +769,7 @@ export function LayoutBattle({
               )}
               <div style={{
                 fontSize: 12, fontWeight: 700,
-                color: side === 0 ? angle.accentColor : "rgba(255,255,255,0.28)",
+                color: side === 0 ? ac : "rgba(255,255,255,0.28)",
                 textTransform: "uppercase", letterSpacing: "0.1em",
                 marginBottom: isTall ? 12 : 10,
               }}>
@@ -764,7 +789,7 @@ export function LayoutBattle({
               <div style={{
                 fontSize: isWide ? 42 : (isTall ? 64 : 52),
                 fontWeight: 900,
-                color: side === 0 ? angle.accentColor : "#fff",
+                color: side === 0 ? ac : "#fff",
                 lineHeight: 1, fontVariantNumeric: "tabular-nums",
                 marginBottom: 6,
               }}>
@@ -789,10 +814,10 @@ export function LayoutBattle({
           zIndex: 10,
           width: vsSize, height: vsSize, borderRadius: "50%",
           background: "#070d1b",
-          border: `2px solid ${angle.accentColor}55`,
+          border: `2px solid ${ac}55`,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          <span style={{ fontSize: 16, fontWeight: 900, color: angle.accentColor }}>VS</span>
+          <span style={{ fontSize: 16, fontWeight: 900, color: ac }}>VS</span>
         </div>
       </div>
 
@@ -812,7 +837,7 @@ export function LayoutBattle({
                   textAlign: "right",
                   fontSize: isWide ? 16 : 18,
                   fontWeight: 800,
-                  color: p1Better === true ? angle.accentColor : "#fff",
+                  color: p1Better === true ? ac : "#fff",
                   fontVariantNumeric: "tabular-nums",
                 }}>
                   {fmt(v1)}
@@ -830,7 +855,7 @@ export function LayoutBattle({
                   textAlign: "left",
                   fontSize: isWide ? 16 : 18,
                   fontWeight: 800,
-                  color: p1Better === false ? angle.accentColor : "#fff",
+                  color: p1Better === false ? ac : "#fff",
                   fontVariantNumeric: "tabular-nums",
                 }}>
                   {fmt(v2)}
@@ -839,7 +864,7 @@ export function LayoutBattle({
             );
           })}
         </div>
-        <Footer accentColor={angle.accentColor} />
+        <Footer accentColor={ac} />
       </div>
     </CanvasShell>
   );
@@ -856,12 +881,13 @@ export function CarouselTitleSlide({
   angle: StatAngle; w: number; h: number; options: GraphicOptions; totalPlayers: number;
 }) {
   const teamColour = { primary: "#1e293b", secondary: "#64748b" };
+  const ac = resolveAccentColor(angle, options, teamColour);
   const isTall = h > w;
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={{ ...options, playerImageUrl: undefined }} teamColour={teamColour}>
+    <CanvasShell w={w} h={h} angle={angle} options={{ ...options, playerImageUrl: undefined }} teamColour={teamColour} resolvedAccent={ac}>
       <div style={{ flexShrink: 0, marginBottom: 24 }}>
-        <BrandBar accentColor={angle.accentColor} />
+        <BrandBar accentColor={ac} />
       </div>
 
       <div style={{
@@ -873,21 +899,21 @@ export function CarouselTitleSlide({
           position: "absolute", top: "30%", left: "50%",
           transform: "translate(-50%,-50%)",
           width: 500, height: 500, borderRadius: "50%",
-          background: `radial-gradient(circle,${angle.accentColor}18 0%,transparent 65%)`,
+          background: `radial-gradient(circle,${ac}18 0%,transparent 65%)`,
           pointerEvents: "none",
         }} />
 
         <div style={{
           display: "flex", alignItems: "center", gap: 12, marginBottom: 28,
         }}>
-          <div style={{ width: 56, height: 3, background: angle.accentColor, borderRadius: 2 }} />
+          <div style={{ width: 56, height: 3, background: ac, borderRadius: 2 }} />
           <span style={{
-            fontSize: 13, fontWeight: 800, color: angle.accentColor,
+            fontSize: 13, fontWeight: 800, color: ac,
             textTransform: "uppercase", letterSpacing: "0.14em",
           }}>
             Carousel
           </span>
-          <div style={{ width: 56, height: 3, background: angle.accentColor, borderRadius: 2 }} />
+          <div style={{ width: 56, height: 3, background: ac, borderRadius: 2 }} />
         </div>
 
         <h1 style={{
@@ -908,18 +934,18 @@ export function CarouselTitleSlide({
         </p>
 
         <div style={{
-          background: `${angle.accentColor}14`,
-          border: `1px solid ${angle.accentColor}35`,
+          background: `${ac}14`,
+          border: `1px solid ${ac}35`,
           borderRadius: 12, padding: "10px 24px",
           fontSize: 18, fontWeight: 700,
-          color: angle.accentColor,
+          color: ac,
         }}>
           Swipe for Top {totalPlayers} Players →
         </div>
       </div>
 
       <div style={{ flexShrink: 0, marginTop: 24 }}>
-        <Footer accentColor={angle.accentColor} />
+        <Footer accentColor={ac} />
       </div>
     </CanvasShell>
   );
@@ -931,6 +957,7 @@ export function CarouselPlayerSlide({
   angle: StatAngle; player: ContentPlayer; rank: number; w: number; h: number; options: GraphicOptions;
 }) {
   const teamColour = getTeamColour(player.team);
+  const ac = resolveAccentColor(angle, options, teamColour);
   const isTall = h > w;
   const isWide = w > h;
   const nameParts = player.player_name.split(" ");
@@ -950,14 +977,14 @@ export function CarouselPlayerSlide({
   ];
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour}>
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac}>
       <div style={{ flexShrink: 0, marginBottom: isTall ? 24 : 18 }}>
-        <BrandBar accentColor={angle.accentColor} right={
+        <BrandBar accentColor={ac} right={
           <div style={{
-            background: `${angle.accentColor}1a`, border: `1px solid ${angle.accentColor}40`,
+            background: `${ac}1a`, border: `1px solid ${ac}40`,
             borderRadius: 8, padding: "4px 12px",
             fontSize: 13, fontWeight: 800,
-            color: angle.accentColor,
+            color: ac,
             fontVariantNumeric: "tabular-nums",
           }}>
             #{rank}
@@ -973,7 +1000,7 @@ export function CarouselPlayerSlide({
       }}>
         {/* Rank badge */}
         <div style={{
-          fontSize: 13, fontWeight: 700, color: angle.accentColor,
+          fontSize: 13, fontWeight: 700, color: ac,
           textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12,
         }}>
           #{rank} {angle.label}
@@ -998,7 +1025,7 @@ export function CarouselPlayerSlide({
         {/* Hero stat */}
         <div style={{
           fontSize: isTall ? 80 : (isWide ? 52 : 68),
-          fontWeight: 900, color: angle.accentColor,
+          fontWeight: 900, color: ac,
           lineHeight: 1, fontVariantNumeric: "tabular-nums", marginBottom: 6,
         }}>
           {angle.statFn(player)}
@@ -1013,14 +1040,14 @@ export function CarouselPlayerSlide({
         {/* Team/position */}
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 8,
-          background: `${angle.accentColor}12`, border: `1px solid ${angle.accentColor}30`,
+          background: `${ac}12`, border: `1px solid ${ac}30`,
           borderRadius: 20, padding: "5px 14px", marginBottom: 24,
         }}>
           <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>{player.team}</span>
           {player.position && (
             <>
-              <span style={{ width: 3, height: 3, borderRadius: "50%", background: angle.accentColor, display: "inline-block" }} />
-              <span style={{ fontSize: 14, color: angle.accentColor, fontWeight: 700 }}>{player.position}</span>
+              <span style={{ width: 3, height: 3, borderRadius: "50%", background: ac, display: "inline-block" }} />
+              <span style={{ fontSize: 14, color: ac, fontWeight: 700 }}>{player.position}</span>
             </>
           )}
         </div>
@@ -1050,7 +1077,7 @@ export function CarouselPlayerSlide({
       </div>
 
       <div style={{ flexShrink: 0, marginTop: 20 }}>
-        <Footer accentColor={angle.accentColor} />
+        <Footer accentColor={ac} />
       </div>
     </CanvasShell>
   );
@@ -1071,6 +1098,7 @@ export function LayoutCaptainPick({
   const isTall = h > w;
   const isWide = w > h;
   const teamColour = getTeamColour(top.team);
+  const ac = resolveAccentColor(angle, options, teamColour);
   const proj = Math.round(Number(top.projection_final ?? 0));
   const captScore = Math.round(Number(top.captain_score ?? 0));
   const nameParts = top.player_name.split(" ");
@@ -1078,10 +1106,10 @@ export function LayoutCaptainPick({
   const firstName = nameParts.slice(0, -1).join(" ");
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour}>
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac}>
       {/* Header */}
       <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
-        <BrandBar accentColor={angle.accentColor} />
+        <BrandBar accentColor={ac} />
       </div>
 
       {/* Body */}
@@ -1095,13 +1123,13 @@ export function LayoutCaptainPick({
         {/* Badge */}
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 8,
-          background: `${angle.accentColor}18`, border: `1.5px solid ${angle.accentColor}50`,
+          background: `${ac}18`, border: `1.5px solid ${ac}50`,
           borderRadius: 30, padding: isTall ? "8px 24px" : "6px 18px",
           marginBottom: isTall ? 28 : 20,
         }}>
           <span style={{
             fontSize: isTall ? 16 : 13, fontWeight: 900,
-            color: angle.accentColor, textTransform: "uppercase", letterSpacing: "0.14em",
+            color: ac, textTransform: "uppercase", letterSpacing: "0.14em",
           }}>
             CAPTAIN PICK
           </span>
@@ -1110,7 +1138,7 @@ export function LayoutCaptainPick({
         {/* Big projection number */}
         <div style={{
           fontSize: isTall ? 180 : (isWide ? 120 : 150),
-          fontWeight: 900, color: angle.accentColor,
+          fontWeight: 900, color: ac,
           lineHeight: 0.85, fontVariantNumeric: "tabular-nums",
           letterSpacing: "-0.05em",
           marginBottom: isTall ? 12 : 8,
@@ -1148,15 +1176,15 @@ export function LayoutCaptainPick({
         {/* Team / position pill */}
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 8,
-          background: `${angle.accentColor}12`, border: `1px solid ${angle.accentColor}30`,
+          background: `${ac}12`, border: `1px solid ${ac}30`,
           borderRadius: 20, padding: "5px 14px",
           marginBottom: isTall ? 28 : 20,
         }}>
           <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>{top.team}</span>
           {top.position && (
             <>
-              <span style={{ width: 3, height: 3, borderRadius: "50%", background: angle.accentColor, display: "inline-block" }} />
-              <span style={{ fontSize: 14, color: angle.accentColor, fontWeight: 700 }}>{top.position}</span>
+              <span style={{ width: 3, height: 3, borderRadius: "50%", background: ac, display: "inline-block" }} />
+              <span style={{ fontSize: 14, color: ac, fontWeight: 700 }}>{top.position}</span>
             </>
           )}
         </div>
@@ -1182,7 +1210,7 @@ export function LayoutCaptainPick({
       </div>
 
       <div style={{ flexShrink: 0, marginTop: isTall ? 28 : 20 }}>
-        <Footer accentColor={angle.accentColor} />
+        <Footer accentColor={ac} />
       </div>
     </CanvasShell>
   );
@@ -1203,6 +1231,7 @@ export function LayoutBreakoutAlert({
   const isTall = h > w;
   const isWide = w > h;
   const teamColour = getTeamColour(top.team);
+  const ac = resolveAccentColor(angle, options, teamColour);
   const upside = Number(top.upside_rating ?? 0).toFixed(1);
   const proj   = Math.round(Number(top.projection_final ?? 0));
   const ceil   = Math.round(Number(top.ceiling_estimate ?? 0));
@@ -1212,21 +1241,21 @@ export function LayoutBreakoutAlert({
   const firstName = nameParts.slice(0, -1).join(" ");
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour}>
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac}>
       {/* Glow pulse */}
       <div style={{
         position: "absolute",
         top: "40%", left: "50%", transform: "translate(-50%,-50%)",
         width: isTall ? 600 : 400, height: isTall ? 600 : 400,
         borderRadius: "50%",
-        background: `radial-gradient(circle,${angle.accentColor}20 0%,transparent 65%)`,
+        background: `radial-gradient(circle,${ac}20 0%,transparent 65%)`,
         pointerEvents: "none",
         zIndex: 0,
       }} />
 
       {/* Header */}
       <div style={{ flexShrink: 0, marginBottom: isTall ? 24 : 18, position: "relative", zIndex: 2 }}>
-        <BrandBar accentColor={angle.accentColor} />
+        <BrandBar accentColor={ac} />
       </div>
 
       {/* Body */}
@@ -1240,18 +1269,18 @@ export function LayoutBreakoutAlert({
         {/* Alert badge */}
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 8,
-          background: `${angle.accentColor}20`, border: `1.5px solid ${angle.accentColor}55`,
+          background: `${ac}20`, border: `1.5px solid ${ac}55`,
           borderRadius: 30, padding: isTall ? "8px 24px" : "6px 18px",
           marginBottom: isTall ? 28 : 18,
         }}>
           <span style={{
             width: 8, height: 8, borderRadius: "50%",
-            background: angle.accentColor, display: "inline-block",
-            boxShadow: `0 0 10px ${angle.accentColor}`,
+            background: ac, display: "inline-block",
+            boxShadow: `0 0 10px ${ac}`,
           }} />
           <span style={{
             fontSize: isTall ? 16 : 13, fontWeight: 900,
-            color: angle.accentColor, textTransform: "uppercase", letterSpacing: "0.14em",
+            color: ac, textTransform: "uppercase", letterSpacing: "0.14em",
           }}>
             BREAKOUT ALERT
           </span>
@@ -1261,7 +1290,7 @@ export function LayoutBreakoutAlert({
         {diff != null && diff > 0 ? (
           <div style={{
             fontSize: isTall ? 160 : (isWide ? 100 : 130),
-            fontWeight: 900, color: angle.accentColor,
+            fontWeight: 900, color: ac,
             lineHeight: 0.85, fontVariantNumeric: "tabular-nums",
             letterSpacing: "-0.04em", marginBottom: isTall ? 8 : 6,
           }}>
@@ -1270,7 +1299,7 @@ export function LayoutBreakoutAlert({
         ) : (
           <div style={{
             fontSize: isTall ? 120 : (isWide ? 80 : 100),
-            fontWeight: 900, color: angle.accentColor,
+            fontWeight: 900, color: ac,
             lineHeight: 0.85, fontVariantNumeric: "tabular-nums",
             letterSpacing: "-0.04em", marginBottom: isTall ? 8 : 6,
           }}>
@@ -1305,15 +1334,15 @@ export function LayoutBreakoutAlert({
         {/* Team pill */}
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 8,
-          background: `${angle.accentColor}12`, border: `1px solid ${angle.accentColor}30`,
+          background: `${ac}12`, border: `1px solid ${ac}30`,
           borderRadius: 20, padding: "5px 14px",
           marginBottom: isTall ? 24 : 16,
         }}>
           <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>{top.team}</span>
           {top.position && (
             <>
-              <span style={{ width: 3, height: 3, borderRadius: "50%", background: angle.accentColor, display: "inline-block" }} />
-              <span style={{ fontSize: 14, color: angle.accentColor, fontWeight: 700 }}>{top.position}</span>
+              <span style={{ width: 3, height: 3, borderRadius: "50%", background: ac, display: "inline-block" }} />
+              <span style={{ fontSize: 14, color: ac, fontWeight: 700 }}>{top.position}</span>
             </>
           )}
         </div>
@@ -1332,7 +1361,7 @@ export function LayoutBreakoutAlert({
             </div>
             {ceil > 0 && (
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: isTall ? 32 : 24, fontWeight: 900, color: angle.accentColor, fontVariantNumeric: "tabular-nums" }}>{ceil}</div>
+                <div style={{ fontSize: isTall ? 32 : 24, fontWeight: 900, color: ac, fontVariantNumeric: "tabular-nums" }}>{ceil}</div>
                 <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 2 }}>Ceiling</div>
               </div>
             )}
@@ -1341,7 +1370,7 @@ export function LayoutBreakoutAlert({
       </div>
 
       <div style={{ flexShrink: 0, marginTop: isTall ? 24 : 16, position: "relative", zIndex: 2 }}>
-        <Footer accentColor={angle.accentColor} />
+        <Footer accentColor={ac} />
       </div>
     </CanvasShell>
   );
@@ -1362,6 +1391,7 @@ export function LayoutTradeTarget({
   const isTall = h > w;
   const isWide = w > h;
   const teamColour = getTeamColour(top.team);
+  const ac = resolveAccentColor(angle, options, teamColour);
   const proj    = Math.round(Number(top.projection_final ?? 0));
   const upside  = Number(top.upside_rating ?? 0).toFixed(1);
   const ceil    = Math.round(Number(top.ceiling_estimate ?? 0));
@@ -1371,10 +1401,10 @@ export function LayoutTradeTarget({
   const firstName = nameParts.slice(0, -1).join(" ");
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour}>
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac}>
       {/* Header */}
       <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
-        <BrandBar accentColor={angle.accentColor} />
+        <BrandBar accentColor={ac} />
       </div>
 
       <div style={{
@@ -1386,13 +1416,13 @@ export function LayoutTradeTarget({
         {/* Badge */}
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 8,
-          background: `${angle.accentColor}18`, border: `1.5px solid ${angle.accentColor}50`,
+          background: `${ac}18`, border: `1.5px solid ${ac}50`,
           borderRadius: 30, padding: isTall ? "8px 24px" : "6px 18px",
           marginBottom: isTall ? 28 : 18,
         }}>
           <span style={{
             fontSize: isTall ? 16 : 13, fontWeight: 900,
-            color: angle.accentColor, textTransform: "uppercase", letterSpacing: "0.14em",
+            color: ac, textTransform: "uppercase", letterSpacing: "0.14em",
           }}>
             TRADE TARGET
           </span>
@@ -1417,15 +1447,15 @@ export function LayoutTradeTarget({
         {/* Team pill */}
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 8,
-          background: `${angle.accentColor}12`, border: `1px solid ${angle.accentColor}30`,
+          background: `${ac}12`, border: `1px solid ${ac}30`,
           borderRadius: 20, padding: "5px 14px",
           marginBottom: isTall ? 28 : 20,
         }}>
           <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>{top.team}</span>
           {top.position && (
             <>
-              <span style={{ width: 3, height: 3, borderRadius: "50%", background: angle.accentColor, display: "inline-block" }} />
-              <span style={{ fontSize: 14, color: angle.accentColor, fontWeight: 700 }}>{top.position}</span>
+              <span style={{ width: 3, height: 3, borderRadius: "50%", background: ac, display: "inline-block" }} />
+              <span style={{ fontSize: 14, color: ac, fontWeight: 700 }}>{top.position}</span>
             </>
           )}
         </div>
@@ -1442,7 +1472,7 @@ export function LayoutTradeTarget({
           </div>
           <div style={{
             fontSize: isTall ? 140 : (isWide ? 96 : 116),
-            fontWeight: 900, color: angle.accentColor,
+            fontWeight: 900, color: ac,
             lineHeight: 0.85, fontVariantNumeric: "tabular-nums",
             letterSpacing: "-0.04em",
           }}>
@@ -1471,7 +1501,7 @@ export function LayoutTradeTarget({
       </div>
 
       <div style={{ flexShrink: 0, marginTop: isTall ? 28 : 20 }}>
-        <Footer accentColor={angle.accentColor} />
+        <Footer accentColor={ac} />
       </div>
     </CanvasShell>
   );
@@ -1492,6 +1522,7 @@ export function LayoutAvoidPlayer({
   const isTall = h > w;
   const isWide = w > h;
   const teamColour = getTeamColour(top.team);
+  const ac = resolveAccentColor(angle, options, teamColour);
   const proj    = Math.round(Number(top.projection_final ?? 0));
   const risk    = Math.round(Number(top.risk_rating ?? 0));
   const matchup = Math.round(Number(top.matchup_rating ?? 0));
@@ -1501,7 +1532,7 @@ export function LayoutAvoidPlayer({
   const warnColor = "#EF4444";
 
   return (
-    <CanvasShell w={w} h={h} angle={{ ...angle, accentColor: warnColor }} options={options} teamColour={teamColour}>
+    <CanvasShell w={w} h={h} angle={{ ...angle, accentColor: warnColor }} options={options} teamColour={teamColour} resolvedAccent={ac}>
       {/* Header */}
       <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
         <BrandBar accentColor={warnColor} />
@@ -1626,6 +1657,7 @@ export function LayoutMatchupAdvantage({
   const isTall = h > w;
   const isWide = w > h;
   const teamColour = getTeamColour(top.team);
+  const ac = resolveAccentColor(angle, options, teamColour);
   const matchup = Math.round(Number(top.matchup_rating ?? 0));
   const proj    = Math.round(Number(top.projection_final ?? 0));
   const ceil    = Math.round(Number(top.ceiling_estimate ?? 0));
@@ -1634,10 +1666,10 @@ export function LayoutMatchupAdvantage({
   const firstName = nameParts.slice(0, -1).join(" ");
 
   return (
-    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour}>
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac}>
       {/* Header */}
       <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
-        <BrandBar accentColor={angle.accentColor} />
+        <BrandBar accentColor={ac} />
       </div>
 
       <div style={{
@@ -1649,13 +1681,13 @@ export function LayoutMatchupAdvantage({
         {/* Badge */}
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 8,
-          background: `${angle.accentColor}18`, border: `1.5px solid ${angle.accentColor}50`,
+          background: `${ac}18`, border: `1.5px solid ${ac}50`,
           borderRadius: 30, padding: isTall ? "8px 24px" : "6px 18px",
           marginBottom: isTall ? 28 : 18,
         }}>
           <span style={{
             fontSize: isTall ? 16 : 13, fontWeight: 900,
-            color: angle.accentColor, textTransform: "uppercase", letterSpacing: "0.14em",
+            color: ac, textTransform: "uppercase", letterSpacing: "0.14em",
           }}>
             BEST MATCHUP
           </span>
@@ -1680,15 +1712,15 @@ export function LayoutMatchupAdvantage({
         {/* Team pill */}
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 8,
-          background: `${angle.accentColor}12`, border: `1px solid ${angle.accentColor}30`,
+          background: `${ac}12`, border: `1px solid ${ac}30`,
           borderRadius: 20, padding: "5px 14px",
           marginBottom: isTall ? 32 : 22,
         }}>
           <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>{top.team}</span>
           {top.position && (
             <>
-              <span style={{ width: 3, height: 3, borderRadius: "50%", background: angle.accentColor, display: "inline-block" }} />
-              <span style={{ fontSize: 14, color: angle.accentColor, fontWeight: 700 }}>{top.position}</span>
+              <span style={{ width: 3, height: 3, borderRadius: "50%", background: ac, display: "inline-block" }} />
+              <span style={{ fontSize: 14, color: ac, fontWeight: 700 }}>{top.position}</span>
             </>
           )}
         </div>
@@ -1705,7 +1737,7 @@ export function LayoutMatchupAdvantage({
           </div>
           <div style={{
             fontSize: isTall ? 150 : (isWide ? 100 : 120),
-            fontWeight: 900, color: angle.accentColor,
+            fontWeight: 900, color: ac,
             lineHeight: 0.85, fontVariantNumeric: "tabular-nums",
             letterSpacing: "-0.04em",
           }}>
@@ -1741,7 +1773,7 @@ export function LayoutMatchupAdvantage({
       </div>
 
       <div style={{ flexShrink: 0, marginTop: isTall ? 28 : 20 }}>
-        <Footer accentColor={angle.accentColor} />
+        <Footer accentColor={ac} />
       </div>
     </CanvasShell>
   );

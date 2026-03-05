@@ -9,6 +9,7 @@ import {
   GraphicCanvas,
   CarouselTitleSlide,
   CarouselPlayerSlide,
+  resolveAccentColor,
   type ContentPlayer,
   type StatAngle,
   type LayoutEngine,
@@ -476,8 +477,6 @@ export default function AdminContentEngine() {
 
   const isCarouselMode  = selectedExportSize.id === "carousel";
   const effectiveLayout = isCarouselMode ? "leaderboard" : selectedLayout;
-  const resolvedAccentColor = accentMode === "custom" ? customAccent : accentMode === "white" ? "#FFFFFF" : undefined;
-  const accentColor = selectedAngle.accentColor;
 
   const graphicOptions: GraphicOptions = {
     layout: effectiveLayout,
@@ -489,10 +488,12 @@ export default function AdminContentEngine() {
     statHighlight: statHighlight.trim() || undefined,
     ctaText:       ctaText.trim()       || undefined,
     ctaPosition:   ctaText.trim() ? ctaPosition : "hidden",
-    accentColourMode:    accentMode,
-    customAccentColour:  resolvedAccentColor,
+    accentColourMode:   accentMode,
+    customAccentColour: accentMode === "custom" ? customAccent : undefined,
     rankHighlight,
   };
+
+  const accentColor = resolveAccentColor(selectedAngle, graphicOptions);
 
   const exportW  = selectedExportSize.w;
   const exportH  = selectedExportSize.h;
