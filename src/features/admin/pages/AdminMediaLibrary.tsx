@@ -48,9 +48,8 @@ const VIDEO_BASE           = "videos/ai-generated";
 const IMAGE_SUBCATEGORIES: Category[] = ["stadium", "crowd", "field", "abstract", "players"];
 const CATEGORIES: Category[]          = ["all", "stadium", "crowd", "field", "abstract", "players"];
 
-const CACHE_KEY_IMAGES = "neeko_media_lib_images_v2";
-const CACHE_KEY_VIDEOS = "neeko_media_lib_videos_v2";
-const CACHE_TTL        = 5 * 60 * 1000;
+const CACHE_KEY_ALL = "neeko_media_lib_all_v3";
+const CACHE_TTL     = 5 * 60 * 1000;
 
 const POLL_INTERVAL_MS = 3000;
 const ACCENT           = "#F59E0B";
@@ -80,9 +79,9 @@ const JOB_CONFIGS: JobConfig[] = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function readCache(key: string): MediaItem[] | null {
+function readCache(): MediaItem[] | null {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = localStorage.getItem(CACHE_KEY_ALL);
     if (!raw) return null;
     const { data, ts } = JSON.parse(raw);
     if (Date.now() - ts > CACHE_TTL) return null;
@@ -90,8 +89,8 @@ function readCache(key: string): MediaItem[] | null {
   } catch { return null; }
 }
 
-function writeCache(key: string, data: MediaItem[]) {
-  try { localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })); } catch { /* quota */ }
+function writeCache(data: MediaItem[]) {
+  try { localStorage.setItem(CACHE_KEY_ALL, JSON.stringify({ data, ts: Date.now() })); } catch { /* quota */ }
 }
 
 function rowToMediaItem(row: Record<string, unknown>): MediaItem {
@@ -112,43 +111,24 @@ function rowToMediaItem(row: Record<string, unknown>): MediaItem {
   };
 }
 
-async function loadImages(force = false): Promise<MediaItem[]> {
+async function loadAllMedia(force = false): Promise<MediaItem[]> {
   if (!force) {
-    const cached = readCache(CACHE_KEY_IMAGES);
+    const cached = readCache();
     if (cached) return cached;
   }
   const { data, error } = await supabase
     .from("ai_media_library")
     .select("*")
     .eq("is_active", true)
-    .eq("media_type", "image")
     .order("sort_order", { ascending: true });
   if (error || !data) return [];
   const items = (data as Record<string, unknown>[]).map(rowToMediaItem);
-  writeCache(CACHE_KEY_IMAGES, items);
-  return items;
-}
-
-async function loadVideos(force = false): Promise<MediaItem[]> {
-  if (!force) {
-    const cached = readCache(CACHE_KEY_VIDEOS);
-    if (cached) return cached;
-  }
-  const { data, error } = await supabase
-    .from("ai_media_library")
-    .select("*")
-    .eq("is_active", true)
-    .eq("media_type", "video")
-    .order("sort_order", { ascending: true });
-  if (error || !data) return [];
-  const items = (data as Record<string, unknown>[]).map(rowToMediaItem);
-  writeCache(CACHE_KEY_VIDEOS, items);
+  writeCache(items);
   return items;
 }
 
 function clearMediaCaches() {
-  localStorage.removeItem(CACHE_KEY_IMAGES);
-  localStorage.removeItem(CACHE_KEY_VIDEOS);
+  localStorage.removeItem(CACHE_KEY_ALL);
   invalidateAIMediaCache();
 }
 
@@ -728,13 +708,15 @@ export default function AdminMediaLibrary() {
   const ml = state.mediaLibrary;
 
   // ── Context-backed persistent state ────────────────────────────────────────
-  const images          = ml.images as MediaItem[];
-  const videos          = ml.videos as MediaItem[];
+  const allMedia        = (ml.images as MediaItem[]).concat(ml.videos as MediaItem[]);
   const runningDbJob    = ml.runningJob as GenerationJob | null;
   const dismissedJobId  = ml.dismissedJobId;
 
-  const setImages        = (imgs: MediaItem[]) => setMediaLibrary((p) => ({ ...p, images: imgs, lastFetchedAt: Date.now() }));
-  const setVideos        = (vids: MediaItem[]) => setMediaLibrary((p) => ({ ...p, videos: vids }));
+  const setAllMedia      = (items: MediaItem[]) => {
+    const imgs = items.filter((i) => i.media_type === "image");
+    const vids = items.filter((i) => i.media_type === "video");
+    setMediaLibrary((p) => ({ ...p, images: imgs, videos: vids, lastFetchedAt: Date.now() }));
+  };
   const setRunningDbJob  = (job: GenerationJob | null) => setMediaLibrary((p) => ({ ...p, runningJob: job }));
   const setDismissedJobId = (id: string | null) => setMediaLibrary((p) => ({ ...p, dismissedJobId: id }));
 
@@ -777,9 +759,8 @@ export default function AdminMediaLibrary() {
     setLoading(true);
     try {
       if (force) clearMediaCaches();
-      const [imgs, vids] = await Promise.all([loadImages(force), loadVideos(force)]);
-      setImages(imgs);
-      setVideos(vids);
+      const items = await loadAllMedia(force);
+      setAllMedia(items);
     } finally {
       setLoading(false);
     }
@@ -788,7 +769,7 @@ export default function AdminMediaLibrary() {
 
   useEffect(() => {
     const age = ml.lastFetchedAt ? Date.now() - ml.lastFetchedAt : Infinity;
-    if (age > MEDIA_CACHE_TTL_MS || images.length === 0) {
+    if (age > MEDIA_CACHE_TTL_MS || allMedia.length === 0) {
       fetchAll(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -841,12 +822,16 @@ export default function AdminMediaLibrary() {
 
   const isGenerationLocked = runningDbJob?.status === "running";
 
-  const activeItems = mode === "graphic" ? images : videos;
+  const modeType    = mode === "graphic" ? "image" : "video";
+  const activeItems = allMedia.filter((i) => i.media_type === modeType);
   const filtered    = activeItems.filter((item) => {
     const matchesCat    = category === "all" || item.category === category;
     const matchesSearch = !search || item.label.toLowerCase().includes(search.toLowerCase()) || item.filename.toLowerCase().includes(search.toLowerCase());
     return matchesCat && matchesSearch;
   });
+
+  const images = allMedia.filter((i) => i.media_type === "image");
+  const videos = allMedia.filter((i) => i.media_type === "video");
 
   const countsByCategory: Record<string, number> = { all: activeItems.length };
   for (const cat of IMAGE_SUBCATEGORIES) {
@@ -888,11 +873,7 @@ export default function AdminMediaLibrary() {
       clearMediaCaches();
 
       // 5. Remove from UI state immediately
-      if (mode === "graphic") {
-        setImages((prev) => prev.filter((i) => i.asset_id !== item.asset_id));
-      } else {
-        setVideos((prev) => prev.filter((i) => i.asset_id !== item.asset_id));
-      }
+      setAllMedia(allMedia.filter((i) => i.asset_id !== item.asset_id));
 
     } finally {
       setDeleting(false);
