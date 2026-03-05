@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { RefreshCw, Shield, LayoutDashboard, Server, BarChart3, Megaphone, Zap } from "lucide-react";
+import { RefreshCw, Shield, LayoutDashboard, Server, ChartBar as BarChart3, Megaphone, Zap } from "lucide-react";
 
 const AdminDashboard = lazy(() => import("@/features/admin/pages/AdminDashboard"));
 const AdminSystemHealth = lazy(() => import("@/features/admin/pages/AdminSystemHealth"));
