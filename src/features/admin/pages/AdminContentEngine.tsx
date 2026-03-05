@@ -26,6 +26,7 @@ import {
 import { StockMediaPicker, StarterPackInstaller, getBackgroundSourceLabel, STOCK_IMAGES, STOCK_VIDEOS } from "../marketing/StockMediaPicker";
 import { exportCarouselSlides } from "../marketing/CarouselExport";
 import { AddToPlannerModal } from "../marketing/AddToPlannerModal";
+import { PlayerSelectorPanel } from "../marketing/PlayerSelectorPanel";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -491,6 +492,11 @@ export default function AdminContentEngine() {
   // Video preview state (lifted from VideoGeneratorPanel)
   const [videoPreviewState, setVideoPreviewState] = useState<VideoPreviewState | null>(null);
 
+  // Manual player selection
+  const [playerMode, setPlayerMode] = useState<"auto" | "manual">("auto");
+  const [manualPlayer1, setManualPlayer1] = useState<ContentPlayer | null>(null);
+  const [manualPlayer2, setManualPlayer2] = useState<ContentPlayer | null>(null);
+
   const previewRef = useRef<HTMLDivElement>(null);
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -525,6 +531,18 @@ export default function AdminContentEngine() {
 
   const exportW  = selectedExportSize.w;
   const exportH  = selectedExportSize.h;
+
+  // When in manual mode, inject selected players at the front of the list
+  const effectivePlayers: ContentPlayer[] = playerMode === "manual"
+    ? [
+        ...(manualPlayer1 ? [manualPlayer1] : []),
+        ...(manualPlayer2 ? [manualPlayer2] : []),
+        ...players.filter((p) =>
+          p.player_name !== manualPlayer1?.player_name &&
+          p.player_name !== manualPlayer2?.player_name
+        ),
+      ]
+    : players;
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -583,12 +601,12 @@ export default function AdminContentEngine() {
   // ── Content handlers ───────────────────────────────────────────────────────
 
   const handleGenerateInsight = () => {
-    if (players.length === 0) return;
-    setInsight(selectedAngle.insightFn(players));
+    if (effectivePlayers.length === 0) return;
+    setInsight(selectedAngle.insightFn(effectivePlayers));
   };
 
   const handleGenerateCaption = async () => {
-    if (players.length === 0) return;
+    if (effectivePlayers.length === 0) return;
     setCaptionLoading(true);
     setCaption("");
     try {
@@ -601,7 +619,7 @@ export default function AdminContentEngine() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ angle_name: selectedAngle.label, players: players.slice(0, 5) }),
+        body: JSON.stringify({ angle_name: selectedAngle.label, players: effectivePlayers.slice(0, 5) }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -621,7 +639,7 @@ export default function AdminContentEngine() {
 
   const handleDownloadGraphic = async () => {
     if (isCarouselMode) { await handleDownloadCarousel(); return; }
-    if (!previewRef.current || players.length === 0) return;
+    if (!previewRef.current || effectivePlayers.length === 0) return;
     setDownloading(true);
     try {
       const inner = previewRef.current.firstElementChild as HTMLElement | null;
@@ -641,9 +659,9 @@ export default function AdminContentEngine() {
   };
 
   const handleDownloadCarousel = async () => {
-    if (players.length === 0) return;
+    if (effectivePlayers.length === 0) return;
     setDownloading(true);
-    setCarouselProgress({ done: 0, total: players.length + 1 });
+    setCarouselProgress({ done: 0, total: effectivePlayers.length + 1 });
     try {
       const { w, h } = selectedExportSize;
       const opts = graphicOptions;
@@ -651,9 +669,9 @@ export default function AdminContentEngine() {
         {
           filename: `neeko-carousel-${selectedAngle.id}-00-title.png`,
           w, h,
-          element: createElement(CarouselTitleSlide, { angle: selectedAngle, w, h, options: opts, totalPlayers: players.length }),
+          element: createElement(CarouselTitleSlide, { angle: selectedAngle, w, h, options: opts, totalPlayers: effectivePlayers.length }),
         },
-        ...players.map((player, i) => ({
+        ...effectivePlayers.map((player, i) => ({
           filename: `neeko-carousel-${selectedAngle.id}-${String(i + 1).padStart(2, "0")}-${player.player_name.replace(/\s+/g, "_")}.png`,
           w, h,
           element: createElement(CarouselPlayerSlide, { angle: selectedAngle, player, rank: i + 1, w, h, options: opts }),
@@ -696,7 +714,7 @@ export default function AdminContentEngine() {
   };
 
   const handleAddToPlanner = async () => {
-    if (isCarouselMode || !previewRef.current || players.length === 0) {
+    if (isCarouselMode || !previewRef.current || effectivePlayers.length === 0) {
       setPlannerMediaUrl(null);
       setPlannerModalOpen(true);
       return;
@@ -818,48 +836,64 @@ export default function AdminContentEngine() {
                   accentColor={accentColor}
                   defaultOpen={true}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-[11px] text-muted-foreground/60 truncate">{selectedAngle.title}</p>
-                    <Button
-                      variant="outline" size="sm"
-                      className="h-6 text-[11px] shrink-0 ml-2"
-                      onClick={() => fetchPlayers(selectedAngle, true)}
-                      disabled={dataLoading}
-                    >
-                      <RefreshCw className={`h-3 w-3 mr-1 ${dataLoading ? "animate-spin" : ""}`} />
-                      Refresh
-                    </Button>
-                  </div>
-                  <div className="rounded-lg border border-border overflow-hidden">
-                    {dataLoading ? (
-                      <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground text-xs">
-                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />Loading…
+                  {/* Player Mode selector */}
+                  <PlayerSelectorPanel
+                    playerMode={playerMode}
+                    onPlayerModeChange={setPlayerMode}
+                    manualPlayer1={manualPlayer1}
+                    manualPlayer2={manualPlayer2}
+                    onPlayer1Change={setManualPlayer1}
+                    onPlayer2Change={setManualPlayer2}
+                    accentColor={accentColor}
+                  />
+
+                  {/* Auto player data table */}
+                  {playerMode === "auto" && (
+                    <>
+                      <div className="flex items-center justify-between mb-1 mt-2">
+                        <p className="text-[11px] text-muted-foreground/60 truncate">{selectedAngle.title}</p>
+                        <Button
+                          variant="outline" size="sm"
+                          className="h-6 text-[11px] shrink-0 ml-2"
+                          onClick={() => fetchPlayers(selectedAngle, true)}
+                          disabled={dataLoading}
+                        >
+                          <RefreshCw className={`h-3 w-3 mr-1 ${dataLoading ? "animate-spin" : ""}`} />
+                          Refresh
+                        </Button>
                       </div>
-                    ) : players.length === 0 ? (
-                      <div className="py-6 text-center text-xs text-muted-foreground">No data loaded</div>
-                    ) : (
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-border bg-muted/40">
-                            <th className="text-left py-1.5 px-2.5 font-medium text-muted-foreground w-6">#</th>
-                            <th className="text-left py-1.5 px-2.5 font-medium text-muted-foreground">Player</th>
-                            <th className="text-left py-1.5 px-2.5 font-medium text-muted-foreground">Team</th>
-                            <th className="text-right py-1.5 px-2.5 font-medium text-muted-foreground">{selectedAngle.statLabel}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {players.slice(0, 10).map((p, i) => (
-                            <tr key={`${p.player_name}-${i}`} className="border-b border-border/40 last:border-0 hover:bg-muted/20 transition-colors">
-                              <td className="py-1.5 px-2.5 text-muted-foreground tabular-nums">{i + 1}</td>
-                              <td className="py-1.5 px-2.5 font-medium max-w-[120px] truncate">{p.player_name}</td>
-                              <td className="py-1.5 px-2.5 text-muted-foreground truncate">{p.team}</td>
-                              <td className="py-1.5 px-2.5 text-right font-semibold tabular-nums" style={accentStyle}>{selectedAngle.statFn(p)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
+                      <div className="rounded-lg border border-border overflow-hidden">
+                        {dataLoading ? (
+                          <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground text-xs">
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />Loading…
+                          </div>
+                        ) : effectivePlayers.length === 0 ? (
+                          <div className="py-6 text-center text-xs text-muted-foreground">No data loaded</div>
+                        ) : (
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-border bg-muted/40">
+                                <th className="text-left py-1.5 px-2.5 font-medium text-muted-foreground w-6">#</th>
+                                <th className="text-left py-1.5 px-2.5 font-medium text-muted-foreground">Player</th>
+                                <th className="text-left py-1.5 px-2.5 font-medium text-muted-foreground">Team</th>
+                                <th className="text-right py-1.5 px-2.5 font-medium text-muted-foreground">{selectedAngle.statLabel}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {effectivePlayers.slice(0, 10).map((p, i) => (
+                                <tr key={`${p.player_name}-${i}`} className="border-b border-border/40 last:border-0 hover:bg-muted/20 transition-colors">
+                                  <td className="py-1.5 px-2.5 text-muted-foreground tabular-nums">{i + 1}</td>
+                                  <td className="py-1.5 px-2.5 font-medium max-w-[120px] truncate">{p.player_name}</td>
+                                  <td className="py-1.5 px-2.5 text-muted-foreground truncate">{p.team}</td>
+                                  <td className="py-1.5 px-2.5 text-right font-semibold tabular-nums" style={accentStyle}>{selectedAngle.statFn(p)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </SideSection>
 
                 {/* Section 2: Graphic Template */}
@@ -1334,7 +1368,7 @@ export default function AdminContentEngine() {
                       }
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" className="flex-1 h-8 text-xs" onClick={handleGenerateInsight} disabled={players.length === 0 || dataLoading}>
+                      <Button variant="outline" className="flex-1 h-8 text-xs" onClick={handleGenerateInsight} disabled={effectivePlayers.length === 0 || dataLoading}>
                         <Zap className="h-3.5 w-3.5 mr-1.5" />Generate Insight
                       </Button>
                       {insight && (
@@ -1357,7 +1391,7 @@ export default function AdminContentEngine() {
                       }
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" className="flex-1 h-8 text-xs" onClick={handleGenerateCaption} disabled={captionLoading || players.length === 0}>
+                      <Button variant="outline" className="flex-1 h-8 text-xs" onClick={handleGenerateCaption} disabled={captionLoading || effectivePlayers.length === 0}>
                         {captionLoading ? <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
                         Generate Caption
                       </Button>
@@ -1411,15 +1445,15 @@ export default function AdminContentEngine() {
                   <Button
                     className="w-full h-9 text-xs font-semibold"
                     onClick={handleDownloadGraphic}
-                    disabled={downloading || players.length === 0 || dataLoading}
-                    style={players.length > 0 && !downloading ? { background: accentColor, color: "#000" } : {}}
+                    disabled={downloading || effectivePlayers.length === 0 || dataLoading}
+                    style={effectivePlayers.length > 0 && !downloading ? { background: accentColor, color: "#000" } : {}}
                   >
                     {downloading ? (
                       carouselProgress
                         ? <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />Exporting {carouselProgress.done}/{carouselProgress.total}…</>
                         : <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />Generating…</>
                     ) : isCarouselMode ? (
-                      <><Layers className="h-3.5 w-3.5 mr-1.5" />Export Carousel ({players.length + 1} slides)</>
+                      <><Layers className="h-3.5 w-3.5 mr-1.5" />Export Carousel ({effectivePlayers.length + 1} slides)</>
                     ) : (
                       <><Download className="h-3.5 w-3.5 mr-1.5" />Download Graphic</>
                     )}
@@ -1429,7 +1463,7 @@ export default function AdminContentEngine() {
             ) : (
               /* VIDEO MODE controls */
               <VideoGeneratorPanel
-                players={players}
+                players={effectivePlayers}
                 selectedAngle={selectedAngle}
                 dataLoading={dataLoading}
                 onPreviewChange={setVideoPreviewState}
@@ -1451,7 +1485,7 @@ export default function AdminContentEngine() {
                   variant="outline" size="sm"
                   className="h-7 text-xs gap-1.5"
                   onClick={handleDownloadGraphic}
-                  disabled={downloading || players.length === 0}
+                  disabled={downloading || effectivePlayers.length === 0}
                   style={{ borderColor: `${accentColor}44`, color: accentColor }}
                 >
                   <Download className="h-3 w-3" />
@@ -1489,7 +1523,7 @@ export default function AdminContentEngine() {
                   variant="outline" size="sm"
                   className="h-7 text-xs gap-1.5"
                   onClick={handleAddToPlanner}
-                  disabled={players.length === 0}
+                  disabled={effectivePlayers.length === 0}
                   style={{ borderColor: `${accentColor}44`, color: accentColor }}
                 >
                   <CalendarPlus className="h-3 w-3" />
@@ -1497,14 +1531,14 @@ export default function AdminContentEngine() {
                 </Button>
                 <div className="ml-auto flex items-center gap-2">
                   <span className="text-[11px] text-muted-foreground/50">
-                    {exportW}×{exportH}px{isCarouselMode ? ` · ${players.length + 1} slides` : ""}
+                    {exportW}×{exportH}px{isCarouselMode ? ` · ${effectivePlayers.length + 1} slides` : ""}
                   </span>
                 </div>
               </div>
 
               {/* Graphic Preview Area */}
               <div className="flex-1 overflow-auto flex items-start justify-center p-6" style={{ minHeight: 0 }}>
-                {players.length === 0 ? (
+                {effectivePlayers.length === 0 ? (
                   <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground h-full">
                     <LayoutTemplate className="h-12 w-12 opacity-15" />
                     <p className="text-sm opacity-60">Select a stat angle to see the graphic preview</p>
@@ -1539,13 +1573,13 @@ export default function AdminContentEngine() {
                               angle={selectedAngle}
                               w={exportW} h={exportH}
                               options={graphicOptions}
-                              totalPlayers={players.length}
+                              totalPlayers={effectivePlayers.length}
                             />
                           ) : (
                             <GraphicCanvas
                               layout={effectiveLayout}
                               angle={selectedAngle}
-                              players={players}
+                              players={effectivePlayers}
                               w={exportW} h={exportH}
                               options={graphicOptions}
                             />
