@@ -3,11 +3,7 @@ import { toPng } from "html-to-image";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate,
-  ChevronDown, Image as ImageIcon, Layers, Palette, Type, Hash, Calendar,
-  Video, Play, ChevronRight, Shuffle, BarChart2,
-} from "lucide-react";
+import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Image as ImageIcon, Layers, Palette, Type, Hash, Calendar, Video, Play, ChevronRight, Shuffle, ChartBar as BarChart2 } from "lucide-react";
 import { VideoGeneratorPanel } from "../marketing/VideoGeneratorPanel";
 import {
   GraphicCanvas,
