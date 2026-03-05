@@ -23,7 +23,8 @@ import {
   type LayoutOffsets,
   DEFAULT_LAYOUT_OFFSETS,
 } from "../marketing/GraphicTemplates";
-import { StockMediaPicker, StarterPackInstaller, getBackgroundSourceLabel, STOCK_IMAGES, STOCK_VIDEOS } from "../marketing/StockMediaPicker";
+import { StockMediaPicker, getBackgroundSourceLabel, STOCK_IMAGES, STOCK_VIDEOS } from "../marketing/StockMediaPicker";
+import { AIMediaPackGenerator } from "../marketing/AIMediaPackGenerator";
 import { exportCarouselSlides } from "../marketing/CarouselExport";
 import { AddToPlannerModal } from "../marketing/AddToPlannerModal";
 import { PlayerSelectorPanel } from "../marketing/PlayerSelectorPanel";
@@ -1289,7 +1290,7 @@ export default function AdminContentEngine() {
                         {STOCK_IMAGES.length + STOCK_VIDEOS.length} assets
                       </span>
                     </div>
-                    <StarterPackInstaller accentColor={accentColor} />
+                    <AIMediaPackGenerator accentColor={accentColor} />
                   </div>
                 </SideSection>
 
