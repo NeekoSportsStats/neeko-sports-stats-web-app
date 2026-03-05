@@ -131,11 +131,11 @@ export function AIMediaPackGenerator({ accentColor = "#F59E0B", onSynced }: AIMe
   }
 
   const categoryBreakdown = [
-    { label: "Stadium",  target: IMAGE_CATEGORY_TARGETS.stadium,  actual: STOCK_IMAGES.filter((i) => i.category === "stadium").length,  icon: "🏟" },
-    { label: "Crowd",    target: IMAGE_CATEGORY_TARGETS.crowd,    actual: STOCK_IMAGES.filter((i) => i.category === "crowd").length,    icon: "👥" },
-    { label: "Abstract", target: IMAGE_CATEGORY_TARGETS.abstract, actual: STOCK_IMAGES.filter((i) => i.category === "abstract").length, icon: "✨" },
-    { label: "Field",    target: IMAGE_CATEGORY_TARGETS.field,    actual: STOCK_IMAGES.filter((i) => i.category === "field").length,    icon: "🌿" },
-    { label: "Players",  target: IMAGE_CATEGORY_TARGETS.players,  actual: STOCK_IMAGES.filter((i) => i.category === "players").length,  icon: "🏃" },
+    { label: "Stadium",  target: IMAGE_CATEGORY_TARGETS.stadium,  actual: STOCK_IMAGES.filter((i) => i.category === "stadium").length  },
+    { label: "Crowd",    target: IMAGE_CATEGORY_TARGETS.crowd,    actual: STOCK_IMAGES.filter((i) => i.category === "crowd").length    },
+    { label: "Abstract", target: IMAGE_CATEGORY_TARGETS.abstract, actual: STOCK_IMAGES.filter((i) => i.category === "abstract").length },
+    { label: "Field",    target: IMAGE_CATEGORY_TARGETS.field,    actual: STOCK_IMAGES.filter((i) => i.category === "field").length    },
+    { label: "Players",  target: IMAGE_CATEGORY_TARGETS.players,  actual: STOCK_IMAGES.filter((i) => i.category === "players").length  },
   ];
 
   if (checking) {
@@ -212,8 +212,7 @@ export function AIMediaPackGenerator({ accentColor = "#F59E0B", onSynced }: AIMe
               className="rounded-lg px-2 py-1.5 text-center"
               style={{ background: `${accentColor}0a` }}
             >
-              <span className="text-base leading-none">{cat.icon}</span>
-              <p className="text-[10px] font-semibold mt-0.5" style={{ color: accentColor }}>
+              <p className="text-[10px] font-semibold" style={{ color: accentColor }}>
                 {cat.actual}
               </p>
               <p className="text-[9px] text-muted-foreground/50 leading-tight">{cat.label}</p>
@@ -282,8 +281,7 @@ export function AIMediaPackGenerator({ accentColor = "#F59E0B", onSynced }: AIMe
             key={cat.label}
             className="rounded-lg px-2 py-2 text-center border border-border/30"
           >
-            <span className="text-sm leading-none">{cat.icon}</span>
-            <p className="text-[10px] font-semibold mt-1 tabular-nums">{cat.actual}</p>
+            <p className="text-[10px] font-semibold tabular-nums">{cat.actual}</p>
             <p className="text-[9px] text-muted-foreground/50 leading-tight">{cat.label}</p>
             {cat.actual !== cat.target && (
               <p className="text-[8px] text-yellow-400/60">target {cat.target}</p>

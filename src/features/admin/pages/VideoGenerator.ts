@@ -24,7 +24,7 @@ export type VideoTemplate =
   | "trade_targets";
 
 export type AnimationSpeed = "slow" | "medium" | "fast";
-export type VideoBackground = "dark_gradient" | "stadium_lights" | "grass_texture" | "analytics_grid" | "team_colour";
+export type VideoBackground = "dark_gradient" | "stadium_lights" | "grass_texture" | "analytics_grid" | "team_colour" | "ai_stadium" | "ai_crowd" | "ai_field" | "ai_abstract" | "ai_players";
 export type ExportSize = "tiktok_reels" | "instagram_post";
 export type SlideTransition = "fade" | "slide" | "zoom" | "bounce";
 
@@ -176,6 +176,62 @@ function drawBackground(
       tg.addColorStop(0.5, accentColor + "10");
       tg.addColorStop(1, "transparent");
       ctx.fillStyle = tg;
+      ctx.fillRect(0, 0, vw, vh);
+      break;
+    }
+    case "ai_crowd":
+    case "ai_field":
+    case "ai_players": {
+      const grad = ctx.createLinearGradient(0, 0, vw, vh);
+      grad.addColorStop(0, "#08111a");
+      grad.addColorStop(1, "#040a10");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, vw, vh);
+      const overlay = ctx.createRadialGradient(vw / 2, vh * 0.4, 0, vw / 2, vh * 0.4, vw * 0.65);
+      overlay.addColorStop(0, accentColor + "18");
+      overlay.addColorStop(1, "transparent");
+      ctx.fillStyle = overlay;
+      ctx.fillRect(0, 0, vw, vh);
+      break;
+    }
+    case "ai_abstract": {
+      ctx.fillStyle = "#050810";
+      ctx.fillRect(0, 0, vw, vh);
+      ctx.strokeStyle = accentColor + "12";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= vw; x += 100) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, vh); ctx.stroke();
+      }
+      for (let y = 0; y <= vh; y += 100) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(vw, y); ctx.stroke();
+      }
+      const glow = ctx.createRadialGradient(vw / 2, vh / 2, 0, vw / 2, vh / 2, vw * 0.7);
+      glow.addColorStop(0, accentColor + "20");
+      glow.addColorStop(1, "transparent");
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, vw, vh);
+      break;
+    }
+    case "ai_stadium": {
+      const grad = ctx.createLinearGradient(0, 0, vw, vh);
+      grad.addColorStop(0, "#060c1a");
+      grad.addColorStop(1, "#030710");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, vw, vh);
+      const s1 = ctx.createRadialGradient(vw * 0.3, vh * 0.15, 0, vw * 0.3, vh * 0.15, vw * 0.5);
+      s1.addColorStop(0, "rgba(255,240,180,0.08)");
+      s1.addColorStop(1, "transparent");
+      ctx.fillStyle = s1;
+      ctx.fillRect(0, 0, vw, vh);
+      const s2 = ctx.createRadialGradient(vw * 0.7, vh * 0.12, 0, vw * 0.7, vh * 0.12, vw * 0.45);
+      s2.addColorStop(0, "rgba(255,240,180,0.06)");
+      s2.addColorStop(1, "transparent");
+      ctx.fillStyle = s2;
+      ctx.fillRect(0, 0, vw, vh);
+      const accentGlow = ctx.createLinearGradient(0, vh * 0.6, 0, vh);
+      accentGlow.addColorStop(0, accentColor + "15");
+      accentGlow.addColorStop(1, "transparent");
+      ctx.fillStyle = accentGlow;
       ctx.fillRect(0, 0, vw, vh);
       break;
     }

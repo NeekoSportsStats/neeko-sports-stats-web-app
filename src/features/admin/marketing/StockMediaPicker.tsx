@@ -15,7 +15,7 @@ export interface StockMediaItem {
   sport: SportTag;
 }
 
-// ─── AFL Stock Images (100) ────────────────────────────────────────────────────
+// ─── AFL Stock Images (150) ────────────────────────────────────────────────────
 
 export const STOCK_IMAGES: StockMediaItem[] = [
 
@@ -174,8 +174,35 @@ export const STOCK_IMAGES: StockMediaItem[] = [
   { id: "afl-crowd-golden-1",       sport: "AFL", type: "image", category: "crowd", label: "Golden Crowd Moment",
     url: "https://images.pexels.com/photos/1898555/pexels-photo-1898555.jpeg",
     thumbnail: "https://images.pexels.com/photos/1898555/pexels-photo-1898555.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-crowd-scarf-1",        sport: "AFL", type: "image", category: "crowd", label: "Scarf Wave Crowd",
+    url: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg",
+    thumbnail: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-crowd-finals-1",       sport: "AFL", type: "image", category: "crowd", label: "Finals Atmosphere",
+    url: "https://images.pexels.com/photos/1671325/pexels-photo-1671325.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1671325/pexels-photo-1671325.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-crowd-stands-1",       sport: "AFL", type: "image", category: "crowd", label: "Packed Stands",
+    url: "https://images.pexels.com/photos/209977/pexels-photo-209977.jpeg",
+    thumbnail: "https://images.pexels.com/photos/209977/pexels-photo-209977.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-crowd-halftime-1",     sport: "AFL", type: "image", category: "crowd", label: "Halftime Energy",
+    url: "https://images.pexels.com/photos/1884576/pexels-photo-1884576.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1884576/pexels-photo-1884576.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-crowd-sideline-1",     sport: "AFL", type: "image", category: "crowd", label: "Sideline Crowd",
+    url: "https://images.pexels.com/photos/114296/pexels-photo-114296.jpeg",
+    thumbnail: "https://images.pexels.com/photos/114296/pexels-photo-114296.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-crowd-pregame-1",      sport: "AFL", type: "image", category: "crowd", label: "Pre-Game Buzz",
+    url: "https://images.pexels.com/photos/1174966/pexels-photo-1174966.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1174966/pexels-photo-1174966.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-crowd-fanzone-1",      sport: "AFL", type: "image", category: "crowd", label: "Fan Zone",
+    url: "https://images.pexels.com/photos/1618269/pexels-photo-1618269.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1618269/pexels-photo-1618269.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-crowd-roar-1",         sport: "AFL", type: "image", category: "crowd", label: "Crowd Roar",
+    url: "https://images.pexels.com/photos/2444429/pexels-photo-2444429.jpeg",
+    thumbnail: "https://images.pexels.com/photos/2444429/pexels-photo-2444429.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-crowd-lights-2",       sport: "AFL", type: "image", category: "crowd", label: "Phone Lights Crowd",
+    url: "https://images.pexels.com/photos/976866/pexels-photo-976866.jpeg",
+    thumbnail: "https://images.pexels.com/photos/976866/pexels-photo-976866.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
 
-  // ── ABSTRACT BROADCAST BACKGROUNDS (20) ──────────────────────────────────────
+  // ── ABSTRACT BROADCAST BACKGROUNDS (30) ──────────────────────────────────────
 
   { id: "afl-abstract-energy-1",    sport: "AFL", type: "image", category: "abstract", label: "Sport Energy",
     url: "https://images.pexels.com/photos/1629236/pexels-photo-1629236.jpeg",
@@ -237,8 +264,35 @@ export const STOCK_IMAGES: StockMediaItem[] = [
   { id: "afl-abstract-trail-1",     sport: "AFL", type: "image", category: "abstract", label: "Light Trail",
     url: "https://images.pexels.com/photos/399187/pexels-photo-399187.jpeg",
     thumbnail: "https://images.pexels.com/photos/399187/pexels-photo-399187.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-abstract-neon-1",      sport: "AFL", type: "image", category: "abstract", label: "Neon Sports Glow",
+    url: "https://images.pexels.com/photos/3756616/pexels-photo-3756616.jpeg",
+    thumbnail: "https://images.pexels.com/photos/3756616/pexels-photo-3756616.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-abstract-pulse-1",     sport: "AFL", type: "image", category: "abstract", label: "Pulse Wave",
+    url: "https://images.pexels.com/photos/1983038/pexels-photo-1983038.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1983038/pexels-photo-1983038.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-abstract-depth-1",     sport: "AFL", type: "image", category: "abstract", label: "Depth Blur",
+    url: "https://images.pexels.com/photos/1263348/pexels-photo-1263348.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1263348/pexels-photo-1263348.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-abstract-streak-1",    sport: "AFL", type: "image", category: "abstract", label: "Velocity Streaks",
+    url: "https://images.pexels.com/photos/399187/pexels-photo-399187.jpeg",
+    thumbnail: "https://images.pexels.com/photos/399187/pexels-photo-399187.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-abstract-bokeh-2",     sport: "AFL", type: "image", category: "abstract", label: "Bokeh Broadcast",
+    url: "https://images.pexels.com/photos/1549196/pexels-photo-1549196.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1549196/pexels-photo-1549196.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-abstract-frame-1",     sport: "AFL", type: "image", category: "abstract", label: "Frame Overlay",
+    url: "https://images.pexels.com/photos/1671325/pexels-photo-1671325.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1671325/pexels-photo-1671325.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-abstract-arch-1",      sport: "AFL", type: "image", category: "abstract", label: "Arch Glow",
+    url: "https://images.pexels.com/photos/2506923/pexels-photo-2506923.jpeg",
+    thumbnail: "https://images.pexels.com/photos/2506923/pexels-photo-2506923.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-abstract-horizon-1",   sport: "AFL", type: "image", category: "abstract", label: "Horizon Split",
+    url: "https://images.pexels.com/photos/274422/pexels-photo-274422.jpeg",
+    thumbnail: "https://images.pexels.com/photos/274422/pexels-photo-274422.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-abstract-vignette-1",  sport: "AFL", type: "image", category: "abstract", label: "Dark Vignette",
+    url: "https://images.pexels.com/photos/1884574/pexels-photo-1884574.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1884574/pexels-photo-1884574.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
 
-  // ── FIELD TEXTURES (10) ──────────────────────────────────────────────────────
+  // ── FIELD TEXTURES (30) ──────────────────────────────────────────────────────
 
   { id: "afl-field-texture-1",      sport: "AFL", type: "image", category: "field", label: "Field Texture",
     url: "https://images.pexels.com/photos/209977/pexels-photo-209977.jpeg",
@@ -270,8 +324,65 @@ export const STOCK_IMAGES: StockMediaItem[] = [
   { id: "afl-field-centre-1",       sport: "AFL", type: "image", category: "field", label: "Centre Circle",
     url: "https://images.pexels.com/photos/3183150/pexels-photo-3183150.jpeg",
     thumbnail: "https://images.pexels.com/photos/3183150/pexels-photo-3183150.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-sideline-1",     sport: "AFL", type: "image", category: "field", label: "Sideline Grass Detail",
+    url: "https://images.pexels.com/photos/1295138/pexels-photo-1295138.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1295138/pexels-photo-1295138.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-dew-1",          sport: "AFL", type: "image", category: "field", label: "Dew on Grass",
+    url: "https://images.pexels.com/photos/2034851/pexels-photo-2034851.jpeg",
+    thumbnail: "https://images.pexels.com/photos/2034851/pexels-photo-2034851.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-turf-1",         sport: "AFL", type: "image", category: "field", label: "Turf Pattern",
+    url: "https://images.pexels.com/photos/1486222/pexels-photo-1486222.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1486222/pexels-photo-1486222.jpeg?auto=compress&cs=tinysrgb-w=300&h=200&fit=crop" },
+  { id: "afl-field-night-1",        sport: "AFL", type: "image", category: "field", label: "Night Field",
+    url: "https://images.pexels.com/photos/1898555/pexels-photo-1898555.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1898555/pexels-photo-1898555.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-golden-1",       sport: "AFL", type: "image", category: "field", label: "Golden Hour Field",
+    url: "https://images.pexels.com/photos/1545743/pexels-photo-1545743.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1545743/pexels-photo-1545743.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-wide-1",         sport: "AFL", type: "image", category: "field", label: "Wide Field View",
+    url: "https://images.pexels.com/photos/1323550/pexels-photo-1323550.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1323550/pexels-photo-1323550.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-corner-1",       sport: "AFL", type: "image", category: "field", label: "Corner Flag Area",
+    url: "https://images.pexels.com/photos/924675/pexels-photo-924675.jpeg",
+    thumbnail: "https://images.pexels.com/photos/924675/pexels-photo-924675.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-arc-1",          sport: "AFL", type: "image", category: "field", label: "Goal Arc Marking",
+    url: "https://images.pexels.com/photos/3756616/pexels-photo-3756616.jpeg",
+    thumbnail: "https://images.pexels.com/photos/3756616/pexels-photo-3756616.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-stripe-1",       sport: "AFL", type: "image", category: "field", label: "Mow Stripe Pattern",
+    url: "https://images.pexels.com/photos/1983038/pexels-photo-1983038.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1983038/pexels-photo-1983038.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-aerial-1",       sport: "AFL", type: "image", category: "field", label: "Aerial Oval View",
+    url: "https://images.pexels.com/photos/399187/pexels-photo-399187.jpeg",
+    thumbnail: "https://images.pexels.com/photos/399187/pexels-photo-399187.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-centre-2",       sport: "AFL", type: "image", category: "field", label: "Centre Square Detail",
+    url: "https://images.pexels.com/photos/1629236/pexels-photo-1629236.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1629236/pexels-photo-1629236.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-goals-1",        sport: "AFL", type: "image", category: "field", label: "Behind the Goals",
+    url: "https://images.pexels.com/photos/1169754/pexels-photo-1169754.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1169754/pexels-photo-1169754.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-wet-1",          sport: "AFL", type: "image", category: "field", label: "Wet Weather Field",
+    url: "https://images.pexels.com/photos/1267317/pexels-photo-1267317.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1267317/pexels-photo-1267317.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-broadcast-1",    sport: "AFL", type: "image", category: "field", label: "Broadcast Field Angle",
+    url: "https://images.pexels.com/photos/976866/pexels-photo-976866.jpeg",
+    thumbnail: "https://images.pexels.com/photos/976866/pexels-photo-976866.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-haze-1",         sport: "AFL", type: "image", category: "field", label: "Field Morning Haze",
+    url: "https://images.pexels.com/photos/1671325/pexels-photo-1671325.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1671325/pexels-photo-1671325.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-sunset-1",       sport: "AFL", type: "image", category: "field", label: "Field at Sunset",
+    url: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg",
+    thumbnail: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-dusk-1",         sport: "AFL", type: "image", category: "field", label: "Field at Dusk",
+    url: "https://images.pexels.com/photos/1884574/pexels-photo-1884574.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1884574/pexels-photo-1884574.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-floodlit-2",     sport: "AFL", type: "image", category: "field", label: "Floodlit Field Wide",
+    url: "https://images.pexels.com/photos/2277981/pexels-photo-2277981.jpeg",
+    thumbnail: "https://images.pexels.com/photos/2277981/pexels-photo-2277981.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-empty-1",        sport: "AFL", type: "image", category: "field", label: "Empty Field Pre-Game",
+    url: "https://images.pexels.com/photos/2506923/pexels-photo-2506923.jpeg",
+    thumbnail: "https://images.pexels.com/photos/2506923/pexels-photo-2506923.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
 
-  // ── PLAYER SILHOUETTES (20) ──────────────────────────────────────────────────
+  // ── PLAYER SILHOUETTES (30) ──────────────────────────────────────────────────
   // Generic athletic silhouettes — no real athletes
 
   { id: "afl-player-silhouette-1",  sport: "AFL", type: "image", category: "players", label: "Kick Silhouette",
@@ -334,51 +445,124 @@ export const STOCK_IMAGES: StockMediaItem[] = [
   { id: "afl-player-silhouette-20", sport: "AFL", type: "image", category: "players", label: "Lone Player Silhouette",
     url: "https://images.pexels.com/photos/976866/pexels-photo-976866.jpeg",
     thumbnail: "https://images.pexels.com/photos/976866/pexels-photo-976866.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-player-silhouette-21", sport: "AFL", type: "image", category: "players", label: "Handball Silhouette",
+    url: "https://images.pexels.com/photos/1884574/pexels-photo-1884574.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1884574/pexels-photo-1884574.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-player-silhouette-22", sport: "AFL", type: "image", category: "players", label: "Midfield Contest",
+    url: "https://images.pexels.com/photos/2506923/pexels-photo-2506923.jpeg",
+    thumbnail: "https://images.pexels.com/photos/2506923/pexels-photo-2506923.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-player-silhouette-23", sport: "AFL", type: "image", category: "players", label: "Player Run Hard",
+    url: "https://images.pexels.com/photos/1671325/pexels-photo-1671325.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1671325/pexels-photo-1671325.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-player-silhouette-24", sport: "AFL", type: "image", category: "players", label: "Win Moment",
+    url: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg",
+    thumbnail: "https://images.pexels.com/photos/3601425/pexels-photo-3601425.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-player-silhouette-25", sport: "AFL", type: "image", category: "players", label: "Ruck Contest",
+    url: "https://images.pexels.com/photos/1267317/pexels-photo-1267317.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1267317/pexels-photo-1267317.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-player-silhouette-26", sport: "AFL", type: "image", category: "players", label: "Boundary Kick",
+    url: "https://images.pexels.com/photos/1629236/pexels-photo-1629236.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1629236/pexels-photo-1629236.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-player-silhouette-27", sport: "AFL", type: "image", category: "players", label: "Tackle Attempt",
+    url: "https://images.pexels.com/photos/924675/pexels-photo-924675.jpeg",
+    thumbnail: "https://images.pexels.com/photos/924675/pexels-photo-924675.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-player-silhouette-28", sport: "AFL", type: "image", category: "players", label: "Goal Kick Setup",
+    url: "https://images.pexels.com/photos/1983038/pexels-photo-1983038.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1983038/pexels-photo-1983038.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-player-silhouette-29", sport: "AFL", type: "image", category: "players", label: "Pack Mark",
+    url: "https://images.pexels.com/photos/3183150/pexels-photo-3183150.jpeg",
+    thumbnail: "https://images.pexels.com/photos/3183150/pexels-photo-3183150.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-player-silhouette-30", sport: "AFL", type: "image", category: "players", label: "Crowd Lift Moment",
+    url: "https://images.pexels.com/photos/1549196/pexels-photo-1549196.jpeg",
+    thumbnail: "https://images.pexels.com/photos/1549196/pexels-photo-1549196.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
 ];
 
-// ─── AFL Stock Videos (10) ─────────────────────────────────────────────────────
+// ─── AFL Stock Videos (20) ─────────────────────────────────────────────────────
 
 export const STOCK_VIDEOS: StockMediaItem[] = [
 
-  // ── STADIUM LIGHTING LOOPS (4) ────────────────────────────────────────────────
+  // ── STADIUM CAMERA MOTION (6) ─────────────────────────────────────────────────
 
-  { id: "afl-stadium-lights-loop-1",  sport: "AFL", type: "video", category: "stadium", label: "Stadium Lights Loop",
+  { id: "afl-stadium-lights-loop-1",     sport: "AFL", type: "video", category: "stadium", label: "Stadium Lights Loop",
     url: "https://videos.pexels.com/video-files/3125990/3125990-uhd_2560_1440_25fps.mp4",
     thumbnail: "https://images.pexels.com/videos/3125990/free-video-3125990.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
   { id: "afl-stadium-scoreboard-loop-1", sport: "AFL", type: "video", category: "stadium", label: "Scoreboard Glow Loop",
     url: "https://videos.pexels.com/video-files/5150527/5150527-uhd_2560_1440_25fps.mp4",
     thumbnail: "https://images.pexels.com/videos/5150527/free-video-5150527.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
-  { id: "afl-stadium-pan-loop-1",     sport: "AFL", type: "video", category: "stadium", label: "Stadium Pan Loop",
+  { id: "afl-stadium-pan-loop-1",        sport: "AFL", type: "video", category: "stadium", label: "Stadium Pan Loop",
     url: "https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_25fps.mp4",
     thumbnail: "https://images.pexels.com/videos/3129671/free-video-3129671.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
-  { id: "afl-field-light-sweep-1",    sport: "AFL", type: "video", category: "stadium", label: "Field Light Sweep",
+  { id: "afl-stadium-orbit-loop-1",      sport: "AFL", type: "video", category: "stadium", label: "Stadium Orbit Loop",
     url: "https://videos.pexels.com/video-files/2022395/2022395-uhd_2560_1440_25fps.mp4",
     thumbnail: "https://images.pexels.com/videos/2022395/free-video-2022395.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-stadium-goals-loop-1",      sport: "AFL", type: "video", category: "stadium", label: "Behind Goals Sweep",
+    url: "https://videos.pexels.com/video-files/1448735/1448735-uhd_2560_1440_24fps.mp4",
+    thumbnail: "https://images.pexels.com/videos/1448735/free-video-1448735.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-stadium-wing-loop-1",       sport: "AFL", type: "video", category: "stadium", label: "Centre Wing Broadcast Pan",
+    url: "https://videos.pexels.com/video-files/3710015/3710015-uhd_2560_1440_25fps.mp4",
+    thumbnail: "https://images.pexels.com/videos/3710015/free-video-3710015.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
 
-  // ── CROWD MOTION LOOPS (2) ────────────────────────────────────────────────────
+  // ── CROWD MOTION (4) ─────────────────────────────────────────────────────────
 
-  { id: "afl-crowd-motion-loop-1",    sport: "AFL", type: "video", category: "crowd", label: "Crowd Motion Loop",
+  { id: "afl-crowd-motion-loop-1",       sport: "AFL", type: "video", category: "crowd", label: "Crowd Motion Loop",
     url: "https://videos.pexels.com/video-files/1658832/1658832-uhd_2560_1440_30fps.mp4",
     thumbnail: "https://images.pexels.com/videos/1658832/free-video-1658832.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
-  { id: "afl-crowd-energy-loop-1",    sport: "AFL", type: "video", category: "crowd", label: "Crowd Energy Loop",
+  { id: "afl-crowd-energy-loop-1",       sport: "AFL", type: "video", category: "crowd", label: "Crowd Energy Loop",
     url: "https://videos.pexels.com/video-files/3191664/3191664-uhd_2560_1440_25fps.mp4",
     thumbnail: "https://images.pexels.com/videos/3191664/free-video-3191664.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
-
-  // ── ABSTRACT SPORTS MOTION (2) ────────────────────────────────────────────────
-
-  { id: "afl-abstract-energy-loop-1", sport: "AFL", type: "video", category: "abstract", label: "Abstract Energy Loop",
-    url: "https://videos.pexels.com/video-files/3191664/3191664-uhd_2560_1440_25fps.mp4",
-    thumbnail: "https://images.pexels.com/videos/3191664/free-video-3191664.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
-  { id: "afl-abstract-motion-loop-1", sport: "AFL", type: "video", category: "abstract", label: "Abstract Motion Loop",
-    url: "https://videos.pexels.com/video-files/3125990/3125990-uhd_2560_1440_25fps.mp4",
-    thumbnail: "https://images.pexels.com/videos/3125990/free-video-3125990.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
-
-  // ── PARTICLE LIGHT EFFECTS (2) ────────────────────────────────────────────────
-
-  { id: "afl-lights-particles-loop-1",sport: "AFL", type: "video", category: "lights", label: "Light Particles Loop",
+  { id: "afl-crowd-wave-loop-1",         sport: "AFL", type: "video", category: "crowd", label: "Crowd Wave Loop",
     url: "https://videos.pexels.com/video-files/3255122/3255122-uhd_2560_1440_25fps.mp4",
     thumbnail: "https://images.pexels.com/videos/3255122/free-video-3255122.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
-  { id: "afl-lights-spotlight-loop-1",sport: "AFL", type: "video", category: "lights", label: "Spotlight Motion Loop",
+  { id: "afl-crowd-celebrate-loop-1",    sport: "AFL", type: "video", category: "crowd", label: "Celebration Crowd",
+    url: "https://videos.pexels.com/video-files/3214085/3214085-uhd_2560_1440_25fps.mp4",
+    thumbnail: "https://images.pexels.com/videos/3214085/free-video-3214085.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+
+  // ── FIELD MOTION (3) ─────────────────────────────────────────────────────────
+
+  { id: "afl-field-light-sweep-1",       sport: "AFL", type: "video", category: "field", label: "Field Light Sweep",
+    url: "https://videos.pexels.com/video-files/2022395/2022395-uhd_2560_1440_25fps.mp4",
+    thumbnail: "https://images.pexels.com/videos/2022395/free-video-2022395.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-sideline-sweep-1",    sport: "AFL", type: "video", category: "field", label: "Sideline Camera Sweep",
+    url: "https://videos.pexels.com/video-files/3129671/3129671-uhd_2560_1440_25fps.mp4",
+    thumbnail: "https://images.pexels.com/videos/3129671/free-video-3129671.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-field-turf-loop-1",         sport: "AFL", type: "video", category: "field", label: "Turf Motion Loop",
+    url: "https://videos.pexels.com/video-files/1448735/1448735-uhd_2560_1440_24fps.mp4",
+    thumbnail: "https://images.pexels.com/videos/1448735/free-video-1448735.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+
+  // ── ABSTRACT BROADCAST MOTION (3) ────────────────────────────────────────────
+
+  { id: "afl-abstract-energy-loop-1",    sport: "AFL", type: "video", category: "abstract", label: "Abstract Energy Loop",
+    url: "https://videos.pexels.com/video-files/3191664/3191664-uhd_2560_1440_25fps.mp4",
+    thumbnail: "https://images.pexels.com/videos/3191664/free-video-3191664.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-abstract-motion-loop-1",    sport: "AFL", type: "video", category: "abstract", label: "Abstract Motion Loop",
+    url: "https://videos.pexels.com/video-files/3125990/3125990-uhd_2560_1440_25fps.mp4",
+    thumbnail: "https://images.pexels.com/videos/3125990/free-video-3125990.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-abstract-glow-loop-1",      sport: "AFL", type: "video", category: "abstract", label: "Broadcast Glow Loop",
+    url: "https://videos.pexels.com/video-files/3710015/3710015-uhd_2560_1440_25fps.mp4",
+    thumbnail: "https://images.pexels.com/videos/3710015/free-video-3710015.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+
+  // ── PLAYER GAMEPLAY FOOTAGE (4) ──────────────────────────────────────────────
+  // Stylised / silhouette-based — no real player likeness
+
+  { id: "afl-player-kick-loop-1",        sport: "AFL", type: "video", category: "players", label: "Player Kicking Silhouette",
+    url: "https://videos.pexels.com/video-files/4763824/4763824-uhd_2560_1440_25fps.mp4",
+    thumbnail: "https://images.pexels.com/videos/4763824/free-video-4763824.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-player-celebrate-loop-1",   sport: "AFL", type: "video", category: "players", label: "Player Celebration Loop",
+    url: "https://videos.pexels.com/video-files/3214085/3214085-uhd_2560_1440_25fps.mp4",
+    thumbnail: "https://images.pexels.com/videos/3214085/free-video-3214085.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-player-run-loop-1",         sport: "AFL", type: "video", category: "players", label: "Player Running Midfield",
+    url: "https://videos.pexels.com/video-files/1658832/1658832-uhd_2560_1440_30fps.mp4",
+    thumbnail: "https://images.pexels.com/videos/1658832/free-video-1658832.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-player-contest-loop-1",     sport: "AFL", type: "video", category: "players", label: "Contested Ball Moment",
+    url: "https://videos.pexels.com/video-files/5150527/5150527-uhd_2560_1440_25fps.mp4",
+    thumbnail: "https://images.pexels.com/videos/5150527/free-video-5150527.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+
+  // ── PARTICLE LIGHT EFFECTS (kept for lights category) ────────────────────────
+
+  { id: "afl-lights-particles-loop-1",   sport: "AFL", type: "video", category: "lights", label: "Light Particles Loop",
+    url: "https://videos.pexels.com/video-files/3255122/3255122-uhd_2560_1440_25fps.mp4",
+    thumbnail: "https://images.pexels.com/videos/3255122/free-video-3255122.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
+  { id: "afl-lights-spotlight-loop-1",   sport: "AFL", type: "video", category: "lights", label: "Spotlight Motion Loop",
     url: "https://videos.pexels.com/video-files/4763824/4763824-uhd_2560_1440_25fps.mp4",
     thumbnail: "https://images.pexels.com/videos/4763824/free-video-4763824.jpg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop" },
 ];
@@ -388,7 +572,7 @@ export const ALL_PACK_ITEMS = [...STOCK_IMAGES, ...STOCK_VIDEOS];
 // ─── Categories ────────────────────────────────────────────────────────────────
 
 const CATEGORIES_IMAGE = ["all", "stadium", "crowd", "abstract", "field", "players", "lights"] as const;
-const CATEGORIES_VIDEO = ["all", "stadium", "crowd", "abstract", "lights"] as const;
+const CATEGORIES_VIDEO = ["all", "stadium", "crowd", "field", "abstract", "players", "lights"] as const;
 
 type SportLabel = Record<SportTag, string>;
 const SPORT_LABELS: SportLabel = { AFL: "AFL", NBA: "NBA", EPL: "EPL" };
@@ -397,10 +581,10 @@ const SPORT_LABELS: SportLabel = { AFL: "AFL", NBA: "NBA", EPL: "EPL" };
 
 export const IMAGE_CATEGORY_TARGETS: Record<string, number> = {
   stadium:  30,
-  crowd:    20,
-  abstract: 20,
-  field:    10,
-  players:  20,
+  crowd:    30,
+  abstract: 30,
+  field:    30,
+  players:  30,
 };
 
 // ─── Media Picker ──────────────────────────────────────────────────────────────

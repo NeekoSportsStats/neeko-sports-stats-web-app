@@ -69,12 +69,17 @@ const ANIM_SPEEDS: { id: AnimationSpeed; label: string }[] = [
   { id: "medium", label: "Medium" },
   { id: "fast",   label: "Fast"   },
 ];
-const BACKGROUNDS: { id: VideoBackground; label: string }[] = [
-  { id: "dark_gradient",  label: "Dark Gradient"   },
-  { id: "stadium_lights", label: "Stadium Lights"  },
-  { id: "grass_texture",  label: "Grass Texture"   },
-  { id: "analytics_grid", label: "Analytics Grid"  },
-  { id: "team_colour",    label: "Team Colour"     },
+const BACKGROUNDS: { id: VideoBackground; label: string; desc?: string }[] = [
+  { id: "dark_gradient",  label: "Dark Gradient"                             },
+  { id: "stadium_lights", label: "Stadium Lights"                            },
+  { id: "grass_texture",  label: "Grass Texture"                             },
+  { id: "analytics_grid", label: "Analytics Grid"                            },
+  { id: "team_colour",    label: "Team Colour"                               },
+  { id: "ai_stadium",     label: "AI Stadium",    desc: "AI video background" },
+  { id: "ai_crowd",       label: "AI Crowd",      desc: "AI video background" },
+  { id: "ai_field",       label: "AI Field",      desc: "AI video background" },
+  { id: "ai_abstract",    label: "AI Abstract",   desc: "AI video background" },
+  { id: "ai_players",     label: "AI Players",    desc: "AI video background" },
 ];
 const EXPORT_SIZES: { id: ExportSize; label: string; dims: string }[] = [
   { id: "tiktok_reels",   label: "TikTok / Reels", dims: "1080×1920" },
