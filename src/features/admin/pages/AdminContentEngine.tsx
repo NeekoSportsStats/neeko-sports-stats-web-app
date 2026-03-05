@@ -503,6 +503,11 @@ export default function AdminContentEngine() {
   const [downloading, setDownloading]                 = useState(false);
   const [carouselProgress, setCarouselProgress]       = useState<{ done: number; total: number } | null>(null);
 
+  // AI Analysis overlay
+  const [includeAIAnalysis, setIncludeAIAnalysis] = useState(false);
+  const [aiAnalysisText, setAIAnalysisText]       = useState("");
+  const [aiAnalysisLoading, setAIAnalysisLoading] = useState(false);
+
   // Content
   const [insight, setInsight]               = useState("");
   const [caption, setCaption]               = useState("");
@@ -601,6 +606,9 @@ export default function AdminContentEngine() {
     rankHighlight,
     layoutOffsets: layoutEditorOpen ? layoutOffsets : undefined,
     autoTeamAccent,
+    aiAnalysisText: includeAIAnalysis && aiAnalysisText
+      ? (aiAnalysisText.length > 180 ? aiAnalysisText.slice(0, 180) + "…" : aiAnalysisText)
+      : undefined,
   };
 
   const accentColor = resolveAccentColor(selectedAngle, graphicOptions, undefined, players[0]?.team);
@@ -702,6 +710,14 @@ export default function AdminContentEngine() {
     fetchPlayers(angle);
   };
 
+  // Fetch AI summary whenever top effective player changes
+  useEffect(() => {
+    const topPlayer = effectivePlayers[0]?.player_name;
+    if (topPlayer) fetchAISummary(topPlayer);
+    else setAIAnalysisText("");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectivePlayers[0]?.player_name]);
+
   const handleShuffleTemplate = () => {
     const all = LAYOUTS.map((l) => l.id);
     const next = all[(all.indexOf(effectiveLayout) + 1) % all.length];
@@ -713,6 +729,34 @@ export default function AdminContentEngine() {
     const next = STAT_ANGLES[(idx + 1) % STAT_ANGLES.length];
     handleAngleSelect(next);
   };
+
+  // ── AI Analysis helpers ────────────────────────────────────────────────────
+
+  const truncateText = (text: string, max: number) =>
+    text.length > max ? text.slice(0, max) + "…" : text;
+
+  const fetchAISummary = useCallback(async (playerName: string) => {
+    if (!playerName) return;
+    setAIAnalysisLoading(true);
+    try {
+      const { data, error } = await supabase
+        .schema("afl")
+        .from("ai_player_summaries")
+        .select("ai_summary")
+        .eq("player_name", playerName)
+        .maybeSingle();
+      if (error) throw error;
+      setAIAnalysisText(data?.ai_summary ?? "");
+    } catch {
+      setAIAnalysisText("");
+    } finally {
+      setAIAnalysisLoading(false);
+    }
+  }, []);
+
+  const effectiveAIText = includeAIAnalysis && aiAnalysisText
+    ? truncateText(aiAnalysisText, contentMode === "video" ? 350 : 180)
+    : undefined;
 
   // ── Content handlers ───────────────────────────────────────────────────────
 
@@ -1664,6 +1708,33 @@ export default function AdminContentEngine() {
                     />
                   </div>
 
+                  {/* Include AI Analysis toggle */}
+                  <div className="rounded-lg border border-border bg-muted/10 px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium">Include AI Analysis</p>
+                        {includeAIAnalysis && (
+                          <p className="text-[10px] text-muted-foreground/60 mt-0.5 truncate">
+                            {aiAnalysisLoading ? "Fetching…" : aiAnalysisText ? `${aiAnalysisText.slice(0, 60)}…` : "No summary found"}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setIncludeAIAnalysis((v) => !v)}
+                        className="shrink-0 w-10 h-6 rounded-full border-2 transition-all relative"
+                        style={includeAIAnalysis
+                          ? { background: accentColor, borderColor: accentColor }
+                          : { background: "transparent", borderColor: "hsl(var(--border))" }
+                        }
+                      >
+                        <span
+                          className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
+                          style={{ left: includeAIAnalysis ? "calc(100% - 1.1rem)" : "2px" }}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
                   <Button
                     className="w-full h-9 text-xs font-semibold"
                     onClick={handleDownloadGraphic}
@@ -1689,6 +1760,10 @@ export default function AdminContentEngine() {
                 selectedAngle={selectedAngle}
                 dataLoading={dataLoading}
                 onPreviewChange={setVideoPreviewState}
+                aiAnalysisText={effectiveAIText}
+                includeAIAnalysis={includeAIAnalysis}
+                onToggleAIAnalysis={setIncludeAIAnalysis}
+                aiAnalysisLoading={aiAnalysisLoading}
               />
             )}
 

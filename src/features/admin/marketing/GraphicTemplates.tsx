@@ -90,6 +90,7 @@ export interface GraphicOptions {
   layoutOffsets?: LayoutOffsets;
   autoTeamAccent?: boolean;
   venue?: string | null;
+  aiAnalysisText?: string;
 }
 
 // ─── Team colours (expanded) ───────────────────────────────────────────────────
@@ -333,6 +334,41 @@ function CtaOverlay({ text, position, accentColor, w, h }: { text: string; posit
     <div style={style}>
       <span style={{ color: accentColor, fontWeight: 700 }}>→ </span>
       {text}
+    </div>
+  );
+}
+
+// ─── AI Analysis text overlay ──────────────────────────────────────────────────
+
+function AIAnalysisOverlay({ text, accentColor, w }: { text: string; accentColor: string; w: number }) {
+  if (!text) return null;
+  const fontSize = Math.max(11, Math.round(w * 0.012));
+  return (
+    <div style={{
+      position: "absolute",
+      left: "50%",
+      bottom: 60,
+      transform: "translateX(-50%)",
+      maxWidth: "70%",
+      background: "rgba(0,0,0,0.72)",
+      backdropFilter: "blur(6px)",
+      borderRadius: 10,
+      border: `1px solid ${accentColor}33`,
+      padding: "8px 14px",
+      pointerEvents: "none",
+      zIndex: 11,
+    }}>
+      <p style={{
+        fontSize,
+        fontWeight: 500,
+        color: "rgba(255,255,255,0.9)",
+        lineHeight: 1.45,
+        margin: 0,
+        textAlign: "center",
+      }}>
+        <span style={{ color: accentColor, fontWeight: 700 }}>AI Insight: </span>
+        {text}
+      </p>
     </div>
   );
 }
@@ -594,6 +630,13 @@ function CanvasShell({
           accentColor={resolvedAccent}
           w={w}
           h={h}
+        />
+      )}
+      {options.aiAnalysisText && (
+        <AIAnalysisOverlay
+          text={options.aiAnalysisText}
+          accentColor={resolvedAccent}
+          w={w}
         />
       )}
       <div style={{

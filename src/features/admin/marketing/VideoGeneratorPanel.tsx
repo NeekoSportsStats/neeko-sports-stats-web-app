@@ -37,6 +37,10 @@ interface Props {
   selectedAngle: StatAngle;
   dataLoading: boolean;
   onPreviewChange?: (state: VideoPreviewState) => void;
+  aiAnalysisText?: string;
+  includeAIAnalysis?: boolean;
+  onToggleAIAnalysis?: (v: boolean) => void;
+  aiAnalysisLoading?: boolean;
 }
 
 // ─── Option definitions ──────────────────────────────────────────────────────
@@ -100,6 +104,7 @@ function buildSlideData(
   roundLabel?: string,
   statHighlight?: string,
   ctaText?: string,
+  aiAnalysisText?: string,
 ): VideoSlideData {
   const top = players[0];
   return {
@@ -114,6 +119,7 @@ function buildSlideData(
     roundLabel:    roundLabel?.trim() || undefined,
     statHighlight: statHighlight?.trim() || undefined,
     ctaText:       ctaText?.trim() || undefined,
+    aiAnalysisText: aiAnalysisText || undefined,
     secondaryStats: [
       { label: "Projection",  value: top ? fmt(top.projection_final, " pts") : "—" },
       { label: "Ceiling",     value: top ? fmt(top.ceiling_estimate, " pts") : "—" },
@@ -249,7 +255,7 @@ function NarrationWarningModal({ onConfirm, onCancel }: { onConfirm: () => void;
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function VideoGeneratorPanel({ players, selectedAngle, dataLoading, onPreviewChange }: Props) {
+export function VideoGeneratorPanel({ players, selectedAngle, dataLoading, onPreviewChange, aiAnalysisText, includeAIAnalysis = false, onToggleAIAnalysis, aiAnalysisLoading = false }: Props) {
   const { toast } = useToast();
 
   const [config, setConfig]             = useState<VideoConfig>({ ...DEFAULT_VIDEO_CONFIG });
@@ -308,7 +314,7 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading, onPre
     setSquareBlob(null);
 
     try {
-      const data = buildSlideData(players, selectedAngle, roundLabel, statHighlight, ctaText);
+      const data = buildSlideData(players, selectedAngle, roundLabel, statHighlight, ctaText, includeAIAnalysis ? aiAnalysisText : undefined);
 
       const reelsConfig: VideoConfig = { ...config, exportSize: "tiktok_reels", aiVideoUrl: selectedAIVideoUrl ?? undefined };
       const blob = await generateVideo(data, setProgress, reelsConfig);
@@ -653,6 +659,27 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading, onPre
           </div>
         )}
       </div>
+
+      {/* Include AI Analysis toggle */}
+      {onToggleAIAnalysis && (
+        <div className="rounded-lg border border-border bg-muted/10 px-3 py-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-medium">Include AI Analysis</p>
+              {includeAIAnalysis && (
+                <p className="text-[10px] text-muted-foreground/60 mt-0.5 truncate">
+                  {aiAnalysisLoading ? "Fetching…" : aiAnalysisText ? `${aiAnalysisText.slice(0, 60)}…` : "No summary found"}
+                </p>
+              )}
+            </div>
+            <Toggle
+              checked={includeAIAnalysis}
+              onChange={onToggleAIAnalysis}
+              accentColor={accentColor}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Generate Button */}
       <Button

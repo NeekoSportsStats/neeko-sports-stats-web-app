@@ -12,6 +12,7 @@ export interface VideoSlideData {
   roundLabel?: string;
   statHighlight?: string;
   ctaText?: string;
+  aiAnalysisText?: string;
 }
 
 export type VideoTemplate =
@@ -398,6 +399,63 @@ function drawStatHighlight(ctx: CanvasRenderingContext2D, label: string, accentC
   void accentColor;
 }
 
+function drawAIAnalysisCaption(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  accentColor: string,
+  alpha: number,
+  vw: number,
+  vh: number,
+) {
+  if (!text || alpha <= 0) return;
+  const maxWidth = vw * 0.72;
+  const padding = 28;
+  const fontSize = Math.max(22, Math.round(vw * 0.022));
+  const lineHeight = fontSize * 1.45;
+
+  ctx.font = `500 ${fontSize}px Inter, Arial, sans-serif`;
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const test = current ? `${current} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth - padding * 2 && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = test;
+    }
+  }
+  if (current) lines.push(current);
+
+  const boxH = lines.length * lineHeight + padding * 2 + 30;
+  const boxY = vh - 160 - boxH;
+  const boxX = (vw - maxWidth) / 2;
+
+  ctx.globalAlpha = alpha * 0.92;
+  ctx.fillStyle = "rgba(0,0,0,0.72)";
+  ctx.beginPath();
+  ctx.roundRect(boxX, boxY, maxWidth, boxH, 16);
+  ctx.fill();
+  ctx.strokeStyle = accentColor + "44";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.fillStyle = accentColor;
+  ctx.font = `700 ${Math.round(fontSize * 0.85)}px Inter, Arial, sans-serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("AI Insight", boxX + padding, boxY + padding + fontSize * 0.85);
+
+  ctx.fillStyle = "rgba(255,255,255,0.88)";
+  ctx.font = `500 ${fontSize}px Inter, Arial, sans-serif`;
+  lines.forEach((line, i) => {
+    ctx.fillText(line, boxX + padding, boxY + padding + fontSize * 0.85 + 8 + (i + 1) * lineHeight);
+  });
+
+  ctx.globalAlpha = 1;
+}
+
 interface SlideCtx {
   ctx: CanvasRenderingContext2D;
   data: VideoSlideData;
@@ -519,6 +577,11 @@ function slideBigStat({ ctx, data, config, progress, vw, vh, aiVideoEl }: SlideC
   ctx.textBaseline = "alphabetic";
   ctx.fillText(data.playerName, cx, cy + 200);
 
+  if (data.aiAnalysisText) {
+    const aiAlpha = easeOutCubic(Math.max(0, Math.min((progress - 0.6) * 3 * sm, 1)));
+    drawAIAnalysisCaption(ctx, data.aiAnalysisText, data.accentColor, fadeIn * aiAlpha, vw, vh);
+  }
+
   ctx.globalAlpha = 1;
 }
 
@@ -602,6 +665,11 @@ function slidePlayerSpotlight({ ctx, data, config, progress, vw, vh, aiVideoEl }
     ctx.fillStyle = "rgba(255,255,255,0.38)";
     ctx.font = "500 26px Inter, Arial, sans-serif";
     ctx.fillText(stat.label.toUpperCase(), xPos + cardW / 2, cardTop + slideY + 118);
+  }
+
+  if (data.aiAnalysisText) {
+    const aiAlpha = easeOutCubic(Math.max(0, Math.min((progress - 0.5) * 2 * sm, 1)));
+    drawAIAnalysisCaption(ctx, data.aiAnalysisText, data.accentColor, fadeIn * aiAlpha, vw, vh);
   }
 
   ctx.globalAlpha = 1;
