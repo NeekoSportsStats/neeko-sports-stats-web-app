@@ -558,24 +558,20 @@ export default function AdminContentEngine() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Persist scroll position ─────────────────────────────────────────────
+  // ── Persist window scroll position ─────────────────────────────────────
   useEffect(() => {
-    let el: HTMLDivElement | null = null;
+    const saved = sessionStorage.getItem("adminContentEngineScroll");
+    if (saved) {
+      window.scrollTo({ top: Number(saved), behavior: "instant" });
+    }
+  }, []);
+
+  useEffect(() => {
     const handleScroll = () => {
-      if (!el) return;
-      setContentEngine((p) => ({ ...p, scrollY: el!.scrollTop }));
+      sessionStorage.setItem("adminContentEngineScroll", window.scrollY.toString());
     };
-    const attach = () => {
-      el = scrollRef.current;
-      if (el) {
-        el.addEventListener("scroll", handleScroll, { passive: true });
-      } else {
-        requestAnimationFrame(attach);
-      }
-    };
-    requestAnimationFrame(attach);
-    return () => { el?.removeEventListener("scroll", handleScroll); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    window.addEventListener("scroll", handleScroll);
+    return () => { window.removeEventListener("scroll", handleScroll); };
   }, []);
 
   // ── Derived ────────────────────────────────────────────────────────────────

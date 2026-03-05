@@ -742,6 +742,22 @@ export default function AdminMediaLibrary() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, category]);
 
+  // ── Persist window scroll position ─────────────────────────────────────
+  useEffect(() => {
+    const saved = sessionStorage.getItem("adminMediaLibraryScroll");
+    if (saved) {
+      window.scrollTo({ top: Number(saved), behavior: "instant" });
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      sessionStorage.setItem("adminMediaLibraryScroll", window.scrollY.toString());
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => { window.removeEventListener("scroll", handleScroll); };
+  }, []);
+
   // ── Load media ──────────────────────────────────────────────────────────────
 
   const fetchAll = useCallback(async (force = false) => {
