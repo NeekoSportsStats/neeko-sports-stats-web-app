@@ -222,6 +222,39 @@ interface AnalyticsDailyRow {
   subscriptions_started: number;
 }
 
+interface SignupMetrics {
+  signups_7d: number;
+  signups_24h: number;
+  signups_30d: number;
+  total_signups: number;
+}
+
+interface SignupDailyRow {
+  day: string;
+  signups: number;
+}
+
+interface UTMSourceRow {
+  source: string;
+  visitors: number;
+  signups: number;
+}
+
+interface TopPlayerRow {
+  player_name: string;
+  views: number;
+  unique_viewers: number;
+}
+
+interface RevenueEstimate {
+  active_subs: number;
+  trial_subs: number;
+  mrr_if_all_yearly: number;
+  mrr_if_all_monthly: number;
+  arr_if_all_yearly: number;
+  arr_if_all_monthly: number;
+}
+
 interface ModelPerformance {
   projection_mae: number | null;
   projection_within_10: number | null;
@@ -377,6 +410,13 @@ export default function Admin() {
   const [dailyVisitors, setDailyVisitors] = useState<DailyVisitorRow[]>([]);
   const [analyticsDaily, setAnalyticsDaily] = useState<AnalyticsDailyRow[]>([]);
   const [v2MetricsLoading, setV2MetricsLoading] = useState(true);
+
+  const [signupMetrics, setSignupMetrics] = useState<SignupMetrics | null>(null);
+  const [signupDaily, setSignupDaily] = useState<SignupDailyRow[]>([]);
+  const [utmSources, setUtmSources] = useState<UTMSourceRow[]>([]);
+  const [topPlayers, setTopPlayers] = useState<TopPlayerRow[]>([]);
+  const [revenueEstimate, setRevenueEstimate] = useState<RevenueEstimate | null>(null);
+  const [growthLoading, setGrowthLoading] = useState(true);
 
   const [modelPerformance, setModelPerformance] = useState<ModelPerformance | null>(null);
   const [calibration, setCalibration] = useState<CalibrationRow[]>([]);
@@ -542,6 +582,28 @@ export default function Admin() {
     }
   }, []);
 
+  const fetchGrowthMetrics = useCallback(async () => {
+    setGrowthLoading(true);
+    try {
+      const [signupRes, signupDailyRes, utmRes, playersRes, revenueRes] = await Promise.all([
+        supabase.schema("admin" as never).from("v_signups_7d").select("*").maybeSingle(),
+        supabase.schema("admin" as never).from("v_signups_daily").select("*").limit(30),
+        supabase.schema("admin" as never).from("v_utm_traffic_sources_7d").select("*").limit(20),
+        supabase.schema("admin" as never).from("v_top_viewed_players_7d").select("*").limit(20),
+        supabase.schema("admin" as never).from("v_revenue_estimate").select("*").maybeSingle(),
+      ]);
+      if (signupRes.data) setSignupMetrics(signupRes.data as SignupMetrics);
+      if (signupDailyRes.data) setSignupDaily(signupDailyRes.data as SignupDailyRow[]);
+      if (utmRes.data) setUtmSources(utmRes.data as UTMSourceRow[]);
+      if (playersRes.data) setTopPlayers(playersRes.data as TopPlayerRow[]);
+      if (revenueRes.data) setRevenueEstimate(revenueRes.data as RevenueEstimate);
+    } catch (err) {
+      console.error("Growth metrics fetch error:", err);
+    } finally {
+      setGrowthLoading(false);
+    }
+  }, []);
+
   const fetchAll = useCallback(async () => {
     setDataLoading(true);
     try {
@@ -577,8 +639,8 @@ export default function Admin() {
     } finally {
       setDataLoading(false);
     }
-    await Promise.all([fetchAlerts(), fetchJobHistory(), fetchAnalytics(), fetchProductMetrics(), fetchV2Metrics(), fetchModelMetrics()]);
-  }, [toast, fetchAlerts, fetchJobHistory, fetchAnalytics, fetchProductMetrics, fetchV2Metrics, fetchModelMetrics]);
+    await Promise.all([fetchAlerts(), fetchJobHistory(), fetchAnalytics(), fetchProductMetrics(), fetchV2Metrics(), fetchModelMetrics(), fetchGrowthMetrics()]);
+  }, [toast, fetchAlerts, fetchJobHistory, fetchAnalytics, fetchProductMetrics, fetchV2Metrics, fetchModelMetrics, fetchGrowthMetrics]);
 
   const handleResolveAlert = async (id: string) => {
     setResolvingId(id);
@@ -634,8 +696,9 @@ export default function Admin() {
       fetchProductMetrics();
       fetchV2Metrics();
       fetchModelMetrics();
+      fetchGrowthMetrics();
     }
-  }, [loading, user, fetchAlerts, fetchJobHistory, fetchAnalytics, fetchProductMetrics, fetchV2Metrics, fetchModelMetrics]);
+  }, [loading, user, fetchAlerts, fetchJobHistory, fetchAnalytics, fetchProductMetrics, fetchV2Metrics, fetchModelMetrics, fetchGrowthMetrics]);
 
   useEffect(() => {
     if (!loading && user?.id === ADMIN_USER_ID) {
@@ -643,12 +706,13 @@ export default function Admin() {
         fetchAnalytics();
         fetchProductMetrics();
         fetchV2Metrics();
+        fetchGrowthMetrics();
       }, 30_000);
     }
     return () => {
       if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
     };
-  }, [loading, user, fetchAnalytics, fetchProductMetrics, fetchV2Metrics]);
+  }, [loading, user, fetchAnalytics, fetchProductMetrics, fetchV2Metrics, fetchGrowthMetrics]);
 
   const PIPELINE_STAGES: Record<string, string[]> = {
     weekly_pipeline: [
@@ -1359,6 +1423,195 @@ export default function Admin() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── Growth & Acquisition ─────────────────────────────────────────── */}
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 mt-6">
+        Growth &amp; Acquisition
+      </h2>
+
+      {/* Summary metric cards */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-4">
+        <SectionCard icon={Users} title="New Signups" loading={growthLoading}>
+          <StatRow label="Last 24 hours" value={signupMetrics?.signups_24h?.toLocaleString() ?? "—"} highlight={(signupMetrics?.signups_24h ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Last 7 days" value={signupMetrics?.signups_7d?.toLocaleString() ?? "—"} highlight={(signupMetrics?.signups_7d ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Last 30 days" value={signupMetrics?.signups_30d?.toLocaleString() ?? "—"} highlight="neutral" />
+          <StatRow label="All time" value={signupMetrics?.total_signups?.toLocaleString() ?? "—"} highlight="neutral" />
+        </SectionCard>
+
+        <SectionCard icon={Star} title="Revenue Estimate" loading={growthLoading}>
+          <div className="space-y-3 pt-1">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Monthly Recurring Revenue</p>
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs text-muted-foreground">If all yearly</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  ${revenueEstimate?.mrr_if_all_yearly?.toLocaleString("en-AU", { minimumFractionDigits: 0 }) ?? "—"}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs text-muted-foreground">If all monthly</span>
+                <span className="font-semibold tabular-nums">
+                  ${revenueEstimate?.mrr_if_all_monthly?.toLocaleString("en-AU", { minimumFractionDigits: 0 }) ?? "—"}
+                </span>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Annual Recurring Revenue</p>
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs text-muted-foreground">If all yearly</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  ${revenueEstimate?.arr_if_all_yearly?.toLocaleString("en-AU", { minimumFractionDigits: 0 }) ?? "—"}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs text-muted-foreground">If all monthly</span>
+                <span className="font-semibold tabular-nums">
+                  ${revenueEstimate?.arr_if_all_monthly?.toLocaleString("en-AU", { minimumFractionDigits: 0 }) ?? "—"}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Based on {revenueEstimate?.active_subs ?? 0} active + {revenueEstimate?.trial_subs ?? 0} trial subs. AUD pricing.
+            </p>
+          </div>
+        </SectionCard>
+
+        <SectionCard icon={ArrowUpRight} title="Signup Conversion (7d)" loading={growthLoading || v2MetricsLoading}>
+          {(() => {
+            const visitors = uniqueVisitors24h?.unique_visitors ?? 0;
+            const signups7d = signupMetrics?.signups_7d ?? 0;
+            const subs = subMetrics?.active_subscriptions ?? 0;
+            return (
+              <div className="space-y-3 pt-1">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-muted-foreground">Visitors (24h)</span>
+                    <span className="font-semibold tabular-nums">{visitors.toLocaleString()}</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-1.5">
+                    <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: "100%" }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-muted-foreground">Signups (7d)</span>
+                    <span className="font-semibold tabular-nums">{signups7d.toLocaleString()}</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-1.5">
+                    <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: visitors > 0 ? `${Math.min(100, (signups7d / Math.max(visitors * 7, 1)) * 100)}%` : "0%" }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-muted-foreground">Subscribers</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{subs.toLocaleString()}</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-1.5">
+                    <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: signups7d > 0 ? `${Math.min(100, (subs / signups7d) * 100)}%` : "0%" }} />
+                  </div>
+                </div>
+                {signups7d > 0 && subs > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Sub rate: {((subs / signups7d) * 100).toFixed(1)}% of signups
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+        </SectionCard>
+
+        <SectionCard icon={CalendarDays} title="Signups — Daily (30d)" loading={growthLoading}>
+          {signupDaily.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">No signup data yet</p>
+          ) : (
+            <div className="space-y-0">
+              {signupDaily.slice(0, 7).map((row) => (
+                <div key={row.day} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0">
+                  <span className="text-xs font-mono text-muted-foreground">
+                    {new Date(row.day).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-16 bg-muted rounded-full h-1.5">
+                      <div
+                        className="bg-blue-500 h-1.5 rounded-full"
+                        style={{
+                          width: signupDaily.length > 0
+                            ? `${Math.min(100, (row.signups / Math.max(...signupDaily.map(r => r.signups), 1)) * 100)}%`
+                            : "0%",
+                        }}
+                      />
+                    </div>
+                    <Badge variant="secondary" className="text-xs tabular-nums shrink-0">
+                      {row.signups}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      </div>
+
+      {/* Traffic Sources + Top Viewed Players */}
+      <div className="grid gap-4 sm:grid-cols-2 mb-4">
+        <SectionCard icon={BarChart3} title="Traffic Sources — UTM (7d)" loading={growthLoading}>
+          {utmSources.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">No UTM data yet. Add utm_source params to links.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/40">
+                    <th className="text-left py-1.5 pr-4 text-xs font-medium text-muted-foreground">Source</th>
+                    <th className="text-right py-1.5 pr-4 text-xs font-medium text-muted-foreground">Visitors</th>
+                    <th className="text-right py-1.5 text-xs font-medium text-muted-foreground">Signups</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {utmSources.map((row) => (
+                    <tr key={row.source} className="border-b border-border/30 last:border-0 hover:bg-muted/30">
+                      <td className="py-1.5 pr-4">
+                        <span className="text-xs font-mono capitalize">{row.source}</span>
+                      </td>
+                      <td className="py-1.5 pr-4 text-right tabular-nums text-sm">{row.visitors.toLocaleString()}</td>
+                      <td className="py-1.5 text-right tabular-nums">
+                        <span className={`text-sm font-medium ${row.signups > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                          {row.signups.toLocaleString()}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard icon={TrendingUp} title="Top Viewed Players (7d)" loading={growthLoading}>
+          {topPlayers.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              No player view data yet. Requires player_page_view events with player_name property.
+            </p>
+          ) : (
+            <div className="space-y-0">
+              {topPlayers.slice(0, 10).map((row, i) => (
+                <div key={row.player_name} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs text-muted-foreground w-4 shrink-0">{i + 1}</span>
+                    <span className="text-sm truncate">{row.player_name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <span className="text-xs text-muted-foreground tabular-nums">{row.unique_viewers} uniq</span>
+                    <Badge variant="secondary" className="text-xs tabular-nums">
+                      {row.views.toLocaleString()}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      </div>
 
       {/* ── Model Performance ────────────────────────────────────────────── */}
       <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 mt-6">
