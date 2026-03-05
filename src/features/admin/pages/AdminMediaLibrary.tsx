@@ -130,6 +130,30 @@ async function generateSingle(
   }
 }
 
+async function generateMultiple(
+  category: ImageCategory,
+  count: number,
+  accessToken: string,
+  onProgress?: (done: number) => void,
+): Promise<{ succeeded: number; failed: number; lastError?: string }> {
+  let succeeded = 0;
+  let failed    = 0;
+  let lastError: string | undefined;
+
+  for (let i = 0; i < count; i++) {
+    const result = await generateSingle(category, accessToken);
+    if (result.success) {
+      succeeded++;
+    } else {
+      failed++;
+      lastError = result.error;
+    }
+    onProgress?.(succeeded + failed);
+    if (i < count - 1) await new Promise((r) => setTimeout(r, 2000));
+  }
+  return { succeeded, failed, lastError };
+}
+
 // ─── Category label display ───────────────────────────────────────────────────
 
 const CAT_LABELS: Record<string, string> = {
@@ -155,12 +179,16 @@ interface GenPanelProps {
   mediaItems:  MediaItem[];
 }
 
+type MultiRunKey = `${ImageCategory}-5`;
+type RunningKey  = ImageCategory | "video" | MultiRunKey;
+
 function GenPanel({ onRefresh, mediaItems }: GenPanelProps) {
   const [locked,        setLocked]        = useState(false);
   const [batchStatus,   setBatchStatus]   = useState<BatchStatus>("idle");
   const [batchItems,    setBatchItems]    = useState<BatchItem[]>([]);
-  const [singleRunning, setSingleRunning] = useState<ImageCategory | "video" | null>(null);
-  const [singleErrors,  setSingleErrors]  = useState<Partial<Record<ImageCategory | "video", string>>>({});
+  const [singleRunning, setSingleRunning] = useState<RunningKey | null>(null);
+  const [singleErrors,  setSingleErrors]  = useState<Partial<Record<RunningKey, string>>>({});
+  const [multiProgress, setMultiProgress] = useState<Partial<Record<ImageCategory, number>>>({});
 
   const countForCat = (cat: ImageCategory) =>
     mediaItems.filter((i) => i.media_type === "image" && i.category === cat).length;
@@ -176,7 +204,7 @@ function GenPanel({ onRefresh, mediaItems }: GenPanelProps) {
     if (locked) return;
     setLocked(true);
     setSingleRunning(cat);
-    setSingleErrors((prev) => { const n = { ...prev }; delete n[cat]; return n; });
+    setSingleErrors((prev) => { const n = { ...prev }; delete n[cat as RunningKey]; return n; });
 
     try {
       const token  = await getToken();
@@ -192,6 +220,37 @@ function GenPanel({ onRefresh, mediaItems }: GenPanelProps) {
     } finally {
       setLocked(false);
       setSingleRunning(null);
+    }
+  };
+
+  const handleMulti = async (cat: ImageCategory, count: number) => {
+    if (locked) return;
+    const key: MultiRunKey = `${cat}-5`;
+    setLocked(true);
+    setSingleRunning(key);
+    setMultiProgress((prev) => ({ ...prev, [cat]: 0 }));
+    setSingleErrors((prev) => { const n = { ...prev }; delete n[key]; return n; });
+
+    try {
+      const token  = await getToken();
+      const result = await generateMultiple(cat, count, token, (done) => {
+        setMultiProgress((prev) => ({ ...prev, [cat]: done }));
+      });
+      if (result.failed > 0 && result.succeeded === 0) {
+        setSingleErrors((prev) => ({ ...prev, [key]: result.lastError ?? "All failed" }));
+      } else {
+        clearMediaCaches();
+        onRefresh();
+        if (result.failed > 0) {
+          setSingleErrors((prev) => ({ ...prev, [key]: `${result.succeeded} ok, ${result.failed} failed` }));
+        }
+      }
+    } catch (err) {
+      setSingleErrors((prev) => ({ ...prev, [key]: err instanceof Error ? err.message : "Failed" }));
+    } finally {
+      setLocked(false);
+      setSingleRunning(null);
+      setMultiProgress((prev) => { const n = { ...prev }; delete n[cat]; return n; });
     }
   };
 
@@ -312,31 +371,47 @@ function GenPanel({ onRefresh, mediaItems }: GenPanelProps) {
           </div>
         )}
 
-        {/* Per-category Generate 1 buttons */}
+        {/* Per-category Generate 1 / Generate 5 buttons */}
         <div className="grid grid-cols-2 gap-2">
           {IMAGE_SUBCATEGORIES.map((cat) => {
-            const isRunning = singleRunning === cat;
-            const err = singleErrors[cat];
+            const isRunning1 = singleRunning === cat;
+            const isRunning5 = singleRunning === `${cat}-5`;
+            const prog5      = multiProgress[cat];
+            const err1       = singleErrors[cat as RunningKey];
+            const err5       = singleErrors[`${cat}-5` as RunningKey];
             return (
               <div key={cat} className="rounded-xl border border-zinc-800 bg-zinc-900/60 overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800/60">
                   <span className="text-[11px] font-semibold text-zinc-200 uppercase tracking-wide">{CAT_LABELS[cat]}</span>
                   <span className="text-[10px] text-zinc-600 tabular-nums">{countForCat(cat)}</span>
                 </div>
-                <div className="p-2">
-                  <button
-                    onClick={() => handleSingle(cat)}
-                    disabled={locked}
-                    className="w-full py-1.5 rounded-lg text-[11px] font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                    style={isRunning
-                      ? { background: `${ACCENT}20`, color: ACCENT }
-                      : { background: "hsl(var(--muted)/0.3)", color: "hsl(var(--foreground))" }}
-                  >
-                    {isRunning
-                      ? <><Loader2 className="h-3 w-3 animate-spin" /> Generating…</>
-                      : "Generate 1"}
-                  </button>
-                  {err && <p className="text-[10px] text-red-400 mt-1 px-1 truncate">{err}</p>}
+                <div className="p-2 space-y-1.5">
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => handleSingle(cat)}
+                      disabled={locked}
+                      className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                      style={isRunning1
+                        ? { background: `${ACCENT}20`, color: ACCENT }
+                        : { background: "hsl(var(--muted)/0.3)", color: "hsl(var(--foreground))" }}
+                    >
+                      {isRunning1 ? <><Loader2 className="h-3 w-3 animate-spin" /> …</> : "Gen 1"}
+                    </button>
+                    <button
+                      onClick={() => handleMulti(cat, 5)}
+                      disabled={locked}
+                      className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                      style={isRunning5
+                        ? { background: `${ACCENT}30`, color: ACCENT, border: `1px solid ${ACCENT}60` }
+                        : { background: `${ACCENT}12`, color: ACCENT, border: `1px solid ${ACCENT}30` }}
+                    >
+                      {isRunning5
+                        ? <><Loader2 className="h-3 w-3 animate-spin" /> {prog5 ?? 0}/5</>
+                        : "Gen 5"}
+                    </button>
+                  </div>
+                  {err1 && <p className="text-[10px] text-red-400 px-1 truncate">{err1}</p>}
+                  {err5 && <p className="text-[10px] text-amber-400 px-1 truncate">{err5}</p>}
                 </div>
               </div>
             );

@@ -16,56 +16,51 @@ type Category = typeof VALID_CATEGORIES[number];
 // ─── Variation pools ───────────────────────────────────────────────────────────
 
 const AFL_STADIUM_GLOBAL_BASE = [
-  "Ultra photorealistic Australian Rules Football stadium, NO players on field",
-  "OVAL shaped field — absolutely NOT rectangular, correct AFL oval boundary line curvature",
-  "AFL centre square AND centre circle markings clearly visible on the turf",
-  "At BOTH ends of the oval: FOUR separate upright posts — two tall central goal posts and two shorter outer behind posts",
-  "Posts are white cylindrical uprights, evenly spaced, NO crossbar, NO net of any kind",
-  "At least ONE complete goal end with all four posts fully visible and unobstructed in the frame",
-  "Massive Australian football stadium packed with spectators — MCG or Optus Stadium scale architecture",
-  "Broadcast quality sports photography, ultra-detailed turf, realistic lighting and shadows",
-  "photorealistic, ultra detailed, 8K sports photography, cinematic sports broadcast lighting, realistic grass texture, high detail crowd",
+  "Photorealistic Australian Rules Football stadium environment",
+  "Large oval grass field with clearly visible centre circle and centre square markings",
+  "Camera positioned in the middle third of the oval — focused only on midfield",
+  "The ends of the oval must be outside the frame — only the centre circle, centre square, wing area, or boundary line near midfield is visible",
+  "Massive modern oval stadium with multi-tier grandstands and spectators",
+  "Realistic stadium architecture similar to major AFL venues",
+  "Detailed turf patterns and professional sports broadcast lighting",
+  "NO goal posts anywhere in the image. NO scoring ends of the field",
+  "photorealistic, ultra detailed, 8K sports photography, broadcast camera quality, cinematic stadium lighting, realistic grass texture, high detail crowd",
 ].join(". ");
 
 const AFL_NEGATIVE = [
-  "NO rugby goalposts", "NO soccer goals", "NO soccer nets", "NO crossbar",
-  "NO American football markings", "NO yard lines", "NO rectangular pitch",
-  "NO incorrect post layouts", "NO goal nets", "NO rugby H-posts",
-  "no NFL field", "no text", "no watermarks", "no logos", "no players",
+  "goal posts", "AFL posts", "behind posts", "upright posts", "goalposts", "posts",
+  "rugby posts", "crossbar", "soccer goal", "goal net", "net",
+  "NFL", "yard lines", "hash marks", "rectangular pitch", "rectangular field",
+  "cricket pitch", "wickets", "scoring end", "goal end",
+  "cartoon", "illustration", "CGI", "3D render", "video game screenshot",
+  "blurry", "fisheye", "text", "watermark", "logo",
 ].join(", ");
 
 const AFL_STADIUM_SCENES = [
-  "Wide broadcast camera positioned high in the grandstand looking diagonally across the full oval. Evening match under bright stadium floodlights. BOTH sets of four AFL posts visible at each end of the oval. Large packed crowd. Centre circle and centre square clearly marked.",
-  "Camera positioned just behind the goal line at ground level looking straight down the length of the oval. All four AFL posts fill the foreground — two tall central posts flanked by two shorter behind posts. No crossbar. No net. Bright sunny afternoon. Ultra detailed turf.",
-  "Wide aerial view from centre of the oval looking toward one goal end. The four white AFL posts stand tall against the packed grandstand backdrop. Golden sunset lighting. Centre circle visible underfoot.",
-  "Heavy rain falling during a night match. Floodlights reflecting across wet grass. Both sets of four AFL posts visible through the rain at each end of the oval. No players. Dramatic atmosphere.",
-  "Completely packed stadium, grand final atmosphere. Camera from centre wing broadcast position. Both goal ends visible — four upright posts at each end. Confetti and banners in crowd. Oval field, centre square markings.",
-  "High aerial drone shot above a massive oval AFL stadium. Entire oval field clearly visible with centre square and centre circle markings. Four posts at each goal end clearly identifiable. Packed crowd in stands.",
-  "Camera from behind one set of goal posts looking toward the far end of the oval. The four posts frame the foreground — tall central posts and shorter outer posts. Far goal end also visible in the distance. Low golden sunset.",
-  "Dark storm clouds building above the stadium. Floodlights illuminating the oval. Four AFL posts at the near end clearly visible. Oval boundary lines curving into the distance. Dramatic sky contrast.",
-  "Camera slightly elevated at the centre circle looking toward both ends of the oval simultaneously. Both sets of four AFL posts visible — four posts at each end. Packed crowd wrapping the entire stadium bowl.",
-  "Camera inside the grandstand seating looking down toward the field over the railing. Oval field below, centre square visible, goal posts at both ends. Fans in foreground watching the empty ground.",
-  "Camera positioned near the goal square looking upward toward the four white AFL posts. No crossbar. No net. Night match under intense floodlights. Four posts — two tall, two shorter — standing against the lit sky.",
-  "Night match with atmospheric fog illuminated by bright stadium lights. Four AFL posts glowing through the mist at the near goal end. Oval turf, centre markings faintly visible through fog.",
-  "Camera from the highest grandstand tier looking down across the entire oval. Complete oval shape visible. Centre circle, centre square, goal squares at both ends. Four posts standing at each goal end.",
-  "Wide shot from the boundary line along the outer edge of the oval. The curvature of the boundary line is visible. Goal posts standing at the near end — four upright posts, two tall two short. Packed stands beyond.",
-  "Morning sunlight casting long shadows from the goal posts across the dewy oval. Camera from wing position. Four AFL posts catching the light. Quiet pre-match atmosphere. Crowd beginning to fill the stands.",
-  "Flags and banners blowing strongly in the wind around the stadium rim. Both goal ends visible with four upright AFL posts each. Dramatic moving cloud sky above the oval.",
-  "Grand final packed stadium. Camera high above the centre of the oval looking across. Oval shape clearly defined by boundary lines. Centre circle visible. Four AFL posts at each end standing tall against the crowd.",
-  "Empty oval during afternoon. Camera from ground level near the centre circle. Highly detailed turf. Four AFL posts visible at the near end. Stadium seating surrounding the oval.",
-  "Camera under the stadium roof structure, looking out over the oval from the covered grandstand. Roof framing the top of the image. Oval field and four AFL posts visible below.",
-  "Night match with fireworks exploding above the stadium. Floodlit oval below. Four AFL posts at one end illuminated by both floodlights and fireworks glow.",
+  "Camera from the grandstand looking across the centre circle. Centre circle and centre square clearly visible in the turf below. Massive oval stadium bowl with packed crowd surrounding the entire oval. Camera frame shows only midfield — both goal ends completely outside frame.",
+  "Camera low near the boundary line looking diagonally across midfield toward the grandstand on the opposite side. The curvature of the oval boundary line clearly visible. Crowd filling the stands. Only the centre third of the oval in frame — both goal ends outside frame.",
+  "Camera positioned beside the centre circle showing turf detail and the AFL markings on the grass. Stadium seating visible in all directions. Camera looking inward toward the circle, not toward either goal end. Midfield only visible.",
+  "Warm sunset lighting raking across the centre square of the oval. Long dramatic shadows from the grandstand across the grass. Camera from the wing looking across midfield. Golden orange and amber tones. Both goal ends outside frame.",
+  "Night match. Bright stadium floodlights illuminating the centre circle with crisp intense light. Camera from grandstand looking across midfield. The oval turf glowing vivid green under the floodlights. Packed crowd visible. No goal ends in frame.",
+  "Wet and reflective oval turf under stadium lights during a rainy match. Light rain visible as streaks through floodlight beams. Camera looking across the centre square from the wing. Puddles reflecting stadium lights on the grass. No goal ends in frame.",
+  "Empty AFL stadium with perfectly manicured green oval turf. Camera positioned near the centre square during a quiet afternoon training session. No players, no crowd — just the immaculate field and empty grandstands. No goal ends in frame.",
+  "Drone camera directly above the centre circle looking straight down. The oval shape of the field clearly visible with centre circle and centre square markings prominent. Crowd surrounding the entire oval. Camera looking straight down only — no goal ends visible.",
+  "Camera positioned under the stadium roof looking out over the midfield area of the oval. The curved roof structure frames the top of the image. Centre square and crowd visible below. No goal ends in frame.",
+  "Fans in the foreground along the boundary fence watching the match. The midfield area of the oval visible beyond the fans. Camera from just behind the boundary line looking across to the opposite grandstand. Centre of the oval only — no goal ends visible.",
+  "Soft morning fog drifting low across the oval turf. Centre circle faintly visible through the mist. Quiet atmospheric empty stadium. Diffused soft light. Camera looking across midfield, not toward either end. No goal ends visible.",
+  "Soft grey overcast lighting across the midfield area of the AFL oval. Flat even illumination. Camera from a grandstand broadcast position looking across the centre square. No goal ends in frame.",
+  "Massive multi-tier AFL stadium bowl similar to the MCG. Camera from a high broadcast position showing the enormous grandstands surrounding the oval. The midfield area visible below. Only midfield captured — no goal ends in frame.",
+  "Night match in a packed AFL stadium. Floodlights blazing. Camera from the wing grandstand looking across the glowing centre circle. Crowd on their feet. Only the middle third of the oval in frame — no goal ends visible.",
+  "Strong afternoon sunlight casting a long dramatic grandstand shadow across the centre square. Half the field in deep shadow, other half brightly lit. Camera from the wing looking across midfield. No goal ends visible.",
 ];
 
 const CAMERA_ANGLES = [
-  "aerial broadcast stadium view",
-  "sideline camera perspective",
-  "behind goal posts view",
-  "centre wing broadcast angle",
-  "tunnel entrance perspective",
-  "scoreboard end view",
-  "wide cinematic stadium shot",
-  "crowd perspective from stands",
+  "grandstand broadcast camera angle looking across midfield",
+  "boundary line perspective focused on centre square",
+  "wing position looking across the oval midfield",
+  "aerial view above the centre circle",
+  "under-roof view looking out toward midfield",
+  "crowd perspective from the boundary fence toward midfield",
 ];
 
 const TIME_OF_DAY = [
@@ -107,128 +102,6 @@ const VIDEO_CLIPS = [
   "sideline camera sweeping across the football field",
 ];
 
-// ─── Stadium prompt v2 — geometry-locked (goal posts required) ───────────────
-
-const afl_stadium_base_v2 = [
-  "AUSTRALIAN RULES FOOTBALL OVAL — NOT RECTANGULAR",
-  "Centre square AND centre circle clearly visible on the turf",
-  "At BOTH ends show FOUR separate upright posts: two tall central goal posts + two shorter outer behind posts",
-  "WHITE cylindrical posts, evenly spaced, no crossbar, no net",
-  "Wide stadium view where at least ONE full goal end (all 4 posts) is clearly visible and unobstructed; preferably both ends visible",
-  "Real AFL stadium architecture (MCG/Optus-style), packed crowd, broadcast sports photography, ultra-detailed turf, correct AFL boundary curvature",
-  "NO rugby posts, NO soccer goals, NO American football yard lines, NO rectangular pitch, NO crossbars",
-  "photorealistic, ultra detailed, 8K broadcast sports photography, cinematic stadium lighting, realistic grass texture, high-fidelity crowd detail",
-].join(". ");
-
-const afl_stadium_negative_v2 = [
-  "rugby posts", "crossbar", "H-shaped posts", "soccer goal", "goal net", "net", "NFL",
-  "yard lines", "hash marks", "rectangular pitch", "rectangular field", "cricket pitch",
-  "cricket wickets", "Gaelic football posts", "wrong number of posts", "incorrect post layout",
-  "missing behind posts", "2 posts only", "3 posts", "6 posts", "posts merged together",
-  "posts not visible", "goal posts obscured", "cartoon", "illustration", "CGI", "3D render",
-  "video game screenshot", "anime", "blurry", "fisheye lens distortion", "text", "watermark", "logo",
-].join(", ");
-
-const AFL_STADIUM_SCENES_V2 = [
-  `High grandstand broadcast camera angle looking diagonally across the full oval. Evening match under full LED floodlights. BOTH goal ends clearly visible with all four AFL posts at each end. Packed crowd filling every tier. Goal end with all 4 posts remains visible in frame. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Ground-level camera positioned directly behind the goal line looking toward the centre of the oval. All four AFL posts tower in the foreground — two tall central posts flanked by two shorter behind posts. Bright sunny afternoon match, ultra-detailed grass texture. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Camera resting on the turf at the centre square looking toward the near goal square. The four AFL posts are clearly visible in the mid-distance. The oval stadium bowl surrounds the field. Golden sunset light rakes across the grass. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Night match in heavy rain. Floodlights scatter across glistening wet turf. Four AFL posts at nearest end stand clearly through the rain, all 4 visible and unobstructed. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Early morning fog rolling low across the oval turf. Soft diffused sunlight breaking through. Four AFL goal posts emerging from the mist at both ends — all 4 posts per end visible. Quiet atmospheric empty stadium. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Completely packed stadium grand final atmosphere. Bright daylight. Confetti and coloured banners in every stand. Camera from centre wing broadcast position. Both goal ends with all four AFL posts visible at each end. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `High aerial drone shot directly above a large AFL oval stadium. Entire oval field visible with centre square, centre circle, and goal square markings. Four AFL posts at BOTH ends clearly identifiable — two tall central posts and two shorter behind posts at each end. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Empty AFL stadium during afternoon training. Camera from ground level near the centre circle. Highly detailed grass surface with mowing patterns. Stadium seating empty. Four AFL posts visible at each end. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Camera positioned directly behind the four AFL posts looking toward midfield. Low golden sunset light casting long dramatic shadows from each post across the oval. All 4 posts — two tall central, two shorter outer — visible in sharp foreground silhouette. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Dark threatening storm clouds rolling in above the stadium. Floodlights flicking on to combat the darkness. Four AFL posts at nearest end sharp and clearly visible. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Camera slightly elevated above the centre circle looking down the long axis of the oval toward both goal ends. Both sets of four AFL posts clearly visible in the distance. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Camera looking out through the player race tunnel onto the oval. Massive crowd-filled stadium visible beyond the tunnel mouth. At the far end all four AFL posts are clearly visible and unobstructed. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Camera from inside the grandstand seating looking over the railing toward the field. Fans partially visible in the foreground. The near goal end showing all four AFL posts clearly. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Camera low in the goal square looking upward toward the four AFL posts. Night match under intense floodlights. Posts dominate the frame — two tall central and two shorter outer posts — all 4 sharp and vertical against the dark sky. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Morning sunlight reflecting off dew-covered turf. Camera from the wing position across the oval. Four AFL posts visible at both ends glinting in the early light. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Flags and banners streaming in strong wind around the stadium. Clouds moving fast across the sky above. Four AFL posts at the nearest end standing firm, all 4 clearly visible. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Thick fog glowing under powerful stadium floodlights. Night match. Four AFL posts at the near end glow through the mist — all 4 posts visible and distinct. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Field empty during halftime. Full crowd sitting in the stands. Four AFL posts at both ends visible across the empty oval. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Camera at ground level along the boundary line looking diagonally across the oval. The four AFL posts at the near end prominent in the frame — all 4 clearly separated and vertical. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Enormous roaring crowd scene from a high vantage point. Fans waving team flags. The oval field below with four AFL posts at both ends fully visible. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Storm clouds breaking apart as sunlight beams through onto wet reflective turf. Four AFL posts at the near end lit by the sunbeam, all 4 distinct and vertical. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Camera from the highest tier of the grandstand looking straight down across the entire oval. Full field visible — centre circle, centre square, goal squares. Four AFL posts at both ends visible from above. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Camera under the stadium roof structure. Curved roof frames the top of the image. The oval field sits below. At the far goal end all four AFL posts are visible and unobstructed. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Massive multi-tier MCG-scale AFL stadium. Camera from a wide mid-level broadcast position. Both goal ends visible with all four AFL posts at each end. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Night match fireworks exploding above the stadium roof. Floodlit oval below with four AFL posts at both ends visible and clearly defined against the night sky. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Strong afternoon sunlight casting a long grandstand shadow across one half of the oval. Four AFL posts at both ends clearly visible. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Flat grey overcast sky covering the stadium. Soft even diffused lighting across the turf. Four AFL posts at both ends clearly visible. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Players running out of the tunnel onto the oval before the match. Enormous crowd erupting. Camera from broadcast position. Four AFL posts visible at the far end, all 4 posts in frame. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Twilight dusk with the last pink and orange sky fading above the stadium. Floodlights beginning to dominate. Four AFL posts at both ends silhouetted and clear against the twilight sky. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-  `Camera positioned at the scoreboard end looking straight down the oval toward the opposite goal. The four AFL posts of the far goal end are clearly visible and unobstructed. Stadium packed on both sides. DO NOT INCLUDE: ${afl_stadium_negative_v2}`,
-];
-
-// ─── Stadium prompt v3 — no-goals side view ──────────────────────────────────
-
-const afl_stadium_no_goals_base = [
-  "Ultra realistic Australian Rules Football stadium",
-  "Large oval grass field with AFL centre square and centre circle markings clearly visible",
-  "Camera positioned so the goal posts are NOT visible in the image — focus on midfield, boundary line, centre square, or stadium bowl only",
-  "NO goal posts anywhere in the frame",
-  "Massive Australian football stadium filled with spectators",
-  "Realistic AFL stadium architecture similar to MCG or Optus Stadium",
-  "Photorealistic lighting, realistic grass texture, broadcast quality sports photography",
-  "photorealistic, ultra detailed, 8K sports photography, broadcast camera quality, realistic stadium lighting, cinematic sports lighting, realistic grass texture, high detail crowd",
-].join(". ");
-
-const afl_stadium_no_goals_negative = [
-  "goal posts", "AFL posts", "behind posts", "upright posts", "rugby posts", "crossbar",
-  "soccer goal", "goal net", "net", "NFL", "yard lines", "hash marks",
-  "rectangular pitch", "rectangular field", "cricket pitch", "wickets",
-  "cartoon", "illustration", "CGI", "3D render", "video game screenshot",
-  "blurry", "fisheye", "text", "watermark", "logo",
-].join(", ");
-
-const AFL_STADIUM_SCENES_NO_GOALS = [
-  // Scene 01 — midfield broadcast view
-  `Camera from the grandstand looking toward the centre square. Massive oval stadium with centre circle clearly visible in the turf below. Packed crowd surrounding the entire oval. NO goal posts visible. DO NOT INCLUDE: ${afl_stadium_no_goals_negative}`,
-
-  // Scene 02 — boundary line perspective
-  `Camera low to the grass near the boundary line looking diagonally across the oval toward the grandstand on the opposite side. The curvature of the oval boundary line clearly visible. Crowd filling the stands. Camera framed to show only midfield — NO goal posts in frame. DO NOT INCLUDE: ${afl_stadium_no_goals_negative}`,
-
-  // Scene 03 — centre circle close view
-  `Camera positioned just outside the centre circle showing the highly detailed turf surface and the centre circle marking. Stadium seating visible in all directions. Looking inward toward the circle, NOT toward either goal end. NO goal posts visible. DO NOT INCLUDE: ${afl_stadium_no_goals_negative}`,
-
-  // Scene 04 — sunset midfield shot
-  `Golden sunset lighting raking across the centre square of the oval. Long dramatic shadows from the grandstand stretching across the grass. Camera from the wing looking across midfield. Warm orange and gold tones. NO goal posts visible. DO NOT INCLUDE: ${afl_stadium_no_goals_negative}`,
-
-  // Scene 05 — night match midfield
-  `Night match. Bright stadium floodlights illuminating the centre circle with crisp intense light. Camera from grandstand looking across midfield. The oval turf glowing green under the lights. Packed crowd visible. NO goal posts visible. DO NOT INCLUDE: ${afl_stadium_no_goals_negative}`,
-
-  // Scene 06 — rainy match atmosphere
-  `Wet and reflective oval turf under stadium lights during a rainy match. Light rain visible as streaks in the floodlight beams. Camera looking across the centre square from the wing. Puddles reflecting stadium lights on the grass. NO goal posts visible. DO NOT INCLUDE: ${afl_stadium_no_goals_negative}`,
-
-  // Scene 07 — empty stadium training
-  `Empty AFL stadium with perfectly manicured green oval turf. Camera positioned near the centre square during a quiet afternoon training session. No players, no crowd — just the immaculate field and the empty grandstands. NO goal posts visible. DO NOT INCLUDE: ${afl_stadium_no_goals_negative}`,
-
-  // Scene 08 — packed crowd wing view
-  `Camera from the wing boundary area looking across the centre square with a completely packed roaring crowd on both sides. Team colours and scarves waving. Midfield turf clearly visible with centre circle marking. NO goal posts visible. DO NOT INCLUDE: ${afl_stadium_no_goals_negative}`,
-
-  // Scene 09 — high aerial midfield
-  `Aerial drone view directly above the centre circle looking straight down. The oval shape of the field clearly visible with centre circle, centre square markings prominent. Crowd surrounding the entire oval. Camera looking DOWN only — NO goal ends visible. DO NOT INCLUDE: ${afl_stadium_no_goals_negative}`,
-
-  // Scene 10 — under stadium roof
-  `Camera positioned under the stadium roof looking out over the midfield area of the oval. The curved roof structure frames the top of the image. Centre square and crowd visible below. NO goal posts visible in frame. DO NOT INCLUDE: ${afl_stadium_no_goals_negative}`,
-
-  // Scene 11 — boundary crowd angle
-  `Fans in the foreground along the boundary fence watching the match. The midfield area of the oval visible beyond the fans. Camera from just behind the boundary line looking across to the opposite grandstand. Centre of the oval only — NO goal posts in frame. DO NOT INCLUDE: ${afl_stadium_no_goals_negative}`,
-
-  // Scene 12 — foggy morning stadium
-  `Soft morning fog drifting low across the oval turf. The centre circle faintly visible through the mist. Quiet atmospheric empty stadium. Diffused soft light. Camera looking across midfield, NOT toward either end. NO goal posts visible. DO NOT INCLUDE: ${afl_stadium_no_goals_negative}`,
-
-  // Scene 13 — afternoon shadows
-  `Strong afternoon sunlight casting a long dramatic grandstand shadow across the centre square of the oval. Half the field in deep shadow, the other half brightly lit. Camera from the wing looking across midfield. NO goal posts visible. DO NOT INCLUDE: ${afl_stadium_no_goals_negative}`,
-
-  // Scene 14 — overcast cloudy match
-  `Soft grey overcast lighting across the midfield area of the AFL oval. Flat even illumination with no harsh shadows. Camera from a grandstand broadcast position looking across the centre square. NO goal posts visible. DO NOT INCLUDE: ${afl_stadium_no_goals_negative}`,
-
-  // Scene 15 — stadium bowl wide shot
-  `Massive multi-tier AFL stadium bowl. Camera from a high broadcast position showing the enormous grandstands surrounding the oval. The midfield area of the oval visible below. MCG or Optus Stadium scale architecture. NO goal posts visible. DO NOT INCLUDE: ${afl_stadium_no_goals_negative}`,
-];
 
 // ─── Deterministic seeded RNG (xorshift) ────────────────────────────────────
 
