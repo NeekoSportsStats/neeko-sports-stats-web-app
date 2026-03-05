@@ -37,6 +37,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const initialSessionSeenRef = useRef(false);
   const premiumFetchInFlightRef = useRef(false);
+  const currentUserIdRef = useRef<string | null>(null);
 
   /**
    * Fetch premium status from `profiles` for a given user id.
@@ -158,12 +159,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       switch (event) {
         case "INITIAL_SESSION":
           initialSessionSeenRef.current = true;
+          currentUserIdRef.current = session?.user?.id ?? null;
           applySession(session, event);
           break;
 
-        case "SIGNED_IN":
+        case "SIGNED_IN": {
+          const newUserId = session?.user?.id ?? null;
+          if (newUserId === currentUserIdRef.current) {
+            console.log("🟡 SIGNED_IN ignored — same user, no change");
+            return;
+          }
+          currentUserIdRef.current = newUserId;
           applySession(session, event);
           break;
+        }
 
         case "TOKEN_REFRESHED":
           applySession(session, event);
@@ -179,6 +188,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         case "SIGNED_OUT":
           console.log("🚪 AUTH EVENT: SIGNED_OUT");
+          currentUserIdRef.current = null;
           resetUser();
           setUser(null);
           setIsPremium(false);
