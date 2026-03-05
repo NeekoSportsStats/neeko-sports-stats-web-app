@@ -63,6 +63,11 @@ export interface MWPlayerRow {
   season: number;
   round_number: number;
   snapshot_updated_at: string;
+  last3_avg: number | null;
+  estimated_price: number | null;
+  value_score: number | null;
+  price_range_top: number | null;
+  price_range_bottom: number | null;
 }
 
 export interface MWBestTrade {
