@@ -267,7 +267,7 @@ export function AIMediaPicker({ type, selected, onSelect, accentColor = "#F59E0B
         <p className="text-xs font-medium text-muted-foreground/60">No AI {type}s uploaded yet.</p>
         <p className="text-[10px] text-muted-foreground/40 leading-relaxed">
           Upload {type === "image" ? "images" : "videos"} to the Supabase Storage bucket
-          at <code className="font-mono opacity-70">{STORAGE_BUCKET}/{type === "image" ? IMAGES_PATH : VIDEOS_PATH}</code>
+          at <code className="font-mono opacity-70">{STORAGE_BUCKET}/{type === "image" ? STOCK_IMAGES_PATH : VIDEOS_PATH}</code>
         </p>
         <button
           onClick={handleRefresh}

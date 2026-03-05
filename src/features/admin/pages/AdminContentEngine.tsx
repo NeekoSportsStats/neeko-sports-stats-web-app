@@ -23,7 +23,7 @@ import {
   type LayoutOffsets,
   DEFAULT_LAYOUT_OFFSETS,
 } from "../marketing/GraphicTemplates";
-import { AIMediaPicker, getBackgroundSourceLabel } from "../marketing/AIMediaPicker";
+import { AIMediaPicker, getBackgroundSourceLabel, loadAIMedia } from "../marketing/AIMediaPicker";
 import { AIMediaPackGenerator } from "../marketing/AIMediaPackGenerator";
 import { exportCarouselSlides } from "../marketing/CarouselExport";
 import { AddToPlannerModal } from "../marketing/AddToPlannerModal";
@@ -500,6 +500,21 @@ export default function AdminContentEngine() {
   const [manualPlayer1, setManualPlayer1] = useState<ContentPlayer | null>(null);
   const [manualPlayer2, setManualPlayer2] = useState<ContentPlayer | null>(null);
 
+  // Row selection — click to pin players in preview
+  const [selectedPlayerKeys, setSelectedPlayerKeys] = useState<string[]>([]);
+
+  // Media library refresh counter — increment to force AIMediaPicker to reload
+  const [mediaRefreshKey, setMediaRefreshKey] = useState(0);
+  const handleMediaSynced = () => setMediaRefreshKey((k) => k + 1);
+
+  const togglePlayerSelection = (key: string) => {
+    setSelectedPlayerKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  };
+
+  const clearPlayerSelection = () => setSelectedPlayerKeys([]);
+
   const previewRef    = useRef<HTMLDivElement>(null);
   const scrollRef     = useRef<HTMLDivElement>(null);
   const didRestoreRef = useRef(false);
@@ -652,7 +667,7 @@ export default function AdminContentEngine() {
   const exportH  = selectedExportSize.h;
 
   // When in manual mode, inject selected players at the front of the list
-  const effectivePlayers: ContentPlayer[] = playerMode === "manual"
+  const basePlayers: ContentPlayer[] = playerMode === "manual"
     ? [
         ...(manualPlayer1 ? [manualPlayer1] : []),
         ...(manualPlayer2 ? [manualPlayer2] : []),
@@ -662,6 +677,11 @@ export default function AdminContentEngine() {
         ),
       ]
     : players;
+
+  // Row-selection filtering: if rows are pinned, show only those in the preview
+  const effectivePlayers: ContentPlayer[] = selectedPlayerKeys.length > 0
+    ? basePlayers.filter((p) => selectedPlayerKeys.includes(p.player_name))
+    : basePlayers;
 
   // ── Reset all persisted state ─────────────────────────────────────────────
 
@@ -725,12 +745,14 @@ export default function AdminContentEngine() {
     if (hasLoaded.current) return;
     hasLoaded.current = true;
     fetchPlayers(STAT_ANGLES[0]);
+    loadAIMedia().catch(() => { /* background pre-warm — ignore errors */ });
   }, [fetchPlayers]);
 
   const handleAngleSelect = (angle: StatAngle) => {
     setSelectedAngle(angle);
     setInsight("");
     setCaption("");
+    setSelectedPlayerKeys([]);
     if (angle.layoutHint && !isCarouselMode) setSelectedLayout(angle.layoutHint);
     fetchPlayers(angle);
   };
@@ -1037,21 +1059,55 @@ export default function AdminContentEngine() {
                                 <th className="text-left py-1.5 px-2.5 font-medium text-muted-foreground">Player</th>
                                 <th className="text-left py-1.5 px-2.5 font-medium text-muted-foreground">Team</th>
                                 <th className="text-right py-1.5 px-2.5 font-medium text-muted-foreground">{selectedAngle.statLabel}</th>
+                                {selectedPlayerKeys.length > 0 && (
+                                  <th className="py-1.5 px-2 text-right">
+                                    <button
+                                      onClick={clearPlayerSelection}
+                                      className="text-[9px] font-semibold px-1.5 py-0.5 rounded transition-colors hover:opacity-80"
+                                      style={{ background: `${accentColor}22`, color: accentColor }}
+                                      title="Clear selection"
+                                    >
+                                      Clear
+                                    </button>
+                                  </th>
+                                )}
                               </tr>
                             </thead>
                             <tbody>
-                              {effectivePlayers.slice(0, 10).map((p, i) => (
-                                <tr key={`${p.player_name}-${i}`} className="border-b border-border/40 last:border-0 hover:bg-muted/20 transition-colors">
-                                  <td className="py-1.5 px-2.5 text-muted-foreground tabular-nums">{i + 1}</td>
-                                  <td className="py-1.5 px-2.5 font-medium max-w-[120px] truncate">{p.player_name}</td>
-                                  <td className="py-1.5 px-2.5 text-muted-foreground truncate">{p.team}</td>
-                                  <td className="py-1.5 px-2.5 text-right font-semibold tabular-nums" style={accentStyle}>{selectedAngle.statFn(p)}</td>
-                                </tr>
-                              ))}
+                              {basePlayers.slice(0, 10).map((p, i) => {
+                                const key = p.player_name;
+                                const isPinned = selectedPlayerKeys.includes(key);
+                                return (
+                                  <tr
+                                    key={`${key}-${i}`}
+                                    onClick={() => togglePlayerSelection(key)}
+                                    className="border-b border-border/40 last:border-0 transition-colors cursor-pointer select-none"
+                                    style={isPinned ? {
+                                      background: `${accentColor}18`,
+                                      borderLeft: `3px solid ${accentColor}`,
+                                    } : { borderLeft: "3px solid transparent" }}
+                                  >
+                                    <td className="py-1.5 px-2.5 text-muted-foreground tabular-nums">{i + 1}</td>
+                                    <td className="py-1.5 px-2.5 font-medium max-w-[120px] truncate" style={isPinned ? { color: accentColor } : {}}>{p.player_name}</td>
+                                    <td className="py-1.5 px-2.5 text-muted-foreground truncate">{p.team}</td>
+                                    <td className="py-1.5 px-2.5 text-right font-semibold tabular-nums" style={accentStyle}>{selectedAngle.statFn(p)}</td>
+                                    {selectedPlayerKeys.length > 0 && (
+                                      <td className="py-1.5 px-2 text-right">
+                                        {isPinned && <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: accentColor }} />}
+                                      </td>
+                                    )}
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         )}
                       </div>
+                      <p className="text-[10px] text-muted-foreground/40 mt-1.5 text-center">
+                        {selectedPlayerKeys.length > 0
+                          ? `${selectedPlayerKeys.length} player${selectedPlayerKeys.length > 1 ? "s" : ""} pinned — preview shows selection only`
+                          : "Click a row to pin players in the preview"}
+                      </p>
                     </>
                   )}
                 </SideSection>
@@ -1172,6 +1228,7 @@ export default function AdminContentEngine() {
                     {/* AI image picker */}
                     {backgroundSource === "stock_image" && (
                       <AIMediaPicker
+                        key={`image-${mediaRefreshKey}`}
                         type="image"
                         selected={backgroundMediaUrl}
                         onSelect={setBackgroundMediaUrl}
@@ -1182,6 +1239,7 @@ export default function AdminContentEngine() {
                     {/* AI video picker */}
                     {backgroundSource === "stock_video" && (
                       <AIMediaPicker
+                        key={`video-${mediaRefreshKey}`}
                         type="video"
                         selected={backgroundMediaUrl}
                         onSelect={setBackgroundMediaUrl}
@@ -1449,7 +1507,7 @@ export default function AdminContentEngine() {
                         AI media library
                       </span>
                     </div>
-                    <AIMediaPackGenerator accentColor={accentColor} />
+                    <AIMediaPackGenerator accentColor={accentColor} onSynced={handleMediaSynced} />
                   </div>
                 </SideSection>
 

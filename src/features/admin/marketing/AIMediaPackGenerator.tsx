@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Check, Package, Loader, RefreshCw, Database, Image as ImageIcon, Video, TriangleAlert as AlertTriangle, Wand as Wand2, ExternalLink } from "lucide-react";
+import { Check, Package, Loader, RefreshCw, Database, Image as ImageIcon, Video, TriangleAlert as AlertTriangle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { invalidateAIMediaCache } from "./AIMediaPicker";
 import { STOCK_IMAGES, STOCK_VIDEOS, IMAGE_CATEGORY_TARGETS } from "./StockMediaPicker";
@@ -39,9 +39,10 @@ function toLibraryRow(item: StockMediaItem, userId: string | null, idx: number) 
 
 interface AIMediaPackGeneratorProps {
   accentColor?: string;
+  onSynced?: () => void;
 }
 
-export function AIMediaPackGenerator({ accentColor = "#F59E0B" }: AIMediaPackGeneratorProps) {
+export function AIMediaPackGenerator({ accentColor = "#F59E0B", onSynced }: AIMediaPackGeneratorProps) {
   const [packStatus, setPackStatus]   = useState<PackStatus | null>(null);
   const [checking,  setChecking]      = useState(true);
   const [status,    setStatus]        = useState<"idle" | "registering" | "done" | "error">("idle");
@@ -49,48 +50,7 @@ export function AIMediaPackGenerator({ accentColor = "#F59E0B" }: AIMediaPackGen
   const [result,    setResult]        = useState<RegisterResult | null>(null);
   const [errorMsg,  setErrorMsg]      = useState<string | null>(null);
 
-  const [testStatus,   setTestStatus]   = useState<"idle" | "generating" | "success" | "error">("idle");
-  const [testResult,   setTestResult]   = useState<{ url: string; filename: string } | null>(null);
-  const [testError,    setTestError]    = useState<string | null>(null);
-  const [testCategory, setTestCategory] = useState<string>("stadium");
-
   const allItems: StockMediaItem[] = [...STOCK_IMAGES, ...STOCK_VIDEOS];
-
-  async function handleTestGenerate() {
-    setTestStatus("generating");
-    setTestResult(null);
-    setTestError(null);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) throw new Error("Not authenticated");
-
-      const { data: urlData } = supabase.storage.from("_").getPublicUrl("_");
-      const supabaseUrl = (urlData?.publicUrl ?? "").split("/storage/")[0];
-
-      const res = await fetch(`${supabaseUrl}/functions/v1/generate-ai-image`, {
-        method: "POST",
-        headers: {
-          "Content-Type":  "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          category: testCategory,
-          filename: `test-${testCategory}-${Date.now()}.png`,
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok || json.error) throw new Error(json.error ?? `HTTP ${res.status}`);
-
-      setTestResult({ url: json.public_url, filename: json.filename });
-      setTestStatus("success");
-      invalidateAIMediaCache();
-    } catch (err) {
-      setTestError(err instanceof Error ? err.message : "Unknown error");
-      setTestStatus("error");
-    }
-  }
 
   useEffect(() => {
     checkPackStatus();
@@ -161,7 +121,9 @@ export function AIMediaPackGenerator({ accentColor = "#F59E0B" }: AIMediaPackGen
 
     if (finalResult.success) {
       setStatus("done");
+      invalidateAIMediaCache();
       await checkPackStatus();
+      onSynced?.();
     } else {
       setStatus("error");
       setErrorMsg(`${errors} asset(s) failed to register. ${upserted} succeeded.`);
@@ -269,15 +231,6 @@ export function AIMediaPackGenerator({ accentColor = "#F59E0B" }: AIMediaPackGen
           </div>
         </div>
 
-        <TestAIGenerationPanel
-          accentColor={accentColor}
-          testStatus={testStatus}
-          testResult={testResult}
-          testError={testError}
-          testCategory={testCategory}
-          onCategoryChange={setTestCategory}
-          onGenerate={handleTestGenerate}
-        />
       </div>
     );
   }
@@ -364,135 +317,6 @@ export function AIMediaPackGenerator({ accentColor = "#F59E0B" }: AIMediaPackGen
         <span className="opacity-60 font-normal">({allItems.length} assets)</span>
       </button>
 
-      <TestAIGenerationPanel
-        accentColor={accentColor}
-        testStatus={testStatus}
-        testResult={testResult}
-        testError={testError}
-        testCategory={testCategory}
-        onCategoryChange={setTestCategory}
-        onGenerate={handleTestGenerate}
-      />
-    </div>
-  );
-}
-
-// ─── Test AI Generation Panel ──────────────────────────────────────────────────
-
-const TEST_CATEGORIES = ["stadium", "crowd", "abstract", "field", "players"] as const;
-
-interface TestPanelProps {
-  accentColor:      string;
-  testStatus:       "idle" | "generating" | "success" | "error";
-  testResult:       { url: string; filename: string } | null;
-  testError:        string | null;
-  testCategory:     string;
-  onCategoryChange: (cat: string) => void;
-  onGenerate:       () => void;
-}
-
-function TestAIGenerationPanel({
-  accentColor,
-  testStatus,
-  testResult,
-  testError,
-  testCategory,
-  onCategoryChange,
-  onGenerate,
-}: TestPanelProps) {
-  return (
-    <div className="border-t border-border/30 pt-3 space-y-2.5">
-      <div className="flex items-center gap-2">
-        <Wand2 className="h-3.5 w-3.5 shrink-0" style={{ color: accentColor }} />
-        <p className="text-[11px] font-semibold" style={{ color: accentColor }}>
-          Test AI Image Generation
-        </p>
-        <span className="ml-auto text-[9px] font-medium px-1.5 py-0.5 rounded border border-border/40 text-muted-foreground/50">
-          DALL-E 3
-        </span>
-      </div>
-
-      <p className="text-[10px] text-muted-foreground/50 leading-relaxed">
-        Calls OpenAI, generates one image and uploads it to <code className="font-mono opacity-70">content-assets/images/ai-generated/</code>. Confirms the full pipeline works.
-      </p>
-
-      <div className="flex gap-1 flex-wrap">
-        {TEST_CATEGORIES.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => onCategoryChange(cat)}
-            className="text-[10px] font-medium px-2 py-0.5 rounded-full transition-all duration-150 capitalize"
-            style={
-              testCategory === cat
-                ? { background: accentColor, color: "#000" }
-                : { background: "hsl(var(--muted)/0.5)", color: "hsl(var(--muted-foreground))" }
-            }
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
-
-      <button
-        onClick={onGenerate}
-        disabled={testStatus === "generating"}
-        className="w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all duration-200 hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed border"
-        style={{ borderColor: `${accentColor}55`, color: accentColor }}
-      >
-        {testStatus === "generating" ? (
-          <>
-            <Loader className="h-3.5 w-3.5 animate-spin" />
-            Generating image…
-          </>
-        ) : (
-          <>
-            <Wand2 className="h-3.5 w-3.5" />
-            Test AI Generation
-          </>
-        )}
-      </button>
-
-      {testStatus === "success" && testResult && (
-        <div
-          className="rounded-lg p-2.5 space-y-2"
-          style={{ background: `${accentColor}0a`, border: `1px solid ${accentColor}30` }}
-        >
-          <div className="flex items-center gap-2">
-            <Check className="h-3.5 w-3.5 shrink-0" style={{ color: accentColor }} />
-            <p className="text-[10px] font-semibold" style={{ color: accentColor }}>
-              Image generated and uploaded
-            </p>
-          </div>
-          <img
-            src={testResult.url}
-            alt="AI generated test image"
-            className="w-full rounded-md object-cover aspect-video"
-          />
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[9px] text-muted-foreground/50 truncate font-mono">{testResult.filename}</p>
-            <a
-              href={testResult.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-[10px] shrink-0"
-              style={{ color: accentColor }}
-            >
-              <ExternalLink className="h-2.5 w-2.5" />
-              View
-            </a>
-          </div>
-        </div>
-      )}
-
-      {testStatus === "error" && testError && (
-        <div className="rounded-lg p-2.5 border border-red-500/30 space-y-1">
-          <div className="flex items-center gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5 text-red-400 shrink-0" />
-            <p className="text-[10px] font-medium text-red-400">Generation failed</p>
-          </div>
-          <p className="text-[9px] text-muted-foreground/60 font-mono leading-relaxed">{testError}</p>
-        </div>
-      )}
     </div>
   );
 }
