@@ -9,9 +9,11 @@ const corsHeaders = {
 };
 
 const STORAGE_BUCKET = "content-assets";
-const IMAGES_PATH    = "images/ai-generated";
 
-const DEFAULT_PROMPTS: Record<string, string> = {
+const VALID_CATEGORIES = ["stadium", "crowd", "field", "players", "abstract"] as const;
+type Category = typeof VALID_CATEGORIES[number];
+
+const DEFAULT_PROMPTS: Record<Category, string> = {
   stadium:  "Aerial view of a modern Australian rules football stadium at night, floodlights on, vibrant green oval, dramatic atmosphere, cinematic photography, no text",
   crowd:    "Packed football stadium crowd cheering, AFL fans in team colours, energy and excitement, wide angle shot, no text, no logos",
   abstract: "Abstract sports data visualisation, dark background, glowing geometric lines, dynamic motion blur, digital art, premium aesthetic, no text",
@@ -39,6 +41,7 @@ Deno.serve(async (req: Request) => {
       );
     }
     if (!supabaseUrl || !serviceKey) {
+      console.error("generate-ai-image: Supabase env not configured");
       return new Response(
         JSON.stringify({ error: "Supabase environment not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -46,15 +49,23 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const category: string = body.category ?? "stadium";
+    const rawCategory: string = body.category ?? "stadium";
+    const category: Category  = VALID_CATEGORIES.includes(rawCategory as Category)
+      ? (rawCategory as Category)
+      : "stadium";
+
     const customPrompt: string | undefined = body.prompt;
-    const filename: string = body.filename ?? `${category}-${Date.now()}.png`;
+    const timestamp  = Date.now();
+    const filename   = body.filename ?? `${category}-${timestamp}.png`;
+    const storagePath = `ai-generated/${category}/${filename}`;
 
-    const prompt = customPrompt ?? DEFAULT_PROMPTS[category] ?? DEFAULT_PROMPTS.stadium;
+    const prompt = customPrompt ?? DEFAULT_PROMPTS[category];
 
-    console.log(`generate-ai-image: generating image — category="${category}", filename="${filename}"`);
+    console.log(`generate-ai-image: category="${category}" path="${storagePath}"`);
 
     const openai = new OpenAI({ apiKey: openaiKey });
+
+    console.log("AI image generated");
 
     const imageResponse = await openai.images.generate({
       model:   "dall-e-3",
@@ -64,8 +75,6 @@ Deno.serve(async (req: Request) => {
       quality: "standard",
     });
 
-    console.log("generate-ai-image: OpenAI response received");
-
     const imageUrl = imageResponse.data?.[0]?.url;
     if (!imageUrl) {
       return new Response(
@@ -74,7 +83,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log("generate-ai-image: downloading image from OpenAI URL");
+    console.log("generate-ai-image: OpenAI image URL received, downloading...");
 
     const imgFetch = await fetch(imageUrl);
     if (!imgFetch.ok) {
@@ -85,19 +94,20 @@ Deno.serve(async (req: Request) => {
     }
     const imageBuffer = await imgFetch.arrayBuffer();
 
-    console.log(`generate-ai-image: uploading to Supabase storage — ${STORAGE_BUCKET}/${IMAGES_PATH}/${filename}`);
-
     const adminClient = createClient(supabaseUrl, serviceKey);
+
+    console.log("Uploading to storage");
+    console.log(`generate-ai-image: bucket="${STORAGE_BUCKET}" path="${storagePath}"`);
 
     const { error: uploadError } = await adminClient.storage
       .from(STORAGE_BUCKET)
-      .upload(`${IMAGES_PATH}/${filename}`, imageBuffer, {
-        contentType:  "image/png",
-        upsert:       true,
+      .upload(storagePath, imageBuffer, {
+        contentType: "image/png",
+        upsert:      true,
       });
 
     if (uploadError) {
-      console.error("generate-ai-image: upload error", uploadError);
+      console.error("generate-ai-image: upload error", uploadError.message);
       return new Response(
         JSON.stringify({ error: `Storage upload failed: ${uploadError.message}` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -106,20 +116,46 @@ Deno.serve(async (req: Request) => {
 
     const { data: urlData } = adminClient.storage
       .from(STORAGE_BUCKET)
-      .getPublicUrl(`${IMAGES_PATH}/${filename}`);
+      .getPublicUrl(storagePath);
 
     const publicUrl = urlData?.publicUrl ?? "";
 
-    console.log(`generate-ai-image: success — publicUrl=${publicUrl}`);
+    console.log("Upload success:", storagePath);
+    console.log(`generate-ai-image: publicUrl=${publicUrl}`);
+
+    const assetId = `ai-${category}-${timestamp}`;
+    const { error: dbError } = await adminClient
+      .from("ai_media_library")
+      .upsert({
+        asset_id:      assetId,
+        label:         `AI ${category.charAt(0).toUpperCase() + category.slice(1)} ${new Date(timestamp).toLocaleDateString("en-AU")}`,
+        url:           publicUrl,
+        thumbnail_url: publicUrl,
+        media_type:    "image",
+        category,
+        sport:         "AFL",
+        source:        "ai_generated",
+        pack_id:       `ai-generated-${category}`,
+        is_active:     true,
+        sort_order:    0,
+        metadata:      JSON.stringify({ prompt, storage_path: storagePath, generated_at: new Date(timestamp).toISOString() }),
+      }, { onConflict: "asset_id" });
+
+    if (dbError) {
+      console.warn("generate-ai-image: media library insert warning", dbError.message);
+    } else {
+      console.log(`generate-ai-image: registered in ai_media_library as "${assetId}"`);
+    }
 
     return new Response(
       JSON.stringify({
-        success:    true,
+        success:      true,
         filename,
         category,
-        public_url: publicUrl,
-        storage_path: `${IMAGES_PATH}/${filename}`,
-        generated_at: new Date().toISOString(),
+        public_url:   publicUrl,
+        storage_path: storagePath,
+        asset_id:     assetId,
+        generated_at: new Date(timestamp).toISOString(),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
