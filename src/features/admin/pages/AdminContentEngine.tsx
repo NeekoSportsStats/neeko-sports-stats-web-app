@@ -11,7 +11,7 @@ import {
   Check,
   Sparkles,
   Zap,
-  Image as ImageIcon,
+  LayoutTemplate,
 } from "lucide-react";
 
 interface ContentPlayer {
@@ -42,6 +42,21 @@ interface StatAngle {
   accentColor: string;
   insightFn: (players: ContentPlayer[]) => string;
 }
+
+type TemplateId = "leaderboard" | "spotlight" | "versus" | "stat_insight";
+
+interface Template {
+  id: TemplateId;
+  label: string;
+  description: string;
+}
+
+const TEMPLATES: Template[] = [
+  { id: "leaderboard", label: "Leaderboard", description: "Top 8 ranked list" },
+  { id: "spotlight", label: "Player Spotlight", description: "#1 player focus card" },
+  { id: "versus", label: "Versus Battle", description: "Head-to-head two players" },
+  { id: "stat_insight", label: "Stat Insight", description: "Top 5 with big stat callout" },
+];
 
 const fmt = (n: number | null, suffix = "") =>
   n != null ? `${Math.round(Number(n))}${suffix}` : "—";
@@ -423,70 +438,298 @@ const STAT_ANGLES: StatAngle[] = [
 ];
 
 const SIZE = 1080;
+const PREVIEW_SCALE = 0.38;
 
-function GraphicCanvas({ angle, players }: { angle: StatAngle; players: ContentPlayer[] }) {
+// ─── Templates ───────────────────────────────────────────────────────────────
+
+function TemplateLeaderboard({ angle, players }: { angle: StatAngle; players: ContentPlayer[] }) {
+  const rows = players.slice(0, 8);
   return (
     <div
       style={{
         width: SIZE,
         height: SIZE,
-        background: "linear-gradient(160deg, #0a0f1a 0%, #0d1525 50%, #0a0f1a 100%)",
+        background: "linear-gradient(160deg, #080c14 0%, #0b1120 55%, #080c14 100%)",
         fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif",
         position: "relative",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
-        padding: "64px 72px",
+        padding: "56px 64px",
         boxSizing: "border-box",
       }}
     >
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)", backgroundSize: "80px 80px", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 5, background: `linear-gradient(90deg, ${angle.accentColor} 0%, ${angle.accentColor}88 60%, transparent 100%)` }} />
-      <div style={{ position: "absolute", top: -180, right: -180, width: 480, height: 480, borderRadius: "50%", background: `radial-gradient(circle, ${angle.accentColor}18 0%, transparent 70%)`, pointerEvents: "none" }} />
+      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px)", backgroundSize: "72px 72px" }} />
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${angle.accentColor} 0%, ${angle.accentColor}55 70%, transparent 100%)` }} />
+      <div style={{ position: "absolute", top: -200, right: -200, width: 500, height: 500, borderRadius: "50%", background: `radial-gradient(circle, ${angle.accentColor}14 0%, transparent 70%)` }} />
+      <div style={{ position: "absolute", bottom: -120, left: -80, width: 360, height: 360, borderRadius: "50%", background: `radial-gradient(circle, ${angle.accentColor}0a 0%, transparent 70%)` }} />
 
-      <div style={{ marginBottom: 40, position: "relative" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: angle.accentColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: "#000" }}>N</div>
-          <span style={{ fontSize: 22, fontWeight: 700, color: "#ffffff", letterSpacing: "0.06em", textTransform: "uppercase" }}>NEEKO SPORTS STATS</span>
+      <div style={{ marginBottom: 36 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 7, background: angle.accentColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 900, color: "#000", letterSpacing: "-0.02em" }}>N</div>
+          <span style={{ fontSize: 18, fontWeight: 700, color: "rgba(255,255,255,0.85)", letterSpacing: "0.08em", textTransform: "uppercase" }}>NEEKO SPORTS STATS</span>
         </div>
-        <div style={{ width: 60, height: 3, background: angle.accentColor, borderRadius: 2, marginBottom: 20 }} />
-        <h1 style={{ fontSize: 52, fontWeight: 800, color: "#ffffff", lineHeight: 1.1, margin: 0, letterSpacing: "-0.02em" }}>{angle.title}</h1>
-        <p style={{ fontSize: 22, color: "rgba(255,255,255,0.45)", marginTop: 10, fontWeight: 400, letterSpacing: "0.01em" }}>{angle.subtitle}</p>
+        <div style={{ width: 48, height: 3, background: angle.accentColor, borderRadius: 2, marginBottom: 16 }} />
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+          <div>
+            <h1 style={{ fontSize: 46, fontWeight: 900, color: "#ffffff", lineHeight: 1.05, margin: 0, letterSpacing: "-0.025em" }}>{angle.title}</h1>
+            <p style={{ fontSize: 20, color: "rgba(255,255,255,0.4)", marginTop: 8, fontWeight: 400 }}>{angle.subtitle}</p>
+          </div>
+          <div style={{ background: `${angle.accentColor}18`, border: `1px solid ${angle.accentColor}33`, borderRadius: 8, padding: "6px 14px", fontSize: 14, fontWeight: 700, color: angle.accentColor, textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>
+            {angle.statLabel}
+          </div>
+        </div>
       </div>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 0, position: "relative" }}>
-        {players.slice(0, Math.min(angle.limit, 8)).map((p, i) => {
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+        {rows.map((p, i) => {
           const isFirst = i === 0;
-          const rowSize = Math.min(angle.limit, 8) <= 5 ? "large" : "small";
-          const nameFontSize = rowSize === "large" ? (isFirst ? 30 : 26) : (isFirst ? 26 : 22);
-          const rankFontSize = rowSize === "large" ? (isFirst ? 28 : 24) : (isFirst ? 24 : 20);
-          const statFontSize = rowSize === "large" ? (isFirst ? 34 : 28) : (isFirst ? 28 : 24);
-          const padding = rowSize === "large" ? "18px 24px" : "13px 20px";
+          const isTop3 = i < 3;
+          const rankColor = i === 0 ? "#F59E0B" : i === 1 ? "#94A3B8" : i === 2 ? "#CD7C37" : "rgba(255,255,255,0.2)";
           return (
-            <div key={`${p.player_name}-${i}`} style={{ display: "flex", alignItems: "center", padding, borderRadius: 12, marginBottom: 7, background: isFirst ? `linear-gradient(90deg, ${angle.accentColor}22 0%, ${angle.accentColor}08 100%)` : "rgba(255,255,255,0.03)", border: isFirst ? `1px solid ${angle.accentColor}44` : "1px solid rgba(255,255,255,0.06)" }}>
-              <span style={{ fontSize: rankFontSize, fontWeight: 800, color: isFirst ? angle.accentColor : "rgba(255,255,255,0.25)", width: 48, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
+            <div
+              key={`${p.player_name}-${i}`}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                padding: isFirst ? "16px 20px" : "12px 20px",
+                borderRadius: 10,
+                background: isFirst
+                  ? `linear-gradient(90deg, ${angle.accentColor}1e 0%, ${angle.accentColor}06 100%)`
+                  : isTop3
+                  ? "rgba(255,255,255,0.04)"
+                  : "rgba(255,255,255,0.025)",
+                border: isFirst
+                  ? `1px solid ${angle.accentColor}40`
+                  : `1px solid rgba(255,255,255,0.05)`,
+              }}
+            >
+              <span style={{ fontSize: isFirst ? 26 : 20, fontWeight: 900, color: rankColor, width: 44, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{i + 1}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: nameFontSize, fontWeight: 700, color: "#ffffff", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.player_name}</div>
-                <div style={{ fontSize: 16, color: "rgba(255,255,255,0.45)", marginTop: 2, display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ fontSize: isFirst ? 26 : 21, fontWeight: 700, color: "#ffffff", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.player_name}</div>
+                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.38)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
                   <span>{p.team}</span>
-                  {p.position && (<><span style={{ color: "rgba(255,255,255,0.2)" }}>·</span><span style={{ color: angle.accentColor, fontWeight: 600 }}>{p.position}</span></>)}
+                  {p.position && <><span style={{ color: "rgba(255,255,255,0.18)" }}>·</span><span style={{ color: angle.accentColor, fontWeight: 600 }}>{p.position}</span></>}
                 </div>
               </div>
               <div style={{ flexShrink: 0, textAlign: "right" }}>
-                <div style={{ fontSize: statFontSize, fontWeight: 800, color: isFirst ? angle.accentColor : "#ffffff", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{angle.statFn(p)}</div>
-                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", marginTop: 4, textTransform: "uppercase", letterSpacing: "0.08em" }}>{angle.statLabel}</div>
+                <div style={{ fontSize: isFirst ? 30 : 24, fontWeight: 800, color: isFirst ? angle.accentColor : "#ffffff", fontVariantNumeric: "tabular-nums" }}>{angle.statFn(p)}</div>
               </div>
             </div>
           );
         })}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 28, paddingTop: 22, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-        <span style={{ fontSize: 22, fontWeight: 700, color: angle.accentColor, letterSpacing: "0.02em" }}>neekostats.com.au</span>
-        <span style={{ fontSize: 18, color: "rgba(255,255,255,0.3)", letterSpacing: "0.04em" }}>#AFLFantasy #AFLFantasy2026</span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 24, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+        <span style={{ fontSize: 18, fontWeight: 700, color: angle.accentColor }}>neekostats.com.au</span>
+        <span style={{ fontSize: 15, color: "rgba(255,255,255,0.28)", letterSpacing: "0.04em" }}>#AFLFantasy #FantasyFooty #AFL</span>
       </div>
     </div>
   );
+}
+
+function TemplateSpotlight({ angle, players }: { angle: StatAngle; players: ContentPlayer[] }) {
+  const top = players[0];
+  const rest = players.slice(1, 5);
+  if (!top) return <div style={{ width: SIZE, height: SIZE, background: "#0a0f1a" }} />;
+  return (
+    <div
+      style={{
+        width: SIZE,
+        height: SIZE,
+        background: `linear-gradient(145deg, #060a12 0%, #0d1420 50%, #060a12 100%)`,
+        fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif",
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        padding: "60px 68px",
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ position: "absolute", top: -100, left: "50%", transform: "translateX(-50%)", width: 700, height: 700, borderRadius: "50%", background: `radial-gradient(circle, ${angle.accentColor}10 0%, transparent 65%)` }} />
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 5, background: `linear-gradient(90deg, transparent 0%, ${angle.accentColor} 40%, ${angle.accentColor} 60%, transparent 100%)` }} />
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 5, background: `linear-gradient(90deg, transparent 0%, ${angle.accentColor}40 40%, ${angle.accentColor}40 60%, transparent 100%)` }} />
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 48 }}>
+        <div style={{ width: 30, height: 30, borderRadius: 7, background: angle.accentColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 900, color: "#000" }}>N</div>
+        <span style={{ fontSize: 17, fontWeight: 700, color: "rgba(255,255,255,0.7)", letterSpacing: "0.09em", textTransform: "uppercase" }}>NEEKO SPORTS STATS</span>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: 14, fontWeight: 600, color: angle.accentColor, textTransform: "uppercase", letterSpacing: "0.07em" }}>{angle.label}</span>
+      </div>
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: angle.accentColor, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 12 }}>#{1} {angle.statLabel}</div>
+        <div style={{ fontSize: 80, fontWeight: 900, color: "#ffffff", lineHeight: 1, letterSpacing: "-0.03em", marginBottom: 6 }}>{top.player_name.split(" ").pop()}</div>
+        <div style={{ fontSize: 40, fontWeight: 700, color: "rgba(255,255,255,0.55)", letterSpacing: "-0.01em", marginBottom: 32 }}>{top.player_name.split(" ").slice(0, -1).join(" ")}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 36 }}>
+          <span style={{ fontSize: 16, color: "rgba(255,255,255,0.4)", fontWeight: 500 }}>{top.team}</span>
+          {top.position && <><span style={{ width: 4, height: 4, borderRadius: "50%", background: angle.accentColor, display: "inline-block" }} /><span style={{ fontSize: 16, color: angle.accentColor, fontWeight: 700 }}>{top.position}</span></>}
+        </div>
+        <div style={{ background: `${angle.accentColor}1a`, border: `2px solid ${angle.accentColor}55`, borderRadius: 16, padding: "22px 48px", display: "inline-flex", flexDirection: "column", alignItems: "center" }}>
+          <div style={{ fontSize: 68, fontWeight: 900, color: angle.accentColor, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{angle.statFn(top)}</div>
+          <div style={{ fontSize: 18, color: "rgba(255,255,255,0.4)", marginTop: 8, textTransform: "uppercase", letterSpacing: "0.1em" }}>{angle.statLabel}</div>
+        </div>
+      </div>
+
+      {rest.length > 0 && (
+        <div style={{ display: "flex", gap: 10, marginTop: 40 }}>
+          {rest.map((p, i) => (
+            <div key={i} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "14px 16px" }}>
+              <div style={{ fontSize: 11, color: angle.accentColor, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>#{i + 2}</div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: "#fff", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.player_name}</div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", marginTop: 3 }}>{p.team}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#ffffff", marginTop: 8, fontVariantNumeric: "tabular-nums" }}>{angle.statFn(p)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 24 }}>
+        <span style={{ fontSize: 16, fontWeight: 700, color: angle.accentColor }}>neekostats.com.au</span>
+        <span style={{ fontSize: 14, color: "rgba(255,255,255,0.25)" }}>#AFLFantasy #FantasyFooty #AFL</span>
+      </div>
+    </div>
+  );
+}
+
+function TemplateVersus({ angle, players }: { angle: StatAngle; players: ContentPlayer[] }) {
+  const p1 = players[0];
+  const p2 = players[1];
+  if (!p1 || !p2) return <div style={{ width: SIZE, height: SIZE, background: "#0a0f1a" }} />;
+  return (
+    <div
+      style={{
+        width: SIZE,
+        height: SIZE,
+        background: "linear-gradient(160deg, #07090f 0%, #0c1118 50%, #07090f 100%)",
+        fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif",
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        padding: "56px 60px",
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ position: "absolute", top: -160, left: -160, width: 480, height: 480, borderRadius: "50%", background: `radial-gradient(circle, ${angle.accentColor}12 0%, transparent 70%)` }} />
+      <div style={{ position: "absolute", bottom: -160, right: -160, width: 480, height: 480, borderRadius: "50%", background: `radial-gradient(circle, ${angle.accentColor}0c 0%, transparent 70%)` }} />
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${angle.accentColor} 0%, ${angle.accentColor}44 100%)` }} />
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 44 }}>
+        <div style={{ width: 30, height: 30, borderRadius: 7, background: angle.accentColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 900, color: "#000" }}>N</div>
+        <span style={{ fontSize: 17, fontWeight: 700, color: "rgba(255,255,255,0.7)", letterSpacing: "0.09em", textTransform: "uppercase" }}>NEEKO SPORTS STATS</span>
+      </div>
+
+      <div style={{ textAlign: "center", marginBottom: 48 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: angle.accentColor, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>{angle.title}</div>
+        <div style={{ fontSize: 22, fontWeight: 600, color: "rgba(255,255,255,0.45)" }}>Who goes bigger this round?</div>
+      </div>
+
+      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 0 }}>
+        {[p1, p2].map((p, side) => (
+          <div key={side} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 32px", background: side === 0 ? `${angle.accentColor}10` : "rgba(255,255,255,0.03)", borderRadius: side === 0 ? "16px 0 0 16px" : "0 16px 16px 0", border: side === 0 ? `1px solid ${angle.accentColor}33` : "1px solid rgba(255,255,255,0.06)", position: "relative" }}>
+            {side === 0 && <div style={{ position: "absolute", top: 16, right: 16, background: angle.accentColor, borderRadius: 6, padding: "3px 10px", fontSize: 11, fontWeight: 800, color: "#000", textTransform: "uppercase", letterSpacing: "0.06em" }}>TOP PICK</div>}
+            <div style={{ fontSize: 15, fontWeight: 700, color: side === 0 ? angle.accentColor : "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 20 }}>#{side + 1}</div>
+            <div style={{ fontSize: 44, fontWeight: 900, color: "#ffffff", textAlign: "center", lineHeight: 1.1, letterSpacing: "-0.02em" }}>{p.player_name}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, marginBottom: 36 }}>
+              <span style={{ fontSize: 16, color: "rgba(255,255,255,0.4)" }}>{p.team}</span>
+              {p.position && <><span style={{ width: 3, height: 3, borderRadius: "50%", background: angle.accentColor, display: "inline-block" }} /><span style={{ fontSize: 16, color: angle.accentColor, fontWeight: 700 }}>{p.position}</span></>}
+            </div>
+            <div style={{ fontSize: 56, fontWeight: 900, color: side === 0 ? angle.accentColor : "#ffffff", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{angle.statFn(p)}</div>
+            <div style={{ fontSize: 14, color: "rgba(255,255,255,0.3)", marginTop: 8, textTransform: "uppercase", letterSpacing: "0.09em" }}>{angle.statLabel}</div>
+          </div>
+        ))}
+        <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", zIndex: 10, width: 56, height: 56, borderRadius: "50%", background: "#0a0f1a", border: `2px solid ${angle.accentColor}44`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ fontSize: 20, fontWeight: 900, color: angle.accentColor }}>VS</span>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 36 }}>
+        <span style={{ fontSize: 17, fontWeight: 700, color: angle.accentColor }}>neekostats.com.au</span>
+        <span style={{ fontSize: 14, color: "rgba(255,255,255,0.25)" }}>#AFLFantasy #FantasyFooty #AFL</span>
+      </div>
+    </div>
+  );
+}
+
+function TemplateStatInsight({ angle, players }: { angle: StatAngle; players: ContentPlayer[] }) {
+  const top = players[0];
+  const rest = players.slice(1, 5);
+  if (!top) return <div style={{ width: SIZE, height: SIZE, background: "#0a0f1a" }} />;
+  return (
+    <div
+      style={{
+        width: SIZE,
+        height: SIZE,
+        background: "linear-gradient(170deg, #07080e 0%, #0a0f1b 40%, #0c1220 100%)",
+        fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif",
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        padding: "56px 64px",
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.01) 1px, transparent 1px)", backgroundSize: "64px 64px" }} />
+      <div style={{ position: "absolute", top: -80, right: -80, width: 460, height: 460, borderRadius: "50%", background: `radial-gradient(circle, ${angle.accentColor}16 0%, transparent 65%)` }} />
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 5, background: `linear-gradient(90deg, ${angle.accentColor} 0%, ${angle.accentColor}33 80%, transparent 100%)` }} />
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 40 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 7, background: angle.accentColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 900, color: "#000" }}>N</div>
+          <span style={{ fontSize: 17, fontWeight: 700, color: "rgba(255,255,255,0.7)", letterSpacing: "0.09em", textTransform: "uppercase" }}>NEEKO SPORTS STATS</span>
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>{angle.subtitle}</div>
+      </div>
+
+      <div style={{ background: `linear-gradient(135deg, ${angle.accentColor}18 0%, ${angle.accentColor}06 100%)`, border: `1px solid ${angle.accentColor}33`, borderRadius: 20, padding: "40px 44px", marginBottom: 36 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: angle.accentColor, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 14 }}>STAT LEADER — {angle.statLabel}</div>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 54, fontWeight: 900, color: "#ffffff", lineHeight: 1, letterSpacing: "-0.025em", marginBottom: 10 }}>{top.player_name}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 18, color: "rgba(255,255,255,0.45)" }}>{top.team}</span>
+              {top.position && <><span style={{ width: 4, height: 4, borderRadius: "50%", background: angle.accentColor, display: "inline-block" }} /><span style={{ fontSize: 18, color: angle.accentColor, fontWeight: 700 }}>{top.position}</span></>}
+            </div>
+          </div>
+          <div style={{ flexShrink: 0, textAlign: "right" }}>
+            <div style={{ fontSize: 72, fontWeight: 900, color: angle.accentColor, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{angle.statFn(top)}</div>
+            <div style={{ fontSize: 16, color: "rgba(255,255,255,0.35)", marginTop: 6, textTransform: "uppercase", letterSpacing: "0.09em" }}>{angle.statLabel}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 14 }}>Also Watching</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {rest.map((p, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", padding: "12px 18px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "rgba(255,255,255,0.2)", width: 36, flexShrink: 0 }}>#{i + 2}</span>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>{p.player_name}</span>
+                <span style={{ fontSize: 14, color: "rgba(255,255,255,0.3)", marginLeft: 10 }}>{p.team}</span>
+              </div>
+              <span style={{ fontSize: 22, fontWeight: 800, color: "#ffffff", fontVariantNumeric: "tabular-nums" }}>{angle.statFn(p)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto", paddingTop: 24, borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+        <span style={{ fontSize: 17, fontWeight: 700, color: angle.accentColor }}>neekostats.com.au</span>
+        <span style={{ fontSize: 14, color: "rgba(255,255,255,0.25)" }}>#AFLFantasy #FantasyFooty #AFL</span>
+      </div>
+    </div>
+  );
+}
+
+function GraphicCanvas({ template, angle, players }: { template: TemplateId; angle: StatAngle; players: ContentPlayer[] }) {
+  if (template === "spotlight") return <TemplateSpotlight angle={angle} players={players} />;
+  if (template === "versus") return <TemplateVersus angle={angle} players={players} />;
+  if (template === "stat_insight") return <TemplateStatInsight angle={angle} players={players} />;
+  return <TemplateLeaderboard angle={angle} players={players} />;
 }
 
 const playerCache = new Map<string, ContentPlayer[]>();
@@ -494,18 +737,17 @@ const playerCache = new Map<string, ContentPlayer[]>();
 export default function AdminContentEngine() {
   const { toast } = useToast();
   const [selectedAngle, setSelectedAngle] = useState<StatAngle>(STAT_ANGLES[0]);
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>("leaderboard");
   const [players, setPlayers] = useState<ContentPlayer[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [insight, setInsight] = useState("");
   const [caption, setCaption] = useState("");
   const [captionLoading, setCaptionLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [showCanvas, setShowCanvas] = useState(false);
   const [copiedInsight, setCopiedInsight] = useState(false);
   const [copiedCaption, setCopiedCaption] = useState(false);
   const [copiedPost, setCopiedPost] = useState(false);
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   const fetchPlayers = useCallback(async (angle: StatAngle, force = false) => {
     if (!force && playerCache.has(angle.id)) {
@@ -549,8 +791,7 @@ export default function AdminContentEngine() {
 
   const handleGenerateInsight = () => {
     if (players.length === 0) return;
-    const text = selectedAngle.insightFn(players);
-    setInsight(text);
+    setInsight(selectedAngle.insightFn(players));
   };
 
   const handleGenerateCaption = async () => {
@@ -582,21 +823,20 @@ export default function AdminContentEngine() {
     }
   };
 
-  const handleGenerateGraphic = async () => {
-    if (players.length === 0) return;
-    setShowCanvas(true);
+  const handleDownloadGraphic = async () => {
+    if (!previewRef.current || players.length === 0) return;
     setDownloading(true);
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     try {
-      if (!canvasRef.current) throw new Error("Canvas not ready");
-      const dataUrl = await toPng(canvasRef.current, {
+      const inner = previewRef.current.firstElementChild as HTMLElement | null;
+      if (!inner) throw new Error("Preview not ready");
+      const dataUrl = await toPng(inner, {
         width: SIZE,
         height: SIZE,
         pixelRatio: 1,
         style: { transform: "none" },
       });
       const link = document.createElement("a");
-      link.download = `neeko-${selectedAngle.id}-graphic.png`;
+      link.download = `neeko-${selectedAngle.id}-${selectedTemplate}.png`;
       link.href = dataUrl;
       link.click();
       toast({ title: "Graphic downloaded" });
@@ -604,7 +844,6 @@ export default function AdminContentEngine() {
       toast({ title: "Download failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
     } finally {
       setDownloading(false);
-      setShowCanvas(false);
     }
   };
 
@@ -637,9 +876,12 @@ export default function AdminContentEngine() {
   };
 
   const accentStyle = { color: selectedAngle.accentColor };
+  const previewWidth = Math.round(SIZE * PREVIEW_SCALE);
+  const previewHeight = Math.round(SIZE * PREVIEW_SCALE);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-base font-semibold flex items-center gap-2">
@@ -647,30 +889,21 @@ export default function AdminContentEngine() {
             Content Engine
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Select a stat angle, review data, generate insight + caption + graphic — then post.
+            Select a stat angle, preview the graphic live, then download and post.
           </p>
         </div>
         {(insight || caption) && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs shrink-0"
-            onClick={handleCopyPost}
-          >
+          <Button variant="outline" size="sm" className="h-8 text-xs shrink-0" onClick={handleCopyPost}>
             {copiedPost ? <Check className="h-3.5 w-3.5 mr-1.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
             Copy Post
           </Button>
         )}
       </div>
 
-      {/* Step 1 — Horizontal Angle Selector */}
+      {/* Stat Angle Pills */}
       <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Step 1 — Stat Angle</p>
-        <div
-          ref={scrollRef}
-          className="flex gap-2 overflow-x-auto pb-2"
-          style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.1) transparent" }}
-        >
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Stat Angle</p>
+        <div className="flex gap-2 overflow-x-auto pb-1.5" style={{ scrollbarWidth: "thin" }}>
           {STAT_ANGLES.map((angle) => {
             const isSelected = angle.id === selectedAngle.id;
             const isCached = playerCache.has(angle.id);
@@ -681,218 +914,211 @@ export default function AdminContentEngine() {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium whitespace-nowrap transition-all shrink-0"
                 style={
                   isSelected
-                    ? {
-                        background: `${angle.accentColor}20`,
-                        borderColor: `${angle.accentColor}60`,
-                        color: angle.accentColor,
-                      }
-                    : {
-                        background: "transparent",
-                        borderColor: "hsl(var(--border))",
-                        color: "hsl(var(--muted-foreground))",
-                      }
+                    ? { background: `${angle.accentColor}20`, borderColor: `${angle.accentColor}60`, color: angle.accentColor }
+                    : { background: "transparent", borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }
                 }
               >
-                <span
-                  className="w-1.5 h-1.5 rounded-full shrink-0"
-                  style={{ background: isSelected ? angle.accentColor : isCached ? "#10B981" : "hsl(var(--muted-foreground))" }}
-                />
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: isSelected ? angle.accentColor : isCached ? "#10B981" : "hsl(var(--muted-foreground))" }} />
                 {angle.label}
               </button>
             );
           })}
         </div>
-        <p className="text-[11px] text-muted-foreground/60">
-          {STAT_ANGLES.length} angles available · green dot = cached
-        </p>
       </div>
 
-      {/* Step 2 — Player Data Table */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Step 2 — Player Data</p>
-            <p className="text-[11px] text-muted-foreground/60 mt-0.5">{selectedAngle.title}</p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => fetchPlayers(selectedAngle, true)}
-            disabled={dataLoading}
-          >
-            <RefreshCw className={`h-3 w-3 mr-1.5 ${dataLoading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        </div>
+      {/* Two-column layout: table left, preview right */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
 
-        <div className="rounded-lg border border-border overflow-hidden">
-          {dataLoading ? (
-            <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground text-sm">
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              Loading…
+        {/* LEFT — Data Table + Content Tools */}
+        <div className="space-y-5">
+          {/* Player Table */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Player Data</p>
+                <p className="text-[11px] text-muted-foreground/60 mt-0.5">{selectedAngle.title}</p>
+              </div>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => fetchPlayers(selectedAngle, true)} disabled={dataLoading}>
+                <RefreshCw className={`h-3 w-3 mr-1.5 ${dataLoading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
             </div>
-          ) : players.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">No data loaded</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground w-8">#</th>
-                  <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Player</th>
-                  <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground hidden sm:table-cell">Team</th>
-                  <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground hidden md:table-cell">Pos</th>
-                  <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">{selectedAngle.statLabel}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {players.map((p, i) => (
-                  <tr key={`${p.player_name}-${i}`} className="border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors">
-                    <td className="py-2 px-3 text-xs text-muted-foreground tabular-nums">{i + 1}</td>
-                    <td className="py-2 px-3 font-medium text-sm">{p.player_name}</td>
-                    <td className="py-2 px-3 text-xs text-muted-foreground hidden sm:table-cell">{p.team}</td>
-                    <td className="py-2 px-3 hidden md:table-cell">
-                      {p.position && (
-                        <Badge variant="outline" className="text-[10px] px-1 py-0 leading-4">{p.position}</Badge>
-                      )}
-                    </td>
-                    <td className="py-2 px-3 text-right font-semibold tabular-nums text-xs" style={accentStyle}>{selectedAngle.statFn(p)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="rounded-lg border border-border overflow-hidden">
+              {dataLoading ? (
+                <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground text-sm">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Loading…
+                </div>
+              ) : players.length === 0 ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">No data loaded</div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/40">
+                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground w-8">#</th>
+                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Player</th>
+                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground hidden sm:table-cell">Team</th>
+                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground hidden md:table-cell">Pos</th>
+                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">{selectedAngle.statLabel}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {players.map((p, i) => (
+                      <tr key={`${p.player_name}-${i}`} className="border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors">
+                        <td className="py-2 px-3 text-xs text-muted-foreground tabular-nums">{i + 1}</td>
+                        <td className="py-2 px-3 font-medium text-sm">{p.player_name}</td>
+                        <td className="py-2 px-3 text-xs text-muted-foreground hidden sm:table-cell">{p.team}</td>
+                        <td className="py-2 px-3 hidden md:table-cell">
+                          {p.position && <Badge variant="outline" className="text-[10px] px-1 py-0 leading-4">{p.position}</Badge>}
+                        </td>
+                        <td className="py-2 px-3 text-right font-semibold tabular-nums text-xs" style={accentStyle}>{selectedAngle.statFn(p)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          {/* Insight */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Stat Insight</p>
+            <div className="rounded-lg border border-border bg-muted/20 min-h-[100px] p-3.5">
+              {insight
+                ? <p className="text-sm whitespace-pre-line leading-relaxed">{insight}</p>
+                : <p className="text-xs text-muted-foreground">Click Generate to create a debate-style stat post.</p>
+              }
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 h-8 text-xs" onClick={handleGenerateInsight} disabled={players.length === 0 || dataLoading}>
+                <Zap className="h-3.5 w-3.5 mr-1.5" />Generate Insight
+              </Button>
+              {insight && (
+                <Button variant="outline" size="sm" className="h-8 px-3" onClick={handleCopyInsight}>
+                  {copiedInsight ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Caption */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Social Caption</p>
+            <div className="rounded-lg border border-border bg-muted/20 min-h-[100px] p-3.5">
+              {captionLoading
+                ? <div className="flex items-center gap-2 text-xs text-muted-foreground"><RefreshCw className="h-3.5 w-3.5 animate-spin" />Generating…</div>
+                : caption
+                ? <p className="text-sm whitespace-pre-line leading-relaxed">{caption}</p>
+                : <p className="text-xs text-muted-foreground">AI-written post with #aflfantasy #fantasyfooty #afl hashtags.</p>
+              }
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 h-8 text-xs" onClick={handleGenerateCaption} disabled={captionLoading || players.length === 0}>
+                {captionLoading ? <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
+                Generate Caption
+              </Button>
+              {caption && (
+                <Button variant="outline" size="sm" className="h-8 px-3" onClick={handleCopyCaption}>
+                  {copiedCaption ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Copy Post */}
+          {(insight || caption) && (
+            <Button variant="outline" className="w-full h-8 text-xs" onClick={handleCopyPost}>
+              {copiedPost ? <Check className="h-3.5 w-3.5 mr-1.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
+              Copy Full Post (Insight + Caption)
+            </Button>
           )}
         </div>
-      </div>
 
-      {/* Steps 3–5 — Generation Panel */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Step 3 — Stat Insight</p>
-          <div className="rounded-lg border border-border bg-muted/20 min-h-[120px] p-4">
-            {insight ? (
-              <p className="text-sm whitespace-pre-line leading-relaxed">{insight}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">Click Generate Insight to create a debate-style stat post.</p>
-            )}
+        {/* RIGHT — Graphic Preview */}
+        <div className="space-y-4">
+          {/* Template Selector */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <LayoutTemplate className="h-3.5 w-3.5" />
+              Graphic Template
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {TEMPLATES.map((tmpl) => {
+                const isSelected = tmpl.id === selectedTemplate;
+                return (
+                  <button
+                    key={tmpl.id}
+                    onClick={() => setSelectedTemplate(tmpl.id)}
+                    className="text-left px-3 py-2.5 rounded-lg border transition-all"
+                    style={
+                      isSelected
+                        ? { background: `${selectedAngle.accentColor}15`, borderColor: `${selectedAngle.accentColor}50`, color: "white" }
+                        : { background: "transparent", borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }
+                    }
+                  >
+                    <div className="text-xs font-semibold" style={isSelected ? accentStyle : {}}>{tmpl.label}</div>
+                    <div className="text-[11px] mt-0.5 opacity-60">{tmpl.description}</div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="flex-1 h-9 text-xs"
-              onClick={handleGenerateInsight}
-              disabled={players.length === 0 || dataLoading}
-            >
-              <Zap className="h-3.5 w-3.5 mr-1.5" />
-              Generate Insight
-            </Button>
-            {insight && (
-              <Button variant="outline" size="sm" className="h-9 px-3" onClick={handleCopyInsight}>
-                {copiedInsight ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-              </Button>
-            )}
-          </div>
-        </div>
 
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Step 4 — Social Caption</p>
-          <div className="rounded-lg border border-border bg-muted/20 min-h-[120px] p-4">
-            {captionLoading ? (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                Generating…
-              </div>
-            ) : caption ? (
-              <p className="text-sm whitespace-pre-line leading-relaxed">{caption}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">Click Generate Caption to create an AI-written post with hashtags.</p>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="flex-1 h-9 text-xs"
-              onClick={handleGenerateCaption}
-              disabled={captionLoading || players.length === 0}
+          {/* Live Preview */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Live Preview</p>
+            <div
+              id="graphic-preview"
+              className="rounded-xl overflow-hidden border border-border bg-black"
+              style={{ width: previewWidth, height: previewHeight, maxWidth: "100%" }}
             >
-              {captionLoading ? (
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              {players.length === 0 ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  <p className="text-xs text-muted-foreground">Load data to preview graphic</p>
+                </div>
               ) : (
-                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                <div
+                  ref={previewRef}
+                  style={{
+                    width: previewWidth,
+                    height: previewHeight,
+                    overflow: "hidden",
+                    position: "relative",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: SIZE,
+                      height: SIZE,
+                      transform: `scale(${PREVIEW_SCALE})`,
+                      transformOrigin: "top left",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                    }}
+                  >
+                    <GraphicCanvas template={selectedTemplate} angle={selectedAngle} players={players} />
+                  </div>
+                </div>
               )}
-              Generate Caption
-            </Button>
-            {caption && (
-              <Button variant="outline" size="sm" className="h-9 px-3" onClick={handleCopyCaption}>
-                {copiedCaption ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-              </Button>
-            )}
+            </div>
+            <p className="text-[11px] text-muted-foreground/50">Preview scaled — exported at 1080×1080px</p>
           </div>
-        </div>
 
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Step 5 — Social Graphic</p>
-          <div className="rounded-lg border border-dashed border-border bg-muted/10 min-h-[120px] p-4 flex flex-col items-center justify-center gap-2">
-            <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
-            <p className="text-xs text-muted-foreground text-center">1080×1080 PNG</p>
-            <p className="text-[11px] text-muted-foreground/60 text-center" style={accentStyle}>{selectedAngle.title}</p>
-          </div>
+          {/* Download */}
           <Button
             className="w-full h-9 text-xs font-semibold"
-            onClick={handleGenerateGraphic}
+            onClick={handleDownloadGraphic}
             disabled={downloading || players.length === 0 || dataLoading}
+            style={players.length > 0 ? { background: selectedAngle.accentColor, color: "#000", borderColor: selectedAngle.accentColor } : {}}
           >
-            {downloading ? (
-              <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-            ) : (
-              <Download className="h-3.5 w-3.5 mr-1.5" />
-            )}
-            {downloading ? "Generating…" : "Download Graphic (1080×1080)"}
+            {downloading
+              ? <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />Generating…</>
+              : <><Download className="h-3.5 w-3.5 mr-1.5" />Download PNG (1080×1080)</>
+            }
           </Button>
         </div>
       </div>
-
-      <div className="rounded-lg border border-border bg-muted/10 p-4 flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <p className="text-sm font-medium">Ready to post?</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Copy the full post (Insight + Caption) for Instagram, TikTok, Facebook, Reddit, or Twitter.
-          </p>
-        </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-9 text-sm shrink-0"
-          onClick={handleCopyPost}
-          disabled={!insight && !caption}
-        >
-          {copiedPost ? <Check className="h-4 w-4 mr-2 text-emerald-500" /> : <Copy className="h-4 w-4 mr-2" />}
-          {copiedPost ? "Copied!" : "Copy Post"}
-        </Button>
-      </div>
-
-      <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-        <span className="font-medium">Hashtags:</span>
-        <span>#aflfantasy #afl #fantasyfooty #aflfantasy2026 #neekosports</span>
-      </div>
-
-      {showCanvas && (
-        <div
-          style={{
-            position: "fixed",
-            top: -9999,
-            left: -9999,
-            width: SIZE,
-            height: SIZE,
-            overflow: "hidden",
-            pointerEvents: "none",
-          }}
-        >
-          <div ref={canvasRef} style={{ width: SIZE, height: SIZE, overflow: "hidden" }}>
-            <GraphicCanvas angle={selectedAngle} players={players} />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
