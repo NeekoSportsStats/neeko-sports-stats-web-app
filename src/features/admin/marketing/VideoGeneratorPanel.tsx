@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Video, Play, Download, RefreshCw, TriangleAlert as AlertTriangle, X, Check, ChevronDown, Zap, Smartphone, Square } from "lucide-react";
+import { Video, Play, Download, RefreshCw, TriangleAlert as AlertTriangle, X, Check, ChevronDown, Smartphone, Square } from "lucide-react";
 import {
   generateVideo,
   DEFAULT_VIDEO_CONFIG,
@@ -64,14 +64,6 @@ const BACKGROUNDS: { id: VideoBackground; label: string }[] = [
 const EXPORT_SIZES: { id: ExportSize; label: string; dims: string }[] = [
   { id: "tiktok_reels",   label: "TikTok / Reels", dims: "1080×1920" },
   { id: "instagram_post", label: "Instagram Post",  dims: "1080×1080" },
-];
-
-const WEEKLY_TEMPLATES: { label: string; template: VideoTemplate; angleId: string }[] = [
-  { label: "Top Projections",  template: "leaderboard_video", angleId: "top_projections"   },
-  { label: "Captain Picks",    template: "captain_picks",     angleId: "captain_picks"     },
-  { label: "Breakout Players", template: "breakout_alert",    angleId: "breakout_players"  },
-  { label: "Trade Targets",    template: "trade_targets",     angleId: "trade_targets"     },
-  { label: "Best Matchups",    template: "projection_battle", angleId: "best_matchups"     },
 ];
 
 const AUTO_HASHTAGS = "#aflfantasy #aflfantasy2026 #fantasyfooty #aflstats #fantasysports";
@@ -247,9 +239,6 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
   const [squareBlob, setSquareBlob]     = useState<Blob | null>(null);
   const [squareUrl, setSquareUrl]       = useState<string | null>(null);
   const [showNarrationWarning, setShowNarrationWarning] = useState(false);
-  const [weeklyRunning, setWeeklyRunning]               = useState(false);
-  const [weeklyDone, setWeeklyDone]                     = useState(0);
-  const [weeklyTotal, setWeeklyTotal]                   = useState(0);
 
   // Content overlay fields
   const [roundLabel, setRoundLabel]       = useState("");
@@ -321,35 +310,6 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
     } else {
       update("narrationEnabled", false);
     }
-  };
-
-  const handleWeeklyGenerate = async () => {
-    if (players.length === 0) return;
-    setWeeklyRunning(true);
-    setWeeklyDone(0);
-    setWeeklyTotal(WEEKLY_TEMPLATES.length);
-
-    for (let i = 0; i < WEEKLY_TEMPLATES.length; i++) {
-      const wt = WEEKLY_TEMPLATES[i];
-      try {
-        const data = buildSlideData(players, selectedAngle, roundLabel, statHighlight, ctaText);
-        data.angleTitle = wt.label;
-        const cfg: VideoConfig = { ...config, template: wt.template };
-        const blob = await generateVideo(data, () => {}, cfg);
-        const link = document.createElement("a");
-        link.download = `neeko-weekly-${wt.label.toLowerCase().replace(/\s+/g, "-")}.webm`;
-        link.href = URL.createObjectURL(blob);
-        link.click();
-        URL.revokeObjectURL(link.href);
-        await new Promise((r) => setTimeout(r, 400));
-      } catch {
-        // continue with next video
-      }
-      setWeeklyDone(i + 1);
-    }
-
-    setWeeklyRunning(false);
-    toast({ title: "Weekly videos generated", description: `${WEEKLY_TEMPLATES.length} videos downloaded.` });
   };
 
   return (
@@ -663,53 +623,53 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
       {/* Video Preview — dual or single */}
       {(videoUrl || squareUrl) && (
         <div className="space-y-3">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Video Preview</p>
+          <p className="text-xs font-semibold">Video Preview</p>
 
-          <div className={`flex gap-4 ${dualPreview && squareUrl ? "flex-row items-start justify-center" : "justify-center"}`}>
-            {/* Phone preview */}
-            {videoUrl && (
-              <div className="space-y-2 flex-1 max-w-[160px]">
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
-                  <Smartphone className="h-3 w-3" />
-                  Phone (9:16)
+          {dualPreview && squareUrl ? (
+            <div className="flex gap-4 items-start">
+              {/* Phone preview — takes ~55% in dual mode */}
+              {videoUrl && (
+                <div className="space-y-2" style={{ flex: "0 0 55%" }}>
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
+                    <Smartphone className="h-3 w-3" />
+                    Phone (9:16)
+                  </div>
+                  <div
+                    className="rounded-xl overflow-hidden border border-border bg-black w-full"
+                    style={{ aspectRatio: "9/16" }}
+                  >
+                    <video
+                      ref={videoRef}
+                      src={videoUrl}
+                      controls
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full h-8 text-xs"
+                    onClick={() => handleDownload(videoBlob, "-reels")}
+                    style={{ borderColor: `${accentColor}44`, color: accentColor }}
+                  >
+                    <Download className="h-3.5 w-3.5 mr-1.5" />
+                    Download
+                  </Button>
                 </div>
-                <div
-                  className="rounded-xl overflow-hidden border border-border bg-black"
-                  style={{ aspectRatio: "9/16" }}
-                >
-                  <video
-                    ref={videoRef}
-                    src={videoUrl}
-                    controls
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-8 text-xs"
-                  onClick={() => handleDownload(videoBlob, "-reels")}
-                  style={{ borderColor: `${accentColor}44`, color: accentColor }}
-                >
-                  <Download className="h-3.5 w-3.5 mr-1.5" />
-                  Download
-                </Button>
-              </div>
-            )}
+              )}
 
-            {/* Square preview */}
-            {dualPreview && squareUrl && (
-              <div className="space-y-2 flex-1 max-w-[160px]">
+              {/* Square preview — takes remaining space */}
+              <div className="space-y-2 flex-1">
                 <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
                   <Square className="h-3 w-3" />
                   Square (1:1)
                 </div>
                 <div
-                  className="rounded-xl overflow-hidden border border-border bg-black"
+                  className="rounded-xl overflow-hidden border border-border bg-black w-full"
                   style={{ aspectRatio: "1/1" }}
                 >
                   <video
@@ -734,11 +694,46 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
                   Download
                 </Button>
               </div>
-            )}
-          </div>
+            </div>
+          ) : videoUrl ? (
+            /* Single phone preview — full content width with aspect ratio constraint */
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
+                <Smartphone className="h-3 w-3" />
+                Phone (9:16)
+              </div>
+              <div className="w-full flex justify-center">
+                <div
+                  className="rounded-xl overflow-hidden border border-border bg-black"
+                  style={{ aspectRatio: "9/16", width: "100%", maxWidth: "360px" }}
+                >
+                  <video
+                    ref={videoRef}
+                    src={videoUrl}
+                    controls
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-8 text-xs"
+                onClick={() => handleDownload(videoBlob, "-reels")}
+                style={{ borderColor: `${accentColor}44`, color: accentColor }}
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Download
+              </Button>
+            </div>
+          ) : null}
 
           <p className="text-[10px] text-muted-foreground/45 leading-relaxed text-center">
-            WebM format. Compatible with TikTok, Instagram Reels, and all modern browsers.
+            Live preview — scaled to fit screen. Exported video will render at full resolution.
           </p>
         </div>
       )}
@@ -750,72 +745,6 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
           Appended to all generated captions and outro slides:
         </p>
         <p className="text-[11px] font-medium" style={{ color: accentColor }}>{AUTO_HASHTAGS}</p>
-      </div>
-
-      {/* Weekly Video Generator */}
-      <div className="rounded-xl bg-muted/10 border border-border/50 p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <Zap className="h-3.5 w-3.5" style={{ color: accentColor }} />
-          <p className="text-xs font-semibold">Weekly Video Generator</p>
-        </div>
-        <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
-          Automatically generates {WEEKLY_TEMPLATES.length} social media videos using the current stat angle data:
-          {" "}{WEEKLY_TEMPLATES.map((t) => t.label).join(", ")}.
-        </p>
-
-        {weeklyRunning && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Generating videos…</span>
-              <span className="font-semibold tabular-nums" style={{ color: accentColor }}>{weeklyDone} / {weeklyTotal}</span>
-            </div>
-            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-300"
-                style={{ width: `${weeklyTotal > 0 ? (weeklyDone / weeklyTotal) * 100 : 0}%`, background: accentColor }}
-              />
-            </div>
-          </div>
-        )}
-
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full h-9 text-xs font-semibold"
-          onClick={handleWeeklyGenerate}
-          disabled={weeklyRunning || players.length === 0 || dataLoading || generating}
-          style={!weeklyRunning && players.length > 0 ? { borderColor: `${accentColor}44`, color: accentColor } : {}}
-        >
-          {weeklyRunning
-            ? <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />Generating {weeklyDone} / {weeklyTotal}…</>
-            : <><Zap className="h-3.5 w-3.5 mr-1.5" />Generate Weekly Videos ({WEEKLY_TEMPLATES.length} videos)</>
-          }
-        </Button>
-
-        <div className="flex flex-wrap gap-1.5">
-          {WEEKLY_TEMPLATES.map((t) => (
-            <span
-              key={t.label}
-              className="text-[10px] px-2 py-1 rounded-full border font-medium"
-              style={{ borderColor: `${accentColor}25`, color: "hsl(var(--muted-foreground))" }}
-            >
-              {t.label}
-            </span>
-          ))}
-        </div>
-
-        {/* Cost transparency */}
-        <div className="rounded-lg bg-muted/20 border border-border/50 p-2.5 space-y-1">
-          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Cost transparency</p>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px]">
-            <span className="text-emerald-500">FREE: Graphic rendering</span>
-            <span className="text-emerald-500">FREE: Video export</span>
-            <span className="text-emerald-500">FREE: Animations</span>
-            <span className="text-emerald-500">FREE: Backgrounds</span>
-            <span className="text-amber-500">COST: Voice narration</span>
-            <span className="text-muted-foreground/50">~$0.002–0.01 / video</span>
-          </div>
-        </div>
       </div>
     </div>
   );
