@@ -32,66 +32,89 @@ const BATCH_DELAY_MS = 500;
 // ─── STRICT AFL STADIUM MASTER PROMPT ─────────────────────────────────────────
 // Enforces correct AFL field geometry, goal post layout, and oval shape.
 
-const AFL_STADIUM_MASTER = [
+const AFL_STADIUM_GLOBAL_BASE = [
   "Ultra realistic Australian Rules Football stadium",
-  "Massive OVAL shaped grass field — NOT rectangular",
-  "Correct AFL goal post layout: FOUR tall central goal posts and TWO shorter behind posts on each side, total SIX posts per end",
-  "Wide oval field proportions",
-  "Packed stadium crowd in grandstands",
-  "Professional sports broadcast lighting",
-  "Cinematic sports photography",
-  "ESPN / Fox Footy broadcast style",
-  "Ultra detailed grass oval",
-].join(", ");
+  "Correct AFL oval shaped field geometry — NOT rectangular",
+  "At EACH END of the field there are FOUR posts: two tall central goal posts and two shorter outer behind posts",
+  "FOUR posts per end clearly visible and correctly spaced",
+  "Large oval grass field with AFL centre square and centre circle markings",
+  "Massive Australian football stadium filled with spectators",
+  "Realistic architecture similar to MCG or Marvel Stadium",
+  "Photorealistic lighting, ultra detailed turf, realistic crowd",
+  "Broadcast quality sports photography",
+  "photorealistic, ultra detailed, 8k sports photography, broadcast camera quality, realistic stadium lighting, cinematic sports lighting, realistic grass texture, high detail crowd",
+].join(". ");
 
 const AFL_NEGATIVE = [
-  "soccer field", "rectangular pitch", "rectangular field",
-  "NFL field", "rugby field", "rugby posts",
-  "goal nets", "extra goal posts", "eight goal posts",
-  "wrong stadium shape", "training ground", "empty park",
-  "text", "watermarks", "logos",
+  "NO rugby goalposts", "NO soccer goals", "NO American football markings",
+  "NO rectangular field", "NO incorrect post layouts",
+  "no soccer field", "no rectangular pitch", "no goal nets",
+  "no rugby posts", "no NFL field", "no text", "no watermarks", "no logos",
 ].join(", ");
 
-// ─── Variation pools ──────────────────────────────────────────────────────────
+// ─── 30 unique AFL stadium scene prompts ──────────────────────────────────────
 
-const CAMERA_ANGLES = [
-  "aerial broadcast view from high grandstand",
-  "mid-level broadcast camera angle centre wing",
-  "tunnel entrance view looking onto the oval",
-  "aerial stadium drone shot pulling back",
-  "scoreboard end elevated perspective",
-  "wide panoramic from behind the goals",
-  "low sideline broadcast angle",
-  "upper tier crowd perspective",
-];
-
-const LIGHTING = [
-  "night match under full stadium floodlights blazing",
-  "golden sunset warm stadium lighting",
-  "stadium lights just switching on twilight",
-  "foggy night stadium lights glowing through mist",
-  "bright daytime broadcast stadium lighting",
-  "deep blue dusk with stadium glow",
-  "MCG style massive floodlight towers",
-  "Marvel Stadium indoor dome lighting",
-];
-
-const CROWD_DENSITY = [
-  "packed grand final sold-out crowd roaring",
-  "massive AFL finals crowd cheering in unison",
-  "regular season packed stands atmosphere",
-  "50000 fans stadium atmosphere buzzing",
-  "halftime crowd energy packed grandstands",
-  "spontaneous standing ovation stadium moment",
-];
-
-const WEATHER = [
-  "clear sky perfect conditions",
-  "light rain glistening on the oval",
-  "misty foggy evening atmosphere",
-  "crisp winter night atmosphere",
-  "hazy warm summer afternoon",
-  "overcast dramatic storm clouds building",
+const AFL_STADIUM_SCENES = [
+  // 1 — Broadcast TV angle
+  "Camera positioned high in the grandstand broadcast position looking diagonally across the oval. Evening match under bright stadium floodlights. Both ends of the field visible with correct four AFL posts. Large packed crowd.",
+  // 2 — Behind the goals ground level
+  "Camera positioned just behind the goal line at ground level looking toward the centre of the oval. The four AFL posts dominate the foreground. Bright sunny afternoon match. Ultra detailed grass texture.",
+  // 3 — Midfield field-level perspective
+  "Camera positioned directly on the grass at the centre square looking toward the goal square. Large oval stadium bowl visible. Golden sunset lighting across the field. Goal posts visible in the distance.",
+  // 4 — Night rain match
+  "Heavy rain falling during a night match. Floodlights reflecting across wet grass. Water droplets visible in the stadium lighting. Four AFL posts visible through the rain.",
+  // 5 — Foggy morning stadium
+  "Early morning fog rolling across the oval. Soft diffused sunlight. Goal posts emerging through the mist. Quiet atmospheric stadium.",
+  // 6 — Grand final atmosphere
+  "Completely packed stadium with roaring crowd. Bright daylight grand final match. Camera positioned from centre wing broadcast view. Confetti and banners in the crowd.",
+  // 7 — High aerial drone view
+  "High aerial drone shot above a large oval AFL stadium. Entire oval field visible with centre square markings. Four AFL posts clearly visible at both ends.",
+  // 8 — Empty training stadium
+  "Empty AFL stadium during afternoon training session. Camera from ground level near the centre circle. Highly detailed grass surface and stadium seating.",
+  // 9 — Golden sunset behind goals
+  "Camera positioned directly behind the goal posts looking toward midfield. Low golden sunset light casting long shadows across the oval.",
+  // 10 — Storm clouds rolling in
+  "Dark storm clouds approaching above the stadium. Floodlights beginning to illuminate the field. Dramatic sky and lighting contrast.",
+  // 11 — Centre bounce perspective
+  "Camera positioned slightly above the centre circle looking toward both ends of the field. Both sets of four AFL posts visible in the distance.",
+  // 12 — Player tunnel entrance
+  "Camera from inside the player tunnel looking out onto the oval. Massive crowd-filled stadium beyond the tunnel opening.",
+  // 13 — Crowd seat perspective
+  "Camera from inside the grandstand seating area looking over the railing toward the field. Fans partially visible in the foreground.",
+  // 14 — Close goal square view
+  "Camera positioned near the goal square looking upward toward the four AFL posts. Night match under intense floodlights.",
+  // 15 — Early morning dew
+  "Morning sunlight reflecting off dew covered grass. Camera from wing position across the oval.",
+  // 16 — Windy stadium
+  "Flags and banners blowing strongly in the wind. Clouds moving across the stadium sky.",
+  // 17 — Foggy night match
+  "Night match with thick fog illuminated by bright stadium lights. Goal posts glowing through the mist.",
+  // 18 — Halftime empty oval
+  "Field temporarily empty during halftime break. Crowd sitting and waiting in the stands.",
+  // 19 — Pre-game warmup
+  "Players warming up across the oval. Camera from ground level near the boundary line.",
+  // 20 — Rivalry derby atmosphere
+  "Huge intense crowd atmosphere. Fans waving team flags and colours.",
+  // 21 — Rain clearing sunset
+  "Storm clouds clearing while sunlight breaks through. Wet reflective grass surface.",
+  // 22 — Boundary line perspective
+  "Camera positioned along the boundary line looking diagonally across the oval field.",
+  // 23 — Stadium roof framing
+  "Camera positioned under the stadium roof structure. Roof framing the top of the image while the oval field sits below.",
+  // 24 — Kick-in perspective
+  "Camera positioned inside the goal square looking outward across the oval. Goal posts towering above the camera.",
+  // 25 — Massive stadium bowl
+  "Huge oval stadium with massive multi-tier grandstands. MCG scale architecture.",
+  // 26 — Night game with fireworks
+  "Night match with fireworks exploding above the stadium. Floodlit oval below.",
+  // 27 — Afternoon shadows
+  "Strong afternoon sunlight casting long shadows from the grandstand across the oval.",
+  // 28 — Overcast cloudy match
+  "Grey overcast sky covering the stadium. Soft diffused lighting.",
+  // 29 — High stand wide view
+  "Camera from the highest grandstand tier looking down across the entire oval.",
+  // 30 — Players running onto field
+  "Players running onto the field before the match begins. Huge crowd cheering.",
 ];
 
 const CROWD_STATES = [
@@ -159,14 +182,15 @@ function pick<T>(arr: T[], rng: () => number): T { return arr[Math.floor(rng() *
 
 function buildImagePrompt(category: ImageCategory, seed: number, i: number): string {
   const rng    = seededRng(seed + i * 7919);
-  const angle  = pick(CAMERA_ANGLES, rng);
   const light  = pick(LIGHTING, rng);
-  const crowd  = pick(CROWD_DENSITY, rng);
   const wx     = pick(WEATHER, rng);
 
   switch (category) {
-    case "stadium":
-      return `${AFL_STADIUM_MASTER}, ${angle}, ${light}, ${crowd}, ${wx}, no text, no logos. Avoid: ${AFL_NEGATIVE}`;
+    case "stadium": {
+      const sceneIndex = i % AFL_STADIUM_SCENES.length;
+      const scene = AFL_STADIUM_SCENES[sceneIndex];
+      return `${AFL_STADIUM_GLOBAL_BASE}. Scene: ${scene}. ${AFL_NEGATIVE}`;
+    }
     case "crowd":
       return `${pick(CROWD_STATES, rng)}, AFL stadium, ${light}, ${wx}, dramatic broadcast sports photography, no text, no logos`;
     case "field":
