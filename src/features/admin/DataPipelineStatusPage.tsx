@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Shield, Database, Bot, Activity, TrendingUp, Calendar, ChevronDown, ChevronUp, CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, Circle as XCircle, Clock } from "lucide-react";
+import { RefreshCw, Shield, Database, Activity, TrendingUp, Calendar, ChevronDown, ChevronUp, CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, Circle as XCircle, Clock } from "lucide-react";
 
 const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
 
@@ -14,9 +14,6 @@ interface PipelineStatus {
   raw_player_rows: number;
   latest_round: number | null;
   projection_rows: number;
-  last_ai_player_gen: string | null;
-  ai_player_rows: number;
-  ai_player_with_summary: number;
   last_ranking_ai: string | null;
   ranking_ai_rows: number;
   last_pipeline_run: string | null;
@@ -195,14 +192,6 @@ export default function DataPipelineStatusPage() {
     return "ok";
   };
 
-  const aiPlayerHealth = (): Health => {
-    if (dataLoading) return "loading";
-    if (!status) return "loading";
-    if (status.ai_player_rows < 300) return "warn";
-    if (status.ai_analysis_rows < 100) return "warn";
-    return "ok";
-  };
-
   const rankingAiHealth = (): Health => {
     if (dataLoading) return "loading";
     if (!status) return "loading";
@@ -231,7 +220,6 @@ export default function DataPipelineStatusPage() {
     const checks = [
       rawIngestHealth(),
       projectionHealth(),
-      aiPlayerHealth(),
       rankingAiHealth(),
       pipelineRunHealth(),
     ];
@@ -349,38 +337,6 @@ export default function DataPipelineStatusPage() {
           {projectionHealth() === "warn" && (
             <p className="mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 rounded p-2">
               Projection count below 500. Run pipeline to rebuild projections.
-            </p>
-          )}
-        </StatusCard>
-
-        {/* AI Player Summaries */}
-        <StatusCard
-          icon={Bot}
-          title="AI Player Summaries"
-          health={aiPlayerHealth()}
-          loading={dataLoading}
-        >
-          <StatRow
-            label="Last generated"
-            value={formatTs(status?.last_ai_player_gen ?? null)}
-            sub={formatDaysAgo(status?.last_ai_player_gen ?? null)}
-          />
-          <StatRow
-            label="Summary rows"
-            value={status?.ai_player_rows?.toLocaleString() ?? "—"}
-          />
-          <StatRow
-            label="With AI text"
-            value={status?.ai_player_with_summary?.toLocaleString() ?? "—"}
-          />
-          <StatRow
-            label="Analysis rows"
-            value={status?.ai_analysis_rows?.toLocaleString() ?? "—"}
-            sub="ai_player_analysis table"
-          />
-          {status && status.ai_analysis_rows < 150 && !dataLoading && (
-            <p className="mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 rounded p-2">
-              Only {status.ai_analysis_rows} players have ranking AI analysis. Run generate-ranking-ai to backfill.
             </p>
           )}
         </StatusCard>
