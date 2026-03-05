@@ -9,19 +9,22 @@ const corsHeaders = {
 };
 
 const STORAGE_BUCKET   = "content-assets";
-const IMAGE_CATEGORIES = ["stadium", "crowd", "field", "abstract", "players"] as const;
-const VIDEO_CATEGORIES = ["stadium", "crowd", "field", "abstract", "players"] as const;
+const IMAGE_CATEGORIES = ["stadium", "crowd", "field", "abstract", "players", "lights"] as const;
+const VIDEO_CATEGORIES = ["stadium", "crowd", "field", "abstract", "players", "lights"] as const;
 type ImageCategory = typeof IMAGE_CATEGORIES[number];
 type VideoCategory = typeof VIDEO_CATEGORIES[number];
 
-// ─── Target counts ────────────────────────────────────────────────────────────
+// ─── Target counts (fill-to-target mode) ─────────────────────────────────────
 
 const IMAGE_COUNTS: Record<ImageCategory, number> = {
-  stadium: 30, crowd: 30, field: 30, abstract: 30, players: 30,
+  stadium: 30, crowd: 30, field: 30, abstract: 30, players: 30, lights: 30,
 };
 const VIDEO_COUNTS: Record<VideoCategory, number> = {
-  stadium: 5, crowd: 4, field: 3, abstract: 4, players: 4,
+  stadium: 5, crowd: 4, field: 3, abstract: 4, players: 4, lights: 4,
 };
+
+// ─── Batch5 mode: always generate exactly this many new images per category ───
+const BATCH5_COUNT = 5;
 
 // ─── Safety limits ────────────────────────────────────────────────────────────
 
@@ -170,6 +173,40 @@ const VIDEO_SCENES = [
   "foggy stadium lights glowing over AFL oval misty night atmosphere broadcast style loopable",
 ];
 
+const LIGHTING = [
+  "cinematic LED floodlights",
+  "golden sunset glow",
+  "bright daylight broadcast lighting",
+  "deep blue dusk with stadium glow",
+  "dramatic overhead stadium floodlights",
+];
+
+const WEATHER = [
+  "clear sky",
+  "light rain",
+  "misty evening",
+  "dramatic storm clouds",
+  "overcast grey sky",
+];
+
+const LIGHTS_SCENES = [
+  "Massive AFL stadium floodlights blazing at full power. Camera looking up at the towering light towers from field level. Intense white LED beams cutting through the dark night sky. Photorealistic stadium lighting photography, no text, no logos",
+  "Night match under full stadium floodlights. Camera positioned at ground level on the oval looking upward at the ring of bright lights surrounding the stadium bowl. Deep blue sky beyond. Broadcast quality, no text",
+  "Close-up of stadium light tower structure with multiple LED flood panels. Industrial sports lighting architecture. Dark night sky background. Ultra detailed metallic structure with intense blazing light beams, no text, no logos",
+  "Aerial view of a large oval AFL stadium at night with all floodlights operating. Oval field glowing vivid green below. Rings of white stadium lights visible from above. Cinematic drone photography, no text",
+  "Pre-match stadium lights gradually activating in sequence. One by one the tall light towers switch on dramatically. Dark crowd silhouetted below. Dramatic atmosphere, cinematic sports photography, no text, no logos",
+  "Single massive AFL floodlight tower photographed from directly below looking straight up. Blinding LED panels radiating intense white light against a pure black night sky. Ultra realistic, no text",
+  "Stadium lights reflecting across wet oval turf after rain. Vivid green grass glistening. Multiple light pools overlapping across the field. Atmospheric night match scene, broadcast quality, no text",
+  "Wide stadium bowl night shot. Every floodlight tower illuminated with full power. Crowd visible under the warm glow. Oval field perfectly lit. MCG-scale atmosphere. Photorealistic, no text, no logos",
+  "Bokeh blur shot of AFL stadium floodlights in the background with the oval turf in sharp focus in the foreground. Dreamy cinematic depth of field. Warm light glowing above, no text",
+  "Two tall AFL floodlight towers framing the shot on either side. Intense beams overlapping in the centre above the field. Dramatic symmetrical sports architecture photography at night, no text, no logos",
+  "Silhouette of stadium light tower against a vivid sunset sky. Orange and gold sky behind the industrial structure. Long exposure blur on the lights starting to activate. Cinematic atmosphere, no text",
+  "Stadium lights casting dramatic overlapping shadows across the oval grass. High contrast shadow and light patterns on the turf. Artistic sports photography perspective, no text, no logos",
+  "Inside view of floodlight housing unit. Multiple LED panels up close. Industrial sports lighting technology photography. Dark background. Ultra sharp metallic detail, no text",
+  "Night stadium exterior long exposure photograph. Light trails from cars outside. Stadium glowing from within with full floodlights blazing. Architectural sports venue photography, no text",
+  "AFL stadium lights switching on just before a night match. Crowd in silhouette watching the lights activate. Dramatic moment. Atmospheric sports event photography, no text, no logos",
+];
+
 // ─── Seeded RNG ───────────────────────────────────────────────────────────────
 
 function seededRng(seed: number) {
@@ -199,6 +236,10 @@ function buildImagePrompt(category: ImageCategory, seed: number, i: number): str
       return `${pick(ABSTRACT_STYLES, rng)}, ${light}, no text, no logos`;
     case "players":
       return `${pick(PLAYER_ACTIONS, rng)}, ${light}, ${wx}, dramatic sports photography style, no text, no logos`;
+    case "lights": {
+      const sceneIndex = i % LIGHTS_SCENES.length;
+      return LIGHTS_SCENES[sceneIndex];
+    }
   }
 }
 
@@ -289,12 +330,19 @@ async function generateImages(
   jobId: string,
   generationCounter: { total: number },
   categoryProgress: Record<string, { generated: number; failed: number; target: number }>,
+  forcedCount?: number,
 ): Promise<{ generated: number; failed: number; skipped: number }> {
   let generated = 0;
   let failed    = 0;
 
   const existingCount = await countExisting(adminClient, category, false);
-  if (existingCount >= targetCount) {
+
+  // In forced mode (batch5) always generate exactly forcedCount new images,
+  // ignoring whether the fill-to-target quota has been reached.
+  const remaining = forcedCount ?? Math.max(0, targetCount - existingCount);
+  const displayTarget = forcedCount ? existingCount + forcedCount : targetCount;
+
+  if (!forcedCount && existingCount >= targetCount) {
     await writer.write(sseEvent({
       phase: "images", category,
       message: `Skipping ${category} — already have ${existingCount}/${targetCount}`,
@@ -303,13 +351,12 @@ async function generateImages(
     return { generated: 0, failed: 0, skipped: existingCount };
   }
 
-  const remaining = targetCount - existingCount;
-  categoryProgress[category] = { generated: existingCount, failed: 0, target: targetCount };
+  categoryProgress[category] = { generated: existingCount, failed: 0, target: displayTarget };
 
   await writer.write(sseEvent({
     phase: "images", category,
-    message: `Generating ${category} images — ${existingCount} existing, need ${remaining} more`,
-    generated: existingCount, total: targetCount, failed: 0,
+    message: `Generating ${category} images — ${existingCount} existing, generating ${remaining} more`,
+    generated: existingCount, total: displayTarget, failed: 0,
   }));
 
   let batchCount = 0;
@@ -344,7 +391,7 @@ async function generateImages(
         await writer.write(sseEvent({
           phase: "images", category,
           message: `Skipping ${filename} — marked as deleted`,
-          generated: existingCount + generated, total: targetCount, failed,
+          generated: existingCount + generated, total: displayTarget, failed,
         }));
         continue;
       }
@@ -373,8 +420,8 @@ async function generateImages(
 
       await writer.write(sseEvent({
         phase: "images", category,
-        message: `Generating ${category} images ${existingCount + generated} / ${targetCount}`,
-        generated: existingCount + generated, total: targetCount, failed,
+        message: `Generating ${category} images ${existingCount + generated} / ${displayTarget}`,
+        generated: existingCount + generated, total: displayTarget, failed,
       }));
 
       await updateJob(adminClient, jobId, {
@@ -384,7 +431,7 @@ async function generateImages(
 
       if (batchCount >= BATCH_SIZE) {
         batchCount = 0;
-        await writer.write(sseEvent({ phase: "batch", category, message: `Batch complete — pausing 500ms`, generated: existingCount + generated, total: targetCount, failed }));
+        await writer.write(sseEvent({ phase: "batch", category, message: `Batch complete — pausing 500ms`, generated: existingCount + generated, total: displayTarget, failed }));
         await delay(BATCH_DELAY_MS);
       }
     } catch (err) {
@@ -395,7 +442,7 @@ async function generateImages(
       await writer.write(sseEvent({
         phase: "images", category,
         message: `Failed: ${category} image ${i + 1} — ${err instanceof Error ? err.message : "unknown"}`,
-        generated: existingCount + generated, total: targetCount, failed,
+        generated: existingCount + generated, total: displayTarget, failed,
       }));
     }
   }
@@ -512,7 +559,7 @@ async function generateVideos(
 
       if (batchCount >= BATCH_SIZE) {
         batchCount = 0;
-        await writer.write(sseEvent({ phase: "batch", category, message: `Batch complete — pausing 500ms`, generated: existingCount + generated, total: targetCount, failed }));
+        await writer.write(sseEvent({ phase: "batch", category, message: `Batch complete — pausing 500ms`, generated: existingCount + generated, total: displayTarget, failed }));
         await delay(BATCH_DELAY_MS);
       }
     } catch (err) {
@@ -572,6 +619,8 @@ Deno.serve(async (req: Request) => {
     if (target === "full") {
       totalTarget = Object.values(IMAGE_COUNTS).reduce((a, b) => a + b, 0)
                   + Object.values(VIDEO_COUNTS).reduce((a, b) => a + b, 0);
+    } else if (target === "batch5") {
+      totalTarget = IMAGE_CATEGORIES.length * BATCH5_COUNT;
     } else if (target === "videos") {
       totalTarget = Object.values(VIDEO_COUNTS).reduce((a, b) => a + b, 0);
     } else if (IMAGE_CATEGORIES.includes(target as ImageCategory)) {
@@ -624,6 +673,11 @@ Deno.serve(async (req: Request) => {
           for (const cat of VIDEO_CATEGORIES) {
             if (generationCounter.total >= MAX_GENERATION) break;
             results[`vid_${cat}`] = await generateVideos(cat, VIDEO_COUNTS[cat], seed, openai, adminClient, writer, packId, jobId, generationCounter, categoryProgress);
+          }
+        } else if (target === "batch5") {
+          for (const cat of IMAGE_CATEGORIES) {
+            if (generationCounter.total >= MAX_GENERATION) break;
+            results[`img_${cat}`] = await generateImages(cat, IMAGE_COUNTS[cat], seed, openai, adminClient, writer, packId, jobId, generationCounter, categoryProgress, BATCH5_COUNT);
           }
         } else if (target === "videos") {
           for (const cat of VIDEO_CATEGORIES) {
