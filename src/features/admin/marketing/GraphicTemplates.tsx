@@ -195,9 +195,6 @@ function BrandBar({ accentColor, right }: { accentColor: string; right?: React.R
         display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: 17, fontWeight: 900, color: "#000", flexShrink: 0,
       }}>N</div>
-      <span style={{ fontSize: 17, fontWeight: 800, color: "rgba(255,255,255,0.82)", letterSpacing: "0.09em", textTransform: "uppercase" }}>
-        NEEKO SPORTS STATS
-      </span>
       {right && <><div style={{ flex: 1 }} />{right}</>}
     </div>
   );
@@ -605,7 +602,7 @@ export function LayoutStatCard({
   return (
     <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac} firstTeam={players[0]?.team ?? ""}>
       {/* Header */}
-      <div style={{ flexShrink: 0, marginBottom: isWide ? 20 : 28 }}>
+      <div style={{ flexShrink: 0, marginBottom: isWide ? 8 : 16 }}>
         <BrandBar accentColor={ac} right={
           <span style={{ fontSize: 12, fontWeight: 700, color: ac, textTransform: "uppercase", letterSpacing: "0.1em" }}>
             {angle.label}
@@ -743,7 +740,7 @@ export function LayoutLeaderboard({
   return (
     <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac} firstTeam={players[0]?.team ?? ""}>
       {/* Header */}
-      <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 22 }}>
+      <div style={{ flexShrink: 0, marginBottom: isTall ? 16 : 10 }}>
         <BrandBar accentColor={ac} right={
           <div style={{
             background: `${ac}1a`, border: `1px solid ${ac}40`,
@@ -866,7 +863,7 @@ export function LayoutBattle({
 
   return (
     <CanvasShell w={w} h={h} angle={angle} options={{ ...options, playerImageUrl: undefined }} teamColour={teamColour1} resolvedAccent={ac} firstTeam={p1?.team ?? ""}>
-      <div style={{ flexShrink: 0, marginBottom: isTall ? 32 : 22 }}>
+      <div style={{ flexShrink: 0, marginBottom: isTall ? 20 : 10 }}>
         <BrandBar accentColor={ac} />
         <div style={{ width: 44, height: 3, background: ac, borderRadius: 2, marginTop: 16, marginBottom: 12 }} />
         <h1 style={{
@@ -1036,7 +1033,7 @@ export function CarouselTitleSlide({
 
   return (
     <CanvasShell w={w} h={h} angle={angle} options={{ ...options, playerImageUrl: undefined }} teamColour={teamColour} resolvedAccent={ac} firstTeam={players[0]?.team ?? ""}>
-      <div style={{ flexShrink: 0, marginBottom: 24 }}>
+      <div style={{ flexShrink: 0, marginBottom: 12 }}>
         <BrandBar accentColor={ac} />
       </div>
 
@@ -1128,7 +1125,7 @@ export function CarouselPlayerSlide({
 
   return (
     <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac} firstTeam={players[0]?.team ?? ""}>
-      <div style={{ flexShrink: 0, marginBottom: isTall ? 24 : 18 }}>
+      <div style={{ flexShrink: 0, marginBottom: isTall ? 12 : 6 }}>
         <BrandBar accentColor={ac} right={
           <div style={{
             background: `${ac}1a`, border: `1px solid ${ac}40`,
@@ -1258,7 +1255,7 @@ export function LayoutCaptainPick({
   return (
     <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac} firstTeam={players[0]?.team ?? ""}>
       {/* Header */}
-      <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
+      <div style={{ flexShrink: 0, marginBottom: isTall ? 16 : 8 }}>
         <BrandBar accentColor={ac} />
       </div>
 
@@ -1404,7 +1401,7 @@ export function LayoutBreakoutAlert({
       }} />
 
       {/* Header */}
-      <div style={{ flexShrink: 0, marginBottom: isTall ? 24 : 18, position: "relative", zIndex: 2 }}>
+      <div style={{ flexShrink: 0, marginBottom: isTall ? 12 : 6, position: "relative", zIndex: 2 }}>
         <BrandBar accentColor={ac} />
       </div>
 
@@ -1553,7 +1550,7 @@ export function LayoutTradeTarget({
   return (
     <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac} firstTeam={players[0]?.team ?? ""}>
       {/* Header */}
-      <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
+      <div style={{ flexShrink: 0, marginBottom: isTall ? 16 : 8 }}>
         <BrandBar accentColor={ac} />
       </div>
 
@@ -1684,7 +1681,7 @@ export function LayoutAvoidPlayer({
   return (
     <CanvasShell w={w} h={h} angle={{ ...angle, accentColor: warnColor }} options={options} teamColour={teamColour} resolvedAccent={ac} firstTeam={top.team}>
       {/* Header */}
-      <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
+      <div style={{ flexShrink: 0, marginBottom: isTall ? 16 : 8 }}>
         <BrandBar accentColor={warnColor} />
       </div>
 
@@ -1818,7 +1815,7 @@ export function LayoutMatchupAdvantage({
   return (
     <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour} resolvedAccent={ac} firstTeam={players[0]?.team ?? ""}>
       {/* Header */}
-      <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
+      <div style={{ flexShrink: 0, marginBottom: isTall ? 16 : 8 }}>
         <BrandBar accentColor={ac} />
       </div>
 

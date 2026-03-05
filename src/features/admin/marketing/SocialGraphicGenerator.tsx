@@ -120,10 +120,9 @@ function GraphicCanvas({ type, players }: { type: GraphicType; players: GraphicP
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 5, background: `linear-gradient(90deg, ${type.accentColor} 0%, ${type.accentColor}88 60%, transparent 100%)` }} />
       <div style={{ position: "absolute", top: -180, right: -180, width: 480, height: 480, borderRadius: "50%", background: `radial-gradient(circle, ${type.accentColor}18 0%, transparent 70%)`, pointerEvents: "none" }} />
 
-      <div style={{ marginBottom: 40, position: "relative" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+      <div style={{ marginBottom: 28, position: "relative" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: 8, background: type.accentColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: "#000" }}>N</div>
-          <span style={{ fontSize: 22, fontWeight: 700, color: "#ffffff", letterSpacing: "0.06em", textTransform: "uppercase" }}>NEEKO SPORTS STATS</span>
         </div>
         <div style={{ width: 60, height: 3, background: type.accentColor, borderRadius: 2, marginBottom: 20 }} />
         <h1 style={{ fontSize: 56, fontWeight: 800, color: "#ffffff", lineHeight: 1.1, margin: 0, letterSpacing: "-0.02em" }}>{type.title}</h1>
