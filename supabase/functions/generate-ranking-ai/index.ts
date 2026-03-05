@@ -8,7 +8,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const BATCH_SIZE = 10;
+const BATCH_SIZE = 30;
+const MAX_BATCHES = 50;
 
 interface PlayerInput {
   player_id: number;
@@ -86,36 +87,49 @@ Deno.serve(async (req: Request) => {
     const openai = new OpenAI({ apiKey: openaiKey });
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
-    const offset = typeof body.offset === "number" ? body.offset : 0;
-    const limit = typeof body.limit === "number" ? body.limit : 60;
+    const runId: string | null = body.run_id ?? null;
 
-    const { data: players, error: fetchError } = await supabase
+    const { count: totalMissing } = await supabase
       .from("v_ai_player_analysis_input")
-      .select("*")
-      .range(offset, offset + limit - 1);
+      .select("player_id", { count: "exact", head: true });
 
-    if (fetchError) throw fetchError;
-    if (!players || players.length === 0) {
-      return new Response(
-        JSON.stringify({ message: "No players in range", offset, count: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const totalTasks = totalMissing ?? 0;
+
+    if (runId) {
+      await supabase
+        .from("pipeline_runs")
+        .update({
+          status: "running",
+          total_tasks: totalTasks,
+          completed_tasks: 0,
+          current_step_label: "Generating player AI analysis",
+        })
+        .eq("id", runId);
     }
 
-    let processed = 0;
-    let errors = 0;
+    let totalProcessed = 0;
+    let totalErrors = 0;
+    let batchCount = 0;
 
-    for (let i = 0; i < players.length; i += BATCH_SIZE) {
-      const batch = (players as PlayerInput[]).slice(i, i + BATCH_SIZE);
+    while (batchCount < MAX_BATCHES) {
+      const { data: players, error: fetchError } = await supabase
+        .from("v_ai_player_analysis_input")
+        .select("*")
+        .limit(BATCH_SIZE);
+
+      if (fetchError) throw fetchError;
+      if (!players || players.length === 0) break;
 
       const results = await Promise.allSettled(
-        batch.map((player) => generateForPlayer(openai, player))
+        (players as PlayerInput[]).map((player) =>
+          generateForPlayer(openai, player)
+        )
       );
 
       const upsertRows = [];
-      for (let j = 0; j < batch.length; j++) {
+      for (let j = 0; j < players.length; j++) {
         const result = results[j];
-        const player = batch[j];
+        const player = (players as PlayerInput[])[j];
         if (result.status === "fulfilled") {
           upsertRows.push({
             player_id: player.player_id,
@@ -126,13 +140,13 @@ Deno.serve(async (req: Request) => {
             captain_recommendation: result.value.captain_recommendation,
             generated_at: new Date().toISOString(),
           });
-          processed++;
+          totalProcessed++;
         } else {
           console.error(
             `Error processing ${player.player_name}:`,
             result.reason
           );
-          errors++;
+          totalErrors++;
         }
       }
 
@@ -142,19 +156,47 @@ Deno.serve(async (req: Request) => {
           .upsert(upsertRows, { onConflict: "player_id" });
         if (upsertError) {
           console.error("Batch upsert error:", upsertError);
-          errors += upsertRows.length;
-          processed -= upsertRows.length;
+          totalErrors += upsertRows.length;
+          totalProcessed -= upsertRows.length;
         }
       }
+
+      batchCount++;
+
+      if (runId) {
+        await supabase
+          .from("pipeline_runs")
+          .update({ completed_tasks: totalProcessed })
+          .eq("id", runId);
+      }
+    }
+
+    const hitLimit = batchCount >= MAX_BATCHES;
+
+    if (runId) {
+      await supabase
+        .from("pipeline_runs")
+        .update({
+          status: hitLimit ? "partial" : "completed",
+          completed_tasks: totalProcessed,
+          total_tasks: totalProcessed + totalErrors,
+          current_step_label: hitLimit
+            ? `Batch limit reached (${MAX_BATCHES} batches)`
+            : "Done",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", runId);
     }
 
     return new Response(
       JSON.stringify({
-        message: "generate-ranking-ai complete",
-        offset,
-        processed,
-        errors,
-        total_input: players.length,
+        message: hitLimit
+          ? `generate-ranking-ai hit MAX_BATCHES limit (${MAX_BATCHES})`
+          : "generate-ranking-ai complete — all players analysed",
+        batches_run: batchCount,
+        total_processed: totalProcessed,
+        total_errors: totalErrors,
+        hit_limit: hitLimit,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
