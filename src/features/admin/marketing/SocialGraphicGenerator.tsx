@@ -122,7 +122,7 @@ function GraphicCanvas({ type, players }: { type: GraphicType; players: GraphicP
 
       <div style={{ marginBottom: 28, position: "relative" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: type.accentColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: "#000" }}>N</div>
+          <img src="/logo.png" alt="Neeko Sports" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "contain" }} />
         </div>
         <div style={{ width: 60, height: 3, background: type.accentColor, borderRadius: 2, marginBottom: 20 }} />
         <h1 style={{ fontSize: 56, fontWeight: 800, color: "#ffffff", lineHeight: 1.1, margin: 0, letterSpacing: "-0.02em" }}>{type.title}</h1>

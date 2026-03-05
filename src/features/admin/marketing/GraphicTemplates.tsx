@@ -192,12 +192,11 @@ function AccentBar({ color }: { color: string }) {
 function BrandBar({ accentColor, right }: { accentColor: string; right?: React.ReactNode }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{
-        width: 32, height: 32, borderRadius: 8,
-        background: accentColor,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 17, fontWeight: 900, color: "#000", flexShrink: 0,
-      }}>N</div>
+      <img
+        src="/logo.png"
+        alt="Neeko Sports"
+        style={{ width: 32, height: 32, borderRadius: 8, objectFit: "contain", flexShrink: 0 }}
+      />
       {right && <><div style={{ flex: 1 }} />{right}</>}
     </div>
   );
