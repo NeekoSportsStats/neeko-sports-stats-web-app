@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { RefreshCw, Shield, Database, Zap, Activity, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, TrendingUp, Server, Bot, ChartBar as BarChart3, Layers, Bell, BellOff, History, Users, Gauge, Star, ArrowUpRight, CalendarDays, Target, Crosshair } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AdminPipelineProgress, PipelineRun } from "@/components/admin/AdminPipelineProgress";
+import MarketingStatsHub from "@/features/admin/marketing/MarketingStatsHub";
 
 const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
 
@@ -1951,6 +1952,14 @@ export default function Admin() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── Marketing Data Hub ───────────────────────────────────────────── */}
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 mt-6">
+        Marketing Data Hub
+      </h2>
+      <div className="mb-8">
+        <MarketingStatsHub />
+      </div>
 
       {/* Actions */}
       <Card>
