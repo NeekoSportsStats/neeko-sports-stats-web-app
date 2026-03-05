@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
 import { supabase } from "@/lib/supabaseClient";
 import {
   Image as ImageIcon, Video, RefreshCw, X, Download, Trash2, Play, Search,
@@ -707,21 +708,39 @@ function MediaCard({ item, mode, onClick }: MediaCardProps) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+const MEDIA_CACHE_TTL_MS = 60_000;
+
 export default function AdminMediaLibrary() {
-  const [mode, setMode]                         = useState<MediaMode>("graphic");
-  const [category, setCategory]                 = useState<Category>("all");
-  const [images, setImages]                     = useState<MediaItem[]>([]);
-  const [videos, setVideos]                     = useState<MediaItem[]>([]);
+  const { state, setMediaLibrary, setActiveJob: setGlobalJob } = useAdminUIState();
+  const ml = state.mediaLibrary;
+
+  // ── Context-backed persistent state ────────────────────────────────────────
+  const images          = ml.images as MediaItem[];
+  const videos          = ml.videos as MediaItem[];
+  const runningDbJob    = ml.runningJob as GenerationJob | null;
+  const dismissedJobId  = ml.dismissedJobId;
+
+  const setImages        = (imgs: MediaItem[]) => setMediaLibrary((p) => ({ ...p, images: imgs, lastFetchedAt: Date.now() }));
+  const setVideos        = (vids: MediaItem[]) => setMediaLibrary((p) => ({ ...p, videos: vids }));
+  const setRunningDbJob  = (job: GenerationJob | null) => setMediaLibrary((p) => ({ ...p, runningJob: job }));
+  const setDismissedJobId = (id: string | null) => setMediaLibrary((p) => ({ ...p, dismissedJobId: id }));
+
+  // ── Ephemeral UI state ──────────────────────────────────────────────────────
+  const [mode, setMode]                         = useState<MediaMode>((ml.mode as MediaMode) ?? "graphic");
+  const [category, setCategory]                 = useState<Category>((ml.category as Category) ?? "all");
   const [loading, setLoading]                   = useState(false);
   const [preview, setPreview]                   = useState<MediaItem | null>(null);
   const [search, setSearch]                     = useState("");
   const [deleteConfirm, setDeleteConfirm]       = useState<MediaItem | null>(null);
   const [deleting, setDeleting]                 = useState(false);
   const [activeJob, setActiveJob]               = useState<JobConfig | null>(null);
-  const [runningDbJob, setRunningDbJob]         = useState<GenerationJob | null>(null);
-  const [dismissedJobId, setDismissedJobId]     = useState<string | null>(null);
-  const hasLoaded                               = useRef(false);
   const pollRef                                 = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Persist mode/category back to context on change
+  useEffect(() => {
+    setMediaLibrary((p) => ({ ...p, mode, category }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, category]);
 
   // ── Load media ──────────────────────────────────────────────────────────────
 
@@ -735,17 +754,18 @@ export default function AdminMediaLibrary() {
     } finally {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (!hasLoaded.current) {
-      hasLoaded.current = true;
-      clearMediaCaches();
+    const age = ml.lastFetchedAt ? Date.now() - ml.lastFetchedAt : Infinity;
+    if (age > MEDIA_CACHE_TTL_MS || images.length === 0) {
       fetchAll(true);
     }
-  }, [fetchAll]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // ── Poll job status (survives page refresh) ─────────────────────────────────
+  // ── Poll job status ─────────────────────────────────────────────────────────
 
   const fetchLatestJob = useCallback(async () => {
     const { data } = await supabase
@@ -763,17 +783,24 @@ export default function AdminMediaLibrary() {
 
     if (job.status === "running" || job.status === "complete" || job.status === "failed") {
       setRunningDbJob(job);
+      if (job.status === "running") {
+        const pct = job.target_count > 0 ? Math.round((job.generated_count / job.target_count) * 100) : 0;
+        setGlobalJob("media", pct, `Generating ${job.target} media…`);
+      } else {
+        setGlobalJob(null, 0, null);
+      }
     } else {
       setRunningDbJob(null);
+      setGlobalJob(null, 0, null);
     }
 
     if (job.status === "complete") {
       clearMediaCaches();
       fetchAll(true);
     }
-  }, [dismissedJobId, fetchAll]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dismissedJobId]);
 
-  // Start polling on mount and whenever dismissedJobId changes
   useEffect(() => {
     fetchLatestJob();
     if (pollRef.current) clearInterval(pollRef.current);

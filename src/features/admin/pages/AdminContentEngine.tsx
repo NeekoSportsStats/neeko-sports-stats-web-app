@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, createElement, lazy, Suspense } from "react";
+import { useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
 
 const AdminMediaLibraryPanel = lazy(() => import("./AdminMediaLibrary"));
 import { toPng } from "html-to-image";
@@ -435,49 +436,70 @@ function DropSelect<T extends string>({
   );
 }
 
-const CE_STORAGE_KEY = "neeko_content_engine_state";
-
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function AdminContentEngine() {
   const { toast } = useToast();
+  const { state, setContentEngine } = useAdminUIState();
+  const ce = state.contentEngine;
 
-  // Mode
-  const [contentMode, setContentMode] = useState<ContentMode>("graphic");
+  // ── Context-backed setters ───────────────────────────────────────────────
+  const setContentMode        = (v: ContentMode)         => setContentEngine((p) => ({ ...p, contentMode: v }));
+  const setSelectedAngleId    = (v: string)              => setContentEngine((p) => ({ ...p, selectedAngleId: v }));
+  const setSelectedLayout     = (v: LayoutEngine)        => setContentEngine((p) => ({ ...p, selectedLayout: v }));
+  const setSelectedBackground = (v: BackgroundTheme)     => setContentEngine((p) => ({ ...p, selectedBackground: v }));
+  const setBackgroundSource   = (v: BackgroundSource)    => setContentEngine((p) => ({ ...p, backgroundSource: v }));
+  const setBackgroundMediaUrl = (v: string | null)       => setContentEngine((p) => ({ ...p, backgroundMediaUrl: v }));
+  const setCustomUploadUrl    = (v: string)              => setContentEngine((p) => ({ ...p, customUploadUrl: v }));
+  const setShowTeamAccent     = (v: boolean)             => setContentEngine((p) => ({ ...p, showTeamAccent: v }));
+  const setPlayerImageUrl     = (v: string)              => setContentEngine((p) => ({ ...p, playerImageUrl: v }));
+  const setLogoUrl            = (v: string)              => setContentEngine((p) => ({ ...p, logoUrl: v }));
+  const setLogoPosition       = (v: LogoPosition)        => setContentEngine((p) => ({ ...p, logoPosition: v }));
+  const setRoundLabel         = (v: string)              => setContentEngine((p) => ({ ...p, roundLabel: v }));
+  const setStatHighlight      = (v: string)              => setContentEngine((p) => ({ ...p, statHighlight: v }));
+  const setCtaText            = (v: string)              => setContentEngine((p) => ({ ...p, ctaText: v }));
+  const setCtaPosition        = (v: CtaPosition)         => setContentEngine((p) => ({ ...p, ctaPosition: v }));
+  const setAccentMode         = (v: AccentColourMode)    => setContentEngine((p) => ({ ...p, accentMode: v }));
+  const setCustomAccent       = (v: string)              => setContentEngine((p) => ({ ...p, customAccent: v }));
+  const setAutoTeamAccent     = (v: boolean)             => setContentEngine((p) => ({ ...p, autoTeamAccent: v }));
+  const setRankHighlight      = (v: RankHighlight)       => setContentEngine((p) => ({ ...p, rankHighlight: v }));
+  const setAppendHashtags     = (v: boolean)             => setContentEngine((p) => ({ ...p, appendHashtags: v }));
+  const setPlayerMode         = (v: "auto" | "manual")  => setContentEngine((p) => ({ ...p, playerMode: v }));
+  const setSelectedExportSize = (v: ExportSize)          => setContentEngine((p) => ({ ...p, exportSizeId: v.id }));
 
-  // Angle + data
-  const [selectedAngle, setSelectedAngle]   = useState<StatAngle>(STAT_ANGLES[0]);
+  // Derived from context
+  const contentMode        = ce.contentMode as ContentMode;
+  const selectedAngle      = STAT_ANGLES.find((a) => a.id === ce.selectedAngleId) ?? STAT_ANGLES[0];
+  const selectedLayout     = ce.selectedLayout as LayoutEngine;
+  const selectedBackground = ce.selectedBackground as BackgroundTheme;
+  const backgroundSource   = ce.backgroundSource as BackgroundSource;
+  const backgroundMediaUrl = ce.backgroundMediaUrl;
+  const customUploadUrl    = ce.customUploadUrl;
+  const showTeamAccent     = ce.showTeamAccent;
+  const playerImageUrl     = ce.playerImageUrl;
+  const logoUrl            = ce.logoUrl;
+  const logoPosition       = ce.logoPosition as LogoPosition;
+  const roundLabel         = ce.roundLabel;
+  const statHighlight      = ce.statHighlight;
+  const ctaText            = ce.ctaText;
+  const ctaPosition        = ce.ctaPosition as CtaPosition;
+  const accentMode         = ce.accentMode as AccentColourMode;
+  const customAccent       = ce.customAccent;
+  const autoTeamAccent     = ce.autoTeamAccent;
+  const rankHighlight      = ce.rankHighlight as RankHighlight;
+  const appendHashtags     = ce.appendHashtags;
+  const playerMode         = ce.playerMode as "auto" | "manual";
+  const selectedExportSize = EXPORT_SIZES.find((s) => s.id === ce.exportSizeId) ?? EXPORT_SIZES[0];
+
+  // ── Ephemeral state (OK to reset on tab switch) ──────────────────────────
   const [players, setPlayers]               = useState<ContentPlayer[]>([]);
   const [dataLoading, setDataLoading]       = useState(false);
 
-  // Layout / style
-  const [selectedLayout, setSelectedLayout]           = useState<LayoutEngine>("leaderboard");
-  const [selectedBackground, setSelectedBackground]   = useState<BackgroundTheme>("dark_gradient");
-  const [backgroundSource, setBackgroundSource]       = useState<BackgroundSource>("gradient");
-  const [backgroundMediaUrl, setBackgroundMediaUrl]   = useState<string | null>(null);
-  const [customUploadUrl, setCustomUploadUrl]         = useState("");
-  const [showTeamAccent, setShowTeamAccent]           = useState(false);
-  const [playerImageUrl, setPlayerImageUrl]           = useState("");
-
-  // Layout editor
+  // Layout editor (ephemeral — visual tool, not persisted)
   const [layoutEditorOpen, setLayoutEditorOpen] = useState(false);
   const [layoutOffsets, setLayoutOffsets]       = useState<LayoutOffsets>({ ...DEFAULT_LAYOUT_OFFSETS });
 
-  // Graphic options
-  const [logoUrl, setLogoUrl]                     = useState<string>("");
-  const [logoPosition, setLogoPosition]           = useState<LogoPosition>("none");
-  const [roundLabel, setRoundLabel]               = useState("");
-  const [statHighlight, setStatHighlight]         = useState("");
-  const [ctaText, setCtaText]                     = useState("");
-  const [ctaPosition, setCtaPosition]             = useState<CtaPosition>("bottom_center");
-  const [accentMode, setAccentMode]               = useState<AccentColourMode>("neeko_gold");
-  const [customAccent, setCustomAccent]           = useState("#F59E0B");
-  const [autoTeamAccent, setAutoTeamAccent]       = useState(false);
-  const [rankHighlight, setRankHighlight]         = useState<RankHighlight>("top_player");
-  const [appendHashtags, setAppendHashtags]       = useState(true);
-
   // Export
-  const [selectedExportSize, setSelectedExportSize]   = useState<ExportSize>(EXPORT_SIZES[0]);
   const [downloading, setDownloading]                 = useState(false);
   const [carouselProgress, setCarouselProgress]       = useState<{ done: number; total: number } | null>(null);
 
@@ -499,7 +521,6 @@ export default function AdminContentEngine() {
   const [videoPreviewState, setVideoPreviewState] = useState<VideoPreviewState | null>(null);
 
   // Manual player selection
-  const [playerMode, setPlayerMode] = useState<"auto" | "manual">("auto");
   const [manualPlayer1, setManualPlayer1] = useState<ContentPlayer | null>(null);
   const [manualPlayer2, setManualPlayer2] = useState<ContentPlayer | null>(null);
 
@@ -518,113 +539,31 @@ export default function AdminContentEngine() {
 
   const clearPlayerSelection = () => setSelectedPlayerKeys([]);
 
-  const previewRef    = useRef<HTMLDivElement>(null);
-  const scrollRef     = useRef<HTMLDivElement>(null);
-  const didRestoreRef = useRef(false);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const scrollRef  = useRef<HTMLDivElement>(null);
 
-  // ── Restore state from localStorage on mount ─────────────────────────────
+  // ── Restore scroll position on mount ────────────────────────────────────
   useEffect(() => {
-    if (didRestoreRef.current) return;
-    didRestoreRef.current = true;
-    try {
-      const raw = localStorage.getItem(CE_STORAGE_KEY);
-      if (!raw) return;
-      const s = JSON.parse(raw);
-      if (s.selectedAngleId) {
-        const a = STAT_ANGLES.find((x) => x.id === s.selectedAngleId);
-        if (a) setSelectedAngle(a);
-      }
-      if (s.contentMode)        setContentMode(s.contentMode);
-      if (s.selectedLayout)     setSelectedLayout(s.selectedLayout);
-      if (s.selectedBackground) setSelectedBackground(s.selectedBackground);
-      if (s.backgroundSource)   setBackgroundSource(s.backgroundSource);
-      if (s.backgroundMediaUrl) setBackgroundMediaUrl(s.backgroundMediaUrl);
-      if (s.customUploadUrl)    setCustomUploadUrl(s.customUploadUrl);
-      if (s.logoUrl)            setLogoUrl(s.logoUrl);
-      if (s.logoPosition)       setLogoPosition(s.logoPosition);
-      if (s.roundLabel != null) setRoundLabel(s.roundLabel);
-      if (s.statHighlight != null) setStatHighlight(s.statHighlight);
-      if (s.ctaText != null)    setCtaText(s.ctaText);
-      if (s.ctaPosition)        setCtaPosition(s.ctaPosition);
-      if (s.playerImageUrl != null) setPlayerImageUrl(s.playerImageUrl);
-      if (s.accentMode)         setAccentMode(s.accentMode);
-      if (s.customAccent)       setCustomAccent(s.customAccent);
-      if (s.rankHighlight)      setRankHighlight(s.rankHighlight);
-      if (s.playerMode)         setPlayerMode(s.playerMode);
-      if (s.exportSizeId) {
-        const sz = EXPORT_SIZES.find((x) => x.id === s.exportSizeId);
-        if (sz) setSelectedExportSize(sz);
-      }
-      if (typeof s.appendHashtags === "boolean") setAppendHashtags(s.appendHashtags);
-      if (typeof s.autoTeamAccent === "boolean") setAutoTeamAccent(s.autoTeamAccent);
-      if (typeof s.showTeamAccent === "boolean") setShowTeamAccent(s.showTeamAccent);
-
-      const scrollY = s.scrollY ?? 0;
-      if (scrollY > 0) {
-        const restore = () => {
-          if (scrollRef.current) {
-            scrollRef.current.scrollTo({ top: scrollY, behavior: "instant" });
-          } else {
-            requestAnimationFrame(restore);
-          }
-        };
-        requestAnimationFrame(restore);
-      }
-    } catch {
-      /* ignore malformed state */
+    const scrollY = ce.scrollY ?? 0;
+    if (scrollY > 0) {
+      const restore = () => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTo({ top: scrollY, behavior: "instant" });
+        } else {
+          requestAnimationFrame(restore);
+        }
+      };
+      requestAnimationFrame(restore);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Persist state to localStorage on change ───────────────────────────────
-  useEffect(() => {
-    try {
-      const s = {
-        selectedAngleId:  selectedAngle.id,
-        contentMode,
-        selectedLayout,
-        selectedBackground,
-        backgroundSource,
-        backgroundMediaUrl,
-        customUploadUrl,
-        logoUrl,
-        logoPosition,
-        roundLabel,
-        statHighlight,
-        ctaText,
-        ctaPosition,
-        playerImageUrl,
-        accentMode,
-        customAccent,
-        rankHighlight,
-        playerMode,
-        exportSizeId:   selectedExportSize.id,
-        appendHashtags,
-        autoTeamAccent,
-        showTeamAccent,
-        scrollY:        scrollRef.current?.scrollTop ?? 0,
-      };
-      localStorage.setItem(CE_STORAGE_KEY, JSON.stringify(s));
-    } catch {
-      /* ignore quota errors */
-    }
-  }, [
-    selectedAngle, contentMode, selectedLayout, selectedBackground, backgroundSource,
-    backgroundMediaUrl, customUploadUrl, logoUrl, logoPosition, roundLabel, statHighlight,
-    ctaText, ctaPosition, playerImageUrl, accentMode, customAccent, rankHighlight,
-    playerMode, selectedExportSize, appendHashtags, autoTeamAccent, showTeamAccent,
-  ]);
-
-  // ── Preserve scroll position ─────────────────────────────────────────────
+  // ── Persist scroll position ─────────────────────────────────────────────
   useEffect(() => {
     let el: HTMLDivElement | null = null;
     const handleScroll = () => {
       if (!el) return;
-      try {
-        const raw = localStorage.getItem(CE_STORAGE_KEY);
-        const s = raw ? JSON.parse(raw) : {};
-        s.scrollY = el.scrollTop;
-        localStorage.setItem(CE_STORAGE_KEY, JSON.stringify(s));
-      } catch { /* ignore */ }
+      setContentEngine((p) => ({ ...p, scrollY: el!.scrollTop }));
     };
     const attach = () => {
       el = scrollRef.current;
@@ -636,6 +575,7 @@ export default function AdminContentEngine() {
     };
     requestAnimationFrame(attach);
     return () => { el?.removeEventListener("scroll", handleScroll); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -692,28 +632,31 @@ export default function AdminContentEngine() {
   // ── Reset all persisted state ─────────────────────────────────────────────
 
   const handleResetState = () => {
-    try { localStorage.removeItem(CE_STORAGE_KEY); } catch { /* ignore */ }
-    setContentMode("graphic");
-    setSelectedAngle(STAT_ANGLES[0]);
-    setSelectedLayout("leaderboard");
-    setSelectedBackground("dark_gradient");
-    setBackgroundSource("gradient");
-    setBackgroundMediaUrl(null);
-    setCustomUploadUrl("");
-    setLogoPosition("none");
-    setRoundLabel("");
-    setStatHighlight("");
-    setCtaText("");
-    setCtaPosition("bottom_center");
-    setPlayerImageUrl("");
-    setAccentMode("neeko_gold");
-    setCustomAccent("#F59E0B");
-    setRankHighlight("top_player");
-    setPlayerMode("auto");
-    setSelectedExportSize(EXPORT_SIZES[0]);
-    setAppendHashtags(true);
-    setAutoTeamAccent(false);
-    setShowTeamAccent(false);
+    setContentEngine(() => ({
+      contentMode:        "graphic",
+      selectedAngleId:    "top_projections",
+      selectedLayout:     "leaderboard",
+      selectedBackground: "dark_gradient",
+      backgroundSource:   "gradient",
+      backgroundMediaUrl: null,
+      customUploadUrl:    "",
+      logoUrl:            "",
+      logoPosition:       "none",
+      roundLabel:         "",
+      statHighlight:      "",
+      ctaText:            "",
+      ctaPosition:        "bottom_center",
+      playerImageUrl:     "",
+      accentMode:         "neeko_gold",
+      customAccent:       "#F59E0B",
+      rankHighlight:      "top_player",
+      playerMode:         "auto",
+      exportSizeId:       "instagram",
+      appendHashtags:     true,
+      autoTeamAccent:     false,
+      showTeamAccent:     false,
+      scrollY:            0,
+    }));
     setInsight("");
     setCaption("");
     toast({ title: "Content Engine reset", description: "All settings restored to defaults." });
@@ -755,11 +698,11 @@ export default function AdminContentEngine() {
   }, [fetchPlayers]);
 
   const handleAngleSelect = (angle: StatAngle) => {
-    setSelectedAngle(angle);
+    setSelectedAngleId(angle.id);
     setInsight("");
     setCaption("");
     setSelectedPlayerKeys([]);
-    if (angle.layoutHint && !isCarouselMode) setSelectedLayout(angle.layoutHint);
+    if (angle.layoutHint && !isCarouselMode) setSelectedLayout(angle.layoutHint as LayoutEngine);
     fetchPlayers(angle);
   };
 
