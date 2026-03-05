@@ -1,6 +1,7 @@
 import React from "react";
 import { getTeamBackgroundTheme } from "@/config/teamBackgroundThemes";
 import { getTeamAccentColour } from "@/config/aflTeamColours";
+import { resolveStadiumBackground } from "@/config/aflStadiumBackgrounds";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -87,6 +88,7 @@ export interface GraphicOptions {
   rankHighlight?: RankHighlight;
   layoutOffsets?: LayoutOffsets;
   autoTeamAccent?: boolean;
+  venue?: string | null;
 }
 
 // ─── Team colours (expanded) ───────────────────────────────────────────────────
@@ -371,10 +373,42 @@ function TeamAccentBorder({ teamPrimary }: { teamPrimary: string }) {
   );
 }
 
+// ─── Stadium background image layer ───────────────────────────────────────────
+// Renders a stadium photo with blur + dark overlay + gradient.
+// Used automatically when a match venue is provided.
+
+function StadiumBackgroundLayer({ imageUrl, blur = 4 }: { imageUrl: string; blur?: number }) {
+  const scale = 1 + blur * 0.025;
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 0, overflow: "hidden" }}>
+      <img
+        src={imageUrl}
+        alt=""
+        style={{
+          width: "100%", height: "100%",
+          objectFit: "cover",
+          filter: `blur(${blur}px) brightness(0.38) saturate(0.65)`,
+          transform: `scale(${scale})`,
+        }}
+      />
+      {/* 40% dark overlay */}
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "rgba(0,0,0,0.40)",
+      }} />
+      {/* Gradient overlay for readability */}
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.55) 70%, rgba(0,0,0,0.75) 100%)",
+      }} />
+    </div>
+  );
+}
+
 // ─── Stock / team background layer ────────────────────────────────────────────
 
 function BackgroundLayer({
-  options, w, h, resolvedAccent, teamPrimary, firstTeam,
+  options, w: _w, h: _h, resolvedAccent: _resolvedAccent, teamPrimary: _teamPrimary, firstTeam,
 }: {
   options: GraphicOptions;
   w: number;
@@ -386,6 +420,20 @@ function BackgroundLayer({
   const source = options.backgroundSource ?? "gradient";
   const offsets = options.layoutOffsets;
   const blur = offsets?.backgroundBlur ?? 0;
+
+  // ── Auto-apply stadium background from venue ──────────────────────────────
+  // When a venue is set, it takes priority over the manual backgroundSource
+  // unless the user has explicitly chosen a stock image/video/upload.
+  const manualOverride =
+    source === "stock_image" || source === "stock_video" || source === "upload";
+
+  if (!manualOverride && options.venue) {
+    const stadium = resolveStadiumBackground(options.venue);
+    if (stadium) {
+      return <StadiumBackgroundLayer imageUrl={stadium.url} blur={4} />;
+    }
+    // Venue set but not found → fall through to team_theme / gradient fallback
+  }
 
   if (source === "stock_image" && options.backgroundMediaUrl) {
     return (
@@ -436,7 +484,9 @@ function BackgroundLayer({
     );
   }
 
-  if (source === "team_theme") {
+  // ── Venue fallback: team theme ─────────────────────────────────────────────
+  // When a venue was provided but wasn't matched, fall back to team theme.
+  if (options.venue || source === "team_theme") {
     const theme = getTeamBackgroundTheme(firstTeam);
     if (theme) {
       return (
@@ -469,7 +519,9 @@ function CanvasShell({
   const source = options.backgroundSource ?? "gradient";
   const offsets = options.layoutOffsets;
 
-  const useGradientBg = source === "gradient" || source === "upload" || (!options.backgroundMediaUrl && source !== "team_theme");
+  // Suppress CSS gradient background when a stadium venue or media URL is active
+  const hasVenueBackground = !!options.venue;
+  const useGradientBg = !hasVenueBackground && (source === "gradient" || source === "upload" || (!options.backgroundMediaUrl && source !== "team_theme"));
 
   const gridOverlay = options.background !== "analytics_grid"
     ? "linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px)"
