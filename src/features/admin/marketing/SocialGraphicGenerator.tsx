@@ -165,6 +165,7 @@ export default function SocialGraphicGenerator() {
   const { toast } = useToast();
   const [selectedType, setSelectedType] = useState<GraphicType>(GRAPHIC_TYPES[0]);
   const [players, setPlayers] = useState<GraphicPlayer[]>([]);
+  const [selectedNames, setSelectedNames] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [caption, setCaption] = useState("");
@@ -172,6 +173,19 @@ export default function SocialGraphicGenerator() {
   const [copied, setCopied] = useState(false);
   const [showCanvas, setShowCanvas] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  const togglePlayer = (name: string) => {
+    setSelectedNames((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    );
+  };
+
+  const clearSelection = () => setSelectedNames([]);
+
+  const displayPlayers =
+    selectedNames.length === 0
+      ? players.slice(0, selectedType.limit)
+      : players.filter((p) => selectedNames.includes(p.player_name));
 
   const fetchPlayers = useCallback(async (type: GraphicType, force = false) => {
     if (!force && cache.has(type.id)) {
@@ -210,11 +224,12 @@ export default function SocialGraphicGenerator() {
     setSelectedType(type);
     setShowCanvas(false);
     setCaption("");
+    setSelectedNames([]);
     fetchPlayers(type);
   };
 
   const handleDownload = async () => {
-    if (players.length === 0) return;
+    if (displayPlayers.length === 0) return;
     setShowCanvas(true);
     setDownloading(true);
 
@@ -242,7 +257,7 @@ export default function SocialGraphicGenerator() {
   };
 
   const handleGenerateCaption = async () => {
-    if (players.length === 0) return;
+    if (displayPlayers.length === 0) return;
     setCaptionLoading(true);
     setCaption("");
     try {
@@ -252,7 +267,7 @@ export default function SocialGraphicGenerator() {
       const res = await fetch(`${supabaseUrl}/functions/v1/generate-marketing-caption`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ angle_name: selectedType.label, players: players.slice(0, 5) }),
+        body: JSON.stringify({ angle_name: selectedType.label, players: displayPlayers.slice(0, 5) }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -333,30 +348,60 @@ export default function SocialGraphicGenerator() {
                   </tr>
                 </thead>
                 <tbody>
-                  {players.slice(0, selectedType.limit).map((p, i) => (
-                    <tr key={`${p.player_name}-${i}`} className="border-b border-border/40 last:border-0 hover:bg-muted/30">
-                      <td className="py-2 px-3 text-xs text-muted-foreground tabular-nums">{i + 1}</td>
-                      <td className="py-2 px-3 font-medium">
-                        <div className="flex items-center gap-2">
-                          {p.player_name}
-                          {p.position && (
-                            <Badge variant="outline" className="text-[10px] px-1 py-0 leading-4">{p.position}</Badge>
+                  {players.slice(0, selectedType.limit).map((p, i) => {
+                    const isSelected = selectedNames.includes(p.player_name);
+                    return (
+                      <tr
+                        key={`${p.player_name}-${i}`}
+                        onClick={() => togglePlayer(p.player_name)}
+                        style={isSelected ? { background: "rgba(255,180,0,0.12)", borderLeft: "3px solid #ffb400" } : {}}
+                        className="border-b border-border/40 last:border-0 hover:bg-muted/30 cursor-pointer select-none transition-colors"
+                      >
+                        <td className="py-2 px-3 text-xs tabular-nums">
+                          {isSelected ? (
+                            <span style={{ color: "#ffb400", fontSize: 14 }}>&#10003;</span>
+                          ) : (
+                            <span className="text-muted-foreground">{i + 1}</span>
                           )}
-                        </div>
-                      </td>
-                      <td className="py-2 px-3 text-xs text-muted-foreground">{p.team}</td>
-                      <td className="py-2 px-3 text-right font-semibold tabular-nums text-xs">{selectedType.statFn(p)}</td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="py-2 px-3 font-medium">
+                          <div className="flex items-center gap-2">
+                            {p.player_name}
+                            {p.position && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 leading-4">{p.position}</Badge>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-xs text-muted-foreground">{p.team}</td>
+                        <td className="py-2 px-3 text-right font-semibold tabular-nums text-xs">{selectedType.statFn(p)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
           </div>
+          {selectedNames.length === 0 && !loading && players.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Click any row to select players for the graphic. Click again to deselect.
+            </p>
+          )}
+          {selectedNames.length > 0 && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">{selectedNames.length} player{selectedNames.length !== 1 ? "s" : ""} selected</span>
+              <button
+                onClick={clearSelection}
+                className="text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
 
           <Button
             className="w-full h-9 text-sm font-semibold"
             onClick={handleDownload}
-            disabled={downloading || players.length === 0 || loading}
+            disabled={downloading || displayPlayers.length === 0 || loading}
           >
             {downloading ? (
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -389,7 +434,7 @@ export default function SocialGraphicGenerator() {
               variant="outline"
               className="flex-1 h-9 text-sm"
               onClick={handleGenerateCaption}
-              disabled={captionLoading || players.length === 0}
+              disabled={captionLoading || displayPlayers.length === 0}
             >
               {captionLoading ? (
                 <RefreshCw className="h-3.5 w-3.5 mr-2 animate-spin" />
@@ -443,7 +488,7 @@ export default function SocialGraphicGenerator() {
           }}
         >
           <div ref={canvasRef} style={{ width: SIZE, height: SIZE, overflow: "hidden" }}>
-            <GraphicCanvas type={selectedType} players={players} />
+            <GraphicCanvas type={selectedType} players={displayPlayers} />
           </div>
         </div>
       )}

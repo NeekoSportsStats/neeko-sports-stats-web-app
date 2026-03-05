@@ -43,7 +43,21 @@ function AnglePanel({
   onGenerateCaption,
 }: AnglePanelProps) {
   const [copied, setCopied] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<(number | string)[]>([]);
   const { toast } = useToast();
+
+  const togglePlayer = (id: number | string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const clearSelection = () => setSelectedIds([]);
+
+  const displayPlayers =
+    selectedIds.length === 0
+      ? players
+      : players.filter((p) => selectedIds.includes(p.player_id ?? p.player_name));
 
   const handleCopy = () => {
     navigator.clipboard.writeText(caption).then(() => {
@@ -57,10 +71,20 @@ function AnglePanel({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm text-muted-foreground">{angle.description}</p>
-        <Button variant="outline" size="sm" onClick={onRefresh} disabled={loading} className="h-8 text-xs shrink-0">
-          <RefreshCw className={`h-3 w-3 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh Data
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {selectedIds.length > 0 && (
+            <button
+              onClick={clearSelection}
+              className="h-8 px-3 rounded text-xs font-medium border border-border bg-background hover:bg-muted text-muted-foreground transition-colors"
+            >
+              Clear Selection ({selectedIds.length})
+            </button>
+          )}
+          <Button variant="outline" size="sm" onClick={onRefresh} disabled={loading} className="h-8 text-xs shrink-0">
+            <RefreshCw className={`h-3 w-3 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+            Refresh Data
+          </Button>
+        </div>
       </div>
 
       {/* Player Table */}
@@ -85,27 +109,48 @@ function AnglePanel({
               </tr>
             </thead>
             <tbody>
-              {players.map((p, i) => (
-                <tr key={p.player_id ?? p.player_name} className="border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors">
-                  <td className="px-3 py-2 text-xs text-muted-foreground tabular-nums">{i + 1}</td>
-                  <td className="px-3 py-2 font-medium">{p.player_name}</td>
-                  <td className="px-3 py-2 text-sm text-muted-foreground hidden sm:table-cell">{p.team}</td>
-                  <td className="px-3 py-2 hidden sm:table-cell">
-                    {p.position && (
-                      <span className={`inline-block text-xs px-1.5 py-0.5 rounded border font-medium ${positionBadgeColor(p.position)}`}>
-                        {p.position}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-right font-semibold tabular-nums text-foreground">
-                    {angle.keyStatFn(p)}
-                  </td>
-                </tr>
-              ))}
+              {players.map((p, i) => {
+                const id = p.player_id ?? p.player_name;
+                const isSelected = selectedIds.includes(id);
+                return (
+                  <tr
+                    key={id}
+                    onClick={() => togglePlayer(id)}
+                    style={isSelected ? { background: "rgba(255,180,0,0.12)", borderLeft: "3px solid #ffb400" } : {}}
+                    className="border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors cursor-pointer select-none"
+                  >
+                    <td className="px-3 py-2 text-xs tabular-nums">
+                      {isSelected ? (
+                        <span style={{ color: "#ffb400", fontSize: 14 }}>&#10003;</span>
+                      ) : (
+                        <span className="text-muted-foreground">{i + 1}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 font-medium">{p.player_name}</td>
+                    <td className="px-3 py-2 text-sm text-muted-foreground hidden sm:table-cell">{p.team}</td>
+                    <td className="px-3 py-2 hidden sm:table-cell">
+                      {p.position && (
+                        <span className={`inline-block text-xs px-1.5 py-0.5 rounded border font-medium ${positionBadgeColor(p.position)}`}>
+                          {p.position}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold tabular-nums text-foreground">
+                      {angle.keyStatFn(p)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
       </div>
+
+      {selectedIds.length === 0 && !loading && players.length > 0 && (
+        <p className="text-xs text-muted-foreground -mt-1">
+          Click any row to select players — preview and caption will only include selected players.
+        </p>
+      )}
 
       {/* Caption Generator */}
       <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
@@ -113,11 +158,14 @@ function AnglePanel({
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium">AI Ad Caption</span>
+            {selectedIds.length > 0 && (
+              <span className="text-xs text-muted-foreground">({displayPlayers.length} selected)</span>
+            )}
           </div>
           <Button
             size="sm"
             onClick={onGenerateCaption}
-            disabled={captionLoading || players.length === 0}
+            disabled={captionLoading || displayPlayers.length === 0}
             className="h-8 text-xs shrink-0"
           >
             {captionLoading ? (
