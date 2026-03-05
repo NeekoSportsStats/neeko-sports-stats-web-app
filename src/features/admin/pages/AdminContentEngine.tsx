@@ -4,22 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Download,
-  RefreshCw,
-  Copy,
-  Check,
-  Sparkles,
-  Zap,
-  LayoutTemplate,
-  ChevronDown,
-  Flame,
-  Video,
-  Play,
-  ImageIcon,
-  Layers,
-  Palette,
-} from "lucide-react";
+import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Flame, Video, Play, Image as ImageIcon, Layers, Palette } from "lucide-react";
 import { generateVideo, type VideoSlideData } from "./VideoGenerator";
 import {
   GraphicCanvas,
