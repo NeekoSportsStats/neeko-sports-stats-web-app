@@ -3,7 +3,7 @@ import { toPng } from "html-to-image";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Image as ImageIcon, Layers, Palette, Type, Hash, Calendar, Video, Play, ChevronRight, Shuffle, ChartBar as BarChart2 } from "lucide-react";
+import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Image as ImageIcon, Layers, Palette, Type, Hash, Calendar, Video, Play, ChevronRight, Shuffle, ChartBar as BarChart2, CalendarPlus } from "lucide-react";
 import { VideoGeneratorPanel } from "../marketing/VideoGeneratorPanel";
 import {
   GraphicCanvas,
@@ -21,6 +21,7 @@ import {
   type CtaPosition,
 } from "../marketing/GraphicTemplates";
 import { exportCarouselSlides } from "../marketing/CarouselExport";
+import { AddToPlannerModal } from "../marketing/AddToPlannerModal";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -471,6 +472,10 @@ export default function AdminContentEngine() {
   const [copiedCaption, setCopiedCaption] = useState(false);
   const [copiedPost, setCopiedPost]       = useState(false);
 
+  // Planner modal
+  const [plannerModalOpen, setPlannerModalOpen] = useState(false);
+  const [plannerMediaUrl, setPlannerMediaUrl]   = useState<string | null>(null);
+
   const previewRef = useRef<HTMLDivElement>(null);
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -667,11 +672,33 @@ export default function AdminContentEngine() {
     });
   };
 
+  const handleAddToPlanner = async () => {
+    if (isCarouselMode || !previewRef.current || players.length === 0) {
+      setPlannerMediaUrl(null);
+      setPlannerModalOpen(true);
+      return;
+    }
+    try {
+      const inner = previewRef.current.firstElementChild as HTMLElement | null;
+      if (inner) {
+        const { w, h } = selectedExportSize;
+        const dataUrl = await toPng(inner, { width: w, height: h, pixelRatio: 1, style: { transform: "none" } });
+        setPlannerMediaUrl(dataUrl);
+      } else {
+        setPlannerMediaUrl(null);
+      }
+    } catch {
+      setPlannerMediaUrl(null);
+    }
+    setPlannerModalOpen(true);
+  };
+
   const accentStyle = { color: accentColor };
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
+    <>
     <div className="flex flex-col h-full" style={{ minHeight: 0 }}>
 
       {/* ── TOP BAR: Header + Stat Angle Selector ─────────────────────────── */}
@@ -1210,6 +1237,16 @@ export default function AdminContentEngine() {
                   <RefreshCw className={`h-3 w-3 ${dataLoading ? "animate-spin" : ""}`} />
                   Refresh Data
                 </Button>
+                <Button
+                  variant="outline" size="sm"
+                  className="h-7 text-xs gap-1.5"
+                  onClick={handleAddToPlanner}
+                  disabled={players.length === 0}
+                  style={{ borderColor: `${accentColor}44`, color: accentColor }}
+                >
+                  <CalendarPlus className="h-3 w-3" />
+                  Add to Planner
+                </Button>
                 <div className="ml-auto flex items-center gap-2">
                   <span className="text-[11px] text-muted-foreground/50">
                     {exportW}×{exportH}px{isCarouselMode ? ` · ${players.length + 1} slides` : ""}
@@ -1297,5 +1334,18 @@ export default function AdminContentEngine() {
         </div>
       </div>
     </div>
+
+    {plannerModalOpen && (
+      <AddToPlannerModal
+        payload={{
+          stat_angle: selectedAngle.label,
+          media_url: plannerMediaUrl,
+          caption,
+          insight,
+        }}
+        onClose={() => { setPlannerModalOpen(false); setPlannerMediaUrl(null); }}
+      />
+    )}
+    </>
   );
 }
