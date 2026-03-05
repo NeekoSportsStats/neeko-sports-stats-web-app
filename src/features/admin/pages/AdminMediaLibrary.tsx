@@ -14,12 +14,17 @@ type MediaMode = "graphic" | "video";
 type Category  = "all" | "stadium" | "crowd" | "field" | "abstract" | "players";
 
 interface MediaItem {
-  id:        string;
-  label:     string;
-  url:       string;
-  thumbnail: string;
-  category:  Category;
-  filename:  string;
+  asset_id:      string;
+  id:            string;
+  label:         string;
+  url:           string;
+  thumbnail_url: string;
+  thumbnail:     string;
+  category:      Category;
+  filename:      string;
+  media_type:    string;
+  is_active:     boolean;
+  sort_order:    number | null;
 }
 
 interface GenerationJob {
@@ -43,8 +48,8 @@ const VIDEO_BASE           = "videos/ai-generated";
 const IMAGE_SUBCATEGORIES: Category[] = ["stadium", "crowd", "field", "abstract", "players"];
 const CATEGORIES: Category[]          = ["all", "stadium", "crowd", "field", "abstract", "players"];
 
-const CACHE_KEY_IMAGES = "neeko_media_lib_images_v1";
-const CACHE_KEY_VIDEOS = "neeko_media_lib_videos_v1";
+const CACHE_KEY_IMAGES = "neeko_media_lib_images_v2";
+const CACHE_KEY_VIDEOS = "neeko_media_lib_videos_v2";
 const CACHE_TTL        = 5 * 60 * 1000;
 
 const POLL_INTERVAL_MS = 3000;
@@ -75,10 +80,6 @@ const JOB_CONFIGS: JobConfig[] = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function labelFromFilename(name: string): string {
-  return name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
 function readCache(key: string): MediaItem[] | null {
   try {
     const raw = localStorage.getItem(key);
@@ -93,22 +94,22 @@ function writeCache(key: string, data: MediaItem[]) {
   try { localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })); } catch { /* quota */ }
 }
 
-async function listFolder(path: string, subcat: Category): Promise<MediaItem[]> {
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .list(path, { limit: 300, sortBy: { column: "name", order: "asc" } });
-  if (error || !data) return [];
-  const items: MediaItem[] = [];
-  for (const file of data) {
-    if (!file.name || file.name.startsWith(".")) continue;
-    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-    if (!["jpg", "jpeg", "png", "webp", "avif", "mp4", "webm", "mov"].includes(ext)) continue;
-    const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(`${path}/${file.name}`);
-    const url = urlData?.publicUrl ?? "";
-    if (!url) continue;
-    items.push({ id: `${path}/${file.name}`, label: labelFromFilename(file.name), url, thumbnail: url, category: subcat, filename: file.name });
-  }
-  return items;
+function rowToMediaItem(row: Record<string, unknown>): MediaItem {
+  const url = (row.url as string) ?? "";
+  const filename = url.split("/").pop() ?? (row.asset_id as string) ?? "";
+  return {
+    asset_id:      (row.asset_id as string) ?? "",
+    id:            (row.asset_id as string) ?? "",
+    label:         (row.label as string) ?? filename,
+    url,
+    thumbnail_url: (row.thumbnail_url as string) ?? url,
+    thumbnail:     (row.thumbnail_url as string) ?? url,
+    category:      ((row.category as string) ?? "abstract") as Category,
+    filename,
+    media_type:    (row.media_type as string) ?? "image",
+    is_active:     (row.is_active as boolean) ?? true,
+    sort_order:    (row.sort_order as number | null) ?? null,
+  };
 }
 
 async function loadImages(force = false): Promise<MediaItem[]> {
@@ -116,10 +117,16 @@ async function loadImages(force = false): Promise<MediaItem[]> {
     const cached = readCache(CACHE_KEY_IMAGES);
     if (cached) return cached;
   }
-  const results = await Promise.all(IMAGE_SUBCATEGORIES.map((cat) => listFolder(`${IMAGE_BASE}/${cat}`, cat)));
-  const flat = results.flat();
-  writeCache(CACHE_KEY_IMAGES, flat);
-  return flat;
+  const { data, error } = await supabase
+    .from("ai_media_library")
+    .select("*")
+    .eq("is_active", true)
+    .eq("media_type", "image")
+    .order("sort_order", { ascending: true });
+  if (error || !data) return [];
+  const items = (data as Record<string, unknown>[]).map(rowToMediaItem);
+  writeCache(CACHE_KEY_IMAGES, items);
+  return items;
 }
 
 async function loadVideos(force = false): Promise<MediaItem[]> {
@@ -127,10 +134,16 @@ async function loadVideos(force = false): Promise<MediaItem[]> {
     const cached = readCache(CACHE_KEY_VIDEOS);
     if (cached) return cached;
   }
-  const results = await Promise.all(IMAGE_SUBCATEGORIES.map((cat) => listFolder(`${VIDEO_BASE}/${cat}`, cat)));
-  const flat = results.flat();
-  writeCache(CACHE_KEY_VIDEOS, flat);
-  return flat;
+  const { data, error } = await supabase
+    .from("ai_media_library")
+    .select("*")
+    .eq("is_active", true)
+    .eq("media_type", "video")
+    .order("sort_order", { ascending: true });
+  if (error || !data) return [];
+  const items = (data as Record<string, unknown>[]).map(rowToMediaItem);
+  writeCache(CACHE_KEY_VIDEOS, items);
+  return items;
 }
 
 function clearMediaCaches() {
@@ -850,20 +863,11 @@ export default function AdminMediaLibrary() {
       const storagePath  = markerIdx !== -1
         ? item.url.slice(markerIdx + bucketMarker.length)
         : `${mode === "graphic" ? IMAGE_BASE : VIDEO_BASE}/${item.category}/${item.filename}`;
-      const folderPath   = storagePath.split("/").slice(0, -1).join("/");
 
       // 1. Remove file from storage
-      const { error: removeErr } = await supabase.storage.from(BUCKET).remove([storagePath]);
-      if (removeErr) throw new Error(removeErr.message);
+      await supabase.storage.from(BUCKET).remove([storagePath]);
 
-      // 2. Verify removal — list folder and confirm file is gone
-      const { data: listing } = await supabase.storage
-        .from(BUCKET)
-        .list(folderPath, { limit: 500 });
-      const stillExists = listing?.some((f) => f.name === item.filename);
-      if (stillExists) throw new Error(`File still exists after delete: ${item.filename}`);
-
-      // 3. Record in media_deleted_files so generator skips this path
+      // 2. Record in media_deleted_files so generator skips this path
       await supabase.from("media_deleted_files").upsert(
         {
           file_path:  storagePath,
@@ -874,46 +878,20 @@ export default function AdminMediaLibrary() {
         { onConflict: "file_path" },
       );
 
-      // 4a. Mark row inactive in ai_media_library (generator source of truth)
+      // 3. Mark row inactive in ai_media_library — source of truth
       await supabase
         .from("ai_media_library")
         .update({ is_active: false })
-        .eq("url", item.url);
+        .eq("asset_id", item.asset_id);
 
-      // 4. Clear ALL local caches — belt and braces
+      // 4. Clear caches
       clearMediaCaches();
 
       // 5. Remove from UI state immediately
       if (mode === "graphic") {
-        setImages((prev) => prev.filter((i) => i.id !== item.id));
+        setImages((prev) => prev.filter((i) => i.asset_id !== item.asset_id));
       } else {
-        setVideos((prev) => prev.filter((i) => i.id !== item.id));
-      }
-
-      // 6. Re-fetch from storage to guarantee UI matches reality
-      const isImage = mode === "graphic";
-      const fresh = isImage
-        ? await listFolder(folderPath, item.category)
-        : await listFolder(folderPath, item.category);
-
-      if (isImage) {
-        setImages((prev) => {
-          const otherCats = prev.filter((i) => i.category !== item.category);
-          return [...otherCats, ...fresh];
-        });
-        writeCache(CACHE_KEY_IMAGES, [
-          ...images.filter((i) => i.category !== item.category),
-          ...fresh,
-        ]);
-      } else {
-        setVideos((prev) => {
-          const otherCats = prev.filter((i) => i.category !== item.category);
-          return [...otherCats, ...fresh];
-        });
-        writeCache(CACHE_KEY_VIDEOS, [
-          ...videos.filter((i) => i.category !== item.category),
-          ...fresh,
-        ]);
+        setVideos((prev) => prev.filter((i) => i.asset_id !== item.asset_id));
       }
 
     } finally {
@@ -1006,7 +984,7 @@ export default function AdminMediaLibrary() {
         <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
           <Grid3x3 className="h-10 w-10 text-muted-foreground/30" />
           <p className="text-sm font-medium text-muted-foreground">
-            {activeItems.length === 0 ? `No ${mode === "graphic" ? "images" : "videos"} found in storage` : "No results match your filter"}
+            {activeItems.length === 0 ? `No ${mode === "graphic" ? "images" : "videos"} found in the media library` : "No results match your filter"}
           </p>
           {activeItems.length === 0 && <p className="text-xs text-muted-foreground/50 max-w-xs">Use the Media Generation panel above to generate new assets.</p>}
         </div>
@@ -1016,7 +994,7 @@ export default function AdminMediaLibrary() {
             <span>{filtered.length} {mode === "graphic" ? "images" : "videos"}</span>
           </div>
           <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}>
-            {filtered.map((item) => <MediaCard key={item.id} item={item} mode={mode} onClick={setPreview} />)}
+            {filtered.map((item) => <MediaCard key={item.asset_id} item={item} mode={mode} onClick={setPreview} />)}
           </div>
         </>
       )}
