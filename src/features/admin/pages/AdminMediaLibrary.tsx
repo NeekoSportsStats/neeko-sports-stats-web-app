@@ -51,8 +51,9 @@ const CATEGORIES: Category[]          = ["all", "stadium", "crowd", "field", "ab
 const CACHE_KEY_ALL = "neeko_media_lib_all_v3";
 const CACHE_TTL     = 5 * 60 * 1000;
 
-const POLL_INTERVAL_MS = 3000;
-const ACCENT           = "#F59E0B";
+const POLL_INTERVAL_MS  = 5000;
+const JOB_TIMEOUT_MS    = 20 * 60 * 1000;
+const ACCENT            = "#F59E0B";
 
 // ─── Job configs ─────────────────────────────────────────────────────────────
 
@@ -236,9 +237,11 @@ function ActiveJobBanner({ job, onDismiss }: ActiveJobBannerProps) {
   const imageEntries = imageCats.filter((c) => cp[c]);
   const videoEntries = imageCats.filter((c) => cp[`video_${c}`]);
 
-  const elapsedSecs = job.started_at
-    ? Math.round((Date.now() - new Date(job.started_at).getTime()) / 1000)
+  const elapsedMs = job.started_at
+    ? Date.now() - new Date(job.started_at).getTime()
     : 0;
+  const elapsedSecs = Math.round(elapsedMs / 1000);
+  const isTimedOut  = isRunning && elapsedMs > JOB_TIMEOUT_MS;
   const rate = elapsedSecs > 0 ? job.generated_count / elapsedSecs : 0;
   const remaining = rate > 0 ? Math.round((job.target_count - job.generated_count) / rate) : null;
 
@@ -246,30 +249,33 @@ function ActiveJobBanner({ job, onDismiss }: ActiveJobBannerProps) {
     <div
       className="rounded-2xl border overflow-hidden"
       style={{
-        borderColor: isComplete ? "#10b98140" : isFailed ? "#ef444440" : `${ACCENT}40`,
-        background:  isComplete ? "#10b98108" : isFailed ? "#ef444408" : `${ACCENT}08`,
+        borderColor: isComplete ? "#10b98140" : (isFailed || isTimedOut) ? "#ef444440" : `${ACCENT}40`,
+        background:  isComplete ? "#10b98108" : (isFailed || isTimedOut) ? "#ef444408" : `${ACCENT}08`,
       }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "inherit" }}>
         <div className="flex items-center gap-2.5">
-          {isRunning && <Loader2 className="h-4 w-4 animate-spin shrink-0" style={{ color: ACCENT }} />}
-          {isComplete && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />}
-          {isFailed   && <AlertCircle  className="h-4 w-4 shrink-0 text-red-400" />}
+          {isRunning && !isTimedOut && <Loader2 className="h-4 w-4 animate-spin shrink-0" style={{ color: ACCENT }} />}
+          {isTimedOut  && <AlertCircle  className="h-4 w-4 shrink-0 text-red-400" />}
+          {isComplete  && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />}
+          {isFailed    && <AlertCircle  className="h-4 w-4 shrink-0 text-red-400" />}
           <div>
             <p className="text-sm font-semibold text-white">
-              {isRunning  && "Media generation in progress"}
-              {isComplete && "Media generation complete"}
-              {isFailed   && "Media generation failed"}
+              {isTimedOut  && "Media generation timed out"}
+              {isRunning && !isTimedOut && "Media generation in progress"}
+              {isComplete  && "Media generation complete"}
+              {isFailed    && "Media generation failed"}
             </p>
             <p className="text-[11px] text-zinc-500 mt-0.5">
               Target: <span className="capitalize">{job.target}</span>
-              {isRunning && remaining !== null && ` · ~${remaining}s remaining`}
+              {isRunning && !isTimedOut && remaining !== null && ` · ~${remaining}s remaining`}
+              {isTimedOut && ` · exceeded 20 minute limit`}
               {isComplete && ` · ${job.generated_count} assets generated`}
             </p>
           </div>
         </div>
-        {!isRunning && (
+        {(!isRunning || isTimedOut) && (
           <button onClick={onDismiss} className="w-7 h-7 flex items-center justify-center rounded-lg bg-zinc-800/60 hover:bg-zinc-700 transition-colors">
             <X className="h-3.5 w-3.5 text-zinc-400" />
           </button>
@@ -279,13 +285,15 @@ function ActiveJobBanner({ job, onDismiss }: ActiveJobBannerProps) {
       {/* Body */}
       <div className="p-4 space-y-4">
 
-        {/* Overall progress */}
-        <ProgressBar
-          label={`Overall — ${job.target}`}
-          generated={job.generated_count}
-          target={job.target_count}
-          color={isComplete ? "#10b981" : isFailed ? "#ef4444" : ACCENT}
-        />
+        {/* Overall progress — only show bar when actively running */}
+        {!isTimedOut && (
+          <ProgressBar
+            label={`Overall — ${job.target}`}
+            generated={job.generated_count}
+            target={job.target_count}
+            color={isComplete ? "#10b981" : isFailed ? "#ef4444" : ACCENT}
+          />
+        )}
 
         {/* Per-category image progress */}
         {imageEntries.length > 0 && (
@@ -332,7 +340,13 @@ function ActiveJobBanner({ job, onDismiss }: ActiveJobBannerProps) {
           <p className="text-[11px] text-red-400 bg-red-900/10 rounded-lg px-3 py-2 break-all">{job.error_message}</p>
         )}
 
-        {isRunning && (
+        {isTimedOut && (
+          <p className="text-[11px] text-red-400 bg-red-900/10 rounded-lg px-3 py-2">
+            Media generation timed out after 20 minutes. The job may have failed silently. Dismiss this banner and try regenerating.
+          </p>
+        )}
+
+        {isRunning && !isTimedOut && (
           <p className="text-[10px] text-zinc-600 text-center">Generation is running in the background — safe to close this browser tab</p>
         )}
       </div>
@@ -793,7 +807,11 @@ export default function AdminMediaLibrary() {
 
     if (job.status === "running" || job.status === "complete" || job.status === "failed") {
       setRunningDbJob(job);
-      if (job.status === "running") {
+      const jobTimedOut = job.status === "running" &&
+        job.started_at &&
+        Date.now() - new Date(job.started_at).getTime() > JOB_TIMEOUT_MS;
+
+      if (job.status === "running" && !jobTimedOut) {
         const pct = job.target_count > 0 ? Math.round((job.generated_count / job.target_count) * 100) : 0;
         setGlobalJob("media", pct, `Generating ${job.target} media…`);
       } else {
