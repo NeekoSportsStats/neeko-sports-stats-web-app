@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Image as ImageIcon, Video, Package, Loader2 } from "lucide-react";
+import { Check, Image as ImageIcon, Video, Package, Loader as Loader2 } from "lucide-react";
 import type { BackgroundSource } from "./GraphicTemplates";
 
 export interface StockMediaItem {
