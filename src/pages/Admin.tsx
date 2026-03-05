@@ -1,22 +1,24 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { RefreshCw, Shield, LayoutDashboard, Server, BarChart3, Megaphone } from "lucide-react";
+import { RefreshCw, Shield, LayoutDashboard, Server, BarChart3, Megaphone, Zap } from "lucide-react";
 
 const AdminDashboard = lazy(() => import("@/features/admin/pages/AdminDashboard"));
 const AdminSystemHealth = lazy(() => import("@/features/admin/pages/AdminSystemHealth"));
 const AdminAnalytics = lazy(() => import("@/features/admin/pages/AdminAnalytics"));
 const AdminMarketingHub = lazy(() => import("@/features/admin/pages/AdminMarketingHub"));
+const AdminContentEngine = lazy(() => import("@/features/admin/pages/AdminContentEngine"));
 
 const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
 
-type TabId = "dashboard" | "system" | "analytics" | "marketing";
+type TabId = "dashboard" | "system" | "analytics" | "marketing" | "content";
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "system", label: "System Health", icon: Server },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "marketing", label: "Marketing Hub", icon: Megaphone },
+  { id: "content", label: "Content Engine", icon: Zap },
 ];
 
 function TabLoadingFallback() {
@@ -100,6 +102,7 @@ export default function Admin() {
                 {id === "system" && <AdminSystemHealth />}
                 {id === "analytics" && <AdminAnalytics />}
                 {id === "marketing" && <AdminMarketingHub />}
+                {id === "content" && <AdminContentEngine />}
               </Suspense>
             )}
           </div>
