@@ -13,9 +13,11 @@ import {
   ChevronRight,
   Sparkles,
   TrendingUp,
+  ImageIcon,
 } from "lucide-react";
 import { STAT_ANGLES } from "./angles";
 import type { MarketingPlayer, StatAngle } from "./types";
+import SocialGraphicGenerator from "./SocialGraphicGenerator";
 
 const HASHTAGS = "#AFLFantasy #AFLFantasy2026 #FantasyFooty #AFL #NeekoSports";
 
@@ -395,6 +397,16 @@ export default function MarketingStatsHub() {
           onRefresh={handleRefresh}
           onGenerateCaption={handleGenerateCaption}
         />
+
+        {/* Divider */}
+        <div className="border-t border-border mt-8 pt-6">
+          <div className="flex items-center gap-2 mb-5">
+            <ImageIcon className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold">Social Graphic Generator</h3>
+            <Badge variant="secondary" className="text-xs">1080×1080</Badge>
+          </div>
+          <SocialGraphicGenerator />
+        </div>
       </CardContent>
     </Card>
   );
