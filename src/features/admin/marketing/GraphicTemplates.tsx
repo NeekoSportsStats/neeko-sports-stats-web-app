@@ -243,7 +243,7 @@ function LogoOverlay({ position, w, h }: { position: LogoPosition; w: number; h:
   return (
     <div style={style}>
       <img
-        src="/neeko-logo-transparent.png"
+        src="/logo.png"
         alt="Neeko"
         onError={() => setOk(false)}
         style={{ width: "100%", height: "100%", objectFit: "contain" }}
