@@ -10,7 +10,7 @@ const corsHeaders = {
 
 const STORAGE_BUCKET = "content-assets";
 
-const VALID_CATEGORIES = ["stadium", "crowd", "field", "players", "abstract"] as const;
+const VALID_CATEGORIES = ["stadium", "crowd", "field", "players", "abstract", "equipment"] as const;
 type Category = typeof VALID_CATEGORIES[number];
 
 // ─── Variation pools ───────────────────────────────────────────────────────────
@@ -185,6 +185,24 @@ function buildPlayersPrompt(seed: number): string {
   return `${pickFrom(actions, rng)}, stadium crowd in background, ${time}, ${light}, dramatic sports photography style, dark background, no text, no logos`;
 }
 
+function buildEquipmentPrompt(seed: number): string {
+  const rng = seededRng(seed);
+  const subjects = [
+    "Sherrin Australian rules football on bright green oval grass, close up product photography, stadium background bokeh, ultra realistic",
+    "AFL football boots on grass, professional sports product photography, dark atmospheric background, studio lighting",
+    "four AFL goal posts standing tall on an oval football field, dramatic sky background, photorealistic sports photography",
+    "AFL training cones and equipment laid out on oval grass, professional sports photography, afternoon stadium lighting",
+    "AFL locker room with team jerseys hanging and boots on the floor, dramatic sports photography, atmospheric lighting",
+    "Sherrin football sitting on the centre circle of an AFL oval field, aerial perspective, ultra realistic product shot",
+    "AFL helmets and protective gear arranged on a bench, sports equipment photography, dark studio aesthetic",
+    "AFL football and training equipment on the oval before a match, golden hour lighting, photorealistic",
+    "close up of a Sherrin football mid-air against stadium crowd background, sports action photography",
+    "AFL gym and weights room with team colours, sports performance environment photography, dramatic lighting",
+  ];
+  const light = pickFrom(LIGHTING_STYLES, rng);
+  return `${pickFrom(subjects, rng)}, ${light}, no text, no logos, photorealistic, ultra detailed`;
+}
+
 function buildVideoPrompt(seed: number): string {
   const rng  = seededRng(seed);
   const clip = pickFrom(VIDEO_CLIPS, rng);
@@ -194,11 +212,12 @@ function buildVideoPrompt(seed: number): string {
 
 function buildVariedPrompt(category: Category, seed: number): string {
   switch (category) {
-    case "stadium":  return buildStadiumPrompt(seed);
-    case "crowd":    return buildCrowdPrompt(seed);
-    case "field":    return buildFieldPrompt(seed);
-    case "abstract": return buildAbstractPrompt(seed);
-    case "players":  return buildPlayersPrompt(seed);
+    case "stadium":   return buildStadiumPrompt(seed);
+    case "crowd":     return buildCrowdPrompt(seed);
+    case "field":     return buildFieldPrompt(seed);
+    case "abstract":  return buildAbstractPrompt(seed);
+    case "players":   return buildPlayersPrompt(seed);
+    case "equipment": return buildEquipmentPrompt(seed);
   }
 }
 
