@@ -25,6 +25,8 @@ import {
   AdminSystemHealth,
   AdminAnalytics,
   AdminContentEngine,
+  AdminContentPlanner,
+  AdminFounderTasks,
 } from "@/pages/Admin";
 
 const NeekoPlusPurchase = React.lazy(() => import("@/pages/NeekoPlusPurchase"));
@@ -151,10 +153,12 @@ function App() {
         }
       >
         <Route index element={<Navigate to="/admin/dashboard" replace />} />
-        <Route path="dashboard"      element={<S fallback={Generic}><AdminDashboard /></S>} />
-        <Route path="system-health"  element={<S fallback={Generic}><AdminSystemHealth /></S>} />
-        <Route path="analytics"      element={<S fallback={Generic}><AdminAnalytics /></S>} />
-        <Route path="content-engine" element={<S fallback={Generic}><AdminContentEngine /></S>} />
+        <Route path="dashboard"        element={<S fallback={Generic}><AdminDashboard /></S>} />
+        <Route path="system-health"    element={<S fallback={Generic}><AdminSystemHealth /></S>} />
+        <Route path="analytics"        element={<S fallback={Generic}><AdminAnalytics /></S>} />
+        <Route path="content-engine"   element={<S fallback={Generic}><AdminContentEngine /></S>} />
+        <Route path="content-planner"  element={<S fallback={Generic}><AdminContentPlanner /></S>} />
+        <Route path="founder-tasks"    element={<S fallback={Generic}><AdminFounderTasks /></S>} />
       </Route>
 
       <Route
