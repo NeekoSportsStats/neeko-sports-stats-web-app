@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Video, Play, Download, RefreshCw, TriangleAlert as AlertTriangle, X, Check, ChevronDown, Smartphone, Square } from "lucide-react";
@@ -17,10 +17,25 @@ import type { ContentPlayer, StatAngle } from "./GraphicTemplates";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+export interface VideoPreviewState {
+  videoUrl: string | null;
+  videoBlob: Blob | null;
+  squareUrl: string | null;
+  squareBlob: Blob | null;
+  dualPreview: boolean;
+  generating: boolean;
+  progress: number;
+  accentColor: string;
+  angleId: string;
+  template: string;
+  onDownload: (blob: Blob | null, suffix?: string) => void;
+}
+
 interface Props {
   players: ContentPlayer[];
   selectedAngle: StatAngle;
   dataLoading: boolean;
+  onPreviewChange?: (state: VideoPreviewState) => void;
 }
 
 // ─── Option definitions ──────────────────────────────────────────────────────
@@ -228,7 +243,7 @@ function NarrationWarningModal({ onConfirm, onCancel }: { onConfirm: () => void;
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Props) {
+export function VideoGeneratorPanel({ players, selectedAngle, dataLoading, onPreviewChange }: Props) {
   const { toast } = useToast();
 
   const [config, setConfig]             = useState<VideoConfig>({ ...DEFAULT_VIDEO_CONFIG });
@@ -252,6 +267,23 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
   const squareVideoRef = useRef<HTMLVideoElement>(null);
 
   const accentColor = selectedAngle.accentColor;
+
+  useEffect(() => {
+    if (!onPreviewChange) return;
+    onPreviewChange({
+      videoUrl,
+      videoBlob,
+      squareUrl,
+      squareBlob,
+      dualPreview,
+      generating,
+      progress,
+      accentColor,
+      angleId: selectedAngle.id,
+      template: config.template,
+      onDownload: handleDownload,
+    });
+  }, [videoUrl, squareUrl, dualPreview, generating, progress]);
 
   const update = <K extends keyof VideoConfig>(key: K, val: VideoConfig[K]) =>
     setConfig((prev) => ({ ...prev, [key]: val }));
@@ -617,124 +649,6 @@ export function VideoGeneratorPanel({ players, selectedAngle, dataLoading }: Pro
             className="h-full rounded-full transition-all duration-200"
             style={{ width: `${progress}%`, background: accentColor }}
           />
-        </div>
-      )}
-
-      {/* Video Preview — dual or single */}
-      {(videoUrl || squareUrl) && (
-        <div className="space-y-3">
-          <p className="text-xs font-semibold">Video Preview</p>
-
-          {dualPreview && squareUrl ? (
-            <div className="flex gap-4 items-start">
-              {/* Phone preview — takes ~55% in dual mode */}
-              {videoUrl && (
-                <div className="space-y-2" style={{ flex: "0 0 55%" }}>
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
-                    <Smartphone className="h-3 w-3" />
-                    Phone (9:16)
-                  </div>
-                  <div
-                    className="rounded-xl overflow-hidden border border-border bg-black w-full"
-                    style={{ aspectRatio: "9/16" }}
-                  >
-                    <video
-                      ref={videoRef}
-                      src={videoUrl}
-                      controls
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full h-8 text-xs"
-                    onClick={() => handleDownload(videoBlob, "-reels")}
-                    style={{ borderColor: `${accentColor}44`, color: accentColor }}
-                  >
-                    <Download className="h-3.5 w-3.5 mr-1.5" />
-                    Download
-                  </Button>
-                </div>
-              )}
-
-              {/* Square preview — takes remaining space */}
-              <div className="space-y-2 flex-1">
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
-                  <Square className="h-3 w-3" />
-                  Square (1:1)
-                </div>
-                <div
-                  className="rounded-xl overflow-hidden border border-border bg-black w-full"
-                  style={{ aspectRatio: "1/1" }}
-                >
-                  <video
-                    ref={squareVideoRef}
-                    src={squareUrl}
-                    controls
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-8 text-xs"
-                  onClick={() => handleDownload(squareBlob, "-square")}
-                  style={{ borderColor: `${accentColor}44`, color: accentColor }}
-                >
-                  <Download className="h-3.5 w-3.5 mr-1.5" />
-                  Download
-                </Button>
-              </div>
-            </div>
-          ) : videoUrl ? (
-            /* Single phone preview — full content width with aspect ratio constraint */
-            <div className="space-y-2">
-              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
-                <Smartphone className="h-3 w-3" />
-                Phone (9:16)
-              </div>
-              <div className="w-full flex justify-center">
-                <div
-                  className="rounded-xl overflow-hidden border border-border bg-black"
-                  style={{ aspectRatio: "9/16", width: "100%", maxWidth: "360px" }}
-                >
-                  <video
-                    ref={videoRef}
-                    src={videoUrl}
-                    controls
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full h-8 text-xs"
-                onClick={() => handleDownload(videoBlob, "-reels")}
-                style={{ borderColor: `${accentColor}44`, color: accentColor }}
-              >
-                <Download className="h-3.5 w-3.5 mr-1.5" />
-                Download
-              </Button>
-            </div>
-          ) : null}
-
-          <p className="text-[10px] text-muted-foreground/45 leading-relaxed text-center">
-            Live preview — scaled to fit screen. Exported video will render at full resolution.
-          </p>
         </div>
       )}
 

@@ -3,8 +3,8 @@ import { toPng } from "html-to-image";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Image as ImageIcon, Layers, Palette, Type, Hash, Calendar, Video, Play, ChevronRight, Shuffle, ChartBar as BarChart2, CalendarPlus } from "lucide-react";
-import { VideoGeneratorPanel } from "../marketing/VideoGeneratorPanel";
+import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Image as ImageIcon, Layers, Palette, Type, Hash, Calendar, Video, Play, ChevronRight, Shuffle, ChartBar as BarChart2, CalendarPlus, Smartphone, Square } from "lucide-react";
+import { VideoGeneratorPanel, type VideoPreviewState } from "../marketing/VideoGeneratorPanel";
 import {
   GraphicCanvas,
   CarouselTitleSlide,
@@ -475,6 +475,9 @@ export default function AdminContentEngine() {
   // Planner modal
   const [plannerModalOpen, setPlannerModalOpen] = useState(false);
   const [plannerMediaUrl, setPlannerMediaUrl]   = useState<string | null>(null);
+
+  // Video preview state (lifted from VideoGeneratorPanel)
+  const [videoPreviewState, setVideoPreviewState] = useState<VideoPreviewState | null>(null);
 
   const previewRef = useRef<HTMLDivElement>(null);
 
@@ -1185,6 +1188,7 @@ export default function AdminContentEngine() {
                 players={players}
                 selectedAngle={selectedAngle}
                 dataLoading={dataLoading}
+                onPreviewChange={setVideoPreviewState}
               />
             )}
 
@@ -1318,16 +1322,150 @@ export default function AdminContentEngine() {
             </>
           ) : (
             /* VIDEO MODE right panel */
-            <div className="flex flex-col items-center justify-center h-full gap-3 px-6">
-              <div className="rounded-xl border border-border/30 bg-muted/10 p-6 text-center space-y-2 max-w-sm">
-                <Play className="h-8 w-8 mx-auto opacity-20" style={{ color: accentColor }} />
-                <p className="text-sm font-semibold">Video Preview</p>
-                <p className="text-xs text-muted-foreground/60 leading-relaxed">
-                  Configure video settings in the left panel, then click Generate Video to create a preview here.
-                </p>
-                <p className="text-[10px] text-muted-foreground/40">
-                  Videos render locally in your browser at full resolution.
-                </p>
+            <div className="flex-1 flex flex-col overflow-hidden" style={{ minHeight: 0 }}>
+              {/* Header bar */}
+              <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b border-border/50 bg-background/60 backdrop-blur-sm">
+                <Video className="h-3.5 w-3.5" style={{ color: videoPreviewState?.accentColor ?? accentColor }} />
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Video Preview</p>
+                {videoPreviewState?.generating && (
+                  <div className="ml-auto flex items-center gap-2">
+                    <div className="h-1 w-32 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-200"
+                        style={{ width: `${videoPreviewState.progress}%`, background: videoPreviewState.accentColor }}
+                      />
+                    </div>
+                    <span className="text-[11px] text-muted-foreground/60 tabular-nums">{videoPreviewState.progress}%</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Preview content area */}
+              <div className="flex-1 overflow-auto p-6" style={{ minHeight: 0 }}>
+                {(!videoPreviewState?.videoUrl && !videoPreviewState?.squareUrl) ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-3">
+                    <div className="rounded-xl border border-border/30 bg-muted/10 p-6 text-center space-y-2 max-w-sm">
+                      {videoPreviewState?.generating ? (
+                        <>
+                          <RefreshCw className="h-8 w-8 mx-auto animate-spin opacity-40" style={{ color: videoPreviewState.accentColor }} />
+                          <p className="text-sm font-semibold">Generating video…</p>
+                          <p className="text-xs text-muted-foreground/60">Rendering {videoPreviewState.dualPreview ? "Phone + Square" : "Phone"} format locally.</p>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-8 w-8 mx-auto opacity-20" style={{ color: accentColor }} />
+                          <p className="text-sm font-semibold">Video Preview</p>
+                          <p className="text-xs text-muted-foreground/60 leading-relaxed">
+                            Configure settings in the left panel, then click Generate Video.
+                          </p>
+                          <p className="text-[10px] text-muted-foreground/40">Videos render locally at full resolution.</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : videoPreviewState?.dualPreview && videoPreviewState.squareUrl ? (
+                  /* Dual preview — side by side (stacks on narrow screens) */
+                  <div className="space-y-4">
+                    <div
+                      className="grid gap-6"
+                      style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}
+                    >
+                      {/* Phone 9:16 */}
+                      {videoPreviewState.videoUrl && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
+                            <Smartphone className="h-3 w-3" />
+                            Phone (9:16)
+                          </div>
+                          <div className="rounded-xl overflow-hidden border border-border bg-black w-full" style={{ aspectRatio: "9/16" }}>
+                            <video
+                              src={videoPreviewState.videoUrl}
+                              controls
+                              autoPlay
+                              loop
+                              muted
+                              playsInline
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full h-8 text-xs"
+                            onClick={() => videoPreviewState.onDownload(videoPreviewState.videoBlob, "-reels")}
+                            style={{ borderColor: `${videoPreviewState.accentColor}44`, color: videoPreviewState.accentColor }}
+                          >
+                            <Download className="h-3.5 w-3.5 mr-1.5" />Download Phone
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* Square 1:1 */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
+                          <Square className="h-3 w-3" />
+                          Square (1:1)
+                        </div>
+                        <div className="rounded-xl overflow-hidden border border-border bg-black w-full" style={{ aspectRatio: "1/1" }}>
+                          <video
+                            src={videoPreviewState.squareUrl}
+                            controls
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full h-8 text-xs"
+                          onClick={() => videoPreviewState.onDownload(videoPreviewState.squareBlob, "-square")}
+                          style={{ borderColor: `${videoPreviewState.accentColor}44`, color: videoPreviewState.accentColor }}
+                        >
+                          <Download className="h-3.5 w-3.5 mr-1.5" />Download Square
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/40 text-center">
+                      Live preview — scaled to fit. Exported video renders at full resolution.
+                    </p>
+                  </div>
+                ) : videoPreviewState?.videoUrl ? (
+                  /* Single preview — centered */
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="space-y-2 w-full" style={{ maxWidth: 420 }}>
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
+                        <Smartphone className="h-3 w-3" />
+                        Phone (9:16)
+                      </div>
+                      <div className="rounded-xl overflow-hidden border border-border bg-black w-full" style={{ aspectRatio: "9/16" }}>
+                        <video
+                          src={videoPreviewState.videoUrl}
+                          controls
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full h-8 text-xs"
+                        onClick={() => videoPreviewState.onDownload(videoPreviewState.videoBlob, "-reels")}
+                        style={{ borderColor: `${videoPreviewState.accentColor}44`, color: videoPreviewState.accentColor }}
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1.5" />Download Video
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/40 text-center">
+                      Live preview — scaled to fit. Exported video renders at full resolution.
+                    </p>
+                  </div>
+                ) : null}
               </div>
             </div>
           )}
