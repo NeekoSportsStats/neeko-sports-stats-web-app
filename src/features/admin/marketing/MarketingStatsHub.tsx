@@ -4,17 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import {
-  RefreshCw,
-  Megaphone,
-  Copy,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
-  TrendingUp,
-  ImageIcon,
-} from "lucide-react";
+import { RefreshCw, Megaphone, Copy, Check, ChevronLeft, ChevronRight, Sparkles, TrendingUp, Image as ImageIcon } from "lucide-react";
 import { STAT_ANGLES } from "./angles";
 import type { MarketingPlayer, StatAngle } from "./types";
 import SocialGraphicGenerator from "./SocialGraphicGenerator";

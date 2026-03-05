@@ -3,15 +3,7 @@ import { toPng } from "html-to-image";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Download,
-  RefreshCw,
-  Megaphone,
-  Copy,
-  Check,
-  ImageIcon,
-  Sparkles,
-} from "lucide-react";
+import { Download, RefreshCw, Megaphone, Copy, Check, Image as ImageIcon, Sparkles } from "lucide-react";
 
 interface GraphicPlayer {
   player_name: string;
