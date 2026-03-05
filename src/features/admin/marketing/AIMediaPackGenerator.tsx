@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Check, Package, Loader, RefreshCw, Database, Image as ImageIcon, Video, TriangleAlert as AlertTriangle, Wand2, ExternalLink } from "lucide-react";
+import { Check, Package, Loader, RefreshCw, Database, Image as ImageIcon, Video, TriangleAlert as AlertTriangle, Wand as Wand2, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { invalidateAIMediaCache } from "./AIMediaPicker";
 import { STOCK_IMAGES, STOCK_VIDEOS, IMAGE_CATEGORY_TARGETS } from "./StockMediaPicker";
