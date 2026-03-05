@@ -29,10 +29,18 @@ export interface StatAngle {
   statFn: (p: ContentPlayer) => string;
   accentColor: string;
   insightFn: (players: ContentPlayer[]) => string;
-  layoutHint?: "stat_card" | "leaderboard" | "battle";
+  layoutHint?: LayoutEngine;
 }
 
-export type LayoutEngine = "stat_card" | "leaderboard" | "battle";
+export type LayoutEngine =
+  | "stat_card"
+  | "leaderboard"
+  | "battle"
+  | "captain_pick"
+  | "breakout_alert"
+  | "trade_target"
+  | "avoid_player"
+  | "matchup_advantage";
 export type BackgroundTheme = "dark_gradient" | "stadium" | "grass" | "team_colour" | "analytics_grid";
 
 export interface GraphicOptions {
@@ -911,6 +919,697 @@ export function CarouselPlayerSlide({
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAYOUT ENGINE 4: CAPTAIN PICK
+// Hero layout: badge, big projection number, player name, context line
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function LayoutCaptainPick({
+  angle, players, w, h, options,
+}: {
+  angle: StatAngle; players: ContentPlayer[]; w: number; h: number; options: GraphicOptions;
+}) {
+  const top = players[0];
+  if (!top) return <div style={{ width: w, height: h, background: "#060a14" }} />;
+  const isTall = h > w;
+  const isWide = w > h;
+  const teamColour = getTeamColour(top.team);
+  const proj = Math.round(Number(top.projection_final ?? 0));
+  const captScore = Math.round(Number(top.captain_score ?? 0));
+  const nameParts = top.player_name.split(" ");
+  const lastName  = nameParts.slice(-1)[0];
+  const firstName = nameParts.slice(0, -1).join(" ");
+
+  return (
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour}>
+      {/* Header */}
+      <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
+        <BrandBar accentColor={angle.accentColor} />
+      </div>
+
+      {/* Body */}
+      <div style={{
+        flex: 1, display: "flex", flexDirection: "column",
+        alignItems: isTall ? "center" : "flex-start",
+        justifyContent: "center",
+        textAlign: isTall ? "center" : "left",
+        gap: 0,
+      }}>
+        {/* Badge */}
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          background: `${angle.accentColor}18`, border: `1.5px solid ${angle.accentColor}50`,
+          borderRadius: 30, padding: isTall ? "8px 24px" : "6px 18px",
+          marginBottom: isTall ? 28 : 20,
+        }}>
+          <span style={{
+            fontSize: isTall ? 16 : 13, fontWeight: 900,
+            color: angle.accentColor, textTransform: "uppercase", letterSpacing: "0.14em",
+          }}>
+            CAPTAIN PICK
+          </span>
+        </div>
+
+        {/* Big projection number */}
+        <div style={{
+          fontSize: isTall ? 180 : (isWide ? 120 : 150),
+          fontWeight: 900, color: angle.accentColor,
+          lineHeight: 0.85, fontVariantNumeric: "tabular-nums",
+          letterSpacing: "-0.05em",
+          marginBottom: isTall ? 12 : 8,
+        }}>
+          {proj > 0 ? proj : angle.statFn(top)}
+        </div>
+
+        {/* Context label */}
+        <div style={{
+          fontSize: isTall ? 22 : 16, fontWeight: 600,
+          color: "rgba(255,255,255,0.32)",
+          textTransform: "uppercase", letterSpacing: "0.12em",
+          marginBottom: isTall ? 32 : 22,
+        }}>
+          {proj > 0 ? "ROUND PROJECTION" : angle.statLabel}
+        </div>
+
+        {/* Player name */}
+        <div style={{
+          fontSize: isTall ? 100 : (isWide ? 64 : 80),
+          fontWeight: 900, color: "#fff",
+          lineHeight: 0.9, letterSpacing: "-0.03em",
+          marginBottom: 4,
+        }}>
+          {lastName}
+        </div>
+        <div style={{
+          fontSize: isTall ? 50 : (isWide ? 34 : 42),
+          fontWeight: 700, color: "rgba(255,255,255,0.45)",
+          letterSpacing: "-0.01em", marginBottom: isTall ? 20 : 14,
+        }}>
+          {firstName}
+        </div>
+
+        {/* Team / position pill */}
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          background: `${angle.accentColor}12`, border: `1px solid ${angle.accentColor}30`,
+          borderRadius: 20, padding: "5px 14px",
+          marginBottom: isTall ? 28 : 20,
+        }}>
+          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>{top.team}</span>
+          {top.position && (
+            <>
+              <span style={{ width: 3, height: 3, borderRadius: "50%", background: angle.accentColor, display: "inline-block" }} />
+              <span style={{ fontSize: 14, color: angle.accentColor, fontWeight: 700 }}>{top.position}</span>
+            </>
+          )}
+        </div>
+
+        {/* Captain score stat */}
+        {captScore > 0 && (
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 12,
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 14, padding: isTall ? "16px 28px" : "12px 22px",
+          }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: isTall ? 36 : 28, fontWeight: 900, color: "#fff", fontVariantNumeric: "tabular-nums" }}>
+                {captScore}
+              </div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 2 }}>
+                Captain Score
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ flexShrink: 0, marginTop: isTall ? 28 : 20 }}>
+        <Footer accentColor={angle.accentColor} />
+      </div>
+    </CanvasShell>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAYOUT ENGINE 5: BREAKOUT ALERT
+// Highlights projected improvement with a prominent +value display
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function LayoutBreakoutAlert({
+  angle, players, w, h, options,
+}: {
+  angle: StatAngle; players: ContentPlayer[]; w: number; h: number; options: GraphicOptions;
+}) {
+  const top = players[0];
+  if (!top) return <div style={{ width: w, height: h, background: "#060a14" }} />;
+  const isTall = h > w;
+  const isWide = w > h;
+  const teamColour = getTeamColour(top.team);
+  const upside = Number(top.upside_rating ?? 0).toFixed(1);
+  const proj   = Math.round(Number(top.projection_final ?? 0));
+  const ceil   = Math.round(Number(top.ceiling_estimate ?? 0));
+  const diff   = ceil > proj ? ceil - proj : null;
+  const nameParts = top.player_name.split(" ");
+  const lastName  = nameParts.slice(-1)[0];
+  const firstName = nameParts.slice(0, -1).join(" ");
+
+  return (
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour}>
+      {/* Glow pulse */}
+      <div style={{
+        position: "absolute",
+        top: "40%", left: "50%", transform: "translate(-50%,-50%)",
+        width: isTall ? 600 : 400, height: isTall ? 600 : 400,
+        borderRadius: "50%",
+        background: `radial-gradient(circle,${angle.accentColor}20 0%,transparent 65%)`,
+        pointerEvents: "none",
+        zIndex: 0,
+      }} />
+
+      {/* Header */}
+      <div style={{ flexShrink: 0, marginBottom: isTall ? 24 : 18, position: "relative", zIndex: 2 }}>
+        <BrandBar accentColor={angle.accentColor} />
+      </div>
+
+      {/* Body */}
+      <div style={{
+        flex: 1, display: "flex", flexDirection: "column",
+        alignItems: isTall ? "center" : "flex-start",
+        justifyContent: "center",
+        textAlign: isTall ? "center" : "left",
+        position: "relative", zIndex: 2,
+      }}>
+        {/* Alert badge */}
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          background: `${angle.accentColor}20`, border: `1.5px solid ${angle.accentColor}55`,
+          borderRadius: 30, padding: isTall ? "8px 24px" : "6px 18px",
+          marginBottom: isTall ? 28 : 18,
+        }}>
+          <span style={{
+            width: 8, height: 8, borderRadius: "50%",
+            background: angle.accentColor, display: "inline-block",
+            boxShadow: `0 0 10px ${angle.accentColor}`,
+          }} />
+          <span style={{
+            fontSize: isTall ? 16 : 13, fontWeight: 900,
+            color: angle.accentColor, textTransform: "uppercase", letterSpacing: "0.14em",
+          }}>
+            BREAKOUT ALERT
+          </span>
+        </div>
+
+        {/* Improvement value */}
+        {diff != null && diff > 0 ? (
+          <div style={{
+            fontSize: isTall ? 160 : (isWide ? 100 : 130),
+            fontWeight: 900, color: angle.accentColor,
+            lineHeight: 0.85, fontVariantNumeric: "tabular-nums",
+            letterSpacing: "-0.04em", marginBottom: isTall ? 8 : 6,
+          }}>
+            +{diff}
+          </div>
+        ) : (
+          <div style={{
+            fontSize: isTall ? 120 : (isWide ? 80 : 100),
+            fontWeight: 900, color: angle.accentColor,
+            lineHeight: 0.85, fontVariantNumeric: "tabular-nums",
+            letterSpacing: "-0.04em", marginBottom: isTall ? 8 : 6,
+          }}>
+            {upside}/10
+          </div>
+        )}
+        <div style={{
+          fontSize: isTall ? 20 : 15, fontWeight: 600,
+          color: "rgba(255,255,255,0.32)",
+          textTransform: "uppercase", letterSpacing: "0.12em",
+          marginBottom: isTall ? 28 : 18,
+        }}>
+          {diff != null && diff > 0 ? "PROJECTED IMPROVEMENT" : "UPSIDE RATING"}
+        </div>
+
+        {/* Player name */}
+        <div style={{
+          fontSize: isTall ? 92 : (isWide ? 60 : 76),
+          fontWeight: 900, color: "#fff",
+          lineHeight: 0.9, letterSpacing: "-0.03em", marginBottom: 4,
+        }}>
+          {lastName}
+        </div>
+        <div style={{
+          fontSize: isTall ? 46 : (isWide ? 30 : 38),
+          fontWeight: 700, color: "rgba(255,255,255,0.45)",
+          letterSpacing: "-0.01em", marginBottom: isTall ? 18 : 12,
+        }}>
+          {firstName}
+        </div>
+
+        {/* Team pill */}
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          background: `${angle.accentColor}12`, border: `1px solid ${angle.accentColor}30`,
+          borderRadius: 20, padding: "5px 14px",
+          marginBottom: isTall ? 24 : 16,
+        }}>
+          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>{top.team}</span>
+          {top.position && (
+            <>
+              <span style={{ width: 3, height: 3, borderRadius: "50%", background: angle.accentColor, display: "inline-block" }} />
+              <span style={{ fontSize: 14, color: angle.accentColor, fontWeight: 700 }}>{top.position}</span>
+            </>
+          )}
+        </div>
+
+        {/* Projection context */}
+        {proj > 0 && (
+          <div style={{
+            display: "inline-flex", gap: 20,
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 14, padding: isTall ? "14px 28px" : "10px 20px",
+          }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: isTall ? 32 : 24, fontWeight: 900, color: "#fff", fontVariantNumeric: "tabular-nums" }}>{proj}</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 2 }}>Projection</div>
+            </div>
+            {ceil > 0 && (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: isTall ? 32 : 24, fontWeight: 900, color: angle.accentColor, fontVariantNumeric: "tabular-nums" }}>{ceil}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 2 }}>Ceiling</div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div style={{ flexShrink: 0, marginTop: isTall ? 24 : 16, position: "relative", zIndex: 2 }}>
+        <Footer accentColor={angle.accentColor} />
+      </div>
+    </CanvasShell>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAYOUT ENGINE 6: TRADE TARGET
+// Shows projection score + value indicator prominently
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function LayoutTradeTarget({
+  angle, players, w, h, options,
+}: {
+  angle: StatAngle; players: ContentPlayer[]; w: number; h: number; options: GraphicOptions;
+}) {
+  const top = players[0];
+  if (!top) return <div style={{ width: w, height: h, background: "#060a14" }} />;
+  const isTall = h > w;
+  const isWide = w > h;
+  const teamColour = getTeamColour(top.team);
+  const proj    = Math.round(Number(top.projection_final ?? 0));
+  const upside  = Number(top.upside_rating ?? 0).toFixed(1);
+  const ceil    = Math.round(Number(top.ceiling_estimate ?? 0));
+  const floor   = Math.round(Number(top.floor_estimate ?? 0));
+  const nameParts = top.player_name.split(" ");
+  const lastName  = nameParts.slice(-1)[0];
+  const firstName = nameParts.slice(0, -1).join(" ");
+
+  return (
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour}>
+      {/* Header */}
+      <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
+        <BrandBar accentColor={angle.accentColor} />
+      </div>
+
+      <div style={{
+        flex: 1, display: "flex", flexDirection: "column",
+        alignItems: isTall ? "center" : "flex-start",
+        justifyContent: "center",
+        textAlign: isTall ? "center" : "left",
+      }}>
+        {/* Badge */}
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          background: `${angle.accentColor}18`, border: `1.5px solid ${angle.accentColor}50`,
+          borderRadius: 30, padding: isTall ? "8px 24px" : "6px 18px",
+          marginBottom: isTall ? 28 : 18,
+        }}>
+          <span style={{
+            fontSize: isTall ? 16 : 13, fontWeight: 900,
+            color: angle.accentColor, textTransform: "uppercase", letterSpacing: "0.14em",
+          }}>
+            TRADE TARGET
+          </span>
+        </div>
+
+        {/* Player name */}
+        <div style={{
+          fontSize: isTall ? 96 : (isWide ? 64 : 80),
+          fontWeight: 900, color: "#fff",
+          lineHeight: 0.9, letterSpacing: "-0.03em", marginBottom: 4,
+        }}>
+          {lastName}
+        </div>
+        <div style={{
+          fontSize: isTall ? 48 : (isWide ? 32 : 40),
+          fontWeight: 700, color: "rgba(255,255,255,0.45)",
+          letterSpacing: "-0.01em", marginBottom: isTall ? 20 : 14,
+        }}>
+          {firstName}
+        </div>
+
+        {/* Team pill */}
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          background: `${angle.accentColor}12`, border: `1px solid ${angle.accentColor}30`,
+          borderRadius: 20, padding: "5px 14px",
+          marginBottom: isTall ? 28 : 20,
+        }}>
+          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>{top.team}</span>
+          {top.position && (
+            <>
+              <span style={{ width: 3, height: 3, borderRadius: "50%", background: angle.accentColor, display: "inline-block" }} />
+              <span style={{ fontSize: 14, color: angle.accentColor, fontWeight: 700 }}>{top.position}</span>
+            </>
+          )}
+        </div>
+
+        {/* Projection — large */}
+        <div style={{ marginBottom: isTall ? 24 : 16 }}>
+          <div style={{
+            fontSize: isTall ? 24 : 18, fontWeight: 700,
+            color: "rgba(255,255,255,0.35)",
+            textTransform: "uppercase", letterSpacing: "0.12em",
+            marginBottom: 4,
+          }}>
+            Projection
+          </div>
+          <div style={{
+            fontSize: isTall ? 140 : (isWide ? 96 : 116),
+            fontWeight: 900, color: angle.accentColor,
+            lineHeight: 0.85, fontVariantNumeric: "tabular-nums",
+            letterSpacing: "-0.04em",
+          }}>
+            {proj > 0 ? proj : angle.statFn(top)}
+          </div>
+        </div>
+
+        {/* Value indicator row */}
+        <div style={{
+          display: "inline-flex", gap: 12,
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: 14, padding: isTall ? "14px 28px" : "10px 20px",
+        }}>
+          {[
+            { label: "Upside", val: `${upside}/10` },
+            { label: "Ceiling", val: ceil > 0 ? `${ceil}` : "—" },
+            { label: "Floor",   val: floor > 0 ? `${floor}` : "—" },
+          ].map(({ label, val }) => (
+            <div key={label} style={{ textAlign: "center", minWidth: isTall ? 80 : 60 }}>
+              <div style={{ fontSize: isTall ? 28 : 22, fontWeight: 900, color: "#fff", fontVariantNumeric: "tabular-nums" }}>{val}</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 2 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ flexShrink: 0, marginTop: isTall ? 28 : 20 }}>
+        <Footer accentColor={angle.accentColor} />
+      </div>
+    </CanvasShell>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAYOUT ENGINE 7: AVOID PLAYER
+// Warning-style layout with low projection and risk indicator
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function LayoutAvoidPlayer({
+  angle, players, w, h, options,
+}: {
+  angle: StatAngle; players: ContentPlayer[]; w: number; h: number; options: GraphicOptions;
+}) {
+  const top = players[0];
+  if (!top) return <div style={{ width: w, height: h, background: "#060a14" }} />;
+  const isTall = h > w;
+  const isWide = w > h;
+  const teamColour = getTeamColour(top.team);
+  const proj    = Math.round(Number(top.projection_final ?? 0));
+  const risk    = Math.round(Number(top.risk_rating ?? 0));
+  const matchup = Math.round(Number(top.matchup_rating ?? 0));
+  const nameParts = top.player_name.split(" ");
+  const lastName  = nameParts.slice(-1)[0];
+  const firstName = nameParts.slice(0, -1).join(" ");
+  const warnColor = "#EF4444";
+
+  return (
+    <CanvasShell w={w} h={h} angle={{ ...angle, accentColor: warnColor }} options={options} teamColour={teamColour}>
+      {/* Header */}
+      <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
+        <BrandBar accentColor={warnColor} />
+      </div>
+
+      <div style={{
+        flex: 1, display: "flex", flexDirection: "column",
+        alignItems: isTall ? "center" : "flex-start",
+        justifyContent: "center",
+        textAlign: isTall ? "center" : "left",
+      }}>
+        {/* Warning badge */}
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 10,
+          background: `${warnColor}1a`, border: `1.5px solid ${warnColor}55`,
+          borderRadius: 30, padding: isTall ? "8px 24px" : "6px 18px",
+          marginBottom: isTall ? 28 : 18,
+        }}>
+          <span style={{
+            fontSize: isTall ? 20 : 16, lineHeight: 1,
+          }}>
+            ⚠
+          </span>
+          <span style={{
+            fontSize: isTall ? 16 : 13, fontWeight: 900,
+            color: warnColor, textTransform: "uppercase", letterSpacing: "0.14em",
+          }}>
+            AVOID THIS WEEK
+          </span>
+        </div>
+
+        {/* Player name */}
+        <div style={{
+          fontSize: isTall ? 100 : (isWide ? 66 : 82),
+          fontWeight: 900, color: "#fff",
+          lineHeight: 0.9, letterSpacing: "-0.03em", marginBottom: 4,
+        }}>
+          {lastName}
+        </div>
+        <div style={{
+          fontSize: isTall ? 50 : (isWide ? 34 : 42),
+          fontWeight: 700, color: "rgba(255,255,255,0.45)",
+          letterSpacing: "-0.01em", marginBottom: isTall ? 18 : 12,
+        }}>
+          {firstName}
+        </div>
+
+        {/* Team pill */}
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          background: `${warnColor}12`, border: `1px solid ${warnColor}30`,
+          borderRadius: 20, padding: "5px 14px",
+          marginBottom: isTall ? 28 : 20,
+        }}>
+          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>{top.team}</span>
+          {top.position && (
+            <>
+              <span style={{ width: 3, height: 3, borderRadius: "50%", background: warnColor, display: "inline-block" }} />
+              <span style={{ fontSize: 14, color: warnColor, fontWeight: 700 }}>{top.position}</span>
+            </>
+          )}
+        </div>
+
+        {/* Low projection */}
+        <div style={{ marginBottom: isTall ? 24 : 16 }}>
+          <div style={{
+            fontSize: isTall ? 22 : 17, fontWeight: 700,
+            color: "rgba(255,255,255,0.32)",
+            textTransform: "uppercase", letterSpacing: "0.12em",
+            marginBottom: 4,
+          }}>
+            Projection
+          </div>
+          <div style={{
+            fontSize: isTall ? 140 : (isWide ? 96 : 116),
+            fontWeight: 900, color: warnColor,
+            lineHeight: 0.85, fontVariantNumeric: "tabular-nums",
+            letterSpacing: "-0.04em",
+          }}>
+            {proj > 0 ? proj : angle.statFn(top)}
+          </div>
+        </div>
+
+        {/* Context row */}
+        <div style={{
+          display: "inline-flex", gap: 12,
+          background: `${warnColor}08`,
+          border: `1px solid ${warnColor}20`,
+          borderRadius: 14, padding: isTall ? "14px 28px" : "10px 20px",
+        }}>
+          {[
+            { label: "Risk Score",    val: risk    > 0 ? `${risk}/100`  : "—" },
+            { label: "Matchup",       val: matchup > 0 ? `${matchup}/100` : "—" },
+          ].map(({ label, val }) => (
+            <div key={label} style={{ textAlign: "center", minWidth: isTall ? 100 : 80 }}>
+              <div style={{ fontSize: isTall ? 28 : 22, fontWeight: 900, color: warnColor, fontVariantNumeric: "tabular-nums" }}>{val}</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 2 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ flexShrink: 0, marginTop: isTall ? 28 : 20 }}>
+        <Footer accentColor={warnColor} />
+      </div>
+    </CanvasShell>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LAYOUT ENGINE 8: MATCHUP ADVANTAGE
+// Player name, matchup rating, and contextual stat insight
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function LayoutMatchupAdvantage({
+  angle, players, w, h, options,
+}: {
+  angle: StatAngle; players: ContentPlayer[]; w: number; h: number; options: GraphicOptions;
+}) {
+  const top = players[0];
+  if (!top) return <div style={{ width: w, height: h, background: "#060a14" }} />;
+  const isTall = h > w;
+  const isWide = w > h;
+  const teamColour = getTeamColour(top.team);
+  const matchup = Math.round(Number(top.matchup_rating ?? 0));
+  const proj    = Math.round(Number(top.projection_final ?? 0));
+  const ceil    = Math.round(Number(top.ceiling_estimate ?? 0));
+  const nameParts = top.player_name.split(" ");
+  const lastName  = nameParts.slice(-1)[0];
+  const firstName = nameParts.slice(0, -1).join(" ");
+
+  return (
+    <CanvasShell w={w} h={h} angle={angle} options={options} teamColour={teamColour}>
+      {/* Header */}
+      <div style={{ flexShrink: 0, marginBottom: isTall ? 28 : 20 }}>
+        <BrandBar accentColor={angle.accentColor} />
+      </div>
+
+      <div style={{
+        flex: 1, display: "flex", flexDirection: "column",
+        alignItems: isTall ? "center" : "flex-start",
+        justifyContent: "center",
+        textAlign: isTall ? "center" : "left",
+      }}>
+        {/* Badge */}
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          background: `${angle.accentColor}18`, border: `1.5px solid ${angle.accentColor}50`,
+          borderRadius: 30, padding: isTall ? "8px 24px" : "6px 18px",
+          marginBottom: isTall ? 28 : 18,
+        }}>
+          <span style={{
+            fontSize: isTall ? 16 : 13, fontWeight: 900,
+            color: angle.accentColor, textTransform: "uppercase", letterSpacing: "0.14em",
+          }}>
+            BEST MATCHUP
+          </span>
+        </div>
+
+        {/* Player name */}
+        <div style={{
+          fontSize: isTall ? 100 : (isWide ? 66 : 82),
+          fontWeight: 900, color: "#fff",
+          lineHeight: 0.9, letterSpacing: "-0.03em", marginBottom: 4,
+        }}>
+          {lastName}
+        </div>
+        <div style={{
+          fontSize: isTall ? 50 : (isWide ? 34 : 42),
+          fontWeight: 700, color: "rgba(255,255,255,0.45)",
+          letterSpacing: "-0.01em", marginBottom: isTall ? 18 : 12,
+        }}>
+          {firstName}
+        </div>
+
+        {/* Team pill */}
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          background: `${angle.accentColor}12`, border: `1px solid ${angle.accentColor}30`,
+          borderRadius: 20, padding: "5px 14px",
+          marginBottom: isTall ? 32 : 22,
+        }}>
+          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>{top.team}</span>
+          {top.position && (
+            <>
+              <span style={{ width: 3, height: 3, borderRadius: "50%", background: angle.accentColor, display: "inline-block" }} />
+              <span style={{ fontSize: 14, color: angle.accentColor, fontWeight: 700 }}>{top.position}</span>
+            </>
+          )}
+        </div>
+
+        {/* Matchup rating — centrepiece */}
+        <div style={{ marginBottom: isTall ? 12 : 8 }}>
+          <div style={{
+            fontSize: isTall ? 22 : 17, fontWeight: 700,
+            color: "rgba(255,255,255,0.32)",
+            textTransform: "uppercase", letterSpacing: "0.12em",
+            marginBottom: 4,
+          }}>
+            Avg vs Opponent
+          </div>
+          <div style={{
+            fontSize: isTall ? 150 : (isWide ? 100 : 120),
+            fontWeight: 900, color: angle.accentColor,
+            lineHeight: 0.85, fontVariantNumeric: "tabular-nums",
+            letterSpacing: "-0.04em",
+          }}>
+            {matchup > 0 ? matchup : angle.statFn(top)}
+          </div>
+          <div style={{
+            fontSize: isTall ? 20 : 15, fontWeight: 600,
+            color: "rgba(255,255,255,0.25)",
+            textTransform: "uppercase", letterSpacing: "0.12em",
+            marginTop: 4,
+          }}>
+            {matchup > 0 ? "MATCHUP RATING / 100" : angle.statLabel}
+          </div>
+        </div>
+
+        {/* Stat insight row */}
+        <div style={{
+          display: "inline-flex", gap: 12, marginTop: isTall ? 20 : 14,
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: 14, padding: isTall ? "14px 28px" : "10px 20px",
+        }}>
+          {[
+            { label: "Projection", val: proj > 0 ? `${proj}` : "—" },
+            { label: "Ceiling",    val: ceil > 0 ? `${ceil}` : "—" },
+          ].map(({ label, val }) => (
+            <div key={label} style={{ textAlign: "center", minWidth: isTall ? 90 : 70 }}>
+              <div style={{ fontSize: isTall ? 32 : 26, fontWeight: 900, color: "#fff", fontVariantNumeric: "tabular-nums" }}>{val}</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 2 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ flexShrink: 0, marginTop: isTall ? 28 : 20 }}>
+        <Footer accentColor={angle.accentColor} />
+      </div>
+    </CanvasShell>
+  );
+}
+
 // ─── Main dispatcher ───────────────────────────────────────────────────────────
 
 export function GraphicCanvas({
@@ -923,8 +1622,13 @@ export function GraphicCanvas({
   options: GraphicOptions;
 }) {
   switch (layout) {
-    case "stat_card":  return <LayoutStatCard   angle={angle} players={players} w={w} h={h} options={options} />;
-    case "battle":     return <LayoutBattle     angle={angle} players={players} w={w} h={h} options={options} />;
-    default:           return <LayoutLeaderboard angle={angle} players={players} w={w} h={h} options={options} />;
+    case "stat_card":          return <LayoutStatCard          angle={angle} players={players} w={w} h={h} options={options} />;
+    case "battle":             return <LayoutBattle            angle={angle} players={players} w={w} h={h} options={options} />;
+    case "captain_pick":       return <LayoutCaptainPick       angle={angle} players={players} w={w} h={h} options={options} />;
+    case "breakout_alert":     return <LayoutBreakoutAlert     angle={angle} players={players} w={w} h={h} options={options} />;
+    case "trade_target":       return <LayoutTradeTarget       angle={angle} players={players} w={w} h={h} options={options} />;
+    case "avoid_player":       return <LayoutAvoidPlayer       angle={angle} players={players} w={w} h={h} options={options} />;
+    case "matchup_advantage":  return <LayoutMatchupAdvantage  angle={angle} players={players} w={w} h={h} options={options} />;
+    default:                   return <LayoutLeaderboard       angle={angle} players={players} w={w} h={h} options={options} />;
   }
 }

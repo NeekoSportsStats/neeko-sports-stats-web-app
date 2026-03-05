@@ -36,10 +36,15 @@ const EXPORT_SIZES: ExportSize[] = [
   { id: "carousel",  label: "Carousel Slides (1080×1080)", w: 1080, h: 1080 },
 ];
 
-const LAYOUTS: { id: LayoutEngine; label: string; description: string; icon: string }[] = [
-  { id: "leaderboard", label: "Leaderboard",    description: "Ranked player list",          icon: "🏆" },
-  { id: "stat_card",   label: "Stat Card",      description: "Big stat · single player",    icon: "⭐" },
-  { id: "battle",      label: "Player Battle",  description: "Head-to-head comparison",     icon: "⚔️" },
+const LAYOUTS: { id: LayoutEngine; label: string; description: string; icon: string; group: "core" | "template" }[] = [
+  { id: "leaderboard",        label: "Leaderboard",         description: "Ranked player list",          icon: "🏆", group: "core"     },
+  { id: "stat_card",          label: "Stat Card",           description: "Big stat · single player",    icon: "⭐", group: "core"     },
+  { id: "battle",             label: "Player Battle",       description: "Head-to-head comparison",     icon: "⚔️", group: "core"     },
+  { id: "captain_pick",       label: "Captain Pick",        description: "Big projection · hero layout", icon: "🎯", group: "template" },
+  { id: "breakout_alert",     label: "Breakout Alert",      description: "Improvement + upside value",  icon: "🚀", group: "template" },
+  { id: "trade_target",       label: "Trade Target",        description: "Projection score + value",    icon: "📈", group: "template" },
+  { id: "avoid_player",       label: "Avoid Player",        description: "Warning · low projection",    icon: "⚠️", group: "template" },
+  { id: "matchup_advantage",  label: "Matchup Advantage",   description: "Matchup rating · stat insight", icon: "🔥", group: "template" },
 ];
 
 const BACKGROUNDS: { id: BackgroundTheme; label: string }[] = [
@@ -587,7 +592,7 @@ export default function AdminContentEngine() {
         </div>
       </div>
 
-      {/* Two-column layout */}
+      {/* ── TOP ROW: Data + Content Tools (left) | Graphic Settings (right) ── */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
 
         {/* LEFT — Data Table + Content Tools */}
@@ -697,17 +702,20 @@ export default function AdminContentEngine() {
           )}
         </div>
 
-        {/* RIGHT — Graphic Builder */}
+        {/* RIGHT — Graphic Settings */}
         <div className="space-y-4">
 
-          {/* Layout Engine */}
+          {/* Template / Layout selector */}
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
               <LayoutTemplate className="h-3.5 w-3.5" />
-              Layout Engine
+              Graphic Template
             </p>
+
+            {/* Core layouts */}
+            <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-widest">Core layouts</p>
             <div className="grid grid-cols-1 gap-1.5">
-              {LAYOUTS.map((tmpl) => {
+              {LAYOUTS.filter((t) => t.group === "core").map((tmpl) => {
                 const isSelected = tmpl.id === selectedLayout;
                 const disabled   = isCarouselMode;
                 return (
@@ -732,8 +740,38 @@ export default function AdminContentEngine() {
                 );
               })}
             </div>
+
+            {/* Specialty templates */}
+            <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-widest pt-1">Specialty templates</p>
+            <div className="grid grid-cols-1 gap-1.5">
+              {LAYOUTS.filter((t) => t.group === "template").map((tmpl) => {
+                const isSelected = tmpl.id === selectedLayout;
+                const disabled   = isCarouselMode;
+                return (
+                  <button
+                    key={tmpl.id}
+                    onClick={() => !disabled && setSelectedLayout(tmpl.id)}
+                    disabled={disabled}
+                    className="flex items-center gap-3 px-3.5 py-2.5 rounded-lg border text-left transition-all disabled:opacity-40"
+                    style={
+                      isSelected && !disabled
+                        ? { background: `${selectedAngle.accentColor}14`, borderColor: `${selectedAngle.accentColor}55`, color: "white" }
+                        : { background: "transparent", borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }
+                    }
+                  >
+                    <span className="text-base leading-none">{tmpl.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold" style={isSelected && !disabled ? accentStyle : {}}>{tmpl.label}</div>
+                      <div className="text-[11px] mt-0.5 opacity-55">{tmpl.description}</div>
+                    </div>
+                    {isSelected && !disabled && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: selectedAngle.accentColor }} />}
+                  </button>
+                );
+              })}
+            </div>
+
             {isCarouselMode && (
-              <p className="text-[10px] text-muted-foreground/50">Layout is auto-set in Carousel mode</p>
+              <p className="text-[10px] text-muted-foreground/50">Template is auto-set in Carousel mode</p>
             )}
           </div>
 
@@ -767,8 +805,6 @@ export default function AdminContentEngine() {
                 </div>
               )}
             </div>
-
-            {/* Team colour toggle */}
             <label className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-border cursor-pointer hover:bg-muted/20 transition-colors">
               <input
                 type="checkbox"
@@ -797,54 +833,7 @@ export default function AdminContentEngine() {
             <p className="text-[10px] text-muted-foreground/50">Rendered at 18% opacity behind the player name. Leave blank for text-only.</p>
           </div>
 
-          {/* Live Preview */}
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Live Preview</p>
-            <div
-              className="rounded-xl overflow-hidden border border-border bg-black"
-              style={{ width: previewWidth, height: previewHeight, maxWidth: "100%" }}
-            >
-              {players.length === 0 ? (
-                <div className="w-full h-full flex items-center justify-center" style={{ width: previewWidth, height: previewHeight }}>
-                  <p className="text-xs text-muted-foreground">Load data to see preview</p>
-                </div>
-              ) : (
-                <div
-                  ref={previewRef}
-                  style={{ width: previewWidth, height: previewHeight, overflow: "hidden", position: "relative" }}
-                >
-                  <div style={{
-                    width: exportW, height: exportH,
-                    transform: `scale(${scale})`,
-                    transformOrigin: "top left",
-                    position: "absolute", top: 0, left: 0,
-                  }}>
-                    {isCarouselMode ? (
-                      <CarouselTitleSlide
-                        angle={selectedAngle}
-                        w={exportW} h={exportH}
-                        options={graphicOptions}
-                        totalPlayers={players.length}
-                      />
-                    ) : (
-                      <GraphicCanvas
-                        layout={effectiveLayout}
-                        angle={selectedAngle}
-                        players={players}
-                        w={exportW} h={exportH}
-                        options={graphicOptions}
-                      />
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            <p className="text-[11px] text-muted-foreground/50">
-              Preview scaled — export: {exportW}×{exportH}px{isCarouselMode ? ` · ${players.length + 1} slides` : ""}
-            </p>
-          </div>
-
-          {/* Export Size */}
+          {/* Export Size selector (moved here, above generate button) */}
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Export Format</p>
             <div className="relative">
@@ -879,9 +868,9 @@ export default function AdminContentEngine() {
             </div>
           </div>
 
-          {/* Download Graphic / Carousel */}
+          {/* Generate Graphic Button */}
           <Button
-            className="w-full h-9 text-xs font-semibold"
+            className="w-full h-10 text-xs font-semibold"
             onClick={handleDownloadGraphic}
             disabled={downloading || players.length === 0 || dataLoading}
             style={players.length > 0 && !downloading ? { background: selectedAngle.accentColor, color: "#000", borderColor: selectedAngle.accentColor } : {}}
@@ -893,18 +882,79 @@ export default function AdminContentEngine() {
             ) : isCarouselMode ? (
               <><Layers className="h-3.5 w-3.5 mr-1.5" />Export Carousel ({players.length + 1} slides)</>
             ) : (
-              <><Download className="h-3.5 w-3.5 mr-1.5" />Download Graphic</>
+              <><Download className="h-3.5 w-3.5 mr-1.5" />Generate &amp; Download Graphic</>
             )}
           </Button>
-
-          {/* ── Video Generator ──────────────────────────────────────────── */}
-          <VideoGeneratorPanel
-            players={players}
-            selectedAngle={selectedAngle}
-            dataLoading={dataLoading}
-          />
         </div>
       </div>
+
+      {/* ── FULL-WIDTH GRAPHIC PREVIEW ─────────────────────────────────────────── */}
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Graphic Preview</p>
+          <span className="text-[11px] text-muted-foreground/50">
+            {exportW}×{exportH}px{isCarouselMode ? ` · ${players.length + 1} slides` : ""}
+          </span>
+        </div>
+
+        {/* Preview frame — centres the graphic, scales to fill available width */}
+        <div className="rounded-xl border border-border bg-black/60 overflow-hidden flex items-start justify-center p-4 min-h-[260px]">
+          {players.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground py-12">
+              <LayoutTemplate className="h-8 w-8 opacity-20" />
+              <p className="text-sm">Select a stat angle to see the graphic preview</p>
+            </div>
+          ) : (
+            (() => {
+              const containerW = Math.min(exportW, 1080);
+              const fullWidthScale = Math.min(1, 800 / containerW);
+              const scaledW = Math.round(containerW * fullWidthScale);
+              const scaledH = Math.round(exportH * fullWidthScale);
+              return (
+                <div style={{ width: scaledW, height: scaledH, overflow: "hidden", position: "relative", flexShrink: 0 }}>
+                  <div
+                    ref={previewRef}
+                    style={{
+                      width: exportW, height: exportH,
+                      transform: `scale(${fullWidthScale})`,
+                      transformOrigin: "top left",
+                      position: "absolute", top: 0, left: 0,
+                    }}
+                  >
+                    {isCarouselMode ? (
+                      <CarouselTitleSlide
+                        angle={selectedAngle}
+                        w={exportW} h={exportH}
+                        options={graphicOptions}
+                        totalPlayers={players.length}
+                      />
+                    ) : (
+                      <GraphicCanvas
+                        layout={effectiveLayout}
+                        angle={selectedAngle}
+                        players={players}
+                        w={exportW} h={exportH}
+                        options={graphicOptions}
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })()
+          )}
+        </div>
+
+        <p className="text-[11px] text-muted-foreground/40 text-center">
+          Live preview — scaled to fit screen. Exported file is full resolution {exportW}×{exportH}px.
+        </p>
+      </div>
+
+      {/* ── VIDEO GENERATOR (full width below preview) ────────────────────────── */}
+      <VideoGeneratorPanel
+        players={players}
+        selectedAngle={selectedAngle}
+        dataLoading={dataLoading}
+      />
     </div>
   );
 }
