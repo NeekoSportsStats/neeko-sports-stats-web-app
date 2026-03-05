@@ -208,15 +208,15 @@ async function countExisting(
   category: string,
   isVideo: boolean,
 ): Promise<number> {
-  const folder = isVideo
-    ? `videos/ai-generated/${category}`
-    : `images/ai-generated/${category}`;
+  const { count } = await adminClient
+    .from("ai_media_library")
+    .select("*", { count: "exact", head: true })
+    .eq("category", category)
+    .eq("media_type", isVideo ? "video" : "image")
+    .eq("source", "ai_generated")
+    .eq("is_active", true);
 
-  const { data: storageFiles } = await adminClient.storage
-    .from(STORAGE_BUCKET)
-    .list(folder, { limit: 500 });
-
-  return storageFiles?.filter((f) => f.name && !f.name.startsWith(".")).length ?? 0;
+  return count ?? 0;
 }
 
 async function isPathDeleted(

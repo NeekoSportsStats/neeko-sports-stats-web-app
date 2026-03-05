@@ -874,6 +874,12 @@ export default function AdminMediaLibrary() {
         { onConflict: "file_path" },
       );
 
+      // 4a. Mark row inactive in ai_media_library (generator source of truth)
+      await supabase
+        .from("ai_media_library")
+        .update({ is_active: false })
+        .eq("url", item.url);
+
       // 4. Clear ALL local caches — belt and braces
       clearMediaCaches();
 
