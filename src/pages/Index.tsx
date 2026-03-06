@@ -167,6 +167,109 @@ function confidenceLevel(err: number | null): { label: string; color: string; bg
   return             { label: "LOW",    color: "text-red-400",     bg: "bg-red-400/10",      border: "border-red-400/30",       barColor: "bg-red-400" };
 }
 
+function reliabilityLevel(err: number | null): { label: string; color: string; bg: string; border: string } {
+  if (err == null) return { label: "—",        color: "text-white/30",   bg: "bg-white/5",        border: "border-white/10" };
+  if (err <= 14)   return { label: "EXCELLENT", color: "text-green-400",  bg: "bg-green-400/10",   border: "border-green-400/30" };
+  if (err <= 17)   return { label: "STRONG",    color: "text-[#F5C84C]",  bg: "bg-[#F5C84C]/10",   border: "border-[#F5C84C]/30" };
+  return             { label: "MODERATE",  color: "text-orange-400",  bg: "bg-orange-400/10",  border: "border-orange-400/30" };
+}
+
+interface DistBand {
+  label: string;
+  pct: number;
+  color: string;
+  bg: string;
+}
+
+function buildDistribution(row: AccuracyRow): DistBand[] {
+  const w10  = row.within_10  ?? 0;
+  const w15  = row.within_15  ?? 0;
+  const w20  = row.within_20  ?? 0;
+  return [
+    { label: "0 – 10 pts",  pct: Math.max(w10, 0),          color: "bg-green-400",    bg: "text-green-400" },
+    { label: "10 – 15 pts", pct: Math.max(w15 - w10, 0),    color: "bg-[#F5C84C]",    bg: "text-[#F5C84C]" },
+    { label: "15 – 20 pts", pct: Math.max(w20 - w15, 0),    color: "bg-orange-400",   bg: "text-orange-400" },
+    { label: "20+ pts",     pct: Math.max(100 - w20, 0),    color: "bg-red-500/70",   bg: "text-red-400" },
+  ];
+}
+
+function ErrorDistributionBlock({ row, loading }: { row: AccuracyRow | null; loading: boolean }) {
+  const hasData = !loading && row != null && (row.players_analysed ?? 0) > 0;
+  const rel     = reliabilityLevel(hasData ? (row?.avg_error ?? null) : null);
+  const bands   = hasData && row ? buildDistribution(row) : [];
+
+  return (
+    <div className="mt-4 rounded-2xl border border-white/[0.07] bg-[#0e0e0e] overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-white/[0.06] bg-[#0a0a0a] flex-wrap">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/[0.05] border border-white/[0.08]">
+            <BarChart2 size={14} className="text-white/50" />
+          </div>
+          <span className="text-[11px] font-bold uppercase tracking-widest text-white/40">
+            Prediction Error Distribution
+          </span>
+        </div>
+        {!loading && (
+          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${rel.bg} ${rel.border}`}>
+            <span className="text-[9px] font-bold uppercase tracking-widest text-white/35">Prediction Reliability</span>
+            <span className={`text-[11px] font-black uppercase tracking-wider ${rel.color}`}>{rel.label}</span>
+          </div>
+        )}
+        {loading && <div className="h-7 w-40 bg-white/[0.06] rounded-lg animate-pulse" />}
+      </div>
+
+      {/* Chart body */}
+      <div className="px-5 py-6 space-y-4">
+        {loading && (
+          <div className="space-y-4">
+            {[1,2,3,4].map(i => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="w-20 h-3 bg-white/[0.06] rounded animate-pulse shrink-0" />
+                <div className="flex-1 h-6 bg-white/[0.06] rounded-full animate-pulse" />
+                <div className="w-8 h-3 bg-white/[0.06] rounded animate-pulse shrink-0" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!loading && !hasData && (
+          <p className="text-sm text-white/30 text-center py-2">
+            Distribution will populate after Opening Round statistics are processed.
+          </p>
+        )}
+
+        {!loading && hasData && bands.map(({ label, pct, color, bg }) => {
+          const rounded = Math.round(pct);
+          return (
+            <div key={label} className="flex items-center gap-3 group">
+              <span className="w-[72px] text-[11px] font-semibold text-white/40 shrink-0 tabular-nums">
+                {label}
+              </span>
+              <div className="flex-1 h-6 bg-white/[0.05] rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${color}`}
+                  style={{ width: `${Math.min(rounded, 100)}%` }}
+                />
+              </div>
+              <span className={`w-9 text-right text-[12px] font-bold tabular-nums shrink-0 ${bg}`}>
+                {rounded}%
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Explanation */}
+      <div className="px-5 pb-5">
+        <p className="text-[12px] text-white/30 leading-relaxed">
+          This distribution shows how closely Neeko projections match actual fantasy scores. Most projections fall within a narrow error range, demonstrating strong model reliability.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function AccuracyBar({ pct, barColor }: { pct: number | null; barColor: string }) {
   const width = pct != null ? Math.min(Math.max(Math.round(pct), 0), 100) : 0;
   return (
@@ -324,6 +427,9 @@ function ModelAccuracySection() {
             </div>
           </div>
         </div>
+
+        {/* Error Distribution */}
+        <ErrorDistributionBlock row={row} loading={loading} />
 
         {/* Selling point */}
         <div className="mt-5 rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.03] px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
