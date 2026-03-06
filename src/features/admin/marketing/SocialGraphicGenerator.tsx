@@ -98,12 +98,12 @@ const GRAPHIC_TYPES: GraphicType[] = [
 const SIZE = 800;
 
 function GraphicCanvas({ type, players }: { type: GraphicType; players: GraphicPlayer[] }) {
-  const scale = SIZE / 1080;
+  const scale = 1;
   return (
     <div
       style={{
-        width: 1080,
-        height: 1080,
+        width: SIZE,
+        height: SIZE,
         transform: `scale(${scale})`,
         transformOrigin: "top left",
         background: "linear-gradient(160deg, #0a0f1a 0%, #0d1525 50%, #0a0f1a 100%)",
