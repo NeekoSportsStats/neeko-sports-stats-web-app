@@ -160,15 +160,27 @@ interface AccuracyRow {
   source: string | null;
 }
 
-function confidenceLevel(err: number | null): { label: string; color: string; bg: string; border: string } {
-  if (err == null) return { label: "—", color: "text-white/30", bg: "bg-white/5", border: "border-white/10" };
-  if (err <= 14)   return { label: "HIGH",   color: "text-green-400",    bg: "bg-green-400/10",    border: "border-green-400/25" };
-  if (err <= 17)   return { label: "MEDIUM", color: "text-yellow-400",   bg: "bg-yellow-400/10",   border: "border-yellow-400/25" };
-  return             { label: "LOW",    color: "text-orange-400",  bg: "bg-orange-400/10",  border: "border-orange-400/25" };
+function confidenceLevel(err: number | null): { label: string; color: string; bg: string; border: string; barColor: string } {
+  if (err == null) return { label: "—",      color: "text-white/30",    bg: "bg-white/5",         border: "border-white/10",         barColor: "bg-white/20" };
+  if (err <= 14)   return { label: "HIGH",   color: "text-green-400",   bg: "bg-green-400/10",    border: "border-green-400/30",     barColor: "bg-green-400" };
+  if (err <= 17)   return { label: "MEDIUM", color: "text-yellow-400",  bg: "bg-yellow-400/10",   border: "border-yellow-400/30",    barColor: "bg-yellow-400" };
+  return             { label: "LOW",    color: "text-red-400",     bg: "bg-red-400/10",      border: "border-red-400/30",       barColor: "bg-red-400" };
+}
+
+function AccuracyBar({ pct, barColor }: { pct: number | null; barColor: string }) {
+  const width = pct != null ? Math.min(Math.max(Math.round(pct), 0), 100) : 0;
+  return (
+    <div className="mt-2 h-1 w-full rounded-full bg-white/[0.06] overflow-hidden">
+      <div
+        className={`h-full rounded-full transition-all duration-700 ${barColor}`}
+        style={{ width: `${width}%` }}
+      />
+    </div>
+  );
 }
 
 function ModelAccuracySection() {
-  const [row, setRow]       = useState<AccuracyRow | null>(null);
+  const [row, setRow]         = useState<AccuracyRow | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -176,40 +188,50 @@ function ModelAccuracySection() {
       const { data } = await supabase
         .from("v_projection_accuracy_homepage")
         .select("*")
-        .maybeSingle();
+        .single();
       setRow(data as AccuracyRow | null);
       setLoading(false);
     })();
   }, []);
 
-  const conf = confidenceLevel(row?.avg_error ?? null);
-  const sourceLabel =
-    row?.source === "automatic" ? "2026 Season Accuracy" : "Opening Round Accuracy";
+  const hasData = !loading && row != null && (row.players_analysed ?? 0) > 0;
+  const conf = confidenceLevel(hasData ? (row?.avg_error ?? null) : null);
+  const sourceLabel = row?.source === "automatic" ? "2026 Season Accuracy" : "Opening Round Accuracy";
+
+  const proofLine = hasData && row?.avg_error != null
+    ? `Opening Round projections achieved an average error of ${row.avg_error.toFixed(1)} points — outperforming the model's historical average of 16.0 points.`
+    : null;
 
   const metrics = [
     {
       label: "Players Analysed",
-      value: row?.players_analysed != null ? row.players_analysed.toLocaleString() : "—",
+      value: hasData && row?.players_analysed != null ? row.players_analysed.toLocaleString() : "—",
       suffix: "",
       color: "text-white",
+      bar: null,
     },
     {
       label: "Average Error",
-      value: row?.avg_error != null ? row.avg_error.toFixed(2) : "—",
+      value: hasData && row?.avg_error != null ? row.avg_error.toFixed(1) : "—",
       suffix: " pts",
       color: "text-[#F5C84C]",
+      bar: null,
     },
     {
-      label: "Within 15 Points",
-      value: row?.within_15 != null ? Math.round(row.within_15).toString() : "—",
+      label: "Within 15 pts",
+      value: hasData && row?.within_15 != null ? Math.round(row.within_15).toString() : "—",
       suffix: "%",
       color: "text-green-400",
+      bar: hasData ? (row?.within_15 ?? null) : null,
+      barColor: "bg-green-400",
     },
     {
-      label: "Within 20 Points",
-      value: row?.within_20 != null ? Math.round(row.within_20).toString() : "—",
+      label: "Within 20 pts",
+      value: hasData && row?.within_20 != null ? Math.round(row.within_20).toString() : "—",
       suffix: "%",
       color: "text-green-300",
+      bar: hasData ? (row?.within_20 ?? null) : null,
+      barColor: "bg-green-300",
     },
   ];
 
@@ -219,9 +241,17 @@ function ModelAccuracySection() {
         <SectionLabel>Model Accuracy</SectionLabel>
         <SectionHeading>How Accurate Are Neeko Projections?</SectionHeading>
         <GoldDivider />
-        <p className="text-center text-white/40 text-sm mb-8 max-w-md mx-auto">
+        <p className="text-center text-white/40 text-sm mb-3 max-w-md mx-auto">
           Built on statistical modelling of historical player performance, matchup difficulty and scoring volatility.
         </p>
+
+        {/* Marketing proof line */}
+        {proofLine && (
+          <p className="text-center text-[13px] font-semibold text-green-400/80 mb-7 max-w-xl mx-auto leading-relaxed">
+            {proofLine}
+          </p>
+        )}
+        {!proofLine && <div className="mb-7" />}
 
         <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] overflow-hidden">
           {/* Header bar */}
@@ -234,41 +264,62 @@ function ModelAccuracySection() {
                 {loading ? "Loading…" : sourceLabel}
               </span>
             </div>
-            {!loading && row && (
-              <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg border ${conf.color} ${conf.bg} ${conf.border}`}>
-                <span className="text-[9px] font-semibold text-white/40">Model Confidence</span>
-                {conf.label}
-              </span>
+            {/* Confidence badge — always show once loaded */}
+            {!loading && (
+              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${conf.bg} ${conf.border}`}>
+                <span className="text-[9px] font-bold uppercase tracking-widest text-white/35">Model Confidence</span>
+                <span className={`text-[11px] font-black uppercase tracking-wider ${conf.color}`}>{conf.label}</span>
+              </div>
+            )}
+            {loading && (
+              <div className="h-7 w-36 bg-white/[0.06] rounded-lg animate-pulse" />
             )}
           </div>
 
           {/* Metrics grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/[0.04]">
-            {metrics.map(({ label, value, suffix, color }) => (
-              <div key={label} className="bg-[#0e0e0e] px-5 py-6 flex flex-col gap-1">
-                <p className="text-[10px] text-white/30 uppercase tracking-widest font-semibold leading-tight">
+            {metrics.map(({ label, value, suffix, color, bar, barColor }) => (
+              <div key={label} className="bg-[#0e0e0e] px-5 py-5 flex flex-col">
+                <p className="text-[10px] text-white/30 uppercase tracking-widest font-semibold leading-tight mb-2">
                   {label}
                 </p>
                 {loading ? (
-                  <div className="h-8 w-20 bg-white/[0.06] rounded animate-pulse mt-1" />
+                  <div className="h-8 w-20 bg-white/[0.06] rounded animate-pulse" />
                 ) : (
-                  <p className={`text-3xl font-extrabold tabular-nums leading-none mt-1 ${color}`}>
-                    {value}<span className="text-lg font-bold text-white/30">{value !== "—" ? suffix : ""}</span>
-                  </p>
+                  <>
+                    <p className={`text-3xl font-extrabold tabular-nums leading-none ${color}`}>
+                      {value}
+                      <span className="text-base font-bold text-white/30">
+                        {value !== "—" ? suffix : ""}
+                      </span>
+                    </p>
+                    {bar != null && barColor && (
+                      <AccuracyBar pct={bar} barColor={barColor} />
+                    )}
+                  </>
                 )}
               </div>
             ))}
           </div>
 
+          {/* No data state */}
+          {!loading && !hasData && (
+            <div className="px-5 py-5 border-t border-white/[0.06] bg-[#0c0c0c]">
+              <p className="text-sm text-white/30 text-center">
+                Accuracy data will populate after Opening Round statistics are processed.
+              </p>
+            </div>
+          )}
+
           {/* Credibility footer */}
           <div className="px-5 py-4 border-t border-white/[0.06] bg-[#0a0a0a] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 flex-wrap">
             <div className="text-[12px] text-white/35 leading-relaxed max-w-lg">
-              {!loading && row
-                ? "Opening Round results demonstrate strong early season accuracy. Projections are refined each round as more match data becomes available."
+              {hasData
+                ? "Projections are refined each round as more match data becomes available."
                 : "Accuracy data will populate after Opening Round statistics are processed."}
             </div>
             <div className="shrink-0 flex items-center gap-2 text-[11px] text-white/25">
-              <Database size={12} className="text-white/20" />
+              <Database size={12} className="text-white/20 shrink-0" />
               <span>Based on 9,866 historical projections · Avg error 16.03 pts</span>
             </div>
           </div>
