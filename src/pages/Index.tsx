@@ -199,7 +199,7 @@ function ErrorDistributionBlock({ row, loading }: { row: AccuracyRow | null; loa
   const bands   = hasData && row ? buildDistribution(row) : [];
 
   return (
-    <div className="mt-4 rounded-2xl border border-white/[0.07] bg-[#0e0e0e] overflow-hidden">
+    <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-white/[0.06] bg-[#0a0a0a] flex-wrap">
         <div className="flex items-center gap-2">
@@ -220,13 +220,13 @@ function ErrorDistributionBlock({ row, loading }: { row: AccuracyRow | null; loa
       </div>
 
       {/* Chart body */}
-      <div className="px-5 py-6 space-y-4">
+      <div className="px-5 py-4 space-y-3">
         {loading && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {[1,2,3,4].map(i => (
               <div key={i} className="flex items-center gap-3">
                 <div className="w-20 h-3 bg-white/[0.06] rounded animate-pulse shrink-0" />
-                <div className="flex-1 h-6 bg-white/[0.06] rounded-full animate-pulse" />
+                <div className="flex-1 h-2.5 bg-white/[0.06] rounded-full animate-pulse" />
                 <div className="w-8 h-3 bg-white/[0.06] rounded animate-pulse shrink-0" />
               </div>
             ))}
@@ -246,7 +246,7 @@ function ErrorDistributionBlock({ row, loading }: { row: AccuracyRow | null; loa
               <span className="w-[72px] text-[11px] font-semibold text-white/40 shrink-0 tabular-nums">
                 {label}
               </span>
-              <div className="flex-1 h-6 bg-white/[0.05] rounded-full overflow-hidden">
+              <div className="flex-1 h-2.5 bg-white/[0.05] rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-700 ${color}`}
                   style={{ width: `${Math.min(rounded, 100)}%` }}
@@ -261,7 +261,7 @@ function ErrorDistributionBlock({ row, loading }: { row: AccuracyRow | null; loa
       </div>
 
       {/* Explanation */}
-      <div className="px-5 pb-5">
+      <div className="px-5 pb-4">
         <p className="text-[12px] text-white/30 leading-relaxed">
           This distribution shows how closely Neeko projections match actual fantasy scores. Most projections fall within a narrow error range, demonstrating strong model reliability.
         </p>
@@ -345,106 +345,101 @@ function ModelAccuracySection() {
   ];
 
   return (
-    <section className="py-12 md:py-16 bg-[#070707] border-t border-white/[0.05]">
-      <div className="max-w-4xl mx-auto px-4">
-        <SectionLabel>Model Accuracy</SectionLabel>
+    <section className="py-10 md:py-12 bg-[#070707] border-t border-white/[0.05]">
+      <div className="max-w-5xl mx-auto px-4">
+        <span className="block text-center text-xs uppercase tracking-wide text-[#F5C84C] mb-1">
+          Model Validation
+        </span>
         <SectionHeading>How Accurate Are Neeko Projections?</SectionHeading>
         <GoldDivider />
-        <p className="text-center text-white/40 text-sm mb-3 max-w-md mx-auto">
+        <p className="text-center text-white/40 text-sm mb-4 max-w-md mx-auto">
           Built on statistical modelling of historical player performance, matchup difficulty and scoring volatility.
         </p>
 
         {/* Marketing proof line */}
         {proofLine && (
-          <p className="text-center text-[13px] font-semibold text-green-400/80 mb-7 max-w-xl mx-auto leading-relaxed">
+          <p className="text-center text-[13px] font-semibold text-green-400/80 mb-5 max-w-xl mx-auto leading-relaxed">
             {proofLine}
           </p>
         )}
-        {!proofLine && <div className="mb-7" />}
+        {!proofLine && <div className="mb-5" />}
 
-        <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] overflow-hidden">
-          {/* Header bar */}
-          <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-white/[0.06] bg-[#0a0a0a] flex-wrap">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#F5C84C]/10 border border-[#F5C84C]/20">
-                <Target size={14} className="text-[#F5C84C]" />
+        {/* Two-column grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          {/* Left — Accuracy metrics card */}
+          <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] overflow-hidden">
+            {/* Header bar */}
+            <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-white/[0.06] bg-[#0a0a0a] flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-[#F5C84C]/10 border border-[#F5C84C]/20">
+                  <Target size={13} className="text-[#F5C84C]" />
+                </div>
+                <span className="text-[11px] font-bold uppercase tracking-widest text-white/40">
+                  {loading ? "Loading…" : sourceLabel}
+                </span>
               </div>
-              <span className="text-[11px] font-bold uppercase tracking-widest text-white/40">
-                {loading ? "Loading…" : sourceLabel}
-              </span>
+              {!loading && (
+                <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-lg border ${conf.bg} ${conf.border}`}>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-white/35">Confidence</span>
+                  <span className={`text-[11px] font-black uppercase tracking-wider ${conf.color}`}>{conf.label}</span>
+                </div>
+              )}
+              {loading && <div className="h-6 w-32 bg-white/[0.06] rounded-lg animate-pulse" />}
             </div>
-            {/* Confidence badge — always show once loaded */}
-            {!loading && (
-              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${conf.bg} ${conf.border}`}>
-                <span className="text-[9px] font-bold uppercase tracking-widest text-white/35">Model Confidence</span>
-                <span className={`text-[11px] font-black uppercase tracking-wider ${conf.color}`}>{conf.label}</span>
-              </div>
-            )}
-            {loading && (
-              <div className="h-7 w-36 bg-white/[0.06] rounded-lg animate-pulse" />
-            )}
-          </div>
 
-          {/* Metrics grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/[0.04]">
-            {metrics.map(({ label, value, suffix, color, bar, barColor }) => (
-              <div key={label} className="bg-[#0e0e0e] px-5 py-5 flex flex-col">
-                <p className="text-[10px] text-white/30 uppercase tracking-widest font-semibold leading-tight mb-2">
-                  {label}
+            {/* Metrics grid */}
+            <div className="grid grid-cols-2 gap-px bg-white/[0.04]">
+              {metrics.map(({ label, value, suffix, color, bar, barColor }) => (
+                <div key={label} className="bg-[#0e0e0e] px-4 py-4 flex flex-col">
+                  <p className="text-[10px] text-white/30 uppercase tracking-widest font-semibold leading-tight mb-1.5">
+                    {label}
+                  </p>
+                  {loading ? (
+                    <div className="h-7 w-16 bg-white/[0.06] rounded animate-pulse" />
+                  ) : (
+                    <>
+                      <p className={`text-2xl font-extrabold tabular-nums leading-none ${color}`}>
+                        {value}
+                        <span className="text-sm font-bold text-white/30">
+                          {value !== "—" ? suffix : ""}
+                        </span>
+                      </p>
+                      {bar != null && barColor && (
+                        <AccuracyBar pct={bar} barColor={barColor} />
+                      )}
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* No data state */}
+            {!loading && !hasData && (
+              <div className="px-4 py-4 border-t border-white/[0.06] bg-[#0c0c0c]">
+                <p className="text-sm text-white/30 text-center">
+                  Accuracy data will populate after Opening Round statistics are processed.
                 </p>
-                {loading ? (
-                  <div className="h-8 w-20 bg-white/[0.06] rounded animate-pulse" />
-                ) : (
-                  <>
-                    <p className={`text-3xl font-extrabold tabular-nums leading-none ${color}`}>
-                      {value}
-                      <span className="text-base font-bold text-white/30">
-                        {value !== "—" ? suffix : ""}
-                      </span>
-                    </p>
-                    {bar != null && barColor && (
-                      <AccuracyBar pct={bar} barColor={barColor} />
-                    )}
-                  </>
-                )}
               </div>
-            ))}
-          </div>
+            )}
 
-          {/* No data state */}
-          {!loading && !hasData && (
-            <div className="px-5 py-5 border-t border-white/[0.06] bg-[#0c0c0c]">
-              <p className="text-sm text-white/30 text-center">
-                Accuracy data will populate after Opening Round statistics are processed.
-              </p>
-            </div>
-          )}
-
-          {/* Credibility footer */}
-          <div className="px-5 py-4 border-t border-white/[0.06] bg-[#0a0a0a] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 flex-wrap">
-            <div className="text-[12px] text-white/35 leading-relaxed max-w-lg">
-              {hasData
-                ? "Projections are refined each round as more match data becomes available."
-                : "Accuracy data will populate after Opening Round statistics are processed."}
-            </div>
-            <div className="shrink-0 flex items-center gap-2 text-[11px] text-white/25">
-              <Database size={12} className="text-white/20 shrink-0" />
+            {/* Credibility footer */}
+            <div className="px-4 py-3 border-t border-white/[0.06] bg-[#0a0a0a] flex items-center gap-2 text-[11px] text-white/25">
+              <Database size={11} className="text-white/20 shrink-0" />
               <span>Based on 9,866 historical projections · Avg error 16.03 pts</span>
             </div>
           </div>
+
+          {/* Right — Error Distribution */}
+          <ErrorDistributionBlock row={row} loading={loading} />
+
         </div>
 
-        {/* Error Distribution */}
-        <ErrorDistributionBlock row={row} loading={loading} />
-
-        {/* Selling point */}
-        <div className="mt-5 rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.03] px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-white mb-0.5">Why this matters</p>
-            <p className="text-[13px] text-white/40 leading-relaxed max-w-md">
-              More accurate projections mean better captain choices, smarter trades and stronger fantasy performance.
-            </p>
-          </div>
+        {/* Selling point — compact row */}
+        <div className="flex items-center justify-between mt-6 p-4 border border-[#F5C84C]/20 rounded-lg gap-4">
+          <p className="text-sm text-white/40 leading-relaxed">
+            More accurate projections mean better captain choices, smarter trades and stronger fantasy results.
+          </p>
           <Link
             to="/neeko-plus"
             className="shrink-0 inline-flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-5 py-2.5 rounded-xl hover:brightness-110 transition-all whitespace-nowrap"
