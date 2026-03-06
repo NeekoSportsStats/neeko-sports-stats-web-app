@@ -201,22 +201,21 @@ function ErrorDistributionBlock({ row, loading }: { row: AccuracyRow | null; loa
   return (
     <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-white/[0.06] bg-[#0a0a0a] flex-wrap">
+      <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-white/[0.06] bg-[#0a0a0a] flex-wrap">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/[0.05] border border-white/[0.08]">
-            <BarChart2 size={14} className="text-white/50" />
+          <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-white/[0.05] border border-white/[0.08]">
+            <BarChart2 size={13} className="text-white/50" />
           </div>
-          <span className="text-[11px] font-bold uppercase tracking-widest text-white/40">
+          <span className="text-sm font-semibold text-neutral-300">
             Prediction Error Distribution
           </span>
         </div>
         {!loading && (
-          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${rel.bg} ${rel.border}`}>
-            <span className="text-[9px] font-bold uppercase tracking-widest text-white/35">Prediction Reliability</span>
-            <span className={`text-[11px] font-black uppercase tracking-wider ${rel.color}`}>{rel.label}</span>
-          </div>
+          <span className={`text-xs px-3 py-1 rounded-full border ${rel.bg} ${rel.border} ${rel.color}`}>
+            Reliability: {rel.label}
+          </span>
         )}
-        {loading && <div className="h-7 w-40 bg-white/[0.06] rounded-lg animate-pulse" />}
+        {loading && <div className="h-6 w-36 bg-white/[0.06] rounded-full animate-pulse" />}
       </div>
 
       {/* Chart body */}
@@ -347,22 +346,17 @@ function ModelAccuracySection() {
   return (
     <section className="py-10 md:py-12 bg-[#070707] border-t border-white/[0.05]">
       <div className="max-w-5xl mx-auto px-4">
-        <span className="block text-center text-xs uppercase tracking-wide text-[#F5C84C] mb-1">
-          Model Validation
-        </span>
-        <SectionHeading>How Accurate Are Neeko Projections?</SectionHeading>
-        <GoldDivider />
-        <p className="text-center text-white/40 text-sm mb-4 max-w-md mx-auto">
-          Built on statistical modelling of historical player performance, matchup difficulty and scoring volatility.
-        </p>
-
-        {/* Marketing proof line */}
-        {proofLine && (
-          <p className="text-center text-[13px] font-semibold text-green-400/80 mb-5 max-w-xl mx-auto leading-relaxed">
-            {proofLine}
-          </p>
-        )}
-        {!proofLine && <div className="mb-5" />}
+        <div className="text-center mb-6">
+          <span className="text-xs uppercase tracking-wide text-[#F5C84C]">
+            Model Validation
+          </span>
+          <div className="mt-2"><SectionHeading>How Accurate Are Neeko Projections?</SectionHeading></div>
+          {proofLine && (
+            <p className="text-[13px] font-semibold text-green-400/80 mt-3 max-w-xl mx-auto leading-relaxed">
+              {proofLine}
+            </p>
+          )}
+        </div>
 
         {/* Two-column grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -389,9 +383,9 @@ function ModelAccuracySection() {
             </div>
 
             {/* Metrics grid */}
-            <div className="grid grid-cols-2 gap-px bg-white/[0.04]">
+            <div className="grid grid-cols-2 divide-x divide-y divide-neutral-800">
               {metrics.map(({ label, value, suffix, color, bar, barColor }) => (
-                <div key={label} className="bg-[#0e0e0e] px-4 py-4 flex flex-col">
+                <div key={label} className="px-4 py-4 flex flex-col">
                   <p className="text-[10px] text-white/30 uppercase tracking-widest font-semibold leading-tight mb-1.5">
                     {label}
                   </p>
@@ -423,16 +417,17 @@ function ModelAccuracySection() {
               </div>
             )}
 
-            {/* Credibility footer */}
-            <div className="px-4 py-3 border-t border-white/[0.06] bg-[#0a0a0a] flex items-center gap-2 text-[11px] text-white/25">
-              <Database size={11} className="text-white/20 shrink-0" />
-              <span>Based on 9,866 historical projections · Avg error 16.03 pts</span>
-            </div>
           </div>
 
           {/* Right — Error Distribution */}
           <ErrorDistributionBlock row={row} loading={loading} />
 
+        </div>
+
+        {/* Sample size credibility line */}
+        <div className="flex items-center justify-center gap-2 text-xs text-neutral-500 mt-3">
+          <Database size={11} className="shrink-0" />
+          <span>Model evaluated on 9,866 historical AFL player projections</span>
         </div>
 
         {/* Selling point — compact row */}
