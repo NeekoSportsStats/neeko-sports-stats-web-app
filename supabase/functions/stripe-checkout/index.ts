@@ -201,6 +201,14 @@ Deno.serve(async (req) => {
       success_url,
       cancel_url,
       payment_method_collection: 'always',
+
+      receipt_email: user.email,
+
+      metadata: {
+        supabase_user_id: user.id,
+        email: user.email,
+        plan: plan,
+      },
     });
 
     console.log(`stripe-checkout: session created ${session.id}`);
