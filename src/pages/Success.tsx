@@ -118,7 +118,7 @@ export default function Success() {
 
           <div className="flex flex-col sm:flex-row gap-3 pt-4">
             <Button asChild className="flex-1">
-              <a href="/sports/afl/players">
+              <a href="/sports/afl/rankings">
                 <ArrowRight className="mr-2 h-4 w-4" />
                 Start Exploring
               </a>
