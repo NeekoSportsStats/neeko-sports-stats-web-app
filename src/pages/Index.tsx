@@ -288,11 +288,17 @@ function ModelAccuracySection() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
+        .schema("afl")
         .from("v_projection_accuracy_homepage")
         .select("*")
-        .single();
-      setRow(data as AccuracyRow | null);
+        .maybeSingle();
+      if (error) {
+        console.warn("Accuracy data unavailable", error);
+        setRow(null);
+      } else {
+        setRow(data as AccuracyRow | null);
+      }
       setLoading(false);
     })();
   }, []);
