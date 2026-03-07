@@ -27,6 +27,7 @@ import {
   DEFAULT_LAYOUT_OFFSETS,
 } from "../marketing/GraphicTemplates";
 import { AIMediaPicker, getBackgroundSourceLabel, loadAIMedia } from "../marketing/AIMediaPicker";
+import { getPublicStorageUrl } from "@/lib/storage/getPublicStorageUrl";
 import { AIMediaPackGenerator } from "../marketing/AIMediaPackGenerator";
 import { exportCarouselSlides } from "../marketing/CarouselExport";
 import { AddToPlannerModal } from "../marketing/AddToPlannerModal";
@@ -584,9 +585,12 @@ export default function AdminContentEngine() {
   const isCarouselMode  = selectedExportSize.id === "carousel";
   const effectiveLayout = isCarouselMode ? "leaderboard" : selectedLayout;
 
-  const resolvedMediaUrl = backgroundSource === "upload"
+  const rawMediaUrl = backgroundSource === "upload"
     ? (customUploadUrl.trim() || undefined)
     : (backgroundMediaUrl ?? undefined);
+  const resolvedMediaUrl = rawMediaUrl
+    ? (getPublicStorageUrl(rawMediaUrl) ?? rawMediaUrl)
+    : undefined;
 
   const graphicOptions: GraphicOptions = {
     layout: effectiveLayout,

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Check, Image as ImageIcon, Video, Loader, RefreshCw, FolderOpen } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { getPublicStorageUrl } from "@/lib/storage/getPublicStorageUrl";
 import type { BackgroundSource } from "./GraphicTemplates";
 
 export type MediaCategory = "all" | "stadium" | "crowd" | "abstract" | "field" | "players" | "lights" | "videos";
@@ -81,14 +82,20 @@ async function loadAIGeneratedFromDB(): Promise<AIMediaItem[]> {
 
   if (error || !data) return [];
 
-  return data.map((row) => ({
-    id:           row.asset_id as string,
-    label:        (row.label as string) ?? "",
-    url:          (row.url as string) ?? "",
-    thumbnail_url:(row.thumbnail_url as string) ?? (row.url as string) ?? "",
-    media_type:   ((row.media_type as string) === "video" ? "video" : "image") as "image" | "video",
-    category:     ((row.category as string) ?? "stadium") as MediaCategory,
-  }));
+  return data.map((row) => {
+    const rawUrl = (row.url as string) ?? "";
+    const publicUrl = getPublicStorageUrl(rawUrl) ?? rawUrl;
+    const rawThumb = (row.thumbnail_url as string) ?? rawUrl;
+    const publicThumb = getPublicStorageUrl(rawThumb) ?? rawThumb;
+    return {
+      id:           row.asset_id as string,
+      label:        (row.label as string) ?? "",
+      url:          publicUrl,
+      thumbnail_url: publicThumb,
+      media_type:   ((row.media_type as string) === "video" ? "video" : "image") as "image" | "video",
+      category:     ((row.category as string) ?? "stadium") as MediaCategory,
+    };
+  });
 }
 
 async function listStorageFolder(path: string): Promise<AIMediaItem[]> {

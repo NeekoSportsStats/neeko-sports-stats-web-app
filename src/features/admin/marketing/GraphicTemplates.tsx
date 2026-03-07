@@ -2,6 +2,7 @@ import React from "react";
 import { getTeamBackgroundTheme } from "@/config/teamBackgroundThemes";
 import { getTeamAccentColour } from "@/config/aflTeamColours";
 import { resolveStadiumBackground } from "@/config/aflStadiumBackgrounds";
+import { getPublicStorageUrl } from "@/lib/storage/getPublicStorageUrl";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -470,13 +471,15 @@ function BackgroundLayer({
   }
 
   if (source === "stock_image" && options.backgroundMediaUrl) {
+    const resolvedImgUrl = getPublicStorageUrl(options.backgroundMediaUrl) ?? options.backgroundMediaUrl;
     return (
       <div style={{
         position: "absolute", inset: 0, zIndex: 0, overflow: "hidden",
       }}>
         <img
-          src={options.backgroundMediaUrl}
+          src={resolvedImgUrl}
           alt=""
+          onError={(e) => { e.currentTarget.style.display = "none"; }}
           style={{
             width: "100%", height: "100%",
             objectFit: "cover",
@@ -493,12 +496,13 @@ function BackgroundLayer({
   }
 
   if (source === "stock_video" && options.backgroundMediaUrl) {
+    const resolvedVidUrl = getPublicStorageUrl(options.backgroundMediaUrl) ?? options.backgroundMediaUrl;
     return (
       <div style={{
         position: "absolute", inset: 0, zIndex: 0, overflow: "hidden",
       }}>
         <video
-          src={options.backgroundMediaUrl}
+          src={resolvedVidUrl}
           autoPlay
           loop
           muted
