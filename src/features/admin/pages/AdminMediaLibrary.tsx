@@ -38,7 +38,7 @@ const IMAGE_SUBCATEGORIES: ImageCategory[] = ["stadium", "crowd", "field", "abst
 const CATEGORIES: Category[]              = ["all", "stadium", "crowd", "field", "abstract", "players", "equipment"];
 const BATCH_CATEGORIES: ImageCategory[]   = ["stadium", "crowd", "field", "players", "abstract", "equipment"];
 
-const CACHE_KEY_ALL = "neeko_media_lib_all_v6";
+const CACHE_KEY_ALL = "neeko_media_lib_all_v7";
 const CACHE_TTL     = 5 * 60 * 1000;
 
 const ACCENT = "#F59E0B";
@@ -82,7 +82,7 @@ function rowToMediaItem(row: Record<string, unknown>): MediaItem {
     media_type:    (row.media_type as string) ?? "image",
     is_active:     (row.is_active as boolean) ?? true,
     sort_order:    (row.sort_order as number | null) ?? null,
-    created_at:    (row.created_at as string) ?? undefined,
+    created_at:    (row.registered_at as string) ?? undefined,
   };
 }
 
@@ -93,9 +93,9 @@ async function loadAllMedia(force = false): Promise<MediaItem[]> {
   }
   const { data, error } = await supabase
     .from("ai_media_library")
-    .select("*")
+    .select("asset_id, label, url, thumbnail_url, media_type, category, is_active, sort_order, registered_at")
     .eq("is_active", true)
-    .order("sort_order", { ascending: true });
+    .order("registered_at", { ascending: false });
   if (error || !data) return [];
   const items = (data as Record<string, unknown>[]).map(rowToMediaItem);
   writeCache(items);
