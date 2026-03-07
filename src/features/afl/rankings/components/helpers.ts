@@ -157,7 +157,7 @@ export function getValueTagStyle(tag: string | null | undefined) {
   const t = tag.toUpperCase();
   if (t.includes("ELITE")) return { text: "text-green-300", bg: "bg-green-500/10", border: "border-green-500/30" };
   if (t.includes("GOOD")) return { text: "text-[#F5C84C]", bg: "bg-[#F5C84C]/10", border: "border-[#F5C84C]/30" };
-  if (t.includes("AVERAGE")) return { text: "text-white/50", bg: "bg-white/5", border: "border-white/10" };
+  if (t.includes("FAIR") || t.includes("AVERAGE")) return { text: "text-white/50", bg: "bg-white/5", border: "border-white/10" };
   return { text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" };
 }
 
