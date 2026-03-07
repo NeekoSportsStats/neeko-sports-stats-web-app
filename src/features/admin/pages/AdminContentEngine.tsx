@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, createElement, lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
+import { buildGraphicRenderConfig, draftToDbRow } from "@/features/admin/marketing/contentEngineDraft";
 
 const AdminMediaLibraryPanel = lazy(() => import("./AdminMediaLibrary"));
 import { toPng } from "html-to-image";
@@ -458,36 +459,37 @@ function DropSelect<T extends string>({
 
 export default function AdminContentEngine() {
   const { toast } = useToast();
-  const { state, setContentEngine } = useAdminUIState();
+  const { state, setContentEngine, setDraft, resetDraft, loadDraftFromRow } = useAdminUIState();
   const ce = state.contentEngine;
+  const draft = state.draft;
   const [searchParams] = useSearchParams();
   const plannerId = searchParams.get("plannerId");
   const [plannerSaving, setPlannerSaving] = useState(false);
   const plannerLoadedRef = useRef<string | null>(null);
 
-  // ── Context-backed setters ───────────────────────────────────────────────
+  // ── Context-backed setters (legacy CE state — kept for backward compat) ──
   const setContentMode        = (v: ContentMode)         => setContentEngine((p) => ({ ...p, contentMode: v }));
-  const setSelectedAngleId    = (v: string)              => setContentEngine((p) => ({ ...p, selectedAngleId: v }));
-  const setSelectedLayout     = (v: LayoutEngine)        => setContentEngine((p) => ({ ...p, selectedLayout: v }));
-  const setSelectedBackground = (v: BackgroundTheme)     => setContentEngine((p) => ({ ...p, selectedBackground: v }));
-  const setBackgroundSource   = (v: BackgroundSource)    => setContentEngine((p) => ({ ...p, backgroundSource: v }));
-  const setBackgroundMediaUrl = (v: string | null)       => setContentEngine((p) => ({ ...p, backgroundMediaUrl: v }));
-  const setCustomUploadUrl    = (v: string)              => setContentEngine((p) => ({ ...p, customUploadUrl: v }));
-  const setShowTeamAccent     = (v: boolean)             => setContentEngine((p) => ({ ...p, showTeamAccent: v }));
-  const setPlayerImageUrl     = (v: string)              => setContentEngine((p) => ({ ...p, playerImageUrl: v }));
-  const setLogoUrl            = (v: string)              => setContentEngine((p) => ({ ...p, logoUrl: v }));
-  const setLogoPosition       = (v: LogoPosition)        => setContentEngine((p) => ({ ...p, logoPosition: v }));
-  const setRoundLabel         = (v: string)              => setContentEngine((p) => ({ ...p, roundLabel: v }));
-  const setStatHighlight      = (v: string)              => setContentEngine((p) => ({ ...p, statHighlight: v }));
-  const setCtaText            = (v: string)              => setContentEngine((p) => ({ ...p, ctaText: v }));
-  const setCtaPosition        = (v: CtaPosition)         => setContentEngine((p) => ({ ...p, ctaPosition: v }));
-  const setAccentMode         = (v: AccentColourMode)    => setContentEngine((p) => ({ ...p, accentMode: v }));
-  const setCustomAccent       = (v: string)              => setContentEngine((p) => ({ ...p, customAccent: v }));
-  const setAutoTeamAccent     = (v: boolean)             => setContentEngine((p) => ({ ...p, autoTeamAccent: v }));
-  const setRankHighlight      = (v: RankHighlight)       => setContentEngine((p) => ({ ...p, rankHighlight: v }));
-  const setAppendHashtags     = (v: boolean)             => setContentEngine((p) => ({ ...p, appendHashtags: v }));
-  const setPlayerMode         = (v: "auto" | "manual")  => setContentEngine((p) => ({ ...p, playerMode: v }));
-  const setSelectedExportSize = (v: ExportSize)          => setContentEngine((p) => ({ ...p, exportSizeId: v.id }));
+  const setSelectedAngleId    = (v: string)              => { setContentEngine((p) => ({ ...p, selectedAngleId: v })); setDraft((p) => ({ ...p, statAngleId: v })); };
+  const setSelectedLayout     = (v: LayoutEngine)        => { setContentEngine((p) => ({ ...p, selectedLayout: v })); setDraft((p) => ({ ...p, template: v })); };
+  const setSelectedBackground = (v: BackgroundTheme)     => { setContentEngine((p) => ({ ...p, selectedBackground: v })); setDraft((p) => ({ ...p, selectedBackground: v })); };
+  const setBackgroundSource   = (v: BackgroundSource)    => { setContentEngine((p) => ({ ...p, backgroundSource: v })); setDraft((p) => ({ ...p, backgroundSource: v })); };
+  const setBackgroundMediaUrl = (v: string | null)       => { setContentEngine((p) => ({ ...p, backgroundMediaUrl: v })); setDraft((p) => ({ ...p, backgroundMediaUrl: v })); };
+  const setCustomUploadUrl    = (v: string)              => { setContentEngine((p) => ({ ...p, customUploadUrl: v })); setDraft((p) => ({ ...p, customUploadUrl: v })); };
+  const setShowTeamAccent     = (v: boolean)             => { setContentEngine((p) => ({ ...p, showTeamAccent: v })); setDraft((p) => ({ ...p, showTeamAccent: v })); };
+  const setPlayerImageUrl     = (v: string)              => { setContentEngine((p) => ({ ...p, playerImageUrl: v })); setDraft((p) => ({ ...p, playerImageUrl: v })); };
+  const setLogoUrl            = (v: string)              => { setContentEngine((p) => ({ ...p, logoUrl: v })); setDraft((p) => ({ ...p, logoUrl: v })); };
+  const setLogoPosition       = (v: LogoPosition)        => { setContentEngine((p) => ({ ...p, logoPosition: v })); setDraft((p) => ({ ...p, logoPosition: v })); };
+  const setRoundLabel         = (v: string)              => { setContentEngine((p) => ({ ...p, roundLabel: v })); setDraft((p) => ({ ...p, roundLabel: v })); };
+  const setStatHighlight      = (v: string)              => { setContentEngine((p) => ({ ...p, statHighlight: v })); setDraft((p) => ({ ...p, statHighlight: v })); };
+  const setCtaText            = (v: string)              => { setContentEngine((p) => ({ ...p, ctaText: v })); setDraft((p) => ({ ...p, ctaText: v })); };
+  const setCtaPosition        = (v: CtaPosition)         => { setContentEngine((p) => ({ ...p, ctaPosition: v })); setDraft((p) => ({ ...p, ctaPosition: v })); };
+  const setAccentMode         = (v: AccentColourMode)    => { setContentEngine((p) => ({ ...p, accentMode: v })); setDraft((p) => ({ ...p, accentMode: v })); };
+  const setCustomAccent       = (v: string)              => { setContentEngine((p) => ({ ...p, customAccent: v })); setDraft((p) => ({ ...p, customAccent: v })); };
+  const setAutoTeamAccent     = (v: boolean)             => { setContentEngine((p) => ({ ...p, autoTeamAccent: v })); setDraft((p) => ({ ...p, autoTeamAccent: v })); };
+  const setRankHighlight      = (v: RankHighlight)       => { setContentEngine((p) => ({ ...p, rankHighlight: v })); setDraft((p) => ({ ...p, rankHighlight: v })); };
+  const setAppendHashtags     = (v: boolean)             => { setContentEngine((p) => ({ ...p, appendHashtags: v })); setDraft((p) => ({ ...p, appendHashtags: v })); };
+  const setPlayerMode         = (v: "auto" | "manual")  => { setContentEngine((p) => ({ ...p, playerMode: v })); setDraft((p) => ({ ...p, playerMode: v })); };
+  const setSelectedExportSize = (v: ExportSize)          => { setContentEngine((p) => ({ ...p, exportSizeId: v.id })); setDraft((p) => ({ ...p, exportSizeId: v.id })); };
 
   // Derived from context
   const contentMode        = ce.contentMode as ContentMode;
@@ -661,6 +663,40 @@ export default function AdminContentEngine() {
     ? basePlayers.filter((p) => selectedPlayerKeys.includes(p.player_name))
     : basePlayers;
 
+  // Build canonical render config from draft (used for export parity)
+  const canonicalRenderConfig = (() => {
+    const syncedDraft = {
+      ...draft,
+      statAngleId:        selectedAngle.id,
+      template:           selectedLayout as import("../marketing/GraphicTemplates").LayoutEngine,
+      selectedBackground: selectedBackground as import("../marketing/GraphicTemplates").BackgroundTheme,
+      backgroundSource:   backgroundSource  as import("../marketing/GraphicTemplates").BackgroundSource,
+      backgroundMediaUrl: backgroundMediaUrl,
+      customUploadUrl:    customUploadUrl,
+      accentMode:         accentMode        as import("../marketing/GraphicTemplates").AccentColourMode,
+      customAccent,
+      autoTeamAccent,
+      showTeamAccent,
+      logoUrl,
+      logoPosition:       logoPosition      as import("../marketing/GraphicTemplates").LogoPosition,
+      playerImageUrl,
+      roundLabel,
+      statHighlight,
+      ctaText,
+      ctaPosition:        ctaPosition       as import("../marketing/GraphicTemplates").CtaPosition,
+      rankHighlight:      rankHighlight     as import("../marketing/GraphicTemplates").RankHighlight,
+      exportSizeId:       selectedExportSize.id,
+      includeAiAnalysis:  includeAIAnalysis,
+    };
+    return buildGraphicRenderConfig(
+      syncedDraft,
+      selectedAngle,
+      effectivePlayers,
+      selectedExportSize.id,
+      layoutEditorOpen ? layoutOffsets : undefined,
+    );
+  })();
+
   // ── Reset all persisted state ─────────────────────────────────────────────
 
   const handleResetState = () => {
@@ -689,6 +725,7 @@ export default function AdminContentEngine() {
       showTeamAccent:     false,
       scrollY:            0,
     }));
+    resetDraft();
     setInsight("");
     setCaption("");
     toast({ title: "Content Engine reset", description: "All settings restored to defaults." });
@@ -745,33 +782,30 @@ export default function AdminContentEngine() {
         if (error) throw error;
         if (!data) return;
 
-        const row = data as {
-          stat_angle: string;
-          template: string;
-          background: string;
-          background_type: string;
-          accent_color: string;
-          export_format: string;
-          caption: string;
-        };
+        const row = data as Record<string, unknown>;
+
+        loadDraftFromRow(row);
+
+        const statAngle = (row.stat_angle as string) || "";
+        const caption   = (row.caption as string) || "";
 
         setContentEngine((p) => ({
           ...p,
-          selectedAngleId:    row.stat_angle    || p.selectedAngleId,
-          selectedLayout:     (row.template     || p.selectedLayout)     as typeof p.selectedLayout,
-          selectedBackground: (row.background   || p.selectedBackground) as typeof p.selectedBackground,
-          backgroundSource:   (row.background_type || p.backgroundSource) as typeof p.backgroundSource,
-          exportSizeId:       row.export_format || p.exportSizeId,
+          selectedAngleId:    statAngle    || p.selectedAngleId,
+          selectedLayout:     ((row.template as string)      || p.selectedLayout)     as typeof p.selectedLayout,
+          selectedBackground: ((row.background as string)    || p.selectedBackground) as typeof p.selectedBackground,
+          backgroundSource:   ((row.background_type as string) || p.backgroundSource) as typeof p.backgroundSource,
+          exportSizeId:       (row.export_format as string)  || p.exportSizeId,
           accentMode:         "custom" as typeof p.accentMode,
-          customAccent:       row.accent_color  || p.customAccent,
+          customAccent:       (row.accent_color as string)   || p.customAccent,
         }));
 
-        if (row.caption) setCaption(row.caption);
+        if (caption) setCaption(caption);
 
-        const matchedAngle = STAT_ANGLES.find((a) => a.id === row.stat_angle);
+        const matchedAngle = STAT_ANGLES.find((a) => a.id === statAngle);
         if (matchedAngle) fetchPlayers(matchedAngle);
 
-        toast({ title: "Loaded from planner", description: `Editing ${row.stat_angle.replace(/_/g, " ")}` });
+        toast({ title: "Loaded from planner", description: `Editing ${statAngle.replace(/_/g, " ")}` });
       } catch (err) {
         toast({ title: "Failed to load planner post", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
       }
@@ -783,16 +817,19 @@ export default function AdminContentEngine() {
   const handleSaveToPlanner = async () => {
     setPlannerSaving(true);
     try {
-      const payload = {
-        stat_angle:      selectedAngle.id,
-        template:        selectedLayout,
-        background:      selectedBackground,
-        background_type: backgroundSource,
-        accent_color:    accentColor,
-        caption,
-        hashtags:        appendHashtags ? AUTO_HASHTAGS : "",
-        export_format:   selectedExportSize.id,
+      const updatedDraft = {
+        ...draft,
+        statAngleId:        selectedAngle.id,
+        template:           selectedLayout,
+        selectedBackground,
+        backgroundSource,
+        customAccent:       accentColor,
+        socialCaption:      caption,
+        appendHashtags,
+        exportSizeId:       selectedExportSize.id,
       };
+
+      const payload = draftToDbRow(updatedDraft);
 
       if (plannerId) {
         const { error } = await supabase
@@ -800,6 +837,7 @@ export default function AdminContentEngine() {
           .update(payload)
           .eq("id", plannerId);
         if (error) throw error;
+        setDraft(() => ({ ...updatedDraft, lastSavedAt: new Date().toISOString() }));
         toast({ title: "Planner post updated", description: "Changes saved." });
       } else {
         const today = new Date();
@@ -814,6 +852,7 @@ export default function AdminContentEngine() {
           .from("content_planner_posts")
           .insert({ ...payload, week_start: weekStart, day: currentDay, status: "draft" });
         if (error) throw error;
+        setDraft(() => ({ ...updatedDraft, lastSavedAt: new Date().toISOString() }));
         toast({ title: "Saved to planner", description: "New draft post created." });
       }
     } catch (err) {
@@ -946,7 +985,7 @@ export default function AdminContentEngine() {
     setCarouselProgress({ done: 0, total: effectivePlayers.length + 1 });
     try {
       const { w, h } = selectedExportSize;
-      const opts = graphicOptions;
+      const opts = canonicalRenderConfig.options;
       const slides = [
         {
           filename: `neeko-carousel-${selectedAngle.id}-00-title.png`,

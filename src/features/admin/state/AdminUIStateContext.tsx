@@ -1,6 +1,7 @@
 import { createContext, useContext, useRef, useState, useCallback, useEffect, type ReactNode } from "react";
+import { type ContentEngineDraft, DEFAULT_DRAFT, mergeDraft, dbRowToDraft } from "@/features/admin/marketing/contentEngineDraft";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Legacy shape kept for backward compat (used by video panel etc.) ─────────
 
 export interface ContentEngineState {
   contentMode:        string;
@@ -41,6 +42,7 @@ export interface MediaLibraryState {
 
 interface AdminUIState {
   contentEngine:    ContentEngineState;
+  draft:            ContentEngineDraft;
   mediaLibrary:     MediaLibraryState;
   activeJobType:    string | null;
   activeJobPct:     number;
@@ -50,6 +52,9 @@ interface AdminUIState {
 interface AdminUIStateContextValue {
   state:              AdminUIState;
   setContentEngine:   (updater: (prev: ContentEngineState) => ContentEngineState) => void;
+  setDraft:           (updater: (prev: ContentEngineDraft) => ContentEngineDraft) => void;
+  resetDraft:         () => void;
+  loadDraftFromRow:   (row: Record<string, unknown>) => void;
   setMediaLibrary:    (updater: (prev: MediaLibraryState) => MediaLibraryState) => void;
   setActiveJob:       (type: string | null, pct: number, label: string | null) => void;
 }
@@ -93,9 +98,10 @@ const DEFAULT_MEDIA_LIBRARY: MediaLibraryState = {
   category:        "all",
 };
 
-const CE_STORAGE_KEY = "neeko_content_engine_state";
+const CE_STORAGE_KEY   = "neeko_content_engine_state";
+const DRAFT_STORAGE_KEY = "neeko_content_engine_draft_v2";
 
-// ─── Sync localStorage read ───────────────────────────────────────────────────
+// ─── Storage helpers ──────────────────────────────────────────────────────────
 
 function readContentEngineState(): ContentEngineState {
   try {
@@ -132,6 +138,17 @@ function readContentEngineState(): ContentEngineState {
   }
 }
 
+function readDraftState(): ContentEngineDraft {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_DRAFT };
+    const parsed = JSON.parse(raw) as Partial<ContentEngineDraft>;
+    return mergeDraft(DEFAULT_DRAFT, parsed);
+  } catch {
+    return { ...DEFAULT_DRAFT };
+  }
+}
+
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 const AdminUIStateContext = createContext<AdminUIStateContextValue | null>(null);
@@ -141,21 +158,28 @@ const AdminUIStateContext = createContext<AdminUIStateContextValue | null>(null)
 export function AdminUIStateProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AdminUIState>(() => ({
     contentEngine: readContentEngineState(),
+    draft:         readDraftState(),
     mediaLibrary:  { ...DEFAULT_MEDIA_LIBRARY },
     activeJobType:  null,
     activeJobPct:   0,
     activeJobLabel: null,
   }));
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ceDebounceRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persistContentEngine = useCallback((ce: ContentEngineState) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      try {
-        localStorage.setItem(CE_STORAGE_KEY, JSON.stringify(ce));
-      } catch { /* quota */ }
+    if (ceDebounceRef.current) clearTimeout(ceDebounceRef.current);
+    ceDebounceRef.current = setTimeout(() => {
+      try { localStorage.setItem(CE_STORAGE_KEY, JSON.stringify(ce)); } catch { /* quota */ }
     }, 300);
+  }, []);
+
+  const persistDraft = useCallback((d: ContentEngineDraft) => {
+    if (draftDebounceRef.current) clearTimeout(draftDebounceRef.current);
+    draftDebounceRef.current = setTimeout(() => {
+      try { localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(d)); } catch { /* quota */ }
+    }, 400);
   }, []);
 
   const setContentEngine = useCallback((updater: (prev: ContentEngineState) => ContentEngineState) => {
@@ -166,6 +190,30 @@ export function AdminUIStateProvider({ children }: { children: ReactNode }) {
     });
   }, [persistContentEngine]);
 
+  const setDraft = useCallback((updater: (prev: ContentEngineDraft) => ContentEngineDraft) => {
+    setState((prev) => {
+      const next = updater(prev.draft);
+      persistDraft(next);
+      return { ...prev, draft: next };
+    });
+  }, [persistDraft]);
+
+  const resetDraft = useCallback(() => {
+    setState((prev) => {
+      const next = { ...DEFAULT_DRAFT };
+      persistDraft(next);
+      return { ...prev, draft: next };
+    });
+  }, [persistDraft]);
+
+  const loadDraftFromRow = useCallback((row: Record<string, unknown>) => {
+    const loaded = dbRowToDraft(row);
+    setState((prev) => {
+      persistDraft(loaded);
+      return { ...prev, draft: loaded };
+    });
+  }, [persistDraft]);
+
   const setMediaLibrary = useCallback((updater: (prev: MediaLibraryState) => MediaLibraryState) => {
     setState((prev) => ({ ...prev, mediaLibrary: updater(prev.mediaLibrary) }));
   }, []);
@@ -175,11 +223,14 @@ export function AdminUIStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    return () => {
+      if (ceDebounceRef.current)    clearTimeout(ceDebounceRef.current);
+      if (draftDebounceRef.current) clearTimeout(draftDebounceRef.current);
+    };
   }, []);
 
   return (
-    <AdminUIStateContext.Provider value={{ state, setContentEngine, setMediaLibrary, setActiveJob }}>
+    <AdminUIStateContext.Provider value={{ state, setContentEngine, setDraft, resetDraft, loadDraftFromRow, setMediaLibrary, setActiveJob }}>
       {children}
     </AdminUIStateContext.Provider>
   );
