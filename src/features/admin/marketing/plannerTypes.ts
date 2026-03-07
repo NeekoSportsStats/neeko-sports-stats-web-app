@@ -23,6 +23,8 @@ export interface ContentPlannerPost {
   hashtags: string;
   export_format: string;
   status: PlannerPostStatus;
+  image_url: string | null;
+  image_category: string | null;
   created_at: string;
   updated_at: string;
 }

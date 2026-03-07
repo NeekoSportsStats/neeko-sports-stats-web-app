@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, ChevronDown, Copy, Download, Trash2, RefreshCw, Check, Calendar, Sparkles, CreditCard as Edit2, Zap, List, LayoutGrid, Filter, SquareCheck as CheckSquare, Square as SquareIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, ChevronDown, Copy, Download, Trash2, RefreshCw, Check, Calendar, Sparkles, CreditCard as Edit2, Zap, List, LayoutGrid, Filter, SquareCheck as CheckSquare, Square as SquareIcon, ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
@@ -48,6 +48,42 @@ const WEEKLY_AD_PRESETS: {
   { day: "Saturday",  stat_angle: "best_matchups",        template: "matchup_advantage", accent_color: "#A3E635", export_format: "instagram" },
   { day: "Sunday",    stat_angle: "safe_floor_players",   template: "stat_card",         accent_color: "#10B981", export_format: "instagram" },
 ];
+
+// ─── Angle → media category mapping ──────────────────────────────────────────
+
+type ImageCategory = "stadium" | "crowd" | "field" | "abstract" | "players" | "equipment";
+
+const ANGLE_TO_CATEGORY: Record<string, ImageCategory> = {
+  top_projections:   "stadium",
+  breakout_players:  "players",
+  captain_picks:     "players",
+  best_value_picks:  "abstract",
+  avoid_players:     "abstract",
+  trade_targets:     "abstract",
+  best_matchups:     "stadium",
+  safe_floor_players: "field",
+};
+
+const BUCKET = "content-assets";
+
+async function getRandomImageByCategory(category: ImageCategory): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("ai_media_library")
+    .select("url")
+    .eq("is_active", true)
+    .eq("media_type", "image")
+    .eq("category", category);
+
+  if (error || !data || data.length === 0) {
+    if (category !== "abstract") return getRandomImageByCategory("abstract");
+    return null;
+  }
+
+  const row = data[Math.floor(Math.random() * data.length)] as { url: string };
+  const storagePath = row.url;
+  const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
+  return publicUrl;
+}
 
 // ─── Status meta ───────────────────────────────────────────────────────────────
 
@@ -287,14 +323,21 @@ function PlannerPostCard({
         }
       </button>
 
-      <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${accentCol}20` }}>
-        <Zap className="h-3 w-3" style={{ color: accentCol }} />
-      </div>
+      {post.image_url ? (
+        <div className="w-7 h-7 rounded-lg overflow-hidden shrink-0 border border-border/40">
+          <img src={post.image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+        </div>
+      ) : (
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${accentCol}20` }}>
+          <Zap className="h-3 w-3" style={{ color: accentCol }} />
+        </div>
+      )}
 
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold truncate">{angleLabel}</p>
         <p className="text-[10px] text-muted-foreground/60 truncate">
           {post.template.replace(/_/g, " ")} · {post.export_format}
+          {post.image_category && <span className="ml-1 capitalize opacity-60">· {post.image_category}</span>}
         </p>
       </div>
 
@@ -423,6 +466,7 @@ export default function WeeklyPlanner() {
   const [weekOffset, setWeekOffset]           = useState(0);
   const [selectedIds, setSelectedIds]         = useState<string[]>([]);
   const [bulkUpdating, setBulkUpdating]       = useState(false);
+  const [useAiImages, setUseAiImages]         = useState(true);
 
   const todayName = getTodayDayName();
   const currentWeekStart = getMonday(weekOffset);
@@ -505,17 +549,31 @@ export default function WeeklyPlanner() {
     setGenerating(true);
     try {
       const weekStart = currentWeekStart;
+
+      const imageMap: Record<string, { url: string | null; category: ImageCategory | null }> = {};
+      if (useAiImages) {
+        await Promise.all(
+          WEEKLY_AD_PRESETS.map(async (preset) => {
+            const category = ANGLE_TO_CATEGORY[preset.stat_angle] ?? "abstract";
+            const url = await getRandomImageByCategory(category);
+            imageMap[preset.stat_angle] = { url, category: url ? category : null };
+          })
+        );
+      }
+
       const rows = WEEKLY_AD_PRESETS.map((preset, idx) => {
+        const imgEntry = useAiImages ? (imageMap[preset.stat_angle] ?? { url: null, category: null }) : { url: null, category: null };
         const presetDraft = {
           ...DEFAULT_DRAFT,
-          statAngleId:       preset.stat_angle,
-          template:          preset.template as typeof DEFAULT_DRAFT.template,
+          statAngleId:        preset.stat_angle,
+          template:           preset.template as typeof DEFAULT_DRAFT.template,
           selectedBackground: "dark_gradient" as typeof DEFAULT_DRAFT.selectedBackground,
-          backgroundSource:  "gradient" as typeof DEFAULT_DRAFT.backgroundSource,
-          accentMode:        "custom" as typeof DEFAULT_DRAFT.accentMode,
-          customAccent:      preset.accent_color,
-          exportSizeId:      preset.export_format,
-          status:            "draft" as const,
+          backgroundSource:   imgEntry.url ? ("stock_image" as typeof DEFAULT_DRAFT.backgroundSource) : ("gradient" as typeof DEFAULT_DRAFT.backgroundSource),
+          backgroundMediaUrl: imgEntry.url ?? null,
+          accentMode:         "custom" as typeof DEFAULT_DRAFT.accentMode,
+          customAccent:       preset.accent_color,
+          exportSizeId:       preset.export_format,
+          status:             "draft" as const,
         };
         const dbRow = draftToDbRow(presetDraft, {
           week_start: weekStart,
@@ -523,16 +581,21 @@ export default function WeeklyPlanner() {
           sort_order: idx + 1,
           source:     "auto_weekly",
         });
-        return dbRow;
+        return {
+          ...dbRow,
+          image_url:      imgEntry.url ?? null,
+          image_category: imgEntry.category ?? null,
+        };
       });
 
       const { data, error } = await supabase.from("content_planner_posts").insert(rows).select();
       if (error) throw error;
 
       setPlannerPosts((prev) => [...prev, ...((data ?? []) as ContentPlannerPost[])]);
+      const imgCount = Object.values(imageMap).filter((e) => e.url).length;
       toast({
         title: "Weekly ads generated",
-        description: `${rows.length} draft posts created for week of ${formatWeekLabel(weekStart)}.`,
+        description: `${rows.length} draft posts created for week of ${formatWeekLabel(weekStart)}.${useAiImages && imgCount > 0 ? ` ${imgCount} posts have AI background images.` : ""}`,
       });
     } catch (err) {
       toast({ title: "Failed to generate weekly ads", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
@@ -576,6 +639,28 @@ export default function WeeklyPlanner() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <button
+            onClick={() => setUseAiImages((v) => !v)}
+            className="flex items-center gap-1.5 h-8 px-3 rounded-lg border text-xs font-medium transition-all"
+            style={
+              useAiImages
+                ? { borderColor: `${ACCENT}55`, background: `${ACCENT}15`, color: ACCENT }
+                : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }
+            }
+            title={useAiImages ? "AI Images: ON — backgrounds will be attached from Media Library" : "AI Images: OFF — no background images will be attached"}
+          >
+            <ImageIcon className="h-3.5 w-3.5" />
+            Use AI Images
+            <span
+              className="w-7 h-4 rounded-full transition-colors relative shrink-0"
+              style={{ background: useAiImages ? ACCENT : "hsl(var(--muted))" }}
+            >
+              <span
+                className="absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-all"
+                style={{ left: useAiImages ? "calc(100% - 14px)" : "2px" }}
+              />
+            </span>
+          </button>
           <Button
             variant="outline" size="sm" className="h-8 text-xs gap-1.5"
             onClick={handleGenerateWeeklyAds} disabled={generating}

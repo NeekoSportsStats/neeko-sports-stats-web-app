@@ -183,37 +183,50 @@ export function draftToDbRow(draft: ContentEngineDraft, extra?: {
 // ─── Parse DB row back to draft ───────────────────────────────────────────────
 
 export function dbRowToDraft(row: Record<string, unknown>): ContentEngineDraft {
+  const imageUrl = (row.image_url as string | null) ?? null;
+
   if (row.draft_state && typeof row.draft_state === "string") {
     try {
       const parsed = JSON.parse(row.draft_state) as Partial<ContentEngineDraft>;
-      return mergeDraft(DEFAULT_DRAFT, {
+      const merged = mergeDraft(DEFAULT_DRAFT, {
         ...parsed,
         plannerPostId: row.id as string,
         mode: "edit",
         status: (row.status as ContentEngineDraft["status"]) ?? parsed.status ?? "draft",
       });
+      if (imageUrl && !merged.backgroundMediaUrl) {
+        return { ...merged, backgroundSource: "stock_image", backgroundMediaUrl: imageUrl };
+      }
+      return merged;
     } catch { /* fall through */ }
   }
   if (row.draft_state && typeof row.draft_state === "object") {
     const parsed = row.draft_state as Partial<ContentEngineDraft>;
-    return mergeDraft(DEFAULT_DRAFT, {
+    const merged = mergeDraft(DEFAULT_DRAFT, {
       ...parsed,
       plannerPostId: row.id as string,
       mode: "edit",
       status: (row.status as ContentEngineDraft["status"]) ?? parsed.status ?? "draft",
     });
+    if (imageUrl && !merged.backgroundMediaUrl) {
+      return { ...merged, backgroundSource: "stock_image", backgroundMediaUrl: imageUrl };
+    }
+    return merged;
   }
   return mergeDraft(DEFAULT_DRAFT, {
-    plannerPostId:    row.id as string,
-    mode:             "edit",
-    statAngleId:      (row.stat_angle as string)    || DEFAULT_DRAFT.statAngleId,
-    template:         (row.template as LayoutEngine) || DEFAULT_DRAFT.template,
+    plannerPostId:      row.id as string,
+    mode:               "edit",
+    statAngleId:        (row.stat_angle as string)     || DEFAULT_DRAFT.statAngleId,
+    template:           (row.template as LayoutEngine) || DEFAULT_DRAFT.template,
     selectedBackground: (row.background as BackgroundTheme) || DEFAULT_DRAFT.selectedBackground,
-    backgroundSource: (row.background_type as BackgroundSource) || DEFAULT_DRAFT.backgroundSource,
-    customAccent:     (row.accent_color as string)  || DEFAULT_DRAFT.customAccent,
-    accentMode:       "custom",
-    exportSizeId:     (row.export_format as string) || DEFAULT_DRAFT.exportSizeId,
-    socialCaption:    (row.caption as string)        || DEFAULT_DRAFT.socialCaption,
-    status:           (row.status as ContentEngineDraft["status"]) || "draft",
+    backgroundSource:   imageUrl
+      ? "stock_image"
+      : ((row.background_type as BackgroundSource) || DEFAULT_DRAFT.backgroundSource),
+    backgroundMediaUrl: imageUrl ?? null,
+    customAccent:       (row.accent_color as string)   || DEFAULT_DRAFT.customAccent,
+    accentMode:         "custom",
+    exportSizeId:       (row.export_format as string)  || DEFAULT_DRAFT.exportSizeId,
+    socialCaption:      (row.caption as string)        || DEFAULT_DRAFT.socialCaption,
+    status:             (row.status as ContentEngineDraft["status"]) || "draft",
   });
 }
