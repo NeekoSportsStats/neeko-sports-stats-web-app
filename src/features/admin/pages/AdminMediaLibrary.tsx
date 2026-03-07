@@ -38,7 +38,7 @@ const IMAGE_SUBCATEGORIES: ImageCategory[] = ["stadium", "crowd", "field", "abst
 const CATEGORIES: Category[]              = ["all", "stadium", "crowd", "field", "abstract", "players", "equipment"];
 const BATCH_CATEGORIES: ImageCategory[]   = ["stadium", "crowd", "field", "players", "abstract", "equipment"];
 
-const CACHE_KEY_ALL = "neeko_media_lib_all_v5";
+const CACHE_KEY_ALL = "neeko_media_lib_all_v6";
 const CACHE_TTL     = 5 * 60 * 1000;
 
 const ACCENT = "#F59E0B";
@@ -59,17 +59,24 @@ function writeCache(data: MediaItem[]) {
   try { localStorage.setItem(CACHE_KEY_ALL, JSON.stringify({ data, ts: Date.now() })); } catch { /* quota */ }
 }
 
+function resolveMediaUrl(rawUrl: string): string {
+  if (!rawUrl) return "";
+  if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) return rawUrl;
+  const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(rawUrl);
+  return publicUrl;
+}
+
 function rowToMediaItem(row: Record<string, unknown>): MediaItem {
-  const storagePath = (row.url as string) ?? "";
-  const filename = storagePath.split("/").pop() ?? (row.asset_id as string) ?? "";
-  const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
+  const rawUrl   = (row.url as string) ?? "";
+  const resolved = resolveMediaUrl(rawUrl);
+  const filename = rawUrl.split("/").pop() ?? (row.asset_id as string) ?? "";
   return {
     asset_id:      (row.asset_id as string) ?? "",
     id:            (row.asset_id as string) ?? "",
     label:         (row.label as string) ?? filename,
-    url:           publicUrl,
-    thumbnail_url: publicUrl,
-    thumbnail:     publicUrl,
+    url:           resolved,
+    thumbnail_url: resolved,
+    thumbnail:     resolved,
     category:      ((row.category as string) ?? "abstract") as Category,
     filename,
     media_type:    (row.media_type as string) ?? "image",
@@ -554,7 +561,7 @@ function MediaCard({ item, mode, onClick, onUseInGraphic, onDownload, onDelete }
     >
       <div className="relative aspect-video bg-zinc-950">
         {mode === "graphic"
-          ? <img src={item.thumbnail} alt={CAT_LABELS[item.category] ?? item.category} loading="lazy" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+          ? <img src={item.thumbnail} alt={CAT_LABELS[item.category] ?? item.category} loading="lazy" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" onError={(e) => { e.currentTarget.src = "/placeholder.svg"; }} />
           : (
             <>
               <video ref={videoRef} src={item.url} muted loop playsInline preload="none" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
