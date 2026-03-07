@@ -307,9 +307,19 @@ function ModelAccuracySection() {
   const conf = confidenceLevel(hasData ? (row?.avg_error ?? null) : null);
   const sourceLabel = row?.source === "automatic" ? "2026 Season Accuracy" : "Opening Round Accuracy";
 
-  const proofLine = hasData && row?.avg_error != null
-    ? `Opening Round projections achieved an average error of ${row.avg_error.toFixed(1)} points — outperforming the model's historical average of 16.0 points.`
-    : null;
+  const HISTORICAL_AVG = 16.0;
+  const proofLine = (() => {
+    if (!hasData || row?.avg_error == null) return null;
+    const err = row.avg_error;
+    const players = row?.players_analysed != null ? row.players_analysed.toLocaleString() : "—";
+    if (err < HISTORICAL_AVG - 0.2) {
+      return `Opening Round projections achieved an average error of ${err.toFixed(1)} points — outperforming the model's historical average of ${HISTORICAL_AVG.toFixed(1)} points.`;
+    } else if (err <= HISTORICAL_AVG + 0.2) {
+      return `Opening Round projections averaged ${err.toFixed(1)} points error across ${players} players — closely matching the model's historical average of ${HISTORICAL_AVG.toFixed(1)} points.`;
+    } else {
+      return `Opening Round projections averaged ${err.toFixed(1)} points error across ${players} players — slightly above the model's historical average of ${HISTORICAL_AVG.toFixed(1)} points.`;
+    }
+  })();
 
   const metrics = [
     {
