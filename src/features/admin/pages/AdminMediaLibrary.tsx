@@ -59,15 +59,16 @@ function writeCache(data: MediaItem[]) {
 }
 
 function rowToMediaItem(row: Record<string, unknown>): MediaItem {
-  const url = (row.url as string) ?? "";
-  const filename = url.split("/").pop() ?? (row.asset_id as string) ?? "";
+  const storagePath = (row.url as string) ?? "";
+  const filename = storagePath.split("/").pop() ?? (row.asset_id as string) ?? "";
+  const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
   return {
     asset_id:      (row.asset_id as string) ?? "",
     id:            (row.asset_id as string) ?? "",
     label:         (row.label as string) ?? filename,
-    url,
-    thumbnail_url: (row.thumbnail_url as string) ?? url,
-    thumbnail:     (row.thumbnail_url as string) ?? url,
+    url:           publicUrl,
+    thumbnail_url: publicUrl,
+    thumbnail:     publicUrl,
     category:      ((row.category as string) ?? "abstract") as Category,
     filename,
     media_type:    (row.media_type as string) ?? "image",
