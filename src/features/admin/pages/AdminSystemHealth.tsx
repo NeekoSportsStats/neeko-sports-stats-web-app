@@ -1,15 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
-import {
-  Activity,
-  Database,
-  Brain,
-  ShieldCheck,
-  Zap,
-  RefreshCw,
-  BarChart2,
-} from "lucide-react";
+import { Activity, Database, Brain, ShieldCheck, Zap, RefreshCw, ChartBar as BarChart2 } from "lucide-react";
 import {
   formatDate,
   formatMs,
