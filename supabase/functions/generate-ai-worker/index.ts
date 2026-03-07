@@ -90,12 +90,57 @@ async function callOpenAI(
   return { text, tokensUsed: usage.total_tokens };
 }
 
+function parseRankingLabel(text: string): { label: string; short: string; color: string } {
+  const upper = text.toUpperCase();
+  let label = "HOLD";
+  let color = "yellow";
+
+  if (upper.includes("MUST START") || upper.includes("STRONG BUY") || upper.includes("ELITE")) {
+    label = "MUST START"; color = "green";
+  } else if (upper.includes("BUY") || upper.includes("START")) {
+    label = "BUY"; color = "green";
+  } else if (upper.includes("SELL") || upper.includes("AVOID") || upper.includes("DO NOT START")) {
+    label = "SELL"; color = "red";
+  } else if (upper.includes("HOLD")) {
+    label = "HOLD"; color = "yellow";
+  } else if (upper.includes("DOWNGRADE")) {
+    label = "DOWNGRADE"; color = "orange";
+  }
+
+  const short = label.split(" ")[0];
+  return { label, short, color };
+}
+
 async function writeResult(
   supabase: ReturnType<typeof createClient>,
   job: QueueJob,
   result: string
 ): Promise<void> {
   switch (job.job_type) {
+    case "ranking_recommendation": {
+      const playerId = job.entity_id ? Number(job.entity_id) : null;
+      if (!playerId) break;
+
+      const { label, short, color } = parseRankingLabel(result);
+
+      await supabase
+        .from("ai_rankings_player_recos")
+        .upsert(
+          {
+            player_id: playerId,
+            season: 2026,
+            recommendation_label: label,
+            recommendation_short: short,
+            recommendation_long: result,
+            recommendation_color: color,
+            generated_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "player_id" }
+        );
+      break;
+    }
+
     case "player_analysis": {
       const playerId = job.entity_id ? Number(job.entity_id) : null;
       if (!playerId) break;
@@ -114,6 +159,7 @@ async function writeResult(
         );
       break;
     }
+
     case "test":
     default:
       console.log(`[ai-worker] job_type="${job.job_type}" result preview:`, result.slice(0, 120));

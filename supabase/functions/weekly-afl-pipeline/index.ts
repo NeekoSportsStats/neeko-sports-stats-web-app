@@ -216,6 +216,18 @@ Deno.serve(async (req: Request) => {
       return callFn("generate-all-ai", {});
     }, skipAI);
 
+    // ── Step 10b: Enqueue ranking recommendation AI jobs ──────────────────────
+    await runStep("10b_enqueue_ranking_recos", async () => {
+      const { error } = await db.rpc("enqueue_ranking_reco_jobs");
+      if (error) throw new Error(error.message);
+      const { count } = await db
+        .from("ai_generation_queue")
+        .select("*", { count: "exact", head: true })
+        .eq("job_type", "ranking_recommendation")
+        .eq("status", "pending");
+      return { jobs_enqueued: count ?? 0 };
+    }, skipAI);
+
     // ── Step 11: Clean up stale Start/Sit cache ───────────────────────────────
     await runStep("11_cleanup_start_sit_cache", async () => {
       const { data, error } = await db.rpc("fn_cleanup_stale_start_sit_cache");
