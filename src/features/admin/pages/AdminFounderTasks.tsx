@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, Plus, CheckSquare, Square, Trash2, Pencil, Check, X, ListTodo, ChevronDown, ChevronRight } from "lucide-react";
+import { RefreshCw, Plus, SquareCheck as CheckSquare, Square, Trash2, Pencil, Check, X, ListTodo, ChevronDown, ChevronRight } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
