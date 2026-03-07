@@ -263,6 +263,7 @@ function ErrorDistributionBlock({ row, loading }: { row: AccuracyRow | null; loa
       <div className="px-5 pb-4">
         <p className="text-[12px] text-white/30 leading-relaxed">
           This distribution shows how closely Neeko projections match actual fantasy scores. Most projections fall within a narrow error range, demonstrating strong model reliability.
+          {' '}Accuracy metrics exclude extreme outlier performances likely caused by early-game injuries or limited game time, ensuring projections are evaluated under normal match conditions.
         </p>
       </div>
     </div>
