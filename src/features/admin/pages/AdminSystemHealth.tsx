@@ -2,18 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Activity,
-  Database,
-  BarChart2,
-  ShieldCheck,
-  Zap,
-  RefreshCw,
-  MonitorCheck,
-  TriangleAlert as AlertTriangle,
-  CircleCheck as CheckCircle,
-  Circle as XCircle,
-} from "lucide-react";
+import { Activity, Database, ChartBar as BarChart2, ShieldCheck, Zap, RefreshCw, MonitorCheck, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Circle as XCircle } from "lucide-react";
 import {
   formatDate,
   formatMs,
