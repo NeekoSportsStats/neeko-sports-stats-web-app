@@ -1167,13 +1167,52 @@ export default function AdminContentEngine() {
                   setOpenStep={setOpenStep}
                   accentColor={accentColor}
                 >
+                  {/* Primary Stat Angles — quick-pick */}
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-widest">Primary</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {(["top_projections", "breakout_players", "captain_picks", "best_value_picks"] as const).map((id) => {
+                        const angle = STAT_ANGLES.find((a) => a.id === id);
+                        if (!angle) return null;
+                        const isSelected = angle.id === selectedAngle.id;
+                        const icons: Record<string, string> = {
+                          top_projections: "🏆",
+                          breakout_players: "🚀",
+                          captain_picks: "🎯",
+                          best_value_picks: "💎",
+                        };
+                        return (
+                          <button
+                            key={angle.id}
+                            onClick={() => handleAngleSelect(angle)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-all"
+                            style={
+                              isSelected
+                                ? { background: `${angle.accentColor}20`, borderColor: `${angle.accentColor}60` }
+                                : { background: "transparent", borderColor: "hsl(var(--border))" }
+                            }
+                          >
+                            <span className="text-sm leading-none shrink-0">{icons[angle.id]}</span>
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-semibold truncate" style={isSelected ? { color: angle.accentColor } : { color: "hsl(var(--foreground))" }}>{angle.label}</p>
+                              <p className="text-[10px] text-muted-foreground/50 truncate">{angle.statLabel}</p>
+                            </div>
+                            {isSelected && <span className="ml-auto w-1.5 h-1.5 rounded-full shrink-0" style={{ background: angle.accentColor }} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* All Stat Angles */}
+                  <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-widest pt-1">All Angles</p>
                   <div className="flex flex-wrap gap-1.5">
                     {STAT_ANGLES.map((angle) => {
                       const isSelected = angle.id === selectedAngle.id;
                       return (
                         <button
                           key={angle.id}
-                          onClick={() => { handleAngleSelect(angle); setOpenStep("2"); }}
+                          onClick={() => handleAngleSelect(angle)}
                           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11px] font-medium whitespace-nowrap transition-all"
                           style={
                             isSelected
@@ -1295,7 +1334,7 @@ export default function AdminContentEngine() {
                       return (
                         <button
                           key={tmpl.id}
-                          onClick={() => { if (!disabled) { setSelectedLayout(tmpl.id); setOpenStep("3"); } }}
+                          onClick={() => { if (!disabled) setSelectedLayout(tmpl.id); }}
                           disabled={disabled}
                           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-left transition-all disabled:opacity-40"
                           style={isSelected && !disabled ? { background: `${accentColor}14`, borderColor: `${accentColor}55` } : { background: "transparent", borderColor: "hsl(var(--border))" }}
@@ -1318,7 +1357,7 @@ export default function AdminContentEngine() {
                       return (
                         <button
                           key={tmpl.id}
-                          onClick={() => { if (!disabled) { setSelectedLayout(tmpl.id); setOpenStep("3"); } }}
+                          onClick={() => { if (!disabled) setSelectedLayout(tmpl.id); }}
                           disabled={disabled}
                           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-left transition-all disabled:opacity-40"
                           style={isSelected && !disabled ? { background: `${accentColor}14`, borderColor: `${accentColor}55` } : { background: "transparent", borderColor: "hsl(var(--border))" }}
@@ -1682,7 +1721,20 @@ export default function AdminContentEngine() {
                   }
                   {plannerId ? "Update" : "Save"}
                 </Button>
-                <div className="ml-auto text-[11px] text-muted-foreground/50">
+                <Button
+                  size="sm" className="h-7 text-xs gap-1.5 ml-auto"
+                  onClick={handleDownloadGraphic}
+                  disabled={downloading || effectivePlayers.length === 0 || dataLoading}
+                  style={effectivePlayers.length > 0 && !downloading ? { background: accentColor, color: "#000", borderColor: accentColor } : {}}
+                  title="Download graphic"
+                >
+                  {downloading
+                    ? <RefreshCw className="h-3 w-3 animate-spin" />
+                    : <Download className="h-3 w-3" />
+                  }
+                  Download
+                </Button>
+                <div className="text-[11px] text-muted-foreground/50">
                   {exportW}×{exportH}px{isCarouselMode ? ` · ${effectivePlayers.length + 1} slides` : ""}
                 </div>
               </div>
