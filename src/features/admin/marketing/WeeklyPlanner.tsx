@@ -64,8 +64,6 @@ const ANGLE_TO_CATEGORY: Record<string, ImageCategory> = {
   safe_floor_players: "field",
 };
 
-const BUCKET = "content-assets";
-
 async function getRandomImageByCategory(category: ImageCategory): Promise<string | null> {
   const { data, error } = await supabase
     .from("ai_media_library")
@@ -80,9 +78,7 @@ async function getRandomImageByCategory(category: ImageCategory): Promise<string
   }
 
   const row = data[Math.floor(Math.random() * data.length)] as { url: string };
-  const storagePath = row.url;
-  const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
-  return publicUrl;
+  return row.url;
 }
 
 // ─── Status meta ───────────────────────────────────────────────────────────────
