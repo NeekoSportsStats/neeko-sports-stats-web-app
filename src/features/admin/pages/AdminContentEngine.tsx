@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, createElement, lazy, Suspense } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
 
 const AdminMediaLibraryPanel = lazy(() => import("./AdminMediaLibrary"));
@@ -6,7 +7,7 @@ import { toPng } from "html-to-image";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Image as ImageIcon, Layers, Palette, Type, Hash, Calendar, Video, Play, ChevronRight, Shuffle, ChartBar as BarChart2, CalendarPlus, Smartphone, Square, SlidersHorizontal, Upload, Library } from "lucide-react";
+import { Download, RefreshCw, Copy, Check, Sparkles, Zap, LayoutTemplate, ChevronDown, Image as ImageIcon, Layers, Palette, Type, Calendar, Video, Play, Shuffle, ChartBar as BarChart2, CalendarPlus, Smartphone, Square, SlidersHorizontal, Upload, Library, Save } from "lucide-react";
 import { VideoGeneratorPanel, type VideoPreviewState } from "../marketing/VideoGeneratorPanel";
 import {
   GraphicCanvas,
@@ -459,6 +460,10 @@ export default function AdminContentEngine() {
   const { toast } = useToast();
   const { state, setContentEngine } = useAdminUIState();
   const ce = state.contentEngine;
+  const [searchParams] = useSearchParams();
+  const plannerId = searchParams.get("plannerId");
+  const [plannerSaving, setPlannerSaving] = useState(false);
+  const plannerLoadedRef = useRef<string | null>(null);
 
   // ── Context-backed setters ───────────────────────────────────────────────
   const setContentMode        = (v: ContentMode)         => setContentEngine((p) => ({ ...p, contentMode: v }));
@@ -724,6 +729,100 @@ export default function AdminContentEngine() {
     loadAIMedia().catch(() => { /* background pre-warm — ignore errors */ });
   }, [fetchPlayers]);
 
+  // ── Load from content_planner_posts when plannerId is present ───────────
+  useEffect(() => {
+    if (!plannerId) return;
+    if (plannerLoadedRef.current === plannerId) return;
+    plannerLoadedRef.current = plannerId;
+
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("content_planner_posts")
+          .select("*")
+          .eq("id", plannerId)
+          .maybeSingle();
+        if (error) throw error;
+        if (!data) return;
+
+        const row = data as {
+          stat_angle: string;
+          template: string;
+          background: string;
+          background_type: string;
+          accent_color: string;
+          export_format: string;
+          caption: string;
+        };
+
+        setContentEngine((p) => ({
+          ...p,
+          selectedAngleId:    row.stat_angle    || p.selectedAngleId,
+          selectedLayout:     (row.template     || p.selectedLayout)     as typeof p.selectedLayout,
+          selectedBackground: (row.background   || p.selectedBackground) as typeof p.selectedBackground,
+          backgroundSource:   (row.background_type || p.backgroundSource) as typeof p.backgroundSource,
+          exportSizeId:       row.export_format || p.exportSizeId,
+          accentMode:         "custom" as typeof p.accentMode,
+          customAccent:       row.accent_color  || p.customAccent,
+        }));
+
+        if (row.caption) setCaption(row.caption);
+
+        const matchedAngle = STAT_ANGLES.find((a) => a.id === row.stat_angle);
+        if (matchedAngle) fetchPlayers(matchedAngle);
+
+        toast({ title: "Loaded from planner", description: `Editing ${row.stat_angle.replace(/_/g, " ")}` });
+      } catch (err) {
+        toast({ title: "Failed to load planner post", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plannerId, fetchPlayers]);
+
+  // ── Save to content_planner_posts ────────────────────────────────────────
+  const handleSaveToPlanner = async () => {
+    setPlannerSaving(true);
+    try {
+      const payload = {
+        stat_angle:      selectedAngle.id,
+        template:        selectedLayout,
+        background:      selectedBackground,
+        background_type: backgroundSource,
+        accent_color:    accentColor,
+        caption,
+        hashtags:        appendHashtags ? AUTO_HASHTAGS : "",
+        export_format:   selectedExportSize.id,
+      };
+
+      if (plannerId) {
+        const { error } = await supabase
+          .from("content_planner_posts")
+          .update(payload)
+          .eq("id", plannerId);
+        if (error) throw error;
+        toast({ title: "Planner post updated", description: "Changes saved." });
+      } else {
+        const today = new Date();
+        const dayIdx = today.getDay();
+        const diff = today.getDate() - dayIdx + (dayIdx === 0 ? -6 : 1);
+        today.setDate(diff);
+        const weekStart = today.toISOString().split("T")[0];
+        const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+        const currentDay = dayNames[new Date().getDay()] ?? "Monday";
+
+        const { error } = await supabase
+          .from("content_planner_posts")
+          .insert({ ...payload, week_start: weekStart, day: currentDay, status: "draft" });
+        if (error) throw error;
+        toast({ title: "Saved to planner", description: "New draft post created." });
+      }
+    } catch (err) {
+      toast({ title: "Save failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+    } finally {
+      setPlannerSaving(false);
+    }
+  };
+
   const handleAngleSelect = (angle: StatAngle) => {
     setSelectedAngleId(angle.id);
     setInsight("");
@@ -934,9 +1033,14 @@ export default function AdminContentEngine() {
             <h2 className="text-base font-semibold flex items-center gap-2">
               <Zap className="h-4 w-4" style={accentStyle} />
               Content Engine
+              {plannerId && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#22C55E20", color: "#22C55E" }}>
+                  Editing Planner Post
+                </span>
+              )}
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Build a graphic in 5 steps, then download.
+              {plannerId ? "Changes will update the planner post when you click Update." : "Build a graphic in 5 steps, then download."}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -1525,6 +1629,19 @@ export default function AdminContentEngine() {
                   style={{ borderColor: `${accentColor}44`, color: accentColor }}
                 >
                   <CalendarPlus className="h-3 w-3" />Planner
+                </Button>
+                <Button
+                  variant="outline" size="sm" className="h-7 text-xs gap-1.5"
+                  onClick={handleSaveToPlanner}
+                  disabled={plannerSaving || effectivePlayers.length === 0}
+                  style={plannerId ? { borderColor: "#22C55E44", color: "#22C55E" } : { borderColor: `${accentColor}44`, color: accentColor }}
+                  title={plannerId ? "Update this planner post" : "Save as new planner post"}
+                >
+                  {plannerSaving
+                    ? <RefreshCw className="h-3 w-3 animate-spin" />
+                    : <Save className="h-3 w-3" />
+                  }
+                  {plannerId ? "Update" : "Save"}
                 </Button>
                 <div className="ml-auto text-[11px] text-muted-foreground/50">
                   {exportW}×{exportH}px{isCarouselMode ? ` · ${effectivePlayers.length + 1} slides` : ""}

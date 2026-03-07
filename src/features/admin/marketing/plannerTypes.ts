@@ -7,6 +7,26 @@ export type DayOfWeek =
   | "Saturday"
   | "Sunday";
 
+export type PlannerPostStatus = "draft" | "ready" | "posted";
+
+export interface ContentPlannerPost {
+  id: string;
+  week_start: string;
+  day: DayOfWeek;
+  stat_angle: string;
+  template: string;
+  players_json: unknown;
+  background: string;
+  background_type: string;
+  accent_color: string;
+  caption: string;
+  hashtags: string;
+  export_format: string;
+  status: PlannerPostStatus;
+  created_at: string;
+  updated_at: string;
+}
+
 export type PlatformId = "facebook" | "instagram" | "tiktok" | "reddit";
 
 export interface ScheduledPost {
