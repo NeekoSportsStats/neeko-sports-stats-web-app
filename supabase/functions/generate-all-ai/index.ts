@@ -58,7 +58,6 @@ Deno.serve(async (req: Request) => {
 
     const functions = [
       "generate-ranking-ai",
-      "generate-player-ranking-recos",
     ];
 
     const results: Record<string, unknown> = {};
