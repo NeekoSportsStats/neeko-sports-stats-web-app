@@ -31,6 +31,43 @@ interface PlayerData {
   ai_recommendation: string | null;
 }
 
+interface PromptRecord {
+  system_prompt: string;
+  user_prompt_template: string;
+}
+
+async function loadPrompt(supabase: ReturnType<typeof createClient>): Promise<PromptRecord> {
+  const { data, error } = await supabase
+    .schema("afl")
+    .from("ai_prompts")
+    .select("system_prompt, user_prompt_template")
+    .eq("prompt_key", "start_sit_analysis")
+    .eq("is_active", true)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) {
+    return {
+      system_prompt: `You are an elite AFL fantasy analyst for Neeko Sports Stats.
+
+Your task is to explain WHY the model selected the winning player in a Start/Sit decision.
+
+CRITICAL RULES:
+- The winner is already determined by the model. You are explaining the decision, NOT making it.
+- NEVER contradict the model verdict.
+- Focus only on metrics that favour the winner.
+- Use specific numbers from the dataset provided.
+- Write 4 concise bullet points (one sentence each, starting with a dash).
+- Do not mention AI or models.
+- Do not include any preamble or closing statement.`,
+      user_prompt_template: "Compare the following two AFL players and determine who should start:\n\n{DATA}",
+    };
+  }
+
+  return data as PromptRecord;
+}
+
 function deterministicWinner(
   pA: PlayerData,
   pB: PlayerData
@@ -150,35 +187,18 @@ function containsOpposite(text: string, loserName: string): boolean {
   });
 }
 
-async function callOpenAI(
-  openaiKey: string,
+function buildComparisonData(
   winner: PlayerData,
   loser: PlayerData,
   confidence: number,
-  round: number,
-  attempt: number
-): Promise<string | null> {
+  round: number
+): string {
   const formW = estimateRecentForm(winner);
   const formL = estimateRecentForm(loser);
   const edgeW = calcMatchupEdge(winner, true);
   const edgeL = calcMatchupEdge(loser, false);
 
-  const systemPrompt = `You are an elite AFL fantasy analyst for Neeko Sports Stats.
-
-Your task is to explain WHY the model selected the winning player in a Start/Sit decision.
-
-CRITICAL RULES:
-- The winner is already determined by the model. You are explaining the decision, NOT making it.
-- You MUST justify why ${winner.player_name} was selected.
-- NEVER recommend ${loser.player_name} to start.
-- NEVER contradict the model verdict.
-- Focus only on metrics that favour ${winner.player_name}.
-- Use specific numbers from the dataset provided.
-- Write 4 concise bullet points (one sentence each, starting with a dash).
-- Do not mention AI or models.
-- Do not include any preamble or closing statement.`;
-
-  const userPrompt = `Model Verdict
+  return `Model Verdict
 Winner: ${winner.player_name}
 Confidence: ${confidence}%
 
@@ -217,6 +237,25 @@ ${winner.player_name}: +${edgeW}%
 ${loser.player_name}: ${edgeL >= 0 ? "+" : ""}${edgeL}%
 
 Explain why the model selected ${winner.player_name} over ${loser.player_name}. Only reference metrics where ${winner.player_name} has an advantage.`;
+}
+
+async function callOpenAI(
+  openaiKey: string,
+  winner: PlayerData,
+  loser: PlayerData,
+  confidence: number,
+  round: number,
+  attempt: number,
+  prompt: PromptRecord
+): Promise<string | null> {
+  const dataString = buildComparisonData(winner, loser, confidence, round);
+
+  const systemContent = prompt.system_prompt
+    .replace(/\$\{winner\.player_name\}/g, winner.player_name)
+    .replace(/\$\{loser\.player_name\}/g, loser.player_name)
+    + `\n\nCRITICAL RULES:\n- The winner is already determined by the model. You are explaining the decision, NOT making it.\n- You MUST justify why ${winner.player_name} was selected.\n- NEVER recommend ${loser.player_name} to start.\n- NEVER contradict the model verdict.\n- Focus only on metrics that favour ${winner.player_name}.\n- Use specific numbers from the dataset provided.\n- Write 4 concise bullet points (one sentence each, starting with a dash).\n- Do not mention AI or models.\n- Do not include any preamble or closing statement.`;
+
+  const userContent = prompt.user_prompt_template.replace("{DATA}", dataString);
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -224,8 +263,8 @@ Explain why the model selected ${winner.player_name} over ${loser.player_name}. 
     body: JSON.stringify({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
+        { role: "system", content: systemContent },
+        { role: "user", content: userContent },
       ],
       temperature: attempt === 1 ? 0.25 : 0.05,
       max_tokens: 220,
@@ -312,14 +351,19 @@ Deno.serve(async (req: Request) => {
     const loId = Math.min(playerAId, playerBId);
     const hiId = Math.max(playerAId, playerBId);
 
-    const { data: players, error: playersError } = await serviceClient
-      .from("v_rankings_master")
-      .select(
-        `player_id, player_name, team, position,
-         projection_final, ceiling_estimate, floor_estimate,
-         projection_confidence, risk_rating, neeko_rating, ai_recommendation`
-      )
-      .in("player_id", [playerAId, playerBId]);
+    const [promptResult, playersResult] = await Promise.all([
+      loadPrompt(serviceClient),
+      serviceClient
+        .from("v_rankings_master")
+        .select(
+          `player_id, player_name, team, position,
+           projection_final, ceiling_estimate, floor_estimate,
+           projection_confidence, risk_rating, neeko_rating, ai_recommendation`
+        )
+        .in("player_id", [playerAId, playerBId]),
+    ]);
+
+    const { data: players, error: playersError } = playersResult;
 
     if (playersError || !players || players.length < 2) {
       console.error("Player fetch failed:", { playersError, count: players?.length, playerAId, playerBId });
@@ -371,9 +415,9 @@ Deno.serve(async (req: Request) => {
 
     let aiSummary: string | null = null;
     if (isPremium && openaiKey) {
-      const attempt1 = await callOpenAI(openaiKey, winner, loser, confidence, round_number, 1);
+      const attempt1 = await callOpenAI(openaiKey, winner, loser, confidence, round_number, 1, promptResult);
       if (attempt1 && containsOpposite(attempt1, loser.player_name)) {
-        const attempt2 = await callOpenAI(openaiKey, winner, loser, confidence, round_number, 2);
+        const attempt2 = await callOpenAI(openaiKey, winner, loser, confidence, round_number, 2, promptResult);
         aiSummary =
           attempt2 && !containsOpposite(attempt2, loser.player_name)
             ? attempt2

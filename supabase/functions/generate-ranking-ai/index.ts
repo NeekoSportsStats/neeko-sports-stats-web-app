@@ -27,13 +27,36 @@ interface AIResult {
   captain_recommendation: string;
 }
 
-async function generateForPlayer(
-  openai: OpenAI,
-  player: PlayerInput
-): Promise<AIResult> {
-  const prompt = `You are an elite AFL fantasy analyst writing premium analysis for Neeko Sports Stats.
+interface PromptRecord {
+  system_prompt: string;
+  user_prompt_template: string;
+}
 
-Player: ${player.player_name}
+async function loadPrompt(supabase: ReturnType<typeof createClient>): Promise<PromptRecord> {
+  const { data, error } = await supabase
+    .schema("afl")
+    .from("ai_prompts")
+    .select("system_prompt, user_prompt_template")
+    .eq("prompt_key", "player_ai_analysis")
+    .eq("is_active", true)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) {
+    return {
+      system_prompt:
+        "You are a professional AFL fantasy analyst. Return only valid JSON with 'analysis' and 'captain' fields.",
+      user_prompt_template:
+        "Analyse this AFL player using the following dataset:\n\n{DATA}\n\nProvide elite fantasy analysis describing expected performance, reliability and risk.",
+    };
+  }
+
+  return data as PromptRecord;
+}
+
+function buildPlayerDataString(player: PlayerInput): string {
+  return `Player: ${player.player_name}
 Team: ${player.team}
 Projection: ${player.projection_final}
 Ceiling: ${player.ceiling_estimate}
@@ -47,16 +70,21 @@ Respond with a JSON object containing exactly two fields:
 - "captain": ONE short sentence (max 20 words) on captain suitability.
 
 Return only valid JSON, no markdown.`;
+}
+
+async function generateForPlayer(
+  openai: OpenAI,
+  player: PlayerInput,
+  prompt: PromptRecord
+): Promise<AIResult> {
+  const dataString = buildPlayerDataString(player);
+  const userContent = prompt.user_prompt_template.replace("{DATA}", dataString);
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
-      {
-        role: "system",
-        content:
-          "You are a professional AFL fantasy analyst. Return only valid JSON with 'analysis' and 'captain' fields.",
-      },
-      { role: "user", content: prompt },
+      { role: "system", content: prompt.system_prompt },
+      { role: "user", content: userContent },
     ],
     temperature: 0.4,
     max_tokens: 400,
@@ -88,6 +116,8 @@ Deno.serve(async (req: Request) => {
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const runId: string | null = body.run_id ?? null;
     const batchNumber: number = body.batch_number ?? 1;
+
+    const prompt = await loadPrompt(supabase);
 
     if (batchNumber === 1 && runId) {
       const { count: totalMissing } = await supabase
@@ -144,7 +174,7 @@ Deno.serve(async (req: Request) => {
 
     const results = await Promise.allSettled(
       (players as PlayerInput[]).map((player) =>
-        generateForPlayer(openai, player)
+        generateForPlayer(openai, player, prompt)
       )
     );
 
