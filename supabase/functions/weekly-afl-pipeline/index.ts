@@ -164,6 +164,16 @@ Deno.serve(async (req: Request) => {
       if (!error && data !== null && data !== undefined) {
         latestRound = Number(data);
       }
+      if (latestRound === 0) {
+        const { data: matches } = await db
+          .schema("afl")
+          .from("raw_2026_matches")
+          .select("id", { count: "exact", head: false })
+          .limit(1);
+        if (matches && matches.length > 0) {
+          latestRound = 1;
+        }
+      }
       return { latest_round: latestRound };
     });
 
