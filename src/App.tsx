@@ -23,6 +23,7 @@ import {
   AdminShell,
   AdminDashboard,
   AdminSystemHealth,
+  AdminOperations,
   AdminAnalytics,
   AdminContentEngine,
   AdminContentPlanner,
@@ -155,6 +156,7 @@ function App() {
         <Route index element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="dashboard"        element={<S fallback={Generic}><AdminDashboard /></S>} />
         <Route path="system-health"    element={<S fallback={Generic}><AdminSystemHealth /></S>} />
+        <Route path="operations"       element={<S fallback={Generic}><AdminOperations /></S>} />
         <Route path="analytics"        element={<S fallback={Generic}><AdminAnalytics /></S>} />
         <Route path="content-engine"   element={<S fallback={Generic}><AdminContentEngine /></S>} />
         <Route path="content-planner"  element={<S fallback={Generic}><AdminContentPlanner /></S>} />
