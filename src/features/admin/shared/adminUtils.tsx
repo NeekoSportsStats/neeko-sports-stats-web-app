@@ -312,6 +312,26 @@ export interface RevenueEstimate {
   arr_if_all_monthly: number;
 }
 
+export interface AIQueueHealthRow {
+  status: string;
+  jobs: number;
+  newest_job: string | null;
+  oldest_job: string | null;
+}
+
+export interface AIWorkerHealth {
+  last_worker_run: string | null;
+  jobs_last_10m: number;
+  errors_last_hour: number;
+}
+
+export interface AIOutputHealth {
+  player_analysis_rows: number;
+  ranking_recos_rows: number;
+  start_sit_rows: number;
+  market_watch_rows: number;
+}
+
 export interface ModelPerformance {
   projection_mae: number | null;
   projection_within_10: number | null;

@@ -40,6 +40,9 @@ import {
   type PipelineJobRun,
   type ModelPerformance,
   type CalibrationRow,
+  type AIQueueHealthRow,
+  type AIWorkerHealth,
+  type AIOutputHealth,
 } from "../shared/adminUtils";
 import { AdminPipelineProgress, type PipelineRun } from "@/components/admin/AdminPipelineProgress";
 
@@ -66,6 +69,26 @@ export default function AdminSystemHealth() {
   const [calibration, setCalibration] = useState<CalibrationRow[]>([]);
   const [modelLoading, setModelLoading] = useState(false);
   const [activeRun, setActiveRun] = useState<PipelineRun | null>(null);
+  const [aiQueueHealth, setAiQueueHealth] = useState<AIQueueHealthRow[]>([]);
+  const [aiWorkerHealth, setAiWorkerHealth] = useState<AIWorkerHealth | null>(null);
+  const [aiOutputHealth, setAiOutputHealth] = useState<AIOutputHealth | null>(null);
+  const [aiHealthLoading, setAiHealthLoading] = useState(false);
+
+  const fetchAIHealth = useCallback(async () => {
+    setAiHealthLoading(true);
+    try {
+      const [queueRes, workerRes, outputRes] = await Promise.all([
+        supabase.from("v_ai_queue_health").select("*"),
+        supabase.from("v_ai_worker_health").select("*").maybeSingle(),
+        supabase.from("v_ai_output_health").select("*").maybeSingle(),
+      ]);
+      if (queueRes.data) setAiQueueHealth(queueRes.data as AIQueueHealthRow[]);
+      if (workerRes.data) setAiWorkerHealth(workerRes.data as AIWorkerHealth);
+      if (outputRes.data) setAiOutputHealth(outputRes.data as AIOutputHealth);
+    } finally {
+      setAiHealthLoading(false);
+    }
+  }, []);
 
   const fetchAlerts = useCallback(async () => {
     setAlertsLoading(true);
@@ -133,8 +156,8 @@ export default function AdminSystemHealth() {
     } finally {
       setDataLoading(false);
     }
-    await Promise.all([fetchAlerts(), fetchJobHistory(), fetchModelMetrics()]);
-  }, [toast, fetchAlerts, fetchJobHistory, fetchModelMetrics]);
+    await Promise.all([fetchAlerts(), fetchJobHistory(), fetchModelMetrics(), fetchAIHealth()]);
+  }, [toast, fetchAlerts, fetchJobHistory, fetchModelMetrics, fetchAIHealth]);
 
   const handleResolveAlert = async (id: string) => {
     setResolvingId(id);
@@ -408,6 +431,159 @@ export default function AdminSystemHealth() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* AI System Health */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">AI System Health</h3>
+          <Button variant="ghost" size="sm" onClick={fetchAIHealth} disabled={aiHealthLoading} className="h-7 text-xs">
+            <RefreshCw className={`h-3 w-3 mr-1 ${aiHealthLoading ? "animate-spin" : ""}`} />Refresh
+          </Button>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-4">
+          {/* Queue status */}
+          <Card className="flex flex-col">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-base">
+                <span className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                  AI Queue
+                </span>
+                {(() => {
+                  const pending = aiQueueHealth.find(r => r.status === "pending");
+                  if (!pending) return null;
+                  const oldestPending = pending.oldest_job ? new Date(pending.oldest_job) : null;
+                  const stuckMins = oldestPending ? (Date.now() - oldestPending.getTime()) / 60000 : 0;
+                  return stuckMins > 30
+                    ? <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    : <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />;
+                })()}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1">
+              {aiHealthLoading ? (
+                <div className="flex items-center justify-center h-24"><RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+              ) : aiQueueHealth.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">No queue data</p>
+              ) : (
+                <>
+                  <table className="w-full text-sm mb-3">
+                    <thead>
+                      <tr className="border-b border-border/40">
+                        <th className="text-left py-1.5 text-xs font-medium text-muted-foreground">Status</th>
+                        <th className="text-right py-1.5 text-xs font-medium text-muted-foreground">Jobs</th>
+                        <th className="text-right py-1.5 text-xs font-medium text-muted-foreground">Oldest</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {aiQueueHealth.map(row => {
+                        const oldestDate = row.oldest_job ? new Date(row.oldest_job) : null;
+                        const ageMin = oldestDate ? Math.round((Date.now() - oldestDate.getTime()) / 60000) : null;
+                        const stuck = row.status === "pending" && ageMin != null && ageMin > 30;
+                        return (
+                          <tr key={row.status} className="border-b border-border/30 last:border-0">
+                            <td className="py-1.5 capitalize font-medium">{row.status}</td>
+                            <td className="py-1.5 text-right tabular-nums">{row.jobs.toLocaleString()}</td>
+                            <td className={`py-1.5 text-right text-xs ${stuck ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-muted-foreground"}`}>
+                              {ageMin != null ? `${ageMin}m ago` : "—"}
+                              {stuck && " ⚠"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {(() => {
+                    const pending = aiQueueHealth.find(r => r.status === "pending");
+                    const oldestPending = pending?.oldest_job ? new Date(pending.oldest_job) : null;
+                    const stuckMins = oldestPending ? (Date.now() - oldestPending.getTime()) / 60000 : 0;
+                    return stuckMins > 30 ? (
+                      <div className="rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-2 text-xs text-amber-700 dark:text-amber-300">
+                        Queue stuck — pending jobs older than 30 minutes
+                      </div>
+                    ) : null;
+                  })()}
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Worker health */}
+          <Card className="flex flex-col">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-base">
+                <span className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-muted-foreground" />
+                  AI Worker
+                </span>
+                {(() => {
+                  if (!aiWorkerHealth?.last_worker_run) return null;
+                  const minsSince = (Date.now() - new Date(aiWorkerHealth.last_worker_run).getTime()) / 60000;
+                  const errSpike = (aiWorkerHealth.errors_last_hour ?? 0) > 5;
+                  if (errSpike || minsSince > 10) return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+                  return <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />;
+                })()}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1">
+              {aiHealthLoading ? (
+                <div className="flex items-center justify-center h-24"><RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+              ) : (
+                <>
+                  {(() => {
+                    if (!aiWorkerHealth?.last_worker_run) return null;
+                    const minsSince = Math.round((Date.now() - new Date(aiWorkerHealth.last_worker_run).getTime()) / 60000);
+                    return minsSince > 10 ? (
+                      <div className="rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-2 text-xs text-amber-700 dark:text-amber-300 mb-3">
+                        Worker stalled — last run {minsSince}m ago
+                      </div>
+                    ) : null;
+                  })()}
+                  {(aiWorkerHealth?.errors_last_hour ?? 0) > 5 && (
+                    <div className="rounded-md bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 p-2 text-xs text-red-700 dark:text-red-300 mb-3">
+                      Error spike — {aiWorkerHealth!.errors_last_hour} errors in last hour
+                    </div>
+                  )}
+                  <StatRow label="Last worker run" value={formatDate(aiWorkerHealth?.last_worker_run ?? null)} />
+                  <StatRow
+                    label="Jobs last 10m"
+                    value={aiWorkerHealth?.jobs_last_10m ?? "—"}
+                    highlight={(aiWorkerHealth?.jobs_last_10m ?? 0) > 0 ? "good" : "neutral"}
+                  />
+                  <StatRow
+                    label="Errors last hour"
+                    value={aiWorkerHealth?.errors_last_hour ?? "—"}
+                    highlight={(aiWorkerHealth?.errors_last_hour ?? 0) === 0 ? "good" : (aiWorkerHealth?.errors_last_hour ?? 0) <= 5 ? "warn" : "bad"}
+                  />
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Output tables */}
+          <Card className="flex flex-col">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Database className="h-4 w-4 text-muted-foreground" />
+                AI Output Tables
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1">
+              {aiHealthLoading ? (
+                <div className="flex items-center justify-center h-24"><RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+              ) : (
+                <>
+                  <StatRow label="ai_player_analysis" value={aiOutputHealth?.player_analysis_rows?.toLocaleString() ?? "—"} highlight="neutral" />
+                  <StatRow label="ai_rankings_player_recos" value={aiOutputHealth?.ranking_recos_rows?.toLocaleString() ?? "—"} highlight="neutral" />
+                  <StatRow label="start_sit_cache" value={aiOutputHealth?.start_sit_rows?.toLocaleString() ?? "—"} highlight="neutral" />
+                  <StatRow label="ai_market_watch_summary" value={aiOutputHealth?.market_watch_rows?.toLocaleString() ?? "—"} highlight="neutral" />
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Pipeline Alerts */}
