@@ -156,10 +156,8 @@ export function MobilePlayerCard({
                 {displayRec}
               </p>
               {(row.ai_summary || row.recommendation_why) && (
-                <p className="text-[11px] text-white/50 mt-1 leading-snug line-clamp-2">
-                  {row.ai_summary
-                    ? row.ai_summary.slice(0, 80) + (row.ai_summary.length > 80 ? "…" : "")
-                    : row.recommendation_why}
+                <p className="text-[11px] text-white/50 mt-1 leading-snug line-clamp-3">
+                  {row.ai_summary ?? row.recommendation_why}
                 </p>
               )}
             </div>

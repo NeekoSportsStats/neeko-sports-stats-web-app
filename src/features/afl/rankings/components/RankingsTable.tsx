@@ -206,15 +206,13 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, onRowClick, onU
           </span>
         ) : <span className="text-white/20 text-xs">—</span>}
       </td>
-      <td className="px-4 py-3 text-left align-middle" style={{ minWidth: 160, maxWidth: 260 }}>
+      <td className="px-4 py-3 text-left align-top" style={{ minWidth: 200, maxWidth: 420 }}>
         {locked("recommendation_why") ? (
           <LockedWhyCell why={row.ai_summary ?? row.recommendation_why} onClick={onUpgrade} />
         ) : (() => {
-          const whyText = row.ai_summary
-            ? row.ai_summary.slice(0, 90) + (row.ai_summary.length > 90 ? "…" : "")
-            : row.recommendation_why ?? "—";
+          const whyText = row.ai_summary ?? row.recommendation_why ?? "—";
           return (
-            <span className="text-xs text-white/60 leading-snug max-w-[260px] block truncate">{whyText}</span>
+            <span className="text-xs text-white/60 leading-snug max-w-[420px] block line-clamp-3 hover:line-clamp-none transition-all">{whyText}</span>
           );
         })()}
       </td>

@@ -19,7 +19,7 @@ const COL = {
   price: 100,
   value: 110,
   aiRec: 130,
-  why: 240,
+  why: 320,
 } as const;
 
 // Only rank + player are sticky now
@@ -29,7 +29,7 @@ const SCROLL_W =
   COL.price + COL.value + COL.aiRec + COL.why;
 const TABLE_W = FIXED_W + SCROLL_W;
 
-const CELL_H = "h-[52px]";
+const CELL_H = "min-h-[52px]";
 const CELL_BASE = `${CELL_H} flex items-center`;
 const HEADER_BASE =
   "h-9 flex items-center text-[10px] font-semibold uppercase tracking-wider text-white/35 select-none whitespace-nowrap";
@@ -228,10 +228,8 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
         </div>
         <div className={`${CELL_BASE} px-3`} style={{ width: COL.why, minWidth: COL.why }}>
           {locked("why") ? <LockedPlaceholder onUpgrade={onUpgrade} /> : (
-            <span className="text-xs text-white/50 leading-snug line-clamp-2">
-              {row.ai_summary
-                ? row.ai_summary.slice(0, 80) + (row.ai_summary.length > 80 ? "…" : "")
-                : row.recommendation_why ?? "—"}
+            <span className="text-xs text-white/50 leading-snug line-clamp-3 py-2">
+              {row.ai_summary ?? row.recommendation_why ?? "—"}
             </span>
           )}
         </div>
