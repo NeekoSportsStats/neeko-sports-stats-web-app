@@ -367,32 +367,48 @@ const STAT_ANGLES: StatAngle[] = [
 
 const playerCache = new Map<string, ContentPlayer[]>();
 
-// ─── Collapsible section ───────────────────────────────────────────────────────
+// ─── Step Accordion ────────────────────────────────────────────────────────────
 
-function SideSection({
-  title, icon, children, defaultOpen = true, accentColor,
+function StepSection({
+  step, title, icon, children, openStep, setOpenStep, accentColor,
 }: {
+  step: string;
   title: string;
   icon: React.ReactNode;
   children: React.ReactNode;
-  defaultOpen?: boolean;
+  openStep: string | null;
+  setOpenStep: (s: string | null) => void;
   accentColor: string;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const open = openStep === step;
   return (
-    <div className="rounded-xl border border-border overflow-hidden">
+    <div
+      className="rounded-xl border overflow-hidden transition-colors"
+      style={{ borderColor: open ? `${accentColor}40` : "hsl(var(--border))" }}
+    >
       <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2.5 px-4 py-3 bg-muted/20 hover:bg-muted/40 transition-colors text-left"
+        onClick={() => setOpenStep(open ? null : step)}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
+        style={{ background: open ? `${accentColor}0a` : undefined }}
       >
-        <span style={{ color: accentColor }}>{icon}</span>
-        <span className="text-xs font-semibold flex-1">{title}</span>
-        <ChevronRight
-          className="h-3.5 w-3.5 text-muted-foreground transition-transform shrink-0"
-          style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
+        <span
+          className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+          style={
+            open
+              ? { background: accentColor, color: "#000" }
+              : { background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))" }
+          }
+        >
+          {step}
+        </span>
+        <span style={{ color: open ? accentColor : undefined }}>{icon}</span>
+        <span className="text-xs font-semibold flex-1" style={{ color: open ? accentColor : undefined }}>{title}</span>
+        <ChevronDown
+          className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 shrink-0"
+          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
         />
       </button>
-      {open && <div className="p-4 space-y-3">{children}</div>}
+      {open && <div className="px-4 pb-4 pt-2 space-y-3 border-t border-border/40">{children}</div>}
     </div>
   );
 }
@@ -529,6 +545,9 @@ export default function AdminContentEngine() {
   // Manual player selection
   const [manualPlayer1, setManualPlayer1] = useState<ContentPlayer | null>(null);
   const [manualPlayer2, setManualPlayer2] = useState<ContentPlayer | null>(null);
+
+  // Accordion open step (null = all closed)
+  const [openStep, setOpenStep] = useState<string | null>("1");
 
   // Row selection — click to pin players in preview
   const [selectedPlayerKeys, setSelectedPlayerKeys] = useState<string[]>([]);
@@ -906,8 +925,10 @@ export default function AdminContentEngine() {
     <>
     <div className="flex flex-col h-full" style={{ minHeight: 0 }}>
 
-      {/* ── TOP BAR: Header + Stat Angle Selector ─────────────────────────── */}
+      {/* ── TOP BAR ──────────────────────────────────────────────────────────── */}
       <div className="shrink-0 space-y-3 pb-3 border-b border-border">
+
+        {/* Title row */}
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-base font-semibold flex items-center gap-2">
@@ -915,14 +936,14 @@ export default function AdminContentEngine() {
               Content Engine
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Select a stat angle, customise the graphic, then download and post.
+              Build a graphic in 5 steps, then download.
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={handleResetState}
               className="flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted/40"
-              title="Reset all Content Engine settings to defaults"
+              title="Reset all settings to defaults"
             >
               <RefreshCw className="h-3 w-3" />
               Reset
@@ -936,74 +957,39 @@ export default function AdminContentEngine() {
           </div>
         </div>
 
-        {/* Stat Angle Selector */}
-        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "thin" }}>
-          {STAT_ANGLES.map((angle) => {
-            const isSelected = angle.id === selectedAngle.id;
-            const isCached   = playerCache.has(angle.id);
+        {/* Mode Toggle */}
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-muted/30 border border-border w-fit">
+          {(["graphic", "video", "media"] as ContentMode[]).map((mode) => {
+            const icons: Record<ContentMode, React.ReactNode> = {
+              graphic: <LayoutTemplate className="h-3.5 w-3.5" />,
+              video:   <Video className="h-3.5 w-3.5" />,
+              media:   <Library className="h-3.5 w-3.5" />,
+            };
+            const labels: Record<ContentMode, string> = {
+              graphic: "Graphic",
+              video:   "Video",
+              media:   "Media Library",
+            };
             return (
               <button
-                key={angle.id}
-                onClick={() => handleAngleSelect(angle)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium whitespace-nowrap transition-all shrink-0"
+                key={mode}
+                onClick={() => setContentMode(mode)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
                 style={
-                  isSelected
-                    ? { background: `${angle.accentColor}20`, borderColor: `${angle.accentColor}60`, color: angle.accentColor }
-                    : { background: "transparent", borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }
+                  contentMode === mode
+                    ? { background: accentColor, color: "#000" }
+                    : { color: "hsl(var(--muted-foreground))" }
                 }
               >
-                <span
-                  className="w-1.5 h-1.5 rounded-full shrink-0"
-                  style={{ background: isSelected ? angle.accentColor : isCached ? "#10B981" : "hsl(var(--muted-foreground))" }}
-                />
-                {angle.label}
+                {icons[mode]}
+                {labels[mode]}
               </button>
             );
           })}
         </div>
-
-        {/* Mode Toggle */}
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-muted/30 border border-border w-fit">
-          <button
-            onClick={() => setContentMode("graphic")}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all"
-            style={
-              contentMode === "graphic"
-                ? { background: accentColor, color: "#000" }
-                : { color: "hsl(var(--muted-foreground))" }
-            }
-          >
-            <LayoutTemplate className="h-3.5 w-3.5" />
-            Graphic Mode
-          </button>
-          <button
-            onClick={() => setContentMode("video")}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all"
-            style={
-              contentMode === "video"
-                ? { background: accentColor, color: "#000" }
-                : { color: "hsl(var(--muted-foreground))" }
-            }
-          >
-            <Video className="h-3.5 w-3.5" />
-            Video Mode
-          </button>
-          <button
-            onClick={() => setContentMode("media")}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all"
-            style={
-              contentMode === "media"
-                ? { background: accentColor, color: "#000" }
-                : { color: "hsl(var(--muted-foreground))" }
-            }
-          >
-            <Library className="h-3.5 w-3.5" />
-            Media Library
-          </button>
-        </div>
       </div>
 
-      {/* ── MEDIA LIBRARY MODE ──────────────────────────────────────────────── */}
+      {/* ── MEDIA LIBRARY MODE ─────────────────────────────────────────────── */}
       {contentMode === "media" && (
         <div className="flex-1 overflow-y-auto p-6" style={{ minHeight: 0 }}>
           <Suspense fallback={<div className="flex items-center justify-center py-24"><RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
@@ -1012,59 +998,86 @@ export default function AdminContentEngine() {
         </div>
       )}
 
-      {/* ── WORKSPACE: Left Panel + Right Panel ────────────────────────────── */}
-      <div className={`flex flex-col lg:flex-row flex-1 gap-0 overflow-hidden lg:overflow-hidden overflow-y-auto${contentMode === "media" ? " hidden" : ""}`} style={{ minHeight: 0 }}>
+      {/* ── WORKSPACE ──────────────────────────────────────────────────────── */}
+      <div
+        className={`flex-1 overflow-hidden${contentMode === "media" ? " hidden" : ""}`}
+        style={{ display: contentMode === "media" ? "none" : "grid", gridTemplateColumns: "420px 1fr", minHeight: 0 }}
+      >
 
-        {/* LEFT PANEL — Controls */}
+        {/* ── LEFT COLUMN — Step Accordion ─────────────────────────────────── */}
         <div
           ref={scrollRef}
-          className="lg:shrink-0 lg:border-r border-b lg:border-b-0 border-border lg:overflow-y-auto w-full lg:w-[420px]"
+          className="border-r border-border overflow-y-auto"
           style={{ scrollbarWidth: "thin" } as Record<string, string>}
         >
-          <div className="p-4 space-y-3">
+          <div className="p-4 space-y-2">
 
             {contentMode === "graphic" ? (
               <>
-                {/* Section 1: Player Data */}
-                <SideSection
-                  title="Player Data"
-                  icon={<BarChart2 className="h-3.5 w-3.5" />}
-                  accentColor={accentColor}
-                  defaultOpen={true}
-                >
-                  {/* Player Mode selector */}
-                  <PlayerSelectorPanel
-                    playerMode={playerMode}
-                    onPlayerModeChange={setPlayerMode}
-                    manualPlayer1={manualPlayer1}
-                    manualPlayer2={manualPlayer2}
-                    onPlayer1Change={setManualPlayer1}
-                    onPlayer2Change={setManualPlayer2}
-                    accentColor={accentColor}
-                  />
 
-                  {/* Auto player data table */}
-                  {playerMode === "auto" && (
-                    <>
-                      <div className="flex items-center justify-between mb-1 mt-2">
-                        <p className="text-[11px] text-muted-foreground/60 truncate">{selectedAngle.title}</p>
-                        <Button
-                          variant="outline" size="sm"
-                          className="h-6 text-[11px] shrink-0 ml-2"
-                          onClick={() => fetchPlayers(selectedAngle, true)}
-                          disabled={dataLoading}
+                {/* STEP 1 — Stat Angle */}
+                <StepSection
+                  step="1"
+                  title="Stat Angle"
+                  icon={<BarChart2 className="h-3.5 w-3.5" />}
+                  openStep={openStep}
+                  setOpenStep={setOpenStep}
+                  accentColor={accentColor}
+                >
+                  <div className="flex flex-wrap gap-1.5">
+                    {STAT_ANGLES.map((angle) => {
+                      const isSelected = angle.id === selectedAngle.id;
+                      return (
+                        <button
+                          key={angle.id}
+                          onClick={() => { handleAngleSelect(angle); setOpenStep("2"); }}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11px] font-medium whitespace-nowrap transition-all"
+                          style={
+                            isSelected
+                              ? { background: `${angle.accentColor}20`, borderColor: `${angle.accentColor}60`, color: angle.accentColor }
+                              : { background: "transparent", borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }
+                          }
                         >
-                          <RefreshCw className={`h-3 w-3 mr-1 ${dataLoading ? "animate-spin" : ""}`} />
-                          Refresh
-                        </Button>
-                      </div>
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: isSelected ? angle.accentColor : "hsl(var(--muted-foreground)/0.4)" }} />
+                          {angle.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Player data table */}
+                  <div className="pt-1 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] text-muted-foreground/60 truncate">{selectedAngle.title}</p>
+                      <Button
+                        variant="outline" size="sm"
+                        className="h-6 text-[11px] shrink-0 ml-2"
+                        onClick={() => fetchPlayers(selectedAngle, true)}
+                        disabled={dataLoading}
+                      >
+                        <RefreshCw className={`h-3 w-3 mr-1 ${dataLoading ? "animate-spin" : ""}`} />
+                        Refresh
+                      </Button>
+                    </div>
+
+                    <PlayerSelectorPanel
+                      playerMode={playerMode}
+                      onPlayerModeChange={setPlayerMode}
+                      manualPlayer1={manualPlayer1}
+                      manualPlayer2={manualPlayer2}
+                      onPlayer1Change={setManualPlayer1}
+                      onPlayer2Change={setManualPlayer2}
+                      accentColor={accentColor}
+                    />
+
+                    {playerMode === "auto" && (
                       <div className="rounded-lg border border-border overflow-hidden">
                         {dataLoading ? (
-                          <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground text-xs">
+                          <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground text-xs">
                             <RefreshCw className="h-3.5 w-3.5 animate-spin" />Loading…
                           </div>
                         ) : effectivePlayers.length === 0 ? (
-                          <div className="py-6 text-center text-xs text-muted-foreground">No data loaded</div>
+                          <div className="py-5 text-center text-xs text-muted-foreground">No data loaded</div>
                         ) : (
                           <table className="w-full text-xs">
                             <thead>
@@ -1079,7 +1092,6 @@ export default function AdminContentEngine() {
                                       onClick={clearPlayerSelection}
                                       className="text-[9px] font-semibold px-1.5 py-0.5 rounded transition-colors hover:opacity-80"
                                       style={{ background: `${accentColor}22`, color: accentColor }}
-                                      title="Clear selection"
                                     >
                                       Clear
                                     </button>
@@ -1095,14 +1107,11 @@ export default function AdminContentEngine() {
                                   <tr
                                     key={`${key}-${i}`}
                                     onClick={() => togglePlayerSelection(key)}
-                                    className="border-b border-border/40 last:border-0 transition-colors cursor-pointer select-none"
-                                    style={isPinned ? {
-                                      background: `${accentColor}18`,
-                                      borderLeft: `3px solid ${accentColor}`,
-                                    } : { borderLeft: "3px solid transparent" }}
+                                    className="border-b border-border/40 last:border-0 cursor-pointer select-none transition-colors"
+                                    style={isPinned ? { background: `${accentColor}18`, borderLeft: `3px solid ${accentColor}` } : { borderLeft: "3px solid transparent" }}
                                   >
                                     <td className="py-1.5 px-2.5 text-muted-foreground tabular-nums">{i + 1}</td>
-                                    <td className="py-1.5 px-2.5 font-medium max-w-[120px] truncate" style={isPinned ? { color: accentColor } : {}}>{p.player_name}</td>
+                                    <td className="py-1.5 px-2.5 font-medium max-w-[110px] truncate" style={isPinned ? { color: accentColor } : {}}>{p.player_name}</td>
                                     <td className="py-1.5 px-2.5 text-muted-foreground truncate">{p.team}</td>
                                     <td className="py-1.5 px-2.5 text-right font-semibold tabular-nums" style={accentStyle}>{selectedAngle.statFn(p)}</td>
                                     {selectedPlayerKeys.length > 0 && (
@@ -1117,38 +1126,36 @@ export default function AdminContentEngine() {
                           </table>
                         )}
                       </div>
-                      <p className="text-[10px] text-muted-foreground/40 mt-1.5 text-center">
-                        {selectedPlayerKeys.length > 0
-                          ? `${selectedPlayerKeys.length} player${selectedPlayerKeys.length > 1 ? "s" : ""} pinned — preview shows selection only`
-                          : "Click a row to pin players in the preview"}
+                    )}
+                    {selectedPlayerKeys.length > 0 && (
+                      <p className="text-[10px] text-muted-foreground/40 text-center">
+                        {selectedPlayerKeys.length} player{selectedPlayerKeys.length > 1 ? "s" : ""} pinned
                       </p>
-                    </>
-                  )}
-                </SideSection>
+                    )}
+                  </div>
+                </StepSection>
 
-                {/* Section 2: Graphic Template */}
-                <SideSection
-                  title="Graphic Template"
+                {/* STEP 2 — Template */}
+                <StepSection
+                  step="2"
+                  title="Template"
                   icon={<LayoutTemplate className="h-3.5 w-3.5" />}
+                  openStep={openStep}
+                  setOpenStep={setOpenStep}
                   accentColor={accentColor}
-                  defaultOpen={true}
                 >
-                  <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-widest">Core layouts</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-widest">Core</p>
                   <div className="space-y-1">
                     {LAYOUTS.filter((t) => t.group === "core").map((tmpl) => {
                       const isSelected = tmpl.id === selectedLayout;
-                      const disabled   = isCarouselMode;
+                      const disabled = isCarouselMode;
                       return (
                         <button
                           key={tmpl.id}
-                          onClick={() => !disabled && setSelectedLayout(tmpl.id)}
+                          onClick={() => { if (!disabled) { setSelectedLayout(tmpl.id); setOpenStep("3"); } }}
                           disabled={disabled}
                           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-left transition-all disabled:opacity-40"
-                          style={
-                            isSelected && !disabled
-                              ? { background: `${accentColor}14`, borderColor: `${accentColor}55` }
-                              : { background: "transparent", borderColor: "hsl(var(--border))" }
-                          }
+                          style={isSelected && !disabled ? { background: `${accentColor}14`, borderColor: `${accentColor}55` } : { background: "transparent", borderColor: "hsl(var(--border))" }}
                         >
                           <span className="text-sm leading-none">{tmpl.icon}</span>
                           <div className="flex-1 min-w-0">
@@ -1160,23 +1167,18 @@ export default function AdminContentEngine() {
                       );
                     })}
                   </div>
-
-                  <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-widest pt-1">Specialty templates</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground/40 uppercase tracking-widest pt-1">Specialty</p>
                   <div className="space-y-1">
                     {LAYOUTS.filter((t) => t.group === "template").map((tmpl) => {
                       const isSelected = tmpl.id === selectedLayout;
-                      const disabled   = isCarouselMode;
+                      const disabled = isCarouselMode;
                       return (
                         <button
                           key={tmpl.id}
-                          onClick={() => !disabled && setSelectedLayout(tmpl.id)}
+                          onClick={() => { if (!disabled) { setSelectedLayout(tmpl.id); setOpenStep("3"); } }}
                           disabled={disabled}
                           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-left transition-all disabled:opacity-40"
-                          style={
-                            isSelected && !disabled
-                              ? { background: `${accentColor}14`, borderColor: `${accentColor}55` }
-                              : { background: "transparent", borderColor: "hsl(var(--border))" }
-                          }
+                          style={isSelected && !disabled ? { background: `${accentColor}14`, borderColor: `${accentColor}55` } : { background: "transparent", borderColor: "hsl(var(--border))" }}
                         >
                           <span className="text-sm leading-none">{tmpl.icon}</span>
                           <div className="flex-1 min-w-0">
@@ -1188,112 +1190,87 @@ export default function AdminContentEngine() {
                       );
                     })}
                   </div>
-                  {isCarouselMode && (
-                    <p className="text-[10px] text-muted-foreground/50">Template is auto-set in Carousel mode</p>
-                  )}
-                </SideSection>
+                  {isCarouselMode && <p className="text-[10px] text-muted-foreground/50">Template is auto-set in Carousel mode</p>}
+                </StepSection>
 
-                {/* Section 3: Graphic Design */}
-                <SideSection
-                  title="Graphic Design"
+                {/* STEP 3 — Background */}
+                <StepSection
+                  step="3"
+                  title="Background"
                   icon={<Palette className="h-3.5 w-3.5" />}
+                  openStep={openStep}
+                  setOpenStep={setOpenStep}
                   accentColor={accentColor}
-                  defaultOpen={false}
                 >
-                  {/* Background Source */}
-                  <div className="space-y-1.5">
-                    <p className="text-[11px] font-medium text-muted-foreground">Background Source</p>
-                    <div className="grid grid-cols-1 gap-1">
-                      {(["gradient", "stock_image", "stock_video", "team_theme", "upload"] as BackgroundSource[]).map((src) => (
-                        <button
-                          key={src}
-                          onClick={() => {
-                            setBackgroundSource(src);
-                            if (src !== "stock_image" && src !== "stock_video") setBackgroundMediaUrl(null);
-                          }}
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium text-left transition-all"
-                          style={
-                            backgroundSource === src
-                              ? { background: `${accentColor}14`, borderColor: `${accentColor}55`, color: accentColor }
-                              : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }
-                          }
-                        >
-                          {src === "gradient"    && <Palette className="h-3 w-3 shrink-0" />}
-                          {src === "stock_image" && <ImageIcon className="h-3 w-3 shrink-0" />}
-                          {src === "stock_video" && <Video className="h-3 w-3 shrink-0" />}
-                          {src === "team_theme"  && <span className="w-3 h-3 rounded-full shrink-0" style={{ background: accentColor }} />}
-                          {src === "upload"      && <Upload className="h-3 w-3 shrink-0" />}
-                          {getBackgroundSourceLabel(src)}
-                          {backgroundSource === src && <span className="ml-auto w-1.5 h-1.5 rounded-full" style={{ background: accentColor }} />}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Gradient sub-theme (only when gradient selected) */}
-                    {backgroundSource === "gradient" && (
-                      <DropSelect
-                        value={selectedBackground}
-                        options={BACKGROUNDS}
-                        onChange={(v) => setSelectedBackground(v as BackgroundTheme)}
-                        accentColor={accentColor}
-                      />
-                    )}
-
-                    {/* AI image picker */}
-                    {backgroundSource === "stock_image" && (
-                      <AIMediaPicker
-                        key={`image-${mediaRefreshKey}`}
-                        type="image"
-                        selected={backgroundMediaUrl}
-                        onSelect={setBackgroundMediaUrl}
-                        accentColor={accentColor}
-                      />
-                    )}
-
-                    {/* AI video picker */}
-                    {backgroundSource === "stock_video" && (
-                      <AIMediaPicker
-                        key={`video-${mediaRefreshKey}`}
-                        type="video"
-                        selected={backgroundMediaUrl}
-                        onSelect={setBackgroundMediaUrl}
-                        accentColor={accentColor}
-                      />
-                    )}
-
-                    {/* Team theme info */}
-                    {backgroundSource === "team_theme" && (
-                      <p className="text-[10px] text-muted-foreground/60 px-1">
-                        Background will use the team colour scheme of the top-ranked player.
-                      </p>
-                    )}
-
-                    {/* Custom upload URL */}
-                    {backgroundSource === "upload" && (
-                      <div className="space-y-1">
-                        <p className="text-[10px] text-muted-foreground/60">Paste an image or video URL</p>
-                        <input
-                          type="text"
-                          value={customUploadUrl}
-                          onChange={(e) => setCustomUploadUrl(e.target.value)}
-                          placeholder="https://…"
-                          className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none placeholder:text-muted-foreground/40"
-                        />
-                      </div>
-                    )}
-
-                    <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border cursor-pointer hover:bg-muted/20 transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={showTeamAccent}
-                        onChange={(e) => setShowTeamAccent(e.target.checked)}
-                        className="rounded"
-                      />
-                      <span className="text-xs font-medium">Team colour accent bar</span>
-                    </label>
+                  <div className="grid grid-cols-1 gap-1">
+                    {(["gradient", "stock_image", "stock_video", "team_theme", "upload"] as BackgroundSource[]).map((src) => (
+                      <button
+                        key={src}
+                        onClick={() => {
+                          setBackgroundSource(src);
+                          if (src !== "stock_image" && src !== "stock_video") setBackgroundMediaUrl(null);
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium text-left transition-all"
+                        style={
+                          backgroundSource === src
+                            ? { background: `${accentColor}14`, borderColor: `${accentColor}55`, color: accentColor }
+                            : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }
+                        }
+                      >
+                        {src === "gradient"    && <Palette className="h-3 w-3 shrink-0" />}
+                        {src === "stock_image" && <ImageIcon className="h-3 w-3 shrink-0" />}
+                        {src === "stock_video" && <Video className="h-3 w-3 shrink-0" />}
+                        {src === "team_theme"  && <span className="w-3 h-3 rounded-full shrink-0" style={{ background: accentColor }} />}
+                        {src === "upload"      && <Upload className="h-3 w-3 shrink-0" />}
+                        {getBackgroundSourceLabel(src)}
+                        {backgroundSource === src && <span className="ml-auto w-1.5 h-1.5 rounded-full" style={{ background: accentColor }} />}
+                      </button>
+                    ))}
                   </div>
 
-                  {/* Accent Colour */}
+                  {backgroundSource === "gradient" && (
+                    <DropSelect value={selectedBackground} options={BACKGROUNDS} onChange={(v) => setSelectedBackground(v as BackgroundTheme)} accentColor={accentColor} />
+                  )}
+                  {backgroundSource === "stock_image" && (
+                    <AIMediaPicker key={`image-${mediaRefreshKey}`} type="image" selected={backgroundMediaUrl} onSelect={setBackgroundMediaUrl} accentColor={accentColor} />
+                  )}
+                  {backgroundSource === "stock_video" && (
+                    <AIMediaPicker key={`video-${mediaRefreshKey}`} type="video" selected={backgroundMediaUrl} onSelect={setBackgroundMediaUrl} accentColor={accentColor} />
+                  )}
+                  {backgroundSource === "team_theme" && (
+                    <p className="text-[10px] text-muted-foreground/60">Uses the top player's team colour scheme.</p>
+                  )}
+                  {backgroundSource === "upload" && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground/60">Paste an image or video URL</p>
+                      <input
+                        type="text" value={customUploadUrl} onChange={(e) => setCustomUploadUrl(e.target.value)}
+                        placeholder="https://…"
+                        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none placeholder:text-muted-foreground/40"
+                      />
+                    </div>
+                  )}
+
+                  <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border cursor-pointer hover:bg-muted/20 transition-colors">
+                    <input type="checkbox" checked={showTeamAccent} onChange={(e) => setShowTeamAccent(e.target.checked)} className="rounded" />
+                    <span className="text-xs font-medium">Team colour accent bar</span>
+                  </label>
+
+                  <div className="pt-1 border-t border-border/40">
+                    <AIMediaPackGenerator accentColor={accentColor} onSynced={handleMediaSynced} />
+                  </div>
+                </StepSection>
+
+                {/* STEP 4 — Branding */}
+                <StepSection
+                  step="4"
+                  title="Branding"
+                  icon={<Type className="h-3.5 w-3.5" />}
+                  openStep={openStep}
+                  setOpenStep={setOpenStep}
+                  accentColor={accentColor}
+                >
+                  {/* Accent colour */}
                   <div className="space-y-1.5">
                     <p className="text-[11px] font-medium text-muted-foreground">Accent Colour</p>
                     <div className="grid grid-cols-2 gap-1.5">
@@ -1315,327 +1292,122 @@ export default function AdminContentEngine() {
                     </div>
                     {accentMode === "custom" && (
                       <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={customAccent}
-                          onChange={(e) => setCustomAccent(e.target.value)}
-                          className="w-9 h-9 rounded-lg border border-border cursor-pointer p-0.5 bg-transparent"
-                        />
-                        <input
-                          type="text"
-                          value={customAccent}
-                          onChange={(e) => setCustomAccent(e.target.value)}
-                          placeholder="#F59E0B"
-                          className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none font-mono placeholder:text-muted-foreground/40"
-                        />
+                        <input type="color" value={customAccent} onChange={(e) => setCustomAccent(e.target.value)} className="w-9 h-9 rounded-lg border border-border cursor-pointer p-0.5 bg-transparent" />
+                        <input type="text" value={customAccent} onChange={(e) => setCustomAccent(e.target.value)} placeholder="#F59E0B" className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none font-mono placeholder:text-muted-foreground/40" />
                       </div>
                     )}
-
-                    {/* Auto Team Colour Accent */}
                     <label
                       className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border cursor-pointer transition-all"
-                      style={
-                        autoTeamAccent
-                          ? { borderColor: `${accentColor}55`, background: `${accentColor}0c` }
-                          : { borderColor: "hsl(var(--border))" }
-                      }
+                      style={autoTeamAccent ? { borderColor: `${accentColor}55`, background: `${accentColor}0c` } : { borderColor: "hsl(var(--border))" }}
                     >
-                      <input
-                        type="checkbox"
-                        checked={autoTeamAccent}
-                        onChange={(e) => setAutoTeamAccent(e.target.checked)}
-                        className="rounded"
-                      />
+                      <input type="checkbox" checked={autoTeamAccent} onChange={(e) => setAutoTeamAccent(e.target.checked)} className="rounded" />
                       <div className="flex-1">
-                        <p className="text-xs font-semibold">Auto Team Colour Accent</p>
-                        <p className="text-[10px] text-muted-foreground/55 mt-0.5">
-                          Accent colour follows the top player's AFL team
-                        </p>
+                        <p className="text-xs font-semibold">Auto Team Colour</p>
+                        <p className="text-[10px] text-muted-foreground/55 mt-0.5">Follows the top player's AFL team</p>
                       </div>
-                      {autoTeamAccent && (
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ background: accentColor }}
-                        />
-                      )}
+                      {autoTeamAccent && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: accentColor }} />}
                     </label>
                   </div>
 
-                  {/* Rank Highlight */}
+                  {/* Rank highlight */}
                   <div className="space-y-1.5">
                     <p className="text-[11px] font-medium text-muted-foreground">Rank Highlight</p>
-                    <DropSelect
-                      value={rankHighlight}
-                      options={RANK_HIGHLIGHTS}
-                      onChange={(v) => setRankHighlight(v as RankHighlight)}
-                      accentColor={accentColor}
-                    />
+                    <DropSelect value={rankHighlight} options={RANK_HIGHLIGHTS} onChange={(v) => setRankHighlight(v as RankHighlight)} accentColor={accentColor} />
                   </div>
 
-                  {/* Logo Upload */}
+                  {/* Logo */}
                   <div className="space-y-1.5">
                     <p className="text-[11px] font-medium text-muted-foreground">Logo</p>
                     <div className="flex gap-2 items-center">
                       <label
-                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-border text-[11px] text-muted-foreground cursor-pointer hover:border-border/80 hover:bg-muted/20 transition-colors"
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-border text-[11px] text-muted-foreground cursor-pointer hover:bg-muted/20 transition-colors"
                         style={logoUrl ? { borderColor: `${accentColor}55`, color: accentColor } : {}}
                       >
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            const reader = new FileReader();
-                            reader.onload = (ev) => { if (ev.target?.result) setLogoUrl(ev.target.result as string); };
-                            reader.readAsDataURL(file);
-                          }}
-                        />
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                          const file = e.target.files?.[0]; if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (ev) => { if (ev.target?.result) setLogoUrl(ev.target.result as string); };
+                          reader.readAsDataURL(file);
+                        }} />
                         {logoUrl ? "Logo selected — click to replace" : "Upload logo image"}
                       </label>
                       {logoUrl && (
-                        <button
-                          onClick={() => setLogoUrl("")}
-                          className="px-2 py-2 rounded-lg border border-border text-[11px] text-muted-foreground hover:bg-muted/20 transition-colors"
-                          title="Remove logo"
-                        >
-                          ✕
-                        </button>
+                        <button onClick={() => setLogoUrl("")} className="px-2 py-2 rounded-lg border border-border text-[11px] text-muted-foreground hover:bg-muted/20 transition-colors">✕</button>
                       )}
                     </div>
-                    {logoUrl && (
-                      <img src={logoUrl} alt="Logo preview" className="h-8 object-contain rounded" />
+                    {logoUrl && <img src={logoUrl} alt="Logo preview" className="h-8 object-contain rounded" />}
+                    <DropSelect value={logoPosition} options={LOGO_POSITIONS} onChange={(v) => setLogoPosition(v as LogoPosition)} accentColor={accentColor} />
+                  </div>
+
+                  {/* Overlays */}
+                  <div className="space-y-2 pt-1 border-t border-border/40">
+                    <p className="text-[11px] font-medium text-muted-foreground">Text Overlays</p>
+                    <input type="text" value={roundLabel} onChange={(e) => setRoundLabel(e.target.value)} placeholder="Round Label (e.g. Round 12)" className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none placeholder:text-muted-foreground/40" />
+                    <input type="text" value={statHighlight} onChange={(e) => setStatHighlight(e.target.value)} placeholder="Stat Highlight (e.g. Captain Pick)" className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none placeholder:text-muted-foreground/40" />
+                    <input type="text" value={ctaText} onChange={(e) => setCtaText(e.target.value)} placeholder="CTA (e.g. neekostats.com.au)" className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none placeholder:text-muted-foreground/40" />
+                    {ctaText.trim() && (
+                      <DropSelect value={ctaPosition} options={CTA_POSITIONS} onChange={(v) => setCtaPosition(v as CtaPosition)} accentColor={accentColor} />
                     )}
-                    <p className="text-[10px] text-muted-foreground/50">No logo selected = no logo on graphic.</p>
+                    <input type="text" value={playerImageUrl} onChange={(e) => setPlayerImageUrl(e.target.value)} placeholder="Player Image URL (optional)" className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none placeholder:text-muted-foreground/40" />
                   </div>
 
-                  {/* Logo Position */}
-                  <div className="space-y-1.5">
-                    <p className="text-[11px] font-medium text-muted-foreground">Logo Position</p>
-                    <DropSelect
-                      value={logoPosition}
-                      options={LOGO_POSITIONS}
-                      onChange={(v) => setLogoPosition(v as LogoPosition)}
-                      accentColor={accentColor}
-                    />
-                    <p className="text-[10px] text-muted-foreground/50">Watermark renders at ~12% opacity.</p>
-                  </div>
-
-                  {/* Player Image */}
-                  <div className="space-y-1.5">
-                    <p className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
-                      <ImageIcon className="h-3 w-3" />
-                      Player Image URL (optional)
-                    </p>
-                    <input
-                      type="text"
-                      value={playerImageUrl}
-                      onChange={(e) => setPlayerImageUrl(e.target.value)}
-                      placeholder="https://… or /players/player.png"
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none placeholder:text-muted-foreground/40"
-                    />
-                    <p className="text-[10px] text-muted-foreground/50">Rendered at 18% opacity behind player name.</p>
-                  </div>
-
-                  {/* Layout Editor toggle */}
-                  <div className="border-t border-border/30 pt-2.5 space-y-2.5">
+                  {/* Layout Editor */}
+                  <div className="pt-1 border-t border-border/40">
                     <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border cursor-pointer hover:bg-muted/20 transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={layoutEditorOpen}
-                        onChange={(e) => {
-                          setLayoutEditorOpen(e.target.checked);
-                          if (!e.target.checked) setLayoutOffsets({ ...DEFAULT_LAYOUT_OFFSETS });
-                        }}
-                        className="rounded"
-                      />
+                      <input type="checkbox" checked={layoutEditorOpen} onChange={(e) => { setLayoutEditorOpen(e.target.checked); if (!e.target.checked) setLayoutOffsets({ ...DEFAULT_LAYOUT_OFFSETS }); }} className="rounded" />
                       <SlidersHorizontal className="h-3.5 w-3.5 opacity-60" />
-                      <span className="text-xs font-medium">Enable Layout Editor</span>
+                      <span className="text-xs font-medium">Fine-tune Layout</span>
                     </label>
-
                     {layoutEditorOpen && (
-                      <div className="space-y-3 px-1">
-                        {/* Title offset */}
+                      <div className="space-y-3 px-1 pt-2">
                         <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <p className="text-[10px] text-muted-foreground/70 font-medium">Title Offset X</p>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="range" min={-80} max={80} step={1}
-                                value={layoutOffsets.titleX}
-                                onChange={(e) => setLayoutOffsets((o) => ({ ...o, titleX: Number(e.target.value) }))}
-                                className="flex-1 h-1.5 accent-current"
-                                style={{ accentColor }}
-                              />
-                              <span className="text-[10px] tabular-nums w-7 text-right text-muted-foreground/60">{layoutOffsets.titleX}</span>
+                          {[
+                            { key: "titleX", label: "Title X", min: -80, max: 80, step: 1, fmt: (v: number) => String(v) },
+                            { key: "titleY", label: "Title Y", min: -80, max: 80, step: 1, fmt: (v: number) => String(v) },
+                          ].map(({ key, label, min, max, step, fmt: fmtFn }) => (
+                            <div key={key} className="space-y-1">
+                              <p className="text-[10px] text-muted-foreground/70 font-medium">{label}</p>
+                              <div className="flex items-center gap-1.5">
+                                <input type="range" min={min} max={max} step={step} value={layoutOffsets[key as keyof LayoutOffsets] as number} onChange={(e) => setLayoutOffsets((o) => ({ ...o, [key]: Number(e.target.value) }))} className="flex-1 h-1.5" style={{ accentColor }} />
+                                <span className="text-[10px] tabular-nums w-7 text-right text-muted-foreground/60">{fmtFn(layoutOffsets[key as keyof LayoutOffsets] as number)}</span>
+                              </div>
                             </div>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[10px] text-muted-foreground/70 font-medium">Title Offset Y</p>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="range" min={-80} max={80} step={1}
-                                value={layoutOffsets.titleY}
-                                onChange={(e) => setLayoutOffsets((o) => ({ ...o, titleY: Number(e.target.value) }))}
-                                className="flex-1 h-1.5"
-                                style={{ accentColor }}
-                              />
-                              <span className="text-[10px] tabular-nums w-7 text-right text-muted-foreground/60">{layoutOffsets.titleY}</span>
-                            </div>
-                          </div>
+                          ))}
                         </div>
-
-                        {/* Scale controls */}
                         {[
-                          { key: "playerImageScale", label: "Player Image Scale", min: 0.5, max: 2 },
-                          { key: "logoScale",        label: "Logo Scale",         min: 0.5, max: 2 },
-                        ].map(({ key, label, min, max }) => (
+                          { key: "playerImageScale", label: "Player Image", min: 0.5, max: 2, step: 0.05, fmt: (v: number) => `${v.toFixed(2)}x` },
+                          { key: "logoScale",        label: "Logo Scale",   min: 0.5, max: 2, step: 0.05, fmt: (v: number) => `${v.toFixed(2)}x` },
+                          { key: "overlayOpacity",   label: "Overlay Opacity", min: 0, max: 1, step: 0.05, fmt: (v: number) => `${Math.round(v * 100)}%` },
+                          { key: "backgroundBlur",   label: "BG Blur",     min: 0, max: 20, step: 1, fmt: (v: number) => `${v}px` },
+                        ].map(({ key, label, min, max, step, fmt: fmtFn }) => (
                           <div key={key} className="space-y-1">
                             <p className="text-[10px] text-muted-foreground/70 font-medium">{label}</p>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="range" min={min} max={max} step={0.05}
-                                value={layoutOffsets[key as keyof LayoutOffsets] as number}
-                                onChange={(e) => setLayoutOffsets((o) => ({ ...o, [key]: Number(e.target.value) }))}
-                                className="flex-1 h-1.5"
-                                style={{ accentColor }}
-                              />
-                              <span className="text-[10px] tabular-nums w-8 text-right text-muted-foreground/60">
-                                {(layoutOffsets[key as keyof LayoutOffsets] as number).toFixed(2)}x
-                              </span>
+                            <div className="flex items-center gap-1.5">
+                              <input type="range" min={min} max={max} step={step} value={layoutOffsets[key as keyof LayoutOffsets] as number} onChange={(e) => setLayoutOffsets((o) => ({ ...o, [key]: Number(e.target.value) }))} className="flex-1 h-1.5" style={{ accentColor }} />
+                              <span className="text-[10px] tabular-nums w-10 text-right text-muted-foreground/60">{fmtFn(layoutOffsets[key as keyof LayoutOffsets] as number)}</span>
                             </div>
                           </div>
                         ))}
-
-                        {/* Opacity + Blur */}
-                        <div className="space-y-1">
-                          <p className="text-[10px] text-muted-foreground/70 font-medium">Overlay Opacity</p>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="range" min={0} max={1} step={0.05}
-                              value={layoutOffsets.overlayOpacity}
-                              onChange={(e) => setLayoutOffsets((o) => ({ ...o, overlayOpacity: Number(e.target.value) }))}
-                              className="flex-1 h-1.5"
-                              style={{ accentColor }}
-                            />
-                            <span className="text-[10px] tabular-nums w-8 text-right text-muted-foreground/60">
-                              {Math.round(layoutOffsets.overlayOpacity * 100)}%
-                            </span>
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[10px] text-muted-foreground/70 font-medium">Background Blur</p>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="range" min={0} max={20} step={1}
-                              value={layoutOffsets.backgroundBlur}
-                              onChange={(e) => setLayoutOffsets((o) => ({ ...o, backgroundBlur: Number(e.target.value) }))}
-                              className="flex-1 h-1.5"
-                              style={{ accentColor }}
-                            />
-                            <span className="text-[10px] tabular-nums w-7 text-right text-muted-foreground/60">{layoutOffsets.backgroundBlur}px</span>
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => setLayoutOffsets({ ...DEFAULT_LAYOUT_OFFSETS })}
-                          className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground underline underline-offset-2 transition-colors"
-                        >
-                          Reset to defaults
-                        </button>
+                        <button onClick={() => setLayoutOffsets({ ...DEFAULT_LAYOUT_OFFSETS })} className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground underline underline-offset-2 transition-colors">Reset</button>
                       </div>
                     )}
                   </div>
+                </StepSection>
 
-                  {/* Starter Media Pack */}
-                  <div className="border-t border-border/30 pt-2.5">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[11px] font-medium text-muted-foreground">Media Library</p>
-                      <span
-                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                        style={{ background: `${accentColor}18`, color: accentColor }}
-                      >
-                        AI media library
-                      </span>
-                    </div>
-                    <AIMediaPackGenerator accentColor={accentColor} onSynced={handleMediaSynced} />
-                  </div>
-                </SideSection>
-
-                {/* Section 4: Content Overlays */}
-                <SideSection
-                  title="Content Overlays"
-                  icon={<Type className="h-3.5 w-3.5" />}
-                  accentColor={accentColor}
-                  defaultOpen={false}
-                >
-                  <div className="space-y-2">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-medium text-muted-foreground">
-                        <Calendar className="h-3 w-3 inline mr-1" />
-                        Round Label
-                      </label>
-                      <input
-                        type="text"
-                        value={roundLabel}
-                        onChange={(e) => setRoundLabel(e.target.value)}
-                        placeholder="e.g. Round 12"
-                        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none placeholder:text-muted-foreground/40"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-medium text-muted-foreground">Stat Highlight Label</label>
-                      <input
-                        type="text"
-                        value={statHighlight}
-                        onChange={(e) => setStatHighlight(e.target.value)}
-                        placeholder="e.g. Captain Pick, Highest Projection"
-                        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none placeholder:text-muted-foreground/40"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-medium text-muted-foreground">CTA Text</label>
-                      <input
-                        type="text"
-                        value={ctaText}
-                        onChange={(e) => setCtaText(e.target.value)}
-                        placeholder="e.g. See full rankings at neekostats.com.au"
-                        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs focus:outline-none placeholder:text-muted-foreground/40"
-                      />
-                    </div>
-
-                    {ctaText.trim() && (
-                      <div className="space-y-1">
-                        <label className="text-[11px] font-medium text-muted-foreground">CTA Position</label>
-                        <DropSelect
-                          value={ctaPosition}
-                          options={CTA_POSITIONS}
-                          onChange={(v) => setCtaPosition(v as CtaPosition)}
-                          accentColor={accentColor}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </SideSection>
-
-                {/* Section 5: AI Content */}
-                <SideSection
-                  title="AI Content"
+                {/* STEP 5 — Caption */}
+                <StepSection
+                  step="5"
+                  title="Caption"
                   icon={<Sparkles className="h-3.5 w-3.5" />}
+                  openStep={openStep}
+                  setOpenStep={setOpenStep}
                   accentColor={accentColor}
-                  defaultOpen={false}
                 >
                   {/* Insight */}
                   <div className="space-y-1.5">
                     <p className="text-[11px] font-medium text-muted-foreground">Stat Insight</p>
-                    <div className="rounded-lg border border-border bg-muted/20 min-h-[80px] p-3">
-                      {insight
-                        ? <p className="text-xs whitespace-pre-line leading-relaxed">{insight}</p>
-                        : <p className="text-[11px] text-muted-foreground/50">Click Generate to create a debate-style stat post.</p>
-                      }
+                    <div className="rounded-lg border border-border bg-muted/20 min-h-[70px] p-3">
+                      {insight ? <p className="text-xs whitespace-pre-line leading-relaxed">{insight}</p> : <p className="text-[11px] text-muted-foreground/50">Generate a debate-style stat post.</p>}
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" className="flex-1 h-8 text-xs" onClick={handleGenerateInsight} disabled={effectivePlayers.length === 0 || dataLoading}>
@@ -1652,7 +1424,7 @@ export default function AdminContentEngine() {
                   {/* Caption */}
                   <div className="space-y-1.5">
                     <p className="text-[11px] font-medium text-muted-foreground">Social Caption</p>
-                    <div className="rounded-lg border border-border bg-muted/20 min-h-[80px] p-3">
+                    <div className="rounded-lg border border-border bg-muted/20 min-h-[70px] p-3">
                       {captionLoading
                         ? <div className="flex items-center gap-2 text-xs text-muted-foreground"><RefreshCw className="h-3.5 w-3.5 animate-spin" />Generating…</div>
                         : caption
@@ -1673,50 +1445,24 @@ export default function AdminContentEngine() {
                     </div>
                   </div>
 
+                  <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border cursor-pointer hover:bg-muted/20 transition-colors">
+                    <input type="checkbox" checked={appendHashtags} onChange={(e) => setAppendHashtags(e.target.checked)} className="rounded" />
+                    <span className="text-xs font-medium">Append hashtags</span>
+                  </label>
+                  <p className="text-[10px] text-muted-foreground/40">{AUTO_HASHTAGS}</p>
+
                   {(insight || caption) && (
                     <Button variant="outline" className="w-full h-8 text-xs" onClick={handleCopyPost}>
                       {copiedPost ? <Check className="h-3.5 w-3.5 mr-1.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
                       Copy Full Post
                     </Button>
                   )}
-                </SideSection>
 
-                {/* Section 6: Hashtags + Export */}
-                <SideSection
-                  title="Hashtags & Export"
-                  icon={<Hash className="h-3.5 w-3.5" />}
-                  accentColor={accentColor}
-                  defaultOpen={false}
-                >
-                  <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border cursor-pointer hover:bg-muted/20 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={appendHashtags}
-                      onChange={(e) => setAppendHashtags(e.target.checked)}
-                      className="rounded"
-                    />
-                    <span className="text-xs font-medium">Append hashtags to captions</span>
-                  </label>
-                  <p className="text-[10px] text-muted-foreground/50">{AUTO_HASHTAGS}</p>
-
-                  <div className="space-y-1.5 pt-1">
-                    <p className="text-[11px] font-medium text-muted-foreground">Export Format</p>
-                    <DropSelect
-                      value={selectedExportSize.id}
-                      options={EXPORT_SIZES.map((s) => ({ id: s.id, label: s.label }))}
-                      onChange={(v) => {
-                        const sz = EXPORT_SIZES.find((s) => s.id === v);
-                        if (sz) setSelectedExportSize(sz);
-                      }}
-                      accentColor={accentColor}
-                    />
-                  </div>
-
-                  {/* Include AI Analysis toggle */}
+                  {/* AI Analysis toggle */}
                   <div className="rounded-lg border border-border bg-muted/10 px-3 py-2.5">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-xs font-medium">Include AI Analysis</p>
+                        <p className="text-xs font-medium">Include AI Analysis overlay</p>
                         {includeAIAnalysis && (
                           <p className="text-[10px] text-muted-foreground/60 mt-0.5 truncate">
                             {aiAnalysisLoading ? "Fetching…" : aiAnalysisText ? `${aiAnalysisText.slice(0, 60)}…` : "No summary found"}
@@ -1726,36 +1472,14 @@ export default function AdminContentEngine() {
                       <button
                         onClick={() => setIncludeAIAnalysis((v) => !v)}
                         className="shrink-0 w-10 h-6 rounded-full border-2 transition-all relative"
-                        style={includeAIAnalysis
-                          ? { background: accentColor, borderColor: accentColor }
-                          : { background: "transparent", borderColor: "hsl(var(--border))" }
-                        }
+                        style={includeAIAnalysis ? { background: accentColor, borderColor: accentColor } : { background: "transparent", borderColor: "hsl(var(--border))" }}
                       >
-                        <span
-                          className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
-                          style={{ left: includeAIAnalysis ? "calc(100% - 1.1rem)" : "2px" }}
-                        />
+                        <span className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all" style={{ left: includeAIAnalysis ? "calc(100% - 1.1rem)" : "2px" }} />
                       </button>
                     </div>
                   </div>
+                </StepSection>
 
-                  <Button
-                    className="w-full h-9 text-xs font-semibold"
-                    onClick={handleDownloadGraphic}
-                    disabled={downloading || effectivePlayers.length === 0 || dataLoading}
-                    style={effectivePlayers.length > 0 && !downloading ? { background: accentColor, color: "#000" } : {}}
-                  >
-                    {downloading ? (
-                      carouselProgress
-                        ? <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />Exporting {carouselProgress.done}/{carouselProgress.total}…</>
-                        : <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />Generating…</>
-                    ) : isCarouselMode ? (
-                      <><Layers className="h-3.5 w-3.5 mr-1.5" />Export Carousel ({effectivePlayers.length + 1} slides)</>
-                    ) : (
-                      <><Download className="h-3.5 w-3.5 mr-1.5" />Download Graphic</>
-                    )}
-                  </Button>
-                </SideSection>
               </>
             ) : (
               /* VIDEO MODE controls */
@@ -1770,121 +1494,70 @@ export default function AdminContentEngine() {
                 aiAnalysisLoading={aiAnalysisLoading}
               />
             )}
-
           </div>
         </div>
 
-        {/* RIGHT PANEL — Live Preview */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-black/40 min-w-0 min-h-0" style={{ minWidth: 0 }}>
+        {/* ── RIGHT COLUMN — Sticky Preview ────────────────────────────────── */}
+        <div className="flex flex-col overflow-hidden bg-black/40 min-w-0" style={{ minHeight: 0 }}>
 
           {contentMode === "graphic" ? (
             <>
-              {/* Quick Action Bar */}
+              {/* Action bar */}
               <div className="shrink-0 flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-border/50 bg-background/60 backdrop-blur-sm">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mr-1 hidden sm:block">Quick Actions</p>
                 <Button
-                  variant="outline" size="sm"
-                  className="h-7 text-xs gap-1.5"
-                  onClick={handleDownloadGraphic}
-                  disabled={downloading || effectivePlayers.length === 0}
-                  style={{ borderColor: `${accentColor}44`, color: accentColor }}
-                >
-                  <Download className="h-3 w-3" />
-                  Download
-                </Button>
-                <Button
-                  variant="outline" size="sm"
-                  className="h-7 text-xs gap-1.5"
+                  variant="outline" size="sm" className="h-7 text-xs gap-1.5"
                   onClick={handleShuffleTemplate}
-                  style={{ borderColor: "hsl(var(--border))" }}
                 >
-                  <Shuffle className="h-3 w-3" />
-                  Shuffle Template
+                  <Shuffle className="h-3 w-3" />Shuffle
                 </Button>
                 <Button
-                  variant="outline" size="sm"
-                  className="h-7 text-xs gap-1.5"
-                  onClick={handleShuffleAngle}
-                  style={{ borderColor: "hsl(var(--border))" }}
-                >
-                  <BarChart2 className="h-3 w-3" />
-                  New Stat Angle
-                </Button>
-                <Button
-                  variant="outline" size="sm"
-                  className="h-7 text-xs gap-1.5"
+                  variant="outline" size="sm" className="h-7 text-xs gap-1.5"
                   onClick={() => fetchPlayers(selectedAngle, true)}
                   disabled={dataLoading}
-                  style={{ borderColor: "hsl(var(--border))" }}
                 >
                   <RefreshCw className={`h-3 w-3 ${dataLoading ? "animate-spin" : ""}`} />
-                  Refresh Data
+                  Refresh
                 </Button>
                 <Button
-                  variant="outline" size="sm"
-                  className="h-7 text-xs gap-1.5"
+                  variant="outline" size="sm" className="h-7 text-xs gap-1.5"
                   onClick={handleAddToPlanner}
                   disabled={effectivePlayers.length === 0}
                   style={{ borderColor: `${accentColor}44`, color: accentColor }}
                 >
-                  <CalendarPlus className="h-3 w-3" />
-                  Add to Planner
+                  <CalendarPlus className="h-3 w-3" />Planner
                 </Button>
-                <div className="ml-auto flex items-center gap-2">
-                  <span className="text-[11px] text-muted-foreground/50">
-                    {exportW}×{exportH}px{isCarouselMode ? ` · ${effectivePlayers.length + 1} slides` : ""}
-                  </span>
+                <div className="ml-auto text-[11px] text-muted-foreground/50">
+                  {exportW}×{exportH}px{isCarouselMode ? ` · ${effectivePlayers.length + 1} slides` : ""}
                 </div>
               </div>
 
-              {/* Graphic Preview Area */}
-              <div className="flex-1 overflow-auto flex items-start justify-center p-3 sm:p-6" style={{ minHeight: 0 }}>
+              {/* Preview canvas */}
+              <div className="flex-1 overflow-auto flex items-start justify-center p-4 sm:p-6" style={{ minHeight: 0 }}>
                 {effectivePlayers.length === 0 ? (
                   <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground h-full">
                     <LayoutTemplate className="h-12 w-12 opacity-15" />
-                    <p className="text-sm opacity-60">Select a stat angle to see the graphic preview</p>
+                    <p className="text-sm opacity-60">Select a stat angle to preview</p>
                   </div>
                 ) : (
                   (() => {
-                    const maxW = exportW;
-                    const maxH = exportH;
-                    const vw = typeof window !== "undefined" ? Math.min(window.innerWidth - 24, 700) : 700;
+                    const vw = typeof window !== "undefined" ? Math.min(window.innerWidth - 480, 680) : 680;
                     const containerMaxW = vw;
-                    const containerMaxH = typeof window !== "undefined" ? Math.min(window.innerHeight * 0.65, 700) : 700;
-                    const scaleByW = containerMaxW / maxW;
-                    const scaleByH = containerMaxH / maxH;
+                    const containerMaxH = typeof window !== "undefined" ? Math.min(window.innerHeight * 0.6, 680) : 680;
+                    const scaleByW = containerMaxW / exportW;
+                    const scaleByH = containerMaxH / exportH;
                     const scale = Math.min(scaleByW, scaleByH, 1);
-                    const scaledW = Math.round(maxW * scale);
-                    const scaledH = Math.round(maxH * scale);
+                    const scaledW = Math.round(exportW * scale);
+                    const scaledH = Math.round(exportH * scale);
                     return (
                       <div style={{ width: scaledW, height: scaledH, position: "relative", flexShrink: 0, overflow: "hidden", maxWidth: "100%" }}>
                         <div
                           ref={previewRef}
-                          style={{
-                            width: maxW,
-                            height: maxH,
-                            transform: `scale(${scale})`,
-                            transformOrigin: "top left",
-                            position: "absolute",
-                            top: 0,
-                            left: 0,
-                          }}
+                          style={{ width: exportW, height: exportH, transform: `scale(${scale})`, transformOrigin: "top left", position: "absolute", top: 0, left: 0 }}
                         >
                           {isCarouselMode ? (
-                            <CarouselTitleSlide
-                              angle={selectedAngle}
-                              w={exportW} h={exportH}
-                              options={graphicOptions}
-                              totalPlayers={effectivePlayers.length}
-                            />
+                            <CarouselTitleSlide angle={selectedAngle} w={exportW} h={exportH} options={graphicOptions} totalPlayers={effectivePlayers.length} />
                           ) : (
-                            <GraphicCanvas
-                              layout={effectiveLayout}
-                              angle={selectedAngle}
-                              players={effectivePlayers}
-                              w={exportW} h={exportH}
-                              options={graphicOptions}
-                            />
+                            <GraphicCanvas layout={effectiveLayout} angle={selectedAngle} players={effectivePlayers} w={exportW} h={exportH} options={graphicOptions} />
                           )}
                         </div>
                       </div>
@@ -1893,34 +1566,54 @@ export default function AdminContentEngine() {
                 )}
               </div>
 
-              {/* Preview footer */}
-              <div className="shrink-0 px-4 py-2 border-t border-border/30">
-                <p className="text-[10px] text-muted-foreground/40 text-center">
-                  Live preview — scaled to fit screen. Exported graphic renders at full resolution.
+              {/* Export controls pinned to bottom */}
+              <div className="shrink-0 border-t border-border/40 bg-background/80 backdrop-blur-sm p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <DropSelect
+                      value={selectedExportSize.id}
+                      options={EXPORT_SIZES.map((s) => ({ id: s.id, label: s.label }))}
+                      onChange={(v) => { const sz = EXPORT_SIZES.find((s) => s.id === v); if (sz) setSelectedExportSize(sz); }}
+                      accentColor={accentColor}
+                    />
+                  </div>
+                </div>
+                <Button
+                  className="w-full h-10 text-sm font-semibold"
+                  onClick={handleDownloadGraphic}
+                  disabled={downloading || effectivePlayers.length === 0 || dataLoading}
+                  style={effectivePlayers.length > 0 && !downloading ? { background: accentColor, color: "#000" } : {}}
+                >
+                  {downloading ? (
+                    carouselProgress
+                      ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Exporting {carouselProgress.done}/{carouselProgress.total}…</>
+                      : <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Generating…</>
+                  ) : isCarouselMode ? (
+                    <><Layers className="h-4 w-4 mr-2" />Export Carousel ({effectivePlayers.length + 1} slides)</>
+                  ) : (
+                    <><Download className="h-4 w-4 mr-2" />Download Graphic</>
+                  )}
+                </Button>
+                <p className="text-[10px] text-muted-foreground/30 text-center">
+                  Preview is scaled to fit. Download renders at full resolution.
                 </p>
               </div>
             </>
           ) : (
             /* VIDEO MODE right panel */
             <div className="flex-1 flex flex-col overflow-hidden" style={{ minHeight: 0 }}>
-              {/* Header bar */}
               <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b border-border/50 bg-background/60 backdrop-blur-sm">
                 <Video className="h-3.5 w-3.5" style={{ color: videoPreviewState?.accentColor ?? accentColor }} />
                 <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Video Preview</p>
                 {videoPreviewState?.generating && (
                   <div className="ml-auto flex items-center gap-2">
                     <div className="h-1 w-32 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-200"
-                        style={{ width: `${videoPreviewState.progress}%`, background: videoPreviewState.accentColor }}
-                      />
+                      <div className="h-full rounded-full transition-all duration-200" style={{ width: `${videoPreviewState.progress}%`, background: videoPreviewState.accentColor }} />
                     </div>
                     <span className="text-[11px] text-muted-foreground/60 tabular-nums">{videoPreviewState.progress}%</span>
                   </div>
                 )}
               </div>
-
-              {/* Preview content area */}
               <div className="flex-1 overflow-auto p-6" style={{ minHeight: 0 }}>
                 {(!videoPreviewState?.videoUrl && !videoPreviewState?.squareUrl) ? (
                   <div className="flex flex-col items-center justify-center h-full gap-3">
@@ -1935,115 +1628,48 @@ export default function AdminContentEngine() {
                         <>
                           <Play className="h-8 w-8 mx-auto opacity-20" style={{ color: accentColor }} />
                           <p className="text-sm font-semibold">Video Preview</p>
-                          <p className="text-xs text-muted-foreground/60 leading-relaxed">
-                            Configure settings in the left panel, then click Generate Video.
-                          </p>
+                          <p className="text-xs text-muted-foreground/60 leading-relaxed">Configure settings in the left panel, then click Generate Video.</p>
                           <p className="text-[10px] text-muted-foreground/40">Videos render locally at full resolution.</p>
                         </>
                       )}
                     </div>
                   </div>
                 ) : videoPreviewState?.dualPreview && videoPreviewState.squareUrl ? (
-                  /* Dual preview — side by side (stacks on narrow screens) */
                   <div className="space-y-4">
-                    <div
-                      className="grid gap-6"
-                      style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}
-                    >
-                      {/* Phone 9:16 */}
+                    <div className="grid gap-6" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
                       {videoPreviewState.videoUrl && (
                         <div className="space-y-2">
-                          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
-                            <Smartphone className="h-3 w-3" />
-                            Phone (9:16)
-                          </div>
+                          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60"><Smartphone className="h-3 w-3" />Phone (9:16)</div>
                           <div className="rounded-xl overflow-hidden border border-border bg-black w-full" style={{ aspectRatio: "9/16" }}>
-                            <video
-                              src={videoPreviewState.videoUrl}
-                              controls
-                              autoPlay
-                              loop
-                              muted
-                              playsInline
-                              className="w-full h-full object-cover"
-                            />
+                            <video src={videoPreviewState.videoUrl} controls autoPlay loop muted playsInline className="w-full h-full object-cover" />
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full h-8 text-xs"
-                            onClick={() => videoPreviewState.onDownload(videoPreviewState.videoBlob, "-reels")}
-                            style={{ borderColor: `${videoPreviewState.accentColor}44`, color: videoPreviewState.accentColor }}
-                          >
+                          <Button variant="outline" size="sm" className="w-full h-8 text-xs" onClick={() => videoPreviewState.onDownload(videoPreviewState.videoBlob, "-reels")} style={{ borderColor: `${videoPreviewState.accentColor}44`, color: videoPreviewState.accentColor }}>
                             <Download className="h-3.5 w-3.5 mr-1.5" />Download Phone
                           </Button>
                         </div>
                       )}
-
-                      {/* Square 1:1 */}
                       <div className="space-y-2">
-                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
-                          <Square className="h-3 w-3" />
-                          Square (1:1)
-                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60"><Square className="h-3 w-3" />Square (1:1)</div>
                         <div className="rounded-xl overflow-hidden border border-border bg-black w-full" style={{ aspectRatio: "1/1" }}>
-                          <video
-                            src={videoPreviewState.squareUrl}
-                            controls
-                            autoPlay
-                            loop
-                            muted
-                            playsInline
-                            className="w-full h-full object-cover"
-                          />
+                          <video src={videoPreviewState.squareUrl} controls autoPlay loop muted playsInline className="w-full h-full object-cover" />
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full h-8 text-xs"
-                          onClick={() => videoPreviewState.onDownload(videoPreviewState.squareBlob, "-square")}
-                          style={{ borderColor: `${videoPreviewState.accentColor}44`, color: videoPreviewState.accentColor }}
-                        >
+                        <Button variant="outline" size="sm" className="w-full h-8 text-xs" onClick={() => videoPreviewState.onDownload(videoPreviewState.squareBlob, "-square")} style={{ borderColor: `${videoPreviewState.accentColor}44`, color: videoPreviewState.accentColor }}>
                           <Download className="h-3.5 w-3.5 mr-1.5" />Download Square
                         </Button>
                       </div>
                     </div>
-                    <p className="text-[10px] text-muted-foreground/40 text-center">
-                      Live preview — scaled to fit. Exported video renders at full resolution.
-                    </p>
                   </div>
                 ) : videoPreviewState?.videoUrl ? (
-                  /* Single preview — centered */
                   <div className="flex flex-col items-center gap-4">
                     <div className="space-y-2 w-full" style={{ maxWidth: 420 }}>
-                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
-                        <Smartphone className="h-3 w-3" />
-                        Phone (9:16)
-                      </div>
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60"><Smartphone className="h-3 w-3" />Phone (9:16)</div>
                       <div className="rounded-xl overflow-hidden border border-border bg-black w-full" style={{ aspectRatio: "9/16" }}>
-                        <video
-                          src={videoPreviewState.videoUrl}
-                          controls
-                          autoPlay
-                          loop
-                          muted
-                          playsInline
-                          className="w-full h-full object-cover"
-                        />
+                        <video src={videoPreviewState.videoUrl} controls autoPlay loop muted playsInline className="w-full h-full object-cover" />
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full h-8 text-xs"
-                        onClick={() => videoPreviewState.onDownload(videoPreviewState.videoBlob, "-reels")}
-                        style={{ borderColor: `${videoPreviewState.accentColor}44`, color: videoPreviewState.accentColor }}
-                      >
+                      <Button variant="outline" size="sm" className="w-full h-8 text-xs" onClick={() => videoPreviewState.onDownload(videoPreviewState.videoBlob, "-reels")} style={{ borderColor: `${videoPreviewState.accentColor}44`, color: videoPreviewState.accentColor }}>
                         <Download className="h-3.5 w-3.5 mr-1.5" />Download Video
                       </Button>
                     </div>
-                    <p className="text-[10px] text-muted-foreground/40 text-center">
-                      Live preview — scaled to fit. Exported video renders at full resolution.
-                    </p>
                   </div>
                 ) : null}
               </div>
@@ -2055,12 +1681,7 @@ export default function AdminContentEngine() {
 
     {plannerModalOpen && (
       <AddToPlannerModal
-        payload={{
-          stat_angle: selectedAngle.label,
-          media_url: plannerMediaUrl,
-          caption,
-          insight,
-        }}
+        payload={{ stat_angle: selectedAngle.label, media_url: plannerMediaUrl, caption, insight }}
         onClose={() => { setPlannerModalOpen(false); setPlannerMediaUrl(null); }}
       />
     )}
