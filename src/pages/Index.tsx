@@ -163,7 +163,7 @@ interface AccuracyRow {
 function confidenceLevel(err: number | null): { label: string; color: string; bg: string; border: string; barColor: string } {
   if (err == null) return { label: "—",      color: "text-white/30",    bg: "bg-white/5",         border: "border-white/10",         barColor: "bg-white/20" };
   if (err <= 14)   return { label: "HIGH",   color: "text-green-400",   bg: "bg-green-400/10",    border: "border-green-400/30",     barColor: "bg-green-400" };
-  if (err <= 17)   return { label: "MEDIUM", color: "text-yellow-400",  bg: "bg-yellow-400/10",   border: "border-yellow-400/30",    barColor: "bg-yellow-400" };
+  if (err <= 17)   return { label: "STRONG", color: "text-yellow-400",  bg: "bg-yellow-400/10",   border: "border-yellow-400/30",    barColor: "bg-yellow-400" };
   return             { label: "LOW",    color: "text-red-400",     bg: "bg-red-400/10",      border: "border-red-400/30",       barColor: "bg-red-400" };
 }
 
