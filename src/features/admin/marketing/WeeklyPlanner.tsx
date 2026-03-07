@@ -1,10 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Plus, ChevronDown, Copy, Download, Trash2, RefreshCw, Check, Calendar,
-  Sparkles, CreditCard as Edit2, Zap, List, LayoutGrid, Filter, CheckSquare,
-  Square as SquareIcon, ChevronLeft, ChevronRight,
-} from "lucide-react";
+import { Plus, ChevronDown, Copy, Download, Trash2, RefreshCw, Check, Calendar, Sparkles, CreditCard as Edit2, Zap, List, LayoutGrid, Filter, SquareCheck as CheckSquare, Square as SquareIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
