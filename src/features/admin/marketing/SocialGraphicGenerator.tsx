@@ -95,7 +95,7 @@ const GRAPHIC_TYPES: GraphicType[] = [
   },
 ];
 
-const SIZE = 800;
+const SIZE = 1080;
 
 function GraphicCanvas({ type, players }: { type: GraphicType; players: GraphicPlayer[] }) {
   const scale = 1;
@@ -238,10 +238,10 @@ export default function SocialGraphicGenerator() {
     try {
       if (!canvasRef.current) throw new Error("Canvas not ready");
       const dataUrl = await toPng(canvasRef.current, {
-        width: SIZE,
-        height: SIZE,
-        pixelRatio: 1,
-        style: { transform: "none" },
+        width: 1080,
+        height: 1080,
+        canvasWidth: 800,
+        canvasHeight: 800,
       });
       const link = document.createElement("a");
       link.download = `neeko-${selectedType.id}-graphic.png`;
