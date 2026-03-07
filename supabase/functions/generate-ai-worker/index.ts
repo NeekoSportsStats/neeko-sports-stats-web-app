@@ -123,26 +123,16 @@ async function writeResult(
 
       const inputHash = (job.payload as Record<string, unknown>)?.input_hash as string | null ?? null;
 
-      let label: string;
-      let short: string;
-      let color: string;
-      let longText: string;
+      let cleanText: string;
 
       try {
         const parsed = JSON.parse(result) as Record<string, string>;
-        longText = parsed.analysis ?? parsed.recommendation_long ?? result;
-        const rawLabel = parsed.recommendation_label ?? parsed.label ?? longText;
-        const parsed2 = parseRankingLabel(rawLabel);
-        label = parsed2.label;
-        short = parsed2.short;
-        color = parsed.recommendation_color ?? parsed2.color;
+        cleanText = parsed.analysis ?? parsed.recommendation_long ?? parsed.recommendation_short ?? result;
       } catch {
-        const fallback = parseRankingLabel(result);
-        label = fallback.label;
-        short = fallback.short;
-        color = fallback.color;
-        longText = result;
+        cleanText = result;
       }
+
+      cleanText = cleanText.trim();
 
       await supabase
         .from("ai_rankings_player_recos")
@@ -150,10 +140,7 @@ async function writeResult(
           {
             player_id: playerId,
             season: 2026,
-            recommendation_label: label,
-            recommendation_short: short,
-            recommendation_long: longText,
-            recommendation_color: color,
+            recommendation_long: cleanText,
             input_hash: inputHash,
             generated_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),

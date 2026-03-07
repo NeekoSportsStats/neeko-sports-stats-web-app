@@ -198,7 +198,18 @@ const AI_REPLACEMENTS: [RegExp, string][] = [
 
 export function sharpenAIText(text: string | null | undefined): string | null {
   if (!text) return null;
-  let out = text;
+
+  let out = text.trim();
+
+  if (out.startsWith("{") || out.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(out) as Record<string, string>;
+      out = parsed.analysis ?? parsed.recommendation_long ?? parsed.recommendation_short ?? out;
+    } catch {
+      // not valid JSON — leave as-is
+    }
+  }
+
   for (const [pattern, replacement] of AI_REPLACEMENTS) {
     out = out.replace(pattern, replacement);
   }
