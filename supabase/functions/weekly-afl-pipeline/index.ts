@@ -215,7 +215,7 @@ Deno.serve(async (req: Request) => {
 
     // ── Step 9b: Rebuild Market Watch snapshot ────────────────────────────────
     await runStep("9b_market_watch_snapshot", async () => {
-      const { error } = await db.schema("market").rpc("build_market_watch_snapshot");
+      const { error } = await db.rpc("build_market_watch_snapshot");
       if (error) throw new Error(error.message);
       return { snapshot: "built" };
     });

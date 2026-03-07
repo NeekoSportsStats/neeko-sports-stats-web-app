@@ -121,8 +121,28 @@ async function writeResult(
       const playerId = job.entity_id ? Number(job.entity_id) : null;
       if (!playerId) break;
 
-      const { label, short, color } = parseRankingLabel(result);
       const inputHash = (job.payload as Record<string, unknown>)?.input_hash as string | null ?? null;
+
+      let label: string;
+      let short: string;
+      let color: string;
+      let longText: string;
+
+      try {
+        const parsed = JSON.parse(result) as Record<string, string>;
+        longText = parsed.analysis ?? parsed.recommendation_long ?? result;
+        const rawLabel = parsed.recommendation_label ?? parsed.label ?? longText;
+        const parsed2 = parseRankingLabel(rawLabel);
+        label = parsed2.label;
+        short = parsed2.short;
+        color = parsed.recommendation_color ?? parsed2.color;
+      } catch {
+        const fallback = parseRankingLabel(result);
+        label = fallback.label;
+        short = fallback.short;
+        color = fallback.color;
+        longText = result;
+      }
 
       await supabase
         .from("ai_rankings_player_recos")
@@ -132,7 +152,7 @@ async function writeResult(
             season: 2026,
             recommendation_label: label,
             recommendation_short: short,
-            recommendation_long: result,
+            recommendation_long: longText,
             recommendation_color: color,
             input_hash: inputHash,
             generated_at: new Date().toISOString(),
@@ -198,11 +218,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const jobIds = (jobs as QueueJob[]).map((j) => j.id);
-
-    const { error: markError } = await supabase
-      .from("ai_generation_queue")
-      .update({ status: "processing", attempts: supabase.rpc })
-      .in("id", jobIds);
 
     await supabase
       .from("ai_generation_queue")
