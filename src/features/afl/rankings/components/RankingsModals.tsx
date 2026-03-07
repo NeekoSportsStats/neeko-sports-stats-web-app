@@ -558,11 +558,21 @@ export function PlayerDetailModal({
             {unlocked ? (
               loadingAI ? (
                 <div className="h-4 w-full animate-pulse rounded bg-white/5" />
-              ) : (row.ai_summary || aiAnalysis?.analysis) ? (
-                <p className="text-sm text-white/70 leading-relaxed italic">{sharpenAIText(row.ai_summary ?? aiAnalysis?.analysis)}</p>
-              ) : (
-                <p className="text-sm text-white/30 italic leading-relaxed">AI analysis not yet generated for this player.</p>
-              )
+              ) : (() => {
+                const aiText = sharpenAIText(row.ai_summary ?? aiAnalysis?.analysis);
+                if (aiText && aiText !== "Model analysis is currently generating.") {
+                  return <p className="text-sm text-white/70 leading-relaxed italic">{aiText}</p>;
+                }
+                if (row.recommendation_why) {
+                  return (
+                    <>
+                      <p className="text-sm text-white/70 leading-relaxed italic">{row.recommendation_why}</p>
+                      <p className="text-[10px] text-white/25 mt-1.5">Full AI breakdown generating...</p>
+                    </>
+                  );
+                }
+                return <p className="text-sm text-white/30 italic leading-relaxed">Generating AI analysis...</p>;
+              })()
             ) : (
               <p className="text-sm text-white/25 italic">Upgrade to Neeko+ to unlock AI analysis.</p>
             )}

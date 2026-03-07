@@ -155,8 +155,12 @@ export function MobilePlayerCard({
               <p className="text-xs font-bold" style={{ color: row.recommendation_color ?? "rgba(255,255,255,0.6)" }}>
                 {displayRec}
               </p>
-              {row.recommendation_why && (
-                <p className="text-[11px] text-white/50 mt-1 leading-snug line-clamp-2">{row.recommendation_why}</p>
+              {(row.ai_summary || row.recommendation_why) && (
+                <p className="text-[11px] text-white/50 mt-1 leading-snug line-clamp-2">
+                  {row.ai_summary
+                    ? row.ai_summary.slice(0, 80) + (row.ai_summary.length > 80 ? "…" : "")
+                    : row.recommendation_why}
+                </p>
               )}
             </div>
           )}

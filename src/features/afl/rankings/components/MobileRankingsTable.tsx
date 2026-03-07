@@ -228,7 +228,11 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
         </div>
         <div className={`${CELL_BASE} px-3`} style={{ width: COL.why, minWidth: COL.why }}>
           {locked("why") ? <LockedPlaceholder onUpgrade={onUpgrade} /> : (
-            <span className="text-xs text-white/50 leading-snug line-clamp-2">{row.recommendation_why ?? "—"}</span>
+            <span className="text-xs text-white/50 leading-snug line-clamp-2">
+              {row.ai_summary
+                ? row.ai_summary.slice(0, 80) + (row.ai_summary.length > 80 ? "…" : "")
+                : row.recommendation_why ?? "—"}
+            </span>
           )}
         </div>
       </div>

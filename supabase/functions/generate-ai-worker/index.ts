@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const BATCH_SIZE = 30;
+const BATCH_SIZE = 200;
 const MAX_ATTEMPTS = 3;
 
 interface QueueJob {
@@ -127,12 +127,16 @@ async function writeResult(
 
       try {
         const parsed = JSON.parse(result) as Record<string, string>;
-        cleanText = parsed.analysis ?? parsed.recommendation_long ?? parsed.recommendation_short ?? result;
+        cleanText = parsed.analysis ?? parsed.recommendation_long ?? parsed.text ?? parsed.recommendation_short ?? result;
       } catch {
         cleanText = result;
       }
 
       cleanText = cleanText.trim();
+
+      if (!cleanText || cleanText.length < 10) {
+        cleanText = "Model analysis is currently generating.";
+      }
 
       await supabase
         .from("ai_rankings_player_recos")
