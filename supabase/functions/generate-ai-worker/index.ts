@@ -50,10 +50,18 @@ async function loadPrompt(
 }
 
 function injectPayload(template: string, payload: Record<string, unknown> | null): string {
-  const dataString = payload && Object.keys(payload).length > 0
-    ? JSON.stringify(payload, null, 2)
+  const data = payload?.data ?? payload ?? {};
+  const dataString = data && Object.keys(data).length > 0
+    ? JSON.stringify(data, null, 2)
     : "(no payload provided)";
-  return template.replace("{DATA}", dataString);
+
+  const label = (payload?.recommendation_label as string | undefined)
+    ?? (payload?.data as Record<string, unknown> | undefined)?.recommendation_label as string | undefined
+    ?? "HOLD";
+
+  return template
+    .replace("{DATA}", dataString)
+    .replace("{LABEL}", label);
 }
 
 async function callOpenAI(
