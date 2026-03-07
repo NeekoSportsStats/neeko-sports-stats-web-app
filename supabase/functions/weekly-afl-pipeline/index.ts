@@ -15,17 +15,19 @@ interface PipelineStep {
 }
 
 const STEP_LABELS: Record<string, string> = {
-  "1_ingest_matches":          "Ingesting AFL match data",
-  "2_ingest_player_stats":     "Ingesting player stats",
-  "3_ingest_team_stats":       "Ingesting team stats",
-  "4_detect_latest_round":     "Detecting latest round",
-  "5_transform_player_stats":  "Transforming player stats",
-  "6_transform_matches":       "Transforming match data",
-  "7_update_team_defense":     "Rebuilding team defence profile",
-  "8_refresh_neeko_intel":     "Refreshing Neeko intelligence",
-  "9_refresh_volatility":      "Refreshing player volatility",
-  "10_generate_ai":            "Generating AI rankings",
-  "11_cleanup_start_sit_cache":"Cleaning Start/Sit cache",
+  "1_ingest_matches":           "Ingesting AFL match data",
+  "2_ingest_player_stats":      "Ingesting player stats",
+  "3_ingest_team_stats":        "Ingesting team stats",
+  "4_detect_latest_round":      "Detecting latest round",
+  "5_transform_player_stats":   "Transforming player stats",
+  "6_transform_matches":        "Transforming match data",
+  "7_update_team_defense":      "Rebuilding team defence profile",
+  "8_refresh_neeko_intel":      "Refreshing Neeko intelligence",
+  "9_refresh_volatility":       "Refreshing player volatility",
+  "9b_market_watch_snapshot":   "Refreshing Market Watch snapshot",
+  "9c_market_watch_summary":    "Generating Market Watch AI summary",
+  "10_generate_ai":             "Generating AI rankings",
+  "11_cleanup_start_sit_cache": "Cleaning Start/Sit cache",
 };
 
 Deno.serve(async (req: Request) => {
@@ -51,7 +53,7 @@ Deno.serve(async (req: Request) => {
 
     const steps: PipelineStep[] = [];
     let completedCount = 0;
-    const totalSteps = 11;
+    const totalSteps = 13;
 
     const fnHeaders = {
       "Authorization": `Bearer ${serviceKey}`,
@@ -210,6 +212,18 @@ Deno.serve(async (req: Request) => {
       if (error) throw new Error(error.message);
       return { rows_upserted: data };
     });
+
+    // ── Step 9b: Rebuild Market Watch snapshot ────────────────────────────────
+    await runStep("9b_market_watch_snapshot", async () => {
+      const { error } = await db.schema("market").rpc("build_market_watch_snapshot");
+      if (error) throw new Error(error.message);
+      return { snapshot: "built" };
+    });
+
+    // ── Step 9c: Generate Market Watch AI summary ─────────────────────────────
+    await runStep("9c_market_watch_summary", async () => {
+      return callFn("generate-market-watch-summary", {});
+    }, skipAI);
 
     // ── Step 10: Regenerate AI rankings & recommendations ────────────────────
     await runStep("10_generate_ai", async () => {
