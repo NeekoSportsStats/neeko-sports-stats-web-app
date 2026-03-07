@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import {
   Image as ImageIcon, Video, RefreshCw, X, Download, Trash2, Play, Search,
   Grid3x3, Sparkles, CircleCheck as CheckCircle2, CircleAlert as AlertCircle,
-  Loader as Loader2, Layers,
+  Loader as Loader2, Layers, Eye, Paintbrush,
 } from "lucide-react";
 import { invalidateAIMediaCache } from "../marketing/AIMediaPicker";
 
@@ -26,6 +26,7 @@ interface MediaItem {
   media_type:    string;
   is_active:     boolean;
   sort_order:    number | null;
+  created_at?:   string;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -74,6 +75,7 @@ function rowToMediaItem(row: Record<string, unknown>): MediaItem {
     media_type:    (row.media_type as string) ?? "image",
     is_active:     (row.is_active as boolean) ?? true,
     sort_order:    (row.sort_order as number | null) ?? null,
+    created_at:    (row.created_at as string) ?? undefined,
   };
 }
 
@@ -96,6 +98,13 @@ async function loadAllMedia(force = false): Promise<MediaItem[]> {
 function clearMediaCaches() {
   localStorage.removeItem(CACHE_KEY_ALL);
   invalidateAIMediaCache();
+}
+
+function formatDate(iso?: string): string {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+  } catch { return ""; }
 }
 
 // ─── Single-item generation via generate-ai-image ─────────────────────────────
@@ -176,11 +185,11 @@ interface BatchItem {
 // ─── Generate Panel ───────────────────────────────────────────────────────────
 
 interface GenPanelProps {
-  onRefresh:   () => void;
-  mediaItems:  MediaItem[];
+  onRefresh:  () => void;
+  mediaItems: MediaItem[];
 }
 
-type MultiRunKey = `${ImageCategory}-5`;
+type MultiRunKey = `${ImageCategory}-${number}`;
 type RunningKey  = ImageCategory | "video" | MultiRunKey;
 
 function GenPanel({ onRefresh, mediaItems }: GenPanelProps) {
@@ -226,7 +235,7 @@ function GenPanel({ onRefresh, mediaItems }: GenPanelProps) {
 
   const handleMulti = async (cat: ImageCategory, count: number) => {
     if (locked) return;
-    const key: MultiRunKey = `${cat}-5`;
+    const key: MultiRunKey = `${cat}-${count}`;
     setLocked(true);
     setSingleRunning(key);
     setMultiProgress((prev) => ({ ...prev, [cat]: 0 }));
@@ -302,7 +311,6 @@ function GenPanel({ onRefresh, mediaItems }: GenPanelProps) {
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 overflow-hidden">
-      {/* Header */}
       <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-800">
         <div className="flex items-center gap-2.5">
           <Sparkles className="h-3.5 w-3.5" style={{ color: ACCENT }} />
@@ -317,7 +325,6 @@ function GenPanel({ onRefresh, mediaItems }: GenPanelProps) {
 
       <div className="p-4 space-y-4">
 
-        {/* Batch button */}
         {!isBatchActive && (
           <button
             onClick={handleBatch}
@@ -326,16 +333,15 @@ function GenPanel({ onRefresh, mediaItems }: GenPanelProps) {
             style={{ background: locked ? "#444" : ACCENT, color: "#000" }}
           >
             <Layers className="h-4 w-4" />
-            Generate Batch (6)
+            Generate All Categories
           </button>
         )}
 
-        {/* Batch progress */}
         {isBatchActive && (
           <div className="rounded-xl border border-zinc-700 overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-700 bg-zinc-800/50">
               <div className="flex items-center gap-2">
-                {batchStatus === "running" && <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: ACCENT }} />}
+                {batchStatus === "running"  && <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: ACCENT }} />}
                 {batchStatus === "complete" && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
                 {batchStatus === "error"    && <AlertCircle  className="h-3.5 w-3.5 text-amber-400" />}
                 <span className="text-[12px] font-semibold text-white">
@@ -372,14 +378,16 @@ function GenPanel({ onRefresh, mediaItems }: GenPanelProps) {
           </div>
         )}
 
-        {/* Per-category Generate 1 / Generate 5 buttons */}
         <div className="grid grid-cols-2 gap-2">
           {IMAGE_SUBCATEGORIES.map((cat) => {
-            const isRunning1 = singleRunning === cat;
-            const isRunning5 = singleRunning === `${cat}-5`;
-            const prog5      = multiProgress[cat];
-            const err1       = singleErrors[cat as RunningKey];
-            const err5       = singleErrors[`${cat}-5` as RunningKey];
+            const isRunning1  = singleRunning === cat;
+            const isRunning5  = singleRunning === `${cat}-5`;
+            const isRunning10 = singleRunning === `${cat}-10`;
+            const prog        = multiProgress[cat];
+            const err1        = singleErrors[cat as RunningKey];
+            const err5        = singleErrors[`${cat}-5` as RunningKey];
+            const err10       = singleErrors[`${cat}-10` as RunningKey];
+            const anyMultiRunning = isRunning5 || isRunning10;
             return (
               <div key={cat} className="rounded-xl border border-zinc-800 bg-zinc-900/60 overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800/60">
@@ -387,39 +395,52 @@ function GenPanel({ onRefresh, mediaItems }: GenPanelProps) {
                   <span className="text-[10px] text-zinc-600 tabular-nums">{countForCat(cat)}</span>
                 </div>
                 <div className="p-2 space-y-1.5">
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-1">
                     <button
                       onClick={() => handleSingle(cat)}
                       disabled={locked}
-                      className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                      className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1"
                       style={isRunning1
                         ? { background: `${ACCENT}20`, color: ACCENT }
                         : { background: "hsl(var(--muted)/0.3)", color: "hsl(var(--foreground))" }}
                     >
-                      {isRunning1 ? <><Loader2 className="h-3 w-3 animate-spin" /> …</> : "Gen 1"}
+                      {isRunning1 ? <><Loader2 className="h-3 w-3 animate-spin" /> …</> : "Generate 1"}
                     </button>
                     <button
                       onClick={() => handleMulti(cat, 5)}
                       disabled={locked}
-                      className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                      className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1"
                       style={isRunning5
                         ? { background: `${ACCENT}30`, color: ACCENT, border: `1px solid ${ACCENT}60` }
                         : { background: `${ACCENT}12`, color: ACCENT, border: `1px solid ${ACCENT}30` }}
                     >
-                      {isRunning5
-                        ? <><Loader2 className="h-3 w-3 animate-spin" /> {prog5 ?? 0}/5</>
-                        : "Gen 5"}
+                      {isRunning5 ? <><Loader2 className="h-3 w-3 animate-spin" /> {prog ?? 0}/5</> : "Generate 5"}
+                    </button>
+                    <button
+                      onClick={() => handleMulti(cat, 10)}
+                      disabled={locked}
+                      className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                      style={isRunning10
+                        ? { background: `${ACCENT}30`, color: ACCENT, border: `1px solid ${ACCENT}60` }
+                        : { background: `${ACCENT}18`, color: ACCENT, border: `1px solid ${ACCENT}40` }}
+                    >
+                      {isRunning10 ? <><Loader2 className="h-3 w-3 animate-spin" /> {prog ?? 0}/10</> : "Generate 10"}
                     </button>
                   </div>
-                  {err1 && <p className="text-[10px] text-red-400 px-1 truncate">{err1}</p>}
-                  {err5 && <p className="text-[10px] text-amber-400 px-1 truncate">{err5}</p>}
+                  {anyMultiRunning && prog !== undefined && (
+                    <div className="h-1 rounded-full overflow-hidden bg-zinc-800">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${(prog / (isRunning5 ? 5 : 10)) * 100}%`, background: ACCENT }} />
+                    </div>
+                  )}
+                  {err1  && <p className="text-[10px] text-red-400 px-1 truncate">{err1}</p>}
+                  {err5  && <p className="text-[10px] text-amber-400 px-1 truncate">{err5}</p>}
+                  {err10 && <p className="text-[10px] text-amber-400 px-1 truncate">{err10}</p>}
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Video — Generate 1 */}
         <div className="rounded-xl border overflow-hidden" style={{ borderColor: "#38BDF840", background: "#38BDF808" }}>
           <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: "#38BDF830" }}>
             <div className="flex items-center gap-1.5">
@@ -453,13 +474,14 @@ function GenPanel({ onRefresh, mediaItems }: GenPanelProps) {
 // ─── Preview Modal ────────────────────────────────────────────────────────────
 
 interface PreviewModalProps {
-  item:     MediaItem;
-  mode:     MediaMode;
-  onClose:  () => void;
-  onDelete: (item: MediaItem) => void;
+  item:           MediaItem;
+  mode:           MediaMode;
+  onClose:        () => void;
+  onDelete:       (item: MediaItem) => void;
+  onUseInGraphic: (item: MediaItem) => void;
 }
 
-function PreviewModal({ item, mode, onClose, onDelete }: PreviewModalProps) {
+function PreviewModal({ item, mode, onClose, onDelete, onUseInGraphic }: PreviewModalProps) {
   const handleDownload = () => {
     const a = document.createElement("a");
     a.href = item.url; a.download = item.filename; a.target = "_blank"; a.click();
@@ -469,10 +491,20 @@ function PreviewModal({ item, mode, onClose, onDelete }: PreviewModalProps) {
       <div className="relative bg-zinc-900 border border-zinc-700 rounded-2xl overflow-hidden max-w-3xl w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-white truncate">{item.label}</p>
-            <p className="text-[11px] text-zinc-500 mt-0.5 truncate">{item.filename}</p>
+            <p className="text-sm font-semibold text-white truncate capitalize">{CAT_LABELS[item.category] ?? item.category}</p>
+            {item.created_at && (
+              <p className="text-[11px] text-zinc-500 mt-0.5">Created {formatDate(item.created_at)}</p>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-4">
+            <button
+              onClick={() => { onUseInGraphic(item); onClose(); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+              style={{ background: `${ACCENT}20`, color: ACCENT, border: `1px solid ${ACCENT}40` }}
+            >
+              <Paintbrush className="h-3.5 w-3.5" />
+              Use in Graphic
+            </button>
             <button onClick={handleDownload} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 text-zinc-200 hover:bg-zinc-700 transition-colors">
               <Download className="h-3.5 w-3.5" />Download
             </button>
@@ -486,11 +518,13 @@ function PreviewModal({ item, mode, onClose, onDelete }: PreviewModalProps) {
         </div>
         <div className="bg-black flex items-center justify-center" style={{ minHeight: 360, maxHeight: 560 }}>
           {mode === "graphic"
-            ? <img src={item.url} alt={item.label} className="max-w-full max-h-[540px] object-contain" />
+            ? <img src={item.url} alt={CAT_LABELS[item.category] ?? item.category} className="max-w-full max-h-[540px] object-contain" />
             : <video src={item.url} controls autoPlay loop className="max-w-full max-h-[540px]" />}
         </div>
         <div className="px-5 py-3 flex items-center gap-3 border-t border-zinc-800">
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold capitalize" style={{ background: `${ACCENT}18`, color: ACCENT }}>{item.category}</span>
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold capitalize" style={{ background: `${ACCENT}18`, color: ACCENT }}>
+            {CAT_LABELS[item.category] ?? item.category}
+          </span>
           <span className="text-[11px] text-zinc-500">{mode === "graphic" ? "Image" : "Video"}</span>
         </div>
       </div>
@@ -501,23 +535,26 @@ function PreviewModal({ item, mode, onClose, onDelete }: PreviewModalProps) {
 // ─── Media Card ───────────────────────────────────────────────────────────────
 
 interface MediaCardProps {
-  item:    MediaItem;
-  mode:    MediaMode;
-  onClick: (item: MediaItem) => void;
+  item:           MediaItem;
+  mode:           MediaMode;
+  onClick:        (item: MediaItem) => void;
+  onUseInGraphic: (item: MediaItem) => void;
+  onDownload:     (item: MediaItem) => void;
+  onDelete:       (item: MediaItem) => void;
 }
 
-function MediaCard({ item, mode, onClick }: MediaCardProps) {
+function MediaCard({ item, mode, onClick, onUseInGraphic, onDownload, onDelete }: MediaCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   return (
-    <button
-      className="group relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 hover:border-zinc-600 transition-all text-left"
+    <div
+      className="group relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900 hover:border-zinc-600 transition-all cursor-pointer"
       onClick={() => onClick(item)}
       onMouseEnter={() => { if (mode === "video") videoRef.current?.play().catch(() => {}); }}
       onMouseLeave={() => { if (mode === "video" && videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0; } }}
     >
       <div className="relative aspect-video bg-zinc-950">
         {mode === "graphic"
-          ? <img src={item.thumbnail} alt={item.label} loading="lazy" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+          ? <img src={item.thumbnail} alt={CAT_LABELS[item.category] ?? item.category} loading="lazy" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
           : (
             <>
               <video ref={videoRef} src={item.url} muted loop playsInline preload="none" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
@@ -528,15 +565,57 @@ function MediaCard({ item, mode, onClick }: MediaCardProps) {
               </div>
             </>
           )}
-        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-1.5" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)" }}>
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold capitalize" style={{ background: `${ACCENT}25`, color: ACCENT }}>{item.category}</span>
+
+        {/* Hover overlay with action buttons */}
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2"
+          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 50%)" }}>
+          <div className="flex justify-end">
+            <button
+              className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/60 hover:bg-black/80 transition-colors"
+              onClick={(e) => { e.stopPropagation(); onClick(item); }}
+              title="Preview"
+            >
+              <Eye className="h-3.5 w-3.5 text-white" />
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-colors flex-1 justify-center"
+              style={{ background: `${ACCENT}dd`, color: "#000" }}
+              onClick={(e) => { e.stopPropagation(); onUseInGraphic(item); }}
+              title="Use in Graphic"
+            >
+              <Paintbrush className="h-3 w-3" />
+              Use
+            </button>
+            <button
+              className="w-7 h-7 flex items-center justify-center rounded-md bg-zinc-800/90 hover:bg-zinc-700 transition-colors"
+              onClick={(e) => { e.stopPropagation(); onDownload(item); }}
+              title="Download"
+            >
+              <Download className="h-3 w-3 text-zinc-200" />
+            </button>
+            <button
+              className="w-7 h-7 flex items-center justify-center rounded-md bg-red-900/70 hover:bg-red-900 transition-colors"
+              onClick={(e) => { e.stopPropagation(); onDelete(item); }}
+              title="Delete"
+            >
+              <Trash2 className="h-3 w-3 text-red-300" />
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Card metadata */}
       <div className="px-2.5 py-2 bg-zinc-900/80">
-        <p className="text-[11px] font-medium text-zinc-200 truncate leading-tight">{item.label}</p>
-        <p className="text-[10px] text-zinc-600 truncate mt-0.5">{item.filename}</p>
+        <p className="text-[11px] font-semibold text-zinc-200 capitalize leading-tight">
+          {CAT_LABELS[item.category] ?? item.category}
+        </p>
+        {item.created_at && (
+          <p className="text-[10px] text-zinc-500 mt-0.5">Created {formatDate(item.created_at)}</p>
+        )}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -545,7 +624,7 @@ function MediaCard({ item, mode, onClick }: MediaCardProps) {
 const MEDIA_CACHE_TTL_MS = 60_000;
 
 export default function AdminMediaLibrary() {
-  const { state, setMediaLibrary } = useAdminUIState();
+  const { state, setMediaLibrary, setContentEngine, setDraft } = useAdminUIState();
   const ml = state.mediaLibrary;
 
   const allMedia = (ml.images as MediaItem[]).concat(ml.videos as MediaItem[]);
@@ -563,6 +642,7 @@ export default function AdminMediaLibrary() {
   const [search,        setSearch]        = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<MediaItem | null>(null);
   const [deleting,      setDeleting]      = useState(false);
+  const [useToast,      setUseToast]      = useState<string | null>(null);
 
   useEffect(() => {
     setMediaLibrary((p) => ({ ...p, mode, category }));
@@ -579,6 +659,13 @@ export default function AdminMediaLibrary() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (useToast) {
+      const t = setTimeout(() => setUseToast(null), 2500);
+      return () => clearTimeout(t);
+    }
+  }, [useToast]);
 
   const fetchAll = useCallback(async (force = false) => {
     setLoading(true);
@@ -598,11 +685,25 @@ export default function AdminMediaLibrary() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const handleUseInGraphic = (item: MediaItem) => {
+    setContentEngine((p) => ({ ...p, backgroundSource: "stock_image", backgroundMediaUrl: item.url }));
+    setDraft((p) => ({ ...p, backgroundSource: "stock_image", backgroundMediaUrl: item.url }));
+    setUseToast(`"${CAT_LABELS[item.category] ?? item.category}" set as graphic background`);
+  };
+
+  const handleDownload = (item: MediaItem) => {
+    const a = document.createElement("a");
+    a.href = item.url; a.download = item.filename; a.target = "_blank"; a.click();
+  };
+
   const modeType    = mode === "graphic" ? "image" : "video";
   const activeItems = allMedia.filter((i) => i.media_type === modeType);
   const filtered    = activeItems.filter((item) => {
     const matchesCat    = category === "all" || item.category === category;
-    const matchesSearch = !search || item.label.toLowerCase().includes(search.toLowerCase()) || item.filename.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = !search
+      || (CAT_LABELS[item.category] ?? item.category).toLowerCase().includes(search.toLowerCase())
+      || item.category.toLowerCase().includes(search.toLowerCase())
+      || item.label.toLowerCase().includes(search.toLowerCase());
     return matchesCat && matchesSearch;
   });
 
@@ -690,7 +791,7 @@ export default function AdminMediaLibrary() {
                   : { borderColor: "hsl(var(--border))", color: "hsl(var(--muted-foreground))" }
               }
             >
-              {cat}
+              {cat === "all" ? "All" : CAT_LABELS[cat]}
               <span className="text-[10px] px-1 py-0.5 rounded-full" style={{ background: category === cat ? `${ACCENT}30` : "hsl(var(--muted)/0.5)" }}>
                 {countsByCategory[cat] ?? 0}
               </span>
@@ -700,7 +801,7 @@ export default function AdminMediaLibrary() {
         <div className="flex items-center gap-2 ml-auto border border-border rounded-lg px-3 py-1.5 bg-background">
           <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <input
-            type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search media..."
+            type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by category…"
             className="text-xs bg-transparent outline-none w-40 placeholder:text-muted-foreground/50"
           />
           {search && <button onClick={() => setSearch("")}><X className="h-3 w-3 text-muted-foreground" /></button>}
@@ -725,15 +826,31 @@ export default function AdminMediaLibrary() {
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{filtered.length} {mode === "graphic" ? "images" : "videos"}</span>
           </div>
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}>
-            {filtered.map((item) => <MediaCard key={item.asset_id} item={item} mode={mode} onClick={setPreview} />)}
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+            {filtered.map((item) => (
+              <MediaCard
+                key={item.asset_id}
+                item={item}
+                mode={mode}
+                onClick={setPreview}
+                onUseInGraphic={handleUseInGraphic}
+                onDownload={handleDownload}
+                onDelete={setDeleteConfirm}
+              />
+            ))}
           </div>
         </>
       )}
 
       {/* Preview Modal */}
       {preview && (
-        <PreviewModal item={preview} mode={mode} onClose={() => setPreview(null)} onDelete={(item) => { setPreview(null); setDeleteConfirm(item); }} />
+        <PreviewModal
+          item={preview}
+          mode={mode}
+          onClose={() => setPreview(null)}
+          onDelete={(item) => { setPreview(null); setDeleteConfirm(item); }}
+          onUseInGraphic={handleUseInGraphic}
+        />
       )}
 
       {/* Delete Confirm */}
@@ -746,7 +863,7 @@ export default function AdminMediaLibrary() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-white">Delete asset?</p>
-                <p className="text-[11px] text-zinc-500 mt-0.5 truncate max-w-[200px]">{deleteConfirm.filename}</p>
+                <p className="text-[11px] text-zinc-500 mt-0.5 capitalize">{CAT_LABELS[deleteConfirm.category] ?? deleteConfirm.category}</p>
               </div>
             </div>
             <p className="text-xs text-zinc-400">This will permanently remove the file from storage. This action cannot be undone.</p>
@@ -759,6 +876,16 @@ export default function AdminMediaLibrary() {
           </div>
         </div>
       )}
+
+      {/* "Use in Graphic" toast notification */}
+      {useToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-xl shadow-lg border pointer-events-none"
+          style={{ background: `${ACCENT}18`, borderColor: `${ACCENT}40`, color: ACCENT }}>
+          <Paintbrush className="h-3.5 w-3.5 shrink-0" />
+          <span className="text-xs font-semibold">{useToast}</span>
+        </div>
+      )}
+
     </div>
   );
 }
