@@ -122,6 +122,7 @@ async function writeResult(
       if (!playerId) break;
 
       const { label, short, color } = parseRankingLabel(result);
+      const inputHash = (job.payload as Record<string, unknown>)?.input_hash as string | null ?? null;
 
       await supabase
         .from("ai_rankings_player_recos")
@@ -133,6 +134,7 @@ async function writeResult(
             recommendation_short: short,
             recommendation_long: result,
             recommendation_color: color,
+            input_hash: inputHash,
             generated_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           },
