@@ -1,0 +1,263 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+};
+
+const BATCH_SIZE = 30;
+const MAX_ATTEMPTS = 3;
+
+interface QueueJob {
+  id: number;
+  job_type: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  prompt_key: string;
+  payload: Record<string, unknown> | null;
+  status: string;
+  attempts: number;
+  created_at: string;
+}
+
+interface PromptRecord {
+  system_prompt: string;
+  user_prompt_template: string;
+}
+
+interface OpenAIUsage {
+  total_tokens: number;
+}
+
+async function loadPrompt(
+  supabase: ReturnType<typeof createClient>,
+  promptKey: string
+): Promise<PromptRecord | null> {
+  const { data, error } = await supabase
+    .schema("afl")
+    .from("ai_prompts")
+    .select("system_prompt, user_prompt_template")
+    .eq("prompt_key", promptKey)
+    .eq("is_active", true)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data as PromptRecord;
+}
+
+function injectPayload(template: string, payload: Record<string, unknown> | null): string {
+  const dataString = payload && Object.keys(payload).length > 0
+    ? JSON.stringify(payload, null, 2)
+    : "(no payload provided)";
+  return template.replace("{DATA}", dataString);
+}
+
+async function callOpenAI(
+  openaiKey: string,
+  systemPrompt: string,
+  userContent: string
+): Promise<{ text: string; tokensUsed: number } | null> {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${openaiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+      temperature: 0.4,
+      max_tokens: 500,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => res.statusText);
+    throw new Error(`OpenAI HTTP ${res.status}: ${errText}`);
+  }
+
+  const json = await res.json();
+  const text = json.choices?.[0]?.message?.content?.trim() ?? "";
+  const usage: OpenAIUsage = json.usage ?? { total_tokens: 0 };
+
+  return { text, tokensUsed: usage.total_tokens };
+}
+
+async function writeResult(
+  supabase: ReturnType<typeof createClient>,
+  job: QueueJob,
+  result: string
+): Promise<void> {
+  switch (job.job_type) {
+    case "player_analysis": {
+      const playerId = job.entity_id ? Number(job.entity_id) : null;
+      if (!playerId) break;
+      await supabase
+        .from("ai_player_analysis")
+        .upsert(
+          {
+            player_id: playerId,
+            player_name: (job.payload as Record<string, unknown>)?.player_name ?? null,
+            team: (job.payload as Record<string, unknown>)?.team ?? null,
+            projection_final: (job.payload as Record<string, unknown>)?.projection_final ?? null,
+            analysis: result,
+            generated_at: new Date().toISOString(),
+          },
+          { onConflict: "player_id" }
+        );
+      break;
+    }
+    case "test":
+    default:
+      console.log(`[ai-worker] job_type="${job.job_type}" result preview:`, result.slice(0, 120));
+      break;
+  }
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const openaiKey = Deno.env.get("OPENAI_API_KEY");
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    const { data: jobs, error: fetchError } = await supabase
+      .from("ai_generation_queue")
+      .select("*")
+      .eq("status", "pending")
+      .order("created_at", { ascending: true })
+      .limit(BATCH_SIZE);
+
+    if (fetchError) throw fetchError;
+
+    if (!jobs || jobs.length === 0) {
+      return new Response(
+        JSON.stringify({ ok: true, message: "No pending jobs", processed: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const jobIds = (jobs as QueueJob[]).map((j) => j.id);
+
+    const { error: markError } = await supabase
+      .from("ai_generation_queue")
+      .update({ status: "processing", attempts: supabase.rpc })
+      .in("id", jobIds);
+
+    await supabase
+      .from("ai_generation_queue")
+      .update({ status: "processing" })
+      .in("id", jobIds);
+
+    let processed = 0;
+    let failed = 0;
+
+    const promptCache = new Map<string, PromptRecord | null>();
+
+    for (const job of jobs as QueueJob[]) {
+      const startedAt = Date.now();
+      let tokensUsed = 0;
+      let success = false;
+      let errorMsg: string | null = null;
+      let model = "gpt-4o-mini";
+
+      try {
+        if (!promptCache.has(job.prompt_key)) {
+          promptCache.set(job.prompt_key, await loadPrompt(supabase, job.prompt_key));
+        }
+        const prompt = promptCache.get(job.prompt_key);
+
+        if (!prompt) {
+          throw new Error(`No active prompt found for key: ${job.prompt_key}`);
+        }
+
+        const userContent = injectPayload(prompt.user_prompt_template, job.payload);
+
+        let resultText = "";
+        if (openaiKey) {
+          const aiResult = await callOpenAI(openaiKey, prompt.system_prompt, userContent);
+          if (aiResult) {
+            resultText = aiResult.text;
+            tokensUsed = aiResult.tokensUsed;
+          }
+        } else {
+          resultText = `[mock] job_type=${job.job_type} entity_id=${job.entity_id}`;
+          model = "mock";
+        }
+
+        await writeResult(supabase, job, resultText);
+
+        await supabase
+          .from("ai_generation_queue")
+          .update({
+            status: "complete",
+            processed_at: new Date().toISOString(),
+            attempts: job.attempts + 1,
+          })
+          .eq("id", job.id);
+
+        success = true;
+        processed++;
+      } catch (err) {
+        errorMsg = err instanceof Error ? err.message : String(err);
+        console.error(`[ai-worker] job ${job.id} failed:`, errorMsg);
+
+        const newAttempts = job.attempts + 1;
+        const newStatus = newAttempts >= MAX_ATTEMPTS ? "failed" : "pending";
+
+        await supabase
+          .from("ai_generation_queue")
+          .update({
+            status: newStatus,
+            attempts: newAttempts,
+            processed_at: newStatus === "failed" ? new Date().toISOString() : null,
+          })
+          .eq("id", job.id);
+
+        failed++;
+      }
+
+      await supabase
+        .from("ai_generation_logs")
+        .insert({
+          queue_id: job.id,
+          prompt_key: job.prompt_key,
+          model,
+          tokens_used: tokensUsed,
+          success,
+          error: errorMsg,
+          created_at: new Date().toISOString(),
+        });
+
+      console.log(`[ai-worker] job ${job.id} (${job.job_type}) done in ${Date.now() - startedAt}ms — success=${success}`);
+    }
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        jobs_fetched: jobs.length,
+        processed,
+        failed,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    console.error("[ai-worker] fatal error:", err);
+    return new Response(
+      JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});
