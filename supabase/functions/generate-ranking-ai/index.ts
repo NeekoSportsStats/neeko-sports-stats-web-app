@@ -8,7 +8,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const BATCH_SIZE = 30;
+const BATCH_SIZE = 10;
+const MAX_PLAYERS_PER_RUN = 50;
 
 interface PlayerInput {
   player_id: number;
@@ -20,6 +21,7 @@ interface PlayerInput {
   consistency_score: number;
   trend_3_vs_10: number;
   matchup_delta: number;
+  input_hash: string | null;
 }
 
 interface AIResult {
@@ -81,7 +83,7 @@ async function generateForPlayer(
   const userContent = prompt.user_prompt_template.replace("{DATA}", dataString);
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4o-mini",
     messages: [
       { role: "system", content: prompt.system_prompt },
       { role: "user", content: userContent },
@@ -116,88 +118,125 @@ Deno.serve(async (req: Request) => {
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const runId: string | null = body.run_id ?? null;
     const batchNumber: number = body.batch_number ?? 1;
+    const processedSoFar: number = body.processed_so_far ?? 0;
 
     const prompt = await loadPrompt(supabase);
 
-    if (batchNumber === 1 && runId) {
-      const { count: totalMissing } = await supabase
-        .from("v_ai_player_analysis_input")
-        .select("player_id", { count: "exact", head: true });
+    const { data: allCandidates, error: countError } = await supabase
+      .from("v_ai_player_analysis_input")
+      .select("player_id, input_hash");
 
+    if (countError) throw countError;
+
+    const candidates = allCandidates ?? [];
+
+    const existingAnalysis = candidates.length > 0
+      ? await supabase
+          .from("ai_player_analysis")
+          .select("player_id, input_hash")
+          .in("player_id", candidates.map((c: { player_id: number }) => c.player_id))
+      : { data: [] };
+
+    const storedHashMap = new Map<number, string | null>(
+      (existingAnalysis.data ?? []).map((r: { player_id: number; input_hash: string | null }) => [r.player_id, r.input_hash])
+    );
+
+    const needsGeneration = candidates.filter((c: { player_id: number; input_hash: string | null }) => {
+      const stored = storedHashMap.get(c.player_id);
+      return stored == null || stored !== c.input_hash;
+    });
+
+    const totalNeedingGeneration = needsGeneration.length;
+
+    if (batchNumber === 1 && runId) {
       await supabase
         .from("pipeline_runs")
         .update({
           status: "running",
-          total_tasks: totalMissing ?? 0,
+          total_tasks: totalNeedingGeneration,
           completed_tasks: 0,
-          current_step_label: `Starting AI analysis — batch ${batchNumber}`,
+          current_step_label: `Starting AI analysis — ${totalNeedingGeneration} players need generation`,
         })
         .eq("id", runId);
     }
 
-    const { data: players, error: fetchError } = await supabase
-      .from("v_ai_player_analysis_input")
-      .select("*")
-      .limit(BATCH_SIZE);
-
-    if (fetchError) throw fetchError;
-
-    if (!players || players.length === 0) {
+    if (totalNeedingGeneration === 0) {
       if (runId) {
-        const { data: runData } = await supabase
-          .from("pipeline_runs")
-          .select("total_tasks")
-          .eq("id", runId)
-          .maybeSingle();
-
         await supabase
           .from("pipeline_runs")
           .update({
             status: "completed",
-            completed_tasks: runData?.total_tasks ?? 0,
-            current_step_label: "Done",
+            completed_tasks: 0,
+            current_step_label: "Done — no players required AI regeneration",
             completed_at: new Date().toISOString(),
           })
           .eq("id", runId);
       }
 
+      console.log("[generate-ranking-ai] No players need generation — skipping OpenAI calls");
+
       return new Response(
         JSON.stringify({
-          message: "generate-ranking-ai complete — all players analysed",
+          message: "generate-ranking-ai skipped — all players up to date",
           batch_number: batchNumber,
-          processed_this_batch: 0,
+          players_selected: 0,
+          players_generated: 0,
           remaining: 0,
+          model: "gpt-4o-mini",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const results = await Promise.allSettled(
-      (players as PlayerInput[]).map((player) =>
-        generateForPlayer(openai, player, prompt)
-      )
-    );
+    const remainingBudget = MAX_PLAYERS_PER_RUN - processedSoFar;
+    if (remainingBudget <= 0) {
+      return new Response(
+        JSON.stringify({
+          message: `generate-ranking-ai safety cap reached — ${processedSoFar} processed this run`,
+          batch_number: batchNumber,
+          players_selected: 0,
+          players_generated: 0,
+          remaining: totalNeedingGeneration,
+          model: "gpt-4o-mini",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const batchSlice = needsGeneration.slice(0, Math.min(BATCH_SIZE, remainingBudget));
+
+    const playerIds = batchSlice.map((c: { player_id: number }) => c.player_id);
+    const { data: playerData, error: fetchError } = await supabase
+      .from("v_ai_player_analysis_input")
+      .select("*")
+      .in("player_id", playerIds);
+
+    if (fetchError) throw fetchError;
+
+    const players = (playerData ?? []) as PlayerInput[];
+
+    console.log(`[generate-ranking-ai] Batch ${batchNumber}: selected=${players.length} players_needing_gen=${totalNeedingGeneration} processed_so_far=${processedSoFar} budget_remaining=${remainingBudget}`);
 
     const upsertRows = [];
     let batchProcessed = 0;
     let batchErrors = 0;
 
-    for (let j = 0; j < players.length; j++) {
-      const result = results[j];
-      const player = (players as PlayerInput[])[j];
-      if (result.status === "fulfilled") {
+    for (const player of players) {
+      try {
+        const result = await generateForPlayer(openai, player, prompt);
         upsertRows.push({
           player_id: player.player_id,
           player_name: player.player_name,
           team: player.team,
           projection_final: player.projection_final,
-          analysis: result.value.analysis,
-          captain_recommendation: result.value.captain_recommendation,
+          analysis: result.analysis,
+          captain_recommendation: result.captain_recommendation,
+          input_hash: player.input_hash,
           generated_at: new Date().toISOString(),
         });
         batchProcessed++;
-      } else {
-        console.error(`Error processing ${player.player_name}:`, result.reason);
+      } catch (err) {
+        console.error(`[generate-ranking-ai] Error processing ${player.player_name}:`, err);
         batchErrors++;
       }
     }
@@ -208,16 +247,16 @@ Deno.serve(async (req: Request) => {
         .upsert(upsertRows, { onConflict: "player_id" });
 
       if (upsertError) {
-        console.error("Batch upsert error:", upsertError);
+        console.error("[generate-ranking-ai] Batch upsert error:", upsertError);
         throw upsertError;
       }
     }
 
-    const { count: remainingCount } = await supabase
-      .from("v_ai_player_analysis_input")
-      .select("player_id", { count: "exact", head: true });
+    const newProcessedTotal = processedSoFar + batchProcessed;
+    const remaining = Math.max(0, totalNeedingGeneration - newProcessedTotal);
+    const canContinue = remaining > 0 && newProcessedTotal < MAX_PLAYERS_PER_RUN;
 
-    const remaining = remainingCount ?? 0;
+    console.log(`[generate-ranking-ai] Batch ${batchNumber} complete: generated=${batchProcessed} errors=${batchErrors} remaining=${remaining} model=gpt-4o-mini`);
 
     if (runId) {
       const { data: runData } = await supabase
@@ -232,14 +271,14 @@ Deno.serve(async (req: Request) => {
         .from("pipeline_runs")
         .update({
           completed_tasks: newCompleted,
-          current_step_label: remaining > 0
+          current_step_label: canContinue
             ? `Processing AI batch ${batchNumber} — ${remaining} remaining`
             : "Done",
         })
         .eq("id", runId);
     }
 
-    if (remaining > 0) {
+    if (canContinue) {
       EdgeRuntime.waitUntil(
         fetch(`${supabaseUrl}/functions/v1/generate-ranking-ai`, {
           method: "POST",
@@ -250,8 +289,9 @@ Deno.serve(async (req: Request) => {
           body: JSON.stringify({
             run_id: runId,
             batch_number: batchNumber + 1,
+            processed_so_far: newProcessedTotal,
           }),
-        }).catch((err) => console.error("Failed to trigger next batch:", err))
+        }).catch((err) => console.error("[generate-ranking-ai] Failed to trigger next batch:", err))
       );
     } else if (runId) {
       const { data: runData } = await supabase
@@ -273,18 +313,21 @@ Deno.serve(async (req: Request) => {
 
     return new Response(
       JSON.stringify({
-        message: remaining > 0
+        message: canContinue
           ? `Batch ${batchNumber} complete — triggering next batch`
-          : "generate-ranking-ai complete — all players analysed",
+          : "generate-ranking-ai complete",
         batch_number: batchNumber,
-        processed_this_batch: batchProcessed,
+        players_selected: players.length,
+        players_generated: batchProcessed,
         errors_this_batch: batchErrors,
+        processed_so_far: newProcessedTotal,
         remaining,
+        model: "gpt-4o-mini",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("generate-ranking-ai fatal error:", err);
+    console.error("[generate-ranking-ai] Fatal error:", err);
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

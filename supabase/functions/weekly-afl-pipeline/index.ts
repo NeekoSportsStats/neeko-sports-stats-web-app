@@ -233,7 +233,36 @@ Deno.serve(async (req: Request) => {
     }, skipAI);
 
     // ── Step 10: Regenerate AI rankings & recommendations ────────────────────
+    // Pre-check: only call OpenAI if there are players whose input has changed
     await runStep("10_generate_ai", async () => {
+      const { data: candidates } = await db
+        .from("v_ai_player_analysis_input")
+        .select("player_id, input_hash");
+
+      const playerIds = (candidates ?? []).map((c: { player_id: number }) => c.player_id);
+
+      const { data: existing } = playerIds.length > 0
+        ? await db
+            .from("ai_player_analysis")
+            .select("player_id, input_hash")
+            .in("player_id", playerIds)
+        : { data: [] };
+
+      const storedMap = new Map(
+        (existing ?? []).map((r: { player_id: number; input_hash: string | null }) => [r.player_id, r.input_hash])
+      );
+
+      const needsAI = (candidates ?? []).filter((c: { player_id: number; input_hash: string | null }) => {
+        const stored = storedMap.get(c.player_id);
+        return stored == null || stored !== c.input_hash;
+      });
+
+      if (needsAI.length === 0) {
+        console.log("[pipeline step 10] All players up to date — skipping AI generation");
+        return { skipped: true, reason: "no_changes_detected", players_checked: (candidates ?? []).length };
+      }
+
+      console.log(`[pipeline step 10] ${needsAI.length} players need AI regeneration — calling generate-all-ai`);
       return callFn("generate-all-ai", {});
     }, skipAI);
 
