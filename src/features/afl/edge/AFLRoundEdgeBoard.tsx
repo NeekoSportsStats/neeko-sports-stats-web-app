@@ -31,6 +31,7 @@ interface RankingRow {
   value_tag: string | null;
   ai_summary: string | null;
   recommendation_color: string | null;
+  refreshed_at: string | null;
 }
 
 type Section = "captain" | "breakout" | "trap";
@@ -1074,9 +1075,23 @@ function FreePaywallPanel({ captainCount, breakoutCount, trapCount, onUnlock }: 
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+function formatRefreshedAt(ts: string | null | undefined): string | null {
+  if (!ts) return null;
+  try {
+    const d = new Date(ts);
+    return d.toLocaleDateString("en-AU", {
+      weekday: "short", day: "numeric", month: "short",
+      hour: "2-digit", minute: "2-digit", timeZone: "Australia/Melbourne",
+    });
+  } catch {
+    return null;
+  }
+}
+
 export default function AFLRoundEdgeBoard() {
   const { isPremium } = useAuth();
   const [rows, setRows] = useState<RankingRow[]>([]);
+  const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
@@ -1093,7 +1108,10 @@ export default function AFLRoundEdgeBoard() {
         limit_n: PREMIUM_VISIBLE,
       });
       if (rpcErr) throw rpcErr;
-      setRows((data as RankingRow[]) ?? []);
+      const rows = (data as RankingRow[]) ?? [];
+      setRows(rows);
+      const ts = rows[0]?.refreshed_at ?? null;
+      setRefreshedAt(ts);
     } catch {
       setError("Unable to load Edge Board data.");
     } finally {
@@ -1204,13 +1222,21 @@ export default function AFLRoundEdgeBoard() {
           )}
 
           {rows.length > 0 && (
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5 rounded-full border border-[#F5C84C]/25 bg-[#F5C84C]/[0.07] px-3 py-1">
                 <Target size={10} className="text-[#F5C84C]" />
                 <span className="text-[11px] font-semibold text-[#F5C84C]/80">
                   AI detected {rows.length} edge signals this round
                 </span>
               </div>
+              {formatRefreshedAt(refreshedAt) && (
+                <div className="flex items-center gap-1 px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.04]">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-400/70" />
+                  <span className="text-[10px] text-white/35">
+                    Board updated {formatRefreshedAt(refreshedAt)}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
