@@ -254,9 +254,13 @@ Deno.serve(async (req: Request) => {
 
     const newProcessedTotal = processedSoFar + batchProcessed;
     const remaining = Math.max(0, totalNeedingGeneration - newProcessedTotal);
-    const canContinue = remaining > 0 && newProcessedTotal < MAX_PLAYERS_PER_RUN;
+    const canContinue = remaining > 0 && batchProcessed > 0 && newProcessedTotal < MAX_PLAYERS_PER_RUN;
 
     console.log(`[generate-ranking-ai] Batch ${batchNumber} complete: generated=${batchProcessed} errors=${batchErrors} remaining=${remaining} model=gpt-4o-mini`);
+    console.log("AI batch run", {
+      players_selected: players.length,
+      players_generated: batchProcessed,
+    });
 
     if (runId) {
       const { data: runData } = await supabase
