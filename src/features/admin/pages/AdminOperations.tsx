@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Zap, TrendingUp, Bot, Activity, History, Database, RefreshCw, DollarSign, Upload, CircleCheck as CheckCircle, CircleAlert as AlertCircle, BarChart2, Grid } from "lucide-react";
+import { Zap, TrendingUp, Bot, Activity, History, Database, RefreshCw, DollarSign, Upload, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChartBar as BarChart2, Grid2x2 as Grid } from "lucide-react";
 import { AdminPipelineProgress, type PipelineRun } from "@/components/admin/AdminPipelineProgress";
 
 const PIPELINE_STAGES: Record<string, string[]> = {
