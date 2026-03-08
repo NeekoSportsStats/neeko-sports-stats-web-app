@@ -85,7 +85,7 @@ export default function StartSitPage() {
       .select("player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, projection_confidence, risk_rating, neeko_rating")
       .not("player_id", "is", null)
       .order("neeko_rating", { ascending: false })
-      .limit(600)
+      .limit(300)
       .then(({ data }) => {
         if (data) setTopPlayers(data as PlayerOption[]);
       });
