@@ -15,11 +15,12 @@ interface PipelineStep {
 }
 
 const STEP_LABELS: Record<string, string> = {
-  "1_ingest_matches":           "Ingesting AFL match data",
-  "2_ingest_player_stats":      "Ingesting player stats",
-  "3_ingest_team_stats":        "Ingesting team stats",
-  "4_detect_latest_round":      "Detecting latest round",
-  "5_transform_player_stats":   "Transforming player stats",
+  "1_ingest_matches":             "Ingesting AFL match data",
+  "2_ingest_player_stats":        "Ingesting player stats",
+  "3_ingest_team_stats":          "Ingesting team stats",
+  "3b_compute_fantasy_points":    "Computing fantasy points",
+  "4_detect_latest_round":        "Detecting latest round",
+  "5_transform_player_stats":     "Transforming player stats",
   "6_transform_matches":        "Transforming match data",
   "7_update_team_defense":      "Rebuilding team defence profile",
   "8_refresh_neeko_intel":      "Refreshing Neeko intelligence",
@@ -53,7 +54,7 @@ Deno.serve(async (req: Request) => {
 
     const steps: PipelineStep[] = [];
     let completedCount = 0;
-    const totalSteps = 13;
+    const totalSteps = 14;
 
     const fnHeaders = {
       "Authorization": `Bearer ${serviceKey}`,
@@ -173,6 +174,16 @@ Deno.serve(async (req: Request) => {
     await runStep("3_ingest_team_stats", async () => {
       return callFn("afl-worker-games-team-stats", { season, round_number: latestRound });
     }, skipIngest);
+
+    // ── Step 3b: Compute fantasy points for any unscored rows ────────────────
+    await runStep("3b_compute_fantasy_points", async () => {
+      const { data, error } = await db.schema("afl").rpc(
+        "fn_backfill_raw_fantasy_points",
+        { p_season: season }
+      );
+      if (error) throw new Error(error.message);
+      return { rows_updated: data };
+    });
 
     // ── Step 5: Transform raw → canonical (player stats) ─────────────────────
     await runStep("5_transform_player_stats", async () => {
