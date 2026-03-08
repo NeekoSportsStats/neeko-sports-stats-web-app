@@ -197,6 +197,18 @@ export default function AFLRankingsPage() {
     fetchRankings();
   }, [fetchRankings]);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel("ai_player_analysis_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ai_player_analysis" },
+        () => { fetchRankings(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchRankings]);
+
   function handleTabChange(tab: RankingsTab) {
     setActiveTab(tab);
     setSortKey(TAB_DEFAULT_SORT[tab]);

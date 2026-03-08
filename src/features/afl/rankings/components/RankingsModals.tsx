@@ -295,10 +295,13 @@ export function PlayerDetailModal({
   const [loadingAI, setLoadingAI] = useState(true);
 
   useEffect(() => {
+    setAiAnalysis(null);
+    setLoadingAI(true);
+
     let cancelled = false;
+
     async function fetchAI() {
       if (!row.player_id || !isPremium) { setLoadingAI(false); return; }
-      setLoadingAI(true);
       const { data } = await supabase
         .from("ai_player_analysis")
         .select("analysis, captain_recommendation")
@@ -309,7 +312,36 @@ export function PlayerDetailModal({
         setLoadingAI(false);
       }
     }
+
     fetchAI();
+
+    if (row.player_id && isPremium) {
+      const channel = supabase
+        .channel(`ai_analysis_${row.player_id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "ai_player_analysis",
+            filter: `player_id=eq.${row.player_id}`,
+          },
+          (payload) => {
+            if (!cancelled && payload.new) {
+              const record = payload.new as { analysis: string | null; captain_recommendation: string | null };
+              setAiAnalysis({ analysis: record.analysis, captain_recommendation: record.captain_recommendation });
+              setLoadingAI(false);
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        cancelled = true;
+        supabase.removeChannel(channel);
+      };
+    }
+
     return () => { cancelled = true; };
   }, [row.player_id, isPremium]);
 
