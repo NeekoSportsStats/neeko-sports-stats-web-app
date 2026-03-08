@@ -245,7 +245,7 @@ function ComparisonPanel({ out, inn }: { out: MWPlayerRow; inn: MWPlayerRow }) {
       higherIsBetter: false,
     },
     {
-      label: "Ceiling",
+      label: "Est. Ceiling",
       outVal: fmtNum(out.ceiling, 0),
       inVal: fmtNum(inn.ceiling, 0),
       delta: inn.ceiling - out.ceiling,

@@ -678,7 +678,7 @@ export default function AFLPlayerCompare() {
               />
 
               <StatRow
-                label="Ceiling"
+                label="Est. Ceiling"
                 valA={fmtInt(playerA!.ceiling_estimate)}
                 valB={fmtInt(playerB!.ceiling_estimate)}
                 winner={ceilWin}
@@ -687,7 +687,7 @@ export default function AFLPlayerCompare() {
               />
 
               <StatRow
-                label="Floor"
+                label="Est. Floor"
                 valA={fmtInt(playerA!.floor_estimate)}
                 valB={fmtInt(playerB!.floor_estimate)}
                 winner={null}

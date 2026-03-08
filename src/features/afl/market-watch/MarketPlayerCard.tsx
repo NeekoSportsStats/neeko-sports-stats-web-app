@@ -81,7 +81,7 @@ export function MarketPlayerCard({ row, locked, onUnlock, tab, rank }: Props) {
             valueClass={momentumColor(momentum)}
           />
           <StatCell
-            label="Ceiling"
+            label="Est. Ceiling"
             value={fmtNum(row.ceiling_estimate, 0)}
           />
           <StatCell

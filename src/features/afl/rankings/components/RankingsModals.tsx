@@ -11,7 +11,7 @@ import {
   getCaptainStyle, getValueTagStyle, getNeekoRatingBadge, getRiskBadge,
   getConsistencyBadge, getConfidenceColor, getValueScoreColor,
   getFormColor, getMatchupColor, getUpsideColor, getRiskColor,
-  sharpenAIText,
+  sharpenAIText, resolveRecommendationColor,
 } from "./helpers";
 
 // ─── InfoTooltip ──────────────────────────────────────────────────────────────
@@ -350,7 +350,7 @@ export function PlayerDetailModal({
   const isPartial = tier === "partial";
   const consistencyBadge = getConsistencyBadge(row.consistency_score ?? null);
   const capStyle = getCaptainStyle(row.captain_rating ?? null);
-  const recColor = row.recommendation_color ?? null;
+  const recColor = resolveRecommendationColor(row.recommendation_color ?? null, row.ai_recommendation ?? null);
   const neekoRBadge = getNeekoRatingBadge(row.neeko_rating ?? null);
   const riskBadge = getRiskBadge(Number(row.risk_rating) ?? null);
 
@@ -451,10 +451,10 @@ export function PlayerDetailModal({
           {unlocked && row.ai_recommendation && (
             <div
               className="rounded-lg border px-4 py-3"
-              style={recColor ? { background: `${recColor}18`, borderColor: `${recColor}40` } : { background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}
+              style={{ background: `${recColor}18`, borderColor: `${recColor}40` }}
             >
               <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">AI Recommendation</p>
-              <p className="text-base font-bold" style={{ color: recColor ?? "rgba(255,255,255,0.6)" }}>
+              <p className="text-base font-bold" style={{ color: recColor }}>
                 {row.ai_recommendation}
               </p>
             </div>
@@ -468,11 +468,11 @@ export function PlayerDetailModal({
             {unlocked ? (
               <>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Ceiling</p>
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Est. Ceiling</p>
                   <p className="text-lg font-bold text-emerald-400">{fmt(row.ceiling_estimate)}</p>
                 </div>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Floor</p>
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Est. Floor</p>
                   <p className="text-lg font-bold text-red-400">{fmt(row.floor_estimate)}</p>
                 </div>
               </>

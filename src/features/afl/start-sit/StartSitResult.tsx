@@ -453,8 +453,8 @@ export function StartSitResult({
         {/* Free rows */}
         <div className="px-4">
           <CompareBar label="Projection" aVal={playerA.projection_final} bVal={playerB.projection_final} winnerIsA={winnerIsA} large animated={barsAnimated} />
-          <CompareBar label="Ceiling" aVal={playerA.ceiling_estimate} bVal={playerB.ceiling_estimate} winnerIsA={winnerIsA} animated={barsAnimated} />
-          <CompareBar label="Floor" aVal={playerA.floor_estimate} bVal={playerB.floor_estimate} winnerIsA={winnerIsA} animated={barsAnimated} />
+          <CompareBar label="Est. Ceiling" aVal={playerA.ceiling_estimate} bVal={playerB.ceiling_estimate} winnerIsA={winnerIsA} animated={barsAnimated} />
+          <CompareBar label="Est. Floor" aVal={playerA.floor_estimate} bVal={playerB.floor_estimate} winnerIsA={winnerIsA} animated={barsAnimated} />
           <CompareBar label="Neeko Rating" aVal={playerA.neeko_rating} bVal={playerB.neeko_rating} winnerIsA={winnerIsA} animated={barsAnimated} />
           <CompareBar label="Last 3 Avg" aVal={formA.last3} bVal={formB.last3} winnerIsA={winnerIsA} animated={barsAnimated} />
           <CompareBar label="Last 5 Avg" aVal={formA.last5} bVal={formB.last5} winnerIsA={winnerIsA} animated={barsAnimated} />

@@ -5,6 +5,7 @@ import {
   fmt, fmtInt, fmtPrice, fmtValueScore,
   getNeekoRatingBadge, getRiskBadge, getValueTagStyle,
   getValueScoreColor, getConfidenceColor, getDisplayRecommendation,
+  resolveRecommendationColor,
   FREE_FULL_ROWS, FREE_PARTIAL_ROWS,
 } from "./helpers";
 
@@ -213,18 +214,17 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
           )}
         </div>
         <div className={`${CELL_BASE} justify-center px-2`} style={{ width: COL.aiRec, minWidth: COL.aiRec }}>
-          {locked("aiRec") ? <LockedPlaceholder onUpgrade={onUpgrade} /> : displayRec ? (
-            <span
-              className="inline-block rounded-md border px-1.5 py-0.5 text-[9px] font-semibold whitespace-nowrap"
-              style={row.recommendation_color ? {
-                color: row.recommendation_color,
-                background: `${row.recommendation_color}18`,
-                borderColor: `${row.recommendation_color}40`,
-              } : { color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)" }}
-            >
-              {displayRec}
-            </span>
-          ) : <span className="text-white/20 text-xs">—</span>}
+          {locked("aiRec") ? <LockedPlaceholder onUpgrade={onUpgrade} /> : displayRec ? (() => {
+            const rc = resolveRecommendationColor(row.recommendation_color, displayRec);
+            return (
+              <span
+                className="inline-block rounded-md border px-1.5 py-0.5 text-[9px] font-semibold whitespace-nowrap"
+                style={{ color: rc, background: `${rc}18`, borderColor: `${rc}40` }}
+              >
+                {displayRec}
+              </span>
+            );
+          })() : <span className="text-white/20 text-xs">—</span>}
         </div>
         <div className={`${CELL_BASE} px-3`} style={{ width: COL.why, minWidth: COL.why }}>
           {locked("why") ? <LockedPlaceholder onUpgrade={onUpgrade} /> : (

@@ -9,7 +9,7 @@ export interface AIVideoItem {
   category: AIVideoCategory;
 }
 
-const BASE_PATH = "assets/videos/ai-generated";
+const BASE_PATH = "videos/ai-generated";
 
 const CATEGORIES: Exclude<AIVideoCategory, "all">[] = [
   "stadium",

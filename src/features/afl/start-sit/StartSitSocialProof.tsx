@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { Flame, Scale, ChevronRight } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
 export interface QuickFillPlayer {
   player_id: string;
@@ -19,6 +20,16 @@ interface SocialProofMatchup {
   playerB: QuickFillPlayer;
   comparisons: number;
   splitA?: number;
+}
+
+interface PopularityRow {
+  player_a_id: string;
+  player_a_name: string;
+  player_b_id: string;
+  player_b_name: string;
+  comparison_count: number;
+  win_a_pct: number | null;
+  last_compared_at: string;
 }
 
 interface SocialProofProps {
@@ -58,22 +69,47 @@ export function StartSitSocialProof({ players, onFillBoth, onScrollToCompare }: 
     return Math.floor(1100 + seed(daySeed) * 400);
   }, []);
 
+  const [livePopularity, setLivePopularity] = useState<PopularityRow[]>([]);
+
+  useEffect(() => {
+    supabase.rpc("get_start_sit_popularity", { days_back: 7, limit_n: 6 })
+      .then(({ data }) => { if (data) setLivePopularity(data as PopularityRow[]); });
+  }, []);
+
   const playerMap = useMemo(() => {
     const map = new Map<string, QuickFillPlayer>();
-    for (const p of players) map.set(p.player_name, p);
+    for (const p of players) {
+      map.set(p.player_name, p);
+      map.set(p.player_id, p);
+    }
     return map;
   }, [players]);
 
-  const popularMatchups = useMemo((): SocialProofMatchup[] =>
-    POPULAR_PAIRS
+  const popularMatchups = useMemo((): SocialProofMatchup[] => {
+    if (livePopularity.length >= 2) {
+      return livePopularity
+        .map((row) => {
+          const pA = playerMap.get(row.player_a_name) ?? playerMap.get(row.player_a_id);
+          const pB = playerMap.get(row.player_b_name) ?? playerMap.get(row.player_b_id);
+          if (!pA || !pB) return null;
+          return {
+            playerA: pA, playerB: pB,
+            comparisons: Number(row.comparison_count),
+            splitA: row.win_a_pct != null ? Number(row.win_a_pct) : undefined,
+          };
+        })
+        .filter((m): m is SocialProofMatchup => m !== null)
+        .slice(0, 4);
+    }
+    return POPULAR_PAIRS
       .map(([nameA, nameB], i) => {
         const pA = playerMap.get(nameA);
         const pB = playerMap.get(nameB);
         if (!pA || !pB) return null;
         return { playerA: pA, playerB: pB, comparisons: pseudoCount(i + 1) };
       })
-      .filter((m): m is SocialProofMatchup => m !== null),
-    [playerMap]);
+      .filter((m): m is SocialProofMatchup => m !== null);
+  }, [livePopularity, playerMap]);
 
   const closeDecisions = useMemo((): SocialProofMatchup[] =>
     CLOSE_PAIRS
@@ -129,7 +165,7 @@ export function StartSitSocialProof({ players, onFillBoth, onScrollToCompare }: 
               </div>
               <div className="flex items-center gap-2 shrink-0 ml-3">
                 <span className="text-[11px] tabular-nums text-white/25 hidden sm:inline">
-                  {m.comparisons} today
+                  {m.comparisons > 0 ? `${m.comparisons} this week` : ""}
                 </span>
                 <ChevronRight size={13} className="text-white/15 group-hover:text-white/35 transition-colors" />
               </div>

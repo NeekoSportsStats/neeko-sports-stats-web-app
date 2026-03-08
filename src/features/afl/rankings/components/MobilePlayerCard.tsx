@@ -5,6 +5,7 @@ import {
   fmt, fmtInt, fmtPrice, fmtValueScore,
   getNeekoRatingBadge, getRiskBadge, getValueTagStyle,
   getValueScoreColor, getConfidenceColor, getDisplayRecommendation,
+  resolveRecommendationColor,
 } from "./helpers";
 
 interface MobilePlayerCardProps {
@@ -144,24 +145,23 @@ export function MobilePlayerCard({
             </div>
           )}
 
-          {isUnlocked && displayRec && (
-            <div
-              className="rounded-lg border px-3 py-2.5 mb-3"
-              style={row.recommendation_color
-                ? { background: `${row.recommendation_color}18`, borderColor: `${row.recommendation_color}40` }
-                : { background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}
-            >
-              <p className="text-[9px] text-white/35 uppercase tracking-wider mb-0.5">AI Rec</p>
-              <p className="text-xs font-bold" style={{ color: row.recommendation_color ?? "rgba(255,255,255,0.6)" }}>
-                {displayRec}
-              </p>
-              {(row.ai_summary || row.recommendation_why) && (
-                <p className="text-[11px] text-white/50 mt-1 leading-snug line-clamp-3">
-                  {row.ai_summary ?? row.recommendation_why}
-                </p>
-              )}
-            </div>
-          )}
+          {isUnlocked && displayRec && (() => {
+            const rc = resolveRecommendationColor(row.recommendation_color, displayRec);
+            return (
+              <div
+                className="rounded-lg border px-3 py-2.5 mb-3"
+                style={{ background: `${rc}18`, borderColor: `${rc}40` }}
+              >
+                <p className="text-[9px] text-white/35 uppercase tracking-wider mb-0.5">AI Rec</p>
+                <p className="text-xs font-bold" style={{ color: rc }}>{displayRec}</p>
+                {(row.ai_summary || row.recommendation_why) && (
+                  <p className="text-[11px] text-white/50 mt-1 leading-snug line-clamp-3">
+                    {row.ai_summary ?? row.recommendation_why}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
 
           {!isUnlocked && (
             <div className="rounded-lg border border-[#F5C84C]/20 bg-[#F5C84C]/[0.04] px-3 py-2.5 mb-3">

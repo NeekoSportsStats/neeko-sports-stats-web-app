@@ -195,6 +195,15 @@ export default function StartSitPage() {
         playerA: resultPlayerA,
         playerB: resultPlayerB,
       });
+
+      supabase.from("start_sit_decisions").insert({
+        player_a_id:      playerA.player_id,
+        player_a_name:    playerA.player_name,
+        player_b_id:      playerB.player_id,
+        player_b_name:    playerB.player_name,
+        winner_player_id: String(json.winner_player_id),
+        session_id:       typeof crypto !== "undefined" ? crypto.randomUUID?.() ?? null : null,
+      }).then(() => {});
     } catch {
       setError("Unable to generate comparison. Please try again.");
     } finally {

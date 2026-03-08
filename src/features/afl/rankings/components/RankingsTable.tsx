@@ -4,6 +4,7 @@ import {
   fmt, fmtInt, fmtPrice, fmtValueScore,
   getNeekoRatingBadge, getRiskBadge, getValueTagStyle,
   getValueScoreColor, getConfidenceColor, getDisplayRecommendation,
+  resolveRecommendationColor,
   FREE_PARTIAL_ROWS, FREE_FULL_ROWS,
 } from "./helpers";
 import { InfoTooltip, LockedCell, LockedWhyCell } from "./RankingsModals";
@@ -196,11 +197,10 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, onRowClick, onU
         ) : displayRec ? (
           <span
             className="inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap"
-            style={row.recommendation_color ? {
-              color: row.recommendation_color,
-              background: `${row.recommendation_color}18`,
-              borderColor: `${row.recommendation_color}40`,
-            } : { color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)" }}
+            style={(() => {
+              const rc = resolveRecommendationColor(row.recommendation_color, displayRec);
+              return { color: rc, background: `${rc}18`, borderColor: `${rc}40` };
+            })()}
           >
             {displayRec}
           </span>

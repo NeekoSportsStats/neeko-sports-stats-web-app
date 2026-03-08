@@ -216,6 +216,56 @@ export function sharpenAIText(text: string | null | undefined): string | null {
   return out;
 }
 
+// ─── Recommendation pill colour resolver ──────────────────────────────────────
+// Maps DB colour names / labels to accessible hex values for pill display.
+// BUY → emerald, START → teal, CAPTAIN → gold, HOLD → slate, SIT → amber, SELL → red
+
+const REC_COLOR_MAP: Record<string, string> = {
+  // By recommendation_color field (DB value)
+  green:  "#10b981",
+  teal:   "#14b8a6",
+  gold:   "#F5C84C",
+  yellow: "#64748b",
+  amber:  "#f59e0b",
+  orange: "#f59e0b",
+  red:    "#ef4444",
+  slate:  "#64748b",
+  grey:   "#64748b",
+  gray:   "#64748b",
+  blue:   "#3b82f6",
+  white:  "rgba(255,255,255,0.55)",
+};
+
+const REC_LABEL_COLOR_MAP: Record<string, string> = {
+  BUY:     "#10b981",
+  START:   "#14b8a6",
+  CAPTAIN: "#F5C84C",
+  "ELITE CAPTAIN":  "#F5C84C",
+  "STRONG CAPTAIN": "#F5C84C",
+  "CAPTAIN OPTION": "#e2b93b",
+  HOLD:    "#64748b",
+  SIT:     "#f59e0b",
+  SELL:    "#ef4444",
+  "UPGRADE TARGET":    "#10b981",
+  "BEST CASH SAVER":   "#14b8a6",
+  "SPECULATIVE VALUE": "#94a3b8",
+  "STRONG OPTION":     "#10b981",
+  "BENCH WATCH":       "#f59e0b",
+};
+
+export function resolveRecommendationColor(
+  color: string | null,
+  label: string | null,
+): string {
+  const c = (color ?? "").toLowerCase().trim();
+  const l = (label ?? "").toUpperCase().trim();
+
+  if (c && REC_COLOR_MAP[c]) return REC_COLOR_MAP[c];
+  if (l && REC_LABEL_COLOR_MAP[l]) return REC_LABEL_COLOR_MAP[l];
+  if (c && c.startsWith("#")) return c;
+  return "rgba(255,255,255,0.35)";
+}
+
 // ─── KPI tile computation ─────────────────────────────────────────────────────
 
 export function computeKpiTiles(rows: RankingRow[]) {
