@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Zap, TrendingUp, Bot, Activity, History, Database, RefreshCw, DollarSign, Upload, CircleCheck as CheckCircle, CircleAlert as AlertCircle } from "lucide-react";
+import { Zap, TrendingUp, Bot, Activity, History, Database, RefreshCw, DollarSign, Upload, CircleCheck as CheckCircle, CircleAlert as AlertCircle, BarChart2, Grid } from "lucide-react";
 import { AdminPipelineProgress, type PipelineRun } from "@/components/admin/AdminPipelineProgress";
 
 const PIPELINE_STAGES: Record<string, string[]> = {
@@ -170,6 +170,40 @@ export default function AdminOperations() {
     }
   };
 
+  const handleRefreshMarketWatch = async () => {
+    setRunning("market_watch");
+    try {
+      const { error } = await supabase.rpc("fn_refresh_market_watch");
+      if (error) throw error;
+      toast({ title: "Market Watch refreshed successfully" });
+    } catch (err) {
+      toast({
+        title: "Market Watch refresh failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setRunning(null);
+    }
+  };
+
+  const handleRefreshEdgeBoard = async () => {
+    setRunning("edge_board");
+    try {
+      const { error } = await supabase.rpc("fn_refresh_edge_board");
+      if (error) throw error;
+      toast({ title: "Edge Board refreshed successfully" });
+    } catch (err) {
+      toast({
+        title: "Edge Board refresh failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setRunning(null);
+    }
+  };
+
   const isRunning = running !== null;
 
   // ─── Price Upload ───────────────────────────────────────────────────────────
@@ -314,6 +348,34 @@ export default function AdminOperations() {
                 <Bot className="h-4 w-4 mr-2" />
               )}
               Run Ranking AI
+            </Button>
+
+            <Button
+              onClick={handleRefreshMarketWatch}
+              disabled={isRunning}
+              variant="outline"
+              className="w-full"
+            >
+              {running === "market_watch" ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <BarChart2 className="h-4 w-4 mr-2" />
+              )}
+              Refresh Market Watch
+            </Button>
+
+            <Button
+              onClick={handleRefreshEdgeBoard}
+              disabled={isRunning}
+              variant="outline"
+              className="w-full"
+            >
+              {running === "edge_board" ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Grid className="h-4 w-4 mr-2" />
+              )}
+              Refresh Edge Board
             </Button>
 
             <Button
