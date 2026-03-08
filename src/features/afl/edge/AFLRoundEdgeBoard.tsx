@@ -1047,7 +1047,7 @@ function FreePaywallPanel({ captainCount, breakoutCount, trapCount, onUnlock }: 
       <div className="flex items-center justify-center gap-1.5 mb-6">
         <Users size={11} className="text-white/25" />
         <p className="text-[11px] text-white/35">
-          Used by <span className="text-white/55 font-semibold">700+ AFL Fantasy coaches</span> this season
+          Based on <span className="text-white/55 font-semibold"> 2026 </span> AFL model projections
         </p>
       </div>
 
