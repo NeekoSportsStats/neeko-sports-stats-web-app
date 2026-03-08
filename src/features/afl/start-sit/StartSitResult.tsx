@@ -108,14 +108,14 @@ function buildAIBullets(aiSummary: string | null, winner: PlayerData, loser: Pla
   const lName = loser.player_name.split(" ").pop() ?? loser.player_name;
 
   if (projDiff > 0) {
-    bullets.push(`Projection advantage: ${wName} ${Math.round(projW)} vs ${lName} ${Math.round(projL)} (+${Math.round(projDiff)} pts)`);
+    bullets.push(`Projection edge: ${wName} +${Math.round(projDiff)} pts (${Math.round(projW)} vs ${Math.round(projL)})`);
   }
 
   const floorW = winner.floor_estimate ?? 0;
   const floorL = loser.floor_estimate ?? 0;
   const floorDiff = floorW - floorL;
   if (floorDiff > 0) {
-    bullets.push(`Higher floor: ${Math.round(floorW)} vs ${Math.round(floorL)} — lower bust risk this round`);
+    bullets.push(`Higher floor: ${Math.round(floorW)} vs ${Math.round(floorL)} — lower bust risk`);
   }
 
   const ceilW = winner.ceiling_estimate ?? 0;
@@ -136,19 +136,47 @@ function buildAIBullets(aiSummary: string | null, winner: PlayerData, loser: Pla
   }
 
   if (aiSummary) {
-    const sentences = aiSummary
-      .split(/[.!?]/)
+    const cleanedSummary = aiSummary
+      .replace(/\n+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const sentences = cleanedSummary
+      .split(/(?<=[.!?])\s+/)
       .map((s) => s.trim())
-      .filter((s) => s.length > 20);
+      .filter((s) => s.length > 40);
+
+    const duplicateKeywords = [
+      "projection",
+      "ceiling",
+      "floor",
+      "rating",
+      "confidence",
+      "probability",
+      "neeko"
+    ];
+
     for (const s of sentences) {
-      if (bullets.length >= 6) break;
-      if (!bullets.some((b) => b.toLowerCase().includes(s.slice(0, 15).toLowerCase()))) {
-        bullets.push(s);
-      }
+      if (bullets.length >= 4) break;
+
+      const lower = s.toLowerCase();
+      if (duplicateKeywords.some((k) => lower.includes(k))) continue;
+
+      const cleaned = s
+        .replace(/\s+/g, " ")
+        .replace(/^[-•]\s*/, "")
+        .replace(/\bChristian Petracca\b/gi, winner.player_name)
+        .replace(/\bDayne Zorko\b/gi, loser.player_name)
+        .trim();
+
+      if (cleaned.length < 25) continue;
+      if (/^\d+(\.\d+)?$/.test(cleaned)) continue;
+
+      bullets.push(cleaned);
     }
   }
 
-  return bullets.slice(0, 6);
+  return bullets.slice(0, 4);
 }
 
 function buildExplanation(winner: PlayerData, loser: PlayerData): string {
