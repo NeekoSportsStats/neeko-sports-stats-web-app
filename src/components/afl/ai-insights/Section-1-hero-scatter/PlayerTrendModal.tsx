@@ -184,7 +184,8 @@ export default function PlayerTrendModal(props: {
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 rounded-full border border-white/10 bg-black/20 p-2 text-white/70 hover:bg-white/5"
+          className="absolute right-4 z-10 rounded-full border border-white/10 bg-black/20 p-2 text-white/70 hover:bg-white/5"
+          style={{ top: "calc(env(safe-area-inset-top) + 16px)" }}
         >
           <X className="h-4 w-4" />
         </button>

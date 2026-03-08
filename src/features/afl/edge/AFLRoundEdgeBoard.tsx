@@ -290,7 +290,7 @@ function ModelAuthoritySection() {
 
 function UpgradeModal({ onClose }: { onClose: () => void }) {
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pt-[env(safe-area-inset-top)]" onClick={onClose}>
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" />
       <div
         className="relative w-full max-w-sm rounded-2xl border border-[#F5C84C]/30 bg-[#0e0e0e] p-7 shadow-2xl text-center"

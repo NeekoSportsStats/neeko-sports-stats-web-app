@@ -45,7 +45,7 @@ export function UpgradeModal({ onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-[env(safe-area-inset-top)]"
       style={{ background: "rgba(0,0,0,0.80)", backdropFilter: "blur(8px)" }}
       onClick={onClose}
     >
