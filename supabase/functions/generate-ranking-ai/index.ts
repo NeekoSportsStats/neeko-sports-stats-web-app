@@ -21,6 +21,9 @@ interface PlayerInput {
   consistency_score: number;
   trend_3_vs_10: number;
   matchup_delta: number;
+  price: number | null;
+  value_score: number | null;
+  value_tag: string | null;
   input_hash: string | null;
 }
 
@@ -58,6 +61,13 @@ async function loadPrompt(supabase: ReturnType<typeof createClient>): Promise<Pr
 }
 
 function buildPlayerDataString(player: PlayerInput): string {
+  const priceFormatted = player.price != null
+    ? `$${(player.price / 1000).toFixed(0)}k`
+    : "N/A";
+  const valueFormatted = player.value_score != null
+    ? player.value_score.toFixed(2)
+    : "N/A";
+
   return `Player: ${player.player_name}
 Team: ${player.team}
 Projection: ${player.projection_final}
@@ -66,9 +76,12 @@ Floor: ${player.floor_estimate}
 Consistency Score: ${player.consistency_score}
 3-Game vs 10-Game Trend: ${player.trend_3_vs_10}
 Matchup Delta: ${player.matchup_delta}
+Price: ${priceFormatted}
+Value Score: ${valueFormatted}
+Value Tag: ${player.value_tag ?? "N/A"}
 
 Respond with a JSON object containing exactly two fields:
-- "analysis": 2-3 sentence premium analysis covering expected scoring, ceiling potential and risk, and consistency. Plain prose only, no bullet points.
+- "analysis": 2-3 sentence premium analysis covering expected scoring, ceiling potential and risk, consistency, and value for price. Plain prose only, no bullet points.
 - "captain": ONE short sentence (max 20 words) on captain suitability.
 
 Return only valid JSON, no markdown.`;
