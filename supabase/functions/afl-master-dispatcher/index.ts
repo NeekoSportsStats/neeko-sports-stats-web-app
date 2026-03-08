@@ -20,25 +20,20 @@ Deno.serve(async (req: Request) => {
 
     const db = createClient(supabaseUrl, serviceKey);
 
-    const body        = req.method === "POST" ? await req.json().catch(() => ({})) : {};
-    const season      = body.season       ?? 2026;
-    const roundNumber = body.round_number ?? null;
-
-    console.log(`[master-dispatcher] season=${season} round_number=${roundNumber ?? "ALL"}`);
+    const body         = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+    const season       = body.season       ?? 2026;
+    const weekFilter   = body.round_number ?? null;
 
     const apiHeaders = {
       "x-apisports-key": apiKey,
       "Content-Type": "application/json",
     };
 
-    // ── Fetch games from provider API ─────────────────────────────────────────
-    // Provider uses ?season=YYYY to list all games, we filter by round client-side
-    let apiUrl = `${apiBase}/games?season=${season}`;
-    if (roundNumber !== null) {
-      apiUrl += `&round=${roundNumber}`;
-    }
-
+    // ── Fetch ALL games for the season — provider does not support filtering by week/round ──
+    const apiUrl = `${apiBase}/games?league=1&season=${season}`;
     console.log(`[master-dispatcher] API call: ${apiUrl}`);
+    console.log(`[master-dispatcher] season=${season} week_filter=${weekFilter ?? "ALL"}`);
+
     const apiRes = await fetch(apiUrl, { headers: apiHeaders });
 
     if (!apiRes.ok) {
@@ -46,56 +41,60 @@ Deno.serve(async (req: Request) => {
     }
 
     const payload  = await apiRes.json();
-    const response = payload?.response ?? [];
+    const allGames = payload?.response ?? [];
 
-    if (response.length === 0) {
+    console.log(`[master-dispatcher] Games fetched: ${allGames.length}`);
+
+    if (allGames.length === 0) {
       return new Response(
-        JSON.stringify({ ok: true, season, round_number: roundNumber, message: "No games returned from provider", rows_upserted: 0 }),
+        JSON.stringify({ ok: true, season, week_filter: weekFilter, message: "No games returned from provider", rows_upserted: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`[master-dispatcher] Provider returned ${response.length} games`);
+    // ── Filter to requested week locally (week is top-level field on each game) ──
+    const weekGames = weekFilter !== null
+      ? allGames.filter((g: Record<string, unknown>) => Number(g.week) === Number(weekFilter))
+      : allGames;
 
-    // ── Build canonical team name map ─────────────────────────────────────────
-    const { data: aliasRows } = await db
-      .schema("afl")
-      .from("team_alias_map")
-      .select("vendor_name, canonical_name");
+    const completedGames = weekGames.filter(
+      (g: Record<string, unknown>) => (g?.status as Record<string, unknown>)?.short === "FT"
+    );
 
-    const aliasMap: Record<string, string> = {};
-    for (const a of aliasRows ?? []) {
-      aliasMap[a.vendor_name] = a.canonical_name;
-    }
+    console.log(`[master-dispatcher] Week filter: ${weekFilter ?? "ALL"}`);
+    console.log(`[master-dispatcher] Week games: ${weekGames.length}`);
+    console.log(`[master-dispatcher] Completed games: ${completedGames.length}`);
 
-    // ── Upsert into raw_2026_matches ──────────────────────────────────────────
+    // ── Upsert ALL week games into raw_2026_matches (not just completed) ──────
     const matchRows: Record<string, unknown>[] = [];
 
-    for (const g of response) {
-      const gameId    = g?.game?.id as number;
-      const roundNum  = g?.league?.round as number ?? roundNumber ?? 0;
-      const homeTeam  = g?.teams?.home?.name as string ?? "";
-      const awayTeam  = g?.teams?.away?.name as string ?? "";
-      const venue     = g?.game?.venue as string ?? null;
-      const dateStr   = g?.game?.date as string ?? null;
-      const status    = g?.game?.status?.short as string ?? "NS";
+    for (const g of weekGames) {
+      const gameId    = (g?.game as Record<string, unknown>)?.id as number;
+      const week      = Number(g.week ?? 0);
+      const homeTeam  = ((g?.teams as Record<string, unknown>)?.home as Record<string, unknown>)?.name as string ?? "";
+      const awayTeam  = ((g?.teams as Record<string, unknown>)?.away as Record<string, unknown>)?.name as string ?? "";
+      const homeId    = ((g?.teams as Record<string, unknown>)?.home as Record<string, unknown>)?.id as number ?? null;
+      const awayId    = ((g?.teams as Record<string, unknown>)?.away as Record<string, unknown>)?.id as number ?? null;
+      const venue     = (g?.game as Record<string, unknown>)?.venue as string ?? null;
+      const dateStr   = (g?.game as Record<string, unknown>)?.date as string ?? null;
+      const statusShort = (g?.status as Record<string, unknown>)?.short as string ?? "NS";
 
-      // Map status to internal values
       const internalStatus =
-        status === "FT"   ? "FT" :
-        status === "LIVE" ? "Live" :
+        statusShort === "FT"   ? "FT"   :
+        statusShort === "LIVE" ? "Live" :
         "Not Started";
 
-      const homeScore  = g?.scores?.home?.total  as number ?? 0;
-      const awayScore  = g?.scores?.away?.total  as number ?? 0;
-      const homeGoals  = g?.scores?.home?.goals  as number ?? 0;
-      const awayGoals  = g?.scores?.away?.goals  as number ?? 0;
-      const homeBehinds = g?.scores?.home?.behinds as number ?? 0;
-      const awayBehinds = g?.scores?.away?.behinds as number ?? 0;
+      // Provider field is scores.home.score / scores.away.score
+      const homeScore   = ((g?.scores as Record<string, unknown>)?.home  as Record<string, unknown>)?.score   as number ?? 0;
+      const awayScore   = ((g?.scores as Record<string, unknown>)?.away  as Record<string, unknown>)?.score   as number ?? 0;
+      const homeGoals   = ((g?.scores as Record<string, unknown>)?.home  as Record<string, unknown>)?.goals   as number ?? 0;
+      const awayGoals   = ((g?.scores as Record<string, unknown>)?.away  as Record<string, unknown>)?.goals   as number ?? 0;
+      const homeBehinds = ((g?.scores as Record<string, unknown>)?.home  as Record<string, unknown>)?.behinds as number ?? 0;
+      const awayBehinds = ((g?.scores as Record<string, unknown>)?.away  as Record<string, unknown>)?.behinds as number ?? 0;
 
       matchRows.push({
         season,
-        round_number: roundNum,
+        round_number: week,
         match_id:     String(gameId),
         home_team:    homeTeam,
         away_team:    awayTeam,
@@ -125,21 +124,18 @@ Deno.serve(async (req: Request) => {
       throw new Error(`raw_2026_matches upsert failed: ${upsertError.message}`);
     }
 
-    console.log(`[master-dispatcher] Upserted ${matchRows.length} match rows`);
+    console.log(`[master-dispatcher] Upserted ${matchRows.length} match rows into raw_2026_matches`);
 
     // ── Sync completed scores back to match_center_games_base ─────────────────
     let scoresUpdated = 0;
-    for (const g of response) {
-      const gameId   = g?.game?.id as number;
-      const status   = g?.game?.status?.short as string ?? "NS";
-      if (status !== "FT") continue;
-
-      const homeScore   = g?.scores?.home?.total   as number ?? 0;
-      const awayScore   = g?.scores?.away?.total   as number ?? 0;
-      const homeGoals   = g?.scores?.home?.goals   as number ?? 0;
-      const awayGoals   = g?.scores?.away?.goals   as number ?? 0;
-      const homeBehinds = g?.scores?.home?.behinds as number ?? 0;
-      const awayBehinds = g?.scores?.away?.behinds as number ?? 0;
+    for (const g of completedGames) {
+      const gameId      = (g?.game as Record<string, unknown>)?.id as number;
+      const homeScore   = ((g?.scores as Record<string, unknown>)?.home  as Record<string, unknown>)?.score   as number ?? 0;
+      const awayScore   = ((g?.scores as Record<string, unknown>)?.away  as Record<string, unknown>)?.score   as number ?? 0;
+      const homeGoals   = ((g?.scores as Record<string, unknown>)?.home  as Record<string, unknown>)?.goals   as number ?? 0;
+      const awayGoals   = ((g?.scores as Record<string, unknown>)?.away  as Record<string, unknown>)?.goals   as number ?? 0;
+      const homeBehinds = ((g?.scores as Record<string, unknown>)?.home  as Record<string, unknown>)?.behinds as number ?? 0;
+      const awayBehinds = ((g?.scores as Record<string, unknown>)?.away  as Record<string, unknown>)?.behinds as number ?? 0;
 
       const { error: updateErr } = await db
         .schema("afl")
@@ -157,23 +153,21 @@ Deno.serve(async (req: Request) => {
         .eq("match_id", gameId)
         .eq("season", season);
 
-      if (updateErr) {
-        console.warn(`[master-dispatcher] Could not update match_center for game ${gameId}: ${updateErr.message}`);
-      } else {
-        scoresUpdated++;
-      }
+      if (!updateErr) scoresUpdated++;
     }
 
-    console.log(`[master-dispatcher] Updated ${scoresUpdated} completed game scores in match_center_games_base`);
+    console.log(`[master-dispatcher] Synced ${scoresUpdated} FT scores to match_center_games_base`);
 
     return new Response(
       JSON.stringify({
-        ok:            true,
+        ok:              true,
         season,
-        round_number:  roundNumber,
-        games_fetched: response.length,
-        rows_upserted: matchRows.length,
-        scores_synced: scoresUpdated,
+        week_filter:     weekFilter,
+        games_fetched:   allGames.length,
+        week_games:      weekGames.length,
+        completed_games: completedGames.length,
+        rows_upserted:   matchRows.length,
+        scores_synced:   scoresUpdated,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

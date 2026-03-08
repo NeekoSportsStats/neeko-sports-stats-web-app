@@ -54,11 +54,11 @@ Deno.serve(async (req: Request) => {
       playerMap[p.player_id] = { name: p.player_name, team: p.team };
     }
 
-    // ── Fetch completed game IDs for the target season/round ───────────────────
+    // ── Fetch completed game IDs from raw_2026_matches (populated by master-dispatcher) ──
     let gameQuery = db
       .schema("afl")
-      .from("match_center_games_base")
-      .select("match_id, round_number, home_team_vendor, away_team_vendor, status")
+      .from("raw_2026_matches")
+      .select("match_id, round_number, home_team, away_team, status")
       .eq("season", season)
       .eq("status", "FT");
 
@@ -85,8 +85,8 @@ Deno.serve(async (req: Request) => {
     for (const game of games) {
       const gameId      = game.match_id as number;
       const roundNum    = game.round_number as number;
-      const homeVendor  = game.home_team_vendor as string;
-      const awayVendor  = game.away_team_vendor as string;
+      const homeVendor  = game.home_team as string;
+      const awayVendor  = game.away_team as string;
 
       try {
         const url = `${apiBase}/games/statistics/players?id=${gameId}`;

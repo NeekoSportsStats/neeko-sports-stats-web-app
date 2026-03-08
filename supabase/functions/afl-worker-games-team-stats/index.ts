@@ -31,111 +31,137 @@ Deno.serve(async (req: Request) => {
       "Content-Type": "application/json",
     };
 
-    // ── Build vendor team ID → name map ────────────────────────────────────────
-    const { data: teamsRaw } = await db
+    // ── Load all 18 teams from teams_raw (IDs are stable across seasons) ──────
+    const { data: teamsRaw, error: teamsErr } = await db
       .schema("afl")
       .from("teams_raw")
       .select("vendor_team_id, raw")
       .eq("season", 2025);
 
-    const teamIdToName: Record<number, string> = {};
-    for (const t of teamsRaw ?? []) {
-      teamIdToName[t.vendor_team_id] = (t.raw as Record<string, string>)?.name ?? String(t.vendor_team_id);
-    }
+    if (teamsErr) throw new Error(`Failed to load teams_raw: ${teamsErr.message}`);
 
-    // ── Fetch completed game IDs for the target season/round ───────────────────
-    let gameQuery = db
+    const teams = (teamsRaw ?? []).map((t) => ({
+      id:   t.vendor_team_id as number,
+      name: (t.raw as Record<string, string>)?.name ?? String(t.vendor_team_id),
+    }));
+
+    console.log(`[team-stats] Processing ${teams.length} teams`);
+
+    // ── Also load completed games for this round from raw_2026_matches ─────────
+    // Used to get per-round opponent / venue / result context
+    let matchQuery = db
       .schema("afl")
-      .from("match_center_games_base")
-      .select("match_id, round_number, home_team_vendor, away_team_vendor, venue, status")
+      .from("raw_2026_matches")
+      .select("match_id, round_number, home_team, away_team, venue, home_score, away_score, status")
       .eq("season", season)
       .eq("status", "FT");
 
     if (roundNumber !== null) {
-      gameQuery = gameQuery.eq("round_number", roundNumber);
+      matchQuery = matchQuery.eq("round_number", roundNumber);
     }
 
-    const { data: games, error: gamesError } = await gameQuery;
+    const { data: completedMatches } = await matchQuery;
 
-    if (gamesError) throw new Error(`Failed to fetch games: ${gamesError.message}`);
-    if (!games || games.length === 0) {
-      return new Response(
-        JSON.stringify({ ok: true, season, round_number: roundNumber, message: "No completed games found", rows_upserted: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Build lookup: team name → list of match contexts for this round
+    const teamMatchContext: Record<string, { match_id: string; round_number: number; opponent: string; venue: string; is_home: boolean; score: number; opponent_score: number }[]> = {};
+
+    for (const m of completedMatches ?? []) {
+      const roundNum = m.round_number as number;
+      const matchId  = m.match_id as string;
+      const venue    = m.venue as string ?? "";
+
+      const homeEntry = {
+        match_id:       matchId,
+        round_number:   roundNum,
+        opponent:       m.away_team as string,
+        venue,
+        is_home:        true,
+        score:          m.home_score as number ?? 0,
+        opponent_score: m.away_score as number ?? 0,
+      };
+      const awayEntry = {
+        match_id:       matchId,
+        round_number:   roundNum,
+        opponent:       m.home_team as string,
+        venue,
+        is_home:        false,
+        score:          m.away_score as number ?? 0,
+        opponent_score: m.home_score as number ?? 0,
+      };
+
+      if (!teamMatchContext[m.home_team as string]) teamMatchContext[m.home_team as string] = [];
+      if (!teamMatchContext[m.away_team as string]) teamMatchContext[m.away_team as string] = [];
+      teamMatchContext[m.home_team as string].push(homeEntry);
+      teamMatchContext[m.away_team as string].push(awayEntry);
     }
-
-    console.log(`[team-stats] Found ${games.length} completed games to process`);
 
     let totalUpserted = 0;
     let totalErrors   = 0;
-    const gameResults: { game_id: number; round: number; teams: number; error?: string }[] = [];
+    const teamResults: { team_id: number; team: string; rows: number; error?: string }[] = [];
 
-    for (const game of games) {
-      const gameId     = game.match_id as number;
-      const roundNum   = game.round_number as number;
-      const homeVendor = game.home_team_vendor as string;
-      const awayVendor = game.away_team_vendor as string;
-      const venue      = game.venue as string;
-
+    // ── Fetch season stats once per team: /teams/statistics?id={team_id}&season={season} ──
+    for (const team of teams) {
       try {
-        const url = `${apiBase}/games/statistics/teams?id=${gameId}`;
-        console.log(`[team-stats] Fetching game_id=${gameId} round=${roundNum}: ${url}`);
+        const url = `${apiBase}/teams/statistics?id=${team.id}&season=${season}`;
+        console.log(`[team-stats] Fetching team_id=${team.id} (${team.name}): ${url}`);
 
         const apiRes = await fetch(url, { headers: apiHeaders });
 
         if (!apiRes.ok) {
-          console.error(`[team-stats] API error for game ${gameId}: HTTP ${apiRes.status}`);
+          console.error(`[team-stats] API error for team ${team.id}: HTTP ${apiRes.status}`);
           totalErrors++;
-          gameResults.push({ game_id: gameId, round: roundNum, teams: 0, error: `HTTP ${apiRes.status}` });
+          teamResults.push({ team_id: team.id, team: team.name, rows: 0, error: `HTTP ${apiRes.status}` });
           continue;
         }
 
         const payload  = await apiRes.json();
-        const response = payload?.response ?? [];
+        const response = payload?.response ?? null;
 
-        if (response.length === 0) {
-          console.warn(`[team-stats] No team data returned for game ${gameId}`);
-          gameResults.push({ game_id: gameId, round: roundNum, teams: 0 });
+        if (!response) {
+          console.warn(`[team-stats] No stats returned for team ${team.id}`);
+          teamResults.push({ team_id: team.id, team: team.name, rows: 0 });
           continue;
         }
 
-        const gameData = response[0];
-        const teams    = gameData?.teams ?? [];
+        // Season-level stats from /teams/statistics response
+        const stats = response?.statistics ?? response ?? {};
+
+        // Build one row per completed match context for this team this round
+        const matchContexts = teamMatchContext[team.name] ?? [];
+
+        if (matchContexts.length === 0) {
+          // No completed match for this team this round — skip (season stats only useful when we have round context)
+          teamResults.push({ team_id: team.id, team: team.name, rows: 0 });
+          continue;
+        }
 
         const rows: Record<string, unknown>[] = [];
 
-        for (const teamEntry of teams) {
-          const vendorTeamId   = teamEntry?.team?.id as number;
-          const vendorTeamName = teamIdToName[vendorTeamId] ?? String(vendorTeamId);
-          const stats          = teamEntry?.statistics ?? {};
-
-          const isHome   = vendorTeamName === homeVendor;
-          const opponent = isHome ? awayVendor : homeVendor;
-          const score    = isHome
-            ? (stats?.scoring?.goals ?? 0) * 6 + (stats?.scoring?.behinds ?? 0)
-            : null;
+        for (const ctx of matchContexts) {
+          const result =
+            ctx.score > ctx.opponent_score ? "W" :
+            ctx.score < ctx.opponent_score ? "L" : "D";
 
           rows.push({
             season,
-            round_number:  roundNum,
-            match_id:      String(gameId),
-            team:          vendorTeamName,
-            opponent,
-            venue,
-            is_home:       isHome,
-            score:         score ?? 0,
-            goals:         stats?.scoring?.goals    ?? 0,
-            behinds:       stats?.scoring?.behinds  ?? 0,
-            disposals:     stats?.disposals?.disposals ?? 0,
-            kicks:         stats?.disposals?.kicks   ?? 0,
-            handballs:     stats?.disposals?.handballs ?? 0,
-            marks:         stats?.marks              ?? 0,
-            tackles:       stats?.defence?.tackles   ?? 0,
-            hitouts:       stats?.stoppages?.hitouts ?? 0,
-            result:        null,
-            api_payload:   teamEntry,
-            source_tag:    "api-sports-v1",
+            round_number: ctx.round_number,
+            match_id:     ctx.match_id,
+            team:         team.name,
+            opponent:     ctx.opponent,
+            venue:        ctx.venue,
+            is_home:      ctx.is_home,
+            score:        ctx.score,
+            goals:        Math.floor(ctx.score / 6),
+            behinds:      ctx.score % 6,
+            disposals:    stats?.disposals?.total     ?? stats?.disposals    ?? 0,
+            kicks:        stats?.kicks?.total         ?? stats?.kicks        ?? 0,
+            handballs:    stats?.handballs?.total     ?? stats?.handballs    ?? 0,
+            marks:        stats?.marks?.total         ?? stats?.marks        ?? 0,
+            tackles:      stats?.tackles?.total       ?? stats?.tackles      ?? 0,
+            hitouts:      stats?.hitouts?.total       ?? stats?.hitouts      ?? 0,
+            result,
+            api_payload:  response,
+            source_tag:   "api-sports-v1",
           });
         }
 
@@ -149,23 +175,23 @@ Deno.serve(async (req: Request) => {
             });
 
           if (upsertError) {
-            console.error(`[team-stats] Upsert error for game ${gameId}: ${upsertError.message}`);
+            console.error(`[team-stats] Upsert error for team ${team.name}: ${upsertError.message}`);
             totalErrors++;
-            gameResults.push({ game_id: gameId, round: roundNum, teams: rows.length, error: upsertError.message });
+            teamResults.push({ team_id: team.id, team: team.name, rows: rows.length, error: upsertError.message });
           } else {
             totalUpserted += rows.length;
-            gameResults.push({ game_id: gameId, round: roundNum, teams: rows.length });
-            console.log(`[team-stats] game_id=${gameId} upserted ${rows.length} team rows`);
+            teamResults.push({ team_id: team.id, team: team.name, rows: rows.length });
+            console.log(`[team-stats] team=${team.name} upserted ${rows.length} rows`);
           }
         } else {
-          gameResults.push({ game_id: gameId, round: roundNum, teams: 0 });
+          teamResults.push({ team_id: team.id, team: team.name, rows: 0 });
         }
 
-      } catch (gameErr) {
-        const msg = gameErr instanceof Error ? gameErr.message : String(gameErr);
-        console.error(`[team-stats] Exception for game ${gameId}: ${msg}`);
+      } catch (teamErr) {
+        const msg = teamErr instanceof Error ? teamErr.message : String(teamErr);
+        console.error(`[team-stats] Exception for team ${team.id}: ${msg}`);
         totalErrors++;
-        gameResults.push({ game_id: gameId, round: roundNum, teams: 0, error: msg });
+        teamResults.push({ team_id: team.id, team: team.name, rows: 0, error: msg });
       }
     }
 
@@ -174,10 +200,10 @@ Deno.serve(async (req: Request) => {
         ok:              totalErrors === 0,
         season,
         round_number:    roundNumber,
-        games_processed: games.length,
+        teams_processed: teams.length,
         rows_upserted:   totalUpserted,
         errors:          totalErrors,
-        games:           gameResults,
+        teams:           teamResults,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
