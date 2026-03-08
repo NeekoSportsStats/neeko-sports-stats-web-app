@@ -176,7 +176,15 @@ export default function AdminOperations() {
   const [priceText, setPriceText] = useState("");
   const [priceRound, setPriceRound] = useState<string>("");
   const [uploadingPrices, setUploadingPrices] = useState(false);
-  const [uploadResult, setUploadResult] = useState<{ ok: number; errors: string[] } | null>(null);
+
+  interface PriceUploadResult {
+    rows_updated: number;
+    rows_not_found: number;
+    unmatched: string[];
+    rows_skipped: number;
+  }
+  const [uploadResult, setUploadResult] = useState<PriceUploadResult | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const handlePriceUpload = async () => {
     const round = parseInt(priceRound, 10);
@@ -191,57 +199,61 @@ export default function AdminOperations() {
 
     setUploadingPrices(true);
     setUploadResult(null);
+    setUploadError(null);
 
     const lines = priceText.trim().split("\n").map((l) => l.trim()).filter(Boolean);
-    const rows: { player_name: string; price: number }[] = [];
-    const errors: string[] = [];
+    const priceRows: { player_name: string; price: number }[] = [];
 
     for (const line of lines) {
       const parts = line.split(",");
-      if (parts.length < 2) { errors.push(`Skipped (no comma): ${line}`); continue; }
+      if (parts.length < 2) continue;
       const rawName = parts.slice(0, -1).join(",").trim();
       const rawPrice = parts[parts.length - 1].replace(/[^0-9]/g, "");
       const price = parseInt(rawPrice, 10);
-      if (!rawName) { errors.push(`Empty name: ${line}`); continue; }
-      if (isNaN(price) || price < 100000) { errors.push(`Invalid price for ${rawName}: ${rawPrice}`); continue; }
-      rows.push({ player_name: rawName, price });
+      if (!rawName || isNaN(price) || price < 100000) continue;
+      priceRows.push({ player_name: rawName, price });
     }
 
-    if (rows.length === 0) {
-      toast({ title: "No valid rows parsed", variant: "destructive" });
-      setUploadResult({ ok: 0, errors });
+    if (priceRows.length === 0) {
+      toast({ title: "No valid rows found. Check format: Player Name,Price", variant: "destructive" });
       setUploadingPrices(false);
       return;
     }
 
-    let ok = 0;
-    for (const row of rows) {
-      const { data: players } = await supabase
-        .from("afl_player_prices")
-        .select("id, player_id")
-        .eq("season", 2026)
-        .ilike("player_name", row.player_name)
-        .limit(1);
+    try {
+      const { data, error } = await supabase.rpc("admin_update_fantasy_prices", {
+        price_rows: priceRows,
+        p_round: round,
+      });
 
-      if (players && players.length > 0) {
-        const { error } = await supabase
-          .from("afl_player_prices")
-          .update({ price: row.price, round_number: round })
-          .eq("id", (players[0] as { id: string }).id);
-        if (error) errors.push(`Update failed for ${row.player_name}: ${error.message}`);
-        else ok++;
+      if (error) throw error;
+
+      const result = data as { success: boolean; error?: string } & PriceUploadResult;
+
+      if (!result.success) {
+        setUploadError(result.error ?? "Unknown error");
+        toast({ title: "Price update failed", variant: "destructive" });
       } else {
-        errors.push(`Player not found: ${row.player_name}`);
+        setUploadResult({
+          rows_updated:   result.rows_updated   ?? 0,
+          rows_not_found: result.rows_not_found ?? 0,
+          unmatched:      result.unmatched      ?? [],
+          rows_skipped:   result.rows_skipped   ?? 0,
+        });
+        const updated = result.rows_updated ?? 0;
+        if (updated > 0) {
+          toast({ title: `${updated} price${updated !== 1 ? "s" : ""} updated for Round ${round} — Market Watch and Edge Board refreshed` });
+        } else {
+          toast({ title: "No prices matched. Check player names.", variant: "destructive" });
+        }
       }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setUploadError(msg);
+      toast({ title: "Price update failed", description: msg, variant: "destructive" });
+    } finally {
+      setUploadingPrices(false);
     }
-
-    setUploadResult({ ok, errors });
-    if (ok > 0) {
-      toast({ title: `${ok} price${ok > 1 ? "s" : ""} updated for Round ${round}` });
-    } else {
-      toast({ title: "No prices updated", variant: "destructive" });
-    }
-    setUploadingPrices(false);
   };
 
   return (
@@ -348,37 +360,46 @@ export default function AdminOperations() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
             Fantasy Price Upload
           </CardTitle>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Paste player prices in CSV format. Matches by player name and upserts into Round prices.
+          <p className="text-xs text-muted-foreground mt-1">
+            Paste player prices below. The system will update{" "}
+            <code className="text-[11px] bg-muted px-1 rounded">afl_player_prices</code>, then automatically
+            refresh Market Watch and Edge Board.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <label className="text-xs text-muted-foreground mb-1 block">Round Number</label>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Round Number</label>
               <input
                 type="number"
                 min={0}
                 max={30}
                 placeholder="e.g. 1"
                 value={priceRound}
-                onChange={(e) => setPriceRound(e.target.value)}
+                onChange={(e) => { setPriceRound(e.target.value); setUploadResult(null); setUploadError(null); }}
                 className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
+            <div className="sm:col-span-2 sm:hidden" />
           </div>
 
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">
-              Paste CSV — one player per line: <code className="text-xs bg-muted px-1 rounded">Player Name,Price</code>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+              Player Prices — one per line: <code className="text-[11px] bg-muted px-1 rounded">Player Name,Price</code>
             </label>
             <textarea
               value={priceText}
-              onChange={(e) => setPriceText(e.target.value)}
+              onChange={(e) => { setPriceText(e.target.value); setUploadResult(null); setUploadError(null); }}
               placeholder={"Marcus Bontempelli,1054000\nNick Daicos,987000\nMax Gawn,921000"}
-              rows={8}
+              rows={10}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring resize-y"
             />
+            {priceText.trim() && (
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {priceText.trim().split("\n").filter((l) => l.trim() && l.includes(",")).length} rows detected
+              </p>
+            )}
           </div>
 
           <Button
@@ -391,27 +412,51 @@ export default function AdminOperations() {
             ) : (
               <Upload className="h-4 w-4 mr-2" />
             )}
-            Upload Prices
+            Update Prices
           </Button>
 
-          {uploadResult && (
-            <div className="space-y-2">
-              {uploadResult.ok > 0 && (
-                <div className="flex items-center gap-2 text-sm text-emerald-600">
-                  <CheckCircle className="h-4 w-4 shrink-0" />
-                  {uploadResult.ok} player{uploadResult.ok > 1 ? "s" : ""} updated successfully
+          {uploadError && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5">
+              <AlertCircle className="h-4 w-4 shrink-0 text-destructive mt-0.5" />
+              <p className="text-xs text-destructive">{uploadError}</p>
+            </div>
+          )}
+
+          {uploadResult && !uploadError && (
+            <div className="space-y-2.5">
+              {uploadResult.rows_updated > 0 && (
+                <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5">
+                  <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />
+                  <div>
+                    <p className="text-sm font-medium text-emerald-600">
+                      {uploadResult.rows_updated} price{uploadResult.rows_updated !== 1 ? "s" : ""} updated
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Market Watch and Edge Board have been refreshed automatically.
+                    </p>
+                  </div>
                 </div>
               )}
-              {uploadResult.errors.length > 0 && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-1">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-destructive">
+              {uploadResult.rows_not_found > 0 && uploadResult.unmatched.length > 0 && (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-amber-600">
                     <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    {uploadResult.errors.length} issue{uploadResult.errors.length > 1 ? "s" : ""}
+                    {uploadResult.rows_not_found} player{uploadResult.rows_not_found !== 1 ? "s" : ""} not found
                   </div>
-                  <ul className="text-xs text-muted-foreground space-y-0.5 max-h-32 overflow-y-auto">
-                    {uploadResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                  <ul className="text-xs text-muted-foreground space-y-0.5 max-h-36 overflow-y-auto font-mono">
+                    {uploadResult.unmatched.map((name, i) => (
+                      <li key={i} className="pl-1">{name}</li>
+                    ))}
                   </ul>
+                  <p className="text-[11px] text-muted-foreground">
+                    Check spelling — names must match exactly (case-insensitive).
+                  </p>
                 </div>
+              )}
+              {uploadResult.rows_skipped > 0 && (
+                <p className="text-[11px] text-muted-foreground">
+                  {uploadResult.rows_skipped} row{uploadResult.rows_skipped !== 1 ? "s" : ""} skipped (invalid format or price below 100,000).
+                </p>
               )}
             </div>
           )}
