@@ -162,15 +162,15 @@ interface AccuracyRow {
 
 function confidenceLevel(err: number | null): { label: string; color: string; bg: string; border: string; barColor: string } {
   if (err == null) return { label: "—",        color: "text-white/30",    bg: "bg-white/5",         border: "border-white/10",         barColor: "bg-white/20" };
-  if (err < 15)    return { label: "HIGH",     color: "text-green-400",   bg: "bg-green-400/10",    border: "border-green-400/30",     barColor: "bg-green-400" };
-  if (err <= 18)   return { label: "MODERATE", color: "text-[#F5C84C]",   bg: "bg-[#F5C84C]/10",    border: "border-[#F5C84C]/30",     barColor: "bg-[#F5C84C]" };
-  return             { label: "LOW",       color: "text-red-400",     bg: "bg-red-400/10",      border: "border-red-400/30",       barColor: "bg-red-400" };
+  if (err < 16)    return { label: "ELITE",     color: "text-green-400",   bg: "bg-green-400/10",    border: "border-green-400/30",     barColor: "bg-green-400" };
+  if (err <= 18)   return { label: "STRONG", color: "text-[#F5C84C]",   bg: "bg-[#F5C84C]/10",    border: "border-[#F5C84C]/30",     barColor: "bg-[#F5C84C]" };
+  return             { label: "MODERATE",       color: "text-red-400",     bg: "bg-red-400/10",      border: "border-red-400/30",       barColor: "bg-red-400" };
 }
 
 function reliabilityLevel(err: number | null): { label: string; color: string; bg: string; border: string } {
   if (err == null) return { label: "—",        color: "text-white/30",   bg: "bg-white/5",        border: "border-white/10" };
-  if (err <= 14)   return { label: "EXCELLENT", color: "text-green-400",  bg: "bg-green-400/10",   border: "border-green-400/30" };
-  if (err <= 17)   return { label: "STRONG",    color: "text-[#F5C84C]",  bg: "bg-[#F5C84C]/10",   border: "border-[#F5C84C]/30" };
+  if (err <= 16)   return { label: "ELITE", color: "text-green-400",  bg: "bg-green-400/10",   border: "border-green-400/30" };
+  if (err <= 18)   return { label: "STRONG",    color: "text-[#F5C84C]",  bg: "bg-[#F5C84C]/10",   border: "border-[#F5C84C]/30" };
   return             { label: "MODERATE",  color: "text-orange-400",  bg: "bg-orange-400/10",  border: "border-orange-400/30" };
 }
 
