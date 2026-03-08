@@ -142,40 +142,37 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // ── Step 1: Ingest AFL API data (master dispatcher + individual workers) ──
+    // ── Step 1: Ingest AFL API data (master dispatcher — fetches & scores matches)
     await runStep("1_ingest_matches", async () => {
-      return callFn("afl-master-dispatcher", { season, round_number: roundNumber || null });
+      return callFn("afl-master-dispatcher", { season, round_number: roundNumber !== 0 ? roundNumber || null : 0 });
     }, skipIngest);
 
-    // ── Step 2: Ingest player stats for the completed round ───────────────────
-    await runStep("2_ingest_player_stats", async () => {
-      return callFn("afl-worker-games-player-stats", { season });
-    }, skipIngest);
-
-    // ── Step 3: Ingest team stats ─────────────────────────────────────────────
-    await runStep("3_ingest_team_stats", async () => {
-      return callFn("afl-worker-games-team-stats", { season });
-    }, skipIngest);
-
-    // ── Step 4: Determine latest completed round ──────────────────────────────
+    // ── Step 4: Determine latest completed round BEFORE player/team stat ingest
+    // (master dispatcher updates match statuses — detect completed round first)
     let latestRound = roundNumber;
     await runStep("4_detect_latest_round", async () => {
-      const { data, error } = await db.rpc("get_latest_completed_round", { p_season: season });
+      const { data, error } = await db.schema("afl").rpc(
+        "get_latest_completed_round",
+        { p_season: season }
+      );
       if (!error && data !== null && data !== undefined) {
-        latestRound = Number(data);
+        const detected = Number(data);
+        // -1 means no completed rounds yet — treat as Opening Round (0)
+        latestRound = detected >= 0 ? detected : 0;
       }
-      if (latestRound === 0) {
-        const { data: matches } = await db
-          .schema("afl")
-          .from("raw_2026_matches")
-          .select("id", { count: "exact", head: false })
-          .limit(1);
-        if (matches && matches.length > 0) {
-          latestRound = 1;
-        }
-      }
+      console.log(`Pipeline detected latest completed round: ${latestRound}`);
       return { latest_round: latestRound };
     });
+
+    // ── Step 2: Ingest player stats for the detected completed round ──────────
+    await runStep("2_ingest_player_stats", async () => {
+      return callFn("afl-worker-games-player-stats", { season, round_number: latestRound });
+    }, skipIngest);
+
+    // ── Step 3: Ingest team stats for the detected completed round ────────────
+    await runStep("3_ingest_team_stats", async () => {
+      return callFn("afl-worker-games-team-stats", { season, round_number: latestRound });
+    }, skipIngest);
 
     // ── Step 5: Transform raw → canonical (player stats) ─────────────────────
     await runStep("5_transform_player_stats", async () => {
