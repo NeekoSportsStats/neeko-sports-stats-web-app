@@ -161,10 +161,10 @@ interface AccuracyRow {
 }
 
 function confidenceLevel(err: number | null): { label: string; color: string; bg: string; border: string; barColor: string } {
-  if (err == null) return { label: "—",      color: "text-white/30",    bg: "bg-white/5",         border: "border-white/10",         barColor: "bg-white/20" };
-  if (err <= 14)   return { label: "HIGH",   color: "text-green-400",   bg: "bg-green-400/10",    border: "border-green-400/30",     barColor: "bg-green-400" };
-  if (err <= 17)   return { label: "STRONG", color: "text-yellow-400",  bg: "bg-yellow-400/10",   border: "border-yellow-400/30",    barColor: "bg-yellow-400" };
-  return             { label: "LOW",    color: "text-red-400",     bg: "bg-red-400/10",      border: "border-red-400/30",       barColor: "bg-red-400" };
+  if (err == null) return { label: "—",        color: "text-white/30",    bg: "bg-white/5",         border: "border-white/10",         barColor: "bg-white/20" };
+  if (err < 15)    return { label: "HIGH",     color: "text-green-400",   bg: "bg-green-400/10",    border: "border-green-400/30",     barColor: "bg-green-400" };
+  if (err <= 18)   return { label: "MODERATE", color: "text-[#F5C84C]",   bg: "bg-[#F5C84C]/10",    border: "border-[#F5C84C]/30",     barColor: "bg-[#F5C84C]" };
+  return             { label: "LOW",       color: "text-red-400",     bg: "bg-red-400/10",      border: "border-red-400/30",       barColor: "bg-red-400" };
 }
 
 function reliabilityLevel(err: number | null): { label: string; color: string; bg: string; border: string } {
@@ -307,18 +307,11 @@ function ModelAccuracySection() {
   const conf = confidenceLevel(hasData ? (row?.avg_error ?? null) : null);
   const sourceLabel = row?.source === "automatic" ? "2026 Season Accuracy" : "Opening Round Accuracy";
 
-  const HISTORICAL_AVG = 16.0;
   const proofLine = (() => {
     if (!hasData || row?.avg_error == null) return null;
     const err = row.avg_error;
     const players = row?.players_analysed != null ? row.players_analysed.toLocaleString() : "—";
-    if (err < HISTORICAL_AVG - 0.2) {
-      return `Opening Round projections achieved an average error of ${err.toFixed(1)} points — outperforming the model's historical average of ${HISTORICAL_AVG.toFixed(1)} points.`;
-    } else if (err <= HISTORICAL_AVG + 0.2) {
-      return `Opening Round projections averaged ${err.toFixed(1)} points error across ${players} players — closely matching the model's historical average of ${HISTORICAL_AVG.toFixed(1)} points.`;
-    } else {
-      return `Opening Round projections averaged ${err.toFixed(1)} points error across ${players} players — slightly above the model's historical average of ${HISTORICAL_AVG.toFixed(1)} points.`;
-    }
+    return `Opening Round projections averaged ${err.toFixed(1)} points error across ${players} players.`;
   })();
 
   const metrics = [
