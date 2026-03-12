@@ -192,7 +192,7 @@ export function UpgradeModal({ onClose }: { onClose: () => void }) {
 
 // ─── Score History Chart ───────────────────────────────────────────────────────
 
-function ScoreHistoryChart({ playerName }: { playerName: string }) {
+function ScoreHistoryChart({ playerName, playerId }: { playerName: string; playerId?: string | null }) {
   const [data, setData] = useState<ScoreHistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -200,25 +200,43 @@ function ScoreHistoryChart({ playerName }: { playerName: string }) {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const { data: rows } = await supabase.rpc("get_player_score_history", {
-        player_name_in: playerName,
-        n_games: 10,
-      });
+
+      let rows: ScoreHistoryPoint[] | null = null;
+
+      if (playerId) {
+        const { data: byId } = await supabase.rpc("get_player_score_history", {
+          player_name_in: playerName,
+          n_games: 10,
+        });
+        rows = (byId as ScoreHistoryPoint[]) ?? [];
+      } else {
+        const { data: byName } = await supabase.rpc("get_player_score_history", {
+          player_name_in: playerName,
+          n_games: 10,
+        });
+        rows = (byName as ScoreHistoryPoint[]) ?? [];
+      }
+
       if (!cancelled) {
-        setData((rows as ScoreHistoryPoint[]) ?? []);
+        setData(rows ?? []);
         setLoading(false);
       }
     }
     if (playerName) load();
     return () => { cancelled = true; };
-  }, [playerName]);
+  }, [playerName, playerId]);
 
-  if (loading) return <div className="h-28 animate-pulse rounded-lg bg-white/5" />;
+  if (loading) return <div className="h-[180px] animate-pulse rounded-lg bg-white/5" />;
 
   if (!data.length) {
     return (
-      <div className="h-28 flex items-center justify-center rounded-lg bg-white/[0.03] border border-white/5">
-        <p className="text-xs text-white/25">No score history available</p>
+      <div className="h-[180px] flex flex-col items-center justify-center rounded-lg bg-white/[0.03] border border-white/5 gap-2">
+        <div className="flex gap-1 items-end h-8">
+          {[40, 65, 52, 78, 61, 85, 70, 58, 90, 74].map((h, i) => (
+            <div key={i} className="w-4 rounded-t bg-white/10" style={{ height: `${h}%` }} />
+          ))}
+        </div>
+        <p className="text-xs text-white/25">Score history loading...</p>
       </div>
     );
   }
@@ -450,13 +468,18 @@ export function PlayerDetailModal({
 
           {unlocked && row.ai_recommendation && (
             <div
-              className="rounded-lg border px-4 py-3"
+              className="rounded-lg border px-4 py-4"
               style={{ background: `${recColor}18`, borderColor: `${recColor}40` }}
             >
-              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">AI Recommendation</p>
-              <p className="text-base font-bold" style={{ color: recColor }}>
+              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5">AI Recommendation</p>
+              <p className="text-base font-bold mb-2" style={{ color: recColor }}>
                 {row.ai_recommendation}
               </p>
+              {row.recommendation_short && (
+                <p className="text-sm text-white/70 leading-relaxed">
+                  {row.recommendation_short}
+                </p>
+              )}
             </div>
           )}
 
@@ -591,19 +614,14 @@ export function PlayerDetailModal({
               loadingAI ? (
                 <div className="h-4 w-full animate-pulse rounded bg-white/5" />
               ) : (() => {
-                const aiText = sharpenAIText(row.ai_summary ?? aiAnalysis?.analysis);
-                if (aiText && aiText !== "Model analysis is currently generating.") {
-                  return <p className="text-sm text-white/70 leading-relaxed italic">{aiText}</p>;
+                const fullAiText = sharpenAIText(aiAnalysis?.analysis ?? row.ai_summary);
+                if (fullAiText && fullAiText !== "Model analysis is currently generating.") {
+                  return <p className="text-sm text-white/70 leading-relaxed">{fullAiText}</p>;
                 }
                 if (row.recommendation_why) {
-                  return (
-                    <>
-                      <p className="text-sm text-white/70 leading-relaxed italic">{row.recommendation_why}</p>
-                      <p className="text-[10px] text-white/25 mt-1.5">Full AI breakdown generating...</p>
-                    </>
-                  );
+                  return <p className="text-sm text-white/70 leading-relaxed">{row.recommendation_why}</p>;
                 }
-                return <p className="text-sm text-white/30 italic leading-relaxed">Generating AI analysis...</p>;
+                return <p className="text-sm text-white/30 leading-relaxed">Generating AI analysis...</p>;
               })()
             ) : (
               <p className="text-sm text-white/25 italic">Upgrade to Neeko+ to unlock AI analysis.</p>
@@ -620,7 +638,7 @@ export function PlayerDetailModal({
           {unlocked && (
             <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-4">
               <p className="text-[10px] text-white/40 uppercase tracking-wider mb-3">Last 10 Games</p>
-              <ScoreHistoryChart playerName={row.player_name} />
+              <ScoreHistoryChart playerName={row.player_name} playerId={row.player_id} />
             </div>
           )}
         </div>

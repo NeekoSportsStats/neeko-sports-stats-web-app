@@ -22,6 +22,7 @@ export interface RankingRow {
   ai_recommendation: string | null;
   ai_summary: string | null;
   ai_updated_at: string | null;
+  recommendation_short: string | null;
   recommendation_why: string | null;
   recommendation_color: string | null;
   consistency_tier: string | null;

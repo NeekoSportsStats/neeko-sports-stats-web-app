@@ -99,11 +99,12 @@ interface TableRowProps {
   isPremium: boolean;
   tier: RowTier;
   activeTab: RankingsTab;
+  isHighlighted?: boolean;
   onRowClick: () => void;
   onUpgrade: () => void;
 }
 
-export function TableRow({ row, idx, isPremium, tier, activeTab, onRowClick, onUpgrade }: TableRowProps) {
+export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, onRowClick, onUpgrade }: TableRowProps) {
   const rank = idx + 1;
   const rowUnlocked = tier === "premium" || tier === "full";
 
@@ -121,7 +122,9 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, onRowClick, onU
     return true;
   };
 
-  const rowClass = isPremium
+  const rowClass = isHighlighted
+    ? "border-b border-[#F5C84C]/30 bg-[#F5C84C]/[0.06] cursor-pointer transition-all duration-150"
+    : isPremium
     ? "border-b border-white/[0.04] cursor-pointer transition-all duration-150 hover:bg-white/[0.06] hover:scale-[1.002]"
     : "border-b border-white/[0.04] transition-all duration-150 cursor-pointer hover:bg-white/5";
 

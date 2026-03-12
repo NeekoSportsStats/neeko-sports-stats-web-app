@@ -194,6 +194,16 @@ const AI_REPLACEMENTS: [RegExp, string][] = [
   [/high floor with moderate upside/gi, "High floor. Moderate upside."],
   [/presents solid value/gi, "Solid value."],
   [/is well-positioned/gi, "Well positioned."],
+  [/boasts an elite projection tier/gi, "Top-tier projection."],
+  [/boasts (a|an) (elite|strong|solid)/gi, "Has $2"],
+  [/is considered a strong/gi, "Strong"],
+  [/it is worth noting that/gi, "Note:"],
+  [/it should be noted that/gi, "Note:"],
+  [/given his (?:recent\s+)?(?:form|performances?)/gi, "Given recent form,"],
+  [/making him a (?:reliable|valuable|worthwhile) (?:asset|option|pick)/gi, "solid fantasy pick."],
+  [/in your fantasy (?:team|lineup|squad)/gi, "this week."],
+  [/fantasy (?:team|lineup|squad) this round/gi, "this week."],
+  [/at a price of \$[\d,]+/gi, "at current price."],
 ];
 
 export function sharpenAIText(text: string | null | undefined): string | null {
