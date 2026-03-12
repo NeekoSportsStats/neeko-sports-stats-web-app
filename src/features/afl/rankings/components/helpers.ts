@@ -122,9 +122,9 @@ export function getRiskColor(v: number | null): string {
 
 export function getConfidenceColor(v: number | null): string {
   if (v == null) return "text-white/30";
-  if (v >= 80) return "text-green-400";
-  if (v >= 65) return "text-yellow-400";
-  if (v >= 45) return "text-orange-400";
+  if (v >= 85) return "text-green-400";
+  if (v >= 72) return "text-yellow-400";
+  if (v >= 58) return "text-orange-400";
   return "text-red-400";
 }
 
@@ -163,18 +163,20 @@ export function getValueTagStyle(tag: string | null | undefined) {
 
 export function getNeekoRatingBadge(rating: number | null) {
   if (rating == null) return { label: "—", text: "text-white/30", bg: "bg-transparent", border: "border-transparent", glow: "" };
-  if (rating >= 150) return { label: "GENERATIONAL", text: "text-yellow-400", bg: "bg-yellow-400/15", border: "border-yellow-400/40", glow: "drop-shadow(0 0 6px rgba(250,204,21,0.55))" };
-  if (rating >= 130) return { label: "ELITE", text: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30", glow: "drop-shadow(0 0 5px rgba(74,222,128,0.45))" };
-  if (rating >= 110) return { label: "STRONG", text: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/30", glow: "" };
-  if (rating >= 90) return { label: "SOLID", text: "text-gray-300", bg: "bg-white/5", border: "border-white/15", glow: "" };
+  if (rating >= 90) return { label: "ELITE", text: "text-yellow-400", bg: "bg-yellow-400/15", border: "border-yellow-400/40", glow: "drop-shadow(0 0 6px rgba(250,204,21,0.55))" };
+  if (rating >= 80) return { label: "STRONG", text: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30", glow: "drop-shadow(0 0 5px rgba(74,222,128,0.45))" };
+  if (rating >= 70) return { label: "SOLID", text: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/30", glow: "" };
+  if (rating >= 58) return { label: "WATCH", text: "text-gray-300", bg: "bg-white/5", border: "border-white/15", glow: "" };
   return { label: "RISK", text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30", glow: "" };
 }
 
 export function getRiskBadge(risk: number | null) {
   if (risk == null) return { label: "—", text: "text-white/30", bg: "bg-transparent", border: "border-transparent" };
-  if (risk >= 75) return { label: "HIGH RISK", text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" };
-  if (risk >= 50) return { label: "RISKY", text: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/30" };
-  return { label: "SAFE", text: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30" };
+  if (risk >= 80) return { label: "EXTREME", text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" };
+  if (risk >= 60) return { label: "HIGH RISK", text: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/30" };
+  if (risk >= 40) return { label: "ELEVATED", text: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/30" };
+  if (risk >= 20) return { label: "MODERATE", text: "text-gray-300", bg: "bg-white/5", border: "border-white/15" };
+  return { label: "LOW RISK", text: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30" };
 }
 
 // ─── AI tone sharpener ────────────────────────────────────────────────────────
