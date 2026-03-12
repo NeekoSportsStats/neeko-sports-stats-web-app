@@ -122,11 +122,13 @@ export default function AFLRankingsPage() {
 
     const rpc = isPremium ? "get_rankings_premium" : "get_rankings_free";
 
-    const { data } = await supabase.rpc(rpc, {
+    const { data, error } = await supabase.rpc(rpc, {
       position_filter: posArg,
       sort_key: sortArg,
       limit_n: 750,
     });
+
+    console.log("Rankings RPC result:", { rpc, rows: (data as any[])?.length, error, sample: (data as any[])?.[0] });
 
     const normalized: RankingRow[] = ((data as any[]) ?? []).map((r) => ({
       player_id: r.player_id,
