@@ -18,7 +18,7 @@ interface StartSitRequest {
 }
 
 interface PlayerData {
-  player_id: string;
+  player_id: number;
   player_name: string;
   team: string | null;
   position: string | null;
@@ -28,7 +28,6 @@ interface PlayerData {
   projection_confidence: number | null;
   risk_rating: number | null;
   neeko_rating: number | null;
-  ai_recommendation: string | null;
 }
 
 interface PromptRecord {
@@ -358,7 +357,7 @@ Deno.serve(async (req: Request) => {
         .select(
           `player_id, player_name, team, position,
            projection_final, ceiling_estimate, floor_estimate,
-           projection_confidence, risk_rating, neeko_rating, ai_recommendation`
+           projection_confidence, risk_rating, neeko_rating`
         )
         .in("player_id", [playerAId, playerBId]),
     ]);
@@ -385,8 +384,8 @@ Deno.serve(async (req: Request) => {
       .select("*")
       .eq("season", season)
       .eq("round_number", round_number)
-      .eq("player_low_id", loId)
-      .eq("player_high_id", hiId)
+      .eq("player_low_id", String(loId))
+      .eq("player_high_id", String(hiId))
       .maybeSingle();
 
     const isFresh =
@@ -433,9 +432,9 @@ Deno.serve(async (req: Request) => {
         {
           season,
           round_number,
-          player_low_id: loId,
-          player_high_id: hiId,
-          winner_player_id: winner.player_id,
+          player_low_id: String(loId),
+          player_high_id: String(hiId),
+          winner_player_id: String(winner.player_id),
           winner_name: winner.player_name,
           confidence,
           ai_summary: aiSummary,
