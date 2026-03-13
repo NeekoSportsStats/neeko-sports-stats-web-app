@@ -4,7 +4,7 @@ import { MWPlayerRow } from "./types";
 import {
   fmtPrice, fmtNum, fmtPriceChange,
   positionBadge, riskColor, momentumColor, priceChangeColor,
-  categoryLabel, categoryColor, tradeScoreExplanation,
+  categoryLabel, categoryColor, tradeScoreExplanation, tradeScoreBadge,
 } from "./helpers";
 
 interface Props {
@@ -22,9 +22,9 @@ export function PlayerTradeCard({ row, locked, onUnlock, onCompare, rank }: Prop
     return <LockedPlayerCard rank={rank} onUnlock={onUnlock} />;
   }
 
-  const reasons = Array.isArray(row.reasons) ? row.reasons.filter(Boolean) : [];
   const edgePts = Number(row.price_edge_pts ?? 0);
   const expChange = Number(row.expected_price_change ?? 0);
+  const score = Number(row.trade_score ?? 0);
 
   return (
     <div className="relative rounded-xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/12 transition-all duration-200 p-4">
@@ -54,7 +54,7 @@ export function PlayerTradeCard({ row, locked, onUnlock, onCompare, rank }: Prop
         <StatCell label="Price"      value={fmtPrice(row.price)} />
       </div>
 
-      <div className="grid grid-cols-3 gap-1.5 mb-1.5">
+      <div className="grid grid-cols-3 gap-1.5 mb-3">
         <StatCell
           label="Price Edge"
           value={`${edgePts >= 0 ? "+" : ""}${fmtNum(edgePts, 1)} pts`}
@@ -72,33 +72,12 @@ export function PlayerTradeCard({ row, locked, onUnlock, onCompare, rank }: Prop
         />
       </div>
 
-      {(row.projected_price_r1 != null || row.projected_price_r2 != null || row.projected_price_r3 != null) && (
-        <div className="mb-3">
-          <p className="text-[9px] text-white/20 uppercase tracking-wider mb-1.5 px-0.5">Price Growth</p>
-          <div className="grid grid-cols-3 gap-1.5">
-            <StatCell
-              label="Next Round"
-              value={fmtPrice(row.projected_price_r1 ?? row.projected_price)}
-              valueClass={priceChangeColor(expChange)}
-            />
-            <StatCell
-              label="2 Rounds"
-              value={fmtPrice(row.projected_price_r2)}
-              valueClass={priceChangeColor(expChange)}
-            />
-            <StatCell
-              label="3 Rounds"
-              value={fmtPrice(row.projected_price_r3)}
-              valueClass={priceChangeColor(expChange)}
-            />
-          </div>
-        </div>
-      )}
-
       <div className="border-t border-white/5 pt-2.5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border tabular-nums ${tradeScoreBadge(score)}`}>
+            {fmtNum(score, 0)}
+          </span>
           <span className="text-[10px] text-white/30">Trade Score</span>
-          <span className="text-sm font-bold tabular-nums text-white">{fmtNum(row.trade_score, 1)}</span>
           <button
             className="text-white/20 hover:text-white/50 transition-colors relative"
             onMouseEnter={() => setShowScoreTooltip(true)}
@@ -123,15 +102,11 @@ export function PlayerTradeCard({ row, locked, onUnlock, onCompare, rank }: Prop
         )}
       </div>
 
-      {reasons.length > 0 && (
-        <div className="mt-2.5 space-y-0.5">
-          {reasons.slice(0, 2).map((r, i) => (
-            <p key={i} className="text-[10px] text-white/30 leading-snug flex items-start gap-1">
-              <span className="text-white/15 shrink-0">·</span>
-              {r}
-            </p>
-          ))}
-        </div>
+      {row.category_reason && (
+        <p className="mt-2 text-[10px] text-white/30 leading-snug flex items-start gap-1">
+          <span className="text-white/15 shrink-0">·</span>
+          {row.category_reason}
+        </p>
       )}
     </div>
   );

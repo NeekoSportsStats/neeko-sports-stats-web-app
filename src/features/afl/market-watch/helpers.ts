@@ -1,4 +1,4 @@
-import { MarketRow, MWCategory } from "./types";
+import { MWCategory } from "./types";
 
 export function fmtPrice(v: number | null | undefined): string {
   if (v == null) return "—";
@@ -45,39 +45,6 @@ export function positionBadge(pos: string | null): string {
   return "bg-white/5 text-white/40 border-white/10";
 }
 
-export const TAB_META: Record<string, { label: string; view: string; icon: string; description: string; scoreLabel: string }> = {
-  buy: {
-    label: "Buy Targets",
-    view: "v_market_buy_targets",
-    icon: "TrendingUp",
-    description: "Players projecting well above their price — strong value for this round.",
-    scoreLabel: "Trade Score",
-  },
-  sell: {
-    label: "Sell Candidates",
-    view: "v_market_sell_targets",
-    icon: "TrendingDown",
-    description: "Players at risk of underperforming their price or with rising risk.",
-    scoreLabel: "Trade Score",
-  },
-  cashcow: {
-    label: "Cash Cows",
-    view: "v_market_cash_cows",
-    icon: "DollarSign",
-    description: "Budget rookies or value picks projecting above their starting price.",
-    scoreLabel: "Price Gain",
-  },
-  trap: {
-    label: "Fade / Traps",
-    view: "v_market_traps",
-    icon: "AlertTriangle",
-    description: "Hyped players whose projections don't support their current price.",
-    scoreLabel: "Risk",
-  },
-};
-
-export const FREE_VISIBLE = 3;
-
 export function fmtPriceChange(v: number | null | undefined): string {
   if (v == null) return "—";
   const n = Number(v);
@@ -97,24 +64,29 @@ export function priceChangeColor(v: number | null): string {
 
 export function categoryLabel(cat: MWCategory): string {
   switch (cat) {
-    case "buy":          return "BUY";
-    case "sell_now":     return "SELL NOW";
-    case "sell_consider":return "CONSIDER SELLING";
-    case "cash_cow":     return "CASH COW";
-    case "fade":         return "FADE";
-    default:             return "MONITOR";
+    case "buy":      return "BUY";
+    case "sell":     return "SELL";
+    case "cash_cow": return "CASH COW";
+    case "trap":     return "TRAP";
+    default:         return "BUY";
   }
 }
 
 export function categoryColor(cat: MWCategory): string {
   switch (cat) {
-    case "buy":          return "text-green-400 bg-green-400/10 border-green-400/25";
-    case "sell_now":     return "text-red-400 bg-red-400/10 border-red-400/25";
-    case "sell_consider":return "text-orange-400 bg-orange-400/10 border-orange-400/25";
-    case "cash_cow":     return "text-[#F5C84C] bg-[#F5C84C]/10 border-[#F5C84C]/25";
-    case "fade":         return "text-orange-300 bg-orange-300/10 border-orange-300/25";
-    default:             return "text-white/40 bg-white/5 border-white/10";
+    case "buy":      return "text-green-400 bg-green-400/10 border-green-400/25";
+    case "sell":     return "text-red-400 bg-red-400/10 border-red-400/25";
+    case "cash_cow": return "text-[#F5C84C] bg-[#F5C84C]/10 border-[#F5C84C]/25";
+    case "trap":     return "text-orange-400 bg-orange-400/10 border-orange-400/25";
+    default:         return "text-white/40 bg-white/5 border-white/10";
   }
+}
+
+export function tradeScoreBadge(v: number): string {
+  if (v >= 80) return "text-green-400 bg-green-400/10 border-green-400/25";
+  if (v >= 60) return "text-[#F5C84C] bg-[#F5C84C]/10 border-[#F5C84C]/25";
+  if (v >= 40) return "text-white/60 bg-white/5 border-white/10";
+  return "text-orange-400 bg-orange-400/10 border-orange-400/25";
 }
 
 export function confidenceBadge(v: number): string {
@@ -124,5 +96,7 @@ export function confidenceBadge(v: number): string {
 }
 
 export function tradeScoreExplanation(): string {
-  return "Trade Score = 40% projection strength + 35% price edge + 20% risk safety + 5% ceiling bonus. Higher is better.";
+  return "Trade Score 0–100: percentile rank across all players. 80+ = elite value, 60–79 = strong, 40–59 = neutral, below 40 = avoid.";
 }
+
+export const FREE_VISIBLE = 3;

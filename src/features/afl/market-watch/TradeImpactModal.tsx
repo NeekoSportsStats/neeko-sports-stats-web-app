@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
-import { X, ArrowRight, Copy, Check, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { X, Copy, Check, TrendingUp, TrendingDown, Minus, Search } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { MWPlayerRow } from "./types";
-import { fmtPrice, fmtNum, fmtPriceChange, riskColor, momentumColor, priceChangeColor } from "./helpers";
+import { fmtPrice, fmtNum, fmtPriceChange, riskColor, priceChangeColor } from "./helpers";
 import { track } from "@/lib/analytics";
 
 interface Props {
@@ -17,7 +17,14 @@ export function TradeImpactModal({ onClose, prefillOutId, prefillInId, allPlayer
   const [inSearch, setInSearch] = useState("");
   const [outPlayer, setOutPlayer] = useState<MWPlayerRow | null>(null);
   const [inPlayer, setInPlayer] = useState<MWPlayerRow | null>(null);
+  const [outResults, setOutResults] = useState<MWPlayerRow[]>([]);
+  const [inResults, setInResults] = useState<MWPlayerRow[]>([]);
+  const [outSearching, setOutSearching] = useState(false);
+  const [inSearching, setInSearching] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const outDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     track("market_watch_compare_open");
@@ -33,27 +40,39 @@ export function TradeImpactModal({ onClose, prefillOutId, prefillInId, allPlayer
     }
   }, [prefillOutId, prefillInId, allPlayers]);
 
-  const filteredOut = outSearch.length >= 2
-    ? allPlayers.filter(p =>
-        p.player_name.toLowerCase().includes(outSearch.toLowerCase()) &&
-        p.player_id !== inPlayer?.player_id
-      ).slice(0, 8)
-    : [];
+  const searchPlayers = useCallback(async (query: string, excludeId: number | null): Promise<MWPlayerRow[]> => {
+    if (query.length < 2) return [];
+    const { data } = await supabase
+      .from("v_mw_premium")
+      .select("*")
+      .ilike("player_name", `%${query}%`)
+      .limit(20);
+    return ((data ?? []) as MWPlayerRow[]).filter(p => p.player_id !== excludeId);
+  }, []);
 
-  const filteredIn = inSearch.length >= 2
-    ? allPlayers.filter(p =>
-        p.player_name.toLowerCase().includes(inSearch.toLowerCase()) &&
-        p.player_id !== outPlayer?.player_id
-      ).slice(0, 8)
-    : [];
+  const handleOutSearch = useCallback((v: string) => {
+    setOutSearch(v);
+    if (!v) { setOutPlayer(null); setOutResults([]); return; }
+    if (outDebounce.current) clearTimeout(outDebounce.current);
+    outDebounce.current = setTimeout(async () => {
+      setOutSearching(true);
+      const results = await searchPlayers(v, inPlayer?.player_id ?? null);
+      setOutResults(results);
+      setOutSearching(false);
+    }, 200);
+  }, [searchPlayers, inPlayer]);
 
-  const handleRun = useCallback(() => {
-    if (!outPlayer || !inPlayer) return;
-    track("market_watch_compare_run", {
-      out_player: outPlayer.player_name,
-      in_player: inPlayer.player_name,
-    });
-  }, [outPlayer, inPlayer]);
+  const handleInSearch = useCallback((v: string) => {
+    setInSearch(v);
+    if (!v) { setInPlayer(null); setInResults([]); return; }
+    if (inDebounce.current) clearTimeout(inDebounce.current);
+    inDebounce.current = setTimeout(async () => {
+      setInSearching(true);
+      const results = await searchPlayers(v, outPlayer?.player_id ?? null);
+      setInResults(results);
+      setInSearching(false);
+    }, 200);
+  }, [searchPlayers, outPlayer]);
 
   const handleCopy = () => {
     if (!outPlayer || !inPlayer) return;
@@ -64,10 +83,16 @@ export function TradeImpactModal({ onClose, prefillOutId, prefillInId, allPlayer
     });
   };
 
+  useEffect(() => {
+    if (outPlayer && inPlayer) {
+      track("market_watch_compare_run", {
+        out_player: outPlayer.player_name,
+        in_player: inPlayer.player_name,
+      });
+    }
+  }, [outPlayer, inPlayer]);
+
   const showComparison = outPlayer && inPlayer;
-  if (showComparison) {
-    handleRun();
-  }
 
   return (
     <div
@@ -99,20 +124,22 @@ export function TradeImpactModal({ onClose, prefillOutId, prefillInId, allPlayer
             <PlayerSelector
               label="OUT (Selling)"
               search={outSearch}
-              onSearchChange={(v) => { setOutSearch(v); if (!v) setOutPlayer(null); }}
-              suggestions={filteredOut}
+              onSearchChange={handleOutSearch}
+              results={outResults}
+              searching={outSearching}
               selected={outPlayer}
-              onSelect={(p) => { setOutPlayer(p); setOutSearch(p.player_name); }}
+              onSelect={(p) => { setOutPlayer(p); setOutSearch(p.player_name); setOutResults([]); }}
               accentClass="border-red-400/25 focus:border-red-400/50"
               labelClass="text-red-400"
             />
             <PlayerSelector
               label="IN (Buying)"
               search={inSearch}
-              onSearchChange={(v) => { setInSearch(v); if (!v) setInPlayer(null); }}
-              suggestions={filteredIn}
+              onSearchChange={handleInSearch}
+              results={inResults}
+              searching={inSearching}
               selected={inPlayer}
-              onSelect={(p) => { setInPlayer(p); setInSearch(p.player_name); }}
+              onSelect={(p) => { setInPlayer(p); setInSearch(p.player_name); setInResults([]); }}
               accentClass="border-green-400/25 focus:border-green-400/50"
               labelClass="text-green-400"
             />
@@ -142,12 +169,13 @@ export function TradeImpactModal({ onClose, prefillOutId, prefillInId, allPlayer
 }
 
 function PlayerSelector({
-  label, search, onSearchChange, suggestions, selected, onSelect, accentClass, labelClass,
+  label, search, onSearchChange, results, searching, selected, onSelect, accentClass, labelClass,
 }: {
   label: string;
   search: string;
   onSearchChange: (v: string) => void;
-  suggestions: MWPlayerRow[];
+  results: MWPlayerRow[];
+  searching: boolean;
   selected: MWPlayerRow | null;
   onSelect: (p: MWPlayerRow) => void;
   accentClass: string;
@@ -156,15 +184,21 @@ function PlayerSelector({
   return (
     <div className="relative">
       <p className={`text-[10px] font-bold uppercase tracking-widest mb-1.5 ${labelClass}`}>{label}</p>
-      <input
-        value={search}
-        onChange={e => onSearchChange(e.target.value)}
-        placeholder="Search player..."
-        className={`w-full rounded-lg border bg-white/[0.03] px-3 py-2 text-sm text-white placeholder-white/20 outline-none transition-colors ${accentClass}`}
-      />
-      {suggestions.length > 0 && !selected && (
-        <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-white/10 bg-[#111] z-10 shadow-xl overflow-hidden">
-          {suggestions.map(p => (
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-white/20 pointer-events-none" />
+        <input
+          value={search}
+          onChange={e => onSearchChange(e.target.value)}
+          placeholder="Search player..."
+          className={`w-full rounded-lg border bg-white/[0.03] pl-7 pr-3 py-2 text-sm text-white placeholder-white/20 outline-none transition-colors ${accentClass}`}
+        />
+      </div>
+      {(results.length > 0 && !selected) && (
+        <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-white/10 bg-[#111] z-10 shadow-xl overflow-hidden max-h-48 overflow-y-auto">
+          {searching && (
+            <div className="px-3 py-2 text-[11px] text-white/30">Searching...</div>
+          )}
+          {results.map(p => (
             <button
               key={p.player_id}
               onClick={() => onSelect(p)}
@@ -180,6 +214,11 @@ function PlayerSelector({
               </div>
             </button>
           ))}
+        </div>
+      )}
+      {searching && results.length === 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1 rounded-lg border border-white/10 bg-[#111] z-10 shadow-xl px-3 py-2">
+          <p className="text-[11px] text-white/30">Searching...</p>
         </div>
       )}
     </div>
@@ -224,13 +263,6 @@ function ComparisonPanel({ out, inn }: { out: MWPlayerRow; inn: MWPlayerRow }) {
       higherIsBetter: true,
     },
     {
-      label: "Price R2",
-      outVal: fmtPrice(out.projected_price_r2 ?? out.price),
-      inVal: fmtPrice(inn.projected_price_r2 ?? inn.price),
-      delta: (inn.projected_price_r2 ?? inn.price) - (out.projected_price_r2 ?? out.price),
-      higherIsBetter: true,
-    },
-    {
       label: "Price R3",
       outVal: fmtPrice(out.projected_price_r3 ?? out.price),
       inVal: fmtPrice(inn.projected_price_r3 ?? inn.price),
@@ -245,16 +277,9 @@ function ComparisonPanel({ out, inn }: { out: MWPlayerRow; inn: MWPlayerRow }) {
       higherIsBetter: false,
     },
     {
-      label: "Est. Ceiling",
-      outVal: fmtNum(out.ceiling, 0),
-      inVal: fmtNum(inn.ceiling, 0),
-      delta: inn.ceiling - out.ceiling,
-      higherIsBetter: true,
-    },
-    {
       label: "Trade Score",
-      outVal: fmtNum(out.trade_score, 1),
-      inVal: fmtNum(inn.trade_score, 1),
+      outVal: fmtNum(out.trade_score, 0),
+      inVal: fmtNum(inn.trade_score, 0),
       delta: inn.trade_score - out.trade_score,
       higherIsBetter: true,
     },
@@ -266,9 +291,6 @@ function ComparisonPanel({ out, inn }: { out: MWPlayerRow; inn: MWPlayerRow }) {
       higherIsBetter: false,
     },
   ];
-
-  const outReasons = Array.isArray(out.reasons) ? out.reasons.filter(Boolean) : [];
-  const inReasons  = Array.isArray(inn.reasons) ? inn.reasons.filter(Boolean) : [];
 
   return (
     <div className="rounded-xl border border-white/8 bg-white/[0.02] overflow-hidden">
@@ -300,19 +322,19 @@ function ComparisonPanel({ out, inn }: { out: MWPlayerRow; inn: MWPlayerRow }) {
         );
       })}
 
-      {(outReasons.length > 0 || inReasons.length > 0) && (
+      {(out.category_reason || inn.category_reason) && (
         <div className="grid grid-cols-2 gap-0 border-t border-white/5">
           <div className="px-3 py-3 border-r border-white/5">
             <p className="text-[9px] text-red-400/60 uppercase tracking-wider mb-1.5">Why sell</p>
-            {outReasons.slice(0, 2).map((r, i) => (
-              <p key={i} className="text-[10px] text-white/30 leading-snug mb-0.5">· {r}</p>
-            ))}
+            {out.category_reason && (
+              <p className="text-[10px] text-white/30 leading-snug">· {out.category_reason}</p>
+            )}
           </div>
           <div className="px-3 py-3">
             <p className="text-[9px] text-green-400/60 uppercase tracking-wider mb-1.5">Why buy</p>
-            {inReasons.slice(0, 2).map((r, i) => (
-              <p key={i} className="text-[10px] text-white/30 leading-snug mb-0.5">· {r}</p>
-            ))}
+            {inn.category_reason && (
+              <p className="text-[10px] text-white/30 leading-snug">· {inn.category_reason}</p>
+            )}
           </div>
         </div>
       )}
@@ -330,7 +352,7 @@ function buildSummaryText(out: MWPlayerRow, inn: MWPlayerRow): string {
     `Price Change Delta: ${priceDelta >= 0 ? "+" : ""}$${Math.round(Math.abs(priceDelta) / 1000)}k`,
     `Price Growth (3 Rounds): OUT ${fmtPrice(out.projected_price_r3 ?? out.price)} | IN ${fmtPrice(inn.projected_price_r3 ?? inn.price)} | Net ${r3Delta >= 0 ? "+" : ""}$${Math.round(Math.abs(r3Delta) / 1000)}k`,
     `Risk Change: ${(inn.risk_pct - out.risk_pct) >= 0 ? "+" : ""}${(inn.risk_pct - out.risk_pct).toFixed(0)}%`,
-    `Trade Score: ${out.trade_score.toFixed(1)} → ${inn.trade_score.toFixed(1)}`,
+    `Trade Score: ${out.trade_score.toFixed(0)} → ${inn.trade_score.toFixed(0)}`,
     `Generated by Neeko Sports`,
   ].join("\n");
 }

@@ -1,34 +1,4 @@
-export interface MarketRow {
-  player_id: number | null;
-  player_name: string;
-  team: string;
-  position: string | null;
-  price: number | null;
-  breakeven: number | null;
-  avg_2025: number | null;
-  games_2025: number | null;
-  projection_final: number | null;
-  ceiling_estimate: number | null;
-  floor_estimate: number | null;
-  consistency_score: number | null;
-  risk_rating: number | null;
-  projection_confidence: number | null;
-  neeko_rating: number | null;
-  ai_recommendation: string | null;
-  recommendation_color: string | null;
-  recommendation_why: string | null;
-  ai_analysis: string | null;
-  price_momentum: number | null;
-  upside_gap: number | null;
-  trade_signal: "BUY" | "SELL" | "HOLD" | null;
-  trade_score: number | null;
-  breakout_score: number | null;
-  breakout_flag: boolean | null;
-  volatility_score: number | null;
-  volatility_level: "LOW" | "MEDIUM" | "HIGH" | null;
-}
-
-export type MarketTab = "buy" | "sell" | "cashcow" | "trap";
+export type MWCategory = "buy" | "sell" | "cash_cow" | "trap";
 
 export interface MWPlayerRow {
   snapshot_id: string;
@@ -48,11 +18,8 @@ export interface MWPlayerRow {
   projected_price_r1: number | null;
   projected_price_r2: number | null;
   projected_price_r3: number | null;
-  breakout_score: number | null;
-  breakout_flag: boolean | null;
-  volatility_score: number | null;
-  volatility_level: "LOW" | "MEDIUM" | "HIGH" | null;
-  category: "buy" | "sell_now" | "sell_consider" | "cash_cow" | "fade" | "monitor";
+  category: MWCategory;
+  category_reason: string;
   action: "BUY" | "SELL" | "HOLD";
   trade_score: number;
   reasons: string[];
@@ -64,15 +31,8 @@ export interface MWPlayerRow {
   round_number: number;
   snapshot_updated_at: string;
   last3_avg: number | null;
-  estimated_price: number | null;
   value_score: number | null;
-  price_range_top: number | null;
-  price_range_bottom: number | null;
-  value_momentum: number | null;
-  momentum_label: "breakout" | "rising" | "improving" | "stable" | "cooling" | "falling" | null;
-  peak_price: number | null;
-  peak_round: "now" | "round_plus_1" | "round_plus_2" | "round_plus_3" | null;
-  peak_status: "sell" | "sell_soon" | "hold" | "strong_hold" | null;
+  momentum_label: "rising" | "improving" | "stable" | "cooling" | "falling" | null;
 }
 
 export interface MWBestTrade {
@@ -119,11 +79,49 @@ export interface MWSummaryCard {
   snapshot_updated_at: string | null;
 }
 
-export type MWCategory = "buy" | "sell_now" | "sell_consider" | "cash_cow" | "fade" | "monitor";
+export interface MWStatus {
+  is_active: boolean;
+  latest_snapshot: string | null;
+  data_quality_level: string | null;
+}
+
+export interface MWSummary {
+  buy_count: number;
+  sell_count: number;
+  cash_cow_count: number;
+  trap_count: number;
+  latest_update: string | null;
+}
 
 export interface MWAISummary {
   season: number;
   round_number: number;
   generated_at: string;
   summary: string;
+}
+
+export interface MarketRow {
+  player_id: number | null;
+  player_name: string;
+  team: string;
+  position: string | null;
+  price: number | null;
+  breakeven: number | null;
+  avg_2025: number | null;
+  games_2025: number | null;
+  projection_final: number | null;
+  ceiling_estimate: number | null;
+  floor_estimate: number | null;
+  consistency_score: number | null;
+  risk_rating: number | null;
+  projection_confidence: number | null;
+  neeko_rating: number | null;
+  ai_recommendation: string | null;
+  recommendation_why: string | null;
+  trade_signal: "BUY" | "SELL" | "HOLD" | null;
+  trade_score: number | null;
+  price_momentum: number | null;
+  breakout_flag: boolean | null;
+  breakout_score: number | null;
+  volatility_level: "LOW" | "MEDIUM" | "HIGH" | null;
 }

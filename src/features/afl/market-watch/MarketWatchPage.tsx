@@ -1,34 +1,35 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { TrendingUp, RefreshCw, Crown, ChevronDown, Lock } from "lucide-react";
+import { TrendingUp, RefreshCw, Crown, ChevronDown, Lock, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
-import { MWPlayerRow, MWBestTrade, MWSummaryCard } from "./types";
+import { MWPlayerRow, MWBestTrade, MWSummaryCard, MWSummary, MWStatus } from "./types";
 
 import { UpgradeModal } from "./UpgradeModal";
 import { MarketWatchSummaryCards } from "./MarketWatchSummaryCards";
 import { BestTradesRow } from "./BestTradesRow";
 import { PlayerTradeCard } from "./PlayerTradeCard";
 import { TradeImpactModal } from "./TradeImpactModal";
-import { MarketWatchBanner, CategoryCounts } from "./MarketWatchBanner";
+import { MarketWatchBanner } from "./MarketWatchBanner";
 import { HorizontalRail } from "./HorizontalRail";
 import { MarketWatchSkeleton } from "./MarketWatchSkeleton";
-import { OpeningRoundNotice } from "./OpeningRoundNotice";
 import { TopTradeOfWeek } from "./TopTradeOfWeek";
 import { MarketWatchSort, SortKey } from "./MarketWatchSort";
 import { MarketWatchFilters, FilterState } from "./MarketWatchFilters";
 
 const FREE_LIMIT = 5;
 
-const SECTION_LIMITS = {
-  buyTargets:   6,
-  sellNow:      6,
-  sellConsider: 8,
-  cashCows:     10,
-  fades:        8,
-} as const;
+const SECTION_DEFAULT = 12;
+const SECTION_EXPANDED = 40;
 
-interface V2Data {
+const SECTION_IDS = [
+  "section-buy",
+  "section-sell",
+  "section-cash-cows",
+  "section-traps",
+] as const;
+
+interface PageData {
   players: MWPlayerRow[];
   trades: MWBestTrade[];
   summaryCards: MWSummaryCard[];
@@ -37,24 +38,22 @@ interface V2Data {
 export default function MarketWatchPage() {
   const { isPremium, loading: authLoading } = useAuth();
 
-  const [data, setData] = useState<V2Data>({ players: [], trades: [], summaryCards: [] });
+  const [data, setData] = useState<PageData>({ players: [], trades: [], summaryCards: [] });
+  const [summary, setSummary] = useState<MWSummary | null>(null);
+  const [status, setStatus] = useState<MWStatus | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
   const fetchedRef = useRef(false);
   const isPremiumRef = useRef(isPremium);
 
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
   const [compareModal, setCompareModal] = useState<{ outId?: number; inId?: number } | null>(null);
-
-  const [categoryCounts, setCategoryCounts] = useState<CategoryCounts | null>(null);
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
   const [showMoreBuy, setShowMoreBuy] = useState(false);
-  const [showMoreSellNow, setShowMoreSellNow] = useState(false);
-  const [showMoreSellConsider, setShowMoreSellConsider] = useState(false);
+  const [showMoreSell, setShowMoreSell] = useState(false);
   const [showMoreCashCows, setShowMoreCashCows] = useState(false);
-  const [showMoreFades, setShowMoreFades] = useState(false);
+  const [showMoreTraps, setShowMoreTraps] = useState(false);
 
   const [sortKey, setSortKey] = useState<SortKey>("trade_score");
   const [filters, setFilters] = useState<FilterState>({
@@ -67,40 +66,31 @@ export default function MarketWatchPage() {
   const fetchData = useCallback(async (premium: boolean) => {
     setDataLoading(true);
     try {
-      const [playersRes, tradesRes, cardsRes] = await Promise.all([
-        supabase.from("v_mw_premium").select("*").limit(premium ? 200 : 40),
+      const [playersRes, tradesRes, cardsRes, summaryRes, statusRes] = await Promise.all([
+        supabase.from("v_mw_premium").select("*").limit(premium ? 400 : 60),
         supabase.from("v_mw_best_trades").select("*").limit(premium ? 10 : 4),
         supabase.from("v_mw_summary_cards").select("*"),
+        supabase.from("v_mw_summary").select("*").maybeSingle(),
+        supabase.from("v_mw_status").select("*").maybeSingle(),
       ]);
 
       setData({
         players: (playersRes.data ?? []) as MWPlayerRow[],
-        trades:  (tradesRes.data ?? []) as MWBestTrade[],
+        trades: (tradesRes.data ?? []) as MWBestTrade[],
         summaryCards: (cardsRes.data ?? []) as MWSummaryCard[],
       });
+      if (summaryRes.data) setSummary(summaryRes.data as MWSummary);
+      if (statusRes.data) setStatus(statusRes.data as MWStatus);
     } finally {
       setDataLoading(false);
-    }
-  }, []);
-
-  const fetchCounts = useCallback(async () => {
-    try {
-      const { data: row } = await supabase
-        .from("v_mw_category_counts")
-        .select("*")
-        .maybeSingle();
-      if (row) setCategoryCounts(row as CategoryCounts);
-    } catch {
-      // non-critical
     }
   }, []);
 
   const handleRefresh = useCallback(() => {
     track("market_watch_refresh_click");
     fetchData(isPremium);
-    fetchCounts();
     setLastUpdated(new Date());
-  }, [fetchData, fetchCounts, isPremium]);
+  }, [fetchData, isPremium]);
 
   useEffect(() => { track("market_watch_view"); }, []);
 
@@ -114,22 +104,12 @@ export default function MarketWatchPage() {
     fetchedRef.current = true;
     const load = async () => {
       await fetchData(isPremiumRef.current);
-      await fetchCounts();
       setLastUpdated(new Date());
     };
     load();
-  }, [authLoading, fetchData, fetchCounts]);
+  }, [authLoading, fetchData]);
 
   useEffect(() => {
-    const sectionIds = [
-      "section-buy-targets",
-      "section-sell-now",
-      "section-sell-consider",
-      "section-cash-cows",
-      "section-fade-traps",
-      "section-breakouts",
-    ];
-
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
@@ -140,13 +120,13 @@ export default function MarketWatchPage() {
       { rootMargin: "-80px 0px -60% 0px", threshold: 0 }
     );
 
-    sectionIds.forEach(id => {
+    SECTION_IDS.forEach(id => {
       const el = document.getElementById(id);
       if (el) observer.observe(el);
     });
 
     return () => observer.disconnect();
-  }, []);
+  }, [data.players]);
 
   const { players, trades, summaryCards } = data;
 
@@ -184,26 +164,23 @@ export default function MarketWatchPage() {
     return out;
   }, [filters, sortKey]);
 
-  const sellNow      = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "sell_now")), [players, applyFiltersAndSort]);
-  const sellConsider = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "sell_consider")), [players, applyFiltersAndSort]);
-  const buyTargets   = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "buy")), [players, applyFiltersAndSort]);
-  const cashCows     = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "cash_cow")), [players, applyFiltersAndSort]);
-  const fades        = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "fade")), [players, applyFiltersAndSort]);
-  const breakouts    = useMemo(() => applyFiltersAndSort(players.filter(p => p.breakout_flag === true)), [players, applyFiltersAndSort]);
+  const buyTargets = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "buy")), [players, applyFiltersAndSort]);
+  const sellPlayers = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "sell")), [players, applyFiltersAndSort]);
+  const cashCows    = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "cash_cow")), [players, applyFiltersAndSort]);
+  const traps       = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "trap")), [players, applyFiltersAndSort]);
 
-  const limitFree = <T,>(arr: T[], limit: number, showMore: boolean): T[] => {
-    if (isPremium) return arr;
-    return showMore ? arr : arr.slice(0, limit);
+  const getVisible = <T,>(arr: T[], showMore: boolean): T[] => {
+    if (isPremium) return showMore ? arr : arr.slice(0, SECTION_DEFAULT);
+    return arr.slice(0, FREE_LIMIT);
   };
 
-  const visibleBuyTargets   = limitFree(buyTargets,   SECTION_LIMITS.buyTargets,   showMoreBuy);
-  const visibleSellNow      = limitFree(sellNow,      SECTION_LIMITS.sellNow,      showMoreSellNow);
-  const visibleSellConsider = limitFree(sellConsider, SECTION_LIMITS.sellConsider, showMoreSellConsider);
-  const visibleCashCows     = limitFree(cashCows,     SECTION_LIMITS.cashCows,     showMoreCashCows);
-  const visibleFades        = limitFree(fades,        SECTION_LIMITS.fades,        showMoreFades);
+  const visibleBuy      = getVisible(buyTargets, showMoreBuy);
+  const visibleSell     = getVisible(sellPlayers, showMoreSell);
+  const visibleCashCows = getVisible(cashCows, showMoreCashCows);
+  const visibleTraps    = getVisible(traps, showMoreTraps);
 
   const topTrade = trades.length > 0 ? trades[0] : null;
-
+  const isInactive = status != null && !status.is_active;
   const ready = !authLoading && !dataLoading;
 
   if (!ready) {
@@ -213,7 +190,7 @@ export default function MarketWatchPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
 
-      <MarketWatchBanner counts={categoryCounts} activeSection={activeSection} />
+      <MarketWatchBanner summary={summary} activeSection={activeSection} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24">
 
@@ -225,7 +202,7 @@ export default function MarketWatchPage() {
                 <h1 className="text-2xl font-bold tracking-tight text-white">Market Watch</h1>
               </div>
               <p className="text-sm text-white/45">
-                Neeko Trade Intelligence — Buy targets, sell signals, breakout alerts and price projections powered by the Neeko projection model.
+                Neeko Trade Intelligence — Buy targets, sell signals, cash cows and traps powered by the Neeko projection model.
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -245,7 +222,17 @@ export default function MarketWatchPage() {
           </div>
         </div>
 
-        <OpeningRoundNotice />
+        {isInactive && (
+          <div className="mb-6 rounded-xl px-5 py-4 flex items-start gap-3 border border-white/10 bg-white/[0.02]">
+            <AlertCircle className="h-4 w-4 text-white/30 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-white/60">Market Watch signals update weekly after rounds complete.</p>
+              <p className="text-[12px] text-white/30 mt-0.5">
+                Showing last available data. New signals will be available once the next snapshot is generated.
+              </p>
+            </div>
+          </div>
+        )}
 
         {!isPremium && (
           <div
@@ -260,7 +247,7 @@ export default function MarketWatchPage() {
               <div>
                 <p className="text-sm font-semibold text-white">Neeko+ — Full Trade Intelligence</p>
                 <p className="text-[12px] text-white/40">
-                  Unlock full Market Watch signals. Upgrade to Neeko+ to see every trade opportunity.
+                  Unlock every buy target, sell signal, cash cow and trap. Upgrade to see it all.
                 </p>
               </div>
             </div>
@@ -304,14 +291,14 @@ export default function MarketWatchPage() {
 
         {buyTargets.length > 0 && (
           <HorizontalRail
-            id="section-buy-targets"
+            id="section-buy"
             label="Buy Targets"
             labelColor="text-green-400"
             dot="bg-green-400"
             description="Players projecting well above their price — strong value this round"
             count={buyTargets.length}
           >
-            {visibleBuyTargets.map((p, i) => (
+            {visibleBuy.map((p, i) => (
               <div key={p.player_id} className="w-[260px] flex-shrink-0">
                 <PlayerTradeCard
                   row={p}
@@ -325,9 +312,9 @@ export default function MarketWatchPage() {
             {!isPremium && buyTargets.length > FREE_LIMIT && (
               <LockedMoreCard count={buyTargets.length - FREE_LIMIT} onUnlock={() => setShowUpgrade(true)} />
             )}
-            {isPremium && buyTargets.length > SECTION_LIMITS.buyTargets && (
+            {isPremium && buyTargets.length > SECTION_DEFAULT && (
               <ShowMoreRailCard
-                count={buyTargets.length - visibleBuyTargets.length}
+                count={buyTargets.length - visibleBuy.length}
                 expanded={showMoreBuy}
                 onToggle={() => setShowMoreBuy(e => !e)}
               />
@@ -335,16 +322,16 @@ export default function MarketWatchPage() {
           </HorizontalRail>
         )}
 
-        {sellNow.length > 0 && (
+        {sellPlayers.length > 0 && (
           <HorizontalRail
-            id="section-sell-now"
-            label="Sell Now"
+            id="section-sell"
+            label="Sell"
             labelColor="text-red-400"
             dot="bg-red-400"
-            description="High-conviction sells — prices likely to fall"
-            count={sellNow.length}
+            description="Players priced above their projection — selling window before prices fall"
+            count={sellPlayers.length}
           >
-            {visibleSellNow.map((p, i) => (
+            {visibleSell.map((p, i) => (
               <div key={p.player_id} className="w-[260px] flex-shrink-0">
                 <PlayerTradeCard
                   row={p}
@@ -355,47 +342,14 @@ export default function MarketWatchPage() {
                 />
               </div>
             ))}
-            {!isPremium && sellNow.length > FREE_LIMIT && (
-              <LockedMoreCard count={sellNow.length - FREE_LIMIT} onUnlock={() => setShowUpgrade(true)} />
+            {!isPremium && sellPlayers.length > FREE_LIMIT && (
+              <LockedMoreCard count={sellPlayers.length - FREE_LIMIT} onUnlock={() => setShowUpgrade(true)} />
             )}
-            {isPremium && sellNow.length > SECTION_LIMITS.sellNow && (
+            {isPremium && sellPlayers.length > SECTION_DEFAULT && (
               <ShowMoreRailCard
-                count={sellNow.length - visibleSellNow.length}
-                expanded={showMoreSellNow}
-                onToggle={() => setShowMoreSellNow(e => !e)}
-              />
-            )}
-          </HorizontalRail>
-        )}
-
-        {sellConsider.length > 0 && (
-          <HorizontalRail
-            id="section-sell-consider"
-            label="Consider Selling"
-            labelColor="text-orange-400"
-            dot="bg-orange-400"
-            description="Monitor closely — borderline holds this round"
-            count={sellConsider.length}
-          >
-            {visibleSellConsider.map((p, i) => (
-              <div key={p.player_id} className="w-[260px] flex-shrink-0">
-                <PlayerTradeCard
-                  row={p}
-                  rank={i + 1}
-                  locked={!isPremium && i >= FREE_LIMIT}
-                  onUnlock={() => setShowUpgrade(true)}
-                  onCompare={(id) => setCompareModal({ outId: id })}
-                />
-              </div>
-            ))}
-            {!isPremium && sellConsider.length > FREE_LIMIT && (
-              <LockedMoreCard count={sellConsider.length - FREE_LIMIT} onUnlock={() => setShowUpgrade(true)} />
-            )}
-            {isPremium && sellConsider.length > SECTION_LIMITS.sellConsider && (
-              <ShowMoreRailCard
-                count={sellConsider.length - visibleSellConsider.length}
-                expanded={showMoreSellConsider}
-                onToggle={() => setShowMoreSellConsider(e => !e)}
+                count={sellPlayers.length - visibleSell.length}
+                expanded={showMoreSell}
+                onToggle={() => setShowMoreSell(e => !e)}
               />
             )}
           </HorizontalRail>
@@ -407,7 +361,7 @@ export default function MarketWatchPage() {
             label="Cash Cows"
             labelColor="text-[#F5C84C]"
             dot="bg-[#F5C84C]"
-            description="Low priced players projected to generate price growth"
+            description="Budget players scoring well above their breakeven — generating price growth"
             count={cashCows.length}
           >
             {visibleCashCows.map((p, i) => (
@@ -424,7 +378,7 @@ export default function MarketWatchPage() {
             {!isPremium && cashCows.length > FREE_LIMIT && (
               <LockedMoreCard count={cashCows.length - FREE_LIMIT} onUnlock={() => setShowUpgrade(true)} />
             )}
-            {isPremium && cashCows.length > SECTION_LIMITS.cashCows && (
+            {isPremium && cashCows.length > SECTION_DEFAULT && (
               <ShowMoreRailCard
                 count={cashCows.length - visibleCashCows.length}
                 expanded={showMoreCashCows}
@@ -434,42 +388,16 @@ export default function MarketWatchPage() {
           </HorizontalRail>
         )}
 
-        {breakouts.length > 0 && (
+        {traps.length > 0 && (
           <HorizontalRail
-            id="section-breakouts"
-            label="Breakout Candidates"
-            labelColor="text-blue-400"
-            dot="bg-blue-400"
-            description="Players projected to outperform their season baseline"
-            count={breakouts.length}
+            id="section-traps"
+            label="Traps"
+            labelColor="text-orange-400"
+            dot="bg-orange-400"
+            description="Premium-priced players whose projections don't justify their current value"
+            count={traps.length}
           >
-            {(isPremium ? breakouts : breakouts.slice(0, FREE_LIMIT)).map((p, i) => (
-              <div key={p.player_id} className="w-[260px] flex-shrink-0">
-                <PlayerTradeCard
-                  row={p}
-                  rank={i + 1}
-                  locked={!isPremium && i >= FREE_LIMIT}
-                  onUnlock={() => setShowUpgrade(true)}
-                  onCompare={(id) => setCompareModal({ inId: id })}
-                />
-              </div>
-            ))}
-            {!isPremium && breakouts.length > FREE_LIMIT && (
-              <LockedMoreCard count={breakouts.length - FREE_LIMIT} onUnlock={() => setShowUpgrade(true)} />
-            )}
-          </HorizontalRail>
-        )}
-
-        {fades.length > 0 && (
-          <HorizontalRail
-            id="section-fade-traps"
-            label="Fade / Traps"
-            labelColor="text-white/50"
-            dot="bg-white/30"
-            description="Hyped players whose projections don't justify their current price"
-            count={fades.length}
-          >
-            {visibleFades.map((p, i) => (
+            {visibleTraps.map((p, i) => (
               <div key={p.player_id} className="w-[260px] flex-shrink-0">
                 <PlayerTradeCard
                   row={p}
@@ -480,14 +408,14 @@ export default function MarketWatchPage() {
                 />
               </div>
             ))}
-            {!isPremium && fades.length > FREE_LIMIT && (
-              <LockedMoreCard count={fades.length - FREE_LIMIT} onUnlock={() => setShowUpgrade(true)} />
+            {!isPremium && traps.length > FREE_LIMIT && (
+              <LockedMoreCard count={traps.length - FREE_LIMIT} onUnlock={() => setShowUpgrade(true)} />
             )}
-            {isPremium && fades.length > SECTION_LIMITS.fades && (
+            {isPremium && traps.length > SECTION_DEFAULT && (
               <ShowMoreRailCard
-                count={fades.length - visibleFades.length}
-                expanded={showMoreFades}
-                onToggle={() => setShowMoreFades(e => !e)}
+                count={traps.length - visibleTraps.length}
+                expanded={showMoreTraps}
+                onToggle={() => setShowMoreTraps(e => !e)}
               />
             )}
           </HorizontalRail>
