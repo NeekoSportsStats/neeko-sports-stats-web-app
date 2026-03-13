@@ -476,11 +476,12 @@ export function PlayerDetailModal({
               <p className="text-base font-bold mb-2" style={{ color: recColor }}>
                 {row.ai_recommendation}
               </p>
-              {row.recommendation_short && (
-                <p className="text-sm text-white/70 leading-relaxed">
-                  {row.recommendation_short}
-                </p>
-              )}
+              {(() => {
+                const safeText = safeWhyText(row);
+                return safeText ? (
+                  <p className="text-sm text-white/70 leading-relaxed">{safeText}</p>
+                ) : null;
+              })()}
             </div>
           )}
 

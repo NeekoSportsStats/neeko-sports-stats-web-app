@@ -424,6 +424,12 @@ export default function AFLRankingsPage() {
               <tbody>
                 {loading ? (
                   <LoadingSkeletonRows />
+                ) : displayRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="px-6 py-16 text-center">
+                      <p className="text-sm text-white/30">No players match the current filter.</p>
+                    </td>
+                  </tr>
                 ) : (
                   <>
                     {(isPremium ? displayRows : displayRows.slice(0, FREE_PARTIAL_ROWS)).map((row, idx) => {

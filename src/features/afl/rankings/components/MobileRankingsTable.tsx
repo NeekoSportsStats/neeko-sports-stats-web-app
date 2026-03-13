@@ -338,8 +338,6 @@ export function MobileRankingsTable({
 
   const visibleRows = rows.slice(0, isPremium ? visibleCount : Math.min(visibleCount, FREE_PARTIAL_ROWS));
 
-  const wallTriggerIdx = !isPremium ? FREE_PARTIAL_ROWS : -1;
-
   return (
     <div className="w-full max-w-full pb-[80px]">
       <SwipeHint />
@@ -381,8 +379,7 @@ export function MobileRankingsTable({
         </div>
       </div>
 
-      {/* Conversion wall outside scroll container — full viewport width */}
-      {!isPremium && !loading && wallTriggerIdx >= 0 && rows.length > wallTriggerIdx && (
+      {!isPremium && !loading && (
         <MobileConversionWall onUpgrade={onUpgrade} />
       )}
     </div>

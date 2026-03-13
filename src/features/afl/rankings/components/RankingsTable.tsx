@@ -225,31 +225,6 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
   );
 }
 
-interface LockedTableRowProps {
-  idx: number;
-  onUpgrade: () => void;
-}
-
-export function LockedTableRow({ idx, onUpgrade }: LockedTableRowProps) {
-  return (
-    <tr
-      className="border-b border-white/[0.03] cursor-pointer"
-      style={{ touchAction: "manipulation" }}
-      onClick={onUpgrade}
-    >
-      <td colSpan={TOTAL_COLS} className="px-4 py-2.5 select-none">
-        <div className="blur-sm pointer-events-none flex items-center gap-6 opacity-30">
-          <span className="text-sm text-white/40 w-8 tabular-nums text-center">{idx + 1}</span>
-          <span className="text-sm font-medium text-white/50 w-40">Player {idx + 1}</span>
-          <span className="text-sm text-white/30 w-20 tabular-nums">—</span>
-          <span className="text-sm text-white/30 w-16 tabular-nums">—</span>
-          <span className="text-sm text-white/30 w-16 tabular-nums">—</span>
-          <span className="text-sm text-white/30 w-16 tabular-nums">—</span>
-        </div>
-      </td>
-    </tr>
-  );
-}
 
 export function ConversionWallRow({ onUpgrade, colSpan = TOTAL_COLS }: { onUpgrade: () => void; colSpan?: number }) {
   return (
