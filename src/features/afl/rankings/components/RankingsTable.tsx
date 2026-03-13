@@ -217,15 +217,14 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
           </span>
         ) : <span className="text-white/20 text-xs">—</span>}
       </td>
-      <td className="px-4 py-3 text-left align-top" style={{ minWidth: 200, maxWidth: 420 }}>
-        {tier === "partial" ? (
-          <span className="text-white/15 text-xs select-none">—</span>
-        ) : locked("recommendation_why") ? (
+      <td className="px-4 py-3 text-left align-top" style={{ minWidth: 180, maxWidth: 320, width: 320 }}>
+        {locked("recommendation_why") ? (
           <LockedCell onClick={onUpgrade} />
         ) : (() => {
-          const whyText = safeWhyText(row) ?? "—";
+          const whyText = safeWhyText(row);
+          if (!whyText) return <span className="text-white/20 text-xs">—</span>;
           return (
-            <span className="text-xs text-white/60 leading-snug max-w-[420px] block line-clamp-2">{whyText}</span>
+            <span className="text-xs text-white/60 leading-snug block line-clamp-2 max-w-[300px]">{whyText}</span>
           );
         })()}
       </td>

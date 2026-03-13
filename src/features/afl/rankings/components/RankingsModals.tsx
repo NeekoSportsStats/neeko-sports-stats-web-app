@@ -11,7 +11,7 @@ import {
   getCaptainStyle, getValueTagStyle, getNeekoRatingBadge, getRiskBadge,
   getConsistencyBadge, getConfidenceColor, getValueScoreColor,
   getFormColor, getMatchupColor, getUpsideColor, getRiskColor,
-  sharpenAIText, resolveRecommendationColor, safeWhyText,
+  sharpenAIText, resolveRecommendationColor, safeWhyText, isAITextStale,
 } from "./helpers";
 
 // ─── InfoTooltip ──────────────────────────────────────────────────────────────
@@ -208,13 +208,15 @@ function ScoreHistoryChart({ playerName, playerId }: { playerName: string; playe
 
   if (!data.length) {
     return (
-      <div className="h-[180px] flex flex-col items-center justify-center rounded-lg bg-white/[0.03] border border-white/5 gap-2">
-        <div className="flex gap-1 items-end h-8">
+      <div className="h-[160px] flex flex-col items-center justify-center rounded-lg bg-white/[0.03] border border-white/5 gap-3 px-4 text-center">
+        <div className="flex gap-1 items-end h-7 opacity-20">
           {[40, 65, 52, 78, 61, 85, 70, 58, 90, 74].map((h, i) => (
-            <div key={i} className="w-4 rounded-t bg-white/10" style={{ height: `${h}%` }} />
+            <div key={i} className="w-3 rounded-t bg-white/40" style={{ height: `${h}%` }} />
           ))}
         </div>
-        <p className="text-xs text-white/25">No recent games available</p>
+        <p className="text-xs text-white/30 leading-relaxed max-w-[220px]">
+          No completed 2026 matches yet. Scoring history will appear once games are played.
+        </p>
       </div>
     );
   }
@@ -622,11 +624,23 @@ export function PlayerDetailModal({
                 </p>
                 {(() => {
                   const displayConf = displayConfidence(row.projection_confidence);
+                  const tier = displayConf == null ? null
+                    : displayConf >= 90 ? "Elite"
+                    : displayConf >= 85 ? "Strong"
+                    : displayConf >= 80 ? "Stable"
+                    : "Volatile";
                   return (
                     <>
-                      <p className={`text-sm font-semibold mb-1.5 ${getConfidenceColor(displayConf)}`}>
-                        {displayConf != null ? `${displayConf}%` : "—"}
-                      </p>
+                      <div className="flex items-baseline gap-1.5 mb-1.5">
+                        <p className={`text-sm font-semibold tabular-nums ${getConfidenceColor(displayConf)}`}>
+                          {displayConf != null ? `${displayConf}%` : "—"}
+                        </p>
+                        {tier && (
+                          <p className={`text-[10px] font-medium ${getConfidenceColor(displayConf)} opacity-75`}>
+                            {tier}
+                          </p>
+                        )}
+                      </div>
                       {displayConf != null && (
                         <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
                           <div
@@ -656,11 +670,17 @@ export function PlayerDetailModal({
             </div>
           )}
 
-          {/* 7. Extended Analysis (no duplicate Recommendation block) */}
+          {/* 7. Extended Analysis */}
           {unlocked ? (() => {
             const aiCtx = { riskRating: row.risk_rating ?? null, confidence: row.projection_confidence ?? null };
-            const extendedText = sharpenAIText(aiAnalysis?.analysis ?? row.ai_summary, aiCtx);
+            const rawExtended = aiAnalysis?.analysis ?? row.ai_summary;
+            const extendedText = sharpenAIText(rawExtended, aiCtx);
             const showExtended = !loadingAI && extendedText && extendedText !== "Model analysis is currently generating.";
+            const isStale = isAITextStale(rawExtended, {
+              projection_final: row.projection_final,
+              ceiling_estimate: row.ceiling_estimate,
+              floor_estimate: row.floor_estimate,
+            });
             return (
               <>
                 <div className="rounded-lg border border-white/5 bg-white/[0.03] px-4 py-4">
@@ -675,6 +695,11 @@ export function PlayerDetailModal({
                     <p className="text-sm text-white/65 leading-relaxed">{extendedText}</p>
                   ) : (
                     <p className="text-sm text-white/30 leading-relaxed">Generating analysis...</p>
+                  )}
+                  {showExtended && isStale && (
+                    <p className="mt-3 text-[10px] text-white/25 italic border-t border-white/5 pt-2">
+                      Analysis generated prior to latest projection update.
+                    </p>
                   )}
                 </div>
                 {aiAnalysis?.captain_recommendation && (

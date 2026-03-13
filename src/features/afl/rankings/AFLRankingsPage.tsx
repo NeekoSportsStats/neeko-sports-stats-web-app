@@ -61,16 +61,21 @@ function SearchAutocomplete({
   value,
   onChange,
   onSelect,
+  isPremium,
+  onUpgrade,
 }: {
   rows: RankingRow[];
   value: string;
   onChange: (v: string) => void;
   onSelect: (row: RankingRow) => void;
+  isPremium: boolean;
+  onUpgrade: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const suggestions = useMemo(() => {
+    if (!isPremium) return [];
     const term = value.trim().toLowerCase();
     if (!term || term.length < 2) return [];
     return rows
@@ -80,7 +85,7 @@ function SearchAutocomplete({
           r.team.toLowerCase().includes(term)
       )
       .slice(0, 6);
-  }, [rows, value]);
+  }, [rows, value, isPremium]);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -92,18 +97,34 @@ function SearchAutocomplete({
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
+  function handleFocus() {
+    if (!isPremium) { onUpgrade(); return; }
+    setOpen(true);
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!isPremium) { onUpgrade(); return; }
+    onChange(e.target.value);
+    setOpen(true);
+  }
+
   return (
     <div ref={containerRef} className="relative w-full">
       <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/35 pointer-events-none" />
       <input
         type="text"
-        placeholder="Search players or teams..."
+        placeholder={isPremium ? "Search players or teams..." : "Search players (Neeko+ only)..."}
         value={value}
-        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        className="h-11 w-full rounded-xl border border-white/15 bg-white/[0.04] pl-10 pr-8 text-sm text-white placeholder-white/30 outline-none focus:border-[#F5C84C]/40 focus:bg-white/[0.06] transition-colors"
+        onChange={handleChange}
+        onFocus={handleFocus}
+        readOnly={!isPremium}
+        className={`h-11 w-full rounded-xl border bg-white/[0.04] pl-10 pr-8 text-sm text-white placeholder-white/30 outline-none transition-colors ${
+          isPremium
+            ? "border-white/15 focus:border-[#F5C84C]/40 focus:bg-white/[0.06] cursor-text"
+            : "border-white/10 cursor-pointer opacity-60"
+        }`}
       />
-      {value && (
+      {value && isPremium && (
         <button
           onClick={() => { onChange(""); setOpen(false); }}
           className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
@@ -111,7 +132,12 @@ function SearchAutocomplete({
           <X size={12} />
         </button>
       )}
-      {open && suggestions.length > 0 && (
+      {!isPremium && (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+          <span className="text-[9px] text-[#F5C84C]/50 font-semibold uppercase tracking-wider">Neeko+</span>
+        </div>
+      )}
+      {open && suggestions.length > 0 && isPremium && (
         <div className="absolute top-full mt-1 left-0 w-64 rounded-xl border border-white/10 bg-[#111] shadow-2xl z-50 overflow-hidden">
           {suggestions.map((row) => (
             <button
@@ -254,7 +280,7 @@ export default function AFLRankingsPage() {
     setHighlightedPlayerId(row.player_id ?? null);
     const idx = displayRows.findIndex((r) => r.player_id === row.player_id);
     if (idx >= 0) {
-      const tier: RowTier = isPremium ? "premium" : (idx < 5 ? "full" : idx < 15 ? "partial" : "locked");
+      const tier: RowTier = isPremium ? "premium" : getFreeTier(idx);
       const isUnlocked = isPremium || tier === "full" || tier === "partial";
       setSelected({ row, rank: idx + 1, tier, isUnlocked });
     }
@@ -312,22 +338,22 @@ export default function AFLRankingsPage() {
           </div>
           <div className="flex items-center gap-3 mt-1 shrink-0">
             {updatedAt && (
-              <div className="hidden md:flex items-center gap-1.5 text-[11px] text-white/30">
-                <Clock size={11} />
-                <span>Updated {fmtUpdatedAt(updatedAt.ts)}</span>
+              <div className="hidden md:flex items-center gap-2 rounded-lg border border-[#F5C84C]/20 bg-[#F5C84C]/[0.05] px-3 py-1.5">
+                <Clock size={11} className="text-[#F5C84C]/60 shrink-0" />
+                <span className="text-[11px] text-white/55 font-medium">Updated {fmtUpdatedAt(updatedAt.ts)}</span>
                 {updatedAt.round && (
-                  <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-white/40">{updatedAt.round}</span>
+                  <span className="rounded bg-[#F5C84C]/15 px-1.5 py-0.5 text-[10px] font-semibold text-[#F5C84C]/70">{updatedAt.round}</span>
                 )}
               </div>
             )}
           </div>
         </div>
         {updatedAt && (
-          <div className="md:hidden flex items-center gap-1.5 text-[11px] text-white/30 mt-2">
-            <Clock size={11} />
-            <span>Updated {fmtUpdatedAt(updatedAt.ts)}</span>
+          <div className="md:hidden flex items-center gap-2 mt-2 rounded-lg border border-[#F5C84C]/20 bg-[#F5C84C]/[0.05] px-3 py-1.5 w-fit">
+            <Clock size={11} className="text-[#F5C84C]/60 shrink-0" />
+            <span className="text-[11px] text-white/55 font-medium">Updated {fmtUpdatedAt(updatedAt.ts)}</span>
             {updatedAt.round && (
-              <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-white/40">{updatedAt.round}</span>
+              <span className="rounded bg-[#F5C84C]/15 px-1.5 py-0.5 text-[10px] font-semibold text-[#F5C84C]/70">{updatedAt.round}</span>
             )}
           </div>
         )}
@@ -359,16 +385,10 @@ export default function AFLRankingsPage() {
           <SearchAutocomplete
             rows={rows}
             value={searchTerm}
-            onChange={(v) => {
-              setSearchTerm(v);
-              if (!isPremium && v) {
-                setShowUpgradeModal(true);
-              }
-            }}
-            onSelect={(row) => {
-              if (!isPremium) { setShowUpgradeModal(true); return; }
-              handleSearchSelect(row);
-            }}
+            isPremium={isPremium}
+            onUpgrade={() => setShowUpgradeModal(true)}
+            onChange={setSearchTerm}
+            onSelect={handleSearchSelect}
           />
         </div>
 
@@ -390,10 +410,15 @@ export default function AFLRankingsPage() {
             : POSITIONS.map((pos) => (
                 <button
                   key={pos}
-                  onClick={() => setPositionFilter(pos)}
+                  onClick={() => {
+                    if (pos !== "ALL") { setShowUpgradeModal(true); return; }
+                    setPositionFilter(pos);
+                  }}
                   className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                    positionFilter === pos
+                    positionFilter === pos && pos === "ALL"
                       ? "bg-[#F5C84C] text-[#070707]"
+                      : pos !== "ALL"
+                      ? "border border-white/10 bg-white/[0.03] text-white/20 cursor-pointer opacity-50"
                       : "border border-white/10 bg-white/[0.03] text-white/50 hover:border-white/20 hover:text-white/70"
                   }`}
                 >
@@ -433,7 +458,7 @@ export default function AFLRankingsPage() {
                 ) : (
                   <>
                     {(isPremium ? displayRows : displayRows.slice(0, FREE_PARTIAL_ROWS)).map((row, idx) => {
-                      const tier = getFreeTier(idx);
+                      const tier: RowTier = isPremium ? "premium" : getFreeTier(idx);
                       const isUnlocked = isPremium || tier === "full" || tier === "partial";
                       const isHighlighted = highlightedPlayerId != null && row.player_id === highlightedPlayerId;
                       return (
@@ -467,7 +492,7 @@ export default function AFLRankingsPage() {
             isPremium={isPremium}
             activeTab={activeTab}
             onOpenRow={(row, idx) => {
-              const tier: RowTier = isPremium ? "premium" : (idx < 5 ? "full" : idx < 15 ? "partial" : "locked");
+              const tier: RowTier = isPremium ? "premium" : getFreeTier(idx);
               const isUnlocked = isPremium || tier === "full" || tier === "partial";
               setSelected({ row, rank: idx + 1, tier, isUnlocked });
             }}

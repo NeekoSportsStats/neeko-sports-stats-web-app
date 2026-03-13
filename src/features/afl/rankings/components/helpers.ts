@@ -224,6 +224,26 @@ export function getRiskBadge(risk: number | null) {
   return { label: "LOW RISK", text: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30" };
 }
 
+// ─── Stale AI text detector ──────────────────────────────────────────────────
+
+export function isAITextStale(
+  text: string | null | undefined,
+  row: { projection_final?: number | null; ceiling_estimate?: number | null; floor_estimate?: number | null }
+): boolean {
+  if (!text) return false;
+  const nums = [...text.matchAll(/\b(\d{2,3}(?:\.\d)?)\b/g)].map((m) => parseFloat(m[1]));
+  if (!nums.length) return false;
+  const fields = [row.projection_final, row.ceiling_estimate, row.floor_estimate].filter((v) => v != null) as number[];
+  if (!fields.length) return false;
+  let mismatches = 0;
+  for (const n of nums) {
+    if (n < 50 || n > 250) continue;
+    const isClose = fields.some((f) => Math.abs(f - n) <= 5);
+    if (!isClose) mismatches++;
+  }
+  return mismatches >= 2;
+}
+
 // ─── AI tone sharpener ────────────────────────────────────────────────────────
 
 const AI_REPLACEMENTS: [RegExp, string][] = [
@@ -405,33 +425,37 @@ export function getFreeTier(idx: number): "full" | "partial" | "locked" {
   return "locked";
 }
 
+const TRUNC = 220;
+function trunc(s: string): string {
+  return s.length > TRUNC ? s.slice(0, TRUNC - 1) + "…" : s;
+}
+
 export function safeWhyText(row: {
   recommendation_short?: string | null;
   recommendation_why?: string | null;
   ai_summary?: string | null;
 }): string | null {
-  const short = (row.recommendation_short ?? "").trim();
-  const why = (row.recommendation_why ?? "").trim();
+  const short   = (row.recommendation_short ?? "").trim();
+  const why     = (row.recommendation_why ?? "").trim();
   const summary = (row.ai_summary ?? "").trim();
 
-  const shortIsGeneric = isGenericAIText(short);
-  const whyIsGeneric = isGenericAIText(why);
+  const shortIsGeneric   = isGenericAIText(short);
+  const whyIsGeneric     = isGenericAIText(why);
+  const summaryIsGeneric = isGenericAIText(summary);
 
-  if (short.length >= 30 && short.split(/\s+/).filter(Boolean).length >= 6 && !shortIsGeneric) {
-    return short.length > 220 ? short.slice(0, 217) + "…" : short;
-  }
+  // Priority 1 — non-generic short
+  if (short.length >= 20 && !shortIsGeneric) return trunc(short);
 
-  if (why.length >= 20 && !whyIsGeneric && why !== short) {
-    return why.length > 220 ? why.slice(0, 217) + "…" : why;
-  }
+  // Priority 2 — non-generic why (skip if identical to short)
+  if (why.length >= 20 && !whyIsGeneric && why !== short) return trunc(why);
 
-  if (summary.length >= 20) {
-    return summary.length > 220 ? summary.slice(0, 217) + "…" : summary;
-  }
+  // Priority 3 — non-generic summary
+  if (summary.length >= 20 && !summaryIsGeneric) return trunc(summary);
 
-  if (short.length >= 30) {
-    return short.length > 220 ? short.slice(0, 217) + "…" : short;
-  }
+  // Priority 4 — any non-empty field even if generic (last resort, never blank)
+  if (short.length >= 10)   return trunc(short);
+  if (why.length >= 10)     return trunc(why);
+  if (summary.length >= 10) return trunc(summary);
 
   return null;
 }

@@ -235,9 +235,7 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
           })() : <span className="text-white/20 text-xs">—</span>}
         </div>
         <div className={`${CELL_BASE} px-3`} style={{ width: COL.why, minWidth: COL.why }}>
-          {tier === "partial" ? (
-            <span className="text-white/15 text-xs select-none">—</span>
-          ) : locked("why") ? (
+          {locked("why") ? (
             <LockedPlaceholder onUpgrade={onUpgrade} />
           ) : (
             <span className="text-xs text-white/50 leading-snug line-clamp-2 py-2">
