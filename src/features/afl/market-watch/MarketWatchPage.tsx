@@ -1,26 +1,20 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { TrendingUp, RefreshCw, Crown, ChevronDown, Lock, CircleAlert as AlertCircle } from "lucide-react";
+import { TrendingUp, RefreshCw, Crown, ChevronDown, Lock as _Lock, CircleAlert as AlertCircle, Zap, Target, Star } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
-import { MWPlayerRow, MWBestTrade, MWSummaryCard, MWSummary, MWStatus } from "./types";
+import { MWPlayerRow, MWSummaryCard, MWSummary, MWStatus } from "./types";
 
 import { UpgradeModal } from "./UpgradeModal";
-import { MarketWatchSummaryCards } from "./MarketWatchSummaryCards";
-import { BestTradesRow } from "./BestTradesRow";
 import { PlayerTradeCard } from "./PlayerTradeCard";
 import { TradeImpactModal } from "./TradeImpactModal";
 import { MarketWatchBanner } from "./MarketWatchBanner";
 import { HorizontalRail } from "./HorizontalRail";
 import { MarketWatchSkeleton } from "./MarketWatchSkeleton";
-import { TopTradeOfWeek } from "./TopTradeOfWeek";
 import { MarketWatchSort, SortKey } from "./MarketWatchSort";
 import { MarketWatchFilters, FilterState } from "./MarketWatchFilters";
 
-const FREE_LIMIT = 5;
-
 const SECTION_DEFAULT = 12;
-const SECTION_EXPANDED = 40;
 
 const SECTION_IDS = [
   "section-buy",
@@ -31,14 +25,13 @@ const SECTION_IDS = [
 
 interface PageData {
   players: MWPlayerRow[];
-  trades: MWBestTrade[];
   summaryCards: MWSummaryCard[];
 }
 
 export default function MarketWatchPage() {
   const { isPremium, loading: authLoading } = useAuth();
 
-  const [data, setData] = useState<PageData>({ players: [], trades: [], summaryCards: [] });
+  const [data, setData] = useState<PageData>({ players: [], summaryCards: [] });
   const [summary, setSummary] = useState<MWSummary | null>(null);
   const [status, setStatus] = useState<MWStatus | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
@@ -66,9 +59,8 @@ export default function MarketWatchPage() {
   const fetchData = useCallback(async (premium: boolean) => {
     setDataLoading(true);
     try {
-      const [playersRes, tradesRes, cardsRes, summaryRes, statusRes] = await Promise.all([
+      const [playersRes, cardsRes, summaryRes, statusRes] = await Promise.all([
         supabase.from("v_mw_premium").select("*").limit(premium ? 400 : 60),
-        supabase.from("v_mw_best_trades").select("*").limit(premium ? 10 : 4),
         supabase.from("v_mw_summary_cards").select("*"),
         supabase.from("v_mw_summary").select("*").maybeSingle(),
         supabase.from("v_mw_status").select("*").maybeSingle(),
@@ -76,7 +68,6 @@ export default function MarketWatchPage() {
 
       setData({
         players: (playersRes.data ?? []) as MWPlayerRow[],
-        trades: (tradesRes.data ?? []) as MWBestTrade[],
         summaryCards: (cardsRes.data ?? []) as MWSummaryCard[],
       });
       if (summaryRes.data) setSummary(summaryRes.data as MWSummary);
@@ -128,7 +119,7 @@ export default function MarketWatchPage() {
     return () => observer.disconnect();
   }, [data.players]);
 
-  const { players, trades, summaryCards } = data;
+  const { players } = data;
 
   const allTeams = useMemo(() => {
     const s = new Set(players.map(p => p.team).filter(Boolean));
@@ -169,17 +160,6 @@ export default function MarketWatchPage() {
   const cashCows    = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "cash_cow")), [players, applyFiltersAndSort]);
   const traps       = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "trap")), [players, applyFiltersAndSort]);
 
-  const getVisible = <T,>(arr: T[], showMore: boolean): T[] => {
-    if (isPremium) return showMore ? arr : arr.slice(0, SECTION_DEFAULT);
-    return arr.slice(0, FREE_LIMIT);
-  };
-
-  const visibleBuy      = getVisible(buyTargets, showMoreBuy);
-  const visibleSell     = getVisible(sellPlayers, showMoreSell);
-  const visibleCashCows = getVisible(cashCows, showMoreCashCows);
-  const visibleTraps    = getVisible(traps, showMoreTraps);
-
-  const topTrade = trades.length > 0 ? trades[0] : null;
   const isInactive = status != null && !status.is_active;
   const ready = !authLoading && !dataLoading;
 
@@ -234,194 +214,14 @@ export default function MarketWatchPage() {
           </div>
         )}
 
-        {!isPremium && (
-          <div
-            className="mb-6 rounded-xl px-5 py-4 flex items-center justify-between gap-4 flex-wrap"
-            style={{
-              background: "linear-gradient(90deg, rgba(245,200,76,0.06) 0%, rgba(245,200,76,0.02) 100%)",
-              border: "1px solid rgba(245,200,76,0.2)",
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <Crown className="h-5 w-5 text-[#F5C84C] shrink-0" />
-              <div>
-                <p className="text-sm font-semibold text-white">Neeko+ — Full Trade Intelligence</p>
-                <p className="text-[12px] text-white/40">
-                  Unlock every buy target, sell signal, cash cow and trap. Upgrade to see it all.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowUpgrade(true)}
-              className="shrink-0 inline-flex items-center gap-2 px-5 py-2 rounded-lg font-semibold text-black bg-[#F5C84C] hover:bg-[#ffd95a] transition-colors text-sm"
-            >
-              <Crown size={13} />
-              Upgrade to Premium
-            </button>
-          </div>
-        )}
-
-        {topTrade && (
-          <TopTradeOfWeek
-            trade={topTrade}
-            onCompare={(t) => setCompareModal({ outId: t.out_player_id, inId: t.in_player_id })}
-          />
-        )}
-
-        <MarketWatchSummaryCards
-          cards={summaryCards}
-          loading={false}
-          onCompareTrade={(a, b) => setCompareModal({ outId: a, inId: b })}
-        />
-
-        <BestTradesRow
-          trades={trades}
-          loading={false}
-          onCompare={(trade) => setCompareModal({ outId: trade.out_player_id, inId: trade.in_player_id })}
-          isPremium={isPremium}
-          onShowUpgrade={() => setShowUpgrade(true)}
-        />
-
-        {players.length > 0 && (
+        {isPremium && players.length > 0 && (
           <div className="mb-6 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 flex flex-col gap-3">
             <MarketWatchSort value={sortKey} onChange={setSortKey} />
             <MarketWatchFilters filters={filters} onChange={setFilters} teams={allTeams} />
           </div>
         )}
 
-        {buyTargets.length > 0 && (
-          <HorizontalRail
-            id="section-buy"
-            label="Buy Targets"
-            labelColor="text-green-400"
-            dot="bg-green-400"
-            description="Players projecting well above their price — strong value this round"
-            count={buyTargets.length}
-          >
-            {visibleBuy.map((p, i) => (
-              <div key={p.player_id} className="w-[260px] flex-shrink-0">
-                <PlayerTradeCard
-                  row={p}
-                  rank={i + 1}
-                  locked={!isPremium && i >= FREE_LIMIT}
-                  onUnlock={() => setShowUpgrade(true)}
-                  onCompare={(id) => setCompareModal({ inId: id })}
-                />
-              </div>
-            ))}
-            {!isPremium && buyTargets.length > FREE_LIMIT && (
-              <LockedMoreCard count={buyTargets.length - FREE_LIMIT} onUnlock={() => setShowUpgrade(true)} />
-            )}
-            {isPremium && buyTargets.length > SECTION_DEFAULT && (
-              <ShowMoreRailCard
-                count={buyTargets.length - visibleBuy.length}
-                expanded={showMoreBuy}
-                onToggle={() => setShowMoreBuy(e => !e)}
-              />
-            )}
-          </HorizontalRail>
-        )}
-
-        {sellPlayers.length > 0 && (
-          <HorizontalRail
-            id="section-sell"
-            label="Sell"
-            labelColor="text-red-400"
-            dot="bg-red-400"
-            description="Players priced above their projection — selling window before prices fall"
-            count={sellPlayers.length}
-          >
-            {visibleSell.map((p, i) => (
-              <div key={p.player_id} className="w-[260px] flex-shrink-0">
-                <PlayerTradeCard
-                  row={p}
-                  rank={i + 1}
-                  locked={!isPremium && i >= FREE_LIMIT}
-                  onUnlock={() => setShowUpgrade(true)}
-                  onCompare={(id) => setCompareModal({ outId: id })}
-                />
-              </div>
-            ))}
-            {!isPremium && sellPlayers.length > FREE_LIMIT && (
-              <LockedMoreCard count={sellPlayers.length - FREE_LIMIT} onUnlock={() => setShowUpgrade(true)} />
-            )}
-            {isPremium && sellPlayers.length > SECTION_DEFAULT && (
-              <ShowMoreRailCard
-                count={sellPlayers.length - visibleSell.length}
-                expanded={showMoreSell}
-                onToggle={() => setShowMoreSell(e => !e)}
-              />
-            )}
-          </HorizontalRail>
-        )}
-
-        {cashCows.length > 0 && (
-          <HorizontalRail
-            id="section-cash-cows"
-            label="Cash Cows"
-            labelColor="text-[#F5C84C]"
-            dot="bg-[#F5C84C]"
-            description="Budget players scoring well above their breakeven — generating price growth"
-            count={cashCows.length}
-          >
-            {visibleCashCows.map((p, i) => (
-              <div key={p.player_id} className="w-[260px] flex-shrink-0">
-                <PlayerTradeCard
-                  row={p}
-                  rank={i + 1}
-                  locked={!isPremium && i >= FREE_LIMIT}
-                  onUnlock={() => setShowUpgrade(true)}
-                  onCompare={(id) => setCompareModal({ inId: id })}
-                />
-              </div>
-            ))}
-            {!isPremium && cashCows.length > FREE_LIMIT && (
-              <LockedMoreCard count={cashCows.length - FREE_LIMIT} onUnlock={() => setShowUpgrade(true)} />
-            )}
-            {isPremium && cashCows.length > SECTION_DEFAULT && (
-              <ShowMoreRailCard
-                count={cashCows.length - visibleCashCows.length}
-                expanded={showMoreCashCows}
-                onToggle={() => setShowMoreCashCows(e => !e)}
-              />
-            )}
-          </HorizontalRail>
-        )}
-
-        {traps.length > 0 && (
-          <HorizontalRail
-            id="section-traps"
-            label="Traps"
-            labelColor="text-orange-400"
-            dot="bg-orange-400"
-            description="Premium-priced players whose projections don't justify their current value"
-            count={traps.length}
-          >
-            {visibleTraps.map((p, i) => (
-              <div key={p.player_id} className="w-[260px] flex-shrink-0">
-                <PlayerTradeCard
-                  row={p}
-                  rank={i + 1}
-                  locked={!isPremium && i >= FREE_LIMIT}
-                  onUnlock={() => setShowUpgrade(true)}
-                  onCompare={(id) => setCompareModal({ outId: id })}
-                />
-              </div>
-            ))}
-            {!isPremium && traps.length > FREE_LIMIT && (
-              <LockedMoreCard count={traps.length - FREE_LIMIT} onUnlock={() => setShowUpgrade(true)} />
-            )}
-            {isPremium && traps.length > SECTION_DEFAULT && (
-              <ShowMoreRailCard
-                count={traps.length - visibleTraps.length}
-                expanded={showMoreTraps}
-                onToggle={() => setShowMoreTraps(e => !e)}
-              />
-            )}
-          </HorizontalRail>
-        )}
-
-        {players.length === 0 && (
+        {players.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <TrendingUp className="h-8 w-8 text-white/15" />
             <p className="text-sm text-white/30">No market data available for this round yet.</p>
@@ -432,6 +232,33 @@ export default function MarketWatchPage() {
               Try refreshing
             </button>
           </div>
+        ) : !isPremium ? (
+          <FreeUserView
+            buyTargets={buyTargets}
+            sellPlayers={sellPlayers}
+            cashCows={cashCows}
+            traps={traps}
+            onUnlock={() => setShowUpgrade(true)}
+            onCompare={(outId, inId) => setCompareModal({ outId, inId })}
+            summary={summary}
+          />
+        ) : (
+          <PremiumUserView
+            buyTargets={buyTargets}
+            sellPlayers={sellPlayers}
+            cashCows={cashCows}
+            traps={traps}
+            showMoreBuy={showMoreBuy}
+            showMoreSell={showMoreSell}
+            showMoreCashCows={showMoreCashCows}
+            showMoreTraps={showMoreTraps}
+            onToggleBuy={() => setShowMoreBuy(e => !e)}
+            onToggleSell={() => setShowMoreSell(e => !e)}
+            onToggleCashCows={() => setShowMoreCashCows(e => !e)}
+            onToggleTraps={() => setShowMoreTraps(e => !e)}
+            onUnlock={() => setShowUpgrade(true)}
+            onCompare={(outId, inId) => setCompareModal({ outId, inId })}
+          />
         )}
 
         <p className="mt-10 text-center text-[11px] text-white/20 leading-relaxed max-w-lg mx-auto">
@@ -455,23 +282,366 @@ export default function MarketWatchPage() {
   );
 }
 
-function LockedMoreCard({ count, onUnlock }: { count: number; onUnlock: () => void }) {
+// ─── Free User View ───────────────────────────────────────────────────────────
+
+interface FreeViewProps {
+  buyTargets: MWPlayerRow[];
+  sellPlayers: MWPlayerRow[];
+  cashCows: MWPlayerRow[];
+  traps: MWPlayerRow[];
+  onUnlock: () => void;
+  onCompare: (outId?: number, inId?: number) => void;
+  summary: MWSummary | null;
+}
+
+function FreeUserView({ buyTargets, sellPlayers, cashCows, traps, onUnlock, onCompare, summary }: FreeViewProps) {
+  const topBuy  = buyTargets[0] ?? null;
+  const topSell = sellPlayers[0] ?? null;
+  const topCow  = cashCows[0] ?? null;
+  const topTrap = traps[0] ?? null;
+
+  const totalBuy  = summary?.buy_count ?? buyTargets.length;
+  const totalSell = summary?.sell_count ?? sellPlayers.length;
+  const totalCow  = summary?.cash_cow_count ?? cashCows.length;
+  const totalTrap = summary?.trap_count ?? traps.length;
+
+  const sections = [
+    {
+      player: topBuy,
+      label: "Buy Target",
+      dot: "bg-green-400",
+      labelColor: "text-green-400",
+      description: "Highest trade-score buy opportunity",
+      total: totalBuy,
+      onCompare: (id: number) => onCompare(undefined, id),
+    },
+    {
+      player: topSell,
+      label: "Sell Signal",
+      dot: "bg-red-400",
+      labelColor: "text-red-400",
+      description: "Highest trade-score sell opportunity",
+      total: totalSell,
+      onCompare: (id: number) => onCompare(id, undefined),
+    },
+    {
+      player: topCow,
+      label: "Cash Cow",
+      dot: "bg-[#F5C84C]",
+      labelColor: "text-[#F5C84C]",
+      description: "Best price growth potential",
+      total: totalCow,
+      onCompare: (id: number) => onCompare(undefined, id),
+    },
+    {
+      player: topTrap,
+      label: "Trap Alert",
+      dot: "bg-orange-400",
+      labelColor: "text-orange-400",
+      description: "Premium-priced player to avoid",
+      total: totalTrap,
+      onCompare: (id: number) => onCompare(id, undefined),
+    },
+  ].filter(s => s.player !== null);
+
+  if (sections.length === 0) return null;
+
   return (
-    <div
-      className="w-[220px] flex-shrink-0 rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.02] flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-[#F5C84C]/[0.05] transition-colors p-5"
-      onClick={onUnlock}
-    >
-      <Lock className="h-4 w-4 text-[#F5C84C]/50" />
-      <div className="text-center">
-        <p className="text-sm font-bold text-white/50">+{count} more</p>
-        <p className="text-[11px] text-[#F5C84C] mt-0.5">Unlock Neeko+</p>
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-sm font-bold text-white">Top Signal per Category</h2>
+          <p className="text-[11px] text-white/30 mt-0.5">Neeko AI detected the strongest trade opportunity in each category.</p>
+        </div>
+        <div className="h-px flex-1 mx-4 bg-white/[0.06]" />
+        <span className="text-[10px] text-white/20 uppercase tracking-widest shrink-0">#1 per category</span>
       </div>
-      <p className="text-[10px] text-white/30 text-center leading-snug">
-        See every trade opportunity
-      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        {sections.map(({ player, label, dot, labelColor, description, total, onCompare: sectionCompare }) => (
+          <div key={label} className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 pl-1">
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
+              <span className={`text-sm font-bold ${labelColor}`}>{label}</span>
+              {total > 1 && (
+                <span className="text-[10px] text-white/20 font-semibold ml-1">{total} total</span>
+              )}
+            </div>
+            <p className="text-[11px] text-white/30 pl-3.5 -mt-1">{description}</p>
+            <PlayerTradeCard
+              row={player!}
+              rank={1}
+              locked={false}
+              onCompare={sectionCompare}
+            />
+          </div>
+        ))}
+      </div>
+
+      <MarketWatchPaywall
+        buyCount={totalBuy}
+        sellCount={totalSell}
+        cowCount={totalCow}
+        trapCount={totalTrap}
+        onUnlock={onUnlock}
+      />
     </div>
   );
 }
+
+// ─── Premium User View ────────────────────────────────────────────────────────
+
+interface PremiumViewProps {
+  buyTargets: MWPlayerRow[];
+  sellPlayers: MWPlayerRow[];
+  cashCows: MWPlayerRow[];
+  traps: MWPlayerRow[];
+  showMoreBuy: boolean;
+  showMoreSell: boolean;
+  showMoreCashCows: boolean;
+  showMoreTraps: boolean;
+  onToggleBuy: () => void;
+  onToggleSell: () => void;
+  onToggleCashCows: () => void;
+  onToggleTraps: () => void;
+  onUnlock: () => void;
+  onCompare: (outId?: number, inId?: number) => void;
+}
+
+function PremiumUserView({
+  buyTargets, sellPlayers, cashCows, traps,
+  showMoreBuy, showMoreSell, showMoreCashCows, showMoreTraps,
+  onToggleBuy, onToggleSell, onToggleCashCows, onToggleTraps,
+  onUnlock, onCompare,
+}: PremiumViewProps) {
+  const getVisible = (arr: MWPlayerRow[], showMore: boolean) =>
+    showMore ? arr : arr.slice(0, SECTION_DEFAULT);
+
+  const visibleBuy      = getVisible(buyTargets, showMoreBuy);
+  const visibleSell     = getVisible(sellPlayers, showMoreSell);
+  const visibleCashCows = getVisible(cashCows, showMoreCashCows);
+  const visibleTraps    = getVisible(traps, showMoreTraps);
+
+  return (
+    <>
+      {buyTargets.length > 0 && (
+        <HorizontalRail
+          id="section-buy"
+          label="Buy Targets"
+          labelColor="text-green-400"
+          dot="bg-green-400"
+          description="Players projecting well above their price — strong value this round"
+          count={buyTargets.length}
+        >
+          {visibleBuy.map((p, i) => (
+            <div key={p.player_id} className="w-[260px] flex-shrink-0">
+              <PlayerTradeCard
+                row={p}
+                rank={i + 1}
+                locked={false}
+                onUnlock={onUnlock}
+                onCompare={(id) => onCompare(undefined, id)}
+              />
+            </div>
+          ))}
+          {buyTargets.length > SECTION_DEFAULT && (
+            <ShowMoreRailCard
+              count={buyTargets.length - visibleBuy.length}
+              expanded={showMoreBuy}
+              onToggle={onToggleBuy}
+            />
+          )}
+        </HorizontalRail>
+      )}
+
+      {sellPlayers.length > 0 && (
+        <HorizontalRail
+          id="section-sell"
+          label="Sell"
+          labelColor="text-red-400"
+          dot="bg-red-400"
+          description="Players priced above their projection — selling window before prices fall"
+          count={sellPlayers.length}
+        >
+          {visibleSell.map((p, i) => (
+            <div key={p.player_id} className="w-[260px] flex-shrink-0">
+              <PlayerTradeCard
+                row={p}
+                rank={i + 1}
+                locked={false}
+                onUnlock={onUnlock}
+                onCompare={(id) => onCompare(id, undefined)}
+              />
+            </div>
+          ))}
+          {sellPlayers.length > SECTION_DEFAULT && (
+            <ShowMoreRailCard
+              count={sellPlayers.length - visibleSell.length}
+              expanded={showMoreSell}
+              onToggle={onToggleSell}
+            />
+          )}
+        </HorizontalRail>
+      )}
+
+      {cashCows.length > 0 && (
+        <HorizontalRail
+          id="section-cash-cows"
+          label="Cash Cows"
+          labelColor="text-[#F5C84C]"
+          dot="bg-[#F5C84C]"
+          description="Budget players scoring well above their breakeven — generating price growth"
+          count={cashCows.length}
+        >
+          {visibleCashCows.map((p, i) => (
+            <div key={p.player_id} className="w-[260px] flex-shrink-0">
+              <PlayerTradeCard
+                row={p}
+                rank={i + 1}
+                locked={false}
+                onUnlock={onUnlock}
+                onCompare={(id) => onCompare(undefined, id)}
+              />
+            </div>
+          ))}
+          {cashCows.length > SECTION_DEFAULT && (
+            <ShowMoreRailCard
+              count={cashCows.length - visibleCashCows.length}
+              expanded={showMoreCashCows}
+              onToggle={onToggleCashCows}
+            />
+          )}
+        </HorizontalRail>
+      )}
+
+      {traps.length > 0 && (
+        <HorizontalRail
+          id="section-traps"
+          label="Traps"
+          labelColor="text-orange-400"
+          dot="bg-orange-400"
+          description="Premium-priced players whose projections don't justify their current value"
+          count={traps.length}
+        >
+          {visibleTraps.map((p, i) => (
+            <div key={p.player_id} className="w-[260px] flex-shrink-0">
+              <PlayerTradeCard
+                row={p}
+                rank={i + 1}
+                locked={false}
+                onUnlock={onUnlock}
+                onCompare={(id) => onCompare(id, undefined)}
+              />
+            </div>
+          ))}
+          {traps.length > SECTION_DEFAULT && (
+            <ShowMoreRailCard
+              count={traps.length - visibleTraps.length}
+              expanded={showMoreTraps}
+              onToggle={onToggleTraps}
+            />
+          )}
+        </HorizontalRail>
+      )}
+    </>
+  );
+}
+
+// ─── Market Watch Paywall ─────────────────────────────────────────────────────
+
+function MarketWatchPaywall({
+  buyCount,
+  sellCount,
+  cowCount,
+  trapCount,
+  onUnlock,
+}: {
+  buyCount: number;
+  sellCount: number;
+  cowCount: number;
+  trapCount: number;
+  onUnlock: () => void;
+}) {
+  const extraBuy  = Math.max(0, buyCount - 1);
+  const extraSell = Math.max(0, sellCount - 1);
+  const extraCow  = Math.max(0, cowCount - 1);
+  const extraTrap = Math.max(0, trapCount - 1);
+  const totalExtra = extraBuy + extraSell + extraCow + extraTrap;
+  const displayExtra = totalExtra > 0 ? totalExtra : 120;
+
+  const lines = [
+    extraBuy  > 0 && `${extraBuy} more buy target${extraBuy !== 1 ? "s" : ""}`,
+    extraSell > 0 && `${extraSell} more sell signal${extraSell !== 1 ? "s" : ""}`,
+    extraCow  > 0 && `${extraCow} cash cow${extraCow !== 1 ? "s" : ""} growing now`,
+    extraTrap > 0 && `${extraTrap} trap alert${extraTrap !== 1 ? "s" : ""} to avoid`,
+  ].filter(Boolean) as string[];
+
+  if (lines.length === 0) {
+    lines.push("Full buy/sell lists", "Breakout cash cows", "Trap alerts", "120+ trade signals");
+  }
+
+  return (
+    <div className="mb-10 rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-b from-[#F5C84C]/[0.07] to-[#F5C84C]/[0.02] p-7 text-center">
+      <div className="flex items-center justify-center w-12 h-12 rounded-full border border-[#F5C84C]/35 bg-[#F5C84C]/15 mx-auto mb-4">
+        <Crown size={22} className="text-[#F5C84C]" />
+      </div>
+
+      <h3 className="text-lg font-extrabold text-white mb-1">
+        Unlock the full Market Watch
+      </h3>
+      <p className="text-sm text-white/40 mb-5">
+        {displayExtra}+ trade signals updated every round
+      </p>
+
+      <div className="mb-5 space-y-1.5">
+        <p className="text-xs text-white/35 uppercase tracking-widest mb-2">Includes</p>
+        {lines.map((line) => (
+          <div key={line} className="flex items-center justify-center gap-2">
+            <div className="w-1 h-1 rounded-full bg-[#F5C84C]/50 shrink-0" />
+            <p className="text-sm text-white/60">{line}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-center gap-2 mb-5">
+        {[
+          { icon: <Zap size={9} />, label: "Full trade signals" },
+          { icon: <Target size={9} />, label: "Updated each round" },
+          { icon: <Star size={9} />, label: "AI-powered insights" },
+        ].map(({ icon, label }) => (
+          <div
+            key={label}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#F5C84C]/25 bg-[#F5C84C]/[0.08] text-[11px] font-semibold text-[#F5C84C]/80"
+          >
+            <span className="text-[#F5C84C]/60">{icon}</span>
+            {label}
+          </div>
+        ))}
+      </div>
+
+      <a
+        href="/neeko-plus"
+        className="inline-flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3.5 rounded-xl hover:brightness-110 transition-all shadow-lg shadow-[#F5C84C]/25"
+      >
+        <Crown size={14} />
+        Unlock Neeko+
+      </a>
+
+      <div className="mt-3 flex items-center justify-center gap-3">
+        <button
+          onClick={onUnlock}
+          className="text-xs text-white/35 hover:text-white/60 transition-colors underline underline-offset-2"
+        >
+          See what's included
+        </button>
+        <span className="text-white/15 text-xs">·</span>
+        <span className="text-xs text-white/25">From $9.99/mo or $89/yr</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Show More Rail Card ──────────────────────────────────────────────────────
 
 function ShowMoreRailCard({
   count,

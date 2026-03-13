@@ -41,7 +41,7 @@ export function HorizontalRail({
     const ro = new ResizeObserver(checkScroll);
     ro.observe(el);
     return () => { el.removeEventListener("scroll", checkScroll); ro.disconnect(); };
-  });
+  }, []);
 
   return (
     <section id={id} className={`mb-8 ${className}`}>
