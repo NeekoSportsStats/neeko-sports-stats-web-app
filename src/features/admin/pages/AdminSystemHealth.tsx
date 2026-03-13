@@ -2,62 +2,20 @@ import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Activity, Database, ChartBar as BarChart2, ShieldCheck, Zap, RefreshCw, MonitorCheck, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Circle as XCircle } from "lucide-react";
 import {
-  formatDate,
-  formatMs,
-  StatRow,
-  type PipelineHealth,
-  type CanonicalHealth,
-  type DataIntegrityChecks,
-  type AIQueueHealthRow,
-  type AIWorkerHealth,
-  type AIOutputHealth,
-} from "../shared/adminUtils";
-
-interface PipelineRunData {
-  last_run: string | null;
-  duration_ms: number | null;
-  status: string | null;
-  last_error: string | null;
-}
-
-interface DataFreshnessData {
-  latest_round: number | null;
-  total_player_rows: number;
-  unique_players: number;
-  last_ingest: string | null;
-  is_preseason: boolean;
-}
-
-interface ProjectionStatusData {
-  players_projected: number;
-  missing_projections: number;
-  missing_neeko_rating: number;
-  last_volatility_refresh: string | null;
-}
-
-interface AIQueueData {
-  pending: number;
-  processing: number;
-  completed_today: number;
-  oldest_pending_mins: number | null;
-}
-
-interface FrontendCoverageData {
-  rankings_narratives: number;
-  ranking_recommendations: number;
-  market_watch_summary: number;
-  start_sit_cache: number;
-}
+  Activity, Database, ChartBar as BarChart2, ShieldCheck, Zap,
+  RefreshCw, MonitorCheck, TriangleAlert as AlertTriangle,
+  CircleCheck as CheckCircle, Circle as XCircle, Target, Grid2x2 as Grid,
+} from "lucide-react";
+import { formatDate, StatRow } from "../shared/adminUtils";
 
 type StatusLevel = "ok" | "warn" | "error" | "loading";
 
 function StatusChip({ level, label }: { level: StatusLevel; label: string }) {
   const cfg = {
-    ok: { cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400", dot: "bg-emerald-500" },
-    warn: { cls: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400", dot: "bg-amber-500" },
-    error: { cls: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400", dot: "bg-red-500" },
+    ok:      { cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400", dot: "bg-emerald-500" },
+    warn:    { cls: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400", dot: "bg-amber-500" },
+    error:   { cls: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400", dot: "bg-red-500" },
     loading: { cls: "bg-muted text-muted-foreground", dot: "bg-muted-foreground animate-pulse" },
   }[level];
   return (
@@ -69,11 +27,7 @@ function StatusChip({ level, label }: { level: StatusLevel; label: string }) {
 }
 
 function HealthCard({
-  icon: Icon,
-  title,
-  status,
-  loading,
-  children,
+  icon: Icon, title, status, loading, children,
 }: {
   icon: React.ElementType;
   title: string;
@@ -82,9 +36,9 @@ function HealthCard({
   children: React.ReactNode;
 }) {
   const borderColor = {
-    ok: "border-emerald-200 dark:border-emerald-900",
-    warn: "border-amber-200 dark:border-amber-900",
-    error: "border-red-200 dark:border-red-900",
+    ok:      "border-emerald-200 dark:border-emerald-900",
+    warn:    "border-amber-200 dark:border-amber-900",
+    error:   "border-red-200 dark:border-red-900",
     loading: "border-border",
   }[status];
 
@@ -124,9 +78,9 @@ function HealthCard({
 
 function IssueRow({ message, level = "warn" }: { message: string; level?: "warn" | "error" | "info" }) {
   const cfg = {
-    warn: { icon: AlertTriangle, cls: "text-amber-600 dark:text-amber-400" },
-    error: { icon: XCircle, cls: "text-red-600 dark:text-red-400" },
-    info: { icon: CheckCircle, cls: "text-muted-foreground" },
+    warn:  { icon: AlertTriangle, cls: "text-amber-600 dark:text-amber-400" },
+    error: { icon: XCircle,       cls: "text-red-600 dark:text-red-400" },
+    info:  { icon: CheckCircle,   cls: "text-muted-foreground" },
   }[level];
   const Icon = cfg.icon;
   return (
@@ -137,110 +91,72 @@ function IssueRow({ message, level = "warn" }: { message: string; level?: "warn"
   );
 }
 
+interface HealthSummary {
+  last_pipeline_run:          string | null;
+  pipeline_status:            string | null;
+  rankings_cache_rows:        number;
+  rankings_cache_refreshed_at: string | null;
+  ai_analysis_rows:           number;
+  reco_rows:                  number;
+  queue_pending:              number;
+  queue_complete:             number;
+  queue_failed:               number;
+  reco_queue_pending:         number;
+  analysis_queue_pending:     number;
+  edge_board_rows:            number;
+  edge_board_captains:        number;
+  edge_board_breakouts:       number;
+  edge_board_traps:           number;
+  edge_board_refreshed_at:    string | null;
+  accuracy_players:           number | null;
+  accuracy_avg_error:         number | null;
+  accuracy_latest_round:      number | null;
+  controller_cron_active:     boolean | null;
+  accuracy_cron_active:       boolean | null;
+}
+
+interface DataChecks {
+  players_missing_projection:   number;
+  players_missing_neeko_rating: number;
+  last_volatility_refresh:      string | null;
+}
+
+interface CanonicalData {
+  unique_players:       number;
+  total_player_round_rows: number;
+  latest_round_loaded:  number | null;
+  latest_cache_refresh: string | null;
+}
+
+interface WorkerHealth {
+  last_worker_run:  string | null;
+  jobs_last_10m:    number;
+  errors_last_hour: number;
+}
+
 export default function AdminSystemHealth() {
   const [loading, setLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
-  const [pipelineRun, setPipelineRun] = useState<PipelineRunData | null>(null);
-  const [dataFreshness, setDataFreshness] = useState<DataFreshnessData | null>(null);
-  const [projectionStatus, setProjectionStatus] = useState<ProjectionStatusData | null>(null);
-  const [aiQueue, setAIQueue] = useState<AIQueueData | null>(null);
-  const [workerHealth, setWorkerHealth] = useState<AIWorkerHealth | null>(null);
-  const [frontendCoverage, setFrontendCoverage] = useState<FrontendCoverageData | null>(null);
-  const [queueRows, setQueueRows] = useState<AIQueueHealthRow[]>([]);
+  const [summary, setSummary] = useState<HealthSummary | null>(null);
+  const [canonical, setCanonical] = useState<CanonicalData | null>(null);
+  const [integrity, setIntegrity] = useState<DataChecks | null>(null);
+  const [worker, setWorker] = useState<WorkerHealth | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [
-        pipelineRes,
-        canonicalRes,
-        integrityRes,
-        workerRes,
-        outputRes,
-        queueHealthRes,
-      ] = await Promise.all([
-        supabase.from("v_pipeline_health").select("*").maybeSingle(),
+      const [summaryRes, canonicalRes, integrityRes, workerRes] = await Promise.all([
+        supabase.from("v_admin_system_health_summary").select("*").maybeSingle(),
         supabase.from("v_canonical_health").select("*").maybeSingle(),
         supabase.from("v_data_integrity_checks").select("*").maybeSingle(),
         supabase.from("v_ai_worker_health").select("*").maybeSingle(),
-        supabase.from("v_ai_output_health").select("*").maybeSingle(),
-        supabase.from("v_ai_queue_health").select("*"),
       ]);
 
-      const ph = pipelineRes.data as PipelineHealth | null;
-      setPipelineRun(
-        ph
-          ? {
-              last_run: ph.last_pipeline_run,
-              duration_ms: ph.avg_duration_ms,
-              status: ph.latest_status,
-              last_error: ph.last_error,
-            }
-          : null
-      );
-
-      const ch = canonicalRes.data as CanonicalHealth | null;
-      if (ch) {
-        setDataFreshness({
-          latest_round: ch.latest_round_loaded,
-          total_player_rows: ch.total_player_round_rows ?? 0,
-          unique_players: ch.unique_players ?? 0,
-          last_ingest: ch.latest_round_loaded
-            ? ph?.last_pipeline_run ?? null
-            : null,
-          is_preseason:
-            !ch.total_player_round_rows || ch.total_player_round_rows === 0,
-        });
-      }
-
-      const di = integrityRes.data as DataIntegrityChecks | null;
-      setProjectionStatus(
-        di
-          ? {
-              players_projected:
-                (ch?.unique_players ?? 0) - (di.players_missing_projection ?? 0),
-              missing_projections: di.players_missing_projection ?? 0,
-              missing_neeko_rating: di.players_missing_neeko_rating ?? 0,
-              last_volatility_refresh: di.last_volatility_refresh ?? null,
-            }
-          : null
-      );
-
-      const rows = (queueHealthRes.data ?? []) as AIQueueHealthRow[];
-      setQueueRows(rows);
-
-      const pendingRow = rows.find((r) => r.status === "pending");
-      const processingRow = rows.find((r) => r.status === "processing");
-      const completedRow = rows.find((r) => r.status === "completed");
-
-      const oldestPendingMs = pendingRow?.oldest_job
-        ? Date.now() - new Date(pendingRow.oldest_job).getTime()
-        : null;
-
-      setAIQueue({
-        pending: pendingRow?.jobs ?? 0,
-        processing: processingRow?.jobs ?? 0,
-        completed_today: completedRow?.jobs ?? 0,
-        oldest_pending_mins:
-          oldestPendingMs !== null
-            ? Math.round(oldestPendingMs / 60000)
-            : null,
-      });
-
-      if (workerRes.data) setWorkerHealth(workerRes.data as AIWorkerHealth);
-
-      const out = outputRes.data as AIOutputHealth | null;
-      setFrontendCoverage(
-        out
-          ? {
-              rankings_narratives: out.player_analysis_rows ?? 0,
-              ranking_recommendations: out.ranking_recos_rows ?? 0,
-              market_watch_summary: out.market_watch_rows ?? 0,
-              start_sit_cache: out.start_sit_rows ?? 0,
-            }
-          : null
-      );
+      if (summaryRes.data) setSummary(summaryRes.data as HealthSummary);
+      if (canonicalRes.data) setCanonical(canonicalRes.data as CanonicalData);
+      if (integrityRes.data) setIntegrity(integrityRes.data as DataChecks);
+      if (workerRes.data) setWorker(workerRes.data as WorkerHealth);
 
       setLastRefreshed(new Date());
     } finally {
@@ -248,116 +164,79 @@ export default function AdminSystemHealth() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const workerLastRunMins =
-    workerHealth?.last_worker_run
-      ? Math.round(
-          (Date.now() - new Date(workerHealth.last_worker_run).getTime()) / 60000
-        )
-      : null;
+  const workerLastRunMins = worker?.last_worker_run
+    ? Math.round((Date.now() - new Date(worker.last_worker_run).getTime()) / 60000)
+    : null;
 
-  const workerStatus: StatusLevel =
-    workerLastRunMins === null
-      ? "loading"
-      : workerLastRunMins <= 20
-        ? "ok"
-        : workerLastRunMins <= 60
-          ? "warn"
-          : "error";
+  const workerStatus: StatusLevel = workerLastRunMins === null ? "loading"
+    : workerLastRunMins <= 20 ? "ok"
+    : workerLastRunMins <= 60 ? "warn"
+    : "error";
 
-  const workerLabel =
-    workerLastRunMins === null
-      ? "Unknown"
-      : workerLastRunMins <= 20
-        ? "Active"
-        : workerLastRunMins <= 60
-          ? "Slow"
-          : "Stalled";
+  const workerLabel = workerLastRunMins === null ? "Unknown"
+    : workerLastRunMins <= 20 ? "Active"
+    : workerLastRunMins <= 60 ? "Slow"
+    : "Stalled";
 
-  const pipelineStatusLevel: StatusLevel =
-    !pipelineRun
-      ? "loading"
-      : pipelineRun.status === "success"
-        ? "ok"
-        : pipelineRun.status === "partial"
-          ? "warn"
-          : pipelineRun.status === "failed"
-            ? "error"
-            : "loading";
+  const pipelineLevel: StatusLevel = !summary ? "loading"
+    : summary.pipeline_status === "completed" ? "ok"
+    : summary.pipeline_status === "running" ? "ok"
+    : summary.pipeline_status === "failed" ? "error"
+    : "warn";
 
-  const dataFreshnessLevel: StatusLevel = dataFreshness?.is_preseason
-    ? "ok"
-    : dataFreshness?.total_player_rows
-      ? "ok"
-      : "warn";
+  const dataLevel: StatusLevel = canonical?.total_player_round_rows ? "ok" : "warn";
 
-  const projectionLevel: StatusLevel =
-    projectionStatus === null
-      ? "loading"
-      : projectionStatus.missing_projections === 0 &&
-          projectionStatus.missing_neeko_rating === 0
-        ? "ok"
-        : projectionStatus.missing_projections < 20
-          ? "warn"
-          : "error";
+  const projectionLevel: StatusLevel = integrity === null ? "loading"
+    : integrity.players_missing_projection === 0 ? "ok"
+    : integrity.players_missing_projection < 20 ? "warn"
+    : "error";
 
-  const queueStatus: StatusLevel = (() => {
-    if (!aiQueue) return "loading";
-    if (aiQueue.pending === 0) return "ok";
-    if (
-      workerLastRunMins !== null &&
-      workerLastRunMins > 60 &&
-      aiQueue.pending > 0
-    )
-      return "error";
-    return "ok";
-  })();
+  const queueLevel: StatusLevel = !summary ? "loading"
+    : summary.queue_failed > 10 ? "error"
+    : (summary.reco_queue_pending > 0 || summary.analysis_queue_pending > 0) ? "warn"
+    : "ok";
 
-  const queueLabel = (() => {
-    if (!aiQueue) return "Loading";
-    if (aiQueue.pending === 0) return "Clear";
-    if (queueStatus === "error") return "Stalled";
-    return "Processing";
-  })();
+  const queueLabel = !summary ? "Loading"
+    : (summary.reco_queue_pending + summary.analysis_queue_pending) === 0 ? "Clear"
+    : queueLevel === "error" ? "Errors"
+    : "Pending";
 
-  const coverageLevel: StatusLevel =
-    frontendCoverage === null
-      ? "loading"
-      : (frontendCoverage.ranking_recommendations ?? 0) >= 500
-        ? "ok"
-        : "warn";
+  const edgeBoardLevel: StatusLevel = !summary ? "loading"
+    : summary.edge_board_captains >= 5 && summary.edge_board_breakouts >= 5 && summary.edge_board_traps >= 5 ? "ok"
+    : summary.edge_board_rows > 0 ? "warn"
+    : "error";
+
+  const accuracyLevel: StatusLevel = !summary ? "loading"
+    : (summary.accuracy_players ?? 0) > 100 ? "ok"
+    : (summary.accuracy_players ?? 0) > 0 ? "warn"
+    : "error";
+
+  const coverageLevel: StatusLevel = !summary ? "loading"
+    : summary.reco_rows >= 500 ? "ok"
+    : summary.reco_rows > 0 ? "warn"
+    : "error";
 
   const issues: Array<{ message: string; level: "warn" | "error" | "info" }> = [];
-  if (pipelineRun?.last_error) {
-    issues.push({ message: `Pipeline error: ${pipelineRun.last_error}`, level: "error" });
+
+  if (summary?.queue_failed > 10) {
+    issues.push({ message: `${summary.queue_failed} failed jobs in ai_generation_queue — check logs`, level: "error" });
   }
-  if (
-    aiQueue &&
-    aiQueue.pending > 0 &&
-    workerLastRunMins !== null &&
-    workerLastRunMins > 60
-  ) {
-    issues.push({
-      message: `AI queue has ${aiQueue.pending} pending jobs but worker last ran ${workerLastRunMins}m ago — may be stalled`,
-      level: "error",
-    });
+  if (summary?.reco_queue_pending && summary.reco_queue_pending > 0) {
+    issues.push({ message: `${summary.reco_queue_pending} ranking_recommendation jobs still pending`, level: "warn" });
   }
-  if (
-    (workerHealth?.errors_last_hour ?? 0) > 5
-  ) {
-    issues.push({
-      message: `Worker reporting ${workerHealth?.errors_last_hour} errors in the last hour`,
-      level: "error",
-    });
+  if (workerLastRunMins !== null && workerLastRunMins > 60 && (summary?.queue_pending ?? 0) > 0) {
+    issues.push({ message: `Worker last ran ${workerLastRunMins}m ago but queue has ${summary?.queue_pending} pending jobs`, level: "error" });
   }
-  if (dataFreshness?.is_preseason) {
-    issues.push({
-      message: "Preseason mode — no live ingest expected yet",
-      level: "info",
-    });
+  if ((worker?.errors_last_hour ?? 0) > 5) {
+    issues.push({ message: `Worker reporting ${worker?.errors_last_hour} errors in the last hour`, level: "error" });
+  }
+  if (edgeBoardLevel !== "ok" && summary) {
+    issues.push({ message: `Edge Board incomplete: ${summary.edge_board_captains} captains, ${summary.edge_board_breakouts} breakouts, ${summary.edge_board_traps} traps (want 5 each)`, level: "warn" });
+  }
+  if (!canonical?.total_player_round_rows) {
+    issues.push({ message: "No players in rankings cache — pipeline may not have run yet", level: "warn" });
   }
 
   return (
@@ -368,249 +247,185 @@ export default function AdminSystemHealth() {
           <p className="text-xs text-muted-foreground mt-0.5">
             {lastRefreshed
               ? `Last refreshed ${lastRefreshed.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`
-              : "Daily pipeline · data ingest · projections · AI · frontend coverage"}
+              : "Pipeline · data · projections · AI · edge board · accuracy"}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={fetchAll}
-          disabled={loading}
-        >
+        <Button variant="outline" size="sm" onClick={fetchAll} disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+
         {/* 1 — Pipeline Run */}
-        <HealthCard
-          icon={Activity}
-          title="Pipeline Run"
-          status={pipelineStatusLevel}
-          loading={loading}
-        >
-          <StatRow
-            label="Last run"
-            value={formatDate(pipelineRun?.last_run ?? null)}
-          />
-          <StatRow
-            label="Duration"
-            value={formatMs(pipelineRun?.duration_ms ?? null)}
-          />
-          <StatRow
-            label="Steps"
-            value="13"
-          />
-          <StatRow
-            label="Status"
-            value={
-              <StatusChip
-                level={pipelineStatusLevel === "loading" ? "loading" : pipelineStatusLevel}
-                label={pipelineRun?.status ?? "No runs"}
-              />
-            }
-          />
-          {pipelineRun?.last_error && (
-            <div className="mt-3 rounded-md bg-red-50 dark:bg-red-950 p-2.5 text-xs text-red-700 dark:text-red-300 break-words">
-              {pipelineRun.last_error}
-            </div>
-          )}
+        <HealthCard icon={Activity} title="Pipeline Run" status={pipelineLevel} loading={loading}>
+          <StatRow label="Last run" value={formatDate(summary?.last_pipeline_run ?? null)} />
+          <StatRow label="Status" value={
+            <StatusChip
+              level={pipelineLevel === "loading" ? "loading" : pipelineLevel}
+              label={summary?.pipeline_status ?? "No runs"}
+            />
+          } />
+          <StatRow label="Controller cron" value={
+            summary?.controller_cron_active === true ? (
+              <StatusChip level="ok" label="Active — 15:00 UTC" />
+            ) : summary?.controller_cron_active === false ? (
+              <StatusChip level="error" label="Inactive" />
+            ) : "—"
+          } />
+          <StatRow label="Rankings cache" value={
+            `${(summary?.rankings_cache_rows ?? 0).toLocaleString()} rows`
+          } />
+          <StatRow label="Cache refreshed" value={formatDate(summary?.rankings_cache_refreshed_at ?? null)} />
         </HealthCard>
 
         {/* 2 — Data Freshness */}
-        <HealthCard
-          icon={Database}
-          title="Data Freshness"
-          status={dataFreshnessLevel}
-          loading={loading}
-        >
-          <StatRow
-            label="Latest round"
-            value={
-              dataFreshness?.is_preseason
-                ? "—"
-                : (dataFreshness?.latest_round ?? "—")
-            }
-          />
-          <StatRow
-            label="Players tracked"
-            value={dataFreshness?.unique_players?.toLocaleString() ?? "—"}
-          />
-          <StatRow
-            label="Stat rows"
-            value={dataFreshness?.total_player_rows?.toLocaleString() ?? "—"}
-          />
-          <StatRow
-            label="Last ingest"
-            value={formatDate(dataFreshness?.last_ingest ?? null)}
-          />
-          <StatRow
-            label="Status"
-            value={
-              dataFreshness?.is_preseason ? (
-                <StatusChip level="ok" label="Preseason" />
-              ) : dataFreshness?.total_player_rows ? (
-                <StatusChip level="ok" label="Live" />
-              ) : (
-                <StatusChip level="warn" label="No data" />
-              )
-            }
-          />
+        <HealthCard icon={Database} title="Data Freshness" status={dataLevel} loading={loading}>
+          <StatRow label="Latest round" value={canonical?.latest_round_loaded ?? "—"} />
+          <StatRow label="Players tracked" value={canonical?.unique_players?.toLocaleString() ?? "—"} />
+          <StatRow label="Rankings rows" value={canonical?.total_player_round_rows?.toLocaleString() ?? "—"} />
+          <StatRow label="Cache refreshed" value={formatDate(canonical?.latest_cache_refresh ?? null)} />
+          <StatRow label="Status" value={
+            canonical?.total_player_round_rows ? (
+              <StatusChip level="ok" label="Live" />
+            ) : (
+              <StatusChip level="warn" label="No data" />
+            )
+          } />
         </HealthCard>
 
         {/* 3 — Projection Status */}
-        <HealthCard
-          icon={BarChart2}
-          title="Projection Status"
-          status={projectionLevel}
-          loading={loading}
-        >
-          <StatRow
-            label="Players projected"
-            value={projectionStatus?.players_projected?.toLocaleString() ?? "—"}
-            highlight={
-              (projectionStatus?.players_projected ?? 0) > 0 ? "good" : "neutral"
-            }
-          />
+        <HealthCard icon={BarChart2} title="Projection Status" status={projectionLevel} loading={loading}>
           <StatRow
             label="Missing projections"
-            value={projectionStatus?.missing_projections ?? "—"}
+            value={integrity?.players_missing_projection ?? "—"}
             highlight={
-              (projectionStatus?.missing_projections ?? 0) === 0
-                ? "good"
-                : (projectionStatus?.missing_projections ?? 0) < 20
-                  ? "warn"
-                  : "bad"
+              (integrity?.players_missing_projection ?? 0) === 0 ? "good"
+              : (integrity?.players_missing_projection ?? 0) < 20 ? "warn"
+              : "bad"
             }
           />
           <StatRow
             label="Missing Neeko rating"
-            value={projectionStatus?.missing_neeko_rating ?? "—"}
-            highlight={
-              (projectionStatus?.missing_neeko_rating ?? 0) === 0
-                ? "good"
-                : "warn"
-            }
+            value={integrity?.players_missing_neeko_rating ?? "—"}
+            highlight={(integrity?.players_missing_neeko_rating ?? 0) === 0 ? "good" : "warn"}
           />
-          <StatRow
-            label="Volatility refresh"
-            value={formatDate(projectionStatus?.last_volatility_refresh ?? null)}
-          />
+          <StatRow label="Last AI generation" value={formatDate(integrity?.last_volatility_refresh ?? null)} />
         </HealthCard>
 
         {/* 4 — AI Queue */}
-        <HealthCard
-          icon={ShieldCheck}
-          title="AI Queue"
-          status={queueStatus}
-          loading={loading}
-        >
+        <HealthCard icon={ShieldCheck} title="AI Queue" status={queueLevel} loading={loading}>
           <StatRow
-            label="Pending"
+            label="Reco pending"
             value={
-              <span className={(aiQueue?.pending ?? 0) > 0 ? "text-amber-600 dark:text-amber-400 font-semibold" : "font-medium"}>
-                {aiQueue?.pending?.toLocaleString() ?? "—"}
+              <span className={(summary?.reco_queue_pending ?? 0) > 0 ? "text-amber-600 dark:text-amber-400 font-semibold" : "font-medium"}>
+                {summary?.reco_queue_pending?.toLocaleString() ?? "—"}
               </span>
             }
           />
           <StatRow
-            label="Processing"
-            value={aiQueue?.processing?.toLocaleString() ?? "—"}
-            highlight={(aiQueue?.processing ?? 0) > 0 ? "good" : "neutral"}
-          />
-          <StatRow
-            label="Completed today"
-            value={aiQueue?.completed_today?.toLocaleString() ?? "—"}
-            highlight={(aiQueue?.completed_today ?? 0) > 0 ? "good" : "neutral"}
-          />
-          <StatRow
-            label="Oldest pending"
+            label="Analysis pending"
             value={
-              aiQueue?.oldest_pending_mins != null
-                ? `${aiQueue.oldest_pending_mins}m ago`
-                : "—"
+              <span className={(summary?.analysis_queue_pending ?? 0) > 0 ? "text-amber-600 dark:text-amber-400 font-semibold" : "font-medium"}>
+                {summary?.analysis_queue_pending?.toLocaleString() ?? "—"}
+              </span>
             }
           />
+          <StatRow label="Complete" value={summary?.queue_complete?.toLocaleString() ?? "—"} highlight="good" />
           <StatRow
-            label="Queue status"
-            value={<StatusChip level={queueStatus === "loading" ? "loading" : queueStatus} label={queueLabel} />}
+            label="Failed"
+            value={summary?.queue_failed?.toLocaleString() ?? "—"}
+            highlight={(summary?.queue_failed ?? 0) === 0 ? "good" : "bad"}
           />
+          <StatRow label="Status" value={<StatusChip level={queueLevel === "loading" ? "loading" : queueLevel} label={queueLabel} />} />
         </HealthCard>
 
         {/* 5 — AI Worker */}
-        <HealthCard
-          icon={Zap}
-          title="AI Worker"
-          status={workerStatus}
-          loading={loading}
-        >
-          <StatRow
-            label="Last run"
-            value={formatDate(workerHealth?.last_worker_run ?? null)}
-          />
+        <HealthCard icon={Zap} title="AI Worker" status={workerStatus} loading={loading}>
+          <StatRow label="Last run" value={formatDate(worker?.last_worker_run ?? null)} />
           <StatRow
             label="Jobs last 10m"
             value={
-              <span className={(workerHealth?.jobs_last_10m ?? 0) > 0 ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "font-medium"}>
-                {workerHealth?.jobs_last_10m?.toLocaleString() ?? "—"}
+              <span className={(worker?.jobs_last_10m ?? 0) > 0 ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "font-medium"}>
+                {worker?.jobs_last_10m?.toLocaleString() ?? "—"}
               </span>
             }
           />
           <StatRow
             label="Errors last hour"
-            value={workerHealth?.errors_last_hour ?? "—"}
-            highlight={
-              (workerHealth?.errors_last_hour ?? 0) === 0
-                ? "good"
-                : (workerHealth?.errors_last_hour ?? 0) <= 5
-                  ? "warn"
-                  : "bad"
-            }
+            value={worker?.errors_last_hour ?? "—"}
+            highlight={(worker?.errors_last_hour ?? 0) === 0 ? "good" : (worker?.errors_last_hour ?? 0) <= 5 ? "warn" : "bad"}
           />
-          <StatRow
-            label="Worker status"
-            value={<StatusChip level={workerStatus === "loading" ? "loading" : workerStatus} label={workerLabel} />}
-          />
+          <StatRow label="Status" value={<StatusChip level={workerStatus === "loading" ? "loading" : workerStatus} label={workerLabel} />} />
         </HealthCard>
 
-        {/* 6 — Frontend Coverage */}
-        <HealthCard
-          icon={MonitorCheck}
-          title="Frontend Coverage"
-          status={coverageLevel}
-          loading={loading}
-        >
+        {/* 6 — Edge Board */}
+        <HealthCard icon={Grid} title="Edge Board" status={edgeBoardLevel} loading={loading}>
+          <StatRow label="Total rows" value={summary?.edge_board_rows?.toLocaleString() ?? "—"} />
           <StatRow
-            label="Rankings narratives"
-            value={frontendCoverage?.rankings_narratives?.toLocaleString() ?? "—"}
-            highlight={(frontendCoverage?.rankings_narratives ?? 0) > 0 ? "good" : "warn"}
+            label="Captains"
+            value={summary?.edge_board_captains ?? "—"}
+            highlight={(summary?.edge_board_captains ?? 0) >= 5 ? "good" : "warn"}
           />
           <StatRow
-            label="Ranking recommendations"
-            value={frontendCoverage?.ranking_recommendations?.toLocaleString() ?? "—"}
-            highlight={(frontendCoverage?.ranking_recommendations ?? 0) > 0 ? "good" : "warn"}
+            label="Breakouts"
+            value={summary?.edge_board_breakouts ?? "—"}
+            highlight={(summary?.edge_board_breakouts ?? 0) >= 5 ? "good" : "warn"}
           />
           <StatRow
-            label="Market Watch summary"
-            value={
-              (frontendCoverage?.market_watch_summary ?? 0) > 0 ? (
-                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                  {frontendCoverage?.market_watch_summary?.toLocaleString()}
-                </span>
-              ) : (
-                <span className="text-amber-600 dark:text-amber-400 font-semibold">
-                  Not generated
-                </span>
-              )
+            label="Traps"
+            value={summary?.edge_board_traps ?? "—"}
+            highlight={(summary?.edge_board_traps ?? 0) >= 5 ? "good" : "warn"}
+          />
+          <StatRow label="Refreshed" value={formatDate(summary?.edge_board_refreshed_at ?? null)} />
+        </HealthCard>
+
+        {/* 7 — Projection Accuracy */}
+        <HealthCard icon={Target} title="Projection Accuracy" status={accuracyLevel} loading={loading}>
+          <StatRow label="Players analysed" value={summary?.accuracy_players?.toLocaleString() ?? "—"} />
+          <StatRow
+            label="Avg error (pts)"
+            value={summary?.accuracy_avg_error != null ? Number(summary.accuracy_avg_error).toFixed(1) : "—"}
+            highlight={
+              (summary?.accuracy_avg_error ?? 99) < 15 ? "good"
+              : (summary?.accuracy_avg_error ?? 99) < 25 ? "warn"
+              : "bad"
             }
           />
-          <StatRow
-            label="Start/Sit cache"
-            value={frontendCoverage?.start_sit_cache?.toLocaleString() ?? "—"}
-            highlight={(frontendCoverage?.start_sit_cache ?? 0) > 0 ? "good" : "neutral"}
-          />
+          <StatRow label="Latest round" value={summary?.accuracy_latest_round ?? "—"} />
+          <StatRow label="Cron" value={
+            summary?.accuracy_cron_active === true ? (
+              <StatusChip level="ok" label="Active — hourly" />
+            ) : summary?.accuracy_cron_active === false ? (
+              <StatusChip level="error" label="Inactive" />
+            ) : "—"
+          } />
         </HealthCard>
+
+        {/* 8 — Frontend Coverage */}
+        <HealthCard icon={MonitorCheck} title="Frontend Coverage" status={coverageLevel} loading={loading}>
+          <StatRow
+            label="Player analyses"
+            value={summary?.ai_analysis_rows?.toLocaleString() ?? "—"}
+            highlight={(summary?.ai_analysis_rows ?? 0) > 0 ? "good" : "warn"}
+          />
+          <StatRow
+            label="Recommendations"
+            value={summary?.reco_rows?.toLocaleString() ?? "—"}
+            highlight={(summary?.reco_rows ?? 0) >= 500 ? "good" : (summary?.reco_rows ?? 0) > 0 ? "warn" : "bad"}
+          />
+          <StatRow label="Status" value={
+            (summary?.reco_rows ?? 0) >= 500 ? (
+              <StatusChip level="ok" label="Good coverage" />
+            ) : (summary?.reco_rows ?? 0) > 0 ? (
+              <StatusChip level="warn" label="Partial" />
+            ) : (
+              <StatusChip level="error" label="No recos" />
+            )
+          } />
+        </HealthCard>
+
       </div>
 
       {issues.length > 0 && (

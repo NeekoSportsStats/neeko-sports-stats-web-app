@@ -4,37 +4,13 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Zap, TrendingUp, Bot, Activity, History, Database, RefreshCw, DollarSign, Upload, CircleCheck as CheckCircle, CircleAlert as AlertCircle, ChartBar as BarChart2, Grid2x2 as Grid } from "lucide-react";
+import {
+  Zap, Bot, Activity, History, Database, RefreshCw,
+  DollarSign, Upload, CircleCheck as CheckCircle,
+  CircleAlert as AlertCircle, ChartBar as BarChart2,
+  Grid2x2 as Grid, ListOrdered, Play, Ban,
+} from "lucide-react";
 import { AdminPipelineProgress, type PipelineRun } from "@/components/admin/AdminPipelineProgress";
-
-const PIPELINE_STAGES: Record<string, string[]> = {
-  weekly_pipeline: [
-    "Ingesting AFL match data",
-    "Ingesting player stats",
-    "Ingesting team stats",
-    "Detecting latest round",
-    "Transforming player stats",
-    "Transforming match data",
-    "Rebuilding team defence profile",
-    "Refreshing Neeko intelligence",
-    "Refreshing player volatility",
-    "Refreshing Market Watch snapshot",
-    "Generating Market Watch AI summary",
-    "Generating AI rankings",
-    "Cleaning Start/Sit cache",
-  ],
-  ranking_ai: [
-    "Loading player data",
-    "Generating AI analysis",
-    "Generating captain recommendations",
-    "Saving results",
-  ],
-  volatility: [
-    "Loading player history",
-    "Computing volatility scores",
-    "Saving results",
-  ],
-};
 
 export default function AdminOperations() {
   const { toast } = useToast();
@@ -42,19 +18,17 @@ export default function AdminOperations() {
   const [running, setRunning] = useState<string | null>(null);
   const [activeRun, setActiveRun] = useState<PipelineRun | null>(null);
 
-  const createPipelineRun = async (
-    pipelineKey: string,
-    label: string
-  ): Promise<string | null> => {
-    const stages = PIPELINE_STAGES[pipelineKey] ?? [];
+  const isRunning = running !== null;
+
+  const createPipelineRun = async (pipelineKey: string, label: string, steps: number): Promise<string | null> => {
     const { data, error } = await supabase
       .from("pipeline_runs")
       .insert({
         pipeline_key: pipelineKey,
         label,
-        total_tasks: stages.length || 1,
+        total_tasks: steps,
         completed_tasks: 0,
-        current_step_label: stages[0] ?? "Starting…",
+        current_step_label: "Starting…",
         status: "running",
       })
       .select("id")
@@ -77,9 +51,7 @@ export default function AdminOperations() {
       .from("pipeline_runs")
       .update({
         status: success ? "completed" : "failed",
-        completed_tasks: success
-          ? (activeRun?.total_tasks ?? 1)
-          : (activeRun?.completed_tasks ?? 0),
+        completed_tasks: success ? (activeRun?.total_tasks ?? 1) : (activeRun?.completed_tasks ?? 0),
         current_step_label: success ? "Done" : "Failed",
         finished_at: new Date().toISOString(),
       })
@@ -87,101 +59,33 @@ export default function AdminOperations() {
     await fetchActiveRun(runId);
   };
 
-  const handleRunPipeline = async () => {
-    setRunning("pipeline");
-    toast({ title: "Triggering weekly pipeline…" });
-    const runId = await createPipelineRun("weekly_pipeline", "Weekly Pipeline");
+  const handleRunController = async () => {
+    setRunning("controller");
+    toast({ title: "Triggering AFL pipeline controller…" });
+    const runId = await createPipelineRun("afl_controller", "AFL Pipeline Controller", 10);
     if (runId) await fetchActiveRun(runId);
-    setRunning(null);
-    supabase.functions
-      .invoke("weekly-afl-pipeline", {
-        body: runId ? { run_id: runId } : {},
-      })
-      .then(async ({ data, error }) => {
-        const success = !error && data?.ok === true;
-        if (runId) {
-          const { data: finalRun } = await supabase
-            .from("v_pipeline_progress")
-            .select("*")
-            .eq("id", runId)
-            .maybeSingle();
-          if (
-            finalRun?.status !== "completed" &&
-            finalRun?.status !== "failed"
-          ) {
-            await finishPipelineRun(runId, success);
-          } else {
-            await fetchActiveRun(runId);
-          }
-        }
+    supabase
+      .rpc("run_afl_pipeline_controller")
+      .then(async ({ error }) => {
+        const success = !error;
+        if (runId) await finishPipelineRun(runId, success);
         toast({
-          title: success ? "Pipeline complete" : "Pipeline failed",
+          title: success ? "Pipeline controller complete" : "Pipeline controller failed",
+          description: error ? error.message : undefined,
           variant: success ? "default" : "destructive",
         });
+        setRunning(null);
       });
   };
 
-  const handleRefreshVolatility = async () => {
-    setRunning("volatility");
-    const runId = await createPipelineRun(
-      "volatility",
-      "Refresh Volatility Model"
-    );
-    if (runId) await fetchActiveRun(runId);
+  const handleRefreshRankingsCache = async () => {
+    setRunning("rankings_cache");
     try {
-      const { error } = await supabase
-        .schema("afl" as never)
-        .rpc("fn_refresh_player_volatility");
-      if (runId) await finishPipelineRun(runId, !error);
+      const { error } = await supabase.schema("afl" as never).rpc("refresh_player_rankings_cache");
       if (error) throw error;
-      toast({ title: "Volatility model refreshed" });
+      toast({ title: "Rankings cache refreshed" });
     } catch (err) {
-      if (runId) await finishPipelineRun(runId, false);
-      toast({
-        title: "Volatility refresh failed",
-        description: err instanceof Error ? err.message : "Unknown",
-        variant: "destructive",
-      });
-    } finally {
-      setRunning(null);
-    }
-  };
-
-  const handleRefreshRankingAI = async () => {
-    setRunning("ranking_ai");
-    const runId = await createPipelineRun("ranking_ai", "Generate Ranking AI");
-    if (runId) await fetchActiveRun(runId);
-    try {
-      const { error } = await supabase.functions.invoke("generate-ranking-ai", {
-        body: {},
-      });
-      if (runId) await finishPipelineRun(runId, !error);
-      if (error) throw error;
-      toast({ title: "Ranking AI generation triggered" });
-    } catch (err) {
-      if (runId) await finishPipelineRun(runId, false);
-      toast({
-        title: "Ranking AI failed",
-        description: err instanceof Error ? err.message : "Unknown",
-        variant: "destructive",
-      });
-    } finally {
-      setRunning(null);
-    }
-  };
-
-  const handleRefreshMarketWatch = async () => {
-    setRunning("market_watch");
-    try {
-      const { error } = await supabase.rpc("fn_refresh_market_watch");
-      if (error) throw error;
-      toast({ title: "Market Watch refreshed successfully" });
-    } catch (err) {
-      toast({
-        title: "Market Watch refresh failed",
-        description: err instanceof Error ? err.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast({ title: "Rankings cache refresh failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
     } finally {
       setRunning(null);
     }
@@ -192,21 +96,105 @@ export default function AdminOperations() {
     try {
       const { error } = await supabase.rpc("fn_refresh_edge_board");
       if (error) throw error;
-      toast({ title: "Edge Board refreshed successfully" });
+      toast({ title: "Edge Board refreshed" });
     } catch (err) {
-      toast({
-        title: "Edge Board refresh failed",
-        description: err instanceof Error ? err.message : "Unknown error",
-        variant: "destructive",
-      });
+      toast({ title: "Edge Board refresh failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
     } finally {
       setRunning(null);
     }
   };
 
-  const isRunning = running !== null;
+  const handleRefreshMarketWatch = async () => {
+    setRunning("market_watch");
+    try {
+      const { error } = await supabase.rpc("fn_refresh_market_watch");
+      if (error) throw error;
+      toast({ title: "Market Watch refreshed" });
+    } catch (err) {
+      toast({ title: "Market Watch refresh failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
+    } finally {
+      setRunning(null);
+    }
+  };
 
-  // ─── Price Upload ───────────────────────────────────────────────────────────
+  const handleRefreshProjectionAccuracy = async () => {
+    setRunning("proj_accuracy");
+    try {
+      const { error } = await supabase.rpc("refresh_projection_accuracy");
+      if (error) throw error;
+      toast({ title: "Projection accuracy refreshed" });
+    } catch (err) {
+      toast({ title: "Projection accuracy failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
+    } finally {
+      setRunning(null);
+    }
+  };
+
+  const handleEnqueueRecoJobs = async () => {
+    setRunning("enqueue_recos");
+    try {
+      const { error } = await supabase.rpc("enqueue_ranking_reco_jobs");
+      if (error) throw error;
+      toast({ title: "Ranking reco jobs enqueued" });
+    } catch (err) {
+      toast({ title: "Enqueue failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
+    } finally {
+      setRunning(null);
+    }
+  };
+
+  const handleRunRecoWorker = async () => {
+    setRunning("reco_worker");
+    try {
+      const { error } = await supabase.functions.invoke("generate-player-ranking-recos", { body: {} });
+      if (error) throw error;
+      toast({ title: "Reco worker triggered (one batch)" });
+    } catch (err) {
+      toast({ title: "Reco worker failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
+    } finally {
+      setRunning(null);
+    }
+  };
+
+  const handleRunRankingAI = async () => {
+    setRunning("ranking_ai");
+    try {
+      const { error } = await supabase.functions.invoke("generate-ranking-ai", { body: {} });
+      if (error) throw error;
+      toast({ title: "Ranking AI worker triggered" });
+    } catch (err) {
+      toast({ title: "Ranking AI failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
+    } finally {
+      setRunning(null);
+    }
+  };
+
+  const ActionButton = ({
+    id, label, icon: Icon, onClick, variant = "outline", disabled,
+  }: {
+    id: string;
+    label: string;
+    icon: React.ElementType;
+    onClick: () => void;
+    variant?: "default" | "outline";
+    disabled?: boolean;
+  }) => (
+    <Button
+      onClick={onClick}
+      disabled={isRunning || disabled}
+      variant={variant}
+      className="w-full justify-start"
+    >
+      {running === id ? (
+        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+      ) : (
+        <Icon className="h-4 w-4 mr-2" />
+      )}
+      {label}
+    </Button>
+  );
+
+  // ─── Price Upload ──────────────────────────────────────────────────────────
   const [priceText, setPriceText] = useState("");
   const [priceRound, setPriceRound] = useState<string>("");
   const [uploadingPrices, setUploadingPrices] = useState(false);
@@ -259,11 +247,9 @@ export default function AdminOperations() {
         price_rows: priceRows,
         p_round: round,
       });
-
       if (error) throw error;
 
       const result = data as { success: boolean; error?: string } & PriceUploadResult;
-
       if (!result.success) {
         setUploadError(result.error ?? "Unknown error");
         toast({ title: "Price update failed", variant: "destructive" });
@@ -276,7 +262,7 @@ export default function AdminOperations() {
         });
         const updated = result.rows_updated ?? 0;
         if (updated > 0) {
-          toast({ title: `${updated} price${updated !== 1 ? "s" : ""} updated for Round ${round} — Market Watch and Edge Board refreshed` });
+          toast({ title: `${updated} price${updated !== 1 ? "s" : ""} updated for Round ${round}` });
         } else {
           toast({ title: "No prices matched. Check player names.", variant: "destructive" });
         }
@@ -295,115 +281,51 @@ export default function AdminOperations() {
       <div>
         <h2 className="text-base font-semibold">Operations</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Manual pipeline triggers and admin tools.
+          Manual pipeline triggers and admin tools. Controller cron runs daily at 15:00 UTC.
         </p>
       </div>
 
+      {/* Primary pipeline controls */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Zap className="h-4 w-4 text-muted-foreground" />
-            Manual Actions
+            Pipeline Controls
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Button
-              onClick={handleRunPipeline}
-              disabled={isRunning}
+            <ActionButton
+              id="controller"
+              label="Run AFL Pipeline Controller"
+              icon={Play}
+              onClick={handleRunController}
               variant="default"
-              className="w-full"
-            >
-              {running === "pipeline" ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Zap className="h-4 w-4 mr-2" />
-              )}
-              Run Weekly Pipeline
-            </Button>
-
-            <Button
-              onClick={handleRefreshVolatility}
-              disabled={isRunning}
-              variant="outline"
-              className="w-full"
-            >
-              {running === "volatility" ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <TrendingUp className="h-4 w-4 mr-2" />
-              )}
-              Refresh Volatility
-            </Button>
-
-            <Button
-              onClick={handleRefreshRankingAI}
-              disabled={isRunning}
-              variant="outline"
-              className="w-full"
-            >
-              {running === "ranking_ai" ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Bot className="h-4 w-4 mr-2" />
-              )}
-              Run Ranking AI
-            </Button>
-
-            <Button
-              onClick={handleRefreshMarketWatch}
-              disabled={isRunning}
-              variant="outline"
-              className="w-full"
-            >
-              {running === "market_watch" ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <BarChart2 className="h-4 w-4 mr-2" />
-              )}
-              Refresh Market Watch
-            </Button>
-
-            <Button
+            />
+            <ActionButton
+              id="rankings_cache"
+              label="Refresh Rankings Cache"
+              icon={ListOrdered}
+              onClick={handleRefreshRankingsCache}
+            />
+            <ActionButton
+              id="edge_board"
+              label="Refresh Edge Board"
+              icon={Grid}
               onClick={handleRefreshEdgeBoard}
-              disabled={isRunning}
-              variant="outline"
-              className="w-full"
-            >
-              {running === "edge_board" ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Grid className="h-4 w-4 mr-2" />
-              )}
-              Refresh Edge Board
-            </Button>
-
-            <Button
-              onClick={() => navigate("/admin/queue")}
-              variant="outline"
-              className="w-full"
-            >
-              <Activity className="h-4 w-4 mr-2" />
-              AI Queue Dashboard
-            </Button>
-
-            <Button
-              onClick={() => navigate("/admin/pipeline-history")}
-              variant="outline"
-              className="w-full"
-            >
-              <History className="h-4 w-4 mr-2" />
-              Pipeline History
-            </Button>
-
-            <Button
-              onClick={() => navigate("/admin/pipeline-status")}
-              variant="outline"
-              className="w-full"
-            >
-              <Database className="h-4 w-4 mr-2" />
-              Data Pipeline Status
-            </Button>
+            />
+            <ActionButton
+              id="market_watch"
+              label="Refresh Market Watch"
+              icon={BarChart2}
+              onClick={handleRefreshMarketWatch}
+            />
+            <ActionButton
+              id="proj_accuracy"
+              label="Refresh Projection Accuracy"
+              icon={RefreshCw}
+              onClick={handleRefreshProjectionAccuracy}
+            />
           </div>
 
           {activeRun && (
@@ -415,7 +337,95 @@ export default function AdminOperations() {
         </CardContent>
       </Card>
 
-      {/* ── Fantasy Price Upload ───────────────────────────────────────────── */}
+      {/* AI queue controls */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Bot className="h-4 w-4 text-muted-foreground" />
+            AI Queue Controls
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Manually trigger AI generation workers or enqueue missing jobs.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <ActionButton
+              id="enqueue_recos"
+              label="Enqueue Ranking Reco Jobs"
+              icon={ListOrdered}
+              onClick={handleEnqueueRecoJobs}
+            />
+            <ActionButton
+              id="reco_worker"
+              label="Run Reco Worker (1 batch)"
+              icon={Zap}
+              onClick={handleRunRecoWorker}
+            />
+            <ActionButton
+              id="ranking_ai"
+              label="Run Ranking Analysis Worker"
+              icon={Bot}
+              onClick={handleRunRankingAI}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Navigation shortcuts */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Activity className="h-4 w-4 text-muted-foreground" />
+            Admin Navigation
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Button onClick={() => navigate("/admin/queue")} variant="outline" className="w-full justify-start">
+              <Activity className="h-4 w-4 mr-2" />
+              AI Queue Dashboard
+            </Button>
+            <Button onClick={() => navigate("/admin/pipeline-history")} variant="outline" className="w-full justify-start">
+              <History className="h-4 w-4 mr-2" />
+              Pipeline History
+            </Button>
+            <Button onClick={() => navigate("/admin/pipeline-status")} variant="outline" className="w-full justify-start">
+              <Database className="h-4 w-4 mr-2" />
+              Data Pipeline Status
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Disabled / legacy */}
+      <Card className="opacity-60">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Ban className="h-4 w-4 text-muted-foreground" />
+            Unavailable Actions
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            These actions are disabled — the underlying functions no longer exist in the production pipeline.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Button disabled variant="outline" className="w-full justify-start">
+              <Ban className="h-4 w-4 mr-2" />
+              Refresh Volatility Model
+              <span className="ml-auto text-xs text-muted-foreground">fn removed</span>
+            </Button>
+            <Button disabled variant="outline" className="w-full justify-start">
+              <Ban className="h-4 w-4 mr-2" />
+              Weekly Pipeline (legacy)
+              <span className="ml-auto text-xs text-muted-foreground">replaced by controller</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Fantasy Price Upload */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -423,32 +433,26 @@ export default function AdminOperations() {
             Fantasy Price Upload
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            Paste player prices below. The system will update{" "}
-            <code className="text-[11px] bg-muted px-1 rounded">afl_player_prices</code>, then automatically
-            refresh Market Watch and Edge Board.
+            Paste player prices below. Format: <code className="text-[11px] bg-muted px-1 rounded">Player Name,Price</code>
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Round Number</label>
-              <input
-                type="number"
-                min={0}
-                max={30}
-                placeholder="e.g. 1"
-                value={priceRound}
-                onChange={(e) => { setPriceRound(e.target.value); setUploadResult(null); setUploadError(null); }}
-                className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-            </div>
-            <div className="sm:col-span-2 sm:hidden" />
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Round Number</label>
+            <input
+              type="number"
+              min={0}
+              max={30}
+              placeholder="e.g. 1"
+              value={priceRound}
+              onChange={(e) => { setPriceRound(e.target.value); setUploadResult(null); setUploadError(null); }}
+              className="w-full max-w-[160px] rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            />
           </div>
 
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-              Player Prices — one per line: <code className="text-[11px] bg-muted px-1 rounded">Player Name,Price</code>
+              Player Prices — one per line
             </label>
             <textarea
               value={priceText}
@@ -494,7 +498,7 @@ export default function AdminOperations() {
                       {uploadResult.rows_updated} price{uploadResult.rows_updated !== 1 ? "s" : ""} updated
                     </p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Market Watch and Edge Board have been refreshed automatically.
+                      Market Watch and Edge Board will reflect new prices on next refresh.
                     </p>
                   </div>
                 </div>
@@ -511,7 +515,7 @@ export default function AdminOperations() {
                     ))}
                   </ul>
                   <p className="text-[11px] text-muted-foreground">
-                    Check spelling — names must match exactly (case-insensitive).
+                    Names must match exactly (case-insensitive).
                   </p>
                 </div>
               )}
