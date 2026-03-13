@@ -154,9 +154,11 @@ function GoldDivider() {
 interface AccuracyRow {
   players_analysed: number | null;
   avg_error: number | null;
+  median_error: number | null;
   within_10: number | null;
   within_15: number | null;
   within_20: number | null;
+  latest_round: number | null;
   source: string | null;
 }
 
@@ -234,7 +236,7 @@ function ErrorDistributionBlock({ row, loading }: { row: AccuracyRow | null; loa
 
         {!loading && !hasData && (
           <p className="text-sm text-white/30 text-center py-2">
-            Distribution will populate after Opening Round statistics are processed.
+            Accuracy metrics will appear after the first completed match.
           </p>
         )}
 
@@ -305,13 +307,19 @@ function ModelAccuracySection() {
 
   const hasData = !loading && row != null && (row.players_analysed ?? 0) > 0;
   const conf = confidenceLevel(hasData ? (row?.avg_error ?? null) : null);
-  const sourceLabel = row?.source === "automatic" ? "2026 Season Accuracy" : "Opening Round Accuracy";
+
+  const latestRound = row?.latest_round ?? null;
+  const roundLabel = latestRound != null && latestRound > 0
+    ? `Round ${latestRound}`
+    : latestRound === 0
+    ? "Opening Round"
+    : null;
 
   const proofLine = (() => {
     if (!hasData || row?.avg_error == null) return null;
     const err = row.avg_error;
     const players = row?.players_analysed != null ? row.players_analysed.toLocaleString() : "—";
-    return `Opening Round projections averaged ${err.toFixed(1)} points error across ${players} players.`;
+    return `Projections average ${err.toFixed(1)} points error across ${players} players.`;
   })();
 
   const metrics = [
@@ -330,20 +338,19 @@ function ModelAccuracySection() {
       bar: null,
     },
     {
+      label: "Median Error",
+      value: hasData && row?.median_error != null ? row.median_error.toFixed(1) : "—",
+      suffix: " pts",
+      color: "text-[#F5C84C]",
+      bar: null,
+    },
+    {
       label: "Within 15 pts",
       value: hasData && row?.within_15 != null ? Math.round(row.within_15).toString() : "—",
       suffix: "%",
       color: "text-green-400",
       bar: hasData ? (row?.within_15 ?? null) : null,
       barColor: "bg-green-400",
-    },
-    {
-      label: "Within 20 pts",
-      value: hasData && row?.within_20 != null ? Math.round(row.within_20).toString() : "—",
-      suffix: "%",
-      color: "text-green-300",
-      bar: hasData ? (row?.within_20 ?? null) : null,
-      barColor: "bg-green-300",
     },
   ];
 
@@ -355,8 +362,11 @@ function ModelAccuracySection() {
             Model Validation
           </span>
           <div className="mt-2"><SectionHeading>How Accurate Are Neeko Projections?</SectionHeading></div>
+          <p className="text-sm font-bold text-white/60 mt-3">
+            2026 Season So Far
+          </p>
           {proofLine && (
-            <p className="text-[13px] font-semibold text-green-400/80 mt-3 max-w-xl mx-auto leading-relaxed">
+            <p className="text-[13px] text-white/40 mt-1 max-w-xl mx-auto leading-relaxed">
               {proofLine}
             </p>
           )}
@@ -374,7 +384,7 @@ function ModelAccuracySection() {
                   <Target size={13} className="text-[#F5C84C]" />
                 </div>
                 <span className="text-[11px] font-bold uppercase tracking-widest text-white/40">
-                  {loading ? "Loading…" : sourceLabel}
+                  {loading ? "Loading…" : "Projection Accuracy"}
                 </span>
               </div>
               {!loading && (
@@ -412,11 +422,20 @@ function ModelAccuracySection() {
               ))}
             </div>
 
+            {/* Round context */}
+            {!loading && hasData && roundLabel && (
+              <div className="px-4 py-2 border-t border-white/[0.06] bg-[#0c0c0c]">
+                <p className="text-[11px] text-white/25 text-center tracking-wide">
+                  Updated through {roundLabel}
+                </p>
+              </div>
+            )}
+
             {/* No data state */}
             {!loading && !hasData && (
               <div className="px-4 py-4 border-t border-white/[0.06] bg-[#0c0c0c]">
                 <p className="text-sm text-white/30 text-center">
-                  Accuracy data will populate after Opening Round statistics are processed.
+                  Accuracy metrics will appear after the first completed match.
                 </p>
               </div>
             )}
