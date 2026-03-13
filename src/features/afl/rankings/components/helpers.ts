@@ -430,27 +430,80 @@ function trunc(s: string): string {
   return s.length > TRUNC ? s.slice(0, TRUNC - 1) + "…" : s;
 }
 
+// ─── Metric-based fallback WHY summary ───────────────────────────────────────
+// Deterministic compact summary generated from numeric metrics when AI text is unavailable.
+
+export function generateMetricFallbackWhy(row: {
+  ai_recommendation?: string | null;
+  projection_final?: number | null;
+  value_score?: number | null;
+  risk_rating?: number | null;
+  projection_confidence?: number | null;
+  price?: number | null;
+}): string {
+  const rec = (row.ai_recommendation ?? "HOLD").toUpperCase();
+  const proj = row.projection_final ?? 0;
+  const risk = row.risk_rating ?? 50;
+  const conf = row.projection_confidence ?? 60;
+  const val = row.value_score;
+
+  if (rec === "BUY") {
+    if (val != null && val >= 11.0) return `Strong value pick. Projects ${Math.round(proj)} with manageable risk.`;
+    return `Good projection of ${Math.round(proj)} and solid confidence back this selection.`;
+  }
+  if (rec === "START") {
+    if (conf >= 75) return `High-confidence start. Projects ${Math.round(proj)} with reliable form.`;
+    return `Solid projection of ${Math.round(proj)} supports starting this week.`;
+  }
+  if (rec === "SELL") {
+    if (val != null && val <= 8.5) return `Overpriced relative to projection of ${Math.round(proj)}. Consider selling.`;
+    return `Low projection with elevated price suggests this is a sell candidate.`;
+  }
+  if (rec === "SIT") {
+    if (risk >= 70) return `High bust risk of ${Math.round(risk)}% makes this a risky starter.`;
+    if (conf < 55) return `Low forecast confidence. Projection of ${Math.round(proj)} uncertain this round.`;
+    return `Moderate confidence and elevated risk suggest benching this week.`;
+  }
+  // HOLD
+  if (conf >= 70 && risk <= 40) return `Steady hold. Projects ${Math.round(proj)} with good confidence and low risk.`;
+  return `Projects ${Math.round(proj)} this round. Hold and monitor form.`;
+}
+
 // ─── Table Why column — concise one-sentence version ─────────────────────────
-// Max 120 chars / 18 words. Priority: recommendation_short → recommendation_why → ai_summary
+// Priority: recommendation_why → recommendation_short → first sentence of ai_summary → metric fallback
 
 export function truncateWhySummary(row: {
   recommendation_short?: string | null;
   recommendation_why?: string | null;
   ai_summary?: string | null;
+  ai_recommendation?: string | null;
+  projection_final?: number | null;
+  value_score?: number | null;
+  risk_rating?: number | null;
+  projection_confidence?: number | null;
+  price?: number | null;
 }): string | null {
-  const candidates = [
-    (row.recommendation_short ?? "").trim(),
-    (row.recommendation_why ?? "").trim(),
-    (row.ai_summary ?? "").trim(),
-  ].filter((s) => s.length >= 10 && !isGenericAIText(s));
+  const why = (row.recommendation_why ?? "").trim();
+  const short = (row.recommendation_short ?? "").trim();
 
-  const best = candidates[0] ?? [
-    (row.recommendation_short ?? "").trim(),
-    (row.recommendation_why ?? "").trim(),
-    (row.ai_summary ?? "").trim(),
-  ].find((s) => s.length >= 10) ?? null;
+  // Try to extract first sentence from ai_summary (never show the full blob in the table)
+  const rawSummary = (row.ai_summary ?? "").trim();
+  const summaryFirstSentence = (() => {
+    if (!rawSummary) return "";
+    const end = rawSummary.search(/[.!?]/);
+    return end > 0 ? rawSummary.slice(0, end + 1).trim() : rawSummary.slice(0, 120);
+  })();
 
-  if (!best) return null;
+  const candidates = [why, short, summaryFirstSentence].filter(
+    (s) => s.length >= 10 && !isGenericAIText(s)
+  );
+
+  let best = candidates[0] ?? [why, short, summaryFirstSentence].find((s) => s.length >= 10) ?? null;
+
+  // If no AI content at all, use metric-based fallback
+  if (!best) {
+    return generateMetricFallbackWhy(row);
+  }
 
   // Trim to first sentence if possible
   const sentenceEnd = best.search(/[.!?]/);
@@ -470,32 +523,32 @@ export function truncateWhySummary(row: {
   return result;
 }
 
+// safeWhyText is used ONLY for the Modal AI Recommendation card summary.
+// It shows recommendation_short (compact 1–2 sentences).
+// It does NOT fall through to ai_summary — that belongs in Extended Analysis only.
 export function safeWhyText(row: {
   recommendation_short?: string | null;
   recommendation_why?: string | null;
-  ai_summary?: string | null;
+  ai_recommendation?: string | null;
+  projection_final?: number | null;
+  value_score?: number | null;
+  risk_rating?: number | null;
+  projection_confidence?: number | null;
+  price?: number | null;
 }): string | null {
-  const short   = (row.recommendation_short ?? "").trim();
-  const why     = (row.recommendation_why ?? "").trim();
-  const summary = (row.ai_summary ?? "").trim();
+  const short = (row.recommendation_short ?? "").trim();
+  const why   = (row.recommendation_why ?? "").trim();
 
-  const shortIsGeneric   = isGenericAIText(short);
-  const whyIsGeneric     = isGenericAIText(why);
-  const summaryIsGeneric = isGenericAIText(summary);
+  // Priority 1 — recommendation_short (compact modal summary)
+  if (short.length >= 20 && !isGenericAIText(short)) return trunc(short);
 
-  // Priority 1 — non-generic short
-  if (short.length >= 20 && !shortIsGeneric) return trunc(short);
+  // Priority 2 — recommendation_why if distinct from short
+  if (why.length >= 20 && !isGenericAIText(why) && why !== short) return trunc(why);
 
-  // Priority 2 — non-generic why (skip if identical to short)
-  if (why.length >= 20 && !whyIsGeneric && why !== short) return trunc(why);
+  // Priority 3 — any non-empty field even if generic
+  if (short.length >= 10) return trunc(short);
+  if (why.length >= 10)   return trunc(why);
 
-  // Priority 3 — non-generic summary
-  if (summary.length >= 20 && !summaryIsGeneric) return trunc(summary);
-
-  // Priority 4 — any non-empty field even if generic (last resort, never blank)
-  if (short.length >= 10)   return trunc(short);
-  if (why.length >= 10)     return trunc(why);
-  if (summary.length >= 10) return trunc(summary);
-
-  return null;
+  // Priority 4 — metric-based fallback (never blank)
+  return generateMetricFallbackWhy(row);
 }

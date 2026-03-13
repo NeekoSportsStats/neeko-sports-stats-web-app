@@ -506,7 +506,7 @@ export function PlayerDetailModal({
             </div>
           )}
 
-          {/* 2. AI Recommendation (green card) */}
+          {/* 2. AI Recommendation (green card) — uses recommendation_short only */}
           {unlocked && row.ai_recommendation && (
             <div
               className="rounded-lg border px-4 py-4"
@@ -517,7 +517,16 @@ export function PlayerDetailModal({
                 {row.ai_recommendation}
               </p>
               {(() => {
-                const safeText = safeWhyText(row);
+                const safeText = safeWhyText({
+                  recommendation_short: row.recommendation_short,
+                  recommendation_why: row.recommendation_why,
+                  ai_recommendation: row.ai_recommendation,
+                  projection_final: row.projection_final,
+                  value_score: row.value_score,
+                  risk_rating: row.risk_rating,
+                  projection_confidence: row.projection_confidence,
+                  price: row.price,
+                });
                 return safeText ? (
                   <p className="text-sm text-white/70 leading-relaxed">{safeText}</p>
                 ) : null;
