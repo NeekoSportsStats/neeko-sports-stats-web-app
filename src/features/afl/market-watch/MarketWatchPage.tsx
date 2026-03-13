@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { TrendingUp, RefreshCw, Crown, ChevronDown, Lock as _Lock, CircleAlert as AlertCircle, Zap, Target, Star } from "lucide-react";
+import { TrendingUp, RefreshCw, Crown, ChevronDown, Lock, CircleAlert as AlertCircle, Zap, Target, Star } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
@@ -294,7 +294,7 @@ interface FreeViewProps {
   summary: MWSummary | null;
 }
 
-function FreeUserView({ buyTargets, sellPlayers, cashCows, traps, onUnlock, onCompare, summary }: FreeViewProps) {
+function FreeUserView({ buyTargets, sellPlayers, cashCows, traps, onUnlock, onCompare: _onCompare, summary }: FreeViewProps) {
   const topBuy  = buyTargets[0] ?? null;
   const topSell = sellPlayers[0] ?? null;
   const topCow  = cashCows[0] ?? null;
@@ -313,7 +313,6 @@ function FreeUserView({ buyTargets, sellPlayers, cashCows, traps, onUnlock, onCo
       labelColor: "text-green-400",
       description: "Highest trade-score buy opportunity",
       total: totalBuy,
-      onCompare: (id: number) => onCompare(undefined, id),
     },
     {
       player: topSell,
@@ -322,7 +321,6 @@ function FreeUserView({ buyTargets, sellPlayers, cashCows, traps, onUnlock, onCo
       labelColor: "text-red-400",
       description: "Highest trade-score sell opportunity",
       total: totalSell,
-      onCompare: (id: number) => onCompare(id, undefined),
     },
     {
       player: topCow,
@@ -331,7 +329,6 @@ function FreeUserView({ buyTargets, sellPlayers, cashCows, traps, onUnlock, onCo
       labelColor: "text-[#F5C84C]",
       description: "Best price growth potential",
       total: totalCow,
-      onCompare: (id: number) => onCompare(undefined, id),
     },
     {
       player: topTrap,
@@ -340,11 +337,8 @@ function FreeUserView({ buyTargets, sellPlayers, cashCows, traps, onUnlock, onCo
       labelColor: "text-orange-400",
       description: "Premium-priced player to avoid",
       total: totalTrap,
-      onCompare: (id: number) => onCompare(id, undefined),
     },
-  ].filter(s => s.player !== null);
-
-  if (sections.length === 0) return null;
+  ];
 
   return (
     <div>
@@ -358,7 +352,7 @@ function FreeUserView({ buyTargets, sellPlayers, cashCows, traps, onUnlock, onCo
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        {sections.map(({ player, label, dot, labelColor, description, total, onCompare: sectionCompare }) => (
+        {sections.map(({ player, label, dot, labelColor, description, total }) => (
           <div key={label} className="flex flex-col gap-2">
             <div className="flex items-center gap-2 pl-1">
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
@@ -368,12 +362,17 @@ function FreeUserView({ buyTargets, sellPlayers, cashCows, traps, onUnlock, onCo
               )}
             </div>
             <p className="text-[11px] text-white/30 pl-3.5 -mt-1">{description}</p>
-            <PlayerTradeCard
-              row={player!}
-              rank={1}
-              locked={false}
-              onCompare={sectionCompare}
-            />
+            {player ? (
+              <PlayerTradeCard
+                row={player}
+                rank={1}
+                locked={false}
+                isPremium={false}
+                onUnlock={onUnlock}
+              />
+            ) : (
+              <EmptyCategoryCard label={label} onUnlock={onUnlock} />
+            )}
           </div>
         ))}
       </div>
@@ -385,6 +384,24 @@ function FreeUserView({ buyTargets, sellPlayers, cashCows, traps, onUnlock, onCo
         trapCount={totalTrap}
         onUnlock={onUnlock}
       />
+    </div>
+  );
+}
+
+function EmptyCategoryCard({ label, onUnlock }: { label: string; onUnlock: () => void }) {
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 flex flex-col items-center justify-center gap-3 min-h-[140px] text-center">
+      <Lock className="h-4 w-4 text-white/15 shrink-0" />
+      <div>
+        <p className="text-sm text-white/30 font-medium">No {label} data yet</p>
+        <p className="text-[11px] text-white/20 mt-0.5">Signals update after each round</p>
+      </div>
+      <button
+        onClick={onUnlock}
+        className="text-[11px] text-[#F5C84C]/70 hover:text-[#F5C84C] transition-colors"
+      >
+        Unlock Neeko+
+      </button>
     </div>
   );
 }
@@ -440,6 +457,7 @@ function PremiumUserView({
                 rank={i + 1}
                 locked={false}
                 onUnlock={onUnlock}
+                isPremium={true}
                 onCompare={(id) => onCompare(undefined, id)}
               />
             </div>
@@ -470,6 +488,7 @@ function PremiumUserView({
                 rank={i + 1}
                 locked={false}
                 onUnlock={onUnlock}
+                isPremium={true}
                 onCompare={(id) => onCompare(id, undefined)}
               />
             </div>
@@ -500,6 +519,7 @@ function PremiumUserView({
                 rank={i + 1}
                 locked={false}
                 onUnlock={onUnlock}
+                isPremium={true}
                 onCompare={(id) => onCompare(undefined, id)}
               />
             </div>
@@ -530,6 +550,7 @@ function PremiumUserView({
                 rank={i + 1}
                 locked={false}
                 onUnlock={onUnlock}
+                isPremium={true}
                 onCompare={(id) => onCompare(id, undefined)}
               />
             </div>

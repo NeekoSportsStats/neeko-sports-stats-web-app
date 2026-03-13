@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Lock, Info, ArrowUpRight } from "lucide-react";
+import { Lock, Info, ArrowUpRight, Crown } from "lucide-react";
 import { MWPlayerRow } from "./types";
 import {
   fmtPrice, fmtNum, fmtPriceChange,
@@ -13,9 +13,10 @@ interface Props {
   onUnlock?: () => void;
   onCompare?: (playerId: number) => void;
   rank: number;
+  isPremium?: boolean;
 }
 
-export function PlayerTradeCard({ row, locked, onUnlock, onCompare, rank }: Props) {
+export function PlayerTradeCard({ row, locked, onUnlock, onCompare, rank, isPremium = true }: Props) {
   const [showScoreTooltip, setShowScoreTooltip] = useState(false);
 
   if (locked) {
@@ -91,7 +92,7 @@ export function PlayerTradeCard({ row, locked, onUnlock, onCompare, rank }: Prop
             )}
           </button>
         </div>
-        {onCompare && (
+        {isPremium && onCompare ? (
           <button
             onClick={() => onCompare(row.player_id)}
             className="flex items-center gap-1 text-[11px] text-white/40 hover:text-[#F5C84C] transition-colors"
@@ -99,7 +100,12 @@ export function PlayerTradeCard({ row, locked, onUnlock, onCompare, rank }: Prop
             <ArrowUpRight className="h-3 w-3" />
             Compare
           </button>
-        )}
+        ) : !isPremium ? (
+          <span className="flex items-center gap-1 text-[11px] text-white/20 cursor-default select-none">
+            <Crown className="h-3 w-3 text-[#F5C84C]/40" />
+            Compare
+          </span>
+        ) : null}
       </div>
 
       {row.category_reason && (

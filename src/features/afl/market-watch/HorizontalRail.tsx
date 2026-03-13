@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, ReactNode } from "react";
+import { useRef, useState, useEffect, useCallback, ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 
 interface Props {
@@ -23,25 +23,34 @@ export function HorizontalRail({
   className = "",
 }: Props) {
   const railRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  const canScrollLeftRef = useRef(false);
+  const canScrollRightRef = useRef(false);
+  const [, forceUpdate] = useState(0);
 
-  const checkScroll = () => {
+  const checkScroll = useCallback(() => {
     const el = railRef.current;
     if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 8);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 8);
-  };
+    const newLeft = el.scrollLeft > 8;
+    const newRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 8;
+    if (newLeft !== canScrollLeftRef.current || newRight !== canScrollRightRef.current) {
+      canScrollLeftRef.current = newLeft;
+      canScrollRightRef.current = newRight;
+      forceUpdate(n => n + 1);
+    }
+  }, []);
 
   useEffect(() => {
-    checkScroll();
     const el = railRef.current;
     if (!el) return;
+    checkScroll();
     el.addEventListener("scroll", checkScroll, { passive: true });
     const ro = new ResizeObserver(checkScroll);
     ro.observe(el);
-    return () => { el.removeEventListener("scroll", checkScroll); ro.disconnect(); };
-  }, []);
+    return () => {
+      el.removeEventListener("scroll", checkScroll);
+      ro.disconnect();
+    };
+  }, [checkScroll]);
 
   return (
     <section id={id} className={`mb-8 ${className}`}>
@@ -60,13 +69,13 @@ export function HorizontalRail({
       </div>
 
       <div className="relative rounded-2xl border border-white/[0.06] bg-white/[0.015] overflow-hidden">
-        {canScrollLeft && (
+        {canScrollLeftRef.current && (
           <div
             className="absolute left-0 top-0 bottom-0 w-10 z-10 pointer-events-none"
             style={{ background: "linear-gradient(to right, rgba(10,10,10,0.9) 0%, transparent 100%)" }}
           />
         )}
-        {canScrollRight && (
+        {canScrollRightRef.current && (
           <div
             className="absolute right-0 top-0 bottom-0 w-16 z-10 pointer-events-none"
             style={{ background: "linear-gradient(to left, rgba(10,10,10,0.9) 0%, transparent 100%)" }}
