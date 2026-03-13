@@ -8,8 +8,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const BATCH_SIZE = 20;
-const MAX_PLAYERS_PER_RUN = 200;
+const BATCH_SIZE = 25;
+const MAX_PLAYERS_PER_RUN = 640;
 
 interface PlayerInput {
   player_id: number;
