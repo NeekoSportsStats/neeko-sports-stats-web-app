@@ -7,7 +7,7 @@ import {
   resolveRecommendationColor,
   FREE_PARTIAL_ROWS, FREE_FULL_ROWS,
 } from "./helpers";
-import { InfoTooltip, LockedCell, LockedWhyCell } from "./RankingsModals";
+import { InfoTooltip, LockedCell } from "./RankingsModals";
 import { Crown } from "lucide-react";
 
 const TH = "bg-[#0a0a0a] px-4 py-3 text-[11px] font-medium uppercase tracking-wider whitespace-nowrap border-b border-white/10 text-center";
@@ -211,11 +211,11 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
       </td>
       <td className="px-4 py-3 text-left align-top" style={{ minWidth: 200, maxWidth: 420 }}>
         {locked("recommendation_why") ? (
-          <LockedWhyCell why={row.ai_summary ?? row.recommendation_why} onClick={onUpgrade} />
+          <LockedCell onClick={onUpgrade} />
         ) : (() => {
-          const whyText = row.ai_summary ?? row.recommendation_why ?? "—";
+          const whyText = row.recommendation_short ?? row.recommendation_why ?? "—";
           return (
-            <span className="text-xs text-white/60 leading-snug max-w-[420px] block line-clamp-3 hover:line-clamp-none transition-all">{whyText}</span>
+            <span className="text-xs text-white/60 leading-snug max-w-[420px] block line-clamp-2">{whyText}</span>
           );
         })()}
       </td>

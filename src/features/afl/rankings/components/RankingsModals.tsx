@@ -128,7 +128,7 @@ export function NeekoRatingInfoModal({ onClose }: { onClose: () => void }) {
         </div>
         <div className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3 mb-5">
           <p className="text-xs text-white/50 leading-relaxed">
-            Each player receives a <span className="text-[#F5C84C] font-semibold">0–200 rating</span>. Higher rating = stronger fantasy selection this round.
+            Each player receives a <span className="text-[#F5C84C] font-semibold">Neeko Rating</span>. Higher rating = stronger fantasy selection this round. ELITE (90+) represents the very best picks.
           </p>
         </div>
         <button
@@ -616,12 +616,9 @@ export function PlayerDetailModal({
                 <div className="h-4 w-full animate-pulse rounded bg-white/5" />
               ) : (() => {
                 const aiCtx = { riskRating: row.risk_rating ?? null, confidence: row.projection_confidence ?? null };
-                const fullAiText = sharpenAIText(aiAnalysis?.analysis ?? row.ai_summary, aiCtx);
-                if (fullAiText && fullAiText !== "Model analysis is currently generating.") {
-                  return <p className="text-sm text-white/70 leading-relaxed">{fullAiText}</p>;
-                }
-                if (row.recommendation_why) {
-                  return <p className="text-sm text-white/70 leading-relaxed">{sharpenAIText(row.recommendation_why, aiCtx)}</p>;
+                const longText = sharpenAIText(aiAnalysis?.analysis ?? row.ai_summary, aiCtx);
+                if (longText && longText !== "Model analysis is currently generating.") {
+                  return <p className="text-sm text-white/70 leading-relaxed">{longText}</p>;
                 }
                 return <p className="text-sm text-white/30 leading-relaxed">Generating AI analysis...</p>;
               })()
