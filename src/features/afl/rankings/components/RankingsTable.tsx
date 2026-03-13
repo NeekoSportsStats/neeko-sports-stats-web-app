@@ -4,7 +4,7 @@ import {
   fmt, fmtInt, fmtPrice, fmtValueScore,
   getNeekoRatingBadge, getRiskBadge, getValueTagStyle,
   getValueScoreColor, getConfidenceColor, getDisplayRecommendation,
-  resolveRecommendationColor, safeWhyText,
+  resolveRecommendationColor, safeWhyText, truncateWhySummary,
   FREE_PARTIAL_ROWS, FREE_FULL_ROWS,
 } from "./helpers";
 import { InfoTooltip, LockedCell } from "./RankingsModals";
@@ -81,8 +81,8 @@ export function TableHeader({ isPremium, sortKey, sortDir, onSortClick, onRating
         </span>
       </th>
       <SortableTh label="Projection" col="projection_final" width={100} tooltip="Expected fantasy points this round" />
-      <SortableTh label="Confidence" col="projection_confidence" width={100} tooltip="How certain the AI is about this projection — higher means more reliable" />
-      <SortableTh label="Risk" col="risk_rating" width={100} tooltip="Chance of underperforming — lower is safer" />
+      <SortableTh label="Confidence" col="projection_confidence" width={100} tooltip="Forecast reliability — how likely the projection is to land near its expected score." />
+      <SortableTh label="Risk" col="risk_rating" width={100} tooltip="Volatility — probability of large deviations from projection." />
       <Th label="Price" locked={!isPremium} width={110} tooltip="AFL Fantasy salary this round" />
       <SortableTh label="Value" col="value_score" width={120} tooltip="Points per dollar of price — higher means better value for money" />
       <Th label="AI Rec" locked={!isPremium} width={150} />
@@ -217,14 +217,14 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
           </span>
         ) : <span className="text-white/20 text-xs">—</span>}
       </td>
-      <td className="px-4 py-3 text-left align-top" style={{ minWidth: 180, maxWidth: 320, width: 320 }}>
+      <td className="px-4 py-3 text-left align-top" style={{ minWidth: 180, maxWidth: 280, width: 280 }}>
         {locked("recommendation_why") ? (
           <LockedCell onClick={onUpgrade} />
         ) : (() => {
-          const whyText = safeWhyText(row);
+          const whyText = truncateWhySummary(row);
           if (!whyText) return <span className="text-white/20 text-xs">—</span>;
           return (
-            <span className="text-xs text-white/60 leading-snug block line-clamp-2 max-w-[300px]">{whyText}</span>
+            <span className="text-xs text-white/60 leading-snug block line-clamp-2 max-w-[260px]">{whyText}</span>
           );
         })()}
       </td>

@@ -430,6 +430,46 @@ function trunc(s: string): string {
   return s.length > TRUNC ? s.slice(0, TRUNC - 1) + "…" : s;
 }
 
+// ─── Table Why column — concise one-sentence version ─────────────────────────
+// Max 120 chars / 18 words. Priority: recommendation_short → recommendation_why → ai_summary
+
+export function truncateWhySummary(row: {
+  recommendation_short?: string | null;
+  recommendation_why?: string | null;
+  ai_summary?: string | null;
+}): string | null {
+  const candidates = [
+    (row.recommendation_short ?? "").trim(),
+    (row.recommendation_why ?? "").trim(),
+    (row.ai_summary ?? "").trim(),
+  ].filter((s) => s.length >= 10 && !isGenericAIText(s));
+
+  const best = candidates[0] ?? [
+    (row.recommendation_short ?? "").trim(),
+    (row.recommendation_why ?? "").trim(),
+    (row.ai_summary ?? "").trim(),
+  ].find((s) => s.length >= 10) ?? null;
+
+  if (!best) return null;
+
+  // Trim to first sentence if possible
+  const sentenceEnd = best.search(/[.!?]/);
+  let result = sentenceEnd > 0 ? best.slice(0, sentenceEnd + 1).trim() : best;
+
+  // Enforce 120 char hard cap
+  if (result.length > 120) {
+    result = result.slice(0, 119) + "…";
+  }
+
+  // Enforce 18 word cap
+  const words = result.split(/\s+/);
+  if (words.length > 18) {
+    result = words.slice(0, 18).join(" ") + "…";
+  }
+
+  return result;
+}
+
 export function safeWhyText(row: {
   recommendation_short?: string | null;
   recommendation_why?: string | null;

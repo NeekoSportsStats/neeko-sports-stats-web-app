@@ -215,7 +215,7 @@ function ScoreHistoryChart({ playerName, playerId }: { playerName: string; playe
           ))}
         </div>
         <p className="text-xs text-white/30 leading-relaxed max-w-[220px]">
-          No completed 2026 matches yet. Scoring history will appear once games are played.
+          No completed matches found. Scoring history will appear once games are played.
         </p>
       </div>
     );
@@ -608,7 +608,7 @@ export function PlayerDetailModal({
               </div>
               <div className="rounded-lg bg-white/5 px-3 py-3">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1 flex items-center gap-0.5">
-                  Risk <InfoTooltip text="Chance of underperforming — lower is safer" />
+                  Risk <InfoTooltip text="Volatility — probability of large deviations from projection." />
                 </p>
                 <p className={`text-sm font-semibold ${getRiskColor(row.risk_rating ?? null)}`}>
                   {row.risk_rating != null ? `${fmtInt(row.risk_rating)}%` : "—"}
@@ -620,7 +620,7 @@ export function PlayerDetailModal({
               </div>
               <div className="rounded-lg bg-white/5 px-3 py-3">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1 flex items-center gap-0.5">
-                  Confidence <InfoTooltip text="AI certainty level in this projection" />
+                  Confidence <InfoTooltip text="Forecast reliability — how likely the projection is to land near its expected score." />
                 </p>
                 {(() => {
                   const displayConf = displayConfidence(row.projection_confidence);
@@ -724,7 +724,7 @@ export function PlayerDetailModal({
           {/* 8. Last 10 Games */}
           {unlocked && (
             <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-4">
-              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-3">Last 10 Games</p>
+              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-3">Last 10 Completed Games</p>
               <ScoreHistoryChart playerName={row.player_name} playerId={row.player_id} />
             </div>
           )}
