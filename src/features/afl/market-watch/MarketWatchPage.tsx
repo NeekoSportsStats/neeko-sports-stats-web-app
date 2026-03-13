@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { TrendingUp, RefreshCw, Crown, ChevronDown, Lock, AlertCircle } from "lucide-react";
+import { TrendingUp, RefreshCw, Crown, ChevronDown, Lock, CircleAlert as AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
