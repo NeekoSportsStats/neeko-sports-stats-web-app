@@ -20,6 +20,7 @@ const RECOMMENDATION_COLORS: Record<string, string> = {
 
 const BATCH_SIZE = 30;
 const CONCURRENT = 5;
+const MAX_JOBS_PER_RUN = 640;
 
 const SYSTEM_PROMPT = `You are Neeko, a professional AFL fantasy analyst. Your role is to produce structured fantasy recommendations for coaches.
 
@@ -104,12 +105,21 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
     const openai = new OpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY")! });
+
+    const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+    const processedSoFar: number = body.processed_so_far ?? 0;
+
+    if (processedSoFar >= MAX_JOBS_PER_RUN) {
+      return new Response(
+        JSON.stringify({ message: "Safety cap reached", processed_so_far: processedSoFar }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const { data: jobs, error: jobsErr } = await supabase
       .from("ai_generation_queue")
@@ -122,7 +132,7 @@ Deno.serve(async (req: Request) => {
     if (jobsErr) throw jobsErr;
     if (!jobs || jobs.length === 0) {
       return new Response(
-        JSON.stringify({ message: "No pending jobs", processed: 0 }),
+        JSON.stringify({ message: "No pending jobs", processed: 0, processed_so_far: processedSoFar }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -226,8 +236,29 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const newProcessedTotal = processedSoFar + processed;
+
+    const { count: remainingCount } = await supabase
+      .from("ai_generation_queue")
+      .select("*", { count: "exact", head: true })
+      .eq("job_type", "ranking_recommendation")
+      .eq("status", "pending");
+
+    const remaining = remainingCount ?? 0;
+    const canContinue = remaining > 0 && processed > 0 && newProcessedTotal < MAX_JOBS_PER_RUN;
+
+    if (canContinue) {
+      EdgeRuntime.waitUntil(
+        fetch(`${supabaseUrl}/functions/v1/generate-player-ranking-recos`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ processed_so_far: newProcessedTotal }),
+        }).catch((err) => console.error("[generate-player-ranking-recos] Failed to trigger next batch:", err))
+      );
+    }
+
     return new Response(
-      JSON.stringify({ processed, failed, total: jobs.length }),
+      JSON.stringify({ processed, failed, total: jobs.length, remaining, processed_so_far: newProcessedTotal, continuing: canContinue }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
