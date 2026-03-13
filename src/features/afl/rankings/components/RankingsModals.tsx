@@ -200,16 +200,17 @@ function ScoreHistoryChart({ playerName, playerId }: { playerName: string; playe
     let cancelled = false;
     async function load() {
       setLoading(true);
-
       let rows: ScoreHistoryPoint[] | null = null;
 
       if (playerId) {
-        const { data: byId } = await supabase.rpc("get_player_score_history", {
-          player_name_in: playerName,
+        const { data: byId } = await supabase.rpc("get_player_score_history_by_id", {
+          player_id_in: playerId,
           n_games: 10,
         });
         rows = (byId as ScoreHistoryPoint[]) ?? [];
-      } else {
+      }
+
+      if (!rows?.length && playerName) {
         const { data: byName } = await supabase.rpc("get_player_score_history", {
           player_name_in: playerName,
           n_games: 10,
@@ -222,7 +223,7 @@ function ScoreHistoryChart({ playerName, playerId }: { playerName: string; playe
         setLoading(false);
       }
     }
-    if (playerName) load();
+    if (playerId || playerName) load();
     return () => { cancelled = true; };
   }, [playerName, playerId]);
 
@@ -236,7 +237,7 @@ function ScoreHistoryChart({ playerName, playerId }: { playerName: string; playe
             <div key={i} className="w-4 rounded-t bg-white/10" style={{ height: `${h}%` }} />
           ))}
         </div>
-        <p className="text-xs text-white/25">Score history loading...</p>
+        <p className="text-xs text-white/25">No recent games available</p>
       </div>
     );
   }
@@ -614,12 +615,13 @@ export function PlayerDetailModal({
               loadingAI ? (
                 <div className="h-4 w-full animate-pulse rounded bg-white/5" />
               ) : (() => {
-                const fullAiText = sharpenAIText(aiAnalysis?.analysis ?? row.ai_summary);
+                const aiCtx = { riskRating: row.risk_rating ?? null, confidence: row.projection_confidence ?? null };
+                const fullAiText = sharpenAIText(aiAnalysis?.analysis ?? row.ai_summary, aiCtx);
                 if (fullAiText && fullAiText !== "Model analysis is currently generating.") {
                   return <p className="text-sm text-white/70 leading-relaxed">{fullAiText}</p>;
                 }
                 if (row.recommendation_why) {
-                  return <p className="text-sm text-white/70 leading-relaxed">{row.recommendation_why}</p>;
+                  return <p className="text-sm text-white/70 leading-relaxed">{sharpenAIText(row.recommendation_why, aiCtx)}</p>;
                 }
                 return <p className="text-sm text-white/30 leading-relaxed">Generating AI analysis...</p>;
               })()
@@ -631,7 +633,7 @@ export function PlayerDetailModal({
           {unlocked && aiAnalysis?.captain_recommendation && (
             <div className="rounded-lg border border-white/5 bg-white/[0.03] px-4 py-3">
               <p className="text-[10px] text-white/40 uppercase tracking-wider mb-2">Captain Verdict</p>
-              <p className="text-sm text-white/70 leading-relaxed italic">{sharpenAIText(aiAnalysis.captain_recommendation)}</p>
+              <p className="text-sm text-white/70 leading-relaxed italic">{sharpenAIText(aiAnalysis.captain_recommendation, { riskRating: row.risk_rating ?? null, confidence: row.projection_confidence ?? null })}</p>
             </div>
           )}
 

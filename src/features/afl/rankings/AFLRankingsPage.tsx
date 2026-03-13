@@ -38,9 +38,9 @@ function KpiTiles({ rows }: { rows: RankingRow[] }) {
 
   const tiles = [
     { label: "Top Captain Avg", value: captainAvgProj != null ? captainAvgProj.toFixed(1) : "—", sub: "Top 5 captain projections", color: "text-[#F5C84C]" },
-    { label: "Value Upgrades", value: valueUpgrades.toString(), sub: "Value score ≥ 1.10", color: "text-green-400" },
-    { label: "Trap Alerts", value: trapAlerts.toString(), sub: "Risk rating ≥ 75", color: "text-red-400" },
-    { label: "High Confidence", value: highConfidence.toString(), sub: "Confidence ≥ 80%", color: "text-blue-400" },
+    { label: "Value Upgrades", value: valueUpgrades.toString(), sub: "Value score ≥ 12.0", color: "text-green-400" },
+    { label: "Trap Alerts", value: trapAlerts.toString(), sub: "Risk rating ≥ 60", color: "text-red-400" },
+    { label: "High Confidence", value: highConfidence.toString(), sub: "Confidence ≥ 85%", color: "text-blue-400" },
   ];
 
   return (
@@ -278,7 +278,7 @@ export default function AFLRankingsPage() {
       } else if (premiumFilter === "TOP100") {
         filtered = filtered.slice(0, 100);
       } else if (premiumFilter === "ELITE") {
-        filtered = filtered.filter((r) => (r.neeko_rating ?? 0) >= 130);
+        filtered = filtered.filter((r) => (r.neeko_rating ?? 0) >= 90);
       } else {
         filtered = filtered.filter((r) => r.position === premiumFilter);
       }

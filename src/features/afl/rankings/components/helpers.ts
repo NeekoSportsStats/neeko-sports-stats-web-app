@@ -130,9 +130,9 @@ export function getConfidenceColor(v: number | null): string {
 
 export function getValueScoreColor(v: number | null): string {
   if (v == null) return "text-white/30";
-  if (v >= 1.25) return "text-green-400";
-  if (v >= 1.10) return "text-[#F5C84C]";
-  if (v >= 0.95) return "text-white/50";
+  if (v >= 12.0) return "text-green-400";
+  if (v >= 10.0) return "text-[#F5C84C]";
+  if (v >= 8.5) return "text-white/50";
   return "text-red-400";
 }
 
@@ -208,7 +208,28 @@ const AI_REPLACEMENTS: [RegExp, string][] = [
   [/at a price of \$[\d,]+/gi, "at current price."],
 ];
 
-export function sharpenAIText(text: string | null | undefined): string | null {
+const HIGH_RISK_CONTRADICTIONS: RegExp[] = [
+  /minimal (?:bust\s*)?risk/gi,
+  /safe (?:fantasy\s*)?option/gi,
+  /low[- ]risk/gi,
+  /stable floor/gi,
+  /reliable pick/gi,
+  /minimal downside/gi,
+  /low bust risk/gi,
+];
+
+const LOW_CONFIDENCE_CONTRADICTIONS: RegExp[] = [
+  /guaranteed (?:scorer|points|output)/gi,
+  /near[- ]certain/gi,
+  /certainty this round/gi,
+  /will definitely/gi,
+  /lock in/gi,
+];
+
+export function sharpenAIText(
+  text: string | null | undefined,
+  context?: { riskRating?: number | null; confidence?: number | null }
+): string | null {
   if (!text) return null;
 
   let out = text.trim();
@@ -225,6 +246,19 @@ export function sharpenAIText(text: string | null | undefined): string | null {
   for (const [pattern, replacement] of AI_REPLACEMENTS) {
     out = out.replace(pattern, replacement);
   }
+
+  if (context?.riskRating != null && context.riskRating >= 60) {
+    for (const pattern of HIGH_RISK_CONTRADICTIONS) {
+      out = out.replace(pattern, "elevated risk");
+    }
+  }
+
+  if (context?.confidence != null && context.confidence < 60) {
+    for (const pattern of LOW_CONFIDENCE_CONTRADICTIONS) {
+      out = out.replace(pattern, "uncertain projection");
+    }
+  }
+
   return out;
 }
 
@@ -288,9 +322,9 @@ export function computeKpiTiles(rows: RankingRow[]) {
     ? captainRows.reduce((s, r) => s + (r.projection_final ?? 0), 0) / captainRows.length
     : null;
 
-  const valueUpgrades = rows.filter((r) => (r.value_score ?? 0) >= 1.10).length;
-  const trapAlerts = rows.filter((r) => (r.risk_rating ?? 0) >= 75).length;
-  const highConfidence = rows.filter((r) => (r.projection_confidence ?? 0) >= 80).length;
+  const valueUpgrades = rows.filter((r) => (r.value_score ?? 0) >= 12.0).length;
+  const trapAlerts = rows.filter((r) => (r.risk_rating ?? 0) >= 60).length;
+  const highConfidence = rows.filter((r) => (r.projection_confidence ?? 0) >= 85).length;
 
   return { captainAvgProj, valueUpgrades, trapAlerts, highConfidence };
 }
