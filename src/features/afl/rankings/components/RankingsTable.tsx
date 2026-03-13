@@ -4,7 +4,7 @@ import {
   fmt, fmtInt, fmtPrice, fmtValueScore,
   getNeekoRatingBadge, getRiskBadge, getValueTagStyle,
   getValueScoreColor, getConfidenceColor, getDisplayRecommendation,
-  resolveRecommendationColor,
+  resolveRecommendationColor, safeWhyText,
   FREE_PARTIAL_ROWS, FREE_FULL_ROWS,
 } from "./helpers";
 import { InfoTooltip, LockedCell } from "./RankingsModals";
@@ -210,10 +210,12 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
         ) : <span className="text-white/20 text-xs">—</span>}
       </td>
       <td className="px-4 py-3 text-left align-top" style={{ minWidth: 200, maxWidth: 420 }}>
-        {locked("recommendation_why") ? (
+        {tier === "partial" ? (
+          <span className="text-white/15 text-xs select-none">—</span>
+        ) : locked("recommendation_why") ? (
           <LockedCell onClick={onUpgrade} />
         ) : (() => {
-          const whyText = row.recommendation_short ?? row.recommendation_why ?? "—";
+          const whyText = safeWhyText(row) ?? "—";
           return (
             <span className="text-xs text-white/60 leading-snug max-w-[420px] block line-clamp-2">{whyText}</span>
           );
@@ -252,23 +254,40 @@ export function LockedTableRow({ idx, onUpgrade }: LockedTableRowProps) {
 export function ConversionWallRow({ onUpgrade, colSpan = TOTAL_COLS }: { onUpgrade: () => void; colSpan?: number }) {
   return (
     <tr>
-      <td colSpan={colSpan} className="px-4 pt-10 pb-6">
+      <td colSpan={colSpan} className="px-4 pt-8 pb-8">
         <div
-          className="flex flex-col items-center gap-3 rounded-xl border border-[#F5C84C]/20 bg-gradient-to-b from-[#F5C84C]/[0.06] to-[#0a0a0a] px-6 py-8 text-center hover:border-[#F5C84C]/40 transition-colors duration-200"
-          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 20px rgba(245,200,76,0.08)"; }}
+          className="relative flex flex-col items-center gap-4 rounded-2xl border border-[#F5C84C]/25 bg-gradient-to-b from-[#F5C84C]/[0.08] via-[#0d0d0d] to-[#0a0a0a] px-8 py-10 text-center overflow-hidden hover:border-[#F5C84C]/40 transition-all duration-200 cursor-pointer"
+          onClick={(e) => { e.stopPropagation(); onUpgrade(); }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 40px rgba(245,200,76,0.10)"; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "none"; }}
         >
-          <p className="text-base font-bold text-white">You're seeing the surface. The edge is locked.</p>
-          <p className="text-sm text-white/45 max-w-xs leading-relaxed">
-            Elite captain calls, breakout value plays and matchup traps are available below.
-          </p>
-          <button
-            onClick={(e) => { e.stopPropagation(); onUpgrade(); }}
-            className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#F5C84C] hover:brightness-110 px-6 py-2.5 text-sm font-bold text-[#070707] transition-all"
-          >
-            <Crown size={13} />
-            Upgrade to Neeko+
-          </button>
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-px bg-gradient-to-r from-transparent via-[#F5C84C]/40 to-transparent" />
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30 mb-1">
+            <Crown size={20} className="text-[#F5C84C]" />
+          </div>
+          <div>
+            <p className="text-lg font-bold text-white mb-1.5">Full rankings are locked for free users</p>
+            <p className="text-sm text-white/45 max-w-sm leading-relaxed">
+              Neeko+ unlocks AI captain calls, breakout value plays, matchup traps and the full 640-player ranked list.
+            </p>
+          </div>
+          <div className="flex flex-wrap justify-center gap-2 mb-1">
+            {["AI Recommendations", "Full Value Rankings", "Breakout Alerts", "Matchup Traps"].map((f) => (
+              <span key={f} className="rounded-full border border-[#F5C84C]/20 bg-[#F5C84C]/[0.06] px-3 py-1 text-[11px] text-[#F5C84C]/70 font-medium">
+                {f}
+              </span>
+            ))}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={(e) => { e.stopPropagation(); onUpgrade(); }}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#F5C84C] hover:brightness-110 px-7 py-3 text-sm font-bold text-[#070707] transition-all shadow-lg"
+            >
+              <Crown size={14} />
+              Upgrade to Neeko+
+            </button>
+            <span className="text-xs text-white/30">$9.99/mo</span>
+          </div>
         </div>
       </td>
     </tr>

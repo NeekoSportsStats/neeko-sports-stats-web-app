@@ -11,7 +11,7 @@ import {
   getCaptainStyle, getValueTagStyle, getNeekoRatingBadge, getRiskBadge,
   getConsistencyBadge, getConfidenceColor, getValueScoreColor,
   getFormColor, getMatchupColor, getUpsideColor, getRiskColor,
-  sharpenAIText, resolveRecommendationColor,
+  sharpenAIText, resolveRecommendationColor, safeWhyText,
 } from "./helpers";
 
 // ─── InfoTooltip ──────────────────────────────────────────────────────────────
@@ -605,32 +605,49 @@ export function PlayerDetailModal({
             </div>
           )}
 
-          <div className={`rounded-lg border px-4 py-4 ${unlocked ? "border-[#F5C84C]/15 bg-[#F5C84C]/[0.04]" : "border-[#111] bg-[#111]"}`}>
-            <div className="flex items-center gap-2 mb-2">
-              <div className={`h-1.5 w-1.5 rounded-full ${unlocked ? "bg-[#F5C84C]" : "bg-white/20"}`} />
-              <p className={`text-[10px] uppercase tracking-wider font-semibold ${unlocked ? "text-[#F5C84C]/70" : "text-white/30"}`}>AI Analysis</p>
-              {!unlocked && <Lock size={11} className="text-[#F5C84C]/50 ml-auto" />}
-            </div>
-            {unlocked ? (
-              loadingAI ? (
-                <div className="h-4 w-full animate-pulse rounded bg-white/5" />
-              ) : (() => {
-                const aiCtx = { riskRating: row.risk_rating ?? null, confidence: row.projection_confidence ?? null };
-                const longText = sharpenAIText(aiAnalysis?.analysis ?? row.ai_summary, aiCtx);
-                if (longText && longText !== "Model analysis is currently generating.") {
-                  return <p className="text-sm text-white/70 leading-relaxed">{longText}</p>;
-                }
-                return <p className="text-sm text-white/30 leading-relaxed">Generating AI analysis...</p>;
-              })()
-            ) : (
+          {unlocked ? (() => {
+            const aiCtx = { riskRating: row.risk_rating ?? null, confidence: row.projection_confidence ?? null };
+            const whyText = safeWhyText(row);
+            const extendedText = sharpenAIText(aiAnalysis?.analysis ?? row.ai_summary, aiCtx);
+            const showExtended = !loadingAI && extendedText && extendedText !== "Model analysis is currently generating.";
+            return (
+              <>
+                {whyText && (
+                  <div className="rounded-lg border border-[#F5C84C]/15 bg-[#F5C84C]/[0.04] px-4 py-4">
+                    <p className="text-[10px] text-[#F5C84C]/70 uppercase tracking-wider font-semibold mb-2">Recommendation</p>
+                    <p className="text-sm text-white/80 leading-relaxed">{whyText}</p>
+                  </div>
+                )}
+                <div className="rounded-lg border border-white/5 bg-white/[0.03] px-4 py-4">
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider font-semibold mb-2">Extended Analysis</p>
+                  {loadingAI ? (
+                    <div className="space-y-2">
+                      <div className="h-3 w-full animate-pulse rounded bg-white/5" />
+                      <div className="h-3 w-4/5 animate-pulse rounded bg-white/5" />
+                      <div className="h-3 w-3/5 animate-pulse rounded bg-white/5" />
+                    </div>
+                  ) : showExtended ? (
+                    <p className="text-sm text-white/65 leading-relaxed">{extendedText}</p>
+                  ) : (
+                    <p className="text-sm text-white/30 leading-relaxed">Generating analysis...</p>
+                  )}
+                </div>
+                {aiAnalysis?.captain_recommendation && (
+                  <div className="rounded-lg border border-white/5 bg-white/[0.03] px-4 py-3">
+                    <p className="text-[10px] text-white/40 uppercase tracking-wider mb-2">Captain Verdict</p>
+                    <p className="text-sm text-white/70 leading-relaxed italic">{sharpenAIText(aiAnalysis.captain_recommendation, aiCtx)}</p>
+                  </div>
+                )}
+              </>
+            );
+          })() : (
+            <div className="rounded-lg border border-[#111] bg-[#111] px-4 py-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-1.5 w-1.5 rounded-full bg-white/20" />
+                <p className="text-[10px] uppercase tracking-wider font-semibold text-white/30">AI Analysis</p>
+                <Lock size={11} className="text-[#F5C84C]/50 ml-auto" />
+              </div>
               <p className="text-sm text-white/25 italic">Upgrade to Neeko+ to unlock AI analysis.</p>
-            )}
-          </div>
-
-          {unlocked && aiAnalysis?.captain_recommendation && (
-            <div className="rounded-lg border border-white/5 bg-white/[0.03] px-4 py-3">
-              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-2">Captain Verdict</p>
-              <p className="text-sm text-white/70 leading-relaxed italic">{sharpenAIText(aiAnalysis.captain_recommendation, { riskRating: row.risk_rating ?? null, confidence: row.projection_confidence ?? null })}</p>
             </div>
           )}
 

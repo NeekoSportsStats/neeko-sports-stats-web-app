@@ -16,7 +16,7 @@ import {
   NeekoRatingInfoModal, UpgradeModal, PlayerDetailModal,
 } from "./components/RankingsModals";
 import {
-  TableHeader, TableRow, LockedTableRow, ConversionWallRow, LoadingSkeletonRows,
+  TableHeader, TableRow, ConversionWallRow, LoadingSkeletonRows,
 } from "./components/RankingsTable";
 import { MobileRankingsTable } from "./components/MobileRankingsTable";
 
@@ -93,15 +93,15 @@ function SearchAutocomplete({
   }, []);
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-sm">
-      <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+    <div ref={containerRef} className="relative w-full">
+      <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/35 pointer-events-none" />
       <input
         type="text"
         placeholder="Search players or teams..."
         value={value}
         onChange={(e) => { onChange(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
-        className="h-9 w-full rounded-xl border border-white/10 bg-white/[0.04] pl-8 pr-7 text-sm text-white placeholder-white/30 outline-none focus:border-white/25 transition-colors"
+        className="h-11 w-full rounded-xl border border-white/15 bg-white/[0.04] pl-10 pr-8 text-sm text-white placeholder-white/30 outline-none focus:border-[#F5C84C]/40 focus:bg-white/[0.06] transition-colors"
       />
       {value && (
         <button
@@ -426,17 +426,8 @@ export default function AFLRankingsPage() {
                   <LoadingSkeletonRows />
                 ) : (
                   <>
-                    {displayRows.map((row, idx) => {
+                    {(isPremium ? displayRows : displayRows.slice(0, FREE_PARTIAL_ROWS)).map((row, idx) => {
                       const tier = getFreeTier(idx);
-                      if (!isPremium && tier === "locked") {
-                        return (
-                          <LockedTableRow
-                            key={row.player_id ?? `locked-${idx}`}
-                            idx={idx}
-                            onUpgrade={() => setShowUpgradeModal(true)}
-                          />
-                        );
-                      }
                       const isUnlocked = isPremium || tier === "full" || tier === "partial";
                       const isHighlighted = highlightedPlayerId != null && row.player_id === highlightedPlayerId;
                       return (
@@ -453,7 +444,7 @@ export default function AFLRankingsPage() {
                         />
                       );
                     })}
-                    {!isPremium && !loading && displayRows.length >= FREE_PARTIAL_ROWS && (
+                    {!isPremium && !loading && (
                       <ConversionWallRow onUpgrade={() => setShowUpgradeModal(true)} />
                     )}
                   </>

@@ -1,11 +1,11 @@
-import { useRef, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Lock, Crown, ChevronRight } from "lucide-react";
 import { RankingRow, RankingsTab, RowTier } from "./types";
 import {
   fmt, fmtInt, fmtPrice, fmtValueScore,
   getNeekoRatingBadge, getRiskBadge, getValueTagStyle,
   getValueScoreColor, getConfidenceColor, getDisplayRecommendation,
-  resolveRecommendationColor,
+  resolveRecommendationColor, safeWhyText,
   FREE_FULL_ROWS, FREE_PARTIAL_ROWS,
 } from "./helpers";
 
@@ -227,9 +227,13 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
           })() : <span className="text-white/20 text-xs">—</span>}
         </div>
         <div className={`${CELL_BASE} px-3`} style={{ width: COL.why, minWidth: COL.why }}>
-          {locked("why") ? <LockedPlaceholder onUpgrade={onUpgrade} /> : (
+          {tier === "partial" ? (
+            <span className="text-white/15 text-xs select-none">—</span>
+          ) : locked("why") ? (
+            <LockedPlaceholder onUpgrade={onUpgrade} />
+          ) : (
             <span className="text-xs text-white/50 leading-snug line-clamp-2 py-2">
-              {row.recommendation_short ?? row.recommendation_why ?? "—"}
+              {safeWhyText(row) ?? "—"}
             </span>
           )}
         </div>
@@ -238,37 +242,6 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
   );
 }
 
-// ─── Blurred locked row ────────────────────────────────────────────────────────
-
-function BlurredRow({ idx, onUpgrade }: { idx: number; onUpgrade: () => void }) {
-  return (
-    <div
-      className="flex border-b border-white/[0.03] cursor-pointer"
-      style={{ width: TABLE_W, minWidth: TABLE_W, touchAction: "manipulation" }}
-      onClick={onUpgrade}
-    >
-      <div
-        className="flex shrink-0 sticky left-0 z-10 bg-[#070707] opacity-25 blur-[3px] select-none pointer-events-none"
-        style={{ width: FIXED_W }}
-      >
-        <div className={`${CELL_BASE} pl-3 text-xs text-white/30 tabular-nums`} style={{ width: COL.rank }}>{idx + 1}</div>
-        <div className={`${CELL_BASE} pl-2`} style={{ width: COL.player }}>
-          <div>
-            <div className="h-3 w-24 bg-white/20 rounded mb-1" />
-            <div className="h-2 w-14 bg-white/10 rounded" />
-          </div>
-        </div>
-      </div>
-      <div className="flex opacity-25 blur-[3px] select-none pointer-events-none">
-        {[COL.rating, COL.projection, COL.confidence, COL.risk, COL.price, COL.value, COL.aiRec].map((w, i) => (
-          <div key={i} className={`${CELL_BASE} justify-center px-2`} style={{ width: w, minWidth: w }}>
-            <div className="h-3 w-10 bg-white/10 rounded" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ─── Conversion wall — full viewport width, outside scroll container ───────────
 
@@ -355,7 +328,6 @@ export function MobileRankingsTable({
   onUpgrade,
 }: MobileRankingsTableProps) {
   const [visibleCount, setVisibleCount] = useState(25);
-  const wallInserted = useRef(false);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
@@ -364,9 +336,8 @@ export function MobileRankingsTable({
     }
   }, []);
 
-  const visibleRows = rows.slice(0, isPremium ? visibleCount : Math.min(visibleCount, rows.length));
+  const visibleRows = rows.slice(0, isPremium ? visibleCount : Math.min(visibleCount, FREE_PARTIAL_ROWS));
 
-  // Separate wall-trigger rows from table rows
   const wallTriggerIdx = !isPremium ? FREE_PARTIAL_ROWS : -1;
 
   return (
@@ -385,35 +356,23 @@ export function MobileRankingsTable({
 
             {loading ? (
               <LoadingSkeleton />
-            ) : (() => {
-              wallInserted.current = false;
-              return visibleRows.map((row, idx) => {
-                const tier: RowTier = isPremium ? "premium" : (
-                  idx < FREE_FULL_ROWS ? "full" : idx < FREE_PARTIAL_ROWS ? "partial" : "locked"
-                );
-
-                if (!isPremium && idx >= FREE_PARTIAL_ROWS) {
-                  if (!wallInserted.current) {
-                    wallInserted.current = true;
-                    return <BlurredRow key={row.player_id ?? `locked-${idx}`} idx={idx} onUpgrade={onUpgrade} />;
-                  }
-                  return <BlurredRow key={row.player_id ?? `locked-${idx}`} idx={idx} onUpgrade={onUpgrade} />;
-                }
-
-                return (
-                  <DataRow
-                    key={row.player_id ?? row.player_name}
-                    row={row}
-                    idx={idx}
-                    tier={tier}
-                    isPremium={isPremium}
-                    activeTab={activeTab}
-                    onTap={() => onOpenRow(row, idx)}
-                    onUpgrade={onUpgrade}
-                  />
-                );
-              });
-            })()}
+            ) : visibleRows.map((row, idx) => {
+              const tier: RowTier = isPremium ? "premium" : (
+                idx < FREE_FULL_ROWS ? "full" : idx < FREE_PARTIAL_ROWS ? "partial" : "locked"
+              );
+              return (
+                <DataRow
+                  key={row.player_id ?? row.player_name}
+                  row={row}
+                  idx={idx}
+                  tier={tier}
+                  isPremium={isPremium}
+                  activeTab={activeTab}
+                  onTap={() => onOpenRow(row, idx)}
+                  onUpgrade={onUpgrade}
+                />
+              );
+            })}
 
             {!loading && isPremium && visibleCount < rows.length && (
               <div className="py-4 text-center text-xs text-white/25">Loading more...</div>

@@ -371,3 +371,23 @@ export function isLockedCell(colKey: string, idx: number, isPremium: boolean): b
   if (idx < FREE_PARTIAL_ROWS) return isPremiumColumn(colKey);
   return true;
 }
+
+export function safeWhyText(row: {
+  recommendation_short?: string | null;
+  recommendation_why?: string | null;
+  ai_summary?: string | null;
+}): string | null {
+  const short = (row.recommendation_short ?? "").trim();
+  if (short.length >= 30 && short.split(/\s+/).filter(Boolean).length >= 6) {
+    return short;
+  }
+  const why = (row.recommendation_why ?? "").trim();
+  if (why.length >= 20) {
+    return why.length > 200 ? why.slice(0, 197) + "…" : why;
+  }
+  const summary = (row.ai_summary ?? "").trim();
+  if (summary.length >= 20) {
+    return summary.length > 200 ? summary.slice(0, 197) + "…" : summary;
+  }
+  return null;
+}
