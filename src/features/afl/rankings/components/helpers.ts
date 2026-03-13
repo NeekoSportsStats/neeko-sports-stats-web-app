@@ -353,23 +353,11 @@ export const TAB_DESCRIPTIONS: Record<RankingsTab, string> = {
 
 export const FREE_FULL_ROWS = 5;
 export const FREE_PARTIAL_ROWS = 15;
-export const FREE_FETCH_LIMIT = 25;
-
-export function isPremiumColumn(colKey: string): boolean {
-  return ["price", "value_score", "value_tag", "ai_recommendation", "recommendation_why", "ai_summary"].includes(colKey);
-}
 
 export function getFreeTier(idx: number): "full" | "partial" | "locked" {
   if (idx < FREE_FULL_ROWS) return "full";
   if (idx < FREE_PARTIAL_ROWS) return "partial";
   return "locked";
-}
-
-export function isLockedCell(colKey: string, idx: number, isPremium: boolean): boolean {
-  if (isPremium) return false;
-  if (idx < FREE_FULL_ROWS) return false;
-  if (idx < FREE_PARTIAL_ROWS) return isPremiumColumn(colKey);
-  return true;
 }
 
 export function safeWhyText(row: {

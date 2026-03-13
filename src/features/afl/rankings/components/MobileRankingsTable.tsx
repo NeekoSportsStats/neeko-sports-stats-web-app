@@ -247,7 +247,7 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
 
 export function MobileConversionWall({ onUpgrade }: { onUpgrade: () => void }) {
   return (
-    <div className="px-4 pt-6 pb-4">
+    <div className="px-4 pt-2 pb-4">
       <div className="flex items-center justify-between gap-3 rounded-xl border border-[#F5C84C]/25 bg-gradient-to-r from-[#F5C84C]/[0.07] to-transparent px-4 py-4">
         <div className="min-w-0">
           <p className="text-sm font-bold text-white leading-tight">Unlock AI captain picks, value scores and matchup insights.</p>

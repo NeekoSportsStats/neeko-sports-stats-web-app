@@ -67,29 +67,6 @@ export function LockedCell({ onClick }: { onClick?: () => void }) {
   );
 }
 
-export function LockedWhyCell({ why, onClick }: { why?: string | null; onClick?: () => void }) {
-  const teaser = why ? why.slice(0, 38) : null;
-  const hasMore = why && why.length > 38;
-  return (
-    <div
-      className="flex items-center gap-1.5 cursor-pointer group min-w-0"
-      onClick={(e) => { e.stopPropagation(); onClick?.(); }}
-    >
-      <Lock size={9} className="text-white/20 shrink-0 group-hover:text-[#F5C84C]/50 transition-colors" />
-      {teaser ? (
-        <span className="text-xs text-white/40 leading-snug min-w-0">
-          <span className="group-hover:text-white/50 transition-colors">{teaser}</span>
-          {hasMore && (
-            <span className="blur-[3px] select-none text-white/30">{why!.slice(38, 58)}</span>
-          )}
-        </span>
-      ) : (
-        <span className="text-xs text-white/25 italic">Member analysis</span>
-      )}
-    </div>
-  );
-}
-
 // ─── Neeko Rating Info Modal ───────────────────────────────────────────────────
 
 export function NeekoRatingInfoModal({ onClose }: { onClose: () => void }) {
