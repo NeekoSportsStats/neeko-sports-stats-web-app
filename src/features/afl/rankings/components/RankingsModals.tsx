@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Crown, Lock, Info } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Dot } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
@@ -350,22 +350,56 @@ export function PlayerDetailModal({
   const neekoRBadge = getNeekoRatingBadge(row.neeko_rating ?? null);
   const riskBadge = getRiskBadge(Number(row.risk_rating) ?? null);
 
+  const modalRef = useRef<HTMLDivElement>(null);
+  const handleOverlayClick = useCallback((e: React.MouseEvent) => {
+    if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
+      onClose();
+    }
+  }, [onClose]);
+  const displayConfidence = useCallback((raw: number | null | undefined): number | null => {
+    if (raw == null) return null;
+    return Math.round(60 + (raw - 60) * 0.7);
+  }, []);
+
+  const vtStyle = getValueTagStyle(row.value_tag);
+  void vtStyle;
+  const valueLabel = (() => {
+    if (row.value_tag) return row.value_tag;
+    const vs = row.value_score;
+    if (vs == null) return null;
+    if (vs >= 12.0) return "Elite Value";
+    if (vs >= 10.0) return "Good Value";
+    if (vs >= 8.5) return "Fair Value";
+    return "Below Average";
+  })();
+  const valueLabelStyle = getValueTagStyle(valueLabel);
+  const hasMatchup = row.matchup_rating != null && Number(row.matchup_rating) > 0;
+
   if (isPartial) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-[env(safe-area-inset-top)]" onClick={onClose}>
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" style={{ paddingTop: "env(safe-area-inset-top)" }} onClick={onClose}>
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
         <div
-          className="relative w-full max-w-md rounded-xl border border-white/10 bg-[#0e0e0e] p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+          className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-xl border border-white/10 bg-[#0e0e0e] shadow-2xl max-h-[92vh] overflow-y-auto"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button onClick={onClose} className="absolute right-4 top-4 text-white/40 hover:text-white/80 transition-colors">
-            <X size={18} />
-          </button>
-          <div className="space-y-4">
-            <div className="pr-6">
+          <div className="flex justify-center pt-3 pb-1 sm:hidden">
+            <div className="w-10 h-1 rounded-full bg-white/20" />
+          </div>
+          <div className="flex items-start justify-between px-5 pt-4 pb-3">
+            <div className="pr-4">
               <h2 className="text-lg font-semibold text-white">{row.player_name}</h2>
-              <p className="text-sm text-white/50">{row.team}{row.position ? ` · ${row.position}` : ""}</p>
+              <p className="text-sm text-white/50 mt-0.5">{row.team}{row.position ? ` · ${row.position}` : ""}</p>
             </div>
+            <button
+              onClick={onClose}
+              className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-white/8 text-white/40 hover:text-white/80 hover:bg-white/12 transition-colors mt-0.5"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div className="px-5 pb-6 space-y-4">
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-lg bg-white/5 px-3 py-3">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Neeko Rating</p>
@@ -373,9 +407,11 @@ export function PlayerDetailModal({
                   {row.neeko_rating != null ? Number(row.neeko_rating).toFixed(1) : "—"}
                 </p>
                 {neekoRBadge.label !== "—" && (
-                  <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border mt-0.5 ${neekoRBadge.text} ${neekoRBadge.bg} ${neekoRBadge.border}`}>
-                    {neekoRBadge.label}
-                  </span>
+                  <div className="mt-1.5">
+                    <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${neekoRBadge.text} ${neekoRBadge.bg} ${neekoRBadge.border}`}>
+                      {neekoRBadge.label}
+                    </span>
+                  </div>
                 )}
               </div>
               <div className="rounded-lg bg-white/5 px-3 py-3">
@@ -415,22 +451,39 @@ export function PlayerDetailModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-[env(safe-area-inset-top)]" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+      style={{ paddingTop: "env(safe-area-inset-top)" }}
+      onClick={handleOverlayClick}
+    >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div
-        className="relative w-full max-w-lg rounded-xl border border-white/10 bg-[#0e0e0e] p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
+        ref={modalRef}
+        className="relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl border border-white/10 bg-[#0e0e0e] shadow-2xl max-h-[92vh] overflow-y-auto"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <button onClick={onClose} className="absolute right-4 top-4 text-white/40 hover:text-white/80 transition-colors">
-          <X size={18} />
-        </button>
+        {/* Drag handle on mobile */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="w-10 h-1 rounded-full bg-white/20" />
+        </div>
 
-        <div className="space-y-4">
-          <div className="pr-6">
+        {/* Header with close button */}
+        <div className="flex items-start justify-between px-5 pt-4 pb-3 sm:pt-5">
+          <div className="pr-4">
             <h2 className="text-lg font-semibold text-white">{row.player_name}</h2>
-            <p className="text-sm text-white/50">{row.team}{row.position ? ` · ${row.position}` : ""}</p>
+            <p className="text-sm text-white/50 mt-0.5">{row.team}{row.position ? ` · ${row.position}` : ""}</p>
           </div>
+          <button
+            onClick={onClose}
+            className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-white/8 text-white/40 hover:text-white/80 hover:bg-white/12 transition-colors mt-0.5"
+          >
+            <X size={16} />
+          </button>
+        </div>
 
+        <div className="px-5 pb-6 space-y-3">
+
+          {/* 1. Captain Rating */}
           {unlocked && row.captain_rating && (
             <div className={`rounded-lg border px-4 py-3 ${capStyle.bg} ${capStyle.border}`}>
               <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Captain Rating</p>
@@ -444,6 +497,7 @@ export function PlayerDetailModal({
             </div>
           )}
 
+          {/* 2. AI Recommendation (green card) */}
           {unlocked && row.ai_recommendation && (
             <div
               className="rounded-lg border px-4 py-4"
@@ -462,6 +516,7 @@ export function PlayerDetailModal({
             </div>
           )}
 
+          {/* 3. Projection / Ceiling / Floor */}
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-lg bg-white/5 px-3 py-3">
               <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Projection</p>
@@ -470,11 +525,11 @@ export function PlayerDetailModal({
             {unlocked ? (
               <>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Est. Ceiling</p>
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Ceiling</p>
                   <p className="text-lg font-bold text-emerald-400">{fmt(row.ceiling_estimate)}</p>
                 </div>
                 <div className="rounded-lg bg-white/5 px-3 py-3">
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Est. Floor</p>
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Floor</p>
                   <p className="text-lg font-bold text-red-400">{fmt(row.floor_estimate)}</p>
                 </div>
               </>
@@ -488,34 +543,34 @@ export function PlayerDetailModal({
             )}
           </div>
 
-          {unlocked && (row.price != null || row.value_score != null) && (() => {
-            const vtStyle = getValueTagStyle(row.value_tag);
-            return (
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-lg bg-white/[0.04] border border-white/5 px-3 py-3">
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Price</p>
-                  <p className="text-base font-bold text-white/80">{fmtPrice(row.price)}</p>
-                </div>
-                <div className="rounded-lg bg-white/[0.04] border border-white/5 px-3 py-3">
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Value Score</p>
-                  <p className={`text-base font-bold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
-                    {fmtValueScore(row.value_score)}
-                  </p>
-                </div>
-                <div className={`rounded-lg border px-3 py-3 ${vtStyle.bg} ${vtStyle.border}`}>
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Value</p>
-                  <p className={`text-xs font-bold leading-tight ${vtStyle.text}`}>{row.value_tag ?? "—"}</p>
-                </div>
+          {/* 4. Price / Value Score / Value label */}
+          {unlocked && (row.price != null || row.value_score != null) && (
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg bg-white/[0.04] border border-white/5 px-3 py-3">
+                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Price</p>
+                <p className="text-base font-bold text-white/80">{fmtPrice(row.price)}</p>
               </div>
-            );
-          })()}
+              <div className="rounded-lg bg-white/[0.04] border border-white/5 px-3 py-3">
+                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Value Score</p>
+                <p className={`text-base font-bold tabular-nums ${getValueScoreColor(row.value_score ?? null)}`}>
+                  {fmtValueScore(row.value_score)}
+                </p>
+              </div>
+              <div className={`rounded-lg border px-3 py-3 ${valueLabelStyle.bg} ${valueLabelStyle.border}`}>
+                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Value</p>
+                <p className={`text-xs font-bold leading-tight ${valueLabelStyle.text}`}>{valueLabel ?? "—"}</p>
+              </div>
+            </div>
+          )}
 
+          {/* 5. Scoring Range */}
           {unlocked && (
             <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-3">
               <ConsistencyRangeBar floor={row.floor_estimate ?? null} projection={row.projection_final ?? null} ceiling={row.ceiling_estimate ?? null} />
             </div>
           )}
 
+          {/* 6. Stats grid: Form / Matchup / Upside / Risk / Consistency / Confidence */}
           {unlocked ? (
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-lg bg-white/5 px-3 py-3">
@@ -524,12 +579,19 @@ export function PlayerDetailModal({
                 </p>
                 <p className={`text-sm font-semibold ${getFormColor(row.form_rating ?? null)}`}>{fmtInt(row.form_rating)}</p>
               </div>
-              <div className="rounded-lg bg-white/5 px-3 py-3">
-                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1 flex items-center gap-0.5">
-                  Matchup <InfoTooltip text="Opponent difficulty — higher means an easier matchup" />
-                </p>
-                <p className={`text-sm font-semibold ${getMatchupColor(row.matchup_rating ?? null)}`}>{fmtInt(row.matchup_rating)}</p>
-              </div>
+              {hasMatchup ? (
+                <div className="rounded-lg bg-white/5 px-3 py-3">
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1 flex items-center gap-0.5">
+                    Matchup <InfoTooltip text="Opponent difficulty — higher means an easier matchup" />
+                  </p>
+                  <p className={`text-sm font-semibold ${getMatchupColor(row.matchup_rating ?? null)}`}>{fmtInt(row.matchup_rating)}</p>
+                </div>
+              ) : (
+                <div className="rounded-lg bg-white/5 px-3 py-3">
+                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Matchup</p>
+                  <p className="text-[11px] text-white/25 italic">Pre-season</p>
+                </div>
+              )}
               <div className="rounded-lg bg-white/5 px-3 py-3">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1 flex items-center gap-0.5">
                   Upside <InfoTooltip text="Potential to significantly exceed projection based on ceiling gap" />
@@ -554,17 +616,24 @@ export function PlayerDetailModal({
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1 flex items-center gap-0.5">
                   Confidence <InfoTooltip text="AI certainty level in this projection" />
                 </p>
-                <p className={`text-sm font-semibold mb-1.5 ${getConfidenceColor(row.projection_confidence ?? null)}`}>
-                  {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
-                </p>
-                {row.projection_confidence != null && (
-                  <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-yellow-300 transition-all"
-                      style={{ width: `${Math.min(100, Math.max(0, row.projection_confidence))}%` }}
-                    />
-                  </div>
-                )}
+                {(() => {
+                  const displayConf = displayConfidence(row.projection_confidence);
+                  return (
+                    <>
+                      <p className={`text-sm font-semibold mb-1.5 ${getConfidenceColor(displayConf)}`}>
+                        {displayConf != null ? `${displayConf}%` : "—"}
+                      </p>
+                      {displayConf != null && (
+                        <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-yellow-300 transition-all"
+                            style={{ width: `${Math.min(100, Math.max(0, displayConf))}%` }}
+                          />
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           ) : (
@@ -583,19 +652,13 @@ export function PlayerDetailModal({
             </div>
           )}
 
+          {/* 7. Extended Analysis (no duplicate Recommendation block) */}
           {unlocked ? (() => {
             const aiCtx = { riskRating: row.risk_rating ?? null, confidence: row.projection_confidence ?? null };
-            const whyText = safeWhyText(row);
             const extendedText = sharpenAIText(aiAnalysis?.analysis ?? row.ai_summary, aiCtx);
             const showExtended = !loadingAI && extendedText && extendedText !== "Model analysis is currently generating.";
             return (
               <>
-                {whyText && (
-                  <div className="rounded-lg border border-[#F5C84C]/15 bg-[#F5C84C]/[0.04] px-4 py-4">
-                    <p className="text-[10px] text-[#F5C84C]/70 uppercase tracking-wider font-semibold mb-2">Recommendation</p>
-                    <p className="text-sm text-white/80 leading-relaxed">{whyText}</p>
-                  </div>
-                )}
                 <div className="rounded-lg border border-white/5 bg-white/[0.03] px-4 py-4">
                   <p className="text-[10px] text-white/40 uppercase tracking-wider font-semibold mb-2">Extended Analysis</p>
                   {loadingAI ? (
@@ -629,6 +692,7 @@ export function PlayerDetailModal({
             </div>
           )}
 
+          {/* 8. Last 10 Games */}
           {unlocked && (
             <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-4">
               <p className="text-[10px] text-white/40 uppercase tracking-wider mb-3">Last 10 Games</p>

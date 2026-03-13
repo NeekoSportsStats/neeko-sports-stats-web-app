@@ -147,14 +147,16 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
         </div>
       </td>
       <td className="px-4 py-4 text-center whitespace-nowrap" style={{ width: 140, minWidth: 120 }}>
-        <div className="flex flex-col items-center gap-1">
+        <div className="flex flex-col items-center">
           <span className={`text-base font-extrabold tabular-nums ${neekoRBadge.text}`} style={neekoRBadge.glow ? { filter: neekoRBadge.glow } : undefined}>
             {row.neeko_rating != null ? Number(row.neeko_rating).toFixed(1) : "—"}
           </span>
           {neekoRBadge.label !== "—" && (
-            <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${neekoRBadge.text} ${neekoRBadge.bg} ${neekoRBadge.border}`}>
-              {neekoRBadge.label}
-            </span>
+            <div className="mt-1.5">
+              <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${neekoRBadge.text} ${neekoRBadge.bg} ${neekoRBadge.border}`}>
+                {neekoRBadge.label}
+              </span>
+            </div>
           )}
         </div>
       </td>
@@ -162,9 +164,15 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
         <span className="text-sm font-semibold text-[#F5C84C]/75 tabular-nums">{fmt(row.projection_final)}</span>
       </td>
       <td className="px-4 py-4 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
-        <span className={`text-sm font-semibold tabular-nums opacity-75 ${getConfidenceColor(row.projection_confidence ?? null)}`}>
-          {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
-        </span>
+        {(() => {
+          const raw = row.projection_confidence;
+          const display = raw != null ? Math.round(60 + (raw - 60) * 0.7) : null;
+          return (
+            <span className={`text-sm font-semibold tabular-nums opacity-75 ${getConfidenceColor(display)}`}>
+              {display != null ? `${display}%` : "—"}
+            </span>
+          );
+        })()}
       </td>
       <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
         <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${riskBadge.text} ${riskBadge.bg} ${riskBadge.border}`}>

@@ -11,16 +11,16 @@ import {
 
 // ─── Column widths ─────────────────────────────────────────────────────────────
 const COL = {
-  rank: 32,
-  player: 170,
-  rating: 90,
-  projection: 90,
-  confidence: 90,
-  risk: 80,
-  price: 100,
-  value: 110,
-  aiRec: 130,
-  why: 320,
+  rank: 28,
+  player: 145,
+  rating: 80,
+  projection: 76,
+  confidence: 76,
+  risk: 76,
+  price: 88,
+  value: 96,
+  aiRec: 110,
+  why: 280,
 } as const;
 
 // Only rank + player are sticky now
@@ -147,14 +147,14 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
         <div className={`${CELL_BASE} pl-2 min-w-0`} style={{ width: COL.player, maxWidth: COL.player }}>
           <div className="min-w-0 w-full">
             <div className="flex items-center gap-1 min-w-0">
-              <span className="text-[13px] font-semibold text-white truncate leading-tight max-w-[140px]">{row.player_name}</span>
+              <span className="text-[12px] font-semibold text-white truncate leading-tight max-w-[118px]">{row.player_name}</span>
               {!isPremium && isUnlocked && (
                 <span className="shrink-0 rounded-sm bg-[#F5C84C]/15 px-1 py-px text-[8px] font-semibold text-[#F5C84C] uppercase">
                   Free
                 </span>
               )}
             </div>
-            <div className="text-[10px] text-white/35 truncate mt-px max-w-[150px]">
+            <div className="text-[9px] text-white/35 truncate mt-px max-w-[118px]">
               {row.team}{row.position ? ` · ${row.position}` : ""}
             </div>
           </div>
@@ -167,7 +167,7 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
         onClick={onTap}
       >
         {/* Neeko rating — no longer sticky */}
-        <div className={`${CELL_BASE} justify-center flex-col gap-0.5`} style={{ width: COL.rating, minWidth: COL.rating }}>
+        <div className={`${CELL_BASE} justify-center flex-col`} style={{ width: COL.rating, minWidth: COL.rating }}>
           <span
             className={`text-sm font-extrabold tabular-nums ${neekoRBadge.text}`}
             style={neekoRBadge.glow ? { filter: neekoRBadge.glow } : undefined}
@@ -175,9 +175,11 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
             {row.neeko_rating != null ? Number(row.neeko_rating).toFixed(1) : "—"}
           </span>
           {neekoRBadge.label !== "—" && (
-            <span className={`rounded px-1 py-px text-[8px] font-semibold border ${neekoRBadge.text} ${neekoRBadge.bg} ${neekoRBadge.border}`}>
-              {neekoRBadge.label}
-            </span>
+            <div className="mt-1">
+              <span className={`rounded px-1 py-px text-[8px] font-semibold border ${neekoRBadge.text} ${neekoRBadge.bg} ${neekoRBadge.border}`}>
+                {neekoRBadge.label}
+              </span>
+            </div>
           )}
         </div>
 
@@ -185,9 +187,15 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
           <span className="text-sm font-semibold text-[#F5C84C]/80 tabular-nums">{fmt(row.projection_final, 0)}</span>
         </div>
         <div className={`${CELL_BASE} justify-center`} style={{ width: COL.confidence, minWidth: COL.confidence }}>
-          <span className={`text-sm font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
-            {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
-          </span>
+          {(() => {
+            const raw = row.projection_confidence;
+            const display = raw != null ? Math.round(60 + (raw - 60) * 0.7) : null;
+            return (
+              <span className={`text-sm font-semibold tabular-nums ${getConfidenceColor(display)}`}>
+                {display != null ? `${display}%` : "—"}
+              </span>
+            );
+          })()}
         </div>
         <div className={`${CELL_BASE} justify-center`} style={{ width: COL.risk, minWidth: COL.risk }}>
           <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${riskBadge.text} ${riskBadge.bg} ${riskBadge.border}`}>
