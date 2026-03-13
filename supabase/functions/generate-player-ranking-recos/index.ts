@@ -92,23 +92,38 @@ Deno.serve(async (req: Request) => {
             const valueScore = data.value_score ?? null;
             const price = data.price ?? null;
             const captainScore = data.captain_score ?? 0;
+            const riskRating = data.risk_rating ?? null;
+            const confidence = data.confidence ?? data.projection_confidence ?? null;
+            const ceilingEstimate = data.ceiling_estimate ?? data.ceiling ?? null;
+            const floorEstimate = data.floor_estimate ?? data.floor ?? null;
             const recommendationLabel = data.recommendation_label ?? payload.recommendation_label ?? "HOLD";
 
-            const systemPrompt = `You are Neeko, an AFL fantasy sports analyst. Write concise, data-driven player recommendations for fantasy coaches. Be direct and specific. Use player stats provided.`;
+            const systemPrompt = `You are Neeko, an AFL fantasy sports analyst. Write concise, data-driven player recommendations for fantasy coaches. Be direct, specific, and action-oriented. Reference actual numbers from the stats provided.`;
 
-            const userPrompt = `Write a 2-3 sentence fantasy recommendation for ${playerName} (${team}, ${position}).
+            const statLines = [
+              `- Projection: ${projectionFinal} pts`,
+              ceilingEstimate !== null ? `- Ceiling: ${ceilingEstimate} pts` : null,
+              floorEstimate !== null ? `- Floor: ${floorEstimate} pts` : null,
+              `- Consistency: ${consistencyScore}/100`,
+              confidence !== null ? `- Confidence: ${confidence}/100` : null,
+              riskRating !== null ? `- Risk: ${riskRating}/100` : null,
+              valueScore !== null ? `- Value score: ${Number(valueScore).toFixed(1)}` : null,
+              price !== null ? `- Price: $${Number(price).toLocaleString()}` : null,
+              `- Form rating: ${formRating}/100`,
+              `- Captain score: ${captainScore}/100`,
+              `- Recommendation: ${recommendationLabel}`,
+            ].filter(Boolean).join("\n");
+
+            const userPrompt = `Write a 2-3 sentence AFL fantasy recommendation for ${playerName} (${team}, ${position}).
 
 Stats:
-- Projection: ${projectionFinal}
-- Form rating: ${formRating}/100
-- Consistency: ${consistencyScore}/100
-${valueScore !== null ? `- Value score: ${valueScore}` : ""}
-${price !== null ? `- Price: $${price.toLocaleString()}` : ""}
-- Captain score: ${captainScore}/100
-- Recommendation: ${recommendationLabel}
+${statLines}
 
-Write as: 1 opening sentence about their projection/value, 1 sentence about form/consistency, 1 sentence with a clear action (${recommendationLabel}).
-Do not use markdown. Plain text only.`;
+Rules:
+- Sentence 1: projection or value insight with specific numbers
+- Sentence 2: form/consistency/risk insight
+- Sentence 3: clear action statement matching the ${recommendationLabel} recommendation
+- Plain text only. No markdown. No bullet points.`;
 
             const completion = await openai.chat.completions.create({
               model: "gpt-4o-mini",
