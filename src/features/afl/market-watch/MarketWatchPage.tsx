@@ -221,7 +221,13 @@ export default function MarketWatchPage() {
           </div>
         )}
 
-        {players.length === 0 ? (
+        {!isPremium ? (
+          <FreeUserView
+            rawPlayers={players}
+            onUnlock={() => setShowUpgrade(true)}
+            summary={summary}
+          />
+        ) : players.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <TrendingUp className="h-8 w-8 text-white/15" />
             <p className="text-sm text-white/30">No market data available for this round yet.</p>
@@ -232,16 +238,6 @@ export default function MarketWatchPage() {
               Try refreshing
             </button>
           </div>
-        ) : !isPremium ? (
-          <FreeUserView
-            buyTargets={buyTargets}
-            sellPlayers={sellPlayers}
-            cashCows={cashCows}
-            traps={traps}
-            onUnlock={() => setShowUpgrade(true)}
-            onCompare={(outId, inId) => setCompareModal({ outId, inId })}
-            summary={summary}
-          />
         ) : (
           <PremiumUserView
             buyTargets={buyTargets}
@@ -285,25 +281,21 @@ export default function MarketWatchPage() {
 // ─── Free User View ───────────────────────────────────────────────────────────
 
 interface FreeViewProps {
-  buyTargets: MWPlayerRow[];
-  sellPlayers: MWPlayerRow[];
-  cashCows: MWPlayerRow[];
-  traps: MWPlayerRow[];
+  rawPlayers: MWPlayerRow[];
   onUnlock: () => void;
-  onCompare: (outId?: number, inId?: number) => void;
   summary: MWSummary | null;
 }
 
-function FreeUserView({ buyTargets, sellPlayers, cashCows, traps, onUnlock, onCompare: _onCompare, summary }: FreeViewProps) {
-  const topBuy  = buyTargets[0] ?? null;
-  const topSell = sellPlayers[0] ?? null;
-  const topCow  = cashCows[0] ?? null;
-  const topTrap = traps[0] ?? null;
+function FreeUserView({ rawPlayers, onUnlock, summary }: FreeViewProps) {
+  const topBuy  = rawPlayers.find(p => p.category === "buy")   ?? null;
+  const topSell = rawPlayers.find(p => p.category === "sell")  ?? null;
+  const topCow  = rawPlayers.find(p => p.category === "cash_cow") ?? null;
+  const topTrap = rawPlayers.find(p => p.category === "trap")  ?? null;
 
-  const totalBuy  = summary?.buy_count ?? buyTargets.length;
-  const totalSell = summary?.sell_count ?? sellPlayers.length;
-  const totalCow  = summary?.cash_cow_count ?? cashCows.length;
-  const totalTrap = summary?.trap_count ?? traps.length;
+  const totalBuy  = summary?.buy_count   ?? rawPlayers.filter(p => p.category === "buy").length;
+  const totalSell = summary?.sell_count  ?? rawPlayers.filter(p => p.category === "sell").length;
+  const totalCow  = summary?.cash_cow_count ?? rawPlayers.filter(p => p.category === "cash_cow").length;
+  const totalTrap = summary?.trap_count  ?? rawPlayers.filter(p => p.category === "trap").length;
 
   const sections = [
     {

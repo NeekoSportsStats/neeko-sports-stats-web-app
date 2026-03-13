@@ -58,9 +58,14 @@ export function MarketWatchBanner({ summary, activeSection }: Props) {
 
   useEffect(() => {
     if (!activeSection || !scrollRef.current) return;
-    const activeBtn = scrollRef.current.querySelector(`[data-section="${activeSection}"]`) as HTMLElement | null;
+    const container = scrollRef.current;
+    const activeBtn = container.querySelector(`[data-section="${activeSection}"]`) as HTMLElement | null;
     if (!activeBtn) return;
-    activeBtn.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+    const btnLeft = activeBtn.offsetLeft;
+    const btnWidth = activeBtn.offsetWidth;
+    const containerWidth = container.offsetWidth;
+    const targetScrollLeft = btnLeft - containerWidth / 2 + btnWidth / 2;
+    container.scrollTo({ left: targetScrollLeft, behavior: "smooth" });
   }, [activeSection]);
 
   if (items.length === 0) return null;
