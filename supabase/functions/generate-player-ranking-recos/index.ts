@@ -8,31 +8,95 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+const ALLOWED_RECOMMENDATIONS = new Set(["START", "HOLD", "SIT", "BUY", "SELL"]);
+
 const RECOMMENDATION_COLORS: Record<string, string> = {
-  BUY: "green",
   START: "green",
+  BUY: "green",
   HOLD: "yellow",
   SIT: "orange",
   SELL: "red",
-  CAPTAIN: "gold",
 };
-
-function deriveColor(label: string | null | undefined): string {
-  if (!label) return "grey";
-  return RECOMMENDATION_COLORS[label.toUpperCase()] ?? "grey";
-}
-
-function extractFirstSentence(text: string): string {
-  if (!text) return "";
-  // Match text up to ". " followed by an uppercase letter (avoids cutting decimals)
-  const match = text.match(/^(.*?\.)(?:\s+[A-Z])/s);
-  if (match) return match[1].trim();
-  // Fallback: first 140 characters
-  return text.slice(0, 140);
-}
 
 const BATCH_SIZE = 30;
 const CONCURRENT = 5;
+
+const SYSTEM_PROMPT = `You are Neeko, a professional AFL fantasy analyst. Your role is to produce structured fantasy recommendations for coaches.
+
+Always respond with valid JSON only — no markdown, no prose outside the JSON.
+
+Required JSON format:
+{
+  "recommendation": "START",
+  "summary": "One sentence, max 20 words, explaining the recommendation clearly.",
+  "analysis": "2-4 sentences referencing scoring profile, ceiling, consistency, and value. Professional analyst tone."
+}
+
+Allowed values for recommendation: START, HOLD, SIT, BUY, SELL
+The summary must be one sentence, maximum 20 words.
+The analysis must be 2-4 sentences of plain prose — no bullet points, no markdown.`;
+
+function buildUserPrompt(payload: Record<string, unknown>, existingAnalysis: string | null): string {
+  const playerName = (payload.player_name as string) ?? "Unknown";
+  const team = (payload.team as string) ?? "";
+  const position = (payload.position as string) ?? "";
+  const projectionFinal = (payload.projection_final as number) ?? 0;
+  const ceilingEstimate = (payload.ceiling_estimate as number | null) ?? null;
+  const floorEstimate = (payload.floor_estimate as number | null) ?? null;
+  const consistencyScore = (payload.consistency_score as number) ?? 50;
+  const formRating = (payload.form_rating as number) ?? 50;
+  const captainScore = (payload.captain_score as number) ?? 0;
+  const riskRating = (payload.risk_rating as number | null) ?? null;
+  const confidence = (payload.confidence as number | null) ?? null;
+  const valueScore = (payload.value_score as number | null) ?? null;
+  const price = (payload.price as number | null) ?? null;
+  const aiRecommendation = (payload.ai_recommendation as string) ?? "HOLD";
+  const valueTag = (payload.value_tag as string | null) ?? null;
+  const neekoRating = (payload.neeko_rating as number | null) ?? null;
+
+  const statLines = [
+    `Projection: ${projectionFinal} pts`,
+    ceilingEstimate !== null ? `Ceiling: ${ceilingEstimate} pts` : null,
+    floorEstimate !== null ? `Floor: ${floorEstimate} pts` : null,
+    `Consistency: ${consistencyScore}/100`,
+    `Form: ${formRating}/100`,
+    `Captain Score: ${captainScore}/100`,
+    confidence !== null ? `Confidence: ${confidence}/100` : null,
+    riskRating !== null ? `Risk: ${riskRating}/100` : null,
+    neekoRating !== null ? `Neeko Rating: ${neekoRating}` : null,
+    valueScore !== null ? `Value Score: ${Number(valueScore).toFixed(1)}` : null,
+    price !== null ? `Price: $${Number(price).toLocaleString()}` : null,
+    valueTag !== null ? `Value Tag: ${valueTag}` : null,
+    `Suggested Action: ${aiRecommendation}`,
+  ].filter(Boolean).join("\n");
+
+  const analysisSection = existingAnalysis
+    ? `\nExisting analysis to use as context:\n"${existingAnalysis}"\n`
+    : "";
+
+  return `Generate a fantasy recommendation for ${playerName} (${team}, ${position}).
+
+Stats:
+${statLines}
+${analysisSection}
+Return only valid JSON with three fields: recommendation, summary, analysis.
+The recommendation must be one of: START, HOLD, SIT, BUY, SELL
+The summary must be one sentence, max 20 words.
+The analysis must be 2-4 sentences referencing the actual numbers above.`;
+}
+
+function validateRecommendation(label: string): string {
+  const upper = label.toUpperCase().trim();
+  if (ALLOWED_RECOMMENDATIONS.has(upper)) return upper;
+  return "HOLD";
+}
+
+function validateSummary(summary: string): string {
+  if (!summary) return "";
+  const words = summary.trim().split(/\s+/);
+  if (words.length <= 20) return summary.trim();
+  return words.slice(0, 20).join(" ") + ".";
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -47,7 +111,6 @@ Deno.serve(async (req: Request) => {
 
     const openai = new OpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY")! });
 
-    // Claim a batch of pending jobs
     const { data: jobs, error: jobsErr } = await supabase
       .from("ai_generation_queue")
       .select("id, entity_id, payload")
@@ -64,17 +127,32 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Mark all as processing
     const jobIds = jobs.map((j: any) => j.id);
     await supabase
       .from("ai_generation_queue")
       .update({ status: "processing", updated_at: new Date().toISOString() })
       .in("id", jobIds);
 
+    const playerIds = jobs.map((j: any) => {
+      const payload = j.payload ?? {};
+      const data = payload.data ?? payload;
+      return data.player_id ?? parseInt(j.entity_id);
+    }).filter(Boolean);
+
+    const { data: existingAnalysisRows } = await supabase
+      .from("ai_player_analysis")
+      .select("player_id, analysis")
+      .in("player_id", playerIds);
+
+    const analysisMap = new Map<number, string>(
+      (existingAnalysisRows ?? [])
+        .filter((r: any) => r.analysis)
+        .map((r: any) => [r.player_id, r.analysis])
+    );
+
     let processed = 0;
     let failed = 0;
 
-    // Process in concurrent batches
     for (let i = 0; i < jobs.length; i += CONCURRENT) {
       const batch = jobs.slice(i, i + CONCURRENT);
       await Promise.all(
@@ -82,86 +160,50 @@ Deno.serve(async (req: Request) => {
           try {
             const payload = job.payload ?? {};
             const data = payload.data ?? payload;
-            const playerId = data.player_id ?? parseInt(job.entity_id);
-            const playerName = data.player_name ?? "Unknown";
-            const team = data.team ?? "";
-            const position = data.position ?? "";
-            const projectionFinal = data.projection_final ?? 0;
-            const formRating = data.form_rating ?? 50;
-            const consistencyScore = data.consistency_score ?? 50;
-            const valueScore = data.value_score ?? null;
-            const price = data.price ?? null;
-            const captainScore = data.captain_score ?? 0;
-            const riskRating = data.risk_rating ?? null;
-            const confidence = data.confidence ?? data.projection_confidence ?? null;
-            const ceilingEstimate = data.ceiling_estimate ?? data.ceiling ?? null;
-            const floorEstimate = data.floor_estimate ?? data.floor ?? null;
-            const recommendationLabel = data.recommendation_label ?? payload.recommendation_label ?? "HOLD";
+            const playerId: number = data.player_id ?? parseInt(job.entity_id);
 
-            const systemPrompt = `You are Neeko, an AFL fantasy sports analyst. Write concise, data-driven player recommendations for fantasy coaches. Be direct, specific, and action-oriented. Reference actual numbers from the stats provided.`;
-
-            const statLines = [
-              `- Projection: ${projectionFinal} pts`,
-              ceilingEstimate !== null ? `- Ceiling: ${ceilingEstimate} pts` : null,
-              floorEstimate !== null ? `- Floor: ${floorEstimate} pts` : null,
-              `- Consistency: ${consistencyScore}/100`,
-              confidence !== null ? `- Confidence: ${confidence}/100` : null,
-              riskRating !== null ? `- Risk: ${riskRating}/100` : null,
-              valueScore !== null ? `- Value score: ${Number(valueScore).toFixed(1)}` : null,
-              price !== null ? `- Price: $${Number(price).toLocaleString()}` : null,
-              `- Form rating: ${formRating}/100`,
-              `- Captain score: ${captainScore}/100`,
-              `- Recommendation: ${recommendationLabel}`,
-            ].filter(Boolean).join("\n");
-
-            const userPrompt = `Write a 2-3 sentence AFL fantasy recommendation for ${playerName} (${team}, ${position}).
-
-Stats:
-${statLines}
-
-Rules:
-- Sentence 1: projection or value insight with specific numbers
-- Sentence 2: form/consistency/risk insight
-- Sentence 3: clear action statement matching the ${recommendationLabel} recommendation
-- Plain text only. No markdown. No bullet points.`;
+            const existingAnalysis = analysisMap.get(playerId) ?? null;
 
             const completion = await openai.chat.completions.create({
               model: "gpt-4o-mini",
               messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt },
+                { role: "system", content: SYSTEM_PROMPT },
+                { role: "user", content: buildUserPrompt(data, existingAnalysis) },
               ],
-              temperature: 0.7,
-              max_tokens: 200,
+              temperature: 0.5,
+              max_tokens: 350,
+              response_format: { type: "json_object" },
             });
 
-            const recommendationLong = completion.choices[0]?.message?.content?.trim() ?? "";
-            const recommendationShort = extractFirstSentence(recommendationLong);
-            const recommendationColor = deriveColor(recommendationLabel);
+            const raw = completion.choices[0]?.message?.content ?? "{}";
+            const result = JSON.parse(raw);
 
-            // Upsert into ai_rankings_player_recos — always write all three fields
+            const recommendationLabel = validateRecommendation(result.recommendation ?? "HOLD");
+            const recommendationShort = validateSummary(result.summary ?? "");
+            const recommendationLong = existingAnalysis ?? (result.analysis ?? "");
+            const recommendationColor = RECOMMENDATION_COLORS[recommendationLabel] ?? "grey";
+
             const { error: upsertErr } = await supabase
               .from("ai_rankings_player_recos")
               .upsert(
                 {
                   player_id: playerId,
                   season: 2026,
-                  recommendation_label: recommendationLabel.toUpperCase(),
+                  recommendation_label: recommendationLabel,
                   recommendation_short: recommendationShort,
                   recommendation_long: recommendationLong,
                   recommendation_color: recommendationColor,
                   generated_at: new Date().toISOString(),
                   updated_at: new Date().toISOString(),
                   input_hash: payload.input_hash ?? null,
-                  value_score: valueScore,
-                  price: price,
+                  value_score: data.value_score ?? null,
+                  price: data.price ?? null,
                 },
                 { onConflict: "player_id" }
               );
 
             if (upsertErr) throw upsertErr;
 
-            // Mark job complete
             await supabase
               .from("ai_generation_queue")
               .update({
@@ -173,14 +215,11 @@ Rules:
 
             processed++;
           } catch (err: any) {
-            console.error(`Job ${job.id} failed:`, err.message);
+            console.error(`[generate-player-ranking-recos] Job ${job.id} failed:`, err.message);
             failed++;
             await supabase
               .from("ai_generation_queue")
-              .update({
-                status: "failed",
-                updated_at: new Date().toISOString(),
-              })
+              .update({ status: "failed", updated_at: new Date().toISOString() })
               .eq("id", job.id);
           }
         })
@@ -192,7 +231,7 @@ Rules:
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
-    console.error("generate-player-ranking-recos error:", err);
+    console.error("[generate-player-ranking-recos] Fatal error:", err);
     return new Response(
       JSON.stringify({ error: err.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

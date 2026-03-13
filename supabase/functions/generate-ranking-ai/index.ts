@@ -27,40 +27,16 @@ interface PlayerInput {
   input_hash: string | null;
 }
 
-interface AIResult {
-  analysis: string;
-  captain_recommendation: string;
-}
+const SYSTEM_PROMPT = `You are a professional AFL fantasy analyst. Your role is to produce concise, data-driven extended analysis of AFL players for fantasy coaches.
 
-interface PromptRecord {
-  system_prompt: string;
-  user_prompt_template: string;
-}
+Always respond with valid JSON only — no markdown, no prose outside the JSON.
 
-async function loadPrompt(supabase: ReturnType<typeof createClient>): Promise<PromptRecord> {
-  const { data, error } = await supabase
-    .schema("afl")
-    .from("ai_prompts")
-    .select("system_prompt, user_prompt_template")
-    .eq("prompt_key", "player_ai_analysis")
-    .eq("is_active", true)
-    .order("version", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+Required JSON format:
+{
+  "analysis": "2-4 sentences covering scoring profile, ceiling potential, consistency, and value for price. Reference actual numbers. Professional analyst tone."
+}`;
 
-  if (error || !data) {
-    return {
-      system_prompt:
-        "You are a professional AFL fantasy analyst. Return only valid JSON with 'analysis' and 'captain' fields.",
-      user_prompt_template:
-        "Analyse this AFL player using the following dataset:\n\n{DATA}\n\nProvide elite fantasy analysis describing expected performance, reliability and risk.",
-    };
-  }
-
-  return data as PromptRecord;
-}
-
-function buildPlayerDataString(player: PlayerInput): string {
+function buildUserPrompt(player: PlayerInput): string {
   const priceFormatted = player.price != null
     ? `$${(player.price / 1000).toFixed(0)}k`
     : "N/A";
@@ -68,38 +44,34 @@ function buildPlayerDataString(player: PlayerInput): string {
     ? player.value_score.toFixed(2)
     : "N/A";
 
-  return `Player: ${player.player_name}
+  return `Generate extended fantasy analysis for the following AFL player.
+
+Player: ${player.player_name}
 Team: ${player.team}
-Projection: ${player.projection_final}
-Ceiling: ${player.ceiling_estimate}
-Floor: ${player.floor_estimate}
-Consistency Score: ${player.consistency_score}
+Projection: ${player.projection_final} pts
+Ceiling: ${player.ceiling_estimate} pts
+Floor: ${player.floor_estimate} pts
+Consistency Score: ${player.consistency_score}/100
 3-Game vs 10-Game Trend: ${player.trend_3_vs_10}
 Matchup Delta: ${player.matchup_delta}
 Price: ${priceFormatted}
 Value Score: ${valueFormatted}
 Value Tag: ${player.value_tag ?? "N/A"}
 
-Respond with a JSON object containing exactly two fields:
-- "analysis": 2-3 sentence premium analysis covering expected scoring, ceiling potential and risk, consistency, and value for price. Plain prose only, no bullet points.
-- "captain": ONE short sentence (max 20 words) on captain suitability.
-
-Return only valid JSON, no markdown.`;
+Return only valid JSON with one field: "analysis"
+The analysis must be 2-4 sentences, plain prose, no bullet points.
+Reference actual numbers from the stats above.`;
 }
 
-async function generateForPlayer(
+async function generateAnalysis(
   openai: OpenAI,
-  player: PlayerInput,
-  prompt: PromptRecord
-): Promise<AIResult> {
-  const dataString = buildPlayerDataString(player);
-  const userContent = prompt.user_prompt_template.replace("{DATA}", dataString);
-
+  player: PlayerInput
+): Promise<string> {
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: prompt.system_prompt },
-      { role: "user", content: userContent },
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: buildUserPrompt(player) },
     ],
     temperature: 0.4,
     max_tokens: 400,
@@ -108,11 +80,13 @@ async function generateForPlayer(
 
   const raw = completion.choices[0]?.message?.content ?? "{}";
   const parsed = JSON.parse(raw);
+  const analysis = parsed.analysis ?? "";
 
-  return {
-    analysis: parsed.analysis ?? "",
-    captain_recommendation: parsed.captain ?? "",
-  };
+  if (!analysis || analysis.length < 10) {
+    throw new Error(`Analysis too short for player ${player.player_id}`);
+  }
+
+  return analysis;
 }
 
 Deno.serve(async (req: Request) => {
@@ -133,8 +107,6 @@ Deno.serve(async (req: Request) => {
     const batchNumber: number = body.batch_number ?? 1;
     const processedSoFar: number = body.processed_so_far ?? 0;
 
-    const prompt = await loadPrompt(supabase);
-
     const { data: allCandidates, error: countError } = await supabase
       .from("v_ai_player_analysis_input")
       .select("player_id, input_hash");
@@ -151,7 +123,10 @@ Deno.serve(async (req: Request) => {
       : { data: [] };
 
     const storedHashMap = new Map<number, string | null>(
-      (existingAnalysis.data ?? []).map((r: { player_id: number; input_hash: string | null }) => [r.player_id, r.input_hash])
+      (existingAnalysis.data ?? []).map((r: { player_id: number; input_hash: string | null }) => [
+        r.player_id,
+        r.input_hash,
+      ])
     );
 
     const needsGeneration = candidates.filter((c: { player_id: number; input_hash: string | null }) => {
@@ -186,7 +161,7 @@ Deno.serve(async (req: Request) => {
           .eq("id", runId);
       }
 
-      console.log("[generate-ranking-ai] No players need generation — skipping OpenAI calls");
+      console.log("[generate-ranking-ai] No players need generation — skipping");
 
       return new Response(
         JSON.stringify({
@@ -217,8 +192,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const batchSlice = needsGeneration.slice(0, Math.min(BATCH_SIZE, remainingBudget));
-
     const playerIds = batchSlice.map((c: { player_id: number }) => c.player_id);
+
     const { data: playerData, error: fetchError } = await supabase
       .from("v_ai_player_analysis_input")
       .select("*")
@@ -228,7 +203,9 @@ Deno.serve(async (req: Request) => {
 
     const players = (playerData ?? []) as PlayerInput[];
 
-    console.log(`[generate-ranking-ai] Batch ${batchNumber}: selected=${players.length} players_needing_gen=${totalNeedingGeneration} processed_so_far=${processedSoFar} budget_remaining=${remainingBudget}`);
+    console.log(
+      `[generate-ranking-ai] Batch ${batchNumber}: selected=${players.length} needing=${totalNeedingGeneration} processed_so_far=${processedSoFar}`
+    );
 
     const upsertRows = [];
     let batchProcessed = 0;
@@ -236,20 +213,19 @@ Deno.serve(async (req: Request) => {
 
     for (const player of players) {
       try {
-        const result = await generateForPlayer(openai, player, prompt);
+        const analysis = await generateAnalysis(openai, player);
         upsertRows.push({
           player_id: player.player_id,
           player_name: player.player_name,
           team: player.team,
           projection_final: player.projection_final,
-          analysis: result.analysis,
-          captain_recommendation: result.captain_recommendation,
+          analysis,
           input_hash: player.input_hash,
           generated_at: new Date().toISOString(),
         });
         batchProcessed++;
       } catch (err) {
-        console.error(`[generate-ranking-ai] Error processing ${player.player_name}:`, err);
+        console.error(`[generate-ranking-ai] Error for ${player.player_name}:`, err);
         batchErrors++;
       }
     }
@@ -260,7 +236,7 @@ Deno.serve(async (req: Request) => {
         .upsert(upsertRows, { onConflict: "player_id" });
 
       if (upsertError) {
-        console.error("[generate-ranking-ai] Batch upsert error:", upsertError);
+        console.error("[generate-ranking-ai] Upsert error:", upsertError);
         throw upsertError;
       }
     }
@@ -269,11 +245,9 @@ Deno.serve(async (req: Request) => {
     const remaining = Math.max(0, totalNeedingGeneration - newProcessedTotal);
     const canContinue = remaining > 0 && batchProcessed > 0 && newProcessedTotal < MAX_PLAYERS_PER_RUN;
 
-    console.log(`[generate-ranking-ai] Batch ${batchNumber} complete: generated=${batchProcessed} errors=${batchErrors} remaining=${remaining} model=gpt-4o-mini`);
-    console.log("AI batch run", {
-      players_selected: players.length,
-      players_generated: batchProcessed,
-    });
+    console.log(
+      `[generate-ranking-ai] Batch ${batchNumber} complete: generated=${batchProcessed} errors=${batchErrors} remaining=${remaining}`
+    );
 
     if (runId) {
       const { data: runData } = await supabase
