@@ -11,16 +11,16 @@ import {
 
 // ─── Column widths ─────────────────────────────────────────────────────────────
 const COL = {
-  rank: 28,
-  player: 145,
-  rating: 80,
-  projection: 76,
-  confidence: 76,
-  risk: 76,
-  price: 88,
-  value: 96,
-  aiRec: 110,
-  why: 280,
+  rank: 24,
+  player: 128,
+  rating: 76,
+  projection: 72,
+  confidence: 72,
+  risk: 72,
+  price: 84,
+  value: 90,
+  aiRec: 100,
+  why: 260,
 } as const;
 
 // Only rank + player are sticky now
@@ -78,8 +78,8 @@ function TableHeader({ isPremium }: { isPremium: boolean }) {
         className="flex shrink-0 sticky left-0 z-30 bg-[#0a0a0a]"
         style={{ width: FIXED_W }}
       >
-        <div className={`${HEADER_BASE} pl-3`} style={{ width: COL.rank }}>#</div>
-        <div className={`${HEADER_BASE} pl-2`} style={{ width: COL.player }}>Player</div>
+        <div className={`${HEADER_BASE} pl-2`} style={{ width: COL.rank }}>#</div>
+        <div className={`${HEADER_BASE} pl-1.5`} style={{ width: COL.player }}>Player</div>
       </div>
 
       {/* Scrollable columns — Neeko is now first scrollable col */}
@@ -141,20 +141,20 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
         className="flex shrink-0 sticky left-0 z-10 bg-[#070707] cursor-pointer active:bg-white/[0.05] transition-colors"
         style={{ width: FIXED_W }}
       >
-        <div className={`${CELL_BASE} pl-3 text-xs text-white/30 tabular-nums`} style={{ width: COL.rank }}>
+        <div className={`${CELL_BASE} pl-2 text-[11px] text-white/30 tabular-nums`} style={{ width: COL.rank }}>
           {idx + 1}
         </div>
-        <div className={`${CELL_BASE} pl-2 min-w-0`} style={{ width: COL.player, maxWidth: COL.player }}>
+        <div className={`${CELL_BASE} pl-1.5 min-w-0`} style={{ width: COL.player, maxWidth: COL.player }}>
           <div className="min-w-0 w-full">
             <div className="flex items-center gap-1 min-w-0">
-              <span className="text-[12px] font-semibold text-white truncate leading-tight max-w-[118px]">{row.player_name}</span>
+              <span className="text-[11px] font-semibold text-white truncate leading-tight max-w-[100px]">{row.player_name}</span>
               {!isPremium && isUnlocked && (
-                <span className="shrink-0 rounded-sm bg-[#F5C84C]/15 px-1 py-px text-[8px] font-semibold text-[#F5C84C] uppercase">
+                <span className="shrink-0 rounded-sm bg-[#F5C84C]/15 px-0.5 py-px text-[7px] font-semibold text-[#F5C84C] uppercase">
                   Free
                 </span>
               )}
             </div>
-            <div className="text-[9px] text-white/35 truncate mt-px max-w-[118px]">
+            <div className="text-[9px] text-white/30 truncate mt-px max-w-[100px]">
               {row.team}{row.position ? ` · ${row.position}` : ""}
             </div>
           </div>
@@ -293,13 +293,13 @@ function LoadingSkeleton() {
       {Array.from({ length: 8 }).map((_, i) => (
         <div key={i} className="flex border-b border-white/[0.04]" style={{ width: TABLE_W, minWidth: TABLE_W }}>
           <div className="flex shrink-0 sticky left-0 bg-[#070707]" style={{ width: FIXED_W }}>
-            <div className={`${CELL_BASE} pl-3`} style={{ width: COL.rank }}>
-              <div className="h-3 w-4 animate-pulse rounded bg-white/8" />
+            <div className={`${CELL_BASE} pl-2`} style={{ width: COL.rank }}>
+              <div className="h-3 w-3 animate-pulse rounded bg-white/8" />
             </div>
-            <div className={`${CELL_BASE} pl-2`} style={{ width: COL.player }}>
+            <div className={`${CELL_BASE} pl-1.5`} style={{ width: COL.player }}>
               <div className="space-y-1.5">
-                <div className="h-3 w-28 animate-pulse rounded bg-white/8" />
-                <div className="h-2 w-16 animate-pulse rounded bg-white/5" />
+                <div className="h-3 w-20 animate-pulse rounded bg-white/8" />
+                <div className="h-2 w-12 animate-pulse rounded bg-white/5" />
               </div>
             </div>
           </div>

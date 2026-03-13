@@ -8,7 +8,7 @@ export interface RankingRow {
   floor_estimate: number | null;
   consistency_score: number | null;
   form_rating: number | null;
-  matchup_rating: number | null;
+  matchup_rating: string | number | null;
   upside_rating: number | null;
   risk_rating: number | null;
   projection_confidence: number | null;

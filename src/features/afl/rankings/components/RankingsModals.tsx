@@ -7,7 +7,7 @@ import {
   RankingRow, ScoreHistoryPoint, RowTier,
 } from "./types";
 import {
-  fmt, fmtInt, fmtPrice, fmtValueScore,
+  fmt, fmtInt, fmtPrice, fmtValueScore, fmtMatchup,
   getCaptainStyle, getValueTagStyle, getNeekoRatingBadge, getRiskBadge,
   getConsistencyBadge, getConfidenceColor, getValueScoreColor,
   getFormColor, getMatchupColor, getUpsideColor, getRiskColor,
@@ -373,7 +373,8 @@ export function PlayerDetailModal({
     return "Below Average";
   })();
   const valueLabelStyle = getValueTagStyle(valueLabel);
-  const hasMatchup = row.matchup_rating != null && Number(row.matchup_rating) > 0;
+  const matchupLabel = fmtMatchup(row.matchup_rating);
+  const hasMatchup = matchupLabel != null && matchupLabel !== "Neutral";
 
   if (isPartial) {
     return (
@@ -420,9 +421,15 @@ export function PlayerDetailModal({
               </div>
               <div className="rounded-lg bg-white/5 px-3 py-3">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Confidence</p>
-                <p className={`text-base font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence ?? null)}`}>
-                  {row.projection_confidence != null ? `${fmtInt(row.projection_confidence)}%` : "—"}
-                </p>
+                {(() => {
+                  const raw = row.projection_confidence;
+                  const display = raw != null ? Math.round(60 + (raw - 60) * 0.7) : null;
+                  return (
+                    <p className={`text-base font-semibold tabular-nums ${getConfidenceColor(display)}`}>
+                      {display != null ? `${display}%` : "—"}
+                    </p>
+                  );
+                })()}
               </div>
               <div className="rounded-lg bg-white/5 px-3 py-3">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Risk</p>
@@ -579,19 +586,16 @@ export function PlayerDetailModal({
                 </p>
                 <p className={`text-sm font-semibold ${getFormColor(row.form_rating ?? null)}`}>{fmtInt(row.form_rating)}</p>
               </div>
-              {hasMatchup ? (
-                <div className="rounded-lg bg-white/5 px-3 py-3">
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1 flex items-center gap-0.5">
-                    Matchup <InfoTooltip text="Opponent difficulty — higher means an easier matchup" />
-                  </p>
-                  <p className={`text-sm font-semibold ${getMatchupColor(row.matchup_rating ?? null)}`}>{fmtInt(row.matchup_rating)}</p>
-                </div>
-              ) : (
-                <div className="rounded-lg bg-white/5 px-3 py-3">
-                  <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Matchup</p>
+              <div className="rounded-lg bg-white/5 px-3 py-3">
+                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1 flex items-center gap-0.5">
+                  Matchup {hasMatchup && <InfoTooltip text="Opponent difficulty for this round" />}
+                </p>
+                {matchupLabel ? (
+                  <p className={`text-sm font-semibold ${getMatchupColor(row.matchup_rating ?? null)}`}>{matchupLabel}</p>
+                ) : (
                   <p className="text-[11px] text-white/25 italic">Pre-season</p>
-                </div>
-              )}
+                )}
+              </div>
               <div className="rounded-lg bg-white/5 px-3 py-3">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1 flex items-center gap-0.5">
                   Upside <InfoTooltip text="Potential to significantly exceed projection based on ceiling gap" />

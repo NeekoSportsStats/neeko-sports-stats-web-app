@@ -30,6 +30,42 @@ export function getDisplayRecommendation(row: RankingRow, tab: RankingsTab): str
   return rec;
 }
 
+// ─── Matchup display helper ───────────────────────────────────────────────────
+
+export function fmtMatchup(v: string | number | null): string | null {
+  if (v == null) return null;
+  if (typeof v === "string") {
+    const u = v.toUpperCase().trim();
+    if (!u || u === "0") return null;
+    const MAP: Record<string, string> = {
+      "ELITE MATCHUP": "Elite",
+      "FAVOURABLE": "Favourable",
+      "NEUTRAL": "Neutral",
+      "DIFFICULT": "Difficult",
+      "BRUTAL": "Brutal",
+    };
+    return MAP[u] ?? v;
+  }
+  if (isNaN(Number(v)) || Number(v) === 0) return null;
+  return Math.round(Number(v)).toString();
+}
+
+// ─── Generic AI text detector ─────────────────────────────────────────────────
+
+const GENERIC_OPENINGS = [
+  /^[\w\s]+ has a solid projection of \d/i,
+  /^[\w\s]+ has a strong projection of \d/i,
+  /^[\w\s]+ has an impressive projection of \d/i,
+  /^[\w\s]+ is projected to score \d/i,
+  /^[\w\s]+ carries a projection of \d/i,
+  /^[\w\s]+ boasts a projection of \d/i,
+];
+
+export function isGenericAIText(text: string | null | undefined): boolean {
+  if (!text) return false;
+  return GENERIC_OPENINGS.some((p) => p.test(text.trim()));
+}
+
 // ─── Position normalisation ───────────────────────────────────────────────────
 
 const POSITION_MAP: Record<string, PositionFilter> = {
@@ -95,8 +131,17 @@ export function getFormColor(v: number | null): string {
   return "text-red-400";
 }
 
-export function getMatchupColor(v: number | null): string {
+export function getMatchupColor(v: number | string | null): string {
   if (v == null) return "text-white/30";
+  if (typeof v === "string") {
+    const u = v.toUpperCase();
+    if (u.includes("ELITE")) return "text-green-400";
+    if (u === "FAVOURABLE") return "text-emerald-400";
+    if (u === "NEUTRAL") return "text-white/50";
+    if (u === "DIFFICULT") return "text-orange-400";
+    if (u === "BRUTAL") return "text-red-400";
+    return "text-white/40";
+  }
   if (v >= 85) return "text-green-400";
   if (v >= 70) return "text-emerald-400";
   if (v >= 55) return "text-white/60";
@@ -366,16 +411,27 @@ export function safeWhyText(row: {
   ai_summary?: string | null;
 }): string | null {
   const short = (row.recommendation_short ?? "").trim();
-  if (short.length >= 30 && short.split(/\s+/).filter(Boolean).length >= 6) {
-    return short;
-  }
   const why = (row.recommendation_why ?? "").trim();
-  if (why.length >= 20) {
-    return why.length > 200 ? why.slice(0, 197) + "…" : why;
-  }
   const summary = (row.ai_summary ?? "").trim();
-  if (summary.length >= 20) {
-    return summary.length > 200 ? summary.slice(0, 197) + "…" : summary;
+
+  const shortIsGeneric = isGenericAIText(short);
+  const whyIsGeneric = isGenericAIText(why);
+
+  if (short.length >= 30 && short.split(/\s+/).filter(Boolean).length >= 6 && !shortIsGeneric) {
+    return short.length > 220 ? short.slice(0, 217) + "…" : short;
   }
+
+  if (why.length >= 20 && !whyIsGeneric && why !== short) {
+    return why.length > 220 ? why.slice(0, 217) + "…" : why;
+  }
+
+  if (summary.length >= 20) {
+    return summary.length > 220 ? summary.slice(0, 217) + "…" : summary;
+  }
+
+  if (short.length >= 30) {
+    return short.length > 220 ? short.slice(0, 217) + "…" : short;
+  }
+
   return null;
 }
