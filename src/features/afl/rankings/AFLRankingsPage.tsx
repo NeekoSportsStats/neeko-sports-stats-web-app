@@ -209,7 +209,7 @@ export default function AFLRankingsPage() {
   setHighlightedPlayerId(null);
 
   const { data, error } = await supabase
-    .from("afl.v_rankings_final")
+    .from("v_rankings_final")
     .select("*")
     .limit(750);
 
