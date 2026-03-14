@@ -223,32 +223,42 @@ export default function AFLRankingsPage() {
     const normalized: RankingRow[] = ((data as any[]) ?? []).map((r) => ({
       player_id: r.player_id,
       player_name: r.player_name,
-      team: r.team_name,
-      position: normalisePosition(r.position_group),
-      projection_final: r.projection,
-      ceiling_estimate: r.ceiling,
-      floor_estimate: r.floor,
-      consistency_score: r.consistency,
-      form_rating: r.form_score,
-      neeko_rating: r.neeko_rating,
-      projection_confidence: r.projection_confidence,
-      risk_rating: r.risk_rating,
-      matchup_rating: r.matchup_rating,
-      upside_rating: r.upside_rating,
-      captain_score: r.captain_score,
-      captain_rating: r.captain_rating,
-      price: r.price,
-      value_score: r.value_score,
-      value_tag: r.value_tag,
-      value_tier: r.value_tier,
-      ai_recommendation: r.ai_recommendation,
-      ai_summary: r.ai_summary,
-      ai_updated_at: r.ai_updated_at,
+
+      team: r.team ?? r.team_name ?? null,
+      position: normalisePosition(r.position ?? r.position_group ?? null),
+
+      projection_final: Number(r.projection_final ?? r.projection ?? 0),
+
+      ceiling_estimate: Number(r.ceiling_estimate ?? r.ceiling ?? 0),
+      floor_estimate: Number(r.floor_estimate ?? r.floor ?? 0),
+
+      consistency_score: Number(r.consistency_score ?? r.consistency ?? 0),
+      form_rating: Number(r.form_rating ?? r.form_score ?? 0),
+
+      neeko_rating: Number(r.neeko_rating ?? 0),
+
+      projection_confidence: r.projection_confidence ?? null,
+      risk_rating: r.risk_rating ?? null,
+      matchup_rating: r.matchup_rating ?? null,
+      upside_rating: r.upside_rating ?? null,
+      captain_score: r.captain_score ?? null,
+      captain_rating: r.captain_rating ?? null,
+
+      price: r.price ?? null,
+      value_score: r.value_score ? Number(r.value_score) : null,
+      value_tag: r.value_tag ?? null,
+      value_tier: r.value_tier ?? null,
+
+      ai_recommendation: r.ai_recommendation ?? null,
+      ai_summary: r.ai_summary ?? null,
+      ai_updated_at: r.ai_updated_at ?? null,
+
       recommendation_short: r.recommendation_short ?? null,
-      recommendation_why: r.recommendation_why,
-      recommendation_color: r.recommendation_color,
-      consistency_tier: r.consistency_tier,
-      total_count: r.total_count,
+      recommendation_why: r.recommendation_why ?? null,
+      recommendation_color: r.recommendation_color ?? null,
+
+      consistency_tier: r.consistency_tier ?? null,
+      total_count: r.total_count ?? null,
     }));
 
     setRows(normalized);
