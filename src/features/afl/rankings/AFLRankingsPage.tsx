@@ -204,19 +204,21 @@ export default function AFLRankingsPage() {
   }, []);
 
   const fetchRankings = useCallback(async () => {
-    setLoading(true);
-    setSelected(null);
-    setHighlightedPlayerId(null);
+  setLoading(true);
+  setSelected(null);
+  setHighlightedPlayerId(null);
 
-    const posArg = positionFilter === "ALL" ? "ALL" : positionFilter;
-    const sortArg = TAB_SORT_KEY[activeTab];
-    const rpc = isPremium ? "get_rankings_premium" : "get_rankings_free";
+  const { data, error } = await supabase
+    .from("v_rankings_final")
+    .select("*")
+    .limit(750);
 
-    const { data } = await supabase.rpc(rpc, {
-      position_filter: posArg,
-      sort_key: sortArg,
-      limit_n: 750,
-    });
+  if (error) {
+    console.error("Rankings fetch error:", error);
+    setRows([]);
+    setLoading(false);
+    return;
+  }
 
     const normalized: RankingRow[] = ((data as any[]) ?? []).map((r) => ({
       player_id: r.player_id,
