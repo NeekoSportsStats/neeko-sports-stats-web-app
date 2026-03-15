@@ -1388,10 +1388,15 @@ export default function Index() {
           style={{
             backgroundImage: "url(/hero.jpg)",
             backgroundSize: "cover",
-            backgroundPosition: "center 70%",
+            backgroundPosition: "center 65%",
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/65 to-[#070707]" />
+        <div
+          className="absolute inset-0"
+          style={{
+            background: "linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.75) 60%, #070707 100%)",
+          }}
+        />
 
         <div className="relative z-10 w-full max-w-4xl mx-auto px-5 py-16 md:py-24 text-center">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#F5C84C]/35 bg-[#F5C84C]/10 text-[#F5C84C] text-[11px] font-bold uppercase tracking-widest mb-7">
@@ -1399,11 +1404,11 @@ export default function Index() {
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-[5.5rem] font-extrabold leading-[1.08] tracking-tight mb-6">
-            Win AFL Fantasy With Data-Driven Weekly Decisions
+            Win Your AFL Fantasy League With Smarter Weekly Picks
           </h1>
 
           <p className="text-base md:text-xl text-neutral-400 font-medium mb-10 max-w-2xl mx-auto leading-relaxed px-1">
-            Projection models, matchup analysis and AI insights that help you pick better captains, avoid traps and identify breakout players before the market reacts.
+            AI-powered rankings, captain picks and breakout alerts updated before every AFL Fantasy round lockout.
           </p>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-center sm:items-center px-2 sm:px-0">
@@ -1413,7 +1418,7 @@ export default function Index() {
                 className="flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-8 rounded-xl hover:brightness-110 transition-all shadow-[0_4px_30px_rgba(245,200,76,0.25)] min-h-[52px] w-full sm:w-auto"
               >
                 <Crown size={15} />
-                Start Winning With Neeko+
+                Unlock The Weekly Edge
               </Link>
             )}
             <Link
@@ -1430,7 +1435,7 @@ export default function Index() {
           </div>
 
           <p className="mt-5 text-[12px] text-white/30 font-medium tracking-wide">
-            Updated before every AFL Fantasy round lockout
+            600+ players ranked and updated every AFL Fantasy round.
           </p>
         </div>
       </section>
