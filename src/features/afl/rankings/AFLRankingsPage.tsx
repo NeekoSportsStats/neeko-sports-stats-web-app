@@ -165,12 +165,19 @@ function SearchAutocomplete({
   );
 }
 
+const INITIAL_LIMIT = 50;
+const LOAD_MORE_STEP = 50;
+const TABLE_COLUMNS_NO_SUMMARY = "player_id,player_name,team,position,team_name,position_group,projection_final,ceiling,floor,ceiling_estimate,floor_estimate,consistency_score,form_rating,neeko_rating,price,value_score,value_tag,value_tier,ai_recommendation,recommendation_short,recommendation_why,recommendation_color,ai_updated_at,projection_confidence,risk_rating,matchup_rating,upside_rating,captain_score,captain_rating,consistency_tier,total_count,cached_at";
+
 export default function AFLRankingsPage() {
   const { isPremium } = useAuth();
 
   const [activeTab, setActiveTab] = useState<RankingsTab>("best");
   const [rows, setRows] = useState<RankingRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [currentLimit, setCurrentLimit] = useState(INITIAL_LIMIT);
+  const [totalRows, setTotalRows] = useState<number | null>(null);
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
   const [premiumFilter, setPremiumFilter] = useState<PremiumFilter>("ALL");
   const [searchTerm, setSearchTerm] = useState("");
@@ -203,71 +210,98 @@ export default function AFLRankingsPage() {
     fetchUpdatedAt();
   }, []);
 
-  const fetchRankings = useCallback(async () => {
-  setLoading(true);
-  setSelected(null);
-  setHighlightedPlayerId(null);
-
-  const query = isPremium
-    ? supabase.from("v_rankings_final").select("*").order("neeko_rating", { ascending: false }).limit(750)
-    : supabase.from("v_rankings_free").select("*").order("neeko_rating", { ascending: false });
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("Rankings fetch error:", error);
-    setRows([]);
-    setLoading(false);
-    return;
-  }
-
-    const normalized: RankingRow[] = ((data as any[]) ?? []).map((r) => ({
+  function normalizeRow(r: any): RankingRow {
+    return {
       player_id: r.player_id,
       player_name: r.player_name,
-
       team: r.team ?? r.team_name ?? null,
       position: normalisePosition(r.position ?? r.position_group ?? null),
-
       projection_final: Number(r.projection_final ?? r.projection ?? 0),
-
       ceiling_estimate: Number(r.ceiling_estimate ?? r.ceiling ?? 0),
       floor_estimate: Number(r.floor_estimate ?? r.floor ?? 0),
-
       consistency_score: Number(r.consistency_score ?? r.consistency ?? 0),
       form_rating: Number(r.form_rating ?? r.form_score ?? 0),
-
       neeko_rating: Number(r.neeko_rating ?? 0),
-
       projection_confidence: r.projection_confidence ?? null,
       risk_rating: r.risk_rating ?? null,
       matchup_rating: r.matchup_rating ?? null,
       upside_rating: r.upside_rating ?? null,
       captain_score: r.captain_score ?? null,
       captain_rating: r.captain_rating ?? null,
-
       price: r.price ?? null,
       value_score: r.value_score ? Number(r.value_score) : null,
       value_tag: r.value_tag ?? null,
       value_tier: r.value_tier ?? null,
-
       ai_recommendation: r.ai_recommendation ?? null,
-      ai_summary: r.ai_summary ?? null,
+      ai_summary: null,
       ai_updated_at: r.ai_updated_at ?? null,
-
       recommendation_short: r.recommendation_short ?? null,
       recommendation_why: r.recommendation_why ?? null,
       recommendation_color: r.recommendation_color ?? null,
-
       consistency_tier: r.consistency_tier ?? null,
       total_count: r.total_count ?? null,
-    }));
+    };
+  }
 
-    setRows(normalized);
+  const fetchRankings = useCallback(async (limit: number = INITIAL_LIMIT) => {
+    setLoading(true);
+    setSelected(null);
+    setHighlightedPlayerId(null);
+    setCurrentLimit(limit);
+
+    if (isPremium) {
+      const { data, error, count } = await supabase
+        .from("v_rankings_final")
+        .select(TABLE_COLUMNS_NO_SUMMARY, { count: "exact" })
+        .order("neeko_rating", { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error("Rankings fetch error:", error);
+        setRows([]);
+        setLoading(false);
+        return;
+      }
+      setRows(((data as any[]) ?? []).map(normalizeRow));
+      setTotalRows(count ?? null);
+    } else {
+      const { data, error } = await supabase
+        .from("v_rankings_free")
+        .select(TABLE_COLUMNS_NO_SUMMARY)
+        .order("neeko_rating", { ascending: false });
+
+      if (error) {
+        console.error("Rankings fetch error:", error);
+        setRows([]);
+        setLoading(false);
+        return;
+      }
+      setRows(((data as any[]) ?? []).map(normalizeRow));
+      setTotalRows(null);
+    }
+
     setLoading(false);
   }, [isPremium, positionFilter, activeTab]);
 
+  const handleLoadMore = useCallback(async () => {
+    const nextLimit = currentLimit + LOAD_MORE_STEP;
+    setLoadingMore(true);
+
+    const { data, error } = await supabase
+      .from("v_rankings_final")
+      .select(TABLE_COLUMNS_NO_SUMMARY)
+      .order("neeko_rating", { ascending: false })
+      .range(currentLimit, nextLimit - 1);
+
+    if (!error && data) {
+      setRows((prev) => [...prev, ...((data as any[]).map(normalizeRow))]);
+      setCurrentLimit(nextLimit);
+    }
+    setLoadingMore(false);
+  }, [currentLimit]);
+
   useEffect(() => {
-    fetchRankings();
+    fetchRankings(INITIAL_LIMIT);
   }, [fetchRankings]);
 
   function handleTabChange(tab: RankingsTab) {
@@ -277,6 +311,7 @@ export default function AFLRankingsPage() {
     setDebouncedSearch("");
     setSortKey(TAB_DEFAULT_SORT[tab]);
     setSortDir("desc");
+    setCurrentLimit(INITIAL_LIMIT);
   }
 
   function handleSortClick(col: SortKey) {
@@ -496,6 +531,20 @@ export default function AFLRankingsPage() {
               </tbody>
             </table>
           </div>
+
+          {isPremium && !loading && totalRows != null && currentLimit < totalRows && !debouncedSearch.trim() && premiumFilter === "ALL" && (
+            <div className="mt-4 flex flex-col items-center gap-2">
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="rounded-xl border border-white/10 bg-white/[0.03] px-6 py-2.5 text-sm font-medium text-white/60 hover:border-white/20 hover:text-white/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {loadingMore
+                  ? "Loading..."
+                  : `Show More  (${rows.length} of ${totalRows} players)`}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="md:hidden">
