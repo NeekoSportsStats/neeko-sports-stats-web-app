@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,11 +14,9 @@ import {
   CircleCheck as CheckCircle,
   TriangleAlert as AlertTriangle,
   Circle as XCircle,
-  Zap,
   Grid2x2 as Grid,
   ListOrdered,
   Play,
-  ExternalLink,
   ShieldAlert,
 } from "lucide-react";
 import { formatDate } from "../shared/adminUtils";
@@ -204,7 +201,6 @@ function DetailCard({
 
 export default function AdminCommandCenter() {
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<CommandCenterStatus | null>(null);
@@ -402,12 +398,25 @@ export default function AdminCommandCenter() {
         </div>
       </div>
 
-      {/* Action Row */}
+      {/* Quick Actions */}
       <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Manual Actions</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Actions</p>
         <Card>
           <CardContent className="pt-4 pb-4">
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <Button
+                variant="default"
+                size="sm"
+                disabled={isActing}
+                onClick={() => runAction("controller", "AFL pipeline controller", async () => {
+                  const { error } = await supabase.rpc("run_afl_pipeline_controller");
+                  if (error) throw error;
+                })}
+                className="justify-start"
+              >
+                {actionRunning === "controller" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
+                Run AFL Pipeline
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -447,64 +456,8 @@ export default function AdminCommandCenter() {
                 {actionRunning === "edge" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Grid className="h-4 w-4 mr-2" />}
                 Refresh Edge Board
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isActing}
-                onClick={() => runAction("enqueue", "Enqueue reco jobs", async () => {
-                  const { error } = await supabase.rpc("enqueue_ranking_reco_jobs");
-                  if (error) throw error;
-                })}
-                className="justify-start"
-              >
-                {actionRunning === "enqueue" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Bot className="h-4 w-4 mr-2" />}
-                Enqueue AI Reco Jobs
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isActing}
-                onClick={() => runAction("worker", "AI reco worker", async () => {
-                  const { error } = await supabase.functions.invoke("generate-player-ranking-recos", { body: {} });
-                  if (error) throw error;
-                })}
-                className="justify-start"
-              >
-                {actionRunning === "worker" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Zap className="h-4 w-4 mr-2" />}
-                Run Reco Worker
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                disabled={isActing}
-                onClick={() => runAction("controller", "AFL pipeline controller", async () => {
-                  const { error } = await supabase.rpc("run_afl_pipeline_controller");
-                  if (error) throw error;
-                })}
-                className="justify-start"
-              >
-                {actionRunning === "controller" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-                Run AFL Pipeline
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate("/admin/queue")}
-                className="justify-start"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Open AI Queue
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate("/admin/system-health")}
-                className="justify-start"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Full System Health
-              </Button>
             </div>
+            <p className="text-[11px] text-muted-foreground mt-3">For AI queue controls and all other pipeline actions, go to <strong>Operations</strong>.</p>
           </CardContent>
         </Card>
       </div>

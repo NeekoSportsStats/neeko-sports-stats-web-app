@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Zap, Bot, Activity, History, Database, RefreshCw,
+  Zap, Bot, Activity, History, RefreshCw,
   DollarSign, Upload, CircleCheck as CheckCircle,
   CircleAlert as AlertCircle, ChartBar as BarChart2,
-  Grid2x2 as Grid, ListOrdered, Play, Ban,
+  Grid2x2 as Grid, ListOrdered, Play,
 } from "lucide-react";
 import { AdminPipelineProgress, type PipelineRun } from "@/components/admin/AdminPipelineProgress";
 
@@ -381,7 +381,7 @@ export default function AdminOperations() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Button onClick={() => navigate("/admin/queue")} variant="outline" className="w-full justify-start">
               <Activity className="h-4 w-4 mr-2" />
               AI Queue Dashboard
@@ -389,37 +389,6 @@ export default function AdminOperations() {
             <Button onClick={() => navigate("/admin/pipeline-history")} variant="outline" className="w-full justify-start">
               <History className="h-4 w-4 mr-2" />
               Pipeline History
-            </Button>
-            <Button onClick={() => navigate("/admin/pipeline-status")} variant="outline" className="w-full justify-start">
-              <Database className="h-4 w-4 mr-2" />
-              Data Pipeline Status
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Disabled / legacy */}
-      <Card className="opacity-60">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Ban className="h-4 w-4 text-muted-foreground" />
-            Unavailable Actions
-          </CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">
-            These actions are disabled — the underlying functions no longer exist in the production pipeline.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Button disabled variant="outline" className="w-full justify-start">
-              <Ban className="h-4 w-4 mr-2" />
-              Refresh Volatility Model
-              <span className="ml-auto text-xs text-muted-foreground">fn removed</span>
-            </Button>
-            <Button disabled variant="outline" className="w-full justify-start">
-              <Ban className="h-4 w-4 mr-2" />
-              Weekly Pipeline (legacy)
-              <span className="ml-auto text-xs text-muted-foreground">replaced by controller</span>
             </Button>
           </div>
         </CardContent>

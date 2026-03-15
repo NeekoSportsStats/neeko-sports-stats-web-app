@@ -25,7 +25,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
@@ -37,7 +37,6 @@ export function AppSidebar() {
   const [sportsOpen, setSportsOpen] = useState(
     currentPath.startsWith("/sports")
   );
-  const [isAdmin, setIsAdmin] = useState(false);
 
   const handleLinkClick = () => {
     if (isMobile) {
@@ -46,11 +45,6 @@ export function AppSidebar() {
       setOpen(false);
     }
   };
-
-  // disable admin for now
-  useEffect(() => {
-    setIsAdmin(false);
-  }, []);
 
   const isActive = (path: string) => {
     if (path === "/") return currentPath === "/";

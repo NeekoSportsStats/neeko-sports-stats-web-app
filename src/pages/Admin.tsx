@@ -1,15 +1,15 @@
 import { lazy, Suspense } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { RefreshCw, Shield, Terminal, LayoutDashboard, Server, ChartBar as BarChart3, Zap, Calendar, ListTodo, Settings } from "lucide-react";
+import { RefreshCw, Shield, Terminal, Server, ChartBar as BarChart3, Zap, Calendar, ListTodo, Settings, Database } from "lucide-react";
 import { AdminUIStateProvider, useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
 
 const TABS: { path: string; label: string; icon: React.ElementType }[] = [
   { path: "/admin/command-center",   label: "Command Center",   icon: Terminal },
-  { path: "/admin/dashboard",        label: "Dashboard",        icon: LayoutDashboard },
   { path: "/admin/system-health",    label: "System Health",    icon: Server },
   { path: "/admin/operations",       label: "Operations",       icon: Settings },
   { path: "/admin/analytics",        label: "Analytics",        icon: BarChart3 },
+  { path: "/admin/queue",            label: "AI Queue",         icon: Database },
   { path: "/admin/content-engine",   label: "Content Engine",   icon: Zap },
   { path: "/admin/content-planner",  label: "Content Planner",  icon: Calendar },
   { path: "/admin/founder-tasks",    label: "Founder Tasks",    icon: ListTodo },
@@ -99,10 +99,10 @@ function AdminShellWithProvider() {
 }
 
 export const AdminCommandCenter  = lazy(() => import("@/features/admin/command-center/AdminCommandCenter"));
-export const AdminDashboard      = lazy(() => import("@/features/admin/pages/AdminDashboard"));
 export const AdminSystemHealth   = lazy(() => import("@/features/admin/pages/AdminSystemHealth"));
 export const AdminOperations     = lazy(() => import("@/features/admin/pages/AdminOperations"));
 export const AdminAnalytics      = lazy(() => import("@/features/admin/pages/AdminAnalytics"));
+export const AdminQueue          = lazy(() => import("@/pages/AdminQueue"));
 export const AdminContentEngine  = lazy(() => import("@/features/admin/pages/AdminContentEngine"));
 export const AdminContentPlanner = lazy(() => import("@/features/admin/pages/AdminContentPlanner"));
 export const AdminFounderTasks   = lazy(() => import("@/features/admin/pages/AdminFounderTasks"));

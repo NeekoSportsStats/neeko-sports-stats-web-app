@@ -23,10 +23,10 @@ import NotFound from "@/pages/NotFound";
 import {
   AdminShell,
   AdminCommandCenter,
-  AdminDashboard,
   AdminSystemHealth,
   AdminOperations,
   AdminAnalytics,
+  AdminQueue,
   AdminContentEngine,
   AdminContentPlanner,
   AdminFounderTasks,
@@ -39,9 +39,7 @@ const About             = React.lazy(() => import("@/pages/About"));
 const Socials           = React.lazy(() => import("@/pages/Socials"));
 const FAQ               = React.lazy(() => import("@/pages/FAQ"));
 const Contact           = React.lazy(() => import("@/pages/Contact"));
-const AdminQueue        = React.lazy(() => import("@/pages/AdminQueue"));
 const PipelineHistory        = React.lazy(() => import("@/pages/PipelineHistory"));
-const DataPipelineStatusPage = React.lazy(() => import("@/features/admin/DataPipelineStatusPage"));
 const Success           = React.lazy(() => import("@/pages/Success"));
 const Cancel            = React.lazy(() => import("@/pages/Cancel"));
 const CreatePassword    = React.lazy(() => import("@/pages/CreatePassword"));
@@ -157,25 +155,14 @@ function App() {
       >
         <Route index element={<Navigate to="/admin/command-center" replace />} />
         <Route path="command-center"   element={<S fallback={Generic}><AdminCommandCenter /></S>} />
-        <Route path="dashboard"        element={<S fallback={Generic}><AdminDashboard /></S>} />
         <Route path="system-health"    element={<S fallback={Generic}><AdminSystemHealth /></S>} />
         <Route path="operations"       element={<S fallback={Generic}><AdminOperations /></S>} />
         <Route path="analytics"        element={<S fallback={Generic}><AdminAnalytics /></S>} />
+        <Route path="queue"            element={<S fallback={Generic}><AdminQueue /></S>} />
         <Route path="content-engine"   element={<S fallback={Generic}><AdminContentEngine /></S>} />
         <Route path="content-planner"  element={<S fallback={Generic}><AdminContentPlanner /></S>} />
         <Route path="founder-tasks"    element={<S fallback={Generic}><AdminFounderTasks /></S>} />
       </Route>
-
-      <Route
-        path="/admin/queue"
-        element={
-          <RequireAdmin>
-            <Layout>
-              <S fallback={Generic}><AdminQueue /></S>
-            </Layout>
-          </RequireAdmin>
-        }
-      />
 
       <Route
         path="/admin/pipeline-history"
@@ -183,17 +170,6 @@ function App() {
           <RequireAdmin>
             <Layout>
               <S fallback={Generic}><PipelineHistory /></S>
-            </Layout>
-          </RequireAdmin>
-        }
-      />
-
-      <Route
-        path="/admin/pipeline-status"
-        element={
-          <RequireAdmin>
-            <Layout>
-              <S fallback={Generic}><DataPipelineStatusPage /></S>
             </Layout>
           </RequireAdmin>
         }
