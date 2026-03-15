@@ -1,10 +1,8 @@
-import { useEffect, lazy, Suspense } from "react";
-import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
+import { lazy, Suspense } from "react";
+import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { RefreshCw, Shield, Terminal, LayoutDashboard, Server, ChartBar as BarChart3, Zap, Calendar, ListTodo, Settings } from "lucide-react";
 import { AdminUIStateProvider, useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
-
-const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
 
 const TABS: { path: string; label: string; icon: React.ElementType }[] = [
   { path: "/admin/command-center",   label: "Command Center",   icon: Terminal },
@@ -48,28 +46,9 @@ function GlobalJobBar() {
 }
 
 function AdminShell() {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { user, isAdmin } = useAuth();
 
-  useEffect(() => {
-    if (loading) return;
-    if (!user) { navigate("/auth"); return; }
-    if (user.id !== ADMIN_USER_ID) { navigate("/"); return; }
-    if (location.pathname === "/admin" || location.pathname === "/admin/") {
-      navigate("/admin/command-center", { replace: true });
-    }
-  }, [user, loading, navigate, location.pathname]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (!user || user.id !== ADMIN_USER_ID) return null;
+  if (!user || !isAdmin) return null;
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">

@@ -15,6 +15,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isPremium: boolean;
+  isAdmin: boolean;
   refreshPremiumStatus: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -23,6 +24,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   isPremium: false,
+  isAdmin: false,
   refreshPremiumStatus: async () => {},
   signOut: async () => {},
 });
@@ -34,6 +36,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [premiumLoading, setPremiumLoading] = useState(true);
   const [isPremium, setIsPremium] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const initialSessionSeenRef = useRef(false);
   const premiumFetchInFlightRef = useRef(false);
@@ -55,11 +58,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       const active = data?.is_premium === true;
-      console.log("⭐ Premium status:", active);
+      const admin  = data?.is_admin   === true;
+      console.log("⭐ Premium status:", active, "| Admin:", admin);
       setIsPremium(active);
+      setIsAdmin(admin);
     } catch (err) {
       console.error("❌ Premium status exception:", err);
       setIsPremium(false);
+      setIsAdmin(false);
     } finally {
       setPremiumLoading(false);
     }
@@ -84,6 +90,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     console.log("🚪 Logging out…");
     setUser(null);
     setIsPremium(false);
+    setIsAdmin(false);
     setLoading(false);
     try {
       await supabase.auth.signOut({ scope: "global" });
@@ -178,6 +185,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           resetUser();
           setUser(null);
           setIsPremium(false);
+          setIsAdmin(false);
           setLoading(false);
           break;
 
@@ -197,11 +205,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     user: user?.email,
     loading,
     isPremium,
+    isAdmin,
   });
 
   return (
     <AuthContext.Provider
-      value={{ user, loading: loading || premiumLoading, isPremium, refreshPremiumStatus, signOut }}
+      value={{ user, loading: loading || premiumLoading, isPremium, isAdmin, refreshPremiumStatus, signOut }}
     >
       {children}
     </AuthContext.Provider>

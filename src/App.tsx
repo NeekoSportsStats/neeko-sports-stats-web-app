@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { track } from "@/lib/analytics";
 import { Layout } from "@/components/Layout";
 import { RequireAuth } from "@/components/RequireAuth";
+import { RequireAdmin } from "@/components/RequireAdmin";
 import {
   PlayersPageSkeleton,
   AIInsightsSkeleton,
@@ -147,11 +148,11 @@ function App() {
       <Route
         path="/admin"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <Layout>
               <AdminShell />
             </Layout>
-          </RequireAuth>
+          </RequireAdmin>
         }
       >
         <Route index element={<Navigate to="/admin/command-center" replace />} />
@@ -168,33 +169,33 @@ function App() {
       <Route
         path="/admin/queue"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <Layout>
               <S fallback={Generic}><AdminQueue /></S>
             </Layout>
-          </RequireAuth>
+          </RequireAdmin>
         }
       />
 
       <Route
         path="/admin/pipeline-history"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <Layout>
               <S fallback={Generic}><PipelineHistory /></S>
             </Layout>
-          </RequireAuth>
+          </RequireAdmin>
         }
       />
 
       <Route
         path="/admin/pipeline-status"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <Layout>
               <S fallback={Generic}><DataPipelineStatusPage /></S>
             </Layout>
-          </RequireAuth>
+          </RequireAdmin>
         }
       />
 
