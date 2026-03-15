@@ -387,7 +387,7 @@ export function computeKpiTiles(rows: RankingRow[]) {
     ? captainRows.reduce((s, r) => s + (r.projection_final ?? 0), 0) / captainRows.length
     : null;
 
-  const valueUpgrades = rows.filter((r) => (r.value_score ?? 0) >= 12.0).length;
+  const valueUpgrades = rows.filter((r) => (r.value_score ?? 0) >= 110).length;
   const trapAlerts = rows.filter((r) => (r.risk_rating ?? 0) >= 60).length;
   const highConfidence = rows.filter((r) => (r.projection_confidence ?? 0) >= 85).length;
 
