@@ -287,10 +287,14 @@ interface FreeViewProps {
 }
 
 function FreeUserView({ rawPlayers, onUnlock, summary }: FreeViewProps) {
-  const topBuy  = rawPlayers.find(p => p.category === "buy")   ?? null;
-  const topSell = rawPlayers.find(p => p.category === "sell")  ?? null;
-  const topCow  = rawPlayers.find(p => p.category === "cash_cow") ?? null;
-  const topTrap = rawPlayers.find(p => p.category === "trap")  ?? null;
+  const byCategory = (cat: string) =>
+    [...rawPlayers.filter(p => p.category === cat)]
+      .sort((a, b) => (b.trade_score ?? 0) - (a.trade_score ?? 0))[0] ?? null;
+
+  const topBuy  = byCategory("buy");
+  const topSell = byCategory("sell");
+  const topCow  = byCategory("cash_cow");
+  const topTrap = byCategory("trap");
 
   const totalBuy  = summary?.buy_count   ?? rawPlayers.filter(p => p.category === "buy").length;
   const totalSell = summary?.sell_count  ?? rawPlayers.filter(p => p.category === "sell").length;
