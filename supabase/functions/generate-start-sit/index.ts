@@ -310,10 +310,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: accessState } = await serviceClient
+    const { data: accessState, error: accessError } = await serviceClient
       .rpc("get_access_state_for_user", { p_user_id: user.id })
-      .maybeSingle()
-      .catch(() => ({ data: null }));
+      .maybeSingle();
+    if (accessError) {
+      console.error("get_access_state_for_user error:", accessError.message);
+    }
 
     let isPremium = false;
     if (accessState?.is_premium === true) {
