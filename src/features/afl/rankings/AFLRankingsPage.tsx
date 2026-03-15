@@ -281,9 +281,10 @@ export default function AFLRankingsPage() {
     }
 
     setLoading(false);
-  }, [isPremium, positionFilter, activeTab]);
+  }, [isPremium]);
 
   const handleLoadMore = useCallback(async () => {
+    if (!isPremium) return;
     const nextLimit = currentLimit + LOAD_MORE_STEP;
     setLoadingMore(true);
 
@@ -298,7 +299,7 @@ export default function AFLRankingsPage() {
       setCurrentLimit(nextLimit);
     }
     setLoadingMore(false);
-  }, [currentLimit]);
+  }, [currentLimit, isPremium]);
 
   useEffect(() => {
     fetchRankings(INITIAL_LIMIT);

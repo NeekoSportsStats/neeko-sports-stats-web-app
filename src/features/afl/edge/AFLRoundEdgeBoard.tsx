@@ -1085,7 +1085,7 @@ export default function AFLRoundEdgeBoard() {
     setError(null);
     try {
       const { data, error: rpcErr } = await supabase.rpc("get_edge_board_data", {
-        limit_n: PREMIUM_VISIBLE,
+        limit_n: isPremium ? PREMIUM_VISIBLE : FREE_VISIBLE + 2,
       });
       if (rpcErr) throw rpcErr;
       const rows = (data as RankingRow[]) ?? [];
@@ -1097,7 +1097,7 @@ export default function AFLRoundEdgeBoard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isPremium]);
 
   useEffect(() => {
     fetchData();

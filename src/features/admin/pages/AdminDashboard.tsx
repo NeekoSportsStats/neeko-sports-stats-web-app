@@ -3,15 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  RefreshCw,
-  Users,
-  TrendingUp,
-  Activity,
-  DollarSign,
-  Star,
-  BarChart3 as BarChart3Icon,
-} from "lucide-react";
+import { RefreshCw, Users, TrendingUp, Activity, DollarSign, Star, ChartBar as BarChart3Icon } from "lucide-react";
 import type {
   SubscriptionMetrics,
   SignupMetrics,
@@ -70,7 +62,7 @@ export default function AdminDashboard() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [subRes, signupRes, revenueRes, playersRes, featureRes, liveRes] = await Promise.all([
+      const [subRes, signupRes, revenueRes, playersRes, featureRes, liveRes] = await Promise.allSettled([
         supabase.from("v_admin_subscription_metrics").select("*").maybeSingle(),
         supabase.schema("admin" as never).from("v_signups_7d").select("*").maybeSingle(),
         supabase.schema("admin" as never).from("v_revenue_estimate").select("*").maybeSingle(),
@@ -78,12 +70,12 @@ export default function AdminDashboard() {
         supabase.from("v_admin_feature_usage").select("*").limit(8),
         supabase.schema("admin" as never).from("v_live_users").select("*").maybeSingle(),
       ]);
-      if (subRes.data) setSubMetrics(subRes.data as SubscriptionMetrics);
-      if (signupRes.data) setSignupMetrics(signupRes.data as SignupMetrics);
-      if (revenueRes.data) setRevenueEstimate(revenueRes.data as RevenueEstimate);
-      if (playersRes.data) setTopPlayers(playersRes.data as TopPlayerRow[]);
-      if (featureRes.data) setFeatureUsage(featureRes.data as FeatureUsageRow[]);
-      if (liveRes.data) setLiveUsers(liveRes.data as LiveUsers);
+      if (subRes.status === "fulfilled" && subRes.value.data) setSubMetrics(subRes.value.data as SubscriptionMetrics);
+      if (signupRes.status === "fulfilled" && signupRes.value.data) setSignupMetrics(signupRes.value.data as SignupMetrics);
+      if (revenueRes.status === "fulfilled" && revenueRes.value.data) setRevenueEstimate(revenueRes.value.data as RevenueEstimate);
+      if (playersRes.status === "fulfilled" && playersRes.value.data) setTopPlayers(playersRes.value.data as TopPlayerRow[]);
+      if (featureRes.status === "fulfilled" && featureRes.value.data) setFeatureUsage(featureRes.value.data as FeatureUsageRow[]);
+      if (liveRes.status === "fulfilled" && liveRes.value.data) setLiveUsers(liveRes.value.data as LiveUsers);
     } finally {
       setLoading(false);
     }

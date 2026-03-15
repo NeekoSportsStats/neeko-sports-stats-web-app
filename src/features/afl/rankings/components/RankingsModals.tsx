@@ -335,12 +335,15 @@ export function PlayerDetailModal({
     async function fetchAI() {
       if (!row.player_id || !isPremium) { setLoadingAI(false); return; }
       const { data } = await supabase
-        .from("ai_player_analysis")
-        .select("analysis, captain_recommendation")
+        .from("ai_player_content")
+        .select("summary, recommendation")
         .eq("player_id", row.player_id)
         .maybeSingle();
       if (!cancelled) {
-        setAiAnalysis(data as { analysis: string | null; captain_recommendation: string | null } | null);
+        const mapped = data
+          ? { analysis: (data as { summary: string | null; recommendation: string | null }).summary, captain_recommendation: (data as { summary: string | null; recommendation: string | null }).recommendation }
+          : null;
+        setAiAnalysis(mapped);
         setLoadingAI(false);
       }
     }
@@ -349,19 +352,19 @@ export function PlayerDetailModal({
 
     if (row.player_id && isPremium) {
       const channel = supabase
-        .channel(`ai_analysis_${row.player_id}`)
+        .channel(`ai_content_${row.player_id}`)
         .on(
           "postgres_changes",
           {
             event: "*",
             schema: "public",
-            table: "ai_player_analysis",
+            table: "ai_player_content",
             filter: `player_id=eq.${row.player_id}`,
           },
           (payload) => {
             if (!cancelled && payload.new) {
-              const record = payload.new as { analysis: string | null; captain_recommendation: string | null };
-              setAiAnalysis({ analysis: record.analysis, captain_recommendation: record.captain_recommendation });
+              const record = payload.new as { summary: string | null; recommendation: string | null };
+              setAiAnalysis({ analysis: record.summary, captain_recommendation: record.recommendation });
               setLoadingAI(false);
             }
           }
