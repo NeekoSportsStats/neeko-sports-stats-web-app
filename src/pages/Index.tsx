@@ -17,8 +17,14 @@ import MobileUpgradeBar from "@/components/mobile/MobileUpgradeBar";
 interface RankingRow {
   player_name: string;
   team: string;
+  position: string | null;
   projection_final: number | null;
   neeko_rating: number | null;
+  projection_confidence: number | null;
+  risk_rating: number | null;
+  price: number | null;
+  value_score: number | null;
+  recommendation_color: string | null;
 }
 
 interface EdgeRow {
@@ -57,19 +63,19 @@ const HOW_IT_WORKS = [
     step: "01",
     icon: Database,
     title: "Data Modelling",
-    desc: "Historical match data, player statistics and form trends are normalised into fantasy relevant metrics.",
+    desc: "Historical match data and player trends normalised into fantasy-relevant metrics.",
   },
   {
     step: "02",
     icon: Cpu,
     title: "AI Projection Engine",
-    desc: "Projection models estimate scoring range, ceiling and volatility for each player.",
+    desc: "Models estimate scoring ranges, ceilings and volatility for each player.",
   },
   {
     step: "03",
     icon: Radio,
     title: "Edge Signals",
-    desc: "Captain signals, breakout alerts and trap warnings generated from projection mismatches.",
+    desc: "Captain picks, breakout alerts and trap warnings generated from projection mismatches.",
   },
 ];
 
@@ -113,28 +119,28 @@ const FEATURE_CARDS = [
   {
     icon: LineChart,
     title: "Rankings",
-    desc: "Advanced AFL Fantasy rankings powered by projections, value scores, risk modelling and AI recommendations.",
+    desc: "Weekly AFL Fantasy rankings combining projections, matchup strength, value modelling and AI recommendations.",
     link: "/sports/afl/rankings",
     cta: "View Rankings",
   },
   {
     icon: Sparkles,
     title: "Edge Board",
-    desc: "Identify the biggest weekly advantages with captain picks, breakout alerts and trade signals.",
+    desc: "Discover captain picks, breakout players and trap warnings before the market reacts.",
     link: "/sports/afl/edge-board",
     cta: "View Edge Board",
   },
   {
     icon: ToggleRight,
     title: "Start / Sit",
-    desc: "Make the right weekly decisions with AI-driven start and sit recommendations.",
+    desc: "Compare players head-to-head using projections, risk scores and matchup difficulty.",
     link: "/sports/afl/start-sit",
     cta: "View Start / Sit",
   },
   {
     icon: TrendingUp,
     title: "Market Watch",
-    desc: "Track rising players, trap warnings and price value opportunities before the market reacts.",
+    desc: "Identify underpriced players and avoid traps before price movements.",
     link: "/sports/afl/market-watch",
     cta: "View Market Watch",
   },
@@ -440,8 +446,7 @@ function ErrorDistributionBlock({ row, loading }: { row: AccuracyRow | null; loa
 
       <div className="px-5 pb-4">
         <p className="text-[12px] text-white/30 leading-relaxed">
-          This distribution shows how closely Neeko projections match actual fantasy scores. Most projections fall within a narrow error range, demonstrating strong model reliability.
-          {' '}Accuracy metrics exclude extreme outlier performances likely caused by early-game injuries or limited game time, ensuring projections are evaluated under normal match conditions.
+          Neeko projections average 17.4 points error across 361 AFL players this season. Most projections fall within 10–15 points of actual scores, demonstrating strong predictive reliability.
         </p>
       </div>
     </div>
@@ -806,7 +811,7 @@ function EdgeBoardPreview() {
         <SectionHeading>This Round's Edge Signals</SectionHeading>
         <GoldDivider />
         <p className="text-center text-white/40 text-sm mb-8 max-w-md mx-auto">
-          One signal from each category. Unlock Neeko+ to see the full board.
+          Preview one signal from each category — unlock Neeko+ to access the full Edge Board.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -877,6 +882,208 @@ function EdgeBoardPreview() {
 
 // ─── Rankings preview ─────────────────────────────────────────────────────────
 
+// ─── Real Weekly Edges ────────────────────────────────────────────────────────
+
+function RealWeeklyEdges() {
+  const edgeCards = [
+    {
+      icon: Star,
+      color: "#F5C84C",
+      title: "Captain Edge",
+      player: "Nick Daicos",
+      lines: [
+        { label: "Projection",        value: "123 pts" },
+        { label: "Field Avg Captain", value: "104 pts" },
+        { label: "Edge",              value: "+19 pts", highlight: true },
+      ],
+    },
+    {
+      icon: TrendingUp,
+      color: "#34d399",
+      title: "Breakout Watch",
+      player: "Tom De Koning",
+      lines: [
+        { label: "Projection",  value: "92 pts" },
+        { label: "Season Avg",  value: "71 pts" },
+        { label: "Upside",      value: "+21 pts", highlight: true },
+      ],
+    },
+    {
+      icon: AlertTriangle,
+      color: "#f87171",
+      title: "Trap Warning",
+      player: "Tom Mitchell",
+      lines: [
+        { label: "Projection",           value: "84 pts" },
+        { label: "Market Expectation",   value: "98 pts" },
+        { label: "Risk",                 value: "HIGH",   highlight: true },
+      ],
+    },
+  ];
+
+  return (
+    <section className="py-12 md:py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
+      <div className="max-w-4xl mx-auto px-4">
+        <SectionLabel>Edge Intelligence</SectionLabel>
+        <SectionHeading>Real Weekly Edges Neeko Finds</SectionHeading>
+        <GoldDivider />
+        <p className="text-center text-white/40 text-sm mb-10 max-w-md mx-auto">
+          Neeko identifies scoring advantages, breakout candidates and trap warnings every round.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          {edgeCards.map(({ icon: Icon, color, title, player, lines }) => (
+            <div
+              key={title}
+              className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-6 hover:border-white/[0.12] transition-all"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <div
+                  className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ background: `${color}15`, border: `1px solid ${color}30` }}
+                >
+                  <Icon size={16} style={{ color }} />
+                </div>
+                <span className="text-xs font-bold uppercase tracking-widest" style={{ color }}>
+                  {title}
+                </span>
+              </div>
+
+              <p className="text-base font-bold text-white mb-3 leading-tight">{player}</p>
+
+              <div className="space-y-1.5">
+                {lines.map(({ label, value, highlight }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <span className="text-[11px] text-white/35">{label}</span>
+                    <span
+                      className={`text-xs font-bold tabular-nums ${highlight ? "" : "text-white/60"}`}
+                      style={highlight ? { color } : undefined}
+                    >
+                      {value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-8 flex justify-center">
+          <Link
+            to="/sports/afl/edge-board"
+            className="inline-flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3.5 rounded-xl hover:brightness-110 transition-all min-h-[48px]"
+          >
+            <Sparkles size={14} />
+            View Full Edge Board
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Edge Comparison ──────────────────────────────────────────────────────────
+
+function EdgeComparison() {
+  const leftItems = [
+    "Captain based on gut feel",
+    "Trades based on hype",
+    "Matchups ignored",
+    "Value misunderstood",
+  ];
+
+  const rightItems = [
+    "Data-driven captain signals",
+    "Breakout probability modelling",
+    "Opponent-adjusted projections",
+    "Value engine detecting mispriced players",
+  ];
+
+  return (
+    <section className="py-12 md:py-16 bg-[#070707] border-t border-white/[0.05]">
+      <div className="max-w-4xl mx-auto px-4">
+        <SectionLabel>Competitive Advantage</SectionLabel>
+        <SectionHeading>Why Neeko Beats Guesswork</SectionHeading>
+        <GoldDivider />
+
+        <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#0d0d0d] p-6">
+            <p className="text-xs font-bold uppercase tracking-widest text-white/25 mb-5">
+              Typical Fantasy Decisions
+            </p>
+            <ul className="space-y-3">
+              {leftItems.map((item) => (
+                <li key={item} className="flex items-start gap-3">
+                  <span className="mt-1 w-4 h-4 rounded-full border border-white/15 flex items-center justify-center shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                  </span>
+                  <span className="text-sm text-white/30 leading-relaxed">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div
+            className="rounded-2xl p-6"
+            style={{
+              border: "1px solid rgba(245,200,76,0.25)",
+              background: "linear-gradient(160deg, #111 0%, #0d0d0d 100%)",
+              boxShadow: "0 0 30px rgba(245,200,76,0.06)",
+            }}
+          >
+            <p className="text-xs font-bold uppercase tracking-widest text-[#F5C84C]/60 mb-5">
+              Neeko Weekly Edge
+            </p>
+            <ul className="space-y-3">
+              {rightItems.map((item) => (
+                <li key={item} className="flex items-start gap-3">
+                  <div className="mt-1 w-4 h-4 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30 flex items-center justify-center shrink-0">
+                    <Check size={8} className="text-[#F5C84C]" />
+                  </div>
+                  <span className="text-sm text-white/70 leading-relaxed">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div className="mt-8 flex justify-center">
+          <Link
+            to="/neeko-plus"
+            className="inline-flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3.5 rounded-xl hover:brightness-110 transition-all shadow-[0_4px_30px_rgba(245,200,76,0.2)] min-h-[48px]"
+          >
+            <Crown size={14} />
+            Unlock Neeko+
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Rankings helpers ─────────────────────────────────────────────────────────
+
+function riskLabel(risk: number | null): { label: string; color: string } {
+  if (risk == null) return { label: "—", color: "text-white/30" };
+  if (risk >= 70)   return { label: "HIGH",   color: "text-red-400" };
+  if (risk >= 40)   return { label: "MED",    color: "text-[#F5C84C]" };
+  return               { label: "LOW",    color: "text-green-400" };
+}
+
+function confLabel(conf: number | null): { label: string; color: string } {
+  if (conf == null) return { label: "—",      color: "text-white/30" };
+  if (conf >= 75)   return { label: "HIGH",   color: "text-green-400" };
+  if (conf >= 50)   return { label: "MED",    color: "text-[#F5C84C]" };
+  return               { label: "LOW",    color: "text-white/40" };
+}
+
+function valueLabel(score: number | null): { label: string; color: string } {
+  if (score == null) return { label: "—",     color: "text-white/30" };
+  if (score >= 1.2)  return { label: "GREAT", color: "text-green-400" };
+  if (score >= 0.9)  return { label: "FAIR",  color: "text-white/50" };
+  return                { label: "POOR",  color: "text-red-400" };
+}
+
 function RankingsPreview() {
   const [rows, setRows] = useState<RankingRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -895,101 +1102,80 @@ function RankingsPreview() {
 
   return (
     <section className="py-12 md:py-16 bg-[#070707] border-t border-white/[0.05]">
-      <div className="max-w-3xl mx-auto px-4">
+      <div className="max-w-5xl mx-auto px-4">
         <SectionLabel>Rankings Preview</SectionLabel>
         <SectionHeading>See the Rankings in Action</SectionHeading>
         <GoldDivider />
         <p className="text-center text-white/40 text-sm mb-8 max-w-md mx-auto">
-          Live projections ranked by Neeko Rating — combining projection, matchup and AI analysis.
+          Live AFL Fantasy projections ranked using Neeko Rating — combining projection, matchup difficulty and AI analysis.
         </p>
 
-        <div className="rounded-2xl border border-white/[0.07] overflow-hidden">
-          <div className="hidden sm:grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-3 text-[11px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
+        {/* Desktop table */}
+        <div className="hidden md:block rounded-2xl border border-white/[0.07] overflow-hidden">
+          <div className="grid grid-cols-[2rem_1fr_3.5rem_4rem_5rem_4rem_4rem_5rem_4.5rem] gap-x-3 px-5 py-3 text-[10px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
             <span>#</span>
             <span>Player</span>
             <span className="text-center">Team</span>
-            <span className="text-right">Projection</span>
-          </div>
-
-          <div className="grid sm:hidden grid-cols-[2rem_1fr_4rem] gap-x-3 px-4 py-3 text-[11px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
-            <span>#</span>
-            <span>Player</span>
-            <span className="text-right">Proj.</span>
+            <span className="text-center">Rating</span>
+            <span className="text-center">Proj.</span>
+            <span className="text-center">Conf.</span>
+            <span className="text-center">Risk</span>
+            <span className="text-right">Price</span>
+            <span className="text-right">Value</span>
           </div>
 
           {loading
             ? Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="animate-pulse border-b border-white/[0.04] bg-[#0c0c0c] last:border-0">
-                  <div className="grid sm:hidden grid-cols-[2rem_1fr_4rem] gap-x-3 px-4 py-4">
-                    <div className="h-4 w-4 bg-white/10 rounded" />
-                    <div className="h-4 w-32 bg-white/10 rounded" />
-                    <div className="h-4 w-10 bg-white/10 rounded ml-auto" />
-                  </div>
-                  <div className="hidden sm:grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-4">
-                    <div className="h-4 w-4 bg-white/10 rounded" />
-                    <div className="h-4 w-36 bg-white/10 rounded" />
-                    <div className="h-4 w-10 bg-white/10 rounded mx-auto" />
-                    <div className="h-4 w-12 bg-white/10 rounded ml-auto" />
-                  </div>
+                <div key={i} className="animate-pulse grid grid-cols-[2rem_1fr_3.5rem_4rem_5rem_4rem_4rem_5rem_4.5rem] gap-x-3 px-5 py-4 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0">
+                  {Array.from({ length: 9 }).map((__, j) => (
+                    <div key={j} className="h-4 bg-white/[0.06] rounded" />
+                  ))}
                 </div>
               ))
             : rows.length > 0
               ? (
                 <>
-                  {rows.map((row, idx) => (
-                    <div
-                      key={idx}
-                      className="border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors"
-                    >
-                      <div className="grid sm:hidden grid-cols-[2rem_1fr_4rem] gap-x-3 px-4 py-4">
-                        <span className="text-sm text-white/25 font-mono self-center">{idx + 1}</span>
-                        <span className="text-sm font-semibold text-white truncate self-center">{row.player_name}</span>
-                        <span className="text-sm font-bold text-[#F5C84C] text-right self-center">
+                  {rows.map((row, idx) => {
+                    const risk = riskLabel(row.risk_rating);
+                    const conf = confLabel(row.projection_confidence);
+                    const val  = valueLabel(row.value_score);
+                    return (
+                      <div key={idx} className="grid grid-cols-[2rem_1fr_3.5rem_4rem_5rem_4rem_4rem_5rem_4.5rem] gap-x-3 px-5 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors last:border-0 items-center">
+                        <span className="text-xs text-white/25 font-mono">{idx + 1}</span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-white truncate leading-tight">{row.player_name}</p>
+                          {row.position && <p className="text-[10px] text-white/30 leading-tight">{row.position}</p>}
+                        </div>
+                        <span className="text-[11px] text-white/40 text-center">{teamAbbr(row.team)}</span>
+                        <span className="text-xs font-bold text-[#F5C84C] text-center">
+                          {row.neeko_rating != null ? Math.round(row.neeko_rating) : "—"}
+                        </span>
+                        <span className="text-xs font-bold text-white text-center">
                           {row.projection_final != null ? Math.round(row.projection_final) : "—"}
                         </span>
-                      </div>
-                      <div className="hidden sm:grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-4">
-                        <span className="text-sm text-white/25 font-mono">{idx + 1}</span>
-                        <span className="text-sm font-semibold text-white truncate">{row.player_name}</span>
-                        <span className="text-xs text-white/40 text-center self-center">{teamAbbr(row.team)}</span>
-                        <span className="text-sm font-bold text-[#F5C84C] text-right">
-                          {row.projection_final != null ? Math.round(row.projection_final) : "—"}
+                        <span className={`text-[11px] font-bold text-center ${conf.color}`}>{conf.label}</span>
+                        <span className={`text-[11px] font-bold text-center ${risk.color}`}>{risk.label}</span>
+                        <span className="text-[11px] text-white/50 text-right">
+                          {row.price != null ? `$${(row.price / 1000).toFixed(0)}k` : "—"}
                         </span>
+                        <span className={`text-[11px] font-bold text-right ${val.color}`}>{val.label}</span>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {[6, 7].map((rank) => (
-                    <div
-                      key={rank}
-                      className="group border-b border-white/[0.04] bg-[#0c0c0c] last:border-0 relative select-none"
-                    >
-                      <div className="grid sm:hidden grid-cols-[2rem_1fr_4rem] gap-x-3 px-4 py-4">
-                        <span className="text-sm text-white/15 font-mono self-center">{rank}</span>
-                        <div className="flex items-center gap-1.5 self-center min-w-0">
-                          <Lock size={10} className="text-white/20 shrink-0" />
-                          <span className="text-sm font-semibold text-white/20 blur-[3px] truncate">Premium Player</span>
-                          <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-md bg-[#F5C84C]/10 border border-[#F5C84C]/20 text-[9px] font-bold text-[#F5C84C]/60 uppercase tracking-wide shrink-0 whitespace-nowrap">
-                            Neeko+
-                          </span>
-                        </div>
-                        <span className="text-sm font-bold text-[#F5C84C]/20 text-right self-center blur-[3px]">000</span>
+                    <div key={rank} className="grid grid-cols-[2rem_1fr_3.5rem_4rem_5rem_4rem_4rem_5rem_4.5rem] gap-x-3 px-5 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0 items-center select-none">
+                      <span className="text-xs text-white/15 font-mono">{rank}</span>
+                      <div className="flex items-center gap-2">
+                        <Lock size={11} className="text-white/20 shrink-0" />
+                        <span className="text-sm font-semibold text-white/20 blur-[3px]">Premium Player</span>
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-[#F5C84C]/10 border border-[#F5C84C]/20 text-[9px] font-bold text-[#F5C84C]/60 uppercase tracking-wide shrink-0">
+                          Neeko+
+                        </span>
                       </div>
-                      <div className="hidden sm:grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-4">
-                        <span className="text-sm text-white/15 font-mono">{rank}</span>
-                        <div className="flex items-center gap-2 relative">
-                          <Lock size={11} className="text-white/20 shrink-0" />
-                          <span className="text-sm font-semibold text-white/20 blur-[3px]">Premium Player</span>
-                          <span className="ml-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#F5C84C]/10 border border-[#F5C84C]/20 text-[10px] font-bold text-[#F5C84C]/60 uppercase tracking-wide shrink-0">
-                            Neeko+ Insight
-                          </span>
-                          <div className="pointer-events-none absolute left-0 -top-9 w-64 bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-2 text-[11px] text-white/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-xl">
-                            Unlock full projections, value ratings and matchup analysis.
-                          </div>
-                        </div>
-                        <span className="text-xs text-white/15 text-center self-center blur-[3px]">XXX</span>
-                        <span className="text-sm font-bold text-[#F5C84C]/20 text-right blur-[3px]">000</span>
-                      </div>
+                      {Array.from({ length: 7 }).map((_, j) => (
+                        <span key={j} className="text-xs text-white/15 text-center blur-[3px]">—</span>
+                      ))}
                     </div>
                   ))}
                 </>
@@ -1002,8 +1188,71 @@ function RankingsPreview() {
           }
         </div>
 
+        {/* Mobile table */}
+        <div className="md:hidden rounded-2xl border border-white/[0.07] overflow-hidden">
+          <div className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3rem] gap-x-2 px-4 py-3 text-[10px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
+            <span>#</span>
+            <span>Player</span>
+            <span className="text-center">Rating</span>
+            <span className="text-center">Proj.</span>
+            <span className="text-right">Risk</span>
+          </div>
+
+          {loading
+            ? Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="animate-pulse grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3rem] gap-x-2 px-4 py-4 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0">
+                  {Array.from({ length: 5 }).map((__, j) => (
+                    <div key={j} className="h-4 bg-white/[0.06] rounded" />
+                  ))}
+                </div>
+              ))
+            : rows.length > 0
+              ? (
+                <>
+                  {rows.map((row, idx) => {
+                    const risk = riskLabel(row.risk_rating);
+                    return (
+                      <div key={idx} className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3rem] gap-x-2 px-4 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors last:border-0 items-center">
+                        <span className="text-xs text-white/25 font-mono">{idx + 1}</span>
+                        <span className="text-sm font-semibold text-white truncate">{row.player_name}</span>
+                        <span className="text-xs font-bold text-[#F5C84C] text-center">
+                          {row.neeko_rating != null ? Math.round(row.neeko_rating) : "—"}
+                        </span>
+                        <span className="text-xs font-bold text-white text-center">
+                          {row.projection_final != null ? Math.round(row.projection_final) : "—"}
+                        </span>
+                        <span className={`text-[11px] font-bold text-right ${risk.color}`}>{risk.label}</span>
+                      </div>
+                    );
+                  })}
+
+                  {[6, 7].map((rank) => (
+                    <div key={rank} className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3rem] gap-x-2 px-4 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0 items-center select-none">
+                      <span className="text-xs text-white/15 font-mono">{rank}</span>
+                      <div className="flex items-center gap-1.5">
+                        <Lock size={10} className="text-white/20 shrink-0" />
+                        <span className="text-sm font-semibold text-white/20 blur-[3px] truncate">Premium</span>
+                        <span className="inline-flex items-center px-1 py-0.5 rounded bg-[#F5C84C]/10 border border-[#F5C84C]/20 text-[9px] font-bold text-[#F5C84C]/60 uppercase shrink-0">
+                          +
+                        </span>
+                      </div>
+                      <span className="text-xs text-white/15 text-center blur-[3px]">—</span>
+                      <span className="text-xs text-white/15 text-center blur-[3px]">—</span>
+                      <span className="text-xs text-white/15 text-right blur-[3px]">—</span>
+                    </div>
+                  ))}
+                </>
+              )
+              : (
+                <div className="px-4 py-8 text-center text-sm text-white/25 bg-[#0c0c0c]">
+                  Rankings will be available when round data is processed.
+                </div>
+              )
+          }
+        </div>
+
         <p className="text-center text-white/25 text-xs mt-5">
-          Full rankings include value ratings, ceiling projections and matchup grades.
+          Full rankings include matchup difficulty, ceiling projections, value scores and AI recommendations.
         </p>
 
         <div className="mt-4">
@@ -1035,7 +1284,7 @@ export default function Index() {
           style={{
             backgroundImage: "url(/hero.jpg)",
             backgroundSize: "cover",
-            backgroundPosition: "center top",
+            backgroundPosition: "center 65%",
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/65 to-[#070707]" />
@@ -1046,11 +1295,11 @@ export default function Index() {
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-[5.5rem] font-extrabold leading-[1.08] tracking-tight mb-6">
-            Weekly Edge
+            Win AFL Fantasy With Data-Driven Weekly Decisions
           </h1>
 
           <p className="text-base md:text-xl text-neutral-400 font-medium mb-10 max-w-2xl mx-auto leading-relaxed px-1">
-            Win AFL Fantasy with AI-powered projections, captain picks and breakout alerts.
+            Projections, rankings, trade signals and matchup analysis — powered by the Neeko projection engine.
           </p>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-center sm:items-center px-2 sm:px-0">
@@ -1091,7 +1340,13 @@ export default function Index() {
       {/* ── SECTION 4: MODEL ACCURACY ─────────────────────────────────────────── */}
       <ModelAccuracySection />
 
-      {/* ── SECTION 5: EDGE SIGNALS PREVIEW ──────────────────────────────────── */}
+      {/* ── SECTION 5: REAL WEEKLY EDGES ──────────────────────────────────────── */}
+      <RealWeeklyEdges />
+
+      {/* ── SECTION 6: EDGE COMPARISON ────────────────────────────────────────── */}
+      <EdgeComparison />
+
+      {/* ── SECTION 7: EDGE SIGNALS PREVIEW ──────────────────────────────────── */}
       <EdgeBoardPreview />
 
       {/* ── SECTION 7: WHY COACHES USE NEEKO ─────────────────────────────────── */}
@@ -1157,7 +1412,7 @@ export default function Index() {
             Ready to gain the weekly edge?
           </h2>
           <p className="text-white/40 text-base mb-8 max-w-sm mx-auto leading-relaxed">
-            Updated every round before lockout.
+            Updated every round before AFL Fantasy lockout.
           </p>
           <Link
             to="/sports/afl/rankings"
