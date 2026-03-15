@@ -208,26 +208,6 @@ function getPositionBadgeStyle(pos: string | null): string {
   return "bg-white/10 text-white/40";
 }
 
-// ─── Opening Round Banner ─────────────────────────────────────────────────────
-
-function OpeningRoundBanner() {
-  return (
-    <div className="mt-4 rounded-xl border border-[#F5C84C]/20 bg-[#F5C84C]/[0.03] px-4 py-3">
-      <div className="flex items-start gap-3">
-        <Info size={14} className="text-[#F5C84C]/70 shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-white/80">
-            2026 Performance Tracking Activates After Opening Round.
-          </p>
-          <p className="text-[11px] text-white/40 mt-0.5">
-            Edge results and model accuracy will publish weekly.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Model Authority Section ──────────────────────────────────────────────────
 
 const MODEL_SIGNALS = [
@@ -1260,7 +1240,6 @@ export default function AFLRoundEdgeBoard() {
             </div>
           </div>
 
-          <OpeningRoundBanner />
           <ModelAuthoritySection />
         </div>
 
