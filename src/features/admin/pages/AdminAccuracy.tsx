@@ -60,6 +60,17 @@ interface ErrorBand {
   pct: number | null;
 }
 
+interface PositionAccuracy {
+  position_group: string;
+  mean_absolute_error: number | null;
+  median_absolute_error: number | null;
+  rmse: number | null;
+  within_10_pct: number | null;
+  within_20_pct: number | null;
+  predictions_count: number | null;
+  players_count: number | null;
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
 function fmt(n: number | null | undefined, suffix = "", dp = 1) {
@@ -174,19 +185,21 @@ export default function AdminAccuracy() {
   const [worst, setWorst] = useState<PredictionResult[]>([]);
   const [recent, setRecent] = useState<PredictionResult[]>([]);
   const [errorBands, setErrorBands] = useState<ErrorBand[]>([]);
+  const [positionAccuracy, setPositionAccuracy] = useState<PositionAccuracy[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = async () => {
     setRefreshing(true);
     try {
-      const [sumRes, roundRes, bestRes, worstRes, recentRes, bandsRes] = await Promise.all([
+      const [sumRes, roundRes, bestRes, worstRes, recentRes, bandsRes, posRes] = await Promise.all([
         supabase.from("v_projection_accuracy_summary").select("*").maybeSingle(),
         supabase.from("v_projection_accuracy_by_round").select("*").order("round_number"),
         supabase.from("v_projection_accuracy_best").select("*").limit(10),
         supabase.from("v_projection_accuracy_worst").select("*").limit(10),
         supabase.from("v_projection_results").select("*").limit(20),
         supabase.schema("afl" as never).from("v_projection_error_distribution").select("*").order("sort_order"),
+        supabase.from("v_projection_accuracy_by_position").select("*"),
       ]);
 
       if (sumRes.data)  setSummary(sumRes.data as AccuracySummary);
@@ -195,6 +208,7 @@ export default function AdminAccuracy() {
       if (worstRes.data)  setWorst(worstRes.data as PredictionResult[]);
       if (recentRes.data) setRecent(recentRes.data as PredictionResult[]);
       if (bandsRes.data)  setErrorBands(bandsRes.data as ErrorBand[]);
+      if (posRes.data)    setPositionAccuracy(posRes.data as PositionAccuracy[]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -459,6 +473,87 @@ export default function AdminAccuracy() {
           rows={recent}
           emptyLabel="No recent data."
         />
+      )}
+
+      {/* Position Accuracy Breakdown */}
+      {positionAccuracy.length > 0 && (
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-foreground">Accuracy by Position</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left px-4 py-2 text-muted-foreground font-medium">Position</th>
+                    <th className="text-right px-4 py-2 text-muted-foreground font-medium">MAE</th>
+                    <th className="text-right px-4 py-2 text-muted-foreground font-medium">Median</th>
+                    <th className="text-right px-4 py-2 text-muted-foreground font-medium">RMSE</th>
+                    <th className="text-right px-4 py-2 text-muted-foreground font-medium">Within 10</th>
+                    <th className="text-right px-4 py-2 text-muted-foreground font-medium">Within 20</th>
+                    <th className="text-right px-4 py-2 text-muted-foreground font-medium">Players</th>
+                    <th className="text-right px-4 py-2 text-muted-foreground font-medium">Preds</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {positionAccuracy.map((p, i) => (
+                    <tr key={i} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-2">
+                        <span className="inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold"
+                          style={{
+                            color: p.position_group === "MID" ? "#60a5fa" :
+                                   p.position_group === "FWD" ? "#f59e0b" :
+                                   p.position_group === "DEF" ? "#10b981" :
+                                   p.position_group === "RUC" ? "#a78bfa" : "#9ca3af",
+                            borderColor: p.position_group === "MID" ? "#60a5fa40" :
+                                         p.position_group === "FWD" ? "#f59e0b40" :
+                                         p.position_group === "DEF" ? "#10b98140" :
+                                         p.position_group === "RUC" ? "#a78bfa40" : "#9ca3af40",
+                            background: p.position_group === "MID" ? "#60a5fa12" :
+                                        p.position_group === "FWD" ? "#f59e0b12" :
+                                        p.position_group === "DEF" ? "#10b98112" :
+                                        p.position_group === "RUC" ? "#a78bfa12" : "#9ca3af12",
+                          }}
+                        >
+                          {p.position_group}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <span style={{ color: errorColor(p.mean_absolute_error) }}>
+                          {fmt(p.mean_absolute_error, " pts")}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-right text-muted-foreground">
+                        {fmt(p.median_absolute_error, " pts")}
+                      </td>
+                      <td className="px-4 py-2 text-right text-muted-foreground">
+                        {fmt(p.rmse, " pts")}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px]"
+                          style={{
+                            borderColor: (p.within_10_pct ?? 0) >= 60 ? "#10b981" : "#f59e0b",
+                            color: (p.within_10_pct ?? 0) >= 60 ? "#10b981" : "#f59e0b",
+                          }}
+                        >
+                          {fmt(p.within_10_pct, "%", 0)}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-2 text-right text-muted-foreground">
+                        {fmt(p.within_20_pct, "%", 0)}
+                      </td>
+                      <td className="px-4 py-2 text-right text-muted-foreground">{p.players_count ?? "—"}</td>
+                      <td className="px-4 py-2 text-right text-muted-foreground">{p.predictions_count ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Scatter: Projection vs Actual */}

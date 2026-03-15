@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Lock, Crown, ChevronRight } from "lucide-react";
 import { RankingRow, RankingsTab, RowTier } from "./types";
 import {
@@ -325,6 +325,8 @@ interface MobileRankingsTableProps {
   onUpgrade: () => void;
 }
 
+const SHOW_MORE_STEP = 25;
+
 export function MobileRankingsTable({
   rows,
   loading,
@@ -333,27 +335,20 @@ export function MobileRankingsTable({
   onOpenRow,
   onUpgrade,
 }: MobileRankingsTableProps) {
-  const [visibleCount, setVisibleCount] = useState(25);
-
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget;
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80) {
-      setVisibleCount((c) => c + 20);
-    }
-  }, []);
+  const initialCount = isPremium ? 100 : 25;
+  const [visibleCount, setVisibleCount] = useState(initialCount);
 
   const visibleRows = rows.slice(0, isPremium ? visibleCount : Math.min(visibleCount, FREE_PARTIAL_ROWS));
+  const hasMore = isPremium && visibleCount < rows.length;
 
   return (
     <div className="w-full max-w-full pb-[80px]">
       <SwipeHint />
 
       <div className="rounded-xl border border-white/5 overflow-hidden w-full max-w-full">
-        {/* Scrollable table — header + rows share one X scroll */}
         <div
-          className="w-full overflow-x-auto overflow-y-auto overscroll-contain"
-          style={{ maxHeight: "calc(100dvh - 280px)", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
-          onScroll={handleScroll}
+          className="w-full overflow-x-auto overscroll-contain"
+          style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}
         >
           <div style={{ width: TABLE_W, minWidth: TABLE_W }}>
             <TableHeader isPremium={isPremium} />
@@ -377,13 +372,20 @@ export function MobileRankingsTable({
                 />
               );
             })}
-
-            {!loading && isPremium && visibleCount < rows.length && (
-              <div className="py-4 text-center text-xs text-white/25">Loading more...</div>
-            )}
           </div>
         </div>
       </div>
+
+      {!loading && hasMore && (
+        <div className="px-4 pt-3">
+          <button
+            onClick={() => setVisibleCount((c) => c + SHOW_MORE_STEP)}
+            className="w-full py-3 rounded-xl border border-white/10 text-xs font-semibold text-white/50 hover:border-white/20 hover:text-white/70 transition-all"
+          >
+            Show More Players ({rows.length - visibleCount} remaining)
+          </button>
+        </div>
+      )}
 
       {!isPremium && !loading && (
         <MobileConversionWall onUpgrade={onUpgrade} />
