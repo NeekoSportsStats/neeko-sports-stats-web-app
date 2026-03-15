@@ -39,15 +39,11 @@ interface AccuracyExampleRow {
 interface EdgeRow {
   player_name: string;
   team: string;
+  position: string | null;
   projection_final: number | null;
   ceiling_score: number | null;
-  captain_score: number | null;
-  upside_rating: number | null;
-  risk_rating: number | null;
-  matchup_advantage: number | null;
-  form_trend: string | null;
-  ai_summary: string | null;
-  section: string;
+  projection_confidence: number | null;
+  projection_edge: number | null;
 }
 
 // ─── Static data ──────────────────────────────────────────────────────────────
@@ -725,183 +721,133 @@ function EdgeStatRow({ label, value, valueColor }: { label: string; value: strin
   );
 }
 
+function EdgeCardSkeleton() {
+  return (
+    <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 animate-pulse">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-9 h-9 rounded-lg bg-white/[0.06]" />
+        <div className="h-3 w-24 bg-white/[0.06] rounded" />
+      </div>
+      <div className="h-3 w-full bg-white/[0.04] rounded mb-4" />
+      <div className="h-5 w-32 bg-white/[0.08] rounded mb-1" />
+      <div className="h-3 w-20 bg-white/[0.05] rounded mb-3" />
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="flex justify-between py-1 border-b border-white/[0.04]">
+          <div className="h-3 w-16 bg-white/[0.05] rounded" />
+          <div className="h-3 w-12 bg-white/[0.05] rounded" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function EdgeBoardPreview() {
-  const [captain,  setCaptain]  = useState<EdgeRow | null>(null);
-  const [breakout, setBreakout] = useState<EdgeRow | null>(null);
-  const [trap,     setTrap]     = useState<EdgeRow | null>(null);
-  const [loading,  setLoading]  = useState(true);
+  const [edgeRows, setEdgeRows] = useState<EdgeRow[]>([]);
+  const [loading, setLoading]  = useState(true);
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.rpc("get_edge_board_data", { limit_n: 5 });
-      const rows: EdgeRow[] = data ?? [];
-      setCaptain(rows.find((r) => r.section === "captain")  ?? null);
-      setBreakout(rows.find((r) => r.section === "breakout") ?? null);
-      setTrap(rows.find((r) => r.section === "trap")     ?? null);
+      const { data } = await supabase
+        .schema("afl")
+        .from("v_rankings_master")
+        .select("player_name, team, position, projection_final, ceiling_score, projection_confidence, projection_edge")
+        .lte("neeko_rank", 25)
+        .gte("projection_edge", 1)
+        .lte("projection_edge", 10)
+        .order("projection_edge", { ascending: false })
+        .limit(3);
+      setEdgeRows((data ?? []) as EdgeRow[]);
       setLoading(false);
     })();
   }, []);
+
+  function confLabel(conf: number | null): { label: string; color: string } {
+    if (conf == null) return { label: "—", color: "text-white/30" };
+    if (conf >= 75)   return { label: "High", color: "text-green-400" };
+    if (conf >= 55)   return { label: "Med",  color: "text-[#F5C84C]" };
+    return               { label: "Low",  color: "text-red-400" };
+  }
+
+  const cardAccents = [
+    { color: "#F5C84C", icon: Star,          label: "Model Edge" },
+    { color: "#34d399", icon: TrendingUp,    label: "Model Edge" },
+    { color: "#60a5fa", icon: Zap,           label: "Model Edge" },
+  ];
 
   return (
     <section className="py-10 md:py-14 bg-[#0a0a0a] border-t border-white/[0.05]">
       <div className="max-w-3xl mx-auto px-4">
         <SectionLabel>Edge Signals Preview</SectionLabel>
-        <SectionHeading>This Round's Edge Signals</SectionHeading>
+        <SectionHeading>This Round's Model Edges</SectionHeading>
         <GoldDivider />
-        <p className="text-center text-white/40 text-sm mb-6 max-w-md mx-auto">
-          Preview one signal from each category — unlock Neeko+ to access the full Edge Board.
+        <p className="text-center text-white/40 text-sm mb-2 max-w-xl mx-auto leading-relaxed">
+          This week's model edges highlight players where projections show a scoring advantage over typical selections.
+        </p>
+        <p className="text-center text-[11px] text-white/25 mb-6">
+          These edges come from the Top 25 Neeko rankings.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {loading
+            ? [0, 1, 2].map((i) => <EdgeCardSkeleton key={i} />)
+            : edgeRows.length > 0
+              ? edgeRows.map((row, idx) => {
+                  const accent = cardAccents[idx] ?? cardAccents[0];
+                  const Icon = accent.icon;
+                  const conf = confLabel(row.projection_confidence);
+                  const edgeVal = row.projection_edge;
+                  return (
+                    <div
+                      key={idx}
+                      className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-white/[0.12] transition-all"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div
+                          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ background: `${accent.color}15`, border: `1px solid ${accent.color}30` }}
+                        >
+                          <Icon size={16} style={{ color: accent.color }} />
+                        </div>
+                        <span className="text-xs font-bold uppercase tracking-widest" style={{ color: accent.color }}>
+                          {accent.label}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-white/30 leading-snug mb-3">
+                        Top 25 ranked player with a projection scoring advantage detected this round.
+                      </p>
 
-          {/* Captain Edge */}
-          <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-[#F5C84C]/20 transition-all">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#F5C84C15", border: "1px solid #F5C84C30" }}>
-                <Star size={16} style={{ color: "#F5C84C" }} />
-              </div>
-              <span className="text-xs font-bold uppercase tracking-widest text-[#F5C84C]">Captain Edge</span>
-            </div>
-            <p className="text-[11px] text-white/30 leading-snug mb-3">Players projected to outperform typical captain selections this round.</p>
+                      <p className="text-base font-bold text-white leading-tight mb-0.5">{row.player_name}</p>
+                      <p className="text-xs text-white/35 mb-3">{row.team}{row.position ? ` · ${row.position}` : ""}</p>
 
-            {loading ? (
-              <div className="space-y-2 animate-pulse">
-                {[32, 24, 20, 20, 20].map((w, i) => (
-                  <div key={i} className="h-3 bg-white/[0.08] rounded" style={{ width: `${w * 3}px` }} />
-                ))}
-              </div>
-            ) : captain ? (
-              <>
-                <p className="text-base font-bold text-white leading-tight mb-0.5">{captain.player_name}</p>
-                <p className="text-xs text-white/35 mb-3">{captain.team}</p>
-                <div className="space-y-0">
-                  {captain.projection_final != null && (
-                    <EdgeStatRow label="Projection" value={`${Math.round(captain.projection_final)} pts`} valueColor="text-[#F5C84C]" />
-                  )}
-                  {captain.ceiling_score != null && (
-                    <EdgeStatRow label="Ceiling" value={`${Math.round(captain.ceiling_score)} pts`} valueColor="text-white/70" />
-                  )}
-                  {captain.matchup_advantage != null && (
-                    <EdgeStatRow
-                      label="Matchup"
-                      value={captain.matchup_advantage >= 0 ? `+${Math.round(captain.matchup_advantage)}` : `${Math.round(captain.matchup_advantage)}`}
-                      valueColor={captain.matchup_advantage >= 0 ? "text-green-400" : "text-red-400"}
-                    />
-                  )}
-                  {captain.captain_score != null && (
-                    <EdgeStatRow label="Confidence" value={captain.captain_score >= 70 ? "High" : captain.captain_score >= 45 ? "Med" : "Low"} valueColor={captain.captain_score >= 70 ? "text-green-400" : captain.captain_score >= 45 ? "text-[#F5C84C]" : "text-white/40"} />
-                  )}
+                      <div>
+                        {row.projection_final != null && (
+                          <EdgeStatRow label="Projection" value={`${Math.round(row.projection_final)} pts`} valueColor="text-[#F5C84C]" />
+                        )}
+                        {row.ceiling_score != null && (
+                          <EdgeStatRow label="Ceiling" value={`${Math.round(row.ceiling_score)} pts`} valueColor="text-white/60" />
+                        )}
+                        <EdgeStatRow label="Confidence" value={conf.label} valueColor={conf.color} />
+                        {edgeVal != null && (
+                          <EdgeStatRow
+                            label="Edge"
+                            value={edgeVal >= 0 ? `+${edgeVal.toFixed(1)}` : `${edgeVal.toFixed(1)}`}
+                            valueColor={edgeVal > 0 ? "text-green-400" : "text-red-400"}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              : (
+                <div className="col-span-3 rounded-2xl border border-white/[0.07] bg-[#0e0e0e] px-5 py-8 text-center">
+                  <p className="text-sm text-white/30">Edge signals will appear when round data is available.</p>
                 </div>
-              </>
-            ) : (
-              <div className="space-y-2 animate-pulse">
-                {[32, 24, 20, 20, 20].map((w, i) => (
-                  <div key={i} className="h-3 bg-white/[0.06] rounded" style={{ width: `${w * 3}px` }} />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Breakout Watch */}
-          <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-green-400/20 transition-all">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#34d39915", border: "1px solid #34d39930" }}>
-                <TrendingUp size={16} style={{ color: "#34d399" }} />
-              </div>
-              <span className="text-xs font-bold uppercase tracking-widest text-[#34d399]">Breakout Watch</span>
-            </div>
-            <p className="text-[11px] text-white/30 leading-snug mb-3">Players with strong upside relative to recent scoring trends.</p>
-
-            {loading ? (
-              <div className="space-y-2 animate-pulse">
-                {[32, 24, 20, 20, 20].map((w, i) => (
-                  <div key={i} className="h-3 bg-white/[0.08] rounded" style={{ width: `${w * 3}px` }} />
-                ))}
-              </div>
-            ) : breakout ? (
-              <>
-                <p className="text-base font-bold text-white leading-tight mb-0.5">{breakout.player_name}</p>
-                <p className="text-xs text-white/35 mb-3">{breakout.team}</p>
-                <div className="space-y-0">
-                  {breakout.projection_final != null && (
-                    <EdgeStatRow label="Projection" value={`${Math.round(breakout.projection_final)} pts`} valueColor="text-[#F5C84C]" />
-                  )}
-                  {breakout.upside_rating != null && (
-                    <EdgeStatRow label="Upside" value={`${Math.round(breakout.upside_rating)} pts`} valueColor="text-green-400" />
-                  )}
-                  {breakout.form_trend != null && (
-                    <EdgeStatRow label="Form Trend" value={breakout.form_trend} valueColor={breakout.form_trend.toLowerCase().includes("up") ? "text-green-400" : breakout.form_trend.toLowerCase().includes("down") ? "text-red-400" : "text-white/50"} />
-                  )}
-                  {breakout.matchup_advantage != null && (
-                    <EdgeStatRow
-                      label="Matchup"
-                      value={breakout.matchup_advantage >= 0 ? `+${Math.round(breakout.matchup_advantage)}` : `${Math.round(breakout.matchup_advantage)}`}
-                      valueColor={breakout.matchup_advantage >= 0 ? "text-green-400" : "text-red-400"}
-                    />
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="space-y-2 animate-pulse">
-                {[32, 24, 20, 20, 20].map((w, i) => (
-                  <div key={i} className="h-3 bg-white/[0.06] rounded" style={{ width: `${w * 3}px` }} />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Trap Warning */}
-          <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-red-400/20 transition-all">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#f8717115", border: "1px solid #f8717130" }}>
-                <AlertTriangle size={16} style={{ color: "#f87171" }} />
-              </div>
-              <span className="text-xs font-bold uppercase tracking-widest text-[#f87171]">Trap Warning</span>
-            </div>
-            <p className="text-[11px] text-white/30 leading-snug mb-3">Players at risk of underperforming their current fantasy price.</p>
-
-            {loading ? (
-              <div className="space-y-2 animate-pulse">
-                {[32, 24, 20, 20, 20].map((w, i) => (
-                  <div key={i} className="h-3 bg-white/[0.08] rounded" style={{ width: `${w * 3}px` }} />
-                ))}
-              </div>
-            ) : trap ? (
-              <>
-                <p className="text-base font-bold text-white leading-tight mb-0.5">{trap.player_name}</p>
-                <p className="text-xs text-white/35 mb-3">{trap.team}</p>
-                <div className="space-y-0">
-                  {trap.projection_final != null && (
-                    <EdgeStatRow label="Projection" value={`${Math.round(trap.projection_final)} pts`} valueColor="text-[#F5C84C]" />
-                  )}
-                  {trap.risk_rating != null && (
-                    <EdgeStatRow label="Risk Rating" value={trap.risk_rating >= 65 ? "High" : trap.risk_rating >= 40 ? "Med" : "Low"} valueColor={trap.risk_rating >= 65 ? "text-red-400" : trap.risk_rating >= 40 ? "text-[#F5C84C]" : "text-green-400"} />
-                  )}
-                  {trap.matchup_advantage != null && (
-                    <EdgeStatRow
-                      label="Matchup"
-                      value={trap.matchup_advantage >= 0 ? `+${Math.round(trap.matchup_advantage)}` : `${Math.round(trap.matchup_advantage)}`}
-                      valueColor={trap.matchup_advantage >= 0 ? "text-green-400" : "text-red-400"}
-                    />
-                  )}
-                  {trap.form_trend != null && (
-                    <EdgeStatRow label="Form Trend" value={trap.form_trend} valueColor={trap.form_trend.toLowerCase().includes("down") ? "text-red-400" : trap.form_trend.toLowerCase().includes("up") ? "text-green-400" : "text-white/50"} />
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="space-y-2 animate-pulse">
-                {[32, 24, 20, 20, 20].map((w, i) => (
-                  <div key={i} className="h-3 bg-white/[0.06] rounded" style={{ width: `${w * 3}px` }} />
-                ))}
-              </div>
-            )}
-          </div>
-
+              )
+          }
         </div>
 
         <p className="text-center text-white/25 text-xs mt-4">
-          Full edge board includes additional signals and matchup analysis.
+          Full edge board includes additional signals, matchup analysis and AI breakdowns.
         </p>
 
         <div className="mt-3 flex justify-center">
@@ -1083,117 +1029,6 @@ function OutcomeProofSection() {
   );
 }
 
-// ─── Social Proof ─────────────────────────────────────────────────────────────
-
-const TESTIMONIALS = [
-  {
-    quote: "Neeko helped me find captain picks I would have missed. The projection model is genuinely accurate.",
-    role: "Competitive League Coach",
-  },
-  {
-    quote: "The projections and edge board are my go-to tools every round. Nothing else comes close.",
-    role: "Data Driven Coach",
-  },
-  {
-    quote: "Finally a fantasy tool that actually explains the numbers instead of just showing them.",
-    role: "Fantasy Optimiser",
-  },
-];
-
-function SocialProofSection() {
-  return (
-    <section className="py-10 md:py-14 bg-[#0a0a0a] border-t border-white/[0.05]">
-      <div className="max-w-4xl mx-auto px-4">
-        <div className="text-center mb-8">
-          <SectionLabel>Trusted By Coaches</SectionLabel>
-          <SectionHeading>Trusted by Serious AFL Fantasy Coaches</SectionHeading>
-          <GoldDivider />
-          <p className="text-sm text-white/40 max-w-md mx-auto leading-relaxed">
-            Helping coaches find captain edges and breakout picks every round.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          {TESTIMONIALS.map(({ quote, role }) => (
-            <div
-              key={role}
-              className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 flex flex-col gap-4"
-            >
-              <p className="text-sm text-white/60 leading-relaxed flex-1">
-                &ldquo;{quote}&rdquo;
-              </p>
-              <div className="border-t border-white/[0.06] pt-3">
-                <p className="text-xs font-bold text-white/50">{role}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-6 text-center">
-          <p className="text-[12px] text-white/25 tracking-wide">
-            Used by hundreds of AFL Fantasy coaches every round.
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Pricing Teaser ───────────────────────────────────────────────────────────
-
-function PricingTeaserSection() {
-  return (
-    <section className="py-10 md:py-14 bg-[#070707] border-t border-white/[0.05]">
-      <div className="max-w-2xl mx-auto px-4 text-center">
-        <SectionLabel>Pricing</SectionLabel>
-        <SectionHeading>Unlock the Full Neeko Edge</SectionHeading>
-        <GoldDivider />
-
-        <p className="text-sm text-white/40 max-w-lg mx-auto leading-relaxed mb-6">
-          Neeko+ unlocks the full projection engine including premium rankings, captain edge signals, breakout alerts and matchup tools.
-        </p>
-
-        <div
-          className="rounded-2xl p-6 mb-6"
-          style={{
-            border: "1px solid rgba(245,200,76,0.30)",
-            background: "linear-gradient(160deg, #111 0%, #0d0d0d 100%)",
-            boxShadow: "0 0 40px rgba(245,200,76,0.07)",
-          }}
-        >
-          <p className="text-[11px] text-white/25 uppercase tracking-widest font-semibold mb-2">
-            Updated projections and signals before every AFL Fantasy round lockout.
-          </p>
-          <div className="flex items-end justify-center gap-2 mb-1">
-            <span className="text-4xl font-extrabold text-white">$3.99</span>
-            <span className="text-sm text-white/35 mb-1.5">per week</span>
-          </div>
-          <p className="text-xs text-[#F5C84C]/60 font-semibold mb-1">Neeko+ from $3.99 per week</p>
-          <p className="text-xs text-white/25 mb-6">Less than the cost of a coffee each week.</p>
-
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link
-              to="/neeko-plus"
-              className="inline-flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3.5 rounded-xl hover:brightness-110 transition-all min-h-[48px] shadow-[0_4px_24px_rgba(245,200,76,0.2)]"
-            >
-              <Crown size={14} />
-              Start Winning With Neeko+
-            </Link>
-            <Link
-              to="/sports/afl/rankings"
-              className="inline-flex items-center justify-center gap-2 border border-white/15 text-white/70 hover:text-white hover:border-white/30 font-semibold text-sm px-7 py-3.5 rounded-xl transition-all min-h-[48px]"
-            >
-              View Free Rankings
-              <ArrowRight size={14} />
-            </Link>
-          </div>
-        </div>
-
-        <p className="text-xs text-white/20">Cancel anytime. No lock-in contracts.</p>
-      </div>
-    </section>
-  );
-}
 
 // ─── Rankings helpers ─────────────────────────────────────────────────────────
 
@@ -1505,19 +1340,10 @@ export default function Index() {
       {/* ── SECTION 5: EDGE SIGNALS PREVIEW ──────────────────────────────────── */}
       <EdgeBoardPreview />
 
-      {/* ── SECTION 6: OUTCOME PROOF ──────────────────────────────────────────── */}
-      <OutcomeProofSection />
-
-      {/* ── SECTION 7: SOCIAL PROOF ───────────────────────────────────────────── */}
-      <SocialProofSection />
-
-      {/* ── SECTION 8: MODEL ACCURACY ─────────────────────────────────────────── */}
-      <ModelAccuracySection />
-
-      {/* ── SECTION 9: WHY COACHES USE NEEKO ─────────────────────────────────── */}
+      {/* ── SECTION 6: WHY COACHES USE NEEKO ─────────────────────────────────── */}
       <WhyNeekoSection />
 
-      {/* ── SECTION 10: HOW IT WORKS ──────────────────────────────────────────── */}
+      {/* ── SECTION 7: HOW IT WORKS ───────────────────────────────────────────── */}
       <section className="py-10 md:py-14 bg-[#070707] border-t border-white/[0.05]">
         <div className="max-w-4xl mx-auto px-4">
           <SectionLabel>How It Works</SectionLabel>
@@ -1543,37 +1369,16 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ── SECTION 11: WHO NEEKO IS FOR ─────────────────────────────────────── */}
-      <section className="py-10 md:py-14 bg-[#0a0a0a] border-t border-white/[0.05]">
-        <div className="max-w-4xl mx-auto px-4">
-          <SectionLabel>Who It's For</SectionLabel>
-          <SectionHeading>Built For Serious AFL Fantasy Coaches</SectionHeading>
-          <GoldDivider />
+      {/* ── SECTION 8: MODEL ACCURACY ─────────────────────────────────────────── */}
+      <ModelAccuracySection />
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5 mt-6">
-            {WHO_FOR.map(({ icon: Icon, title, desc }) => (
-              <div
-                key={title}
-                className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-white/[0.12] transition-all"
-              >
-                <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/[0.05] border border-white/[0.08] mb-4">
-                  <Icon size={18} className="text-white/50" />
-                </div>
-                <h3 className="text-base font-bold text-white mb-2">{title}</h3>
-                <p className="text-sm text-white/40 leading-relaxed">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* ── SECTION 9: OUTCOME PROOF ──────────────────────────────────────────── */}
+      <OutcomeProofSection />
 
-      {/* ── SECTION 12: PRICING TEASER ────────────────────────────────────────── */}
-      {!isPremium && <PricingTeaserSection />}
-
-      {/* ── SECTION 13: FULL PRICING ──────────────────────────────────────────── */}
+      {/* ── SECTION 10: FULL PRICING ──────────────────────────────────────────── */}
       {!isPremium && <PremiumSection />}
 
-      {/* ── SECTION 14: FINAL CTA ─────────────────────────────────────────────── */}
+      {/* ── FINAL CTA ─────────────────────────────────────────────────────────── */}
       <section className="py-12 md:py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
         <div className="max-w-xl mx-auto px-5 text-center">
           <p className="text-[12px] text-[#F5C84C]/60 font-semibold uppercase tracking-widest mb-3">
