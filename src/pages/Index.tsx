@@ -4,7 +4,8 @@ import {
   Crown, ArrowRight, Star, TrendingUp,
   TriangleAlert as AlertTriangle, Check, Database,
   Cpu, Radio, Trophy, Users, ChartBar as BarChart2,
-  Lock, Target, Rocket, ChartLine as LineChart, Shield, Zap,
+  Lock, Target, ChartLine as LineChart, Shield, Zap,
+  Sparkles, ToggleRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
@@ -110,32 +111,32 @@ const FOOTER_LINKS = [
 
 const FEATURE_CARDS = [
   {
-    icon: Crown,
-    title: "Weekly Captain Picks",
-    desc: "Find the best captain option each round using projection models, matchups and form.",
+    icon: LineChart,
+    title: "Rankings",
+    desc: "Advanced AFL Fantasy rankings powered by projections, value scores, risk modelling and AI recommendations.",
     link: "/sports/afl/rankings",
     cta: "View Rankings",
   },
   {
-    icon: Rocket,
-    title: "Breakout Alerts",
-    desc: "Players about to surge in scoring or price before the crowd notices.",
+    icon: Sparkles,
+    title: "Edge Board",
+    desc: "Identify the biggest weekly advantages with captain picks, breakout alerts and trade signals.",
     link: "/sports/afl/edge-board",
-    cta: "View Breakouts",
+    cta: "View Edge Board",
   },
   {
-    icon: AlertTriangle,
-    title: "Trap Warnings",
-    desc: "Avoid overpriced players before they damage your weekly score.",
+    icon: ToggleRight,
+    title: "Start / Sit",
+    desc: "Make the right weekly decisions with AI-driven start and sit recommendations.",
+    link: "/sports/afl/start-sit",
+    cta: "View Start / Sit",
+  },
+  {
+    icon: TrendingUp,
+    title: "Market Watch",
+    desc: "Track rising players, trap warnings and price value opportunities before the market reacts.",
     link: "/sports/afl/market-watch",
-    cta: "View Traps",
-  },
-  {
-    icon: LineChart,
-    title: "Advanced Projections",
-    desc: "Deep AI-powered projections with risk, confidence and value modelling.",
-    link: "/sports/afl/rankings",
-    cta: "View Projections",
+    cta: "View Market Watch",
   },
 ];
 
@@ -173,7 +174,7 @@ function FeatureCards() {
             What You Get
           </p>
           <p className="text-base text-white/40">
-            Get the edge every round with AI-driven insights.
+            The core tools powering smarter AFL Fantasy decisions.
           </p>
         </div>
 
