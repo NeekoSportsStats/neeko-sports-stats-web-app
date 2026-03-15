@@ -41,42 +41,24 @@ interface EdgeRow {
 
 // ─── Static data ──────────────────────────────────────────────────────────────
 
-const FEATURES = [
-  {
-    icon: Cpu,
-    title: "AI Player Analysis",
-    desc: "Each player is evaluated using matchup difficulty, recent form and historical scoring to project realistic fantasy outcomes.",
-  },
-  {
-    icon: Radio,
-    title: "Weekly Edge Signals",
-    desc: "Captain picks, breakout watches and trap warnings generated from projection mismatches.",
-  },
-  {
-    icon: BarChart2,
-    title: "Advanced Rankings",
-    desc: "Neeko Rating combines projection, matchup grade, volatility band and AI verdict.",
-  },
-];
-
 const HOW_IT_WORKS = [
   {
     step: "01",
     icon: Database,
-    title: "Data Modelling",
-    desc: "Historical match data and player trends normalised into fantasy-relevant metrics.",
+    title: "Historical AFL Data Modelling",
+    desc: "Match data and player trends normalised into fantasy scoring metrics.",
   },
   {
     step: "02",
     icon: Cpu,
-    title: "AI Projection Engine",
+    title: "Projection Engine",
     desc: "Models estimate scoring ranges, ceilings and volatility for each player.",
   },
   {
     step: "03",
     icon: Radio,
     title: "Edge Signals",
-    desc: "Captain picks, breakout alerts and trap warnings generated from projection mismatches.",
+    desc: "Captain picks, breakout alerts and trap warnings generated each round.",
   },
 ];
 
@@ -154,17 +136,17 @@ const FEATURE_CARDS = [
 const WHY_NEEKO_BLOCKS = [
   {
     icon: Shield,
-    title: "Opponent Normalised Projections",
+    title: "Opponent Adjusted Projections",
     desc: "Player projections adjusted for opponent defensive strength.",
   },
   {
     icon: AlertTriangle,
-    title: "Risk Modelling",
-    desc: "Identify safe picks and high volatility players.",
+    title: "Volatility & Risk Modelling",
+    desc: "Identify safe picks and high-variance players.",
   },
   {
     icon: Zap,
-    title: "Value Engine",
+    title: "Market Value Detection",
     desc: "Detect underpriced players before the market reacts.",
   },
   {
@@ -173,6 +155,32 @@ const WHY_NEEKO_BLOCKS = [
     desc: "Automated insights explaining projections and recommendations.",
   },
 ];
+
+// ─── Shared layout ────────────────────────────────────────────────────────────
+
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <p className="text-center text-[11px] text-white/25 uppercase tracking-[0.18em] font-semibold mb-3">
+      {children}
+    </p>
+  );
+}
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="text-2xl md:text-4xl font-extrabold text-white text-center leading-tight mb-3">
+      {children}
+    </h2>
+  );
+}
+
+function GoldDivider() {
+  return (
+    <div className="flex justify-center my-4">
+      <div className="w-10 h-0.5 rounded-full bg-[#F5C84C]/30" />
+    </div>
+  );
+}
 
 // ─── Feature Cards ────────────────────────────────────────────────────────────
 
@@ -219,92 +227,6 @@ function FeatureCards() {
   );
 }
 
-// ─── Product Showcase ─────────────────────────────────────────────────────────
-
-function ProductShowcase() {
-  return (
-    <section className="py-16 md:py-24 bg-[#0a0a0a] border-t border-white/[0.05]">
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="text-center mb-10">
-          <p className="text-[11px] text-white/25 uppercase tracking-[0.18em] font-semibold mb-3">
-            See It In Action
-          </p>
-          <h2 className="text-2xl md:text-4xl font-extrabold text-white leading-tight mb-3">
-            SEE THE RANKINGS IN ACTION
-          </h2>
-          <div className="flex justify-center my-4">
-            <div className="w-10 h-0.5 rounded-full bg-[#F5C84C]/30" />
-          </div>
-          <p className="text-base text-white/40 max-w-xl mx-auto leading-relaxed">
-            Explore projections, value scores, risk ratings and AI recommendations for every AFL player.
-          </p>
-        </div>
-
-        <div className="relative rounded-xl border border-neutral-800 overflow-hidden shadow-lg bg-[#0f0f0f]">
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a]/80 via-transparent to-transparent pointer-events-none z-10" />
-
-          <div className="w-full" style={{ minHeight: "320px" }}>
-            <div className="flex flex-col items-center justify-center py-16 px-8 text-center gap-6">
-              <div className="w-14 h-14 rounded-2xl bg-[#F5C84C]/10 border border-[#F5C84C]/20 flex items-center justify-center">
-                <BarChart2 size={26} className="text-[#F5C84C]" />
-              </div>
-              <div>
-                <p className="text-lg font-bold text-white mb-2">Full Rankings Dashboard</p>
-                <p className="text-sm text-white/40 max-w-sm leading-relaxed">
-                  Projections, Neeko Ratings, value tiers, risk bands and AI verdicts — all in one table.
-                </p>
-              </div>
-
-              <div className="w-full max-w-2xl rounded-xl border border-white/[0.07] overflow-hidden mt-2">
-                <div className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_4rem] gap-x-3 px-4 py-2.5 text-[10px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
-                  <span>#</span>
-                  <span>Player</span>
-                  <span className="text-center">Pos</span>
-                  <span className="text-center">Proj.</span>
-                  <span className="text-right">Rating</span>
-                </div>
-                {[
-                  { rank: 1, name: "Clayton Oliver", pos: "MID", proj: 121, rating: 94 },
-                  { rank: 2, name: "Patrick Cripps", pos: "MID", proj: 117, rating: 91 },
-                  { rank: 3, name: "Zach Merrett",   pos: "MID", proj: 112, rating: 88 },
-                  { rank: 4, name: "Lachie Neale",   pos: "MID", proj: 109, rating: 86 },
-                  { rank: 5, name: "Josh Dunkley",   pos: "MID", proj: 106, rating: 83 },
-                ].map(({ rank, name, pos, proj, rating }) => (
-                  <div key={rank} className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_4rem] gap-x-3 px-4 py-3 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0">
-                    <span className="text-xs text-white/25 font-mono self-center">{rank}</span>
-                    <span className="text-xs font-semibold text-white truncate self-center">{name}</span>
-                    <span className="text-[10px] text-white/40 text-center self-center">{pos}</span>
-                    <span className="text-xs font-bold text-[#F5C84C] text-center self-center">{proj}</span>
-                    <div className="flex items-center justify-end self-center">
-                      <span className="text-[10px] font-bold text-white/80 bg-white/[0.07] border border-white/[0.1] rounded px-1.5 py-0.5">
-                        {rating}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                <div className="px-4 py-2.5 flex items-center justify-center gap-2 bg-[#090909] border-t border-white/[0.04]">
-                  <Lock size={10} className="text-white/20" />
-                  <span className="text-[10px] text-white/25">Full rankings require Neeko+</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-center mt-8">
-          <Link
-            to="/sports/afl/rankings"
-            className="inline-flex items-center justify-center gap-2 border border-white/15 text-white/70 hover:text-white hover:border-white/30 font-semibold text-sm px-7 py-3.5 rounded-xl transition-all min-h-[48px]"
-          >
-            Explore Rankings
-            <ArrowRight size={14} />
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function teamAbbr(team: string) {
@@ -317,32 +239,6 @@ function teamAbbr(team: string) {
     "Sydney": "SYD", "West Coast": "WCE", "Western Bulldogs": "WBD",
   };
   return map[team] ?? team.slice(0, 3).toUpperCase();
-}
-
-// ─── Shared layout ────────────────────────────────────────────────────────────
-
-function SectionLabel({ children }: { children: string }) {
-  return (
-    <p className="text-center text-[11px] text-white/25 uppercase tracking-[0.18em] font-semibold mb-3">
-      {children}
-    </p>
-  );
-}
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="text-2xl md:text-4xl font-extrabold text-white text-center leading-tight mb-3">
-      {children}
-    </h2>
-  );
-}
-
-function GoldDivider() {
-  return (
-    <div className="flex justify-center my-4">
-      <div className="w-10 h-0.5 rounded-full bg-[#F5C84C]/30" />
-    </div>
-  );
 }
 
 // ─── Model Accuracy ───────────────────────────────────────────────────────────
@@ -361,15 +257,15 @@ interface AccuracyRow {
 function confidenceLevel(err: number | null): { label: string; color: string; bg: string; border: string; barColor: string } {
   if (err == null) return { label: "—",        color: "text-white/30",    bg: "bg-white/5",         border: "border-white/10",         barColor: "bg-white/20" };
   if (err < 16)    return { label: "ELITE",     color: "text-green-400",   bg: "bg-green-400/10",    border: "border-green-400/30",     barColor: "bg-green-400" };
-  if (err <= 18)   return { label: "STRONG", color: "text-[#F5C84C]",   bg: "bg-[#F5C84C]/10",    border: "border-[#F5C84C]/30",     barColor: "bg-[#F5C84C]" };
+  if (err <= 18)   return { label: "STRONG",    color: "text-[#F5C84C]",   bg: "bg-[#F5C84C]/10",    border: "border-[#F5C84C]/30",     barColor: "bg-[#F5C84C]" };
   return             { label: "MODERATE",       color: "text-red-400",     bg: "bg-red-400/10",      border: "border-red-400/30",       barColor: "bg-red-400" };
 }
 
 function reliabilityLevel(err: number | null): { label: string; color: string; bg: string; border: string } {
   if (err == null) return { label: "—",        color: "text-white/30",   bg: "bg-white/5",        border: "border-white/10" };
-  if (err <= 16)   return { label: "ELITE", color: "text-green-400",  bg: "bg-green-400/10",   border: "border-green-400/30" };
-  if (err <= 18)   return { label: "STRONG",    color: "text-[#F5C84C]",  bg: "bg-[#F5C84C]/10",   border: "border-[#F5C84C]/30" };
-  return             { label: "MODERATE",  color: "text-orange-400",  bg: "bg-orange-400/10",  border: "border-orange-400/30" };
+  if (err <= 16)   return { label: "ELITE",    color: "text-green-400",  bg: "bg-green-400/10",   border: "border-green-400/30" };
+  if (err <= 18)   return { label: "STRONG",   color: "text-[#F5C84C]",  bg: "bg-[#F5C84C]/10",   border: "border-[#F5C84C]/30" };
+  return             { label: "MODERATE",      color: "text-orange-400",  bg: "bg-orange-400/10",  border: "border-orange-400/30" };
 }
 
 interface DistBand {
@@ -457,7 +353,7 @@ function ErrorDistributionBlock({ row, loading }: { row: AccuracyRow | null; loa
 
       <div className="px-5 pb-4">
         <p className="text-[12px] text-white/30 leading-relaxed">
-          Neeko projections average 17.4 points error across 361 AFL players this season. Most projections fall within 10–15 points of actual scores, demonstrating strong predictive reliability.
+          Most projections fall within 10–15 points of actual AFL Fantasy scores, giving coaches a reliable weekly baseline for decision making.
         </p>
       </div>
     </div>
@@ -562,6 +458,9 @@ function ModelAccuracySection() {
               {proofLine}
             </p>
           )}
+          <p className="text-[13px] text-white/30 mt-2 max-w-lg mx-auto leading-relaxed">
+            Most projections fall within 10–15 points of actual AFL Fantasy scores, giving coaches a reliable weekly baseline for decision making.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -687,6 +586,14 @@ function WhyNeekoSection() {
 
 // ─── Premium Section ──────────────────────────────────────────────────────────
 
+const ROUND_DELIVERABLES = [
+  "Updated projections for 600+ players",
+  "Captain rankings",
+  "Breakout alerts",
+  "Trap warnings",
+  "Start/Sit comparisons",
+];
+
 function PremiumSection() {
   return (
     <section className="py-12 md:py-16 bg-[#070707] border-t border-white/[0.05]">
@@ -695,8 +602,11 @@ function PremiumSection() {
           <SectionLabel>Pricing</SectionLabel>
           <SectionHeading>UNLOCK THE FULL EDGE</SectionHeading>
           <GoldDivider />
-          <p className="text-base text-white/40 max-w-md mx-auto leading-relaxed">
-            Get access to the full Neeko analytics engine.
+          <p className="text-[13px] text-[#F5C84C]/60 font-semibold mb-1">
+            Less than the cost of a coffee per round.
+          </p>
+          <p className="text-sm text-white/40 max-w-md mx-auto leading-relaxed">
+            All insights updated before AFL Fantasy round lockout.
           </p>
         </div>
 
@@ -741,7 +651,7 @@ function PremiumSection() {
                 className="block text-center bg-[#F5C84C] text-black font-bold text-sm py-3.5 rounded-xl hover:brightness-110 transition-all min-h-[48px] flex items-center justify-center"
               >
                 <Crown size={14} className="mr-2" />
-                Upgrade to Neeko+
+                Start Winning With Neeko+
               </Link>
             </div>
 
@@ -762,18 +672,12 @@ function PremiumSection() {
           </div>
         </div>
 
-        <div className="mt-8 rounded-xl border border-white/[0.07] bg-[#0d0d0d] px-5 py-4 text-center">
-          <p className="text-sm font-semibold text-white/60 mb-3">
-            Used weekly by competitive AFL Fantasy coaches.
+        <div className="mt-8 rounded-xl border border-white/[0.07] bg-[#0d0d0d] px-5 py-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-white/30 text-center mb-3">
+            Every round, before lockout
           </p>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
-            {[
-              "Full projections for 600+ players",
-              "Weekly captain edge board",
-              "Breakout alerts",
-              "Trap warnings",
-              "Start / Sit comparisons",
-            ].map((item) => (
+            {ROUND_DELIVERABLES.map((item) => (
               <div key={item} className="flex items-center gap-1.5">
                 <div className="w-3.5 h-3.5 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30 flex items-center justify-center shrink-0">
                   <Check size={7} className="text-[#F5C84C]" />
@@ -817,7 +721,7 @@ function EdgeBoardPreview() {
       section: "captain",
       icon: Star,
       color: "#F5C84C",
-      label: "Captain Pick",
+      label: "Captain Edge",
       row: captain,
       stat: (r: EdgeRow) => r.captain_score != null ? `Captain Score ${Math.round(r.captain_score)}` : null,
     },
@@ -833,7 +737,7 @@ function EdgeBoardPreview() {
       section: "trap",
       icon: AlertTriangle,
       color: "#f87171",
-      label: "Trap Alert",
+      label: "Trap Warning",
       row: trap,
       stat: (r: EdgeRow) => r.risk_rating != null ? `Risk ${Math.round(r.risk_rating)}` : null,
     },
@@ -915,125 +819,6 @@ function EdgeBoardPreview() {
   );
 }
 
-// ─── Rankings preview ─────────────────────────────────────────────────────────
-
-// ─── Real Weekly Edges ────────────────────────────────────────────────────────
-
-function RealWeeklyEdges() {
-  const edgeCards = [
-    {
-      icon: Star,
-      color: "#F5C84C",
-      title: "Captain Edge",
-      player: "Nick Daicos",
-      lines: [
-        { label: "Projection",        value: "123 pts" },
-        { label: "Field Avg Captain", value: "104 pts" },
-        { label: "Edge",              value: "+19 pts", highlight: true },
-      ],
-    },
-    {
-      icon: TrendingUp,
-      color: "#34d399",
-      title: "Breakout Watch",
-      player: "Tom De Koning",
-      lines: [
-        { label: "Projection",  value: "92 pts" },
-        { label: "Season Avg",  value: "71 pts" },
-        { label: "Upside",      value: "+21 pts", highlight: true },
-      ],
-    },
-    {
-      icon: AlertTriangle,
-      color: "#f87171",
-      title: "Trap Warning",
-      player: "Tom Mitchell",
-      lines: [
-        { label: "Projection",           value: "84 pts" },
-        { label: "Market Expectation",   value: "98 pts" },
-        { label: "Risk",                 value: "HIGH",   highlight: true },
-      ],
-    },
-  ];
-
-  return (
-    <section className="py-10 md:py-14 bg-[#0a0a0a] border-t border-white/[0.05]">
-      <div className="max-w-4xl mx-auto px-4">
-        <SectionLabel>Edge Intelligence</SectionLabel>
-        <SectionHeading>Weekly Edge Signals</SectionHeading>
-        <GoldDivider />
-        <p className="text-center text-white/40 text-sm mb-6 max-w-md mx-auto">
-          Each round the Neeko engine identifies captain picks, breakout candidates and risky traps.
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {edgeCards.map(({ icon: Icon, color, title, player, lines }) => (
-            <div
-              key={title}
-              className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-white/[0.12] transition-all"
-            >
-              <div className="flex items-center gap-2 mb-4">
-                <div
-                  className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                  style={{ background: `${color}15`, border: `1px solid ${color}30` }}
-                >
-                  <Icon size={16} style={{ color }} />
-                </div>
-                <span className="text-xs font-bold uppercase tracking-widest" style={{ color }}>
-                  {title}
-                </span>
-              </div>
-
-              <p className="text-base font-bold text-white mb-3 leading-tight">{player}</p>
-
-              <div className="space-y-1.5">
-                {lines.map(({ label, value, highlight }) => (
-                  <div key={label} className="flex items-center justify-between">
-                    <span className="text-[11px] text-white/35">{label}</span>
-                    <span
-                      className={`text-xs font-bold tabular-nums ${highlight ? "" : "text-white/60"}`}
-                      style={highlight ? { color } : undefined}
-                    >
-                      {value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-4 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-          style={{
-            border: "1px solid rgba(245,200,76,0.22)",
-            background: "linear-gradient(135deg, #0f0f0f 0%, #0d0d0d 100%)",
-            boxShadow: "0 0 28px rgba(245,200,76,0.05)",
-          }}
-        >
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[#F5C84C]/10 border border-[#F5C84C]/20 flex items-center justify-center shrink-0 mt-0.5">
-              <Lock size={15} className="text-[#F5C84C]" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-white leading-tight mb-1">20+ More Weekly Signals</p>
-              <p className="text-xs text-white/40 leading-relaxed max-w-xs">
-                Unlock captain picks, breakout alerts and trap warnings generated by the Neeko projection engine.
-              </p>
-            </div>
-          </div>
-          <Link
-            to="/neeko-plus"
-            className="shrink-0 inline-flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-6 py-2.5 rounded-xl hover:brightness-110 transition-all min-h-[44px] w-full sm:w-auto"
-          >
-            <Crown size={13} />
-            Unlock All Signals
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 // ─── Problem Section ──────────────────────────────────────────────────────────
 
 function ProblemSection() {
@@ -1078,9 +863,9 @@ function ProblemSection() {
           <div
             className="rounded-2xl p-5"
             style={{
-              border: "1px solid rgba(245,200,76,0.25)",
-              background: "linear-gradient(160deg, #111 0%, #0d0d0d 100%)",
-              boxShadow: "0 0 30px rgba(245,200,76,0.06)",
+              border: "1px solid rgba(245,200,76,0.30)",
+              background: "linear-gradient(160deg, #131313 0%, #0e0e0e 100%)",
+              boxShadow: "0 0 36px rgba(245,200,76,0.08)",
             }}
           >
             <p className="text-xs font-bold uppercase tracking-widest text-[#F5C84C]/60 mb-5">
@@ -1092,7 +877,7 @@ function ProblemSection() {
                   <div className="mt-1 w-4 h-4 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30 flex items-center justify-center shrink-0">
                     <Check size={8} className="text-[#F5C84C]" />
                   </div>
-                  <span className="text-sm text-white/70 leading-relaxed">{item}</span>
+                  <span className="text-sm text-white/75 leading-relaxed">{item}</span>
                 </li>
               ))}
             </ul>
@@ -1113,65 +898,26 @@ function ProblemSection() {
   );
 }
 
-// ─── Weekly Value Section ─────────────────────────────────────────────────────
-
-const WEEKLY_VALUE_ITEMS = [
-  "Updated projections for 600+ players",
-  "Captain rankings",
-  "Breakout alerts",
-  "Trap warnings",
-  "Start/Sit comparisons",
-  "Value and pricing signals",
-];
-
-function WeeklyValueSection() {
-  return (
-    <section className="py-10 md:py-14 bg-[#070707] border-t border-white/[0.05]">
-      <div className="max-w-4xl mx-auto px-4">
-        <div className="text-center mb-8">
-          <SectionLabel>Every Round</SectionLabel>
-          <SectionHeading>What You Get Every Round</SectionHeading>
-          <GoldDivider />
-          <p className="text-sm text-white/40 max-w-md mx-auto leading-relaxed">
-            All insights updated before AFL Fantasy lockout each round.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {WEEKLY_VALUE_ITEMS.map((item) => (
-            <div key={item} className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-[#0e0e0e] px-4 py-3">
-              <div className="w-5 h-5 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30 flex items-center justify-center shrink-0">
-                <Check size={9} className="text-[#F5C84C]" />
-              </div>
-              <span className="text-sm text-white/70 leading-snug">{item}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 // ─── Rankings helpers ─────────────────────────────────────────────────────────
 
 function riskLabel(risk: number | null): { label: string; color: string } {
-  if (risk == null) return { label: "—", color: "text-white/30" };
-  if (risk >= 70)   return { label: "HIGH",   color: "text-red-400" };
-  if (risk >= 40)   return { label: "MED",    color: "text-[#F5C84C]" };
-  return               { label: "LOW",    color: "text-green-400" };
+  if (risk == null) return { label: "—",    color: "text-white/30" };
+  if (risk >= 55)   return { label: "HIGH", color: "text-red-400" };
+  if (risk >= 38)   return { label: "MED",  color: "text-[#F5C84C]" };
+  return               { label: "LOW",  color: "text-green-400" };
 }
 
 function confLabel(conf: number | null): { label: string; color: string } {
-  if (conf == null) return { label: "—",      color: "text-white/30" };
-  if (conf >= 75)   return { label: "HIGH",   color: "text-green-400" };
-  if (conf >= 50)   return { label: "MED",    color: "text-[#F5C84C]" };
-  return               { label: "LOW",    color: "text-white/40" };
+  if (conf == null) return { label: "—",    color: "text-white/30" };
+  if (conf >= 75)   return { label: "HIGH", color: "text-green-400" };
+  if (conf >= 55)   return { label: "MED",  color: "text-[#F5C84C]" };
+  return               { label: "LOW",  color: "text-white/40" };
 }
 
 function valueLabel(score: number | null): { label: string; color: string } {
   if (score == null) return { label: "—",     color: "text-white/30" };
-  if (score >= 1.2)  return { label: "GREAT", color: "text-green-400" };
-  if (score >= 0.9)  return { label: "FAIR",  color: "text-white/50" };
+  if (score >= 120)  return { label: "GREAT", color: "text-green-400" };
+  if (score >= 80)   return { label: "FAIR",  color: "text-white/50" };
   return                { label: "POOR",  color: "text-red-400" };
 }
 
@@ -1197,8 +943,8 @@ function RankingsPreview() {
         <SectionLabel>Rankings Preview</SectionLabel>
         <SectionHeading>See the Rankings in Action</SectionHeading>
         <GoldDivider />
-        <p className="text-center text-white/40 text-sm mb-3 max-w-md mx-auto">
-          Live AFL Fantasy projections ranked using Neeko Rating — combining projection, matchup difficulty and AI analysis.
+        <p className="text-center text-white/40 text-sm mb-3 max-w-lg mx-auto">
+          Rankings combine projection models, matchup difficulty, ceiling projections, volatility scoring and value metrics.
         </p>
         <p className="text-center text-[11px] text-[#F5C84C]/50 font-semibold uppercase tracking-widest mb-1">
           600+ players ranked weekly
@@ -1404,11 +1150,11 @@ export default function Index() {
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-[5.5rem] font-extrabold leading-[1.08] tracking-tight mb-6">
-            Win Your AFL Fantasy League With Smarter Weekly Picks
+            Stop Guessing. Start Winning AFL Fantasy.
           </h1>
 
           <p className="text-base md:text-xl text-neutral-400 font-medium mb-10 max-w-2xl mx-auto leading-relaxed px-1">
-            AI-powered rankings, captain picks and breakout alerts updated before every AFL Fantasy round lockout.
+            Neeko combines projections, matchup difficulty, value modelling and AI insights to give serious AFL Fantasy coaches weekly captain edges, breakout alerts and trap warnings before lockout.
           </p>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-center sm:items-center px-2 sm:px-0">
@@ -1418,7 +1164,7 @@ export default function Index() {
                 className="flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-8 rounded-xl hover:brightness-110 transition-all shadow-[0_4px_30px_rgba(245,200,76,0.25)] min-h-[52px] w-full sm:w-auto"
               >
                 <Crown size={15} />
-                Unlock The Weekly Edge
+                Start Winning With Neeko+
               </Link>
             )}
             <Link
@@ -1429,14 +1175,20 @@ export default function Index() {
                   : "border border-white/15 text-white/70 hover:text-white hover:border-white/30 bg-transparent"
               }`}
             >
-              Explore Rankings
+              View Free Rankings
               <ArrowRight size={14} />
             </Link>
           </div>
 
-          <p className="mt-5 text-[12px] text-white/30 font-medium tracking-wide">
-            600+ players ranked and updated every AFL Fantasy round.
-          </p>
+          <div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6">
+            <p className="text-[12px] text-white/30 font-medium tracking-wide">
+              Updated before every AFL Fantasy round lockout
+            </p>
+            <span className="hidden sm:block text-white/15">·</span>
+            <p className="text-[12px] text-white/30 font-medium tracking-wide">
+              600+ players ranked every week
+            </p>
+          </div>
         </div>
       </section>
 
@@ -1449,22 +1201,16 @@ export default function Index() {
       {/* ── SECTION 4: RANKINGS PREVIEW ───────────────────────────────────────── */}
       <RankingsPreview />
 
-      {/* ── SECTION 5: REAL WEEKLY EDGES / EDGE SIGNALS ──────────────────────── */}
-      <RealWeeklyEdges />
-
-      {/* ── SECTION 6: EDGE SIGNALS PREVIEW ──────────────────────────────────── */}
+      {/* ── SECTION 5: EDGE SIGNALS PREVIEW ──────────────────────────────────── */}
       <EdgeBoardPreview />
 
-      {/* ── SECTION 7: MODEL ACCURACY ─────────────────────────────────────────── */}
+      {/* ── SECTION 6: MODEL ACCURACY ─────────────────────────────────────────── */}
       <ModelAccuracySection />
 
-      {/* ── SECTION 8: WEEKLY VALUE ───────────────────────────────────────────── */}
-      <WeeklyValueSection />
-
-      {/* ── SECTION 9: WHY COACHES USE NEEKO ─────────────────────────────────── */}
+      {/* ── SECTION 7: WHY COACHES USE NEEKO ─────────────────────────────────── */}
       <WhyNeekoSection />
 
-      {/* ── SECTION 10: HOW IT WORKS ──────────────────────────────────────────── */}
+      {/* ── SECTION 8: HOW IT WORKS ──────────────────────────────────────────── */}
       <section className="py-10 md:py-14 bg-[#070707] border-t border-white/[0.05]">
         <div className="max-w-4xl mx-auto px-4">
           <SectionLabel>How It Works</SectionLabel>
@@ -1490,7 +1236,7 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ── SECTION 11: WHO NEEKO IS FOR ─────────────────────────────────────── */}
+      {/* ── SECTION 9: WHO NEEKO IS FOR ──────────────────────────────────────── */}
       <section className="py-10 md:py-14 bg-[#0a0a0a] border-t border-white/[0.05]">
         <div className="max-w-4xl mx-auto px-4">
           <SectionLabel>Who It's For</SectionLabel>
@@ -1514,7 +1260,7 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ── SECTION 12: PREMIUM SECTION ──────────────────────────────────────── */}
+      {/* ── SECTION 10: PREMIUM SECTION ──────────────────────────────────────── */}
       {!isPremium && <PremiumSection />}
 
       {/* ── SECTION 11: FINAL CTA ─────────────────────────────────────────────── */}
@@ -1532,7 +1278,7 @@ export default function Index() {
               className="flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-8 py-3.5 rounded-xl hover:brightness-110 transition-all min-h-[52px] w-full sm:w-auto shadow-[0_4px_30px_rgba(245,200,76,0.2)]"
             >
               <Crown size={14} />
-              Start Using Neeko+
+              Start Winning With Neeko+
             </Link>
             <Link
               to="/sports/afl/rankings"
@@ -1544,40 +1290,6 @@ export default function Index() {
           </div>
         </div>
       </section>
-
-      {/* ── FINAL UPGRADE NUDGE ──────────────────────────────────────────────── */}
-      {!isPremium && (
-        <section className="py-10 md:py-12 bg-[#070707] border-t border-[#F5C84C]/10">
-          <div className="max-w-2xl mx-auto px-5 text-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#F5C84C]/25 bg-[#F5C84C]/8 text-[#F5C84C]/70 text-[10px] font-bold uppercase tracking-widest mb-5">
-              <Crown size={10} />
-              Neeko+
-            </div>
-            <h2 className="text-xl md:text-3xl font-extrabold text-white mb-3 leading-tight">
-              Ready to gain the weekly edge?
-            </h2>
-            <p className="text-sm text-white/40 mb-6 max-w-sm mx-auto leading-relaxed">
-              Unlock full projections, edge signals and AI player insights.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-              <Link
-                to="/neeko-plus"
-                className="flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-8 py-3.5 rounded-xl hover:brightness-110 transition-all shadow-[0_4px_30px_rgba(245,200,76,0.2)] min-h-[48px] w-full sm:w-auto"
-              >
-                <Crown size={14} />
-                Start Using Neeko+
-              </Link>
-              <Link
-                to="/sports/afl/rankings"
-                className="flex items-center justify-center gap-2 border border-white/15 text-white/70 hover:text-white hover:border-white/30 font-semibold text-sm px-8 py-3.5 rounded-xl transition-all min-h-[48px] w-full sm:w-auto"
-              >
-                Explore Rankings
-                <ArrowRight size={14} />
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* ── MOBILE STICKY UPGRADE BAR ─────────────────────────────────────────── */}
       {!isPremium && <MobileUpgradeBar />}
