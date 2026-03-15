@@ -555,7 +555,7 @@ async function generateVideos(
 
       if (batchCount >= BATCH_SIZE) {
         batchCount = 0;
-        await writer.write(sseEvent({ phase: "batch", category, message: `Batch complete — pausing 500ms`, generated: existingCount + generated, total: displayTarget, failed }));
+        await writer.write(sseEvent({ phase: "batch", category, message: `Batch complete — pausing 500ms`, generated: existingCount + generated, total: targetCount, failed }));
         await delay(BATCH_DELAY_MS);
       }
     } catch (err) {
