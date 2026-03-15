@@ -171,10 +171,10 @@ function FeatureCards() {
       <div className="max-w-5xl mx-auto px-4">
         <div className="text-center mb-8">
           <p className="text-sm uppercase tracking-wider text-[#F5C84C] font-semibold mb-2">
-            What You Get
+            Your Weekly AFL Fantasy Toolkit
           </p>
           <p className="text-base text-white/40">
-            The core tools powering smarter AFL Fantasy decisions.
+            Everything you need each week to make smarter AFL Fantasy decisions.
           </p>
         </div>
 
