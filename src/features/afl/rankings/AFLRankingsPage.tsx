@@ -208,10 +208,11 @@ export default function AFLRankingsPage() {
   setSelected(null);
   setHighlightedPlayerId(null);
 
-  const { data, error } = await supabase
-    .from("v_rankings_final")
-    .select("*")
-    .limit(750);
+  const query = isPremium
+    ? supabase.from("v_rankings_final").select("*").order("neeko_rating", { ascending: false }).limit(750)
+    : supabase.from("v_rankings_free").select("*").order("neeko_rating", { ascending: false });
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("Rankings fetch error:", error);
