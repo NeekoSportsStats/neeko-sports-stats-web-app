@@ -407,10 +407,10 @@ export function PlayerDetailModal({
     if (row.value_tag) return row.value_tag;
     const vs = row.value_score;
     if (vs == null) return null;
-    if (vs >= 12.0) return "Elite Value";
-    if (vs >= 10.0) return "Good Value";
-    if (vs >= 8.5) return "Fair Value";
-    return "Below Average";
+    if (vs >= 120) return "Elite Value";
+    if (vs >= 100) return "Strong Value";
+    if (vs >= 80) return "Fair Value";
+    return "Overpriced";
   })();
   const valueLabelStyle = getValueTagStyle(valueLabel);
   const matchupLabel = fmtMatchup(row.matchup_rating);

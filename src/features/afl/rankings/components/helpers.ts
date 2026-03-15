@@ -159,25 +159,26 @@ export function getUpsideColor(v: number | null): string {
 
 export function getRiskColor(v: number | null): string {
   if (v == null) return "text-white/30";
-  if (v <= 15) return "text-green-400";
-  if (v <= 25) return "text-emerald-400";
-  if (v <= 35) return "text-orange-400";
+  if (v <= 25) return "text-green-400";
+  if (v <= 40) return "text-emerald-400";
+  if (v <= 60) return "text-orange-400";
   return "text-red-400";
 }
 
 export function getConfidenceColor(v: number | null): string {
   if (v == null) return "text-white/30";
-  if (v >= 85) return "text-green-400";
-  if (v >= 72) return "text-yellow-400";
-  if (v >= 58) return "text-orange-400";
+  if (v >= 90) return "text-green-400";
+  if (v >= 75) return "text-emerald-400";
+  if (v >= 60) return "text-yellow-400";
+  if (v >= 45) return "text-orange-400";
   return "text-red-400";
 }
 
 export function getValueScoreColor(v: number | null): string {
   if (v == null) return "text-white/30";
-  if (v >= 12.0) return "text-green-400";
-  if (v >= 10.0) return "text-[#F5C84C]";
-  if (v >= 8.5) return "text-white/50";
+  if (v >= 120) return "text-green-400";
+  if (v >= 100) return "text-[#F5C84C]";
+  if (v >= 80) return "text-white/50";
   return "text-red-400";
 }
 
@@ -201,9 +202,11 @@ export function getValueTagStyle(tag: string | null | undefined) {
   if (!tag) return { text: "text-white/30", bg: "bg-white/5", border: "border-white/10" };
   const t = tag.toUpperCase();
   if (t.includes("ELITE")) return { text: "text-green-300", bg: "bg-green-500/10", border: "border-green-500/30" };
+  if (t.includes("STRONG")) return { text: "text-[#F5C84C]", bg: "bg-[#F5C84C]/10", border: "border-[#F5C84C]/30" };
   if (t.includes("GOOD")) return { text: "text-[#F5C84C]", bg: "bg-[#F5C84C]/10", border: "border-[#F5C84C]/30" };
   if (t.includes("FAIR") || t.includes("AVERAGE")) return { text: "text-white/50", bg: "bg-white/5", border: "border-white/10" };
-  return { text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" };
+  if (t.includes("OVERPRICED") || t.includes("TRAP") || t.includes("SELL")) return { text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" };
+  return { text: "text-white/40", bg: "bg-white/5", border: "border-white/10" };
 }
 
 export function getNeekoRatingBadge(rating: number | null) {
@@ -217,10 +220,10 @@ export function getNeekoRatingBadge(rating: number | null) {
 
 export function getRiskBadge(risk: number | null) {
   if (risk == null) return { label: "—", text: "text-white/30", bg: "bg-transparent", border: "border-transparent" };
-  if (risk >= 80) return { label: "EXTREME", text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" };
-  if (risk >= 60) return { label: "HIGH RISK", text: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/30" };
-  if (risk >= 40) return { label: "ELEVATED", text: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/30" };
-  if (risk >= 20) return { label: "MODERATE", text: "text-gray-300", bg: "bg-white/5", border: "border-white/15" };
+  if (risk >= 75) return { label: "EXTREME", text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" };
+  if (risk >= 55) return { label: "HIGH RISK", text: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/30" };
+  if (risk >= 38) return { label: "ELEVATED", text: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/30" };
+  if (risk >= 22) return { label: "MODERATE", text: "text-gray-300", bg: "bg-white/5", border: "border-white/15" };
   return { label: "LOW RISK", text: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30" };
 }
 
@@ -387,7 +390,7 @@ export function computeKpiTiles(rows: RankingRow[]) {
     ? captainRows.reduce((s, r) => s + (r.projection_final ?? 0), 0) / captainRows.length
     : null;
 
-  const valueUpgrades = rows.filter((r) => (r.value_score ?? 0) >= 110).length;
+  const valueUpgrades = rows.filter((r) => (r.value_score ?? 0) >= 120).length;
   const trapAlerts = rows.filter((r) => (r.risk_rating ?? 0) >= 60).length;
   const highConfidence = rows.filter((r) => (r.projection_confidence ?? 0) >= 85).length;
 
@@ -448,7 +451,7 @@ export function generateMetricFallbackWhy(row: {
   const val = row.value_score;
 
   if (rec === "BUY") {
-    if (val != null && val >= 11.0) return `Strong value pick. Projects ${Math.round(proj)} with manageable risk.`;
+    if (val != null && val >= 110) return `Strong value pick. Projects ${Math.round(proj)} with manageable risk.`;
     return `Good projection of ${Math.round(proj)} and solid confidence back this selection.`;
   }
   if (rec === "START") {
@@ -456,7 +459,7 @@ export function generateMetricFallbackWhy(row: {
     return `Solid projection of ${Math.round(proj)} supports starting this week.`;
   }
   if (rec === "SELL") {
-    if (val != null && val <= 8.5) return `Overpriced relative to projection of ${Math.round(proj)}. Consider selling.`;
+    if (val != null && val <= 80) return `Overpriced relative to projection of ${Math.round(proj)}. Consider selling.`;
     return `Low projection with elevated price suggests this is a sell candidate.`;
   }
   if (rec === "SIT") {
