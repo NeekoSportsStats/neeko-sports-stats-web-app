@@ -59,19 +59,42 @@ export default function MarketWatchPage() {
   const fetchData = useCallback(async (premium: boolean) => {
     setDataLoading(true);
     try {
-      const [playersRes, cardsRes, summaryRes, statusRes] = await Promise.all([
-        supabase.from("v_mw_premium").select("*").limit(premium ? 400 : 60),
-        supabase.from("v_mw_summary_cards").select("*"),
-        supabase.from("v_mw_summary").select("*").maybeSingle(),
-        supabase.from("v_mw_status").select("*").maybeSingle(),
-      ]);
-
-      setData({
-        players: (playersRes.data ?? []) as MWPlayerRow[],
-        summaryCards: (cardsRes.data ?? []) as MWSummaryCard[],
-      });
-      if (summaryRes.data) setSummary(summaryRes.data as MWSummary);
-      if (statusRes.data) setStatus(statusRes.data as MWStatus);
+      if (premium) {
+        const [playersRes, cardsRes, summaryRes, statusRes] = await Promise.all([
+          supabase.from("v_mw_premium").select("*").limit(400),
+          supabase.from("v_mw_summary_cards").select("*"),
+          supabase.from("v_mw_summary").select("*").maybeSingle(),
+          supabase.from("v_mw_status").select("*").maybeSingle(),
+        ]);
+        setData({
+          players: (playersRes.data ?? []) as MWPlayerRow[],
+          summaryCards: (cardsRes.data ?? []) as MWSummaryCard[],
+        });
+        if (summaryRes.data) setSummary(summaryRes.data as MWSummary);
+        if (statusRes.data) setStatus(statusRes.data as MWStatus);
+      } else {
+        const [buyRes, sellRes, cowRes, trapRes, cardsRes, summaryRes, statusRes] = await Promise.all([
+          supabase.from("v_mw_premium").select("*").eq("category", "buy").order("trade_score", { ascending: false }).limit(1),
+          supabase.from("v_mw_premium").select("*").eq("category", "sell").order("trade_score", { ascending: false }).limit(1),
+          supabase.from("v_mw_premium").select("*").eq("category", "cash_cow").order("trade_score", { ascending: false }).limit(1),
+          supabase.from("v_mw_premium").select("*").eq("category", "trap").order("trade_score", { ascending: false }).limit(1),
+          supabase.from("v_mw_summary_cards").select("*"),
+          supabase.from("v_mw_summary").select("*").maybeSingle(),
+          supabase.from("v_mw_status").select("*").maybeSingle(),
+        ]);
+        const freePlayers = [
+          ...(buyRes.data ?? []),
+          ...(sellRes.data ?? []),
+          ...(cowRes.data ?? []),
+          ...(trapRes.data ?? []),
+        ] as MWPlayerRow[];
+        setData({
+          players: freePlayers,
+          summaryCards: (cardsRes.data ?? []) as MWSummaryCard[],
+        });
+        if (summaryRes.data) setSummary(summaryRes.data as MWSummary);
+        if (statusRes.data) setStatus(statusRes.data as MWStatus);
+      }
     } finally {
       setDataLoading(false);
     }
