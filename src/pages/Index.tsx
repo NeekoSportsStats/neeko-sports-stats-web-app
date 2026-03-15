@@ -40,10 +40,12 @@ interface EdgeRow {
   player_name: string;
   team: string;
   position: string | null;
+  neeko_rating: number | null;
   projection_final: number | null;
-  ceiling_score: number | null;
+  ceiling_estimate: number | null;
   projection_confidence: number | null;
-  projection_edge: number | null;
+  risk_rating: number | null;
+  upside_rating: number | null;
 }
 
 // ─── Static data ──────────────────────────────────────────────────────────────
@@ -709,11 +711,10 @@ function EdgeCardSkeleton() {
         <div className="w-9 h-9 rounded-lg bg-white/[0.06]" />
         <div className="h-3 w-24 bg-white/[0.06] rounded" />
       </div>
-      <div className="h-3 w-full bg-white/[0.04] rounded mb-4" />
-      <div className="h-5 w-32 bg-white/[0.08] rounded mb-1" />
-      <div className="h-3 w-20 bg-white/[0.05] rounded mb-3" />
+      <div className="h-5 w-32 bg-white/[0.08] rounded mb-1 mt-4" />
+      <div className="h-3 w-20 bg-white/[0.05] rounded mb-4" />
       {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="flex justify-between py-1 border-b border-white/[0.04]">
+        <div key={i} className="flex justify-between py-1.5 border-b border-white/[0.04]">
           <div className="h-3 w-16 bg-white/[0.05] rounded" />
           <div className="h-3 w-12 bg-white/[0.05] rounded" />
         </div>
@@ -722,38 +723,79 @@ function EdgeCardSkeleton() {
   );
 }
 
+interface EdgeSignal {
+  type: "captain" | "breakout" | "trap";
+  label: string;
+  desc: string;
+  accentColor: string;
+  icon: typeof Star;
+  row: EdgeRow;
+  rank: number;
+}
+
+function edgeConfLabel(conf: number | null): { label: string; color: string } {
+  if (conf == null) return { label: "—",    color: "text-white/30" };
+  if (conf >= 75)   return { label: "High", color: "text-green-400" };
+  if (conf >= 55)   return { label: "Med",  color: "text-[#F5C84C]" };
+  return               { label: "Low",  color: "text-red-400" };
+}
+
+function riskLabelEdge(risk: number | null): { label: string; color: string } {
+  if (risk == null) return { label: "—",    color: "text-white/30" };
+  if (risk >= 35)   return { label: "High", color: "text-red-400" };
+  if (risk >= 22)   return { label: "Med",  color: "text-[#F5C84C]" };
+  return               { label: "Low",  color: "text-green-400" };
+}
+
 function EdgeBoardPreview() {
-  const [edgeRows, setEdgeRows] = useState<EdgeRow[]>([]);
-  const [loading, setLoading]  = useState(true);
+  const [signals, setSignals] = useState<EdgeSignal[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       const { data } = await supabase
-        .schema("afl")
         .from("v_rankings_master")
-        .select("player_name, team, position, projection_final, ceiling_score, projection_confidence, projection_edge")
-        .lte("neeko_rank", 25)
-        .gte("projection_edge", 1)
-        .lte("projection_edge", 10)
-        .order("projection_edge", { ascending: false })
-        .limit(3);
-      setEdgeRows((data ?? []) as EdgeRow[]);
+        .select("player_name, team, position, neeko_rating, projection_final, ceiling_estimate, projection_confidence, risk_rating, upside_rating")
+        .order("neeko_rating", { ascending: false })
+        .limit(25);
+
+      type RankedEdgeRow = EdgeRow & { _rank: number };
+      const rows: RankedEdgeRow[] = ((data ?? []) as EdgeRow[]).map((r, i) => ({ ...r, _rank: i + 1 }));
+
+      if (rows.length === 0) {
+        setSignals([]);
+        setLoading(false);
+        return;
+      }
+
+      const top10 = rows.slice(0, 10);
+      const top25 = rows;
+
+      const captain = [...top10].sort((a, b) => (b.ceiling_estimate ?? 0) - (a.ceiling_estimate ?? 0))[0];
+
+      const breakout = [...top25].sort((a, b) =>
+        ((b.ceiling_estimate ?? 0) - (b.projection_final ?? 0)) -
+        ((a.ceiling_estimate ?? 0) - (a.projection_final ?? 0))
+      )[0];
+
+      const trap = [...top25].sort((a, b) => (a.projection_confidence ?? 100) - (b.projection_confidence ?? 100))[0];
+
+      const built: EdgeSignal[] = [];
+
+      if (captain) {
+        built.push({ type: "captain", label: "Captain Edge", desc: "Top projection with high ceiling and confidence.", accentColor: "#F5C84C", icon: Crown, row: captain, rank: captain._rank });
+      }
+      if (breakout) {
+        built.push({ type: "breakout", label: "Breakout Play", desc: "High upside relative to projection.", accentColor: "#34d399", icon: TrendingUp, row: breakout, rank: breakout._rank });
+      }
+      if (trap) {
+        built.push({ type: "trap", label: "Trap Alert", desc: "Highly ranked player with lower confidence.", accentColor: "#f87171", icon: AlertTriangle, row: trap, rank: trap._rank });
+      }
+
+      setSignals(built);
       setLoading(false);
     })();
   }, []);
-
-  function confLabel(conf: number | null): { label: string; color: string } {
-    if (conf == null) return { label: "—", color: "text-white/30" };
-    if (conf >= 75)   return { label: "High", color: "text-green-400" };
-    if (conf >= 55)   return { label: "Med",  color: "text-[#F5C84C]" };
-    return               { label: "Low",  color: "text-red-400" };
-  }
-
-  const cardAccents = [
-    { color: "#F5C84C", icon: Star,          label: "Model Edge" },
-    { color: "#34d399", icon: TrendingUp,    label: "Model Edge" },
-    { color: "#60a5fa", icon: Zap,           label: "Model Edge" },
-  ];
 
   return (
     <section className="py-10 md:py-14 bg-[#0a0a0a] border-t border-white/[0.05]">
@@ -761,69 +803,66 @@ function EdgeBoardPreview() {
         <SectionLabel>Edge Signals</SectionLabel>
         <SectionHeading>This Round's Edge Signals</SectionHeading>
         <GoldDivider />
-        <p className="text-center text-white/40 text-sm mb-2 max-w-xl mx-auto leading-relaxed">
-          This week's model edges highlight players where projections show a scoring advantage over typical selections.
-        </p>
-        <p className="text-center text-[11px] text-white/25 mb-6">
-          These edges come from the Top 25 Neeko rankings.
+        <p className="text-center text-white/40 text-sm mb-6 max-w-xl mx-auto leading-relaxed">
+          Three model-derived signals from the Top 25 Neeko rankings — updated before every round lockout.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {loading
             ? [0, 1, 2].map((i) => <EdgeCardSkeleton key={i} />)
-            : edgeRows.length > 0
-              ? edgeRows.map((row, idx) => {
-                  const accent = cardAccents[idx] ?? cardAccents[0];
-                  const Icon = accent.icon;
-                  const conf = confLabel(row.projection_confidence);
-                  const edgeVal = row.projection_edge;
-                  return (
-                    <div
-                      key={idx}
-                      className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-white/[0.12] transition-all"
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <div
-                          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ background: `${accent.color}15`, border: `1px solid ${accent.color}30` }}
-                        >
-                          <Icon size={16} style={{ color: accent.color }} />
-                        </div>
-                        <span className="text-xs font-bold uppercase tracking-widest" style={{ color: accent.color }}>
-                          {accent.label}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-white/30 leading-snug mb-3">
-                        Top 25 ranked player with a projection scoring advantage detected this round.
-                      </p>
+            : signals.map((signal) => {
+                const { label, desc, accentColor, icon: Icon, row, rank, type } = signal;
+                const conf = edgeConfLabel(row.projection_confidence);
+                const risk = riskLabelEdge(row.risk_rating);
+                const upside = row.ceiling_estimate != null && row.projection_final != null
+                  ? Math.round(row.ceiling_estimate - row.projection_final)
+                  : null;
 
-                      <p className="text-base font-bold text-white leading-tight mb-0.5">{row.player_name}</p>
-                      <p className="text-xs text-white/35 mb-3">{row.team}{row.position ? ` · ${row.position}` : ""}</p>
-
-                      <div>
-                        {row.projection_final != null && (
-                          <EdgeStatRow label="Projection" value={`${Math.round(row.projection_final)} pts`} valueColor="text-[#F5C84C]" />
-                        )}
-                        {row.ceiling_score != null && (
-                          <EdgeStatRow label="Ceiling" value={`${Math.round(row.ceiling_score)} pts`} valueColor="text-white/60" />
-                        )}
-                        <EdgeStatRow label="Confidence" value={conf.label} valueColor={conf.color} />
-                        {edgeVal != null && (
-                          <EdgeStatRow
-                            label="Edge"
-                            value={edgeVal >= 0 ? `+${edgeVal.toFixed(1)}` : `${edgeVal.toFixed(1)}`}
-                            valueColor={edgeVal > 0 ? "text-green-400" : "text-red-400"}
-                          />
-                        )}
+                return (
+                  <div
+                    key={type}
+                    className="rounded-2xl bg-[#0e0e0e] p-5 hover:scale-[1.01] transition-all"
+                    style={{ border: `1px solid ${accentColor}25` }}
+                  >
+                    <div className="flex items-center gap-2 mb-4">
+                      <div
+                        className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                        style={{ background: `${accentColor}15`, border: `1px solid ${accentColor}30` }}
+                      >
+                        <Icon size={16} style={{ color: accentColor }} />
                       </div>
+                      <span className="text-xs font-bold uppercase tracking-widest" style={{ color: accentColor }}>
+                        {label}
+                      </span>
                     </div>
-                  );
-                })
-              : (
-                <div className="col-span-3 rounded-2xl border border-white/[0.07] bg-[#0e0e0e] px-5 py-8 text-center">
-                  <p className="text-sm text-white/30">Edge signals will appear when round data is available.</p>
-                </div>
-              )
+
+                    <p className="text-base font-bold text-white leading-tight mb-0.5">{row.player_name}</p>
+                    <p className="text-[11px] text-white/35 mb-1">{row.team}{row.position ? ` · ${row.position}` : ""}</p>
+                    <p className="text-[10px] text-white/20 mb-3 leading-snug">{desc}</p>
+
+                    <div>
+                      {row.projection_final != null && (
+                        <EdgeStatRow label="Projection" value={`${Math.round(row.projection_final)} pts`} valueColor="text-[#F5C84C]" />
+                      )}
+                      {row.ceiling_estimate != null && (
+                        <EdgeStatRow label="Ceiling" value={`${Math.round(row.ceiling_estimate)} pts`} valueColor="text-white/60" />
+                      )}
+                      {type === "breakout" && upside != null && (
+                        <EdgeStatRow label="Upside" value={`+${upside} pts`} valueColor="text-green-400" />
+                      )}
+                      {type === "trap" ? (
+                        <>
+                          <EdgeStatRow label="Confidence" value={conf.label} valueColor={conf.color} />
+                          <EdgeStatRow label="Risk" value={risk.label} valueColor={risk.color} />
+                        </>
+                      ) : (
+                        <EdgeStatRow label="Confidence" value={conf.label} valueColor={conf.color} />
+                      )}
+                      <EdgeStatRow label="Neeko Rank" value={`#${rank}`} valueColor="text-white/40" />
+                    </div>
+                  </div>
+                );
+              })
           }
         </div>
 
@@ -961,8 +1000,19 @@ function OutcomeProofSection() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.rpc("get_projection_accuracy_examples", { limit_n: 3 });
-      setRows((data ?? []) as AccuracyExampleRow[]);
+      const { data: raw } = await supabase.rpc("get_projection_accuracy_examples", { limit_n: 30 });
+      const all = (raw ?? []) as AccuracyExampleRow[];
+
+      const filtered = all.filter((r) => Number(r.error) >= 1 && Number(r.error) <= 10);
+      const picked = filtered.slice(0, 3);
+
+      if (picked.length >= 3) {
+        setRows(picked);
+      } else {
+        const fallback = all.filter((r) => Number(r.error) > 0).slice(0, 3);
+        setRows(fallback.length > 0 ? fallback : all.slice(0, 3));
+      }
+
       setLoading(false);
     })();
   }, []);
@@ -973,12 +1023,11 @@ function OutcomeProofSection() {
     <section className="py-10 md:py-14 bg-[#070707] border-t border-white/[0.05]">
       <div className="max-w-4xl mx-auto px-4">
         <div className="text-center mb-8">
-          <SectionLabel>Real Edges Found by Neeko</SectionLabel>
+          <SectionLabel>Projection Accuracy</SectionLabel>
           <SectionHeading>Real Projection Accuracy</SectionHeading>
           <GoldDivider />
           <p className="text-sm text-white/40 max-w-lg mx-auto leading-relaxed">
-            Each week the Neeko projection engine identifies high-confidence scoring ranges.
-            Here are recent projections that landed within 1–10 points of the final AFL Fantasy score.
+            Recent projections that landed within 1–10 points of the final AFL Fantasy score.
           </p>
         </div>
 
@@ -994,40 +1043,38 @@ function OutcomeProofSection() {
                 </div>
               ))
             : rows.length > 0
-              ? rows.map((r) => (
-                  <div
-                    key={r.player_name}
-                    className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-green-400/20 transition-all"
-                  >
-                    <p className="text-base font-bold text-white leading-tight mb-0.5">{r.player_name}</p>
-                    <p className="text-xs text-white/35 mb-4">{r.team}</p>
+              ? rows.map((r, i) => {
+                  const err = Number(r.error);
+                  const errDisplay = err < 1 ? "< 1 pt" : `${Math.round(err)} pt${Math.round(err) === 1 ? "" : "s"}`;
+                  return (
+                    <div
+                      key={`${r.player_name}-${i}`}
+                      className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-green-400/20 transition-all"
+                    >
+                      <p className="text-base font-bold text-white leading-tight mb-0.5">{r.player_name}</p>
+                      <p className="text-xs text-white/35 mb-4">{r.team}</p>
 
-                    <div className="space-y-1.5 mb-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-white/30 uppercase tracking-widest font-semibold">Projection</span>
-                        <span className="text-sm font-bold text-white">{r.projection} pts</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-white/30 uppercase tracking-widest font-semibold">Actual</span>
-                        <span className="text-sm font-bold text-white">{r.actual_score} pts</span>
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-white/30 uppercase tracking-widest font-semibold">Projection</span>
+                          <span className="text-sm font-bold text-[#F5C84C]">{r.projection} pts</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-white/30 uppercase tracking-widest font-semibold">Actual</span>
+                          <span className="text-sm font-bold text-white">{r.actual_score} pts</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-white/30 uppercase tracking-widest font-semibold">Error</span>
+                          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-green-400/10 border border-green-400/25">
+                            <Check size={9} className="text-green-400" />
+                            <span className="text-xs font-bold text-green-400">{errDisplay} error</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-400/10 border border-green-400/25">
-                        <Check size={10} className="text-green-400" />
-                        <span className="text-xs font-bold text-green-400">
-                          {r.error < 1 ? "< 1 pt error" : `${r.error} pt error`}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              : (
-                <div className="col-span-3 text-center py-6 text-sm text-white/25">
-                  Accuracy examples will appear after round data is processed.
-                </div>
-              )
+                  );
+                })
+              : null
           }
         </div>
 
