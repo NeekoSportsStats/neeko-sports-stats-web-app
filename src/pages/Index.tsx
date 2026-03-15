@@ -173,7 +173,7 @@ const WHY_NEEKO_BLOCKS = [
 
 function FeatureCards() {
   return (
-    <section className="py-12 md:py-16 bg-[#070707] border-t border-white/[0.05]">
+    <section className="py-10 md:py-14 bg-[#070707] border-t border-white/[0.05]">
       <div className="max-w-5xl mx-auto px-4">
         <div className="text-center mb-8">
           <p className="text-sm uppercase tracking-wider text-[#F5C84C] font-semibold mb-2">
@@ -644,9 +644,9 @@ function ModelAccuracySection() {
 
 function WhyNeekoSection() {
   return (
-    <section className="py-16 md:py-24 bg-[#0a0a0a] border-t border-white/[0.05]">
+    <section className="py-12 md:py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
       <div className="max-w-5xl mx-auto px-4">
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <SectionLabel>Model Advantages</SectionLabel>
           <SectionHeading>WHY COACHES USE NEEKO</SectionHeading>
           <GoldDivider />
@@ -655,11 +655,11 @@ function WhyNeekoSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
           {WHY_NEEKO_BLOCKS.map(({ icon: Icon, title, desc }) => (
             <div
               key={title}
-              className="bg-[#0f0f0f] border border-[#1f1f1f] rounded-xl p-6 hover:border-[#F5C84C]/25 hover:shadow-[0_0_20px_rgba(245,200,76,0.06)] transition-all"
+              className="bg-[#0f0f0f] border border-[#1f1f1f] rounded-xl p-5 hover:border-[#F5C84C]/25 hover:shadow-[0_0_20px_rgba(245,200,76,0.06)] transition-all"
             >
               <div className="w-10 h-10 rounded-xl bg-[#F5C84C]/10 border border-[#F5C84C]/20 flex items-center justify-center mb-4">
                 <Icon size={18} className="text-[#F5C84C]" />
@@ -678,9 +678,9 @@ function WhyNeekoSection() {
 
 function PremiumSection() {
   return (
-    <section className="py-16 md:py-24 bg-[#070707] border-t border-white/[0.05]">
+    <section className="py-12 md:py-16 bg-[#070707] border-t border-white/[0.05]">
       <div className="max-w-4xl mx-auto px-4">
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <SectionLabel>Pricing</SectionLabel>
           <SectionHeading>UNLOCK THE FULL EDGE</SectionHeading>
           <GoldDivider />
@@ -805,12 +805,12 @@ function EdgeBoardPreview() {
   ];
 
   return (
-    <section className="py-12 md:py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
+    <section className="py-10 md:py-14 bg-[#0a0a0a] border-t border-white/[0.05]">
       <div className="max-w-3xl mx-auto px-4">
         <SectionLabel>Edge Signals Preview</SectionLabel>
         <SectionHeading>This Round's Edge Signals</SectionHeading>
         <GoldDivider />
-        <p className="text-center text-white/40 text-sm mb-8 max-w-md mx-auto">
+        <p className="text-center text-white/40 text-sm mb-6 max-w-md mx-auto">
           Preview one signal from each category — unlock Neeko+ to access the full Edge Board.
         </p>
 
@@ -862,11 +862,11 @@ function EdgeBoardPreview() {
           ))}
         </div>
 
-        <p className="text-center text-white/25 text-xs mt-5">
+        <p className="text-center text-white/25 text-xs mt-4">
           Full edge board includes additional signals and matchup analysis.
         </p>
 
-        <div className="mt-4">
+        <div className="mt-3">
           <Link
             to="/neeko-plus"
             className="flex w-full sm:w-auto sm:inline-flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3.5 rounded-xl hover:brightness-110 transition-all min-h-[48px] sm:mx-auto sm:table"
@@ -922,20 +922,20 @@ function RealWeeklyEdges() {
   ];
 
   return (
-    <section className="py-12 md:py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
+    <section className="py-10 md:py-14 bg-[#0a0a0a] border-t border-white/[0.05]">
       <div className="max-w-4xl mx-auto px-4">
         <SectionLabel>Edge Intelligence</SectionLabel>
         <SectionHeading>Real Weekly Edges Neeko Finds</SectionHeading>
         <GoldDivider />
-        <p className="text-center text-white/40 text-sm mb-10 max-w-md mx-auto">
+        <p className="text-center text-white/40 text-sm mb-6 max-w-md mx-auto">
           Neeko identifies scoring advantages, breakout candidates and trap warnings every round.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {edgeCards.map(({ icon: Icon, color, title, player, lines }) => (
             <div
               key={title}
-              className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-6 hover:border-white/[0.12] transition-all"
+              className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-white/[0.12] transition-all"
             >
               <div className="flex items-center gap-2 mb-4">
                 <div
@@ -968,7 +968,7 @@ function RealWeeklyEdges() {
           ))}
         </div>
 
-        <div className="mt-8 flex justify-center">
+        <div className="mt-6 flex justify-center">
           <Link
             to="/sports/afl/edge-board"
             className="inline-flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3.5 rounded-xl hover:brightness-110 transition-all min-h-[48px]"
@@ -1000,14 +1000,14 @@ function EdgeComparison() {
   ];
 
   return (
-    <section className="py-12 md:py-16 bg-[#070707] border-t border-white/[0.05]">
+    <section className="py-10 md:py-14 bg-[#070707] border-t border-white/[0.05]">
       <div className="max-w-4xl mx-auto px-4">
         <SectionLabel>Competitive Advantage</SectionLabel>
         <SectionHeading>Why Neeko Beats Guesswork</SectionHeading>
         <GoldDivider />
 
-        <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div className="rounded-2xl border border-white/[0.06] bg-[#0d0d0d] p-6">
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="rounded-2xl border border-white/[0.06] bg-[#0d0d0d] p-5">
             <p className="text-xs font-bold uppercase tracking-widest text-white/25 mb-5">
               Typical Fantasy Decisions
             </p>
@@ -1024,7 +1024,7 @@ function EdgeComparison() {
           </div>
 
           <div
-            className="rounded-2xl p-6"
+            className="rounded-2xl p-5"
             style={{
               border: "1px solid rgba(245,200,76,0.25)",
               background: "linear-gradient(160deg, #111 0%, #0d0d0d 100%)",
@@ -1047,7 +1047,7 @@ function EdgeComparison() {
           </div>
         </div>
 
-        <div className="mt-8 flex justify-center">
+        <div className="mt-6 flex justify-center">
           <Link
             to="/neeko-plus"
             className="inline-flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3.5 rounded-xl hover:brightness-110 transition-all shadow-[0_4px_30px_rgba(245,200,76,0.2)] min-h-[48px]"
@@ -1101,12 +1101,12 @@ function RankingsPreview() {
   }, []);
 
   return (
-    <section className="py-12 md:py-16 bg-[#070707] border-t border-white/[0.05]">
+    <section className="py-10 md:py-14 bg-[#070707] border-t border-white/[0.05]">
       <div className="max-w-5xl mx-auto px-4">
         <SectionLabel>Rankings Preview</SectionLabel>
         <SectionHeading>See the Rankings in Action</SectionHeading>
         <GoldDivider />
-        <p className="text-center text-white/40 text-sm mb-8 max-w-md mx-auto">
+        <p className="text-center text-white/40 text-sm mb-6 max-w-md mx-auto">
           Live AFL Fantasy projections ranked using Neeko Rating — combining projection, matchup difficulty and AI analysis.
         </p>
 
@@ -1278,18 +1278,18 @@ export default function Index() {
     <div className="min-h-screen bg-[#070707] text-white pb-[80px] sm:pb-0">
 
       {/* ── HERO ──────────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden min-h-[85vh] flex items-center">
+      <section className="relative overflow-hidden min-h-[72vh] flex items-center">
         <div
           className="absolute inset-0"
           style={{
             backgroundImage: "url(/hero.jpg)",
             backgroundSize: "cover",
-            backgroundPosition: "center 65%",
+            backgroundPosition: "center 70%",
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/65 to-[#070707]" />
 
-        <div className="relative z-10 w-full max-w-4xl mx-auto px-5 py-24 md:py-32 text-center">
+        <div className="relative z-10 w-full max-w-4xl mx-auto px-5 py-16 md:py-24 text-center">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#F5C84C]/35 bg-[#F5C84C]/10 text-[#F5C84C] text-[11px] font-bold uppercase tracking-widest mb-7">
             AFL 2026 Season Live
           </div>
@@ -1353,15 +1353,15 @@ export default function Index() {
       <WhyNeekoSection />
 
       {/* ── SECTION 8: HOW IT WORKS ───────────────────────────────────────────── */}
-      <section className="py-12 md:py-16 bg-[#070707] border-t border-white/[0.05]">
+      <section className="py-10 md:py-14 bg-[#070707] border-t border-white/[0.05]">
         <div className="max-w-4xl mx-auto px-4">
           <SectionLabel>How It Works</SectionLabel>
           <SectionHeading>From Raw Data to Weekly Edge Signals</SectionHeading>
           <GoldDivider />
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5 mt-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5 mt-6">
             {HOW_IT_WORKS.map(({ step, icon: Icon, title, desc }) => (
-              <div key={step} className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-6">
+              <div key={step} className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5">
                 <div className="flex items-start gap-4 mb-4">
                   <span className="text-[11px] font-black text-[#F5C84C]/40 tracking-widest font-mono mt-0.5 shrink-0">
                     {step}
@@ -1379,17 +1379,17 @@ export default function Index() {
       </section>
 
       {/* ── SECTION 9: WHO NEEKO IS FOR ───────────────────────────────────────── */}
-      <section className="py-12 md:py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
+      <section className="py-10 md:py-14 bg-[#0a0a0a] border-t border-white/[0.05]">
         <div className="max-w-4xl mx-auto px-4">
           <SectionLabel>Who It's For</SectionLabel>
           <SectionHeading>Built For Serious AFL Fantasy Coaches</SectionHeading>
           <GoldDivider />
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5 mt-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5 mt-6">
             {WHO_FOR.map(({ icon: Icon, title, desc }) => (
               <div
                 key={title}
-                className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-6 hover:border-white/[0.12] transition-all"
+                className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-white/[0.12] transition-all"
               >
                 <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/[0.05] border border-white/[0.08] mb-4">
                   <Icon size={18} className="text-white/50" />
@@ -1406,12 +1406,12 @@ export default function Index() {
       {!isPremium && <PremiumSection />}
 
       {/* ── SECTION 11: FINAL CTA ─────────────────────────────────────────────── */}
-      <section className="py-14 md:py-20 bg-[#0a0a0a] border-t border-white/[0.05]">
+      <section className="py-12 md:py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
         <div className="max-w-xl mx-auto px-5 text-center">
-          <h2 className="text-2xl md:text-4xl font-extrabold mb-4 leading-tight">
+          <h2 className="text-2xl md:text-4xl font-extrabold mb-3 leading-tight">
             Ready to gain the weekly edge?
           </h2>
-          <p className="text-white/40 text-base mb-8 max-w-sm mx-auto leading-relaxed">
+          <p className="text-white/40 text-base mb-5 max-w-sm mx-auto leading-relaxed">
             Updated every round before AFL Fantasy lockout.
           </p>
           <Link
