@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Crown, ArrowRight, Star, TrendingUp, TriangleAlert as AlertTriangle, Check, Database, Cpu, Radio, Trophy, Users, ChartBar as BarChart2, Lock, Target, Rocket, ChartLine as LineChart } from "lucide-react";
+import {
+  Crown, ArrowRight, Star, TrendingUp,
+  TriangleAlert as AlertTriangle, Check, Database,
+  Cpu, Radio, Trophy, Users, ChartBar as BarChart2,
+  Lock, Target, Rocket, ChartLine as LineChart, Shield, Zap,
+} from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { NEEKO_PRICING } from "@/config/neekoPricing";
@@ -86,13 +91,14 @@ const WHO_FOR = [
 ];
 
 const NEEKO_FEATURES = [
-  "Full rankings table",
+  "Full projections",
+  "Captain picks",
+  "Breakout alerts",
+  "Trade signals",
+  "Advanced analytics",
   "AI player breakdowns",
   "Captain Edge Board",
-  "Breakout alerts",
-  "Trap warnings",
   "Player vs Player comparison",
-  "Advanced projections and value metrics",
 ];
 
 const FOOTER_LINKS = [
@@ -133,6 +139,29 @@ const FEATURE_CARDS = [
   },
 ];
 
+const WHY_NEEKO_BLOCKS = [
+  {
+    icon: Shield,
+    title: "Opponent Normalised Projections",
+    desc: "Player scores adjusted for opponent defensive strength.",
+  },
+  {
+    icon: AlertTriangle,
+    title: "Risk Modelling",
+    desc: "Identify safe players and high volatility picks.",
+  },
+  {
+    icon: Zap,
+    title: "Value Engine",
+    desc: "Detect underpriced players before the market reacts.",
+  },
+  {
+    icon: Cpu,
+    title: "AI Player Analysis",
+    desc: "Automated insights explaining projections and recommendations.",
+  },
+];
+
 // ─── Feature Cards ────────────────────────────────────────────────────────────
 
 function FeatureCards() {
@@ -141,7 +170,7 @@ function FeatureCards() {
       <div className="max-w-5xl mx-auto px-4">
         <div className="text-center mb-8">
           <p className="text-sm uppercase tracking-wider text-[#F5C84C] font-semibold mb-2">
-            Why Coaches Use Neeko
+            What You Get
           </p>
           <p className="text-base text-white/40">
             Get the edge every round with AI-driven insights.
@@ -166,6 +195,92 @@ function FeatureCards() {
               </span>
             </Link>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Product Showcase ─────────────────────────────────────────────────────────
+
+function ProductShowcase() {
+  return (
+    <section className="py-16 md:py-24 bg-[#0a0a0a] border-t border-white/[0.05]">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="text-center mb-10">
+          <p className="text-[11px] text-white/25 uppercase tracking-[0.18em] font-semibold mb-3">
+            See It In Action
+          </p>
+          <h2 className="text-2xl md:text-4xl font-extrabold text-white leading-tight mb-3">
+            SEE THE RANKINGS IN ACTION
+          </h2>
+          <div className="flex justify-center my-4">
+            <div className="w-10 h-0.5 rounded-full bg-[#F5C84C]/30" />
+          </div>
+          <p className="text-base text-white/40 max-w-xl mx-auto leading-relaxed">
+            Explore projections, value scores, risk ratings and AI recommendations for every AFL player.
+          </p>
+        </div>
+
+        <div className="relative rounded-xl border border-neutral-800 overflow-hidden shadow-lg bg-[#0f0f0f]">
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a]/80 via-transparent to-transparent pointer-events-none z-10" />
+
+          <div className="w-full" style={{ minHeight: "320px" }}>
+            <div className="flex flex-col items-center justify-center py-16 px-8 text-center gap-6">
+              <div className="w-14 h-14 rounded-2xl bg-[#F5C84C]/10 border border-[#F5C84C]/20 flex items-center justify-center">
+                <BarChart2 size={26} className="text-[#F5C84C]" />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-white mb-2">Full Rankings Dashboard</p>
+                <p className="text-sm text-white/40 max-w-sm leading-relaxed">
+                  Projections, Neeko Ratings, value tiers, risk bands and AI verdicts — all in one table.
+                </p>
+              </div>
+
+              <div className="w-full max-w-2xl rounded-xl border border-white/[0.07] overflow-hidden mt-2">
+                <div className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_4rem] gap-x-3 px-4 py-2.5 text-[10px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
+                  <span>#</span>
+                  <span>Player</span>
+                  <span className="text-center">Pos</span>
+                  <span className="text-center">Proj.</span>
+                  <span className="text-right">Rating</span>
+                </div>
+                {[
+                  { rank: 1, name: "Clayton Oliver", pos: "MID", proj: 121, rating: 94 },
+                  { rank: 2, name: "Patrick Cripps", pos: "MID", proj: 117, rating: 91 },
+                  { rank: 3, name: "Zach Merrett",   pos: "MID", proj: 112, rating: 88 },
+                  { rank: 4, name: "Lachie Neale",   pos: "MID", proj: 109, rating: 86 },
+                  { rank: 5, name: "Josh Dunkley",   pos: "MID", proj: 106, rating: 83 },
+                ].map(({ rank, name, pos, proj, rating }) => (
+                  <div key={rank} className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_4rem] gap-x-3 px-4 py-3 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0">
+                    <span className="text-xs text-white/25 font-mono self-center">{rank}</span>
+                    <span className="text-xs font-semibold text-white truncate self-center">{name}</span>
+                    <span className="text-[10px] text-white/40 text-center self-center">{pos}</span>
+                    <span className="text-xs font-bold text-[#F5C84C] text-center self-center">{proj}</span>
+                    <div className="flex items-center justify-end self-center">
+                      <span className="text-[10px] font-bold text-white/80 bg-white/[0.07] border border-white/[0.1] rounded px-1.5 py-0.5">
+                        {rating}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                <div className="px-4 py-2.5 flex items-center justify-center gap-2 bg-[#090909] border-t border-white/[0.04]">
+                  <Lock size={10} className="text-white/20" />
+                  <span className="text-[10px] text-white/25">Full rankings require Neeko+</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-center mt-8">
+          <Link
+            to="/sports/afl/rankings"
+            className="inline-flex items-center justify-center gap-2 border border-white/15 text-white/70 hover:text-white hover:border-white/30 font-semibold text-sm px-7 py-3.5 rounded-xl transition-all min-h-[48px]"
+          >
+            Explore Rankings
+            <ArrowRight size={14} />
+          </Link>
         </div>
       </div>
     </section>
@@ -265,7 +380,6 @@ function ErrorDistributionBlock({ row, loading }: { row: AccuracyRow | null; loa
 
   return (
     <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] overflow-hidden">
-      {/* Header */}
       <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-white/[0.06] bg-[#0a0a0a] flex-wrap">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-white/[0.05] border border-white/[0.08]">
@@ -283,7 +397,6 @@ function ErrorDistributionBlock({ row, loading }: { row: AccuracyRow | null; loa
         {loading && <div className="h-6 w-36 bg-white/[0.06] rounded-full animate-pulse" />}
       </div>
 
-      {/* Chart body */}
       <div className="px-5 py-4 space-y-3">
         {loading && (
           <div className="space-y-3">
@@ -324,7 +437,6 @@ function ErrorDistributionBlock({ row, loading }: { row: AccuracyRow | null; loa
         })}
       </div>
 
-      {/* Explanation */}
       <div className="px-5 pb-4">
         <p className="text-[12px] text-white/30 leading-relaxed">
           This distribution shows how closely Neeko projections match actual fantasy scores. Most projections fall within a narrow error range, demonstrating strong model reliability.
@@ -435,12 +547,8 @@ function ModelAccuracySection() {
           )}
         </div>
 
-        {/* Two-column grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-          {/* Left — Accuracy metrics card */}
           <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] overflow-hidden">
-            {/* Header bar */}
             <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-white/[0.06] bg-[#0a0a0a] flex-wrap">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-[#F5C84C]/10 border border-[#F5C84C]/20">
@@ -459,7 +567,6 @@ function ModelAccuracySection() {
               {loading && <div className="h-6 w-32 bg-white/[0.06] rounded-lg animate-pulse" />}
             </div>
 
-            {/* Metrics grid */}
             <div className="grid grid-cols-2 divide-x divide-y divide-neutral-800">
               {metrics.map(({ label, value, suffix, color, bar, barColor }) => (
                 <div key={label} className="px-4 py-4 flex flex-col">
@@ -485,7 +592,6 @@ function ModelAccuracySection() {
               ))}
             </div>
 
-            {/* Round context */}
             {!loading && hasData && roundLabel && (
               <div className="px-4 py-2 border-t border-white/[0.06] bg-[#0c0c0c]">
                 <p className="text-[11px] text-white/25 text-center tracking-wide">
@@ -494,7 +600,6 @@ function ModelAccuracySection() {
               </div>
             )}
 
-            {/* No data state */}
             {!loading && !hasData && (
               <div className="px-4 py-4 border-t border-white/[0.06] bg-[#0c0c0c]">
                 <p className="text-sm text-white/30 text-center">
@@ -502,21 +607,16 @@ function ModelAccuracySection() {
                 </p>
               </div>
             )}
-
           </div>
 
-          {/* Right — Error Distribution */}
           <ErrorDistributionBlock row={row} loading={loading} />
-
         </div>
 
-        {/* Sample size credibility line */}
         <div className="flex items-center justify-center gap-2 text-xs text-neutral-500 mt-3">
           <Database size={11} className="shrink-0" />
           <span>Model evaluated on 9,866 historical AFL player projections</span>
         </div>
 
-        {/* Selling point — compact row */}
         <div className="flex items-center justify-between mt-6 p-4 border border-[#F5C84C]/20 rounded-lg gap-4">
           <p className="text-sm text-white/40 leading-relaxed">
             More accurate projections mean better captain choices, smarter trades and stronger fantasy results.
@@ -529,6 +629,124 @@ function ModelAccuracySection() {
             Gain an Edge
           </Link>
         </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Why Coaches Use Neeko ────────────────────────────────────────────────────
+
+function WhyNeekoSection() {
+  return (
+    <section className="py-16 md:py-24 bg-[#0a0a0a] border-t border-white/[0.05]">
+      <div className="max-w-5xl mx-auto px-4">
+        <div className="text-center mb-12">
+          <SectionLabel>Model Advantages</SectionLabel>
+          <SectionHeading>WHY COACHES USE NEEKO</SectionHeading>
+          <GoldDivider />
+          <p className="text-base text-white/40 max-w-xl mx-auto leading-relaxed">
+            Advanced modelling designed specifically for AFL Fantasy.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
+          {WHY_NEEKO_BLOCKS.map(({ icon: Icon, title, desc }) => (
+            <div
+              key={title}
+              className="bg-[#0f0f0f] border border-[#1f1f1f] rounded-xl p-6 hover:border-[#F5C84C]/25 hover:shadow-[0_0_20px_rgba(245,200,76,0.06)] transition-all"
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#F5C84C]/10 border border-[#F5C84C]/20 flex items-center justify-center mb-4">
+                <Icon size={18} className="text-[#F5C84C]" />
+              </div>
+              <h3 className="text-sm font-bold text-white mb-2 leading-snug">{title}</h3>
+              <p className="text-xs text-white/40 leading-relaxed">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Premium Section ──────────────────────────────────────────────────────────
+
+function PremiumSection() {
+  return (
+    <section className="py-16 md:py-24 bg-[#070707] border-t border-white/[0.05]">
+      <div className="max-w-4xl mx-auto px-4">
+        <div className="text-center mb-12">
+          <SectionLabel>Pricing</SectionLabel>
+          <SectionHeading>UNLOCK THE FULL EDGE</SectionHeading>
+          <GoldDivider />
+          <p className="text-base text-white/40 max-w-md mx-auto leading-relaxed">
+            Get access to the full Neeko analytics engine.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          <div className="space-y-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-white/30 mb-4">
+              What's Included
+            </p>
+            {NEEKO_FEATURES.map((f) => (
+              <div key={f} className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30 flex items-center justify-center shrink-0">
+                  <Check size={10} className="text-[#F5C84C]" />
+                </div>
+                <span className="text-sm text-white/60">{f}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-5">
+            <div
+              className="relative rounded-2xl p-7"
+              style={{
+                border: "1px solid rgba(245,200,76,0.35)",
+                background: "linear-gradient(160deg, #111 0%, #0d0d0d 100%)",
+                boxShadow: "0 0 40px rgba(245,200,76,0.08)",
+              }}
+            >
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="bg-[#F5C84C] text-black text-[11px] font-black px-3 py-0.5 rounded-full uppercase tracking-wide">
+                  Best Value
+                </span>
+              </div>
+              <p className="text-xs font-bold uppercase tracking-widest text-[#F5C84C]/60 mb-3">Neeko+ Yearly</p>
+              <div className="flex items-end gap-1.5 mb-1">
+                <span className="text-4xl font-extrabold text-white">$89</span>
+                <span className="text-sm text-white/35 mb-1">AUD / year</span>
+              </div>
+              <p className="text-xs text-[#F5C84C]/50 mb-6">Equivalent to $7.42/month · Cancel anytime</p>
+              <Link
+                to="/neeko-plus"
+                className="block text-center bg-[#F5C84C] text-black font-bold text-sm py-3.5 rounded-xl hover:brightness-110 transition-all min-h-[48px] flex items-center justify-center"
+              >
+                <Crown size={14} className="mr-2" />
+                Upgrade to Neeko+
+              </Link>
+            </div>
+
+            <div className="rounded-2xl border border-white/[0.09] bg-[#0e0e0e] p-6">
+              <p className="text-xs font-bold uppercase tracking-widest text-white/30 mb-3">Monthly</p>
+              <div className="flex items-end gap-1.5 mb-1">
+                <span className="text-3xl font-extrabold text-white">$9.99</span>
+                <span className="text-sm text-white/35 mb-1">AUD / month</span>
+              </div>
+              <p className="text-xs text-white/25 mb-5">{NEEKO_PRICING.monthly.billingNote}</p>
+              <Link
+                to="/neeko-plus"
+                className="block text-center border border-[#F5C84C]/40 text-[#F5C84C] font-semibold text-sm py-3 rounded-xl hover:bg-[#F5C84C]/10 transition-all min-h-[48px] flex items-center justify-center"
+              >
+                Start Monthly
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-center text-xs text-white/20 mt-8">
+          No ads. No noise. Just structured fantasy insights.
+        </p>
       </div>
     </section>
   );
@@ -685,7 +903,6 @@ function RankingsPreview() {
         </p>
 
         <div className="rounded-2xl border border-white/[0.07] overflow-hidden">
-          {/* Desktop header — hides on mobile */}
           <div className="hidden sm:grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-3 text-[11px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
             <span>#</span>
             <span>Player</span>
@@ -693,7 +910,6 @@ function RankingsPreview() {
             <span className="text-right">Projection</span>
           </div>
 
-          {/* Mobile header — shows only on mobile, no Team column */}
           <div className="grid sm:hidden grid-cols-[2rem_1fr_4rem] gap-x-3 px-4 py-3 text-[11px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
             <span>#</span>
             <span>Player</span>
@@ -703,13 +919,11 @@ function RankingsPreview() {
           {loading
             ? Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="animate-pulse border-b border-white/[0.04] bg-[#0c0c0c] last:border-0">
-                  {/* Mobile skeleton */}
                   <div className="grid sm:hidden grid-cols-[2rem_1fr_4rem] gap-x-3 px-4 py-4">
                     <div className="h-4 w-4 bg-white/10 rounded" />
                     <div className="h-4 w-32 bg-white/10 rounded" />
                     <div className="h-4 w-10 bg-white/10 rounded ml-auto" />
                   </div>
-                  {/* Desktop skeleton */}
                   <div className="hidden sm:grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-4">
                     <div className="h-4 w-4 bg-white/10 rounded" />
                     <div className="h-4 w-36 bg-white/10 rounded" />
@@ -726,7 +940,6 @@ function RankingsPreview() {
                       key={idx}
                       className="border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors"
                     >
-                      {/* Mobile row */}
                       <div className="grid sm:hidden grid-cols-[2rem_1fr_4rem] gap-x-3 px-4 py-4">
                         <span className="text-sm text-white/25 font-mono self-center">{idx + 1}</span>
                         <span className="text-sm font-semibold text-white truncate self-center">{row.player_name}</span>
@@ -734,7 +947,6 @@ function RankingsPreview() {
                           {row.projection_final != null ? Math.round(row.projection_final) : "—"}
                         </span>
                       </div>
-                      {/* Desktop row */}
                       <div className="hidden sm:grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-4">
                         <span className="text-sm text-white/25 font-mono">{idx + 1}</span>
                         <span className="text-sm font-semibold text-white truncate">{row.player_name}</span>
@@ -746,13 +958,11 @@ function RankingsPreview() {
                     </div>
                   ))}
 
-                  {/* Blurred locked rows */}
                   {[6, 7].map((rank) => (
                     <div
                       key={rank}
                       className="group border-b border-white/[0.04] bg-[#0c0c0c] last:border-0 relative select-none"
                     >
-                      {/* Mobile locked row */}
                       <div className="grid sm:hidden grid-cols-[2rem_1fr_4rem] gap-x-3 px-4 py-4">
                         <span className="text-sm text-white/15 font-mono self-center">{rank}</span>
                         <div className="flex items-center gap-1.5 self-center min-w-0">
@@ -764,7 +974,6 @@ function RankingsPreview() {
                         </div>
                         <span className="text-sm font-bold text-[#F5C84C]/20 text-right self-center blur-[3px]">000</span>
                       </div>
-                      {/* Desktop locked row */}
                       <div className="hidden sm:grid grid-cols-[2rem_1fr_4rem_5rem] gap-x-4 px-5 py-4">
                         <span className="text-sm text-white/15 font-mono">{rank}</span>
                         <div className="flex items-center gap-2 relative">
@@ -843,7 +1052,6 @@ export default function Index() {
             Win AFL Fantasy with AI-powered projections, captain picks and breakout alerts.
           </p>
 
-          {/* CTA buttons — stacked on mobile, side-by-side on sm+ */}
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-center sm:items-center px-2 sm:px-0">
             {!isPremium && (
               <Link
@@ -876,43 +1084,22 @@ export default function Index() {
       {/* ── SECTION 2: FEATURE CARDS ──────────────────────────────────────────── */}
       <FeatureCards />
 
-      {/* ── SECTION 3: MODEL ACCURACY ─────────────────────────────────────────── */}
+      {/* ── SECTION 3: PRODUCT SHOWCASE ───────────────────────────────────────── */}
+      <ProductShowcase />
+
+      {/* ── SECTION 4: MODEL ACCURACY ─────────────────────────────────────────── */}
       <ModelAccuracySection />
 
-      {/* ── SECTION 3: EDGE SIGNALS PREVIEW ──────────────────────────────────── */}
+      {/* ── SECTION 5: EDGE SIGNALS PREVIEW ──────────────────────────────────── */}
       <EdgeBoardPreview />
 
-      {/* ── SECTION 3: RANKINGS PREVIEW ───────────────────────────────────────── */}
+      {/* ── SECTION 6: RANKINGS PREVIEW ───────────────────────────────────────── */}
       <RankingsPreview />
 
-      {/* ── SECTION 4: WHY NEEKO WINS ─────────────────────────────────────────── */}
-      <section className="py-12 md:py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
-        <div className="max-w-4xl mx-auto px-4">
-          <SectionLabel>Why Neeko+</SectionLabel>
-          <SectionHeading>Why Fantasy Coaches Use Neeko+</SectionHeading>
-          <GoldDivider />
-          <p className="text-center text-white/40 text-sm mb-10 max-w-md mx-auto">
-            Not news. Not chat. Structured intelligence designed for AFL Fantasy decision-making.
-          </p>
+      {/* ── SECTION 7: WHY COACHES USE NEEKO ─────────────────────────────────── */}
+      <WhyNeekoSection />
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5">
-            {FEATURES.map(({ icon: Icon, title, desc }) => (
-              <div
-                key={title}
-                className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-6 hover:border-[#F5C84C]/20 transition-all"
-              >
-                <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[#F5C84C]/10 border border-[#F5C84C]/20 mb-4">
-                  <Icon size={18} className="text-[#F5C84C]" />
-                </div>
-                <h3 className="text-base font-bold text-white mb-2">{title}</h3>
-                <p className="text-sm text-white/40 leading-relaxed">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── SECTION 5: HOW IT WORKS ───────────────────────────────────────────── */}
+      {/* ── SECTION 8: HOW IT WORKS ───────────────────────────────────────────── */}
       <section className="py-12 md:py-16 bg-[#070707] border-t border-white/[0.05]">
         <div className="max-w-4xl mx-auto px-4">
           <SectionLabel>How It Works</SectionLabel>
@@ -938,7 +1125,7 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ── SECTION 6: WHO NEEKO IS FOR ───────────────────────────────────────── */}
+      {/* ── SECTION 9: WHO NEEKO IS FOR ───────────────────────────────────────── */}
       <section className="py-12 md:py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
         <div className="max-w-4xl mx-auto px-4">
           <SectionLabel>Who It's For</SectionLabel>
@@ -962,125 +1149,27 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ── TRUST SIGNAL ──────────────────────────────────────────────────────── */}
-      {!isPremium && (
-        <section className="py-10 md:py-12 bg-[#070707] border-t border-white/[0.05]">
-          <div className="max-w-xl mx-auto px-4 text-center">
-            <p className="text-[11px] text-white/20 uppercase tracking-[0.18em] font-semibold mb-3">
-              Who Uses Neeko+
-            </p>
-            <h2 className="text-xl md:text-2xl font-bold text-white mb-3">
-              Trusted by Competitive AFL Fantasy Coaches
-            </h2>
-            <p className="text-sm text-white/35 leading-relaxed max-w-sm mx-auto">
-              Designed for serious fantasy players who want structured insights — not noise.
-            </p>
-          </div>
-        </section>
-      )}
+      {/* ── SECTION 10: PREMIUM SECTION ───────────────────────────────────────── */}
+      {!isPremium && <PremiumSection />}
 
-      {/* ── SECTION 7: PRICING ────────────────────────────────────────────────── */}
-      {!isPremium && (
-        <section className="py-12 md:py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
-          <div className="max-w-3xl mx-auto px-4">
-            <SectionLabel>Pricing</SectionLabel>
-            <SectionHeading>Simple. No Hidden Fees.</SectionHeading>
-            <GoldDivider />
-            <p className="text-center text-white/40 text-sm mb-10 max-w-sm mx-auto">
-              One subscription. Full access. Cancel anytime.
-            </p>
-
-            {/* On mobile: yearly first, then monthly. On sm+: side by side. */}
-            <div className="flex flex-col-reverse sm:grid sm:grid-cols-2 gap-5 mb-8">
-              {/* Monthly */}
-              <div className="rounded-2xl border border-white/[0.09] bg-[#0e0e0e] p-6">
-                <p className="text-xs font-bold uppercase tracking-widest text-white/30 mb-3">Monthly</p>
-                <div className="flex items-end gap-1.5 mb-1">
-                  <span className="text-4xl font-extrabold text-white">$9.99</span>
-                  <span className="text-sm text-white/35 mb-1">AUD / month</span>
-                </div>
-                <p className="text-xs text-white/25 mb-6">{NEEKO_PRICING.monthly.billingNote}</p>
-                <Link
-                  to="/neeko-plus"
-                  className="block text-center border border-[#F5C84C]/40 text-[#F5C84C] font-semibold text-sm py-3 rounded-xl hover:bg-[#F5C84C]/10 transition-all min-h-[48px] flex items-center justify-center"
-                >
-                  Start Monthly
-                </Link>
-              </div>
-
-              {/* Yearly — shown first on mobile via flex-col-reverse */}
-              <div
-                className="relative rounded-2xl p-6"
-                style={{
-                  border: "1px solid rgba(245,200,76,0.35)",
-                  background: "linear-gradient(160deg, #111 0%, #0d0d0d 100%)",
-                  boxShadow: "0 0 40px rgba(245,200,76,0.08)",
-                }}
-              >
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="bg-[#F5C84C] text-black text-[11px] font-black px-3 py-0.5 rounded-full uppercase tracking-wide">
-                    Best Value
-                  </span>
-                </div>
-                <p className="text-xs font-bold uppercase tracking-widest text-[#F5C84C]/60 mb-3">Yearly</p>
-                <div className="flex items-end gap-1.5 mb-1">
-                  <span className="text-4xl font-extrabold text-white">$89</span>
-                  <span className="text-sm text-white/35 mb-1">AUD / year</span>
-                </div>
-                <p className="text-xs text-[#F5C84C]/50 mb-6">Equivalent to $7.42/month</p>
-                <Link
-                  to="/neeko-plus"
-                  className="block text-center bg-[#F5C84C] text-black font-bold text-sm py-3 rounded-xl hover:brightness-110 transition-all min-h-[48px] flex items-center justify-center"
-                >
-                  Start Yearly
-                </Link>
-              </div>
-            </div>
-
-            <div className="grid sm:grid-cols-2 gap-y-2.5 gap-x-8 max-w-md mx-auto">
-              {NEEKO_FEATURES.map((f) => (
-                <div key={f} className="flex items-center gap-2.5">
-                  <div className="w-4 h-4 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30 flex items-center justify-center shrink-0">
-                    <Check size={9} className="text-[#F5C84C]" />
-                  </div>
-                  <span className="text-sm text-white/50">{f}</span>
-                </div>
-              ))}
-            </div>
-
-            <p className="text-center text-xs text-white/20 mt-8">
-              No ads. No noise. Just structured fantasy insights.
-            </p>
-          </div>
-        </section>
-      )}
-
-      {/* ── SECTION 8: FINAL CTA ──────────────────────────────────────────────── */}
-      {!isPremium && (
-        <section className="py-14 md:py-16 bg-[#070707] border-t border-white/[0.05]">
-          <div className="max-w-xl mx-auto px-5 text-center">
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-6"
-              style={{ background: "rgba(245,200,76,0.10)", border: "1px solid rgba(245,200,76,0.25)" }}
-            >
-              <Crown size={24} className="text-[#F5C84C]" />
-            </div>
-            <h2 className="text-2xl md:text-4xl font-extrabold mb-4 leading-tight">
-              Ready to gain the edge this season?
-            </h2>
-            <p className="text-white/40 text-base mb-8 max-w-sm mx-auto leading-relaxed">
-              Updated every round before lockout — so you can make smarter captain and trade decisions.
-            </p>
-            <Link
-              to="/neeko-plus"
-              className="flex w-full sm:w-auto sm:inline-flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-10 rounded-xl hover:brightness-110 transition-all shadow-[0_4px_30px_rgba(245,200,76,0.2)] min-h-[52px]"
-            >
-              <Crown size={15} />
-              Unlock Neeko+
-            </Link>
-          </div>
-        </section>
-      )}
+      {/* ── SECTION 11: FINAL CTA ─────────────────────────────────────────────── */}
+      <section className="py-14 md:py-20 bg-[#0a0a0a] border-t border-white/[0.05]">
+        <div className="max-w-xl mx-auto px-5 text-center">
+          <h2 className="text-2xl md:text-4xl font-extrabold mb-4 leading-tight">
+            Ready to gain the weekly edge?
+          </h2>
+          <p className="text-white/40 text-base mb-8 max-w-sm mx-auto leading-relaxed">
+            Updated every round before lockout.
+          </p>
+          <Link
+            to="/sports/afl/rankings"
+            className="inline-flex items-center justify-center gap-2 border border-white/15 text-white/70 hover:text-white hover:border-white/30 font-semibold text-sm px-8 py-3.5 rounded-xl transition-all min-h-[52px]"
+          >
+            View Rankings
+            <ArrowRight size={14} />
+          </Link>
+        </div>
+      </section>
 
       {/* ── MOBILE STICKY UPGRADE BAR ─────────────────────────────────────────── */}
       {!isPremium && <MobileUpgradeBar />}
