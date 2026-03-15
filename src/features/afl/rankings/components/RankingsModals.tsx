@@ -1,6 +1,17 @@
 import { createPortal } from "react-dom";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Crown, Lock, Info } from "lucide-react";
+
+function useBodyScrollLock(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [active]);
+}
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Dot } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import {
@@ -70,50 +81,61 @@ export function LockedCell({ onClick }: { onClick?: () => void }) {
 // ─── Neeko Rating Info Modal ───────────────────────────────────────────────────
 
 export function NeekoRatingInfoModal({ onClose }: { onClose: () => void }) {
+  useBodyScrollLock(true);
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pt-[env(safe-area-inset-top)]" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-4"
+      style={{ paddingTop: "env(safe-area-inset-top)", height: "100dvh" }}
+      onClick={onClose}
+    >
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" />
       <div
-        className="relative w-full max-w-sm rounded-2xl border border-[#F5C84C]/30 bg-[#0e0e0e] p-7 shadow-2xl"
+        className="relative w-full max-w-sm rounded-2xl border border-[#F5C84C]/30 bg-[#0e0e0e] shadow-2xl overflow-hidden"
+        style={{ maxHeight: "calc(100dvh - env(safe-area-inset-top) - 2rem)", overscrollBehavior: "contain" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <button onClick={onClose} className="absolute right-4 top-4 text-white/30 hover:text-white/70 transition-colors">
-          <X size={16} />
-        </button>
-        <div className="flex items-center justify-center w-11 h-11 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30 mx-auto mb-4">
-          <span className="text-[#F5C84C] font-bold text-base">N</span>
-        </div>
-        <h3 className="text-lg font-bold text-white mb-1 text-center">How Neeko Rating Works</h3>
-        <p className="text-xs text-white/40 text-center mb-5">Our proprietary fantasy scoring model</p>
-        <div className="space-y-3 mb-5">
-          {[
-            ["Projection", "Expected fantasy score this round based on verified AFL data"],
-            ["Matchup Difficulty", "How tough or favourable the opposition is"],
-            ["Role Security", "Likelihood of guaranteed game time and usage"],
-            ["Consistency", "Historical scoring reliability across the season"],
-            ["Ceiling & Upside", "Potential to blow up and exceed projection"],
-            ["Risk Level", "Chance of underperforming or being a trap pick"],
-          ].map(([label, desc]) => (
-            <div key={label} className="flex items-start gap-2.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#F5C84C] shrink-0 mt-1.5" />
-              <div>
-                <span className="text-xs font-semibold text-white">{label}</span>
-                <p className="text-[11px] text-white/40 leading-relaxed mt-0.5">{desc}</p>
-              </div>
+        <div className="sticky top-0 z-10 flex items-center justify-between bg-[#0e0e0e] border-b border-white/5 px-6 pt-5 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30">
+              <span className="text-[#F5C84C] font-bold text-sm">N</span>
             </div>
-          ))}
+            <h3 className="text-base font-bold text-white">How Neeko Rating Works</h3>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/8 text-white/40 hover:text-white/80 transition-colors shrink-0">
+            <X size={16} />
+          </button>
         </div>
-        <div className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3 mb-5">
-          <p className="text-xs text-white/50 leading-relaxed">
-            Each player receives a <span className="text-[#F5C84C] font-semibold">Neeko Rating</span>. Higher rating = stronger fantasy selection this round. ELITE (90+) represents the very best picks.
-          </p>
+        <div className="overflow-y-auto overscroll-contain px-6 pb-6 pt-3" style={{ maxHeight: "calc(100dvh - 140px)" }}>
+          <div className="space-y-3 mb-5">
+            {[
+              ["Projection", "Expected fantasy score this round based on verified AFL data"],
+              ["Matchup Difficulty", "How tough or favourable the opposition is"],
+              ["Role Security", "Likelihood of guaranteed game time and usage"],
+              ["Consistency", "Historical scoring reliability across the season"],
+              ["Ceiling & Upside", "Potential to blow up and exceed projection"],
+              ["Risk Level", "Chance of underperforming or being a trap pick"],
+            ].map(([label, desc]) => (
+              <div key={label} className="flex items-start gap-2.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#F5C84C] shrink-0 mt-1.5" />
+                <div>
+                  <span className="text-xs font-semibold text-white">{label}</span>
+                  <p className="text-[11px] text-white/40 leading-relaxed mt-0.5">{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3 mb-5">
+            <p className="text-xs text-white/50 leading-relaxed">
+              Each player receives a <span className="text-[#F5C84C] font-semibold">Neeko Rating</span>. Higher rating = stronger fantasy selection this round. ELITE (90+) represents the very best picks.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="block w-full border border-white/10 text-white/60 font-semibold rounded-xl py-2.5 text-sm hover:bg-white/5 transition-all"
+          >
+            Close
+          </button>
         </div>
-        <button
-          onClick={onClose}
-          className="block w-full border border-white/10 text-white/60 font-semibold rounded-xl py-2.5 text-sm hover:bg-white/5 transition-all"
-        >
-          Close
-        </button>
       </div>
     </div>,
     document.body
@@ -123,44 +145,56 @@ export function NeekoRatingInfoModal({ onClose }: { onClose: () => void }) {
 // ─── Upgrade Modal ─────────────────────────────────────────────────────────────
 
 export function UpgradeModal({ onClose }: { onClose: () => void }) {
+  useBodyScrollLock(true);
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pt-[env(safe-area-inset-top)]" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center"
+      style={{ height: "100dvh", paddingTop: "env(safe-area-inset-top)" }}
+      onClick={onClose}
+    >
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" />
       <div
-        className="relative w-full max-w-sm rounded-2xl border border-[#F5C84C]/30 bg-[#0e0e0e] p-7 shadow-2xl text-center"
+        className="relative w-full max-w-sm rounded-t-2xl sm:rounded-2xl border border-[#F5C84C]/30 bg-[#0e0e0e] shadow-2xl overflow-hidden"
+        style={{ maxHeight: "calc(100dvh - env(safe-area-inset-top) - 1rem)", overscrollBehavior: "contain" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <button onClick={onClose} className="absolute right-4 top-4 text-white/30 hover:text-white/70 transition-colors">
-          <X size={16} />
-        </button>
-        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30 mx-auto mb-4">
-          <Crown size={22} className="text-[#F5C84C]" />
-        </div>
-        <h3 className="text-lg font-bold text-white mb-2">Unlock Neeko+</h3>
-        <p className="text-sm text-white/50 leading-relaxed mb-5">Full AFL Fantasy intelligence. Every player. Every round.</p>
-        <div className="space-y-2.5 text-left mb-6">
-          {[
-            "Full Value and Projection rankings",
-            "Breakout players before price rises",
-            "Trap players to avoid this round",
-            "Weekly AI trade and captain insights",
-            "Complete matchup and ceiling analysis",
-          ].map((f) => (
-            <div key={f} className="flex items-center gap-2.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#F5C84C] shrink-0" />
-              <span className="text-xs text-white/70">{f}</span>
+        <div className="sticky top-0 z-10 flex items-center justify-between bg-[#0e0e0e] border-b border-white/5 px-6 pt-5 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30">
+              <Crown size={16} className="text-[#F5C84C]" />
             </div>
-          ))}
+            <h3 className="text-base font-bold text-white">Unlock Neeko+</h3>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/8 text-white/40 hover:text-white/80 transition-colors shrink-0">
+            <X size={16} />
+          </button>
         </div>
-        <a
-          href="/neeko-plus"
-          className="block w-full bg-[#F5C84C] text-black font-bold rounded-xl py-3 text-sm hover:brightness-110 transition-all"
-        >
-          Upgrade to Neeko+
-        </a>
-        <button onClick={onClose} className="mt-3 text-xs text-white/30 hover:text-white/50 transition-colors">
-          Maybe later
-        </button>
+        <div className="overflow-y-auto overscroll-contain px-6 pb-6 pt-4" style={{ maxHeight: "calc(100dvh - 140px)", paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
+          <p className="text-sm text-white/50 leading-relaxed mb-5">Full AFL Fantasy intelligence. Every player. Every round.</p>
+          <div className="space-y-2.5 text-left mb-6">
+            {[
+              "Full Value and Projection rankings",
+              "Breakout players before price rises",
+              "Trap players to avoid this round",
+              "Weekly AI trade and captain insights",
+              "Complete matchup and ceiling analysis",
+            ].map((f) => (
+              <div key={f} className="flex items-center gap-2.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#F5C84C] shrink-0" />
+                <span className="text-xs text-white/70">{f}</span>
+              </div>
+            ))}
+          </div>
+          <a
+            href="/neeko-plus"
+            className="block w-full bg-[#F5C84C] text-black font-bold rounded-xl py-3 text-sm text-center hover:brightness-110 transition-all"
+          >
+            Upgrade to Neeko+
+          </a>
+          <button onClick={onClose} className="mt-3 w-full text-xs text-white/30 hover:text-white/50 transition-colors py-2">
+            Maybe later
+          </button>
+        </div>
       </div>
     </div>,
     document.body
@@ -343,6 +377,7 @@ export function PlayerDetailModal({
     return () => { cancelled = true; };
   }, [row.player_id, isPremium]);
 
+  useBodyScrollLock(true);
   void rank;
   const unlocked = isPremium || isUnlocked;
   const isPartial = tier === "partial";
@@ -380,17 +415,17 @@ export function PlayerDetailModal({
 
   if (isPartial) {
     return (
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" style={{ paddingTop: "env(safe-area-inset-top)" }} onClick={onClose}>
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" style={{ height: "100dvh" }} onClick={onClose}>
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
         <div
-          className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-xl border border-white/10 bg-[#0e0e0e] shadow-2xl max-h-[92vh] overflow-y-auto"
-          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+          className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-xl border border-white/10 bg-[#0e0e0e] shadow-2xl overflow-hidden"
+          style={{ maxHeight: "calc(100dvh - env(safe-area-inset-top) - 1rem)", overscrollBehavior: "contain" }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="flex justify-center pt-3 pb-1 sm:hidden sticky top-0 z-10 bg-[#0e0e0e]">
             <div className="w-10 h-1 rounded-full bg-white/20" />
           </div>
-          <div className="flex items-start justify-between px-5 pt-4 pb-3">
+          <div className="sticky top-0 z-10 flex items-start justify-between px-5 pt-3 pb-3 bg-[#0e0e0e] border-b border-white/5">
             <div className="pr-4">
               <h2 className="text-lg font-semibold text-white">{row.player_name}</h2>
               <p className="text-sm text-white/50 mt-0.5">{row.team}{row.position ? ` · ${row.position}` : ""}</p>
@@ -402,7 +437,7 @@ export function PlayerDetailModal({
               <X size={16} />
             </button>
           </div>
-          <div className="px-5 pb-6 space-y-4">
+          <div className="overflow-y-auto overscroll-contain px-5 pb-6 space-y-4 pt-4" style={{ maxHeight: "calc(100dvh - 180px)", paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-lg bg-white/5 px-3 py-3">
                 <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Neeko Rating</p>
@@ -461,23 +496,23 @@ export function PlayerDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
-      style={{ paddingTop: "env(safe-area-inset-top)" }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      style={{ height: "100dvh" }}
       onClick={handleOverlayClick}
     >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div
         ref={modalRef}
-        className="relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl border border-white/10 bg-[#0e0e0e] shadow-2xl max-h-[92vh] overflow-y-auto"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        className="relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl border border-white/10 bg-[#0e0e0e] shadow-2xl overflow-hidden"
+        style={{ maxHeight: "calc(100dvh - env(safe-area-inset-top) - 1rem)", overscrollBehavior: "contain" }}
       >
         {/* Drag handle on mobile */}
-        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+        <div className="flex justify-center pt-3 pb-1 sm:hidden sticky top-0 z-10 bg-[#0e0e0e]">
           <div className="w-10 h-1 rounded-full bg-white/20" />
         </div>
 
-        {/* Header with close button */}
-        <div className="flex items-start justify-between px-5 pt-4 pb-3 sm:pt-5">
+        {/* Sticky header with close button */}
+        <div className="sticky top-0 z-10 flex items-start justify-between px-5 pt-3 pb-3 sm:pt-4 bg-[#0e0e0e] border-b border-white/5">
           <div className="pr-4">
             <h2 className="text-lg font-semibold text-white">{row.player_name}</h2>
             <p className="text-sm text-white/50 mt-0.5">{row.team}{row.position ? ` · ${row.position}` : ""}</p>
@@ -490,7 +525,7 @@ export function PlayerDetailModal({
           </button>
         </div>
 
-        <div className="px-5 pb-6 space-y-3">
+        <div className="overflow-y-auto overscroll-contain px-5 space-y-3 pt-4" style={{ maxHeight: "calc(100dvh - 180px)", paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
 
           {/* 1. Captain Rating */}
           {unlocked && row.captain_rating && (
@@ -703,7 +738,7 @@ export function PlayerDetailModal({
                   ) : showExtended ? (
                     <p className="text-sm text-white/65 leading-relaxed">{extendedText}</p>
                   ) : (
-                    <p className="text-sm text-white/30 leading-relaxed">Generating analysis...</p>
+                    <p className="text-sm text-white/30 italic">AI analysis not yet available for this player.</p>
                   )}
                   {showExtended && isStale && (
                     <p className="mt-3 text-[10px] text-white/25 italic border-t border-white/5 pt-2">

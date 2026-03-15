@@ -351,8 +351,8 @@ export function MobileRankingsTable({
       <div className="rounded-xl border border-white/5 overflow-hidden w-full max-w-full">
         {/* Scrollable table — header + rows share one X scroll */}
         <div
-          className="w-full overflow-x-auto overflow-y-auto"
-          style={{ maxHeight: "70vh", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+          className="w-full overflow-x-auto overflow-y-auto overscroll-contain"
+          style={{ maxHeight: "calc(100dvh - 280px)", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
           onScroll={handleScroll}
         >
           <div style={{ width: TABLE_W, minWidth: TABLE_W }}>

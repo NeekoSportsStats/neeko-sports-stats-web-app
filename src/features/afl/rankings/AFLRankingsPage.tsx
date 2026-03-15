@@ -440,7 +440,7 @@ export default function AFLRankingsPage() {
           />
         </div>
 
-        <div className="mb-4 flex flex-wrap gap-1.5">
+        <div className="sticky top-[72px] z-30 bg-[#070707] pb-2 -mx-4 px-4 md:-mx-8 md:px-8 mb-2 flex flex-wrap gap-1.5">
           {isPremium
             ? PREMIUM_QUICK_FILTERS.map(({ key, label }) => (
                 <button
