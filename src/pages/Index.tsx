@@ -28,6 +28,15 @@ interface RankingRow {
   recommendation_color: string | null;
 }
 
+interface AccuracyExampleRow {
+  player_name: string;
+  team: string;
+  projection: number;
+  actual_score: number;
+  error: number;
+  round_label: string;
+}
+
 interface EdgeRow {
   player_name: string;
   team: string;
@@ -909,23 +918,106 @@ function ProblemSection() {
   );
 }
 
+// ─── Outcome Proof ────────────────────────────────────────────────────────────
+
+function OutcomeProofSection() {
+  const [rows, setRows]       = useState<AccuracyExampleRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.rpc("get_projection_accuracy_examples", { limit_n: 3 });
+      setRows((data ?? []) as AccuracyExampleRow[]);
+      setLoading(false);
+    })();
+  }, []);
+
+  const skeletons = Array.from({ length: 3 });
+
+  return (
+    <section className="py-10 md:py-14 bg-[#070707] border-t border-white/[0.05]">
+      <div className="max-w-4xl mx-auto px-4">
+        <div className="text-center mb-8">
+          <SectionLabel>Real Edges Found by Neeko</SectionLabel>
+          <SectionHeading>Real Projection Accuracy</SectionHeading>
+          <GoldDivider />
+          <p className="text-sm text-white/40 max-w-lg mx-auto leading-relaxed">
+            Each week the Neeko projection engine identifies high-confidence scoring ranges.
+            Here are recent projections that landed within 1–10 points of the final AFL Fantasy score.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          {loading
+            ? skeletons.map((_, i) => (
+                <div key={i} className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 animate-pulse">
+                  <div className="h-4 w-32 bg-white/[0.08] rounded mb-2" />
+                  <div className="h-3 w-24 bg-white/[0.05] rounded mb-4" />
+                  <div className="h-3 w-28 bg-white/[0.05] rounded mb-1.5" />
+                  <div className="h-3 w-28 bg-white/[0.05] rounded mb-3" />
+                  <div className="h-5 w-20 bg-green-400/10 rounded" />
+                </div>
+              ))
+            : rows.length > 0
+              ? rows.map((r) => (
+                  <div
+                    key={r.player_name}
+                    className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-green-400/20 transition-all"
+                  >
+                    <p className="text-base font-bold text-white leading-tight mb-0.5">{r.player_name}</p>
+                    <p className="text-xs text-white/35 mb-4">{r.team}</p>
+
+                    <div className="space-y-1.5 mb-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-white/30 uppercase tracking-widest font-semibold">Projection</span>
+                        <span className="text-sm font-bold text-white">{r.projection} pts</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-white/30 uppercase tracking-widest font-semibold">Actual</span>
+                        <span className="text-sm font-bold text-white">{r.actual_score} pts</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-400/10 border border-green-400/25">
+                        <Check size={10} className="text-green-400" />
+                        <span className="text-xs font-bold text-green-400">
+                          {r.error < 1 ? "< 1 pt error" : `${r.error} pt error`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              : (
+                <div className="col-span-3 text-center py-6 text-sm text-white/25">
+                  Accuracy examples will appear after round data is processed.
+                </div>
+              )
+          }
+        </div>
+
+        <p className="text-center text-[11px] text-white/20 mt-5 tracking-wide">
+          Based on completed 2026 AFL season rounds. Individual results vary.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 // ─── Social Proof ─────────────────────────────────────────────────────────────
 
 const TESTIMONIALS = [
   {
     quote: "Neeko helped me find captain picks I would have missed. The projection model is genuinely accurate.",
-    name: "AFL Fantasy Coach",
-    detail: "Uses Neeko weekly",
+    role: "Competitive League Coach",
   },
   {
-    quote: "The Edge Board and projections are my go-to tools every round. Nothing else comes close.",
-    name: "Competitive League Player",
-    detail: "Top 10% nationally",
+    quote: "The projections and edge board are my go-to tools every round. Nothing else comes close.",
+    role: "Data Driven Coach",
   },
   {
     quote: "Finally a fantasy tool that actually explains the numbers instead of just showing them.",
-    name: "Data-Driven Coach",
-    detail: "3rd year Neeko+ subscriber",
+    role: "Fantasy Optimiser",
   },
 ];
 
@@ -943,17 +1035,16 @@ function SocialProofSection() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          {TESTIMONIALS.map(({ quote, name, detail }) => (
+          {TESTIMONIALS.map(({ quote, role }) => (
             <div
-              key={name}
+              key={role}
               className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 flex flex-col gap-4"
             >
               <p className="text-sm text-white/60 leading-relaxed flex-1">
                 &ldquo;{quote}&rdquo;
               </p>
               <div className="border-t border-white/[0.06] pt-3">
-                <p className="text-xs font-bold text-white/50">{name}</p>
-                <p className="text-[11px] text-white/25 mt-0.5">{detail}</p>
+                <p className="text-xs font-bold text-white/50">{role}</p>
               </div>
             </div>
           ))}
@@ -964,6 +1055,62 @@ function SocialProofSection() {
             Used by hundreds of AFL Fantasy coaches every round.
           </p>
         </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Pricing Teaser ───────────────────────────────────────────────────────────
+
+function PricingTeaserSection() {
+  return (
+    <section className="py-10 md:py-14 bg-[#070707] border-t border-white/[0.05]">
+      <div className="max-w-2xl mx-auto px-4 text-center">
+        <SectionLabel>Pricing</SectionLabel>
+        <SectionHeading>Unlock the Full Neeko Edge</SectionHeading>
+        <GoldDivider />
+
+        <p className="text-sm text-white/40 max-w-lg mx-auto leading-relaxed mb-6">
+          Neeko+ unlocks the full projection engine including premium rankings, captain edge signals, breakout alerts and matchup tools.
+        </p>
+
+        <div
+          className="rounded-2xl p-6 mb-6"
+          style={{
+            border: "1px solid rgba(245,200,76,0.30)",
+            background: "linear-gradient(160deg, #111 0%, #0d0d0d 100%)",
+            boxShadow: "0 0 40px rgba(245,200,76,0.07)",
+          }}
+        >
+          <p className="text-[11px] text-white/25 uppercase tracking-widest font-semibold mb-2">
+            Updated projections and signals before every AFL Fantasy round lockout.
+          </p>
+          <div className="flex items-end justify-center gap-2 mb-1">
+            <span className="text-4xl font-extrabold text-white">$3.99</span>
+            <span className="text-sm text-white/35 mb-1.5">per week</span>
+          </div>
+          <p className="text-xs text-[#F5C84C]/60 font-semibold mb-1">Neeko+ from $3.99 per week</p>
+          <p className="text-xs text-white/25 mb-6">Less than the cost of a coffee each week.</p>
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              to="/neeko-plus"
+              className="inline-flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3.5 rounded-xl hover:brightness-110 transition-all min-h-[48px] shadow-[0_4px_24px_rgba(245,200,76,0.2)]"
+            >
+              <Crown size={14} />
+              Start Winning With Neeko+
+            </Link>
+            <Link
+              to="/sports/afl/rankings"
+              className="inline-flex items-center justify-center gap-2 border border-white/15 text-white/70 hover:text-white hover:border-white/30 font-semibold text-sm px-7 py-3.5 rounded-xl transition-all min-h-[48px]"
+            >
+              View Free Rankings
+              <ArrowRight size={14} />
+            </Link>
+          </div>
+        </div>
+
+        <p className="text-xs text-white/20">Cancel anytime. No lock-in contracts.</p>
       </div>
     </section>
   );
@@ -1275,16 +1422,19 @@ export default function Index() {
       {/* ── SECTION 5: EDGE SIGNALS PREVIEW ──────────────────────────────────── */}
       <EdgeBoardPreview />
 
-      {/* ── SECTION 6: SOCIAL PROOF ───────────────────────────────────────────── */}
+      {/* ── SECTION 6: OUTCOME PROOF ──────────────────────────────────────────── */}
+      <OutcomeProofSection />
+
+      {/* ── SECTION 7: SOCIAL PROOF ───────────────────────────────────────────── */}
       <SocialProofSection />
 
-      {/* ── SECTION 7: MODEL ACCURACY ─────────────────────────────────────────── */}
+      {/* ── SECTION 8: MODEL ACCURACY ─────────────────────────────────────────── */}
       <ModelAccuracySection />
 
-      {/* ── SECTION 7: WHY COACHES USE NEEKO ─────────────────────────────────── */}
+      {/* ── SECTION 9: WHY COACHES USE NEEKO ─────────────────────────────────── */}
       <WhyNeekoSection />
 
-      {/* ── SECTION 8: HOW IT WORKS ──────────────────────────────────────────── */}
+      {/* ── SECTION 10: HOW IT WORKS ──────────────────────────────────────────── */}
       <section className="py-10 md:py-14 bg-[#070707] border-t border-white/[0.05]">
         <div className="max-w-4xl mx-auto px-4">
           <SectionLabel>How It Works</SectionLabel>
@@ -1310,7 +1460,7 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ── SECTION 9: WHO NEEKO IS FOR ──────────────────────────────────────── */}
+      {/* ── SECTION 11: WHO NEEKO IS FOR ─────────────────────────────────────── */}
       <section className="py-10 md:py-14 bg-[#0a0a0a] border-t border-white/[0.05]">
         <div className="max-w-4xl mx-auto px-4">
           <SectionLabel>Who It's For</SectionLabel>
@@ -1334,10 +1484,13 @@ export default function Index() {
         </div>
       </section>
 
-      {/* ── SECTION 10: PREMIUM SECTION ──────────────────────────────────────── */}
+      {/* ── SECTION 12: PRICING TEASER ────────────────────────────────────────── */}
+      {!isPremium && <PricingTeaserSection />}
+
+      {/* ── SECTION 13: FULL PRICING ──────────────────────────────────────────── */}
       {!isPremium && <PremiumSection />}
 
-      {/* ── SECTION 11: FINAL CTA ─────────────────────────────────────────────── */}
+      {/* ── SECTION 14: FINAL CTA ─────────────────────────────────────────────── */}
       <section className="py-12 md:py-16 bg-[#0a0a0a] border-t border-white/[0.05]">
         <div className="max-w-xl mx-auto px-5 text-center">
           <p className="text-[12px] text-[#F5C84C]/60 font-semibold uppercase tracking-widest mb-3">
