@@ -31,6 +31,9 @@ import {
   AdminContentEngine,
   AdminContentPlanner,
   AdminFounderTasks,
+  AdminBrownlowLab,
+  AdminLeaderboardLab,
+  AdminModelLab,
 } from "@/pages/Admin";
 
 const NeekoPlusPurchase = React.lazy(() => import("@/pages/NeekoPlusPurchase"));
@@ -164,6 +167,9 @@ function App() {
         <Route path="content-engine"   element={<S fallback={Generic}><AdminContentEngine /></S>} />
         <Route path="content-planner"  element={<S fallback={Generic}><AdminContentPlanner /></S>} />
         <Route path="founder-tasks"    element={<S fallback={Generic}><AdminFounderTasks /></S>} />
+        <Route path="brownlow-lab"     element={<S fallback={Generic}><AdminBrownlowLab /></S>} />
+        <Route path="leaderboard-lab"  element={<S fallback={Generic}><AdminLeaderboardLab /></S>} />
+        <Route path="model-lab"        element={<S fallback={Generic}><AdminModelLab /></S>} />
       </Route>
 
       <Route

@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const BATCH_SIZE = 200;
+const BATCH_SIZE = 10;
 const MAX_ATTEMPTS = 3;
 
 interface QueueJob {

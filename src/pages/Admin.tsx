@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { RefreshCw, Shield, Terminal, Server, ChartBar as BarChart3, Zap, Calendar, ListTodo, Settings, Database, Target } from "lucide-react";
+import { RefreshCw, Shield, Terminal, Server, ChartBar as BarChart3, Zap, Calendar, ListTodo, Settings, Database, Target, Trophy, FlaskConical } from "lucide-react";
 import { AdminUIStateProvider, useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
 
 const TABS: { path: string; label: string; icon: React.ElementType }[] = [
@@ -14,6 +14,9 @@ const TABS: { path: string; label: string; icon: React.ElementType }[] = [
   { path: "/admin/content-engine",   label: "Content Engine",   icon: Zap },
   { path: "/admin/content-planner",  label: "Content Planner",  icon: Calendar },
   { path: "/admin/founder-tasks",    label: "Founder Tasks",    icon: ListTodo },
+  { path: "/admin/brownlow-lab",     label: "Brownlow Lab",     icon: Trophy },
+  { path: "/admin/leaderboard-lab",  label: "Leaderboard Lab",  icon: BarChart3 },
+  { path: "/admin/model-lab",        label: "Model Lab",        icon: FlaskConical },
 ];
 
 function TabLoadingFallback() {
@@ -108,6 +111,9 @@ export const AdminQueue          = lazy(() => import("@/pages/AdminQueue"));
 export const AdminContentEngine  = lazy(() => import("@/features/admin/pages/AdminContentEngine"));
 export const AdminContentPlanner = lazy(() => import("@/features/admin/pages/AdminContentPlanner"));
 export const AdminFounderTasks   = lazy(() => import("@/features/admin/pages/AdminFounderTasks"));
+export const AdminBrownlowLab    = lazy(() => import("@/features/admin/pages/AdminBrownlowLab"));
+export const AdminLeaderboardLab = lazy(() => import("@/features/admin/pages/AdminLeaderboardLab"));
+export const AdminModelLab       = lazy(() => import("@/features/admin/pages/AdminModelLab"));
 
 export { AdminShellWithProvider as AdminShell };
 export default AdminShellWithProvider;
