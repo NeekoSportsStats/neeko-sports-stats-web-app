@@ -29,12 +29,6 @@ function createSupabaseClient(): SupabaseClient {
   const projectRef = getProjectRef(supabaseUrl);
   const storageKey = `sb-${projectRef}-auth-token`;
 
-  console.log("🔵 Creating Supabase client:", {
-    url: supabaseUrl,
-    projectRef,
-    storageKey,
-  });
-
   supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       flowType: "pkce",
@@ -71,7 +65,5 @@ function createSupabaseClient(): SupabaseClient {
 export const supabase = createSupabaseClient();
 
 if (import.meta.hot) {
-  import.meta.hot.accept(() => {
-    console.log("⚠️ HMR: Supabase instance reused");
-  });
+  import.meta.hot.accept();
 }

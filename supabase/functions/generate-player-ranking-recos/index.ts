@@ -108,6 +108,15 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+    const authHeader = req.headers.get("Authorization");
+    const token = authHeader?.replace("Bearer ", "");
+    if (!token || token !== serviceRoleKey) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const openai = new OpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY")! });
 
@@ -251,7 +260,10 @@ Deno.serve(async (req: Request) => {
       EdgeRuntime.waitUntil(
         fetch(`${supabaseUrl}/functions/v1/generate-player-ranking-recos`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${serviceRoleKey}`,
+          },
           body: JSON.stringify({ processed_so_far: newProcessedTotal }),
         }).catch((err) => console.error("[generate-player-ranking-recos] Failed to trigger next batch:", err))
       );
@@ -264,7 +276,7 @@ Deno.serve(async (req: Request) => {
   } catch (err: any) {
     console.error("[generate-player-ranking-recos] Fatal error:", err);
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

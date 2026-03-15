@@ -7,8 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Shield, Database, Activity, TrendingUp, Calendar, ChevronDown, ChevronUp, CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, Circle as XCircle, Clock } from "lucide-react";
 
-const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
-
 interface PipelineStatus {
   last_raw_ingest: string | null;
   raw_player_rows: number;
@@ -136,7 +134,7 @@ function StatusCard({ icon: Icon, title, health, loading, children }: StatusCard
 }
 
 export default function DataPipelineStatusPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [status, setStatus] = useState<PipelineStatus | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
@@ -160,10 +158,10 @@ export default function DataPipelineStatusPage() {
   }, []);
 
   useEffect(() => {
-    if (!loading && user?.id === ADMIN_USER_ID) {
+    if (!loading && isAdmin) {
       fetchStatus();
     }
-  }, [loading, user, fetchStatus]);
+  }, [loading, isAdmin, fetchStatus]);
 
   if (loading) {
     return (
@@ -173,7 +171,7 @@ export default function DataPipelineStatusPage() {
     );
   }
 
-  if (!user || user.id !== ADMIN_USER_ID) {
+  if (!user || !isAdmin) {
     return null;
   }
 

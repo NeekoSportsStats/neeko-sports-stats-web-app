@@ -17,6 +17,15 @@ Deno.serve(async (req: Request) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const openaiKey = Deno.env.get("OPENAI_API_KEY")!;
 
+    const authHeader = req.headers.get("Authorization");
+    const token = authHeader?.replace("Bearer ", "");
+    if (!token || token !== serviceRoleKey) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const { data: promptRow, error: promptErr } = await supabase
@@ -31,7 +40,7 @@ Deno.serve(async (req: Request) => {
 
     if (promptErr || !promptRow) {
       return new Response(
-        JSON.stringify({ error: "Prompt not found", detail: promptErr?.message }),
+        JSON.stringify({ error: "Prompt not found" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -43,7 +52,7 @@ Deno.serve(async (req: Request) => {
 
     if (inputErr || !inputRows || inputRows.length === 0) {
       return new Response(
-        JSON.stringify({ error: "No market watch input data available", detail: inputErr?.message }),
+        JSON.stringify({ error: "No market watch input data available" }),
         { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -106,7 +115,7 @@ Deno.serve(async (req: Request) => {
 
     if (upsertErr) {
       return new Response(
-        JSON.stringify({ error: "Failed to save summary", detail: upsertErr.message }),
+        JSON.stringify({ error: "Failed to save summary" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -118,7 +127,7 @@ Deno.serve(async (req: Request) => {
 
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: "Unexpected error", detail: err instanceof Error ? err.message : String(err) }),
+      JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

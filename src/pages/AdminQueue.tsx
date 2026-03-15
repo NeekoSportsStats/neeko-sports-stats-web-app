@@ -8,8 +8,6 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, RefreshCw, Clock, CircleCheck as CheckCircle, Circle as XCircle, Loader as Loader2 } from "lucide-react";
 
-const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
-
 interface JobRow {
   id: string;
   job_type: string;
@@ -32,21 +30,19 @@ interface JobTypeSummary {
 }
 
 export default function AdminQueue() {
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const isAdmin = !loading && user?.id === ADMIN_USER_ID;
-
   useEffect(() => {
     if (!loading && !user) {
       navigate("/auth");
-    } else if (!loading && user && user.id !== ADMIN_USER_ID) {
+    } else if (!loading && user && !isAdmin) {
       navigate("/");
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, isAdmin, navigate]);
 
   const fetchJobs = useCallback(async () => {
     setFetchError(null);

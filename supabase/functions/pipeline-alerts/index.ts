@@ -13,9 +13,20 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const authHeader = req.headers.get("Authorization");
+    const token = authHeader?.replace("Bearer ", "");
+    if (!token || token !== serviceRoleKey) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      serviceRoleKey
     );
 
     const { error: checkError } = await supabase.rpc("fn_check_pipeline_alerts");
@@ -86,7 +97,6 @@ Deno.serve(async (req: Request) => {
         total_active_alerts: (alerts ?? []).length,
         critical: criticalAlerts.length,
         warnings: warningAlerts.length,
-        alerts: alerts ?? [],
       }),
       {
         status: 200,
@@ -96,7 +106,7 @@ Deno.serve(async (req: Request) => {
   } catch (err) {
     console.error("pipeline-alerts function error:", err);
     return new Response(
-      JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) }),
+      JSON.stringify({ success: false, error: "Internal server error" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

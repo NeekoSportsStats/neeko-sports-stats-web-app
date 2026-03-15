@@ -16,10 +16,8 @@ import { Loader as Loader2, Crown, User, LogOut, ArrowLeft, CreditCard, Shield }
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
 
-const ADMIN_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
-
 export default function Account() {
-  const { user, loading: authLoading, signOut, isPremium, refreshPremiumStatus } =
+  const { user, loading: authLoading, signOut, isPremium, isAdmin, refreshPremiumStatus } =
     useAuth();
 
   // ALL hooks declared at top level — never inside conditionals
@@ -295,8 +293,8 @@ export default function Account() {
           </CardContent>
         </Card>
 
-        {/* Admin Controls — only visible to the admin user */}
-        {user.id === ADMIN_ID && (
+        {/* Admin Controls — only visible to admin users */}
+        {isAdmin && (
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3">

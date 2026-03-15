@@ -59,7 +59,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       const active = data?.is_premium === true;
       const admin  = data?.is_admin   === true;
-      console.log("⭐ Premium status:", active, "| Admin:", admin);
       setIsPremium(active);
       setIsAdmin(admin);
     } catch (err) {
@@ -75,11 +74,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    * Public method to re-check premium status for the current user.
    */
   const refreshPremiumStatus = useCallback(async () => {
-    if (!user?.id) {
-      console.log("⚠️ refreshPremiumStatus: no user, skipping");
-      return;
-    }
-    console.log("🔄 refreshPremiumStatus() for", user.id);
+    if (!user?.id) return;
     await fetchPremiumStatus(user.id);
   }, [user?.id, fetchPremiumStatus]);
 
@@ -87,7 +82,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    * Logout helper – only runs when you explicitly call signOut()
    */
   const signOut = useCallback(async () => {
-    console.log("🚪 Logging out…");
     setUser(null);
     setIsPremium(false);
     setIsAdmin(false);
@@ -111,16 +105,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    */
   useEffect(() => {
     let isMounted = true;
-    console.log("⚡ AuthProvider: init");
 
     const applySession = (session: any, source: string) => {
       if (!isMounted) return;
 
       const currentUser = session?.user ?? null;
-      console.log(`📥 applySession from ${source}`, {
-        hasUser: !!currentUser,
-        userId: currentUser?.id,
-      });
 
       setUser(currentUser);
 
@@ -147,8 +136,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
 
-      console.log("🟣 AUTH EVENT:", event, "| hasSession:", !!session);
-
       switch (event) {
         case "INITIAL_SESSION":
           initialSessionSeenRef.current = true;
@@ -159,7 +146,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         case "SIGNED_IN": {
           const newUserId = session?.user?.id ?? null;
           if (newUserId === currentUserIdRef.current) {
-            console.log("🟡 SIGNED_IN ignored — same user, no change");
             return;
           }
           currentUserIdRef.current = newUserId;
@@ -173,14 +159,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         case "USER_UPDATED":
           if (typeof window !== "undefined" && window.location.pathname === "/reset-password") {
-            console.log("🛑 USER_UPDATED ignored on reset-password");
             return;
           }
           applySession(session, event);
           break;
 
         case "SIGNED_OUT":
-          console.log("🚪 AUTH EVENT: SIGNED_OUT");
           currentUserIdRef.current = null;
           resetUser();
           setUser(null);
@@ -195,18 +179,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => {
-      console.log("🧹 AuthProvider: cleanup");
       isMounted = false;
       subscription.unsubscribe();
     };
   }, [fetchPremiumStatus]);
-
-  console.log("🔧 AuthProvider render:", {
-    user: user?.email,
-    loading,
-    isPremium,
-    isAdmin,
-  });
 
   return (
     <AuthContext.Provider

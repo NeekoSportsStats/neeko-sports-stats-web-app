@@ -583,6 +583,15 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
+    const authHeader = req.headers.get("Authorization");
+    const token = authHeader?.replace("Bearer ", "");
+    if (!token || token !== serviceKey) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (!openaiKey || !supabaseUrl || !serviceKey) {
       return new Response(JSON.stringify({ error: "Missing environment configuration" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -724,7 +733,7 @@ Deno.serve(async (req: Request) => {
 
   } catch (err) {
     console.error("generate-category-media: error", err);
-    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }),
+    return new Response(JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
