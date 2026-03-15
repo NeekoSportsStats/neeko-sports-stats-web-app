@@ -149,16 +149,15 @@ Deno.serve(async (req: Request) => {
 
           if (analysis && analysis.length >= 10) {
             await supabase
-              .from("ai_player_analysis")
+              .from("ai_player_content")
               .upsert(
                 {
                   player_id: player.player_id,
-                  player_name: player.player_name,
-                  team: player.team,
-                  projection_final: player.projection_final,
-                  analysis,
+                  summary: analysis,
                   input_hash: player.input_hash,
+                  prompt_version: promptKey,
                   generated_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
                 },
                 { onConflict: "player_id" }
               );

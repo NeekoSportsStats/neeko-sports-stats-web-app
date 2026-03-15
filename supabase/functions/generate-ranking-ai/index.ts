@@ -8,8 +8,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const BATCH_SIZE = 25;
-const MAX_PLAYERS_PER_RUN = 640;
+const BATCH_SIZE = 10;
+const MAX_PLAYERS_PER_RUN = 50;
 
 interface PlayerInput {
   player_id: number;
@@ -140,56 +140,38 @@ Deno.serve(async (req: Request) => {
     const batchNumber: number = body.batch_number ?? 1;
     const processedSoFar: number = body.processed_so_far ?? 0;
 
-    const { data: allCandidates, error: countError } = await supabase
-      .from("v_ai_player_analysis_input")
-      .select("player_id, input_hash");
-
-    if (countError) throw countError;
-
-    const candidates = allCandidates ?? [];
-
-    const existingAnalysis = candidates.length > 0
-      ? await supabase
-          .from("ai_player_analysis")
-          .select("player_id, input_hash")
-          .in("player_id", candidates.map((c: { player_id: number }) => c.player_id))
-      : { data: [] };
-
-    const storedHashMap = new Map<number, string | null>(
-      (existingAnalysis.data ?? []).map((r: { player_id: number; input_hash: string | null }) => [
-        r.player_id,
-        r.input_hash,
-      ])
-    );
-
-    const needsGeneration = candidates.filter((c: { player_id: number; input_hash: string | null }) => {
-      const stored = storedHashMap.get(c.player_id);
-      return stored == null || stored !== c.input_hash;
-    });
-
-    const totalNeedingGeneration = needsGeneration.length;
-
-    if (batchNumber === 1 && runId) {
-      await supabase
-        .from("pipeline_runs")
-        .update({
-          status: "running",
-          total_tasks: totalNeedingGeneration,
-          completed_tasks: 0,
-          current_step_label: `Starting AI analysis — ${totalNeedingGeneration} players need generation`,
-        })
-        .eq("id", runId);
+    const remainingBudget = MAX_PLAYERS_PER_RUN - processedSoFar;
+    if (remainingBudget <= 0) {
+      return new Response(
+        JSON.stringify({
+          message: `generate-ranking-ai safety cap reached — ${processedSoFar} processed this run`,
+          batch_number: batchNumber,
+          players_selected: 0,
+          players_generated: 0,
+          remaining: -1,
+          model: "gpt-4o-mini",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    if (totalNeedingGeneration === 0) {
-      if (runId) {
+    const thisBatchLimit = Math.min(BATCH_SIZE, remainingBudget);
+
+    const { data: needsGenIds, error: queueError } = await supabase
+      .rpc("get_players_needing_ai_analysis", { p_limit: thisBatchLimit });
+
+    if (queueError) throw queueError;
+
+    const candidates = (needsGenIds ?? []) as Array<{ player_id: number; input_hash: string | null }>;
+
+    if (candidates.length === 0) {
+      if (batchNumber === 1 && runId) {
         await supabase
           .from("pipeline_runs")
           .update({
             status: "completed",
             completed_tasks: 0,
             current_step_label: "Done — no players required AI regeneration",
-            completed_at: new Date().toISOString(),
           })
           .eq("id", runId);
       }
@@ -209,23 +191,23 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const remainingBudget = MAX_PLAYERS_PER_RUN - processedSoFar;
-    if (remainingBudget <= 0) {
-      return new Response(
-        JSON.stringify({
-          message: `generate-ranking-ai safety cap reached — ${processedSoFar} processed this run`,
-          batch_number: batchNumber,
-          players_selected: 0,
-          players_generated: 0,
-          remaining: totalNeedingGeneration,
-          model: "gpt-4o-mini",
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const totalRemaining = await supabase
+      .rpc("count_players_needing_ai_analysis")
+      .then((r) => (r.data as number | null) ?? candidates.length);
+
+    if (batchNumber === 1 && runId) {
+      await supabase
+        .from("pipeline_runs")
+        .update({
+          status: "running",
+          total_tasks: totalRemaining,
+          completed_tasks: 0,
+          current_step_label: `Starting AI analysis — ${totalRemaining} players need generation`,
+        })
+        .eq("id", runId);
     }
 
-    const batchSlice = needsGeneration.slice(0, Math.min(BATCH_SIZE, remainingBudget));
-    const playerIds = batchSlice.map((c: { player_id: number }) => c.player_id);
+    const playerIds = candidates.map((c) => c.player_id);
 
     const { data: playerData, error: fetchError } = await supabase
       .from("v_ai_player_analysis_input")
@@ -237,25 +219,30 @@ Deno.serve(async (req: Request) => {
     const players = (playerData ?? []) as PlayerInput[];
 
     console.log(
-      `[generate-ranking-ai] Batch ${batchNumber}: selected=${players.length} needing=${totalNeedingGeneration} processed_so_far=${processedSoFar}`
+      `[generate-ranking-ai] Batch ${batchNumber}: selected=${players.length} remaining_total=${totalRemaining} processed_so_far=${processedSoFar}`
     );
 
-    const upsertRows = [];
     let batchProcessed = 0;
     let batchErrors = 0;
 
     for (const player of players) {
       try {
         const analysis = await generateAnalysis(openai, player);
-        upsertRows.push({
-          player_id: player.player_id,
-          player_name: player.player_name,
-          team: player.team,
-          projection_final: player.projection_final,
-          analysis,
-          input_hash: player.input_hash,
-          generated_at: new Date().toISOString(),
-        });
+
+        await supabase
+          .from("ai_player_content")
+          .upsert(
+            {
+              player_id: player.player_id,
+              summary: analysis,
+              input_hash: player.input_hash,
+              prompt_version: "generate-ranking-ai-v2",
+              generated_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "player_id" }
+          );
+
         batchProcessed++;
       } catch (err) {
         console.error(`[generate-ranking-ai] Error for ${player.player_name}:`, err);
@@ -263,29 +250,18 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    if (upsertRows.length > 0) {
-      const { error: upsertError } = await supabase
-        .from("ai_player_analysis")
-        .upsert(upsertRows, { onConflict: "player_id" });
-
-      if (upsertError) {
-        console.error("[generate-ranking-ai] Upsert error:", upsertError);
-        throw upsertError;
-      }
-    }
-
     const newProcessedTotal = processedSoFar + batchProcessed;
-    const remaining = Math.max(0, totalNeedingGeneration - newProcessedTotal);
-    const canContinue = remaining > 0 && batchProcessed > 0 && newProcessedTotal < MAX_PLAYERS_PER_RUN;
+    const remainingAfter = Math.max(0, totalRemaining - newProcessedTotal);
+    const canContinue = remainingAfter > 0 && batchProcessed > 0 && newProcessedTotal < MAX_PLAYERS_PER_RUN;
 
     console.log(
-      `[generate-ranking-ai] Batch ${batchNumber} complete: generated=${batchProcessed} errors=${batchErrors} remaining=${remaining}`
+      `[generate-ranking-ai] Batch ${batchNumber} complete: generated=${batchProcessed} errors=${batchErrors} remaining=${remainingAfter}`
     );
 
     if (runId) {
       const { data: runData } = await supabase
         .from("pipeline_runs")
-        .select("completed_tasks, total_tasks")
+        .select("completed_tasks")
         .eq("id", runId)
         .maybeSingle();
 
@@ -296,7 +272,7 @@ Deno.serve(async (req: Request) => {
         .update({
           completed_tasks: newCompleted,
           current_step_label: canContinue
-            ? `Processing AI batch ${batchNumber} — ${remaining} remaining`
+            ? `Processing AI batch ${batchNumber} — ${remainingAfter} remaining`
             : "Done",
         })
         .eq("id", runId);
@@ -318,19 +294,11 @@ Deno.serve(async (req: Request) => {
         }).catch((err) => console.error("[generate-ranking-ai] Failed to trigger next batch:", err))
       );
     } else if (runId) {
-      const { data: runData } = await supabase
-        .from("pipeline_runs")
-        .select("total_tasks")
-        .eq("id", runId)
-        .maybeSingle();
-
       await supabase
         .from("pipeline_runs")
         .update({
           status: "completed",
-          completed_tasks: runData?.total_tasks ?? 0,
           current_step_label: "Done",
-          completed_at: new Date().toISOString(),
         })
         .eq("id", runId);
     }
@@ -345,7 +313,7 @@ Deno.serve(async (req: Request) => {
         players_generated: batchProcessed,
         errors_this_batch: batchErrors,
         processed_so_far: newProcessedTotal,
-        remaining,
+        remaining: remainingAfter,
         model: "gpt-4o-mini",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
