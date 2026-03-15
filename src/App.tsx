@@ -26,6 +26,7 @@ import {
   AdminSystemHealth,
   AdminOperations,
   AdminAnalytics,
+  AdminAccuracy,
   AdminQueue,
   AdminContentEngine,
   AdminContentPlanner,
@@ -158,6 +159,7 @@ function App() {
         <Route path="system-health"    element={<S fallback={Generic}><AdminSystemHealth /></S>} />
         <Route path="operations"       element={<S fallback={Generic}><AdminOperations /></S>} />
         <Route path="analytics"        element={<S fallback={Generic}><AdminAnalytics /></S>} />
+        <Route path="accuracy"         element={<S fallback={Generic}><AdminAccuracy /></S>} />
         <Route path="queue"            element={<S fallback={Generic}><AdminQueue /></S>} />
         <Route path="content-engine"   element={<S fallback={Generic}><AdminContentEngine /></S>} />
         <Route path="content-planner"  element={<S fallback={Generic}><AdminContentPlanner /></S>} />

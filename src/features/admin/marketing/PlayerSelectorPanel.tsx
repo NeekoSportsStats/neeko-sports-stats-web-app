@@ -248,7 +248,7 @@ export function PlayerSelectorPanel({
     fetchedRef.current = true;
     setLoading(true);
     supabase
-      .from("v_rankings_master_no_limit")
+      .from("v_rankings_content_engine")
       .select("player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, captain_score, matchup_rating, upside_rating, consistency_score, risk_rating")
       .order("player_name", { ascending: true })
       .then(({ data }) => {

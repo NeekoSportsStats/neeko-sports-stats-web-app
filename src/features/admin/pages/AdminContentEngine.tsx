@@ -743,7 +743,7 @@ export default function AdminContentEngine() {
     setCaption("");
     try {
       const { data, error } = await supabase
-        .from("v_rankings_master_no_limit")
+        .from("v_rankings_content_engine")
         .select("player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, captain_score, matchup_rating, upside_rating, consistency_score, risk_rating")
         .order(angle.orderBy as string, { ascending: angle.orderDir === "asc", nullsFirst: false })
         .limit(angle.limit);

@@ -222,7 +222,7 @@ export default function SocialGraphicGenerator() {
 
     try {
       const { data } = await supabase
-        .from("v_rankings_master_no_limit")
+        .from("v_rankings_content_engine")
         .select("*")
         .order(type.orderBy, { ascending: false })
         .limit(type.limit);
