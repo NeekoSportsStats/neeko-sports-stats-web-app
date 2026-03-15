@@ -897,10 +897,10 @@ function RankingsPreview() {
     <section className="py-12 md:py-16 bg-[#070707] border-t border-white/[0.05]">
       <div className="max-w-3xl mx-auto px-4">
         <SectionLabel>Rankings Preview</SectionLabel>
-        <SectionHeading>This Week's Top Fantasy Projections</SectionHeading>
+        <SectionHeading>See the Rankings in Action</SectionHeading>
         <GoldDivider />
         <p className="text-center text-white/40 text-sm mb-8 max-w-md mx-auto">
-          Ranked by Neeko Rating — projection, matchup and AI verdict combined.
+          Live projections ranked by Neeko Rating — combining projection, matchup and AI analysis.
         </p>
 
         <div className="rounded-2xl border border-white/[0.07] overflow-hidden">
@@ -1085,17 +1085,14 @@ export default function Index() {
       {/* ── SECTION 2: FEATURE CARDS ──────────────────────────────────────────── */}
       <FeatureCards />
 
-      {/* ── SECTION 3: PRODUCT SHOWCASE ───────────────────────────────────────── */}
-      <ProductShowcase />
+      {/* ── SECTION 3: RANKINGS PREVIEW ───────────────────────────────────────── */}
+      <RankingsPreview />
 
       {/* ── SECTION 4: MODEL ACCURACY ─────────────────────────────────────────── */}
       <ModelAccuracySection />
 
       {/* ── SECTION 5: EDGE SIGNALS PREVIEW ──────────────────────────────────── */}
       <EdgeBoardPreview />
-
-      {/* ── SECTION 6: RANKINGS PREVIEW ───────────────────────────────────────── */}
-      <RankingsPreview />
 
       {/* ── SECTION 7: WHY COACHES USE NEEKO ─────────────────────────────────── */}
       <WhyNeekoSection />
