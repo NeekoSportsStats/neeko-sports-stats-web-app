@@ -289,14 +289,53 @@ Deno.serve(async (req: Request) => {
     const serviceClient = createClient(supabaseUrl, serviceKey);
 
     const authHeader = req.headers.get("Authorization");
+
+    if (!authHeader || authHeader === `Bearer ${anonKey}`) {
+      return new Response(
+        JSON.stringify({ error: "Authentication required. Please sign in to use Start / Sit." }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: authHeader ? { Authorization: authHeader } : {} },
+      global: { headers: { Authorization: authHeader } },
     });
 
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Authentication required. Please sign in to use Start / Sit." }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: accessState } = await serviceClient
+      .rpc("get_access_state_for_user", { p_user_id: user.id })
+      .maybeSingle()
+      .catch(() => ({ data: null }));
+
     let isPremium = false;
-    if (authHeader) {
-      const { data: { user } } = await userClient.auth.getUser();
-      if (user) {
+    if (accessState?.is_premium === true) {
+      isPremium = true;
+    } else {
+      const { data: subscription } = await serviceClient
+        .from("subscriptions")
+        .select("status, current_period_end")
+        .or(`user_id.eq.${user.id},profile_id.eq.${user.id}`)
+        .in("status", ["active", "trialing"])
+        .order("current_period_end", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (subscription) {
+        const notExpired =
+          !subscription.current_period_end ||
+          new Date(subscription.current_period_end) > new Date();
+        isPremium = notExpired;
+      }
+
+      if (!isPremium) {
         const { data: profile } = await serviceClient
           .from("profiles")
           .select("subscription_status, current_period_end, is_active")
@@ -314,6 +353,13 @@ Deno.serve(async (req: Request) => {
               profile.subscription_status === "trialing");
         }
       }
+    }
+
+    if (!isPremium) {
+      return new Response(
+        JSON.stringify({ error: "Neeko+ subscription required. Upgrade to access Start / Sit." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const body: StartSitRequest = await req.json();

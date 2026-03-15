@@ -40,16 +40,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const currentUserIdRef = useRef<string | null>(null);
 
   /**
-   * Fetch premium status from `profiles` for a given user id.
+   * Fetch premium status using the server-side get_access_state() RPC.
+   * This is authoritative — expiry is evaluated by the database, not the browser clock.
    */
-  const fetchPremiumStatus = useCallback(async (userId: string) => {
+  const fetchPremiumStatus = useCallback(async (_userId: string) => {
     setPremiumLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("is_active, subscription_status, current_period_end")
-        .eq("id", userId)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc("get_access_state");
 
       if (error) {
         console.error("❌ Premium status error:", error);
@@ -57,19 +54,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      const now = new Date();
-      const periodEnd = data?.current_period_end
-        ? new Date(data.current_period_end)
-        : null;
-      const notExpired = periodEnd !== null && periodEnd > now;
-
-      const statusOk =
-        data?.subscription_status === "active" ||
-        data?.subscription_status === "trialing" ||
-        data?.is_active === true;
-
-      const active = statusOk && notExpired;
-      console.log("⭐ Premium status:", active, "for user:", userId);
+      const active = data?.is_premium === true;
+      console.log("⭐ Premium status:", active);
       setIsPremium(active);
     } catch (err) {
       console.error("❌ Premium status exception:", err);
