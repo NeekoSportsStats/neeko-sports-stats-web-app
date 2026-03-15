@@ -8,7 +8,7 @@ import {
   Zap, Bot, Activity, History, RefreshCw,
   DollarSign, Upload, CircleCheck as CheckCircle,
   CircleAlert as AlertCircle, ChartBar as BarChart2,
-  Grid2x2 as Grid, ListOrdered, Play,
+  Grid2x2 as Grid, ListOrdered, Play, DatabaseZap,
 } from "lucide-react";
 import { AdminPipelineProgress, type PipelineRun } from "@/components/admin/AdminPipelineProgress";
 
@@ -57,6 +57,24 @@ export default function AdminOperations() {
       })
       .eq("id", runId);
     await fetchActiveRun(runId);
+  };
+
+  const handleRefreshPricesAndRankings = async () => {
+    setRunning("refresh_prices");
+    toast({ title: "Refreshing prices and rankings…" });
+    try {
+      const { error } = await supabase.schema("afl" as never).rpc("populate_rankings_cache_from_source");
+      if (error) throw error;
+      await Promise.all([
+        supabase.rpc("fn_refresh_market_watch"),
+        supabase.rpc("fn_refresh_edge_board"),
+      ]);
+      toast({ title: "Prices and rankings refreshed", description: "Frontend will reflect updated prices immediately." });
+    } catch (err) {
+      toast({ title: "Refresh failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
+    } finally {
+      setRunning(null);
+    }
   };
 
   const handleRunController = async () => {
@@ -303,6 +321,13 @@ export default function AdminOperations() {
               variant="default"
             />
             <ActionButton
+              id="refresh_prices"
+              label="Refresh Prices & Rankings"
+              icon={DatabaseZap}
+              onClick={handleRefreshPricesAndRankings}
+              variant="default"
+            />
+            <ActionButton
               id="rankings_cache"
               label="Refresh Rankings Cache"
               icon={ListOrdered}
@@ -467,7 +492,7 @@ export default function AdminOperations() {
                       {uploadResult.rows_updated} price{uploadResult.rows_updated !== 1 ? "s" : ""} updated
                     </p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Market Watch and Edge Board will reflect new prices on next refresh.
+                      Rankings cache, Market Watch and Edge Board refreshed automatically.
                     </p>
                   </div>
                 </div>
