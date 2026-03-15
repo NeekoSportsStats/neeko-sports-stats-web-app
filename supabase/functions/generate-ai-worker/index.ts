@@ -49,9 +49,13 @@ async function loadPrompt(
   return data as PromptRecord;
 }
 
-function injectPayload(template: string, payload: Record<string, unknown> | null): string {
+function injectPayload(template: string | null | undefined, payload: Record<string, unknown> | null): string {
+  if (!template) {
+    throw new Error("Prompt user_prompt_template is null or missing — cannot build prompt");
+  }
+
   const data = payload?.data ?? payload ?? {};
-  const dataString = data && Object.keys(data).length > 0
+  const dataString = data && Object.keys(data as object).length > 0
     ? JSON.stringify(data, null, 2)
     : "(no payload provided)";
 
