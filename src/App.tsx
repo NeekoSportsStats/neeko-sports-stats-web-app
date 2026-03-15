@@ -21,6 +21,7 @@ import NotFound from "@/pages/NotFound";
 ========================= */
 import {
   AdminShell,
+  AdminCommandCenter,
   AdminDashboard,
   AdminSystemHealth,
   AdminOperations,
@@ -153,7 +154,8 @@ function App() {
           </RequireAuth>
         }
       >
-        <Route index element={<Navigate to="/admin/dashboard" replace />} />
+        <Route index element={<Navigate to="/admin/command-center" replace />} />
+        <Route path="command-center"   element={<S fallback={Generic}><AdminCommandCenter /></S>} />
         <Route path="dashboard"        element={<S fallback={Generic}><AdminDashboard /></S>} />
         <Route path="system-health"    element={<S fallback={Generic}><AdminSystemHealth /></S>} />
         <Route path="operations"       element={<S fallback={Generic}><AdminOperations /></S>} />

@@ -1,12 +1,13 @@
 import { useEffect, lazy, Suspense } from "react";
 import { useNavigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { RefreshCw, Shield, LayoutDashboard, Server, ChartBar as BarChart3, Zap, Calendar, ListTodo, Settings } from "lucide-react";
+import { RefreshCw, Shield, Terminal, LayoutDashboard, Server, ChartBar as BarChart3, Zap, Calendar, ListTodo, Settings } from "lucide-react";
 import { AdminUIStateProvider, useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
 
 const ADMIN_USER_ID = "4421a8b2-b5b6-4c93-b865-c8819a7ae902";
 
 const TABS: { path: string; label: string; icon: React.ElementType }[] = [
+  { path: "/admin/command-center",   label: "Command Center",   icon: Terminal },
   { path: "/admin/dashboard",        label: "Dashboard",        icon: LayoutDashboard },
   { path: "/admin/system-health",    label: "System Health",    icon: Server },
   { path: "/admin/operations",       label: "Operations",       icon: Settings },
@@ -56,7 +57,7 @@ function AdminShell() {
     if (!user) { navigate("/auth"); return; }
     if (user.id !== ADMIN_USER_ID) { navigate("/"); return; }
     if (location.pathname === "/admin" || location.pathname === "/admin/") {
-      navigate("/admin/dashboard", { replace: true });
+      navigate("/admin/command-center", { replace: true });
     }
   }, [user, loading, navigate, location.pathname]);
 
@@ -118,6 +119,7 @@ function AdminShellWithProvider() {
   );
 }
 
+export const AdminCommandCenter  = lazy(() => import("@/features/admin/command-center/AdminCommandCenter"));
 export const AdminDashboard      = lazy(() => import("@/features/admin/pages/AdminDashboard"));
 export const AdminSystemHealth   = lazy(() => import("@/features/admin/pages/AdminSystemHealth"));
 export const AdminOperations     = lazy(() => import("@/features/admin/pages/AdminOperations"));
