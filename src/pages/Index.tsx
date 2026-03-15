@@ -11,7 +11,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { NEEKO_PRICING } from "@/config/neekoPricing";
 import MobileUpgradeBar from "@/components/mobile/MobileUpgradeBar";
-import PremiumLock from "@/components/premium/PremiumLock";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,9 +40,12 @@ interface EdgeRow {
   player_name: string;
   team: string;
   projection_final: number | null;
+  ceiling_score: number | null;
   captain_score: number | null;
   upside_rating: number | null;
   risk_rating: number | null;
+  matchup_advantage: number | null;
+  form_trend: string | null;
   ai_summary: string | null;
   section: string;
 }
@@ -221,7 +223,6 @@ function FeatureCards() {
               </div>
               <div className="flex items-center gap-2 mb-2">
                 <h3 className="text-base font-bold text-white leading-snug">{title}</h3>
-                {premium && <PremiumLock />}
               </div>
               <p className="text-sm text-white/40 leading-relaxed flex-1 mb-5">{desc}</p>
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#F5C84C]/70 group-hover:text-[#F5C84C] transition-colors">
@@ -715,6 +716,15 @@ function PremiumSection() {
 
 // ─── Edge board preview ───────────────────────────────────────────────────────
 
+function EdgeStatRow({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
+  return (
+    <div className="flex items-center justify-between py-1 border-b border-white/[0.04] last:border-0">
+      <span className="text-[11px] text-white/35 font-medium">{label}</span>
+      <span className={`text-[12px] font-bold tabular-nums ${valueColor ?? "text-white/70"}`}>{value}</span>
+    </div>
+  );
+}
+
 function EdgeBoardPreview() {
   const [captain,  setCaptain]  = useState<EdgeRow | null>(null);
   const [breakout, setBreakout] = useState<EdgeRow | null>(null);
@@ -732,36 +742,6 @@ function EdgeBoardPreview() {
     })();
   }, []);
 
-  const cards = [
-    {
-      section: "captain",
-      icon: Star,
-      color: "#F5C84C",
-      label: "Captain Edge",
-      subtitle: "Players projected to outperform typical captain selections this round.",
-      row: captain,
-      stat: (r: EdgeRow) => r.captain_score != null ? `Captain Rating ${Math.round(r.captain_score)}` : null,
-    },
-    {
-      section: "breakout",
-      icon: TrendingUp,
-      color: "#34d399",
-      label: "Breakout Watch",
-      subtitle: "Players with strong upside relative to recent scoring trends.",
-      row: breakout,
-      stat: (r: EdgeRow) => r.upside_rating != null ? `Upside ${Math.round(r.upside_rating)}` : null,
-    },
-    {
-      section: "trap",
-      icon: AlertTriangle,
-      color: "#f87171",
-      label: "Trap Warning",
-      subtitle: "Players at risk of underperforming their current fantasy price.",
-      row: trap,
-      stat: (r: EdgeRow) => r.risk_rating != null ? `Risk ${Math.round(r.risk_rating)}` : null,
-    },
-  ];
-
   return (
     <section className="py-10 md:py-14 bg-[#0a0a0a] border-t border-white/[0.05]">
       <div className="max-w-3xl mx-auto px-4">
@@ -773,62 +753,161 @@ function EdgeBoardPreview() {
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {cards.map(({ section, icon: Icon, color, label, subtitle, row, stat }) => (
-            <div
-              key={section}
-              className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-white/[0.12] transition-all"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <div
-                  className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                  style={{ background: `${color}15`, border: `1px solid ${color}30` }}
-                >
-                  <Icon size={16} style={{ color }} />
-                </div>
-                <span className="text-xs font-bold uppercase tracking-widest" style={{ color }}>
-                  {label}
-                </span>
-              </div>
-              <p className="text-[11px] text-white/30 leading-snug mb-3">{subtitle}</p>
 
-              {loading ? (
-                <div className="space-y-2 animate-pulse">
-                  <div className="h-5 w-32 bg-white/10 rounded" />
-                  <div className="h-3 w-20 bg-white/10 rounded" />
-                  <div className="h-3 w-24 bg-white/10 rounded" />
-                </div>
-              ) : row ? (
-                <>
-                  <p className="text-base font-bold text-white leading-tight mb-1">{row.player_name}</p>
-                  <p className="text-xs text-white/35 mb-2">{row.team}</p>
-                  {stat(row) && (
-                    <p className="text-xs font-semibold" style={{ color }}>{stat(row)}</p>
-                  )}
-                  {row.projection_final != null && (
-                    <p className="text-xs text-white/30 mt-1">
-                      Proj. {Math.round(row.projection_final)} pts
-                    </p>
-                  )}
-                </>
-              ) : (
-                <div className="space-y-2 animate-pulse">
-                  <div className="h-5 w-32 bg-white/[0.06] rounded" />
-                  <div className="h-3 w-20 bg-white/[0.06] rounded" />
-                  <div className="h-3 w-24 bg-white/[0.06] rounded" />
-                </div>
-              )}
+          {/* Captain Edge */}
+          <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-[#F5C84C]/20 transition-all">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#F5C84C15", border: "1px solid #F5C84C30" }}>
+                <Star size={16} style={{ color: "#F5C84C" }} />
+              </div>
+              <span className="text-xs font-bold uppercase tracking-widest text-[#F5C84C]">Captain Edge</span>
             </div>
-          ))}
+            <p className="text-[11px] text-white/30 leading-snug mb-3">Players projected to outperform typical captain selections this round.</p>
+
+            {loading ? (
+              <div className="space-y-2 animate-pulse">
+                {[32, 24, 20, 20, 20].map((w, i) => (
+                  <div key={i} className="h-3 bg-white/[0.08] rounded" style={{ width: `${w * 3}px` }} />
+                ))}
+              </div>
+            ) : captain ? (
+              <>
+                <p className="text-base font-bold text-white leading-tight mb-0.5">{captain.player_name}</p>
+                <p className="text-xs text-white/35 mb-3">{captain.team}</p>
+                <div className="space-y-0">
+                  {captain.projection_final != null && (
+                    <EdgeStatRow label="Projection" value={`${Math.round(captain.projection_final)} pts`} valueColor="text-[#F5C84C]" />
+                  )}
+                  {captain.ceiling_score != null && (
+                    <EdgeStatRow label="Ceiling" value={`${Math.round(captain.ceiling_score)} pts`} valueColor="text-white/70" />
+                  )}
+                  {captain.matchup_advantage != null && (
+                    <EdgeStatRow
+                      label="Matchup"
+                      value={captain.matchup_advantage >= 0 ? `+${Math.round(captain.matchup_advantage)}` : `${Math.round(captain.matchup_advantage)}`}
+                      valueColor={captain.matchup_advantage >= 0 ? "text-green-400" : "text-red-400"}
+                    />
+                  )}
+                  {captain.captain_score != null && (
+                    <EdgeStatRow label="Confidence" value={captain.captain_score >= 70 ? "High" : captain.captain_score >= 45 ? "Med" : "Low"} valueColor={captain.captain_score >= 70 ? "text-green-400" : captain.captain_score >= 45 ? "text-[#F5C84C]" : "text-white/40"} />
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="space-y-2 animate-pulse">
+                {[32, 24, 20, 20, 20].map((w, i) => (
+                  <div key={i} className="h-3 bg-white/[0.06] rounded" style={{ width: `${w * 3}px` }} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Breakout Watch */}
+          <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-green-400/20 transition-all">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#34d39915", border: "1px solid #34d39930" }}>
+                <TrendingUp size={16} style={{ color: "#34d399" }} />
+              </div>
+              <span className="text-xs font-bold uppercase tracking-widest text-[#34d399]">Breakout Watch</span>
+            </div>
+            <p className="text-[11px] text-white/30 leading-snug mb-3">Players with strong upside relative to recent scoring trends.</p>
+
+            {loading ? (
+              <div className="space-y-2 animate-pulse">
+                {[32, 24, 20, 20, 20].map((w, i) => (
+                  <div key={i} className="h-3 bg-white/[0.08] rounded" style={{ width: `${w * 3}px` }} />
+                ))}
+              </div>
+            ) : breakout ? (
+              <>
+                <p className="text-base font-bold text-white leading-tight mb-0.5">{breakout.player_name}</p>
+                <p className="text-xs text-white/35 mb-3">{breakout.team}</p>
+                <div className="space-y-0">
+                  {breakout.projection_final != null && (
+                    <EdgeStatRow label="Projection" value={`${Math.round(breakout.projection_final)} pts`} valueColor="text-[#F5C84C]" />
+                  )}
+                  {breakout.upside_rating != null && (
+                    <EdgeStatRow label="Upside" value={`${Math.round(breakout.upside_rating)} pts`} valueColor="text-green-400" />
+                  )}
+                  {breakout.form_trend != null && (
+                    <EdgeStatRow label="Form Trend" value={breakout.form_trend} valueColor={breakout.form_trend.toLowerCase().includes("up") ? "text-green-400" : breakout.form_trend.toLowerCase().includes("down") ? "text-red-400" : "text-white/50"} />
+                  )}
+                  {breakout.matchup_advantage != null && (
+                    <EdgeStatRow
+                      label="Matchup"
+                      value={breakout.matchup_advantage >= 0 ? `+${Math.round(breakout.matchup_advantage)}` : `${Math.round(breakout.matchup_advantage)}`}
+                      valueColor={breakout.matchup_advantage >= 0 ? "text-green-400" : "text-red-400"}
+                    />
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="space-y-2 animate-pulse">
+                {[32, 24, 20, 20, 20].map((w, i) => (
+                  <div key={i} className="h-3 bg-white/[0.06] rounded" style={{ width: `${w * 3}px` }} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Trap Warning */}
+          <div className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-red-400/20 transition-all">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: "#f8717115", border: "1px solid #f8717130" }}>
+                <AlertTriangle size={16} style={{ color: "#f87171" }} />
+              </div>
+              <span className="text-xs font-bold uppercase tracking-widest text-[#f87171]">Trap Warning</span>
+            </div>
+            <p className="text-[11px] text-white/30 leading-snug mb-3">Players at risk of underperforming their current fantasy price.</p>
+
+            {loading ? (
+              <div className="space-y-2 animate-pulse">
+                {[32, 24, 20, 20, 20].map((w, i) => (
+                  <div key={i} className="h-3 bg-white/[0.08] rounded" style={{ width: `${w * 3}px` }} />
+                ))}
+              </div>
+            ) : trap ? (
+              <>
+                <p className="text-base font-bold text-white leading-tight mb-0.5">{trap.player_name}</p>
+                <p className="text-xs text-white/35 mb-3">{trap.team}</p>
+                <div className="space-y-0">
+                  {trap.projection_final != null && (
+                    <EdgeStatRow label="Projection" value={`${Math.round(trap.projection_final)} pts`} valueColor="text-[#F5C84C]" />
+                  )}
+                  {trap.risk_rating != null && (
+                    <EdgeStatRow label="Risk Rating" value={trap.risk_rating >= 65 ? "High" : trap.risk_rating >= 40 ? "Med" : "Low"} valueColor={trap.risk_rating >= 65 ? "text-red-400" : trap.risk_rating >= 40 ? "text-[#F5C84C]" : "text-green-400"} />
+                  )}
+                  {trap.matchup_advantage != null && (
+                    <EdgeStatRow
+                      label="Matchup"
+                      value={trap.matchup_advantage >= 0 ? `+${Math.round(trap.matchup_advantage)}` : `${Math.round(trap.matchup_advantage)}`}
+                      valueColor={trap.matchup_advantage >= 0 ? "text-green-400" : "text-red-400"}
+                    />
+                  )}
+                  {trap.form_trend != null && (
+                    <EdgeStatRow label="Form Trend" value={trap.form_trend} valueColor={trap.form_trend.toLowerCase().includes("down") ? "text-red-400" : trap.form_trend.toLowerCase().includes("up") ? "text-green-400" : "text-white/50"} />
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="space-y-2 animate-pulse">
+                {[32, 24, 20, 20, 20].map((w, i) => (
+                  <div key={i} className="h-3 bg-white/[0.06] rounded" style={{ width: `${w * 3}px` }} />
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
 
         <p className="text-center text-white/25 text-xs mt-4">
           Full edge board includes additional signals and matchup analysis.
         </p>
 
-        <div className="mt-3">
+        <div className="mt-3 flex justify-center">
           <Link
             to="/neeko-plus"
-            className="flex w-full sm:w-auto sm:inline-flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3.5 rounded-xl hover:brightness-110 transition-all min-h-[48px] sm:mx-auto sm:table"
+            className="inline-flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3.5 rounded-xl hover:brightness-110 transition-all min-h-[48px]"
           >
             <Crown size={14} />
             Unlock All Edge Signals
@@ -1125,18 +1204,18 @@ function riskLabel(risk: number | null): { label: string; color: string } {
   return               { label: "LOW",  color: "text-green-400" };
 }
 
-function confLabel(conf: number | null): { label: string; color: string } {
-  if (conf == null) return { label: "—",    color: "text-white/30" };
-  if (conf >= 75)   return { label: "HIGH", color: "text-green-400" };
-  if (conf >= 55)   return { label: "MED",  color: "text-[#F5C84C]" };
-  return               { label: "LOW",  color: "text-white/40" };
+function confLabel(conf: number | null): { label: string; textColor: string; bg: string; border: string } {
+  if (conf == null) return { label: "—",    textColor: "text-white/30",  bg: "bg-white/5",        border: "border-white/10" };
+  if (conf >= 75)   return { label: "HIGH", textColor: "text-green-400", bg: "bg-green-400/10",   border: "border-green-400/30" };
+  if (conf >= 55)   return { label: "MED",  textColor: "text-[#F5C84C]", bg: "bg-[#F5C84C]/10",   border: "border-[#F5C84C]/30" };
+  return               { label: "LOW",  textColor: "text-red-400",   bg: "bg-red-400/10",     border: "border-red-400/30" };
 }
 
-function valueLabel(score: number | null): { label: string; color: string } {
-  if (score == null) return { label: "—",             color: "text-white/30" };
-  if (score >= 120)  return { label: "STRONG VALUE",  color: "text-green-400" };
-  if (score >= 80)   return { label: "FAIR VALUE",    color: "text-white/50" };
-  return                { label: "OVERPRICED",    color: "text-red-400" };
+function valueLabel(score: number | null): { label: string; textColor: string; bg: string; border: string } {
+  if (score == null) return { label: "—",          textColor: "text-white/30",  bg: "bg-white/5",        border: "border-white/10" };
+  if (score >= 120)  return { label: "STRONG",      textColor: "text-green-400", bg: "bg-green-400/10",   border: "border-green-400/30" };
+  if (score >= 80)   return { label: "FAIR",         textColor: "text-white/50",  bg: "bg-white/5",        border: "border-white/10" };
+  return                { label: "OVERPRICED",  textColor: "text-red-400",   bg: "bg-red-400/10",     border: "border-red-400/30" };
 }
 
 function RankingsPreview() {
@@ -1157,38 +1236,31 @@ function RankingsPreview() {
 
   return (
     <section className="py-10 md:py-14 bg-[#070707] border-t border-white/[0.05]">
-      <div className="max-w-5xl mx-auto px-4">
+      <div className="max-w-4xl mx-auto px-4">
         <SectionLabel>Rankings Preview</SectionLabel>
         <SectionHeading>See the Rankings in Action</SectionHeading>
         <GoldDivider />
         <p className="text-center text-white/40 text-sm mb-3 max-w-lg mx-auto">
           Rankings combine projection models, matchup difficulty, ceiling projections, volatility scoring and value metrics.
         </p>
-        <p className="text-center text-[11px] text-[#F5C84C]/50 font-semibold uppercase tracking-widest mb-1">
-          600+ players ranked weekly
-        </p>
-        <p className="text-center text-[11px] text-white/25 mb-6">
-          Updated before every AFL Fantasy round lockout
+        <p className="text-center text-[11px] text-white/30 mb-6 tracking-wide">
+          600+ players ranked every round using the Neeko projection engine.
         </p>
 
         {/* Desktop table */}
         <div className="hidden md:block rounded-2xl border border-white/[0.07] overflow-hidden">
-          <div className="grid grid-cols-[2rem_1fr_3.5rem_4rem_5rem_4rem_4rem_5rem_4.5rem] gap-x-3 px-5 py-3 text-[10px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
+          <div className="grid grid-cols-[2rem_1fr_5rem_6rem_7rem] gap-x-4 px-5 py-3 text-[10px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
             <span>#</span>
             <span>Player</span>
-            <span className="text-center">Team</span>
-            <span className="text-center">Rating</span>
-            <span className="text-center">Proj.</span>
-            <span className="text-center">Conf.</span>
-            <span className="text-center">Risk</span>
-            <span className="text-right">Price</span>
+            <span className="text-center text-[#F5C84C]/60">Projection</span>
+            <span className="text-center">Confidence</span>
             <span className="text-right">Value</span>
           </div>
 
           {loading
             ? Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="animate-pulse grid grid-cols-[2rem_1fr_3.5rem_4rem_5rem_4rem_4rem_5rem_4.5rem] gap-x-3 px-5 py-4 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0">
-                  {Array.from({ length: 9 }).map((__, j) => (
+                <div key={i} className="animate-pulse grid grid-cols-[2rem_1fr_5rem_6rem_7rem] gap-x-4 px-5 py-4 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0">
+                  {Array.from({ length: 5 }).map((__, j) => (
                     <div key={j} className="h-4 bg-white/[0.06] rounded" />
                   ))}
                 </div>
@@ -1197,46 +1269,55 @@ function RankingsPreview() {
               ? (
                 <>
                   {rows.map((row, idx) => {
-                    const risk = riskLabel(row.risk_rating);
                     const conf = confLabel(row.projection_confidence);
                     const val  = valueLabel(row.value_score);
                     return (
-                      <div key={idx} className="grid grid-cols-[2rem_1fr_3.5rem_4rem_5rem_4rem_4rem_5rem_4.5rem] gap-x-3 px-5 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors last:border-0 items-center">
+                      <div key={idx} className="grid grid-cols-[2rem_1fr_5rem_6rem_7rem] gap-x-4 px-5 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors last:border-0 items-center">
                         <span className="text-xs text-white/25 font-mono">{idx + 1}</span>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-white truncate leading-tight">{row.player_name}</p>
+                          <p className="text-sm font-bold text-white truncate leading-tight">{row.player_name}</p>
                           {row.position && <p className="text-[10px] text-white/30 leading-tight">{row.position}</p>}
                         </div>
-                        <span className="text-[11px] text-white/40 text-center">{teamAbbr(row.team)}</span>
-                        <span className="text-xs font-bold text-[#F5C84C] text-center">
-                          {row.neeko_rating != null ? Math.round(row.neeko_rating) : "—"}
-                        </span>
-                        <span className="text-xs font-bold text-white text-center">
+                        <span className="text-sm font-bold text-[#F5C84C] text-center tabular-nums">
                           {row.projection_final != null ? Math.round(row.projection_final) : "—"}
                         </span>
-                        <span className={`text-[11px] font-bold text-center ${conf.color}`}>{conf.label}</span>
-                        <span className={`text-[11px] font-bold text-center ${risk.color}`}>{risk.label}</span>
-                        <span className="text-[11px] text-white/50 text-right">
-                          {row.price != null ? `$${(row.price / 1000).toFixed(0)}k` : "—"}
-                        </span>
-                        <span className={`text-[11px] font-bold text-right ${val.color}`}>{val.label}</span>
+                        <div className="flex justify-center">
+                          {conf.label === "—"
+                            ? <span className="text-xs text-white/30">—</span>
+                            : (
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${conf.bg} ${conf.border} ${conf.textColor}`}>
+                                {conf.label}
+                              </span>
+                            )
+                          }
+                        </div>
+                        <div className="flex justify-end">
+                          {val.label === "—"
+                            ? <span className="text-xs text-white/30">—</span>
+                            : (
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${val.bg} ${val.border} ${val.textColor}`}>
+                                {val.label}
+                              </span>
+                            )
+                          }
+                        </div>
                       </div>
                     );
                   })}
 
                   {[6, 7].map((rank) => (
-                    <div key={rank} className="grid grid-cols-[2rem_1fr_3.5rem_4rem_5rem_4rem_4rem_5rem_4.5rem] gap-x-3 px-5 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0 items-center select-none">
+                    <div key={rank} className="grid grid-cols-[2rem_1fr_5rem_6rem_7rem] gap-x-4 px-5 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0 items-center select-none">
                       <span className="text-xs text-white/15 font-mono">{rank}</span>
                       <div className="flex items-center gap-2">
                         <Lock size={11} className="text-white/20 shrink-0" />
-                        <span className="text-sm font-semibold text-white/20 blur-[3px]">Premium Player</span>
+                        <span className="text-sm font-bold text-white/20 blur-[3px]">Premium Player</span>
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-[#F5C84C]/10 border border-[#F5C84C]/20 text-[9px] font-bold text-[#F5C84C]/60 uppercase tracking-wide shrink-0">
                           Neeko+
                         </span>
                       </div>
-                      {Array.from({ length: 7 }).map((_, j) => (
-                        <span key={j} className="text-xs text-white/15 text-center blur-[3px]">—</span>
-                      ))}
+                      <span className="text-xs text-white/15 text-center blur-[3px]">—</span>
+                      <span className="text-xs text-white/15 text-center blur-[3px]">—</span>
+                      <span className="text-xs text-white/15 text-right blur-[3px]">—</span>
                     </div>
                   ))}
                 </>
@@ -1251,18 +1332,17 @@ function RankingsPreview() {
 
         {/* Mobile table */}
         <div className="md:hidden rounded-2xl border border-white/[0.07] overflow-hidden">
-          <div className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3rem] gap-x-2 px-4 py-3 text-[10px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
+          <div className="grid grid-cols-[2rem_1fr_4.5rem_5rem] gap-x-3 px-4 py-3 text-[10px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
             <span>#</span>
             <span>Player</span>
-            <span className="text-center">Rating</span>
-            <span className="text-center">Proj.</span>
-            <span className="text-right">Risk</span>
+            <span className="text-center text-[#F5C84C]/60">Proj.</span>
+            <span className="text-right">Value</span>
           </div>
 
           {loading
             ? Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="animate-pulse grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3rem] gap-x-2 px-4 py-4 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0">
-                  {Array.from({ length: 5 }).map((__, j) => (
+                <div key={i} className="animate-pulse grid grid-cols-[2rem_1fr_4.5rem_5rem] gap-x-3 px-4 py-4 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0">
+                  {Array.from({ length: 4 }).map((__, j) => (
                     <div key={j} className="h-4 bg-white/[0.06] rounded" />
                   ))}
                 </div>
@@ -1271,33 +1351,36 @@ function RankingsPreview() {
               ? (
                 <>
                   {rows.map((row, idx) => {
-                    const risk = riskLabel(row.risk_rating);
+                    const val = valueLabel(row.value_score);
                     return (
-                      <div key={idx} className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3rem] gap-x-2 px-4 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors last:border-0 items-center">
+                      <div key={idx} className="grid grid-cols-[2rem_1fr_4.5rem_5rem] gap-x-3 px-4 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors last:border-0 items-center">
                         <span className="text-xs text-white/25 font-mono">{idx + 1}</span>
-                        <span className="text-sm font-semibold text-white truncate">{row.player_name}</span>
-                        <span className="text-xs font-bold text-[#F5C84C] text-center">
-                          {row.neeko_rating != null ? Math.round(row.neeko_rating) : "—"}
-                        </span>
-                        <span className="text-xs font-bold text-white text-center">
+                        <span className="text-sm font-bold text-white truncate">{row.player_name}</span>
+                        <span className="text-sm font-bold text-[#F5C84C] text-center tabular-nums">
                           {row.projection_final != null ? Math.round(row.projection_final) : "—"}
                         </span>
-                        <span className={`text-[11px] font-bold text-right ${risk.color}`}>{risk.label}</span>
+                        <div className="flex justify-end">
+                          {val.label === "—"
+                            ? <span className="text-xs text-white/30">—</span>
+                            : (
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold border ${val.bg} ${val.border} ${val.textColor}`}>
+                                {val.label}
+                              </span>
+                            )
+                          }
+                        </div>
                       </div>
                     );
                   })}
 
                   {[6, 7].map((rank) => (
-                    <div key={rank} className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3rem] gap-x-2 px-4 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0 items-center select-none">
+                    <div key={rank} className="grid grid-cols-[2rem_1fr_4.5rem_5rem] gap-x-3 px-4 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0 items-center select-none">
                       <span className="text-xs text-white/15 font-mono">{rank}</span>
                       <div className="flex items-center gap-1.5">
                         <Lock size={10} className="text-white/20 shrink-0" />
-                        <span className="text-sm font-semibold text-white/20 blur-[3px] truncate">Premium</span>
-                        <span className="inline-flex items-center px-1 py-0.5 rounded bg-[#F5C84C]/10 border border-[#F5C84C]/20 text-[9px] font-bold text-[#F5C84C]/60 uppercase shrink-0">
-                          +
-                        </span>
+                        <span className="text-sm font-bold text-white/20 blur-[3px] truncate">Premium</span>
+                        <span className="inline-flex items-center px-1 py-0.5 rounded bg-[#F5C84C]/10 border border-[#F5C84C]/20 text-[9px] font-bold text-[#F5C84C]/60 uppercase shrink-0">+</span>
                       </div>
-                      <span className="text-xs text-white/15 text-center blur-[3px]">—</span>
                       <span className="text-xs text-white/15 text-center blur-[3px]">—</span>
                       <span className="text-xs text-white/15 text-right blur-[3px]">—</span>
                     </div>
