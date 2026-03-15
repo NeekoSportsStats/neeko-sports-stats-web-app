@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Crown, ArrowRight, Star, TrendingUp, TriangleAlert as AlertTriangle, Check, Database, Cpu, Radio, Trophy, Users, ChartBar as BarChart2, Lock, Crosshair, Zap, ShieldAlert, ChartLine as LineChart, Target } from "lucide-react";
+import { Crown, ArrowRight, Star, TrendingUp, TriangleAlert as AlertTriangle, Check, Database, Cpu, Radio, Trophy, Users, ChartBar as BarChart2, Lock, Target, Rocket, ChartLine as LineChart } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { NEEKO_PRICING } from "@/config/neekoPricing";
@@ -102,12 +102,75 @@ const FOOTER_LINKS = [
   { label: "FAQ",      to: "/faq" },
 ];
 
-const HERO_FEATURES = [
-  { icon: Crosshair,   label: "Weekly captain picks" },
-  { icon: Zap,         label: "Breakout alerts" },
-  { icon: ShieldAlert, label: "Trap warnings" },
-  { icon: LineChart,   label: "Advanced player projections" },
+const FEATURE_CARDS = [
+  {
+    icon: Crown,
+    title: "Weekly Captain Picks",
+    desc: "Find the best captain option each round using projection models, matchups and form.",
+    link: "/sports/afl/rankings",
+    cta: "View Rankings",
+  },
+  {
+    icon: Rocket,
+    title: "Breakout Alerts",
+    desc: "Players about to surge in scoring or price before the crowd notices.",
+    link: "/sports/afl/edge-board",
+    cta: "View Breakouts",
+  },
+  {
+    icon: AlertTriangle,
+    title: "Trap Warnings",
+    desc: "Avoid overpriced players before they damage your weekly score.",
+    link: "/sports/afl/market-watch",
+    cta: "View Traps",
+  },
+  {
+    icon: LineChart,
+    title: "Advanced Projections",
+    desc: "Deep AI-powered projections with risk, confidence and value modelling.",
+    link: "/sports/afl/rankings",
+    cta: "View Projections",
+  },
 ];
+
+// ─── Feature Cards ────────────────────────────────────────────────────────────
+
+function FeatureCards() {
+  return (
+    <section className="py-12 md:py-16 bg-[#070707] border-t border-white/[0.05]">
+      <div className="max-w-5xl mx-auto px-4">
+        <div className="text-center mb-8">
+          <p className="text-sm uppercase tracking-wider text-[#F5C84C] font-semibold mb-2">
+            Why Coaches Use Neeko
+          </p>
+          <p className="text-base text-white/40">
+            Get the edge every round with AI-driven insights.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {FEATURE_CARDS.map(({ icon: Icon, title, desc, link, cta }) => (
+            <Link
+              key={title}
+              to={link}
+              className="group flex flex-col bg-[#0f0f0f] border border-[#1f1f1f] rounded-xl p-6 transition-all hover:border-[#F5C84C] hover:shadow-[0_0_24px_rgba(245,200,76,0.12)] hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-[#F5C84C]/50"
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#F5C84C]/10 border border-[#F5C84C]/20 flex items-center justify-center mb-4 shrink-0">
+                <Icon size={18} className="text-[#F5C84C]" />
+              </div>
+              <h3 className="text-base font-bold text-white mb-2 leading-snug">{title}</h3>
+              <p className="text-sm text-white/40 leading-relaxed flex-1 mb-5">{desc}</p>
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#F5C84C]/70 group-hover:text-[#F5C84C] transition-colors">
+                {cta}
+                <ArrowRight size={12} />
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -773,13 +836,11 @@ export default function Index() {
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-[5.5rem] font-extrabold leading-[1.08] tracking-tight mb-6">
-            AFL Fantasy Intelligence
-            <br />
-            <span className="text-[#F5C84C]">Built to Find the Weekly Edge</span>
+            Weekly Edge
           </h1>
 
-          <p className="text-base md:text-xl text-white/55 font-medium mb-10 max-w-xl mx-auto leading-relaxed px-1">
-            AI-powered projections, captain signals, breakout alerts and trap warnings — designed to help serious AFL Fantasy coaches make smarter weekly decisions.
+          <p className="text-base md:text-xl text-neutral-400 font-medium mb-10 max-w-2xl mx-auto leading-relaxed px-1">
+            Win AFL Fantasy with AI-powered projections, captain picks and breakout alerts.
           </p>
 
           {/* CTA buttons — stacked on mobile, side-by-side on sm+ */}
@@ -809,29 +870,13 @@ export default function Index() {
           <p className="mt-6 text-[12px] text-[#F5C84C]/45 font-medium tracking-wide">
             Used weekly by serious AFL Fantasy coaches.
           </p>
-
-          {/* Feature bar — horizontal on desktop, 2×2 grid on mobile */}
-          <div className="mt-7 hidden sm:flex flex-wrap justify-center gap-x-6 gap-y-2.5">
-            {HERO_FEATURES.map(({ icon: Icon, label }) => (
-              <div key={label} className="flex items-center gap-1.5">
-                <Icon size={12} className="text-[#F5C84C]/50 shrink-0" />
-                <span className="text-[12px] text-[#F5C84C]/50 font-medium">{label}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-7 grid grid-cols-2 gap-x-4 gap-y-3 sm:hidden max-w-xs mx-auto">
-            {HERO_FEATURES.map(({ icon: Icon, label }) => (
-              <div key={label} className="flex flex-col items-center gap-1.5">
-                <Icon size={16} className="text-[#F5C84C]/50" />
-                <span className="text-[11px] text-[#F5C84C]/50 font-medium text-center leading-snug">{label}</span>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
-      {/* ── SECTION 2: MODEL ACCURACY ─────────────────────────────────────────── */}
+      {/* ── SECTION 2: FEATURE CARDS ──────────────────────────────────────────── */}
+      <FeatureCards />
+
+      {/* ── SECTION 3: MODEL ACCURACY ─────────────────────────────────────────── */}
       <ModelAccuracySection />
 
       {/* ── SECTION 3: EDGE SIGNALS PREVIEW ──────────────────────────────────── */}
