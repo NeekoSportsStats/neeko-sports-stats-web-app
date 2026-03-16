@@ -167,7 +167,8 @@ function SearchAutocomplete({
 
 const INITIAL_LIMIT = 50;
 const LOAD_MORE_STEP = 50;
-const TABLE_COLUMNS_NO_SUMMARY = "player_id,player_name,team,position,team_name,position_group,projection_final,ceiling,floor,ceiling_estimate,floor_estimate,consistency_score,form_rating,neeko_rating,price,value_score,value_tag,value_tier,ai_recommendation,recommendation_short,recommendation_why,recommendation_color,ai_updated_at,projection_confidence,risk_rating,matchup_rating,upside_rating,captain_score,captain_rating,consistency_tier,total_count,cached_at";
+const TABLE_COLUMNS_NO_SUMMARY =
+"player_id,player_name,team,position,team_name,position_group,projection_final,ceiling,floor,ceiling_estimate,floor_estimate,consistency_score,form_rating,neeko_rating,price,value_score,value_tag,value_tier,signal,summary,analysis,projection_confidence,risk_rating,matchup_rating,upside_rating,captain_score,captain_rating,consistency_tier,total_count,cached_at";
 
 export default function AFLRankingsPage() {
   const { isPremium } = useAuth();
@@ -233,7 +234,9 @@ export default function AFLRankingsPage() {
       value_tag: r.value_tag ?? null,
       value_tier: r.value_tier ?? null,
       ai_recommendation: r.ai_recommendation ?? null,
-      ai_summary: null,
+      ai_summary: r.summary ?? null,
+      signal: r.signal ?? null,
+      analysis: r.analysis ?? null,
       ai_updated_at: r.ai_updated_at ?? null,
       recommendation_short: r.recommendation_short ?? null,
       recommendation_why: r.recommendation_why ?? null,
@@ -251,7 +254,7 @@ export default function AFLRankingsPage() {
 
     if (isPremium) {
       const { data, error, count } = await supabase
-        .from("v_rankings_final")
+        .from("v_rankings_master")
         .select(TABLE_COLUMNS_NO_SUMMARY, { count: "exact" })
         .order("neeko_rating", { ascending: false })
         .limit(limit);
@@ -289,7 +292,7 @@ export default function AFLRankingsPage() {
     setLoadingMore(true);
 
     const { data, error } = await supabase
-      .from("v_rankings_final")
+      .from("v_rankings_master")
       .select(TABLE_COLUMNS_NO_SUMMARY)
       .order("neeko_rating", { ascending: false })
       .range(currentLimit, nextLimit - 1);
