@@ -58,6 +58,15 @@ function fmtValueScore(v: number | null | undefined): string {
   return n.toFixed(2);
 }
 
+function fmtPrice(v: number | null | undefined): string {
+  if (v == null) return "—";
+  const n = Number(v);
+  if (isNaN(n)) return "—";
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(3)}m`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}k`;
+  return `$${n}`;
+}
+
 function sharpenSummary(text: string): string {
   const sentences = text
     .replace(/is expected to /gi, "")
@@ -302,9 +311,16 @@ function HeroPickCard({ type, row, isPremium, onUnlock }: HeroPickCardProps) {
   const cfg = getHeroConfig(type, row);
   const reason = row.ai_summary ? sharpenSummary(row.ai_summary) : null;
   const conf = row.projection_confidence;
+  const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className={`relative flex flex-col rounded-2xl border ${cfg.border} ${cfg.bg} p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/30`}>
+    <div
+      className={`relative flex flex-col rounded-2xl border ${cfg.border} ${cfg.bg} p-5 transition-all duration-200 cursor-pointer
+        ${expanded ? "shadow-2xl shadow-black/40" : "hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/30"}`}
+      onClick={() => setExpanded(e => !e)}
+      role="button"
+      aria-expanded={expanded}
+    >
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
@@ -312,11 +328,14 @@ function HeroPickCard({ type, row, isPremium, onUnlock }: HeroPickCardProps) {
           {cfg.icon}
           {cfg.label}
         </div>
-        {row.position && (
-          <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${getPositionBadgeStyle(row.position)}`}>
-            {row.position}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {row.position && (
+            <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${getPositionBadgeStyle(row.position)}`}>
+              {row.position}
+            </span>
+          )}
+          <span className={`text-[10px] text-white/25 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}>▾</span>
+        </div>
       </div>
 
       {/* Player identity */}
@@ -333,43 +352,104 @@ function HeroPickCard({ type, row, isPremium, onUnlock }: HeroPickCardProps) {
         </p>
       </div>
 
-      {/* Confidence + edge chip */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        {conf != null && (
-          <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1">
-            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${conf >= 75 ? "bg-green-400" : conf >= 60 ? "bg-yellow-400" : "bg-orange-400"}`} />
-            <span className={`text-[11px] font-semibold ${getConfidenceColor(conf)}`}>
-              {conf}% confidence
-            </span>
-          </div>
-        )}
-        <EdgeScoreChip score={row.edge_score} tier={row.edge_tier} />
-      </div>
+      {/* Confidence (no edge chip on hero card — removed per spec) */}
+      {conf != null && (
+        <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 mb-4 self-start">
+          <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${conf >= 75 ? "bg-green-400" : conf >= 60 ? "bg-yellow-400" : "bg-orange-400"}`} />
+          <span className={`text-[11px] font-semibold ${getConfidenceColor(conf)}`}>
+            {conf}% confidence
+          </span>
+        </div>
+      )}
 
-      {/* AI reason */}
-      {isPremium ? (
-        reason ? (
-          <div className={`rounded-xl border border-white/[0.07] bg-black/25 px-3.5 py-3 mt-auto`}>
-            <p className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${cfg.accentText} opacity-60`}>
-              {type === "captain" ? "Why captain" : type === "value" ? "Why value" : type === "trap" ? "Why to avoid" : "Why differential"}
-            </p>
-            <p className="text-[12px] text-white/70 leading-relaxed">{reason}</p>
+      {/* Short reason (collapsed) */}
+      {!expanded && (
+        <>
+          {isPremium ? (
+            reason ? (
+              <div className="rounded-xl border border-white/[0.07] bg-black/25 px-3.5 py-3 mt-auto" onClick={e => e.stopPropagation()}>
+                <p className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${cfg.accentText} opacity-60`}>
+                  {type === "captain" ? "Why captain" : type === "value" ? "Why value" : type === "trap" ? "Why to avoid" : "Why differential"}
+                </p>
+                <p className="text-[12px] text-white/70 leading-relaxed">{reason}</p>
+              </div>
+            ) : null
+          ) : (
+            <div className="rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.03] px-3.5 py-3 mt-auto" onClick={e => e.stopPropagation()}>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-[#F5C84C]/50 mb-1.5">AI reasoning</p>
+              <div className="relative mb-2">
+                <p className="text-[12px] text-white/20 leading-relaxed select-none blur-[3px] line-clamp-2">
+                  Advanced ceiling modelling and matchup delta scoring indicates significant upside leverage this round.
+                </p>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); onUnlock(); }}
+                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-[#F5C84C]/20 bg-[#F5C84C]/[0.05] text-[11px] font-semibold text-[#F5C84C]/70 hover:text-[#F5C84C] hover:border-[#F5C84C]/35 transition-all"
+              >
+                <Lock size={9} />
+                Unlock with Neeko+
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Expanded detail panel */}
+      {expanded && (
+        <div className="mt-2 space-y-3" onClick={e => e.stopPropagation()}>
+
+          {/* Full stat grid */}
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "Projection", value: fmtInt(row.projection_final), color: "text-white" },
+              { label: "Value Score", value: fmtValueScore(row.value_score), color: getValueScoreColor(row.value_score) },
+              { label: "Risk", value: getRiskLabel(row.risk_rating), color: getRiskColor(row.risk_rating) },
+              { label: "Confidence", value: conf != null ? `${conf}%` : "—", color: getConfidenceColor(conf) },
+              { label: "Ceiling", value: fmtInt(row.ceiling_estimate), color: "text-white/60" },
+              { label: "Floor", value: fmtInt(row.floor_estimate), color: "text-white/60" },
+              { label: "Price", value: fmtPrice(row.price), color: "text-white/60" },
+              { label: "Neeko Rating", value: row.neeko_rating != null ? row.neeko_rating.toFixed(1) : "—", color: "text-white/60" },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2">
+                <p className="text-[9px] text-white/30 uppercase tracking-widest mb-0.5">{label}</p>
+                <p className={`text-sm font-bold tabular-nums ${color}`}>{value}</p>
+              </div>
+            ))}
           </div>
-        ) : null
-      ) : (
-        <div className="rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.03] px-3.5 py-3 mt-auto">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-[#F5C84C]/50 mb-1.5">AI reasoning</p>
-          <div className="relative mb-2">
-            <p className="text-[12px] text-white/20 leading-relaxed select-none blur-[3px] line-clamp-2">
-              Advanced ceiling modelling and matchup delta scoring indicates significant upside leverage this round.
-            </p>
-          </div>
+
+          {/* Full AI explanation */}
+          {isPremium ? (
+            row.ai_summary ? (
+              <div className={`rounded-xl border border-white/[0.07] bg-black/25 px-3.5 py-3`}>
+                <p className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${cfg.accentText} opacity-60`}>
+                  Full analysis
+                </p>
+                <p className="text-[12px] text-white/70 leading-relaxed">{row.ai_summary}</p>
+              </div>
+            ) : null
+          ) : (
+            <div className="rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.03] px-3.5 py-3">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-[#F5C84C]/50 mb-1.5">Full AI analysis</p>
+              <div className="relative mb-2">
+                <p className="text-[12px] text-white/20 leading-relaxed select-none blur-[3px]">
+                  Advanced ceiling modelling and matchup delta scoring indicates significant upside leverage this round. Position scarcity and opponent concession profile align strongly.
+                </p>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); onUnlock(); }}
+                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-[#F5C84C]/20 bg-[#F5C84C]/[0.05] text-[11px] font-semibold text-[#F5C84C]/70 hover:text-[#F5C84C] hover:border-[#F5C84C]/35 transition-all"
+              >
+                <Lock size={9} />
+                Unlock full analysis
+              </button>
+            </div>
+          )}
+
           <button
-            onClick={onUnlock}
-            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-[#F5C84C]/20 bg-[#F5C84C]/[0.05] text-[11px] font-semibold text-[#F5C84C]/70 hover:text-[#F5C84C] hover:border-[#F5C84C]/35 transition-all"
+            onClick={() => setExpanded(false)}
+            className="w-full text-[10px] text-white/25 hover:text-white/50 transition-colors py-1"
           >
-            <Lock size={9} />
-            Unlock with Neeko+
+            Collapse ▴
           </button>
         </div>
       )}
