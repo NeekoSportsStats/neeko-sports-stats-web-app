@@ -27,6 +27,9 @@ export interface RankingRow {
   recommendation_color: string | null;
   consistency_tier: string | null;
   total_count: number | null;
+  games_played: number | null;
+  signal: string | null;
+  analysis: string | null;
 }
 
 export interface ScoreHistoryPoint {
