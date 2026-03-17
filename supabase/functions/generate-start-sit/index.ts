@@ -29,6 +29,7 @@ interface PlayerData {
   risk_rating: number | null;
   neeko_rating: number | null;
   value_score: number | null;
+  start_sit_decision: string | null;
 }
 
 interface PromptRecord {
@@ -84,19 +85,34 @@ function compositeScore(p: PlayerData): number {
   return projNorm * 0.35 + neekoNorm * 0.25 + confNorm * 0.20 + valNorm * 0.12 + riskNorm * 0.08;
 }
 
+const DECISION_RANK: Record<string, number> = { START: 2, CONSIDER: 1, SIT: 0 };
+
 function deterministicWinner(
   pA: PlayerData,
   pB: PlayerData
 ): { winner: PlayerData; loser: PlayerData; confidence: number } {
+  const rankA = DECISION_RANK[pA.start_sit_decision ?? "CONSIDER"] ?? 1;
+  const rankB = DECISION_RANK[pB.start_sit_decision ?? "CONSIDER"] ?? 1;
+
+  let winner: PlayerData;
+  let loser: PlayerData;
+
+  if (rankA !== rankB) {
+    winner = rankA > rankB ? pA : pB;
+    loser  = rankA > rankB ? pB : pA;
+  } else {
+    const scoreA = compositeScore(pA);
+    const scoreB = compositeScore(pB);
+    winner = scoreA >= scoreB ? pA : pB;
+    loser  = scoreA >= scoreB ? pB : pA;
+  }
+
   const scoreA = compositeScore(pA);
   const scoreB = compositeScore(pB);
-
-  const winner = scoreA >= scoreB ? pA : pB;
-  const loser  = scoreA >= scoreB ? pB : pA;
-
   const scoreDiff = Math.abs(scoreA - scoreB);
+  const decisionBoost = Math.abs(rankA - rankB) * 15;
   const avgConf = ((pA.projection_confidence ?? 50) + (pB.projection_confidence ?? 50)) / 2;
-  const raw = 50 + scoreDiff * 60 + (avgConf - 50) * 0.15;
+  const raw = 50 + scoreDiff * 60 + (avgConf - 50) * 0.15 + decisionBoost;
   const confidence = Math.round(Math.min(Math.max(raw, 55), 92));
 
   return { winner, loser, confidence };
@@ -399,7 +415,8 @@ Deno.serve(async (req: Request) => {
         .select(
           `player_id, player_name, team, position,
            projection_final, ceiling_estimate, floor_estimate,
-           projection_confidence, risk_rating, neeko_rating, value_score`
+           projection_confidence, risk_rating, neeko_rating, value_score,
+           start_sit_decision`
         )
         .in("player_id", [playerAId, playerBId]),
     ]);

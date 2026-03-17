@@ -32,6 +32,10 @@ interface RankingRow {
   ai_summary: string | null;
   recommendation_color: string | null;
   refreshed_at: string | null;
+  /** DB-computed edge score 0–100 — single source of truth */
+  edge_score: number | null;
+  /** DB-computed edge tier label */
+  edge_tier: string | null;
 }
 
 type Section = "captain" | "breakout" | "trap";
@@ -82,24 +86,6 @@ function fmtValueScore(v: number | null | undefined): string {
 
 // ─── Edge Score ───────────────────────────────────────────────────────────────
 
-function computeEdgeScore(row: RankingRow): number | null {
-  const proj = row.projection_final;
-  const conf = row.projection_confidence;
-  const risk = row.risk_rating;
-  const val  = row.value_score;
-
-  const nullCount = [proj, conf, risk, val].filter((v) => v == null).length;
-  if (nullCount >= 2) return null;
-
-  const projNorm  = proj  != null ? Math.min(Math.max((proj - 60) / 60, 0), 1)   : 0.5;
-  const confNorm  = conf  != null ? Math.min(Math.max(conf / 100, 0), 1)          : 0.5;
-  const riskNorm  = risk  != null ? Math.min(Math.max(1 - risk / 100, 0), 1)      : 0.5;
-  const valNorm   = val   != null ? Math.min(Math.max((val - 0.8) / 0.7, 0), 1)   : 0.5;
-
-  const raw = projNorm * 0.40 + valNorm * 0.25 + confNorm * 0.20 + riskNorm * 0.15;
-  return Math.round(Math.min(Math.max(raw * 100, 0), 100));
-}
-
 function getEdgeScoreColor(score: number | null): string {
   if (score == null) return "text-white/30";
   if (score >= 90)   return "text-[#F5C84C]";
@@ -108,21 +94,13 @@ function getEdgeScoreColor(score: number | null): string {
   return "text-white/50";
 }
 
-function getEdgeScoreTierLabel(score: number | null): string {
-  if (score == null) return "";
-  if (score >= 90)   return "Elite Edge";
-  if (score >= 75)   return "Strong Edge";
-  if (score >= 60)   return "Playable Edge";
-  return "Monitor";
-}
-
-const EDGE_SCORE_TOOLTIP = "Edge Score combines projection, value, confidence and risk to highlight the strongest fantasy opportunities.";
+const EDGE_SCORE_TOOLTIP = "Edge Score combines projection, value, confidence and risk to highlight the strongest fantasy opportunities. Computed from the rankings engine — the single source of truth.";
 
 function EdgeScoreBadge({ row, large = false }: { row: RankingRow; large?: boolean }) {
   const [showTip, setShowTip] = useState(false);
-  const score = computeEdgeScore(row);
+  const score = row.edge_score ?? null;
   const color = getEdgeScoreColor(score);
-  const tier  = getEdgeScoreTierLabel(score);
+  const tier  = row.edge_tier ?? null;
   const limited = score == null;
 
   return (
@@ -1105,7 +1083,31 @@ export default function AFLRoundEdgeBoard() {
         limit_n: isPremium ? PREMIUM_VISIBLE : FREE_VISIBLE + 2,
       });
       if (rpcErr) throw rpcErr;
-      const rows = (data as RankingRow[]) ?? [];
+      const rows = ((data as any[]) ?? []).map((r: any): RankingRow => ({
+        player_id:             r.player_id ?? null,
+        player_name:           r.player_name ?? "",
+        team:                  r.team ?? "",
+        position:              r.position ?? null,
+        section:               r.section ?? "",
+        section_rank:          r.section_rank ?? 0,
+        projection_final:      r.projection_final != null ? Number(r.projection_final) : null,
+        ceiling_estimate:      r.ceiling_estimate != null ? Number(r.ceiling_estimate) : null,
+        floor_estimate:        r.floor_estimate != null ? Number(r.floor_estimate) : null,
+        upside_rating:         r.upside_rating != null ? Number(r.upside_rating) : null,
+        risk_rating:           r.risk_rating != null ? Number(r.risk_rating) : null,
+        projection_confidence: r.projection_confidence != null ? Number(r.projection_confidence) : null,
+        captain_score:         r.captain_score != null ? Number(r.captain_score) : null,
+        captain_rating:        r.captain_rating ?? null,
+        neeko_rating:          r.neeko_rating != null ? Number(r.neeko_rating) : null,
+        price:                 r.price != null ? Number(r.price) : null,
+        value_score:           r.value_score != null ? Number(r.value_score) : null,
+        value_tag:             r.value_tag ?? null,
+        ai_summary:            r.ai_summary ?? null,
+        recommendation_color:  r.recommendation_color ?? null,
+        refreshed_at:          r.refreshed_at ?? null,
+        edge_score:            r.edge_score != null ? Number(r.edge_score) : null,
+        edge_tier:             r.edge_tier ?? null,
+      }));
       setRows(rows);
       const ts = rows[0]?.refreshed_at ?? null;
       setRefreshedAt(ts);

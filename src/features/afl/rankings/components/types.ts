@@ -33,6 +33,18 @@ export interface RankingRow {
   short: string | null;
   /** Modal extended analysis — full AI paragraph (maps to recommendation_why / ai_summary) */
   long: string | null;
+  /** Single-source decision: START / SIT / CONSIDER */
+  start_sit_decision: string | null;
+  /** Computed edge score 0–100 from rankings cache */
+  edge_score: number | null;
+  /** Edge tier label: Elite Edge / Strong Edge / Playable Edge / Monitor */
+  edge_tier: string | null;
+  /** Market watch signal: BUY TARGET / SELL / TRENDING UP / CASH COW / TRAP */
+  market_watch_category: string | null;
+  /** Upside percentage from breakout model */
+  upside_pct: number | null;
+  /** AI summary text */
+  ai_summary: string | null;
 }
 
 export interface ScoreHistoryPoint {

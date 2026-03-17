@@ -171,8 +171,9 @@ const PREMIUM_COLUMNS =
   "projection_final,ceiling,floor," +
   "consistency,form_score,neeko_rating,neeko_rating_scaled,price,value_score,best_value_score,value_tag,value_tier," +
   "projection_confidence,risk_rating,matchup_rating,matchup_label,matchup_multiplier," +
-  "upside_rating,captain_score,captain_rating,ai_recommendation,recommendation_strength,recommendation_color," +
-  "recommendation_short,recommendation_why,consistency_tier,total_count,cached_at,games_played,ai_updated_at";
+  "upside_rating,upside_pct,captain_score,captain_rating,ai_recommendation,recommendation_strength,recommendation_color," +
+  "recommendation_short,recommendation_why,ai_summary,consistency_tier,total_count,cached_at,games_played,ai_updated_at," +
+  "start_sit_decision,edge_score,edge_tier,market_watch_category";
 
 const FREE_COLUMNS =
   "player_id,player_name,team,team_name,position,position_group," +
@@ -180,10 +181,11 @@ const FREE_COLUMNS =
   "consistency,form_score,neeko_rating,neeko_rating_scaled,price,value_score,best_value_score,value_tag,value_tier," +
   "projection_confidence,risk_rating,matchup_rating,matchup_label,matchup_multiplier," +
   "ai_recommendation,recommendation_strength,recommendation_color,recommendation_short," +
-  "consistency_tier,access_tier,total_count,cached_at,games_played,row_rank";
+  "consistency_tier,access_tier,total_count,cached_at,games_played,row_rank," +
+  "start_sit_decision,edge_score,edge_tier,market_watch_category";
 
 const AI_COLUMNS =
-  "player_id,recommendation_short,recommendation_why,ai_updated_at";
+  "player_id,recommendation_short,recommendation_why,ai_summary,ai_updated_at";
 
 export default function AFLRankingsPage() {
   const { isPremium } = useAuth();
@@ -260,7 +262,6 @@ export default function AFLRankingsPage() {
       total_count:            r.total_count != null ? Number(r.total_count) : null,
       games_played:           r.games_played != null ? Number(r.games_played) : null,
       ai_updated_at:          r.ai_updated_at ?? null,
-      // Phase 2: short = WHY column (1-line), long = modal extended text
       short: r.short
         ?? r.recommendation_short
         ?? r.ai_summary_short
@@ -269,6 +270,12 @@ export default function AFLRankingsPage() {
         ?? r.recommendation_why
         ?? r.ai_summary
         ?? null,
+      ai_summary:           r.ai_summary ?? null,
+      start_sit_decision:   r.start_sit_decision ?? null,
+      edge_score:           r.edge_score != null ? Number(r.edge_score) : null,
+      edge_tier:            r.edge_tier ?? null,
+      market_watch_category: r.market_watch_category ?? null,
+      upside_pct:           r.upside_pct != null ? Number(r.upside_pct) : null,
     };
   }
 
