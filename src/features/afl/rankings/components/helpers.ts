@@ -227,11 +227,11 @@ export function getValueTagStyle(tag: string | null | undefined) {
 
 export function getNeekoRatingBadge(rating: number | null) {
   if (rating == null) return { label: "—", text: "text-white/30", bg: "bg-transparent", border: "border-transparent", glow: "" };
-  if (rating >= 90) return { label: "ELITE", text: "text-yellow-400", bg: "bg-yellow-400/15", border: "border-yellow-400/40", glow: "drop-shadow(0 0 6px rgba(250,204,21,0.55))" };
-  if (rating >= 80) return { label: "STRONG", text: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30", glow: "drop-shadow(0 0 5px rgba(74,222,128,0.45))" };
-  if (rating >= 70) return { label: "SOLID", text: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/30", glow: "" };
-  if (rating >= 58) return { label: "WATCH", text: "text-gray-300", bg: "bg-white/5", border: "border-white/15", glow: "" };
-  return { label: "RISK", text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30", glow: "" };
+  if (rating >= 90) return { label: "ELITE",  text: "text-yellow-400", bg: "bg-yellow-400/15", border: "border-yellow-400/40", glow: "drop-shadow(0 0 6px rgba(250,204,21,0.55))" };
+  if (rating >= 75) return { label: "STRONG", text: "text-green-400",  bg: "bg-green-500/10",  border: "border-green-500/30",  glow: "drop-shadow(0 0 5px rgba(74,222,128,0.45))" };
+  if (rating >= 60) return { label: "SOLID",  text: "text-blue-400",   bg: "bg-blue-500/10",   border: "border-blue-500/30",   glow: "" };
+  if (rating >= 45) return { label: "WATCH",  text: "text-gray-300",   bg: "bg-white/5",       border: "border-white/15",      glow: "" };
+  return                   { label: "RISK",   text: "text-red-400",    bg: "bg-red-500/10",    border: "border-red-500/30",    glow: "" };
 }
 
 export function getRiskBadge(risk: number | null) {

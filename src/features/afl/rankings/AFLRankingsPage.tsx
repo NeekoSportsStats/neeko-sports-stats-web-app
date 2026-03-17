@@ -38,7 +38,7 @@ function KpiTiles({ rows }: { rows: RankingRow[] }) {
 
   const tiles = [
     { label: "Top Captain Avg", value: captainAvgProj != null ? captainAvgProj.toFixed(1) : "—", sub: "Top 5 captain projections", color: "text-[#F5C84C]" },
-    { label: "Value Upgrades", value: valueUpgrades.toString(), sub: "Value score ≥ 105", color: "text-green-400" },
+    { label: "Value Upgrades", value: valueUpgrades.toString(), sub: "Strong+ value (top 30%)", color: "text-green-400" },
     { label: "Trap Alerts", value: trapAlerts.toString(), sub: "Overpriced or high risk", color: "text-red-400" },
     { label: "High Confidence", value: highConfidence.toString(), sub: "Confidence ≥ 65%", color: "text-blue-400" },
   ];
@@ -171,7 +171,7 @@ const LOAD_MORE_STEP = 50;
 const PREMIUM_COLUMNS =
   "player_id,player_name,team,team_name,position,position_group," +
   "projection_final,ceiling,floor," +
-  "consistency,form_score,neeko_rating,price,value_score,best_value_score,value_tag,value_tier," +
+  "consistency,form_score,neeko_rating,neeko_rating_scaled,price,value_score,best_value_score,value_tag,value_tier," +
   "projection_confidence,risk_rating,matchup_rating,matchup_label,matchup_multiplier," +
   "upside_rating,captain_score,captain_rating,ai_recommendation,recommendation_color," +
   "recommendation_short,recommendation_why,ai_summary,consistency_tier,total_count,cached_at,games_played,ai_updated_at";
@@ -179,7 +179,7 @@ const PREMIUM_COLUMNS =
 const FREE_COLUMNS =
   "player_id,player_name,team,team_name,position,position_group," +
   "projection_final,ceiling,floor," +
-  "consistency,form_score,neeko_rating,price,value_score,best_value_score,value_tag,value_tier," +
+  "consistency,form_score,neeko_rating,neeko_rating_scaled,price,value_score,best_value_score,value_tag,value_tier," +
   "projection_confidence,risk_rating,matchup_rating,matchup_label,matchup_multiplier," +
   "ai_recommendation,recommendation_color,recommendation_short," +
   "consistency_tier,access_tier,total_count,cached_at,games_played,row_rank";
@@ -244,6 +244,7 @@ export default function AFLRankingsPage() {
       consistency_score:     r.consistency != null ? Number(r.consistency) : (r.consistency_score != null ? Number(r.consistency_score) : null),
       form_rating:           r.form_score != null ? Number(r.form_score) : (r.form_rating != null ? Number(r.form_rating) : null),
       neeko_rating:          r.neeko_rating != null ? Number(r.neeko_rating) : null,
+      neeko_rating_scaled:   r.neeko_rating_scaled != null ? Number(r.neeko_rating_scaled) : null,
       projection_confidence: r.projection_confidence != null ? Number(r.projection_confidence) : null,
       risk_rating:           r.risk_rating != null ? Number(r.risk_rating) : null,
       matchup_rating:        r.matchup_label ?? r.matchup_rating ?? null,
@@ -307,7 +308,7 @@ export default function AFLRankingsPage() {
       const { data, error, count } = await supabase
         .from("v_rankings_master")
         .select(PREMIUM_COLUMNS, { count: "exact" })
-        .order("neeko_rating", { ascending: false })
+        .order("neeko_rating_scaled", { ascending: false })
         .limit(limit);
 
       if (error) {
@@ -322,7 +323,7 @@ export default function AFLRankingsPage() {
       const { data, error } = await supabase
         .from("v_rankings_free")
         .select(FREE_COLUMNS)
-        .order("neeko_rating", { ascending: false });
+        .order("neeko_rating_scaled", { ascending: false });
 
       if (error) {
         console.error("Rankings fetch error (free):", error);
@@ -345,7 +346,7 @@ export default function AFLRankingsPage() {
     const { data, error } = await supabase
       .from("v_rankings_master")
       .select(PREMIUM_COLUMNS)
-      .order("neeko_rating", { ascending: false })
+      .order("neeko_rating_scaled", { ascending: false })
       .range(currentLimit, nextLimit - 1);
 
     if (!error && data) {
@@ -404,7 +405,7 @@ export default function AFLRankingsPage() {
   }
 
   function adjustedOverallScore(r: RankingRow): number {
-    return r.neeko_rating ?? 0;
+    return r.neeko_rating_scaled ?? r.neeko_rating ?? 0;
   }
 
   const displayRows = useMemo(() => {
@@ -427,7 +428,7 @@ export default function AFLRankingsPage() {
       } else if (premiumFilter === "TOP100") {
         filtered = filtered.slice(0, 100);
       } else if (premiumFilter === "ELITE") {
-        filtered = filtered.filter((r) => (r.neeko_rating ?? 0) >= 90);
+        filtered = filtered.filter((r) => (r.neeko_rating_scaled ?? r.neeko_rating ?? 0) >= 90);
       } else {
         filtered = filtered.filter((r) => r.position === premiumFilter);
       }

@@ -15,6 +15,7 @@ export interface RankingRow {
   captain_score: number | null;
   captain_rating: string | null;
   neeko_rating: number | null;
+  neeko_rating_scaled: number | null;
   price: number | null;
   value_score: number | null;
   best_value_score: number | null;

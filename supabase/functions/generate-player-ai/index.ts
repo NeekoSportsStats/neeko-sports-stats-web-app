@@ -10,26 +10,29 @@ const corsHeaders = {
 const BATCH_SIZE = 5;
 const DEFAULT_MAX_PLAYERS = 20;
 
-const SYSTEM_PROMPT = `You are Neeko, an elite AFL fantasy analyst. You write sharp, confident, data-driven player assessments for fantasy coaches.
+const SYSTEM_PROMPT = `You are Neeko, an elite AFL fantasy analyst. Write sharp, confident, data-driven player assessments for fantasy coaches.
 
-Your job is to write explanatory analysis ONLY — the system separately determines the BUY/HOLD/SELL signal. Do NOT include any trade recommendation.
+Your job is analysis ONLY — the system separately determines the BUY/HOLD/SELL signal. Do NOT include any trade recommendation.
 
-Format your response as JSON:
+Format your response as JSON with exactly three fields:
 {
-  "summary_short": "<one punchy sentence, max 120 chars — the single most important insight about this player right now>",
-  "summary_long": "<3-5 sentences of deeper analysis covering: current form trajectory, projection vs price value, matchup context, risk factors, and a specific fantasy insight. Reference actual numbers.>"
+  "short": "<one punchy sentence, max 100 chars — the single most important insight right now. Lead with player name and a key number.>",
+  "why": "<one sentence explaining the core reason behind the rating, max 120 chars. Reference a specific number or context factor.>",
+  "long": "<3-4 sentences of deeper analysis covering: current form trajectory, projection vs price value, matchup context, and a specific fantasy coaching insight. Reference actual numbers from the data.>"
 }
 
 Rules:
-- Do NOT include recommendation, BUY, SELL, HOLD, or any trade signal
-- summary_short: single punchy sentence, lead with the player name, quote key numbers (e.g. "Sheezel is scorching — 130+ avg over his last 3 and facing a soft DEF matchup")
-- summary_long: factual analyst voice, reference projection/ceiling/floor/form/value numbers from the data
-- Write in confident present tense, no hedging phrases like "it may be worth" or "based on the data"
-- Return ONLY valid JSON, no markdown, no explanation outside the JSON`;
+- Do NOT include recommendation, BUY, SELL, HOLD, or any trade signal in any field
+- short: punchy, lead with name, quote a number (e.g. "Sheezel is on fire — 130+ avg last 3, facing a soft DEF matchup")
+- why: one crisp reason grounding the rating (e.g. "Value score of 6.2 with ceiling of 148 makes him hard to ignore")
+- long: analyst voice, reference projection/ceiling/floor/value numbers, no hedging phrases
+- Write in confident present tense
+- Return ONLY valid JSON, no markdown, no text outside the JSON`;
 
 interface AIResult {
-  summary_short: string;
-  summary_long: string;
+  short: string;
+  why: string;
+  long: string;
 }
 
 async function callOpenAI(openaiKey: string, playerData: Record<string, unknown>): Promise<AIResult | null> {
@@ -48,7 +51,7 @@ async function callOpenAI(openaiKey: string, playerData: Record<string, unknown>
         { role: "user", content: userContent },
       ],
       temperature: 0.35,
-      max_tokens: 350,
+      max_tokens: 400,
       response_format: { type: "json_object" },
     }),
   });
@@ -63,8 +66,9 @@ async function callOpenAI(openaiKey: string, playerData: Record<string, unknown>
   if (!content) return null;
 
   const parsed = JSON.parse(content);
-  if (!parsed.summary_short) parsed.summary_short = "";
-  if (!parsed.summary_long) parsed.summary_long = "";
+  if (!parsed.short)  parsed.short = parsed.summary_short ?? "";
+  if (!parsed.why)    parsed.why   = "";
+  if (!parsed.long)   parsed.long  = parsed.summary_long ?? "";
   return parsed as AIResult;
 }
 
@@ -74,9 +78,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const openaiKey = Deno.env.get("OPENAI_API_KEY");
+    const supabaseUrl      = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const openaiKey        = Deno.env.get("OPENAI_API_KEY");
 
     const authHeader = req.headers.get("Authorization");
     const token = authHeader?.replace("Bearer ", "");
@@ -93,16 +97,21 @@ Deno.serve(async (req: Request) => {
       if (body?.limit_players && Number(body.limit_players) > 0) {
         limitPlayers = Number(body.limit_players);
       }
-    } catch (_) { /* no body fine */ }
+    } catch (_) { /* no body — fine */ }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Fetch only players whose input_hash has changed (or who have no analysis yet).
-    // needs_regen = true when: no existing analysis, stored hash is NULL,
-    // or stored hash differs from the live computed hash.
     const { data: players, error: fetchErr } = await supabase
       .from("v_ai_player_analysis_input")
-      .select("player_id, player_name, team, position, price, projection_final, ceiling, floor, risk, confidence, consistency, value_score, matchup_rating, venue_multiplier, rest_days, form_score, form_momentum, neeko_rating, season_avg, last3_avg, last5_avg, last10_avg, opponent_name, is_home, venue, volatility_score, stability_score, ceiling_hit_rate, floor_bust_rate, breakout_probability, input_hash, needs_regen")
+      .select([
+        "player_id", "player_name", "team", "position",
+        "price", "projection_final", "ceiling", "floor",
+        "risk", "confidence", "consistency", "value_score", "value_tag", "best_value_score",
+        "matchup_rating", "venue_multiplier", "form_score",
+        "neeko_rating", "neeko_rating_scaled", "games_played",
+        "upside_rating", "captain_score", "captain_rating",
+        "input_hash", "needs_regen",
+      ].join(","))
       .eq("needs_regen", true)
       .limit(limitPlayers);
 
@@ -132,8 +141,9 @@ Deno.serve(async (req: Request) => {
             result = parsed;
           } else {
             result = {
-              summary_short: `${player.player_name} projecting ${player.projection_final} pts — mock analysis (no OpenAI key configured)`,
-              summary_long: `Projected ${player.projection_final} pts for the upcoming round. Mock analysis — configure OPENAI_API_KEY to enable real AI insights.`,
+              short: `${player.player_name} projecting ${player.projection_final} pts — mock analysis (no OpenAI key)`,
+              why:   `Value score ${player.value_score ?? "N/A"} with confidence ${player.confidence ?? "N/A"}`,
+              long:  `Projected ${player.projection_final} pts for the upcoming round. Mock analysis — configure OPENAI_API_KEY to enable real AI insights.`,
             };
           }
 
@@ -141,8 +151,8 @@ Deno.serve(async (req: Request) => {
             p_player_id:      player.player_id,
             p_recommendation: "HOLD",
             p_confidence:     65,
-            p_summary_short:  result.summary_short,
-            p_summary_long:   result.summary_long,
+            p_summary_short:  result.short,
+            p_summary_long:   `${result.why}\n\n${result.long}`.trim(),
             p_model:          "gpt-4o-mini",
             p_input_hash:     player.input_hash ?? null,
           });

@@ -18,11 +18,15 @@ interface RankingRow {
   player_name: string;
   player_team: string;
   player_position: string | null;
+  team: string | null;
+  position: string | null;
   projection_final: number | null;
   neeko_rating: number | null;
+  neeko_rating_scaled: number | null;
   projection_confidence: number | null;
   risk_rating: number | null;
   value_score: number | null;
+  value_tag: string | null;
 }
 
 interface AccuracyExampleRow {
@@ -1111,11 +1115,15 @@ function confLabel(conf: number | null): { label: string; textColor: string; bg:
   return               { label: "LOW",  textColor: "text-red-400",   bg: "bg-red-400/10",     border: "border-red-400/30" };
 }
 
-function valueLabel(score: number | null): { label: string; textColor: string; bg: string; border: string } {
-  if (score == null) return { label: "—",          textColor: "text-white/30",  bg: "bg-white/5",        border: "border-white/10" };
-  if (score >= 120)  return { label: "STRONG",      textColor: "text-green-400", bg: "bg-green-400/10",   border: "border-green-400/30" };
-  if (score >= 80)   return { label: "FAIR",         textColor: "text-white/50",  bg: "bg-white/5",        border: "border-white/10" };
-  return                { label: "OVERPRICED",  textColor: "text-red-400",   bg: "bg-red-400/10",     border: "border-red-400/30" };
+function valueLabel(tag: string | null, score: number | null): { label: string; textColor: string; bg: string; border: string } {
+  const t = tag ?? "";
+  if (t === "ELITE" || t === "STRONG")    return { label: "STRONG",     textColor: "text-green-400", bg: "bg-green-400/10", border: "border-green-400/30" };
+  if (t === "FAIR")                        return { label: "FAIR",        textColor: "text-white/50",  bg: "bg-white/5",      border: "border-white/10" };
+  if (t === "OVERPRICED")                  return { label: "OVERPRICED",  textColor: "text-red-400",   bg: "bg-red-400/10",   border: "border-red-400/30" };
+  if (score == null)                       return { label: "—",           textColor: "text-white/30",  bg: "bg-white/5",      border: "border-white/10" };
+  if (score >= 4.0)                        return { label: "STRONG",     textColor: "text-green-400", bg: "bg-green-400/10", border: "border-green-400/30" };
+  if (score >= 1.7)                        return { label: "FAIR",        textColor: "text-white/50",  bg: "bg-white/5",      border: "border-white/10" };
+  return                                          { label: "OVERPRICED",  textColor: "text-red-400",   bg: "bg-red-400/10",   border: "border-red-400/30" };
 }
 
 function RankingsPreview() {
@@ -1124,12 +1132,26 @@ function RankingsPreview() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.rpc("get_rankings_free", {
-        position_filter: "ALL",
-        sort_key:        "neeko_rating",
-        limit_n:         10,
-      });
-      setRows((data ?? []).slice(0, 5));
+      const { data } = await supabase
+        .from("v_rankings_master")
+        .select("player_name,team,position,projection_final,neeko_rating,neeko_rating_scaled,projection_confidence,risk_rating,value_score,value_tag")
+        .order("neeko_rating_scaled", { ascending: false })
+        .limit(5);
+      const mapped = (data ?? []).map((r: Record<string, unknown>) => ({
+        player_name: r.player_name as string,
+        player_team: r.team as string,
+        player_position: r.position as string | null,
+        team: r.team as string | null,
+        position: r.position as string | null,
+        projection_final: r.projection_final as number | null,
+        neeko_rating: r.neeko_rating as number | null,
+        neeko_rating_scaled: r.neeko_rating_scaled as number | null,
+        projection_confidence: r.projection_confidence as number | null,
+        risk_rating: r.risk_rating as number | null,
+        value_score: r.value_score as number | null,
+        value_tag: r.value_tag as string | null,
+      }));
+      setRows(mapped);
       setLoading(false);
     })();
   }, []);
@@ -1167,7 +1189,7 @@ function RankingsPreview() {
                 <>
                   {rows.map((row, idx) => {
                     const conf = confLabel(row.projection_confidence);
-                    const val  = valueLabel(row.value_score);
+                    const val  = valueLabel(row.value_tag, row.value_score);
                     return (
                       <div key={idx} className="grid grid-cols-[2rem_1fr_5rem_6rem_7rem] gap-x-4 px-5 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors last:border-0 items-center">
                         <span className="text-xs text-white/25 font-mono">{idx + 1}</span>
@@ -1248,7 +1270,7 @@ function RankingsPreview() {
               ? (
                 <>
                   {rows.map((row, idx) => {
-                    const val = valueLabel(row.value_score);
+                    const val = valueLabel(row.value_tag, row.value_score);
                     return (
                       <div key={idx} className="grid grid-cols-[2rem_1fr_4.5rem_5rem] gap-x-3 px-4 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors last:border-0 items-center">
                         <span className="text-xs text-white/25 font-mono">{idx + 1}</span>
