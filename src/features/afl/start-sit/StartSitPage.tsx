@@ -361,12 +361,10 @@ export default function StartSitPage() {
         {/* Loading skeleton while fetching */}
         {comparing && (
           <div className="mt-6 space-y-3 animate-pulse">
-            <div className="h-36 rounded-2xl bg-white/[0.04]" />
-            <div className="h-28 rounded-xl bg-white/[0.04]" />
+            <div className="h-44 rounded-2xl bg-white/[0.04]" />
             <div className="h-24 rounded-xl bg-white/[0.04]" />
-            <div className="h-48 rounded-xl bg-white/[0.04]" />
-            <div className="h-28 rounded-xl bg-white/[0.04]" />
-            <div className="h-14 rounded-xl bg-white/[0.04]" />
+            <div className="h-32 rounded-xl bg-white/[0.04]" />
+            <div className="h-20 rounded-xl bg-white/[0.04]" />
           </div>
         )}
 
@@ -381,6 +379,7 @@ export default function StartSitPage() {
             modelEdge={result.model_edge}
             isPremium={isPremium}
             onUpgrade={() => navigate("/neeko-plus")}
+            onReset={reset}
           />
         )}
         {!comparing && result && authLoading && (
