@@ -754,7 +754,7 @@ function EdgeBoardPreview() {
   useEffect(() => {
     (async () => {
       const { data } = await supabase
-        .from("v_rankings_master")
+        .from("v_rankings_canonical")
         .select("player_name, team, position, neeko_rating, projection_final, ceiling_estimate, projection_confidence, risk_rating, upside_rating")
         .order("neeko_rating", { ascending: false })
         .limit(25);
