@@ -8,6 +8,7 @@ import { StartSitSelector } from "./StartSitSelector";
 import { StartSitResult } from "./StartSitResult";
 import { StartSitSocialProof } from "./StartSitSocialProof";
 import type { QuickFillPlayer } from "./StartSitSocialProof";
+import { GameContextSelector, loadGameContext, type GameContext } from "./GameContextSelector";
 import { getAflRoundLabel } from "@/features/afl/shared/data/getAflRoundLabel";
 
 const CURRENT_SEASON = 2026;
@@ -61,6 +62,9 @@ export default function StartSitPage() {
   const [round, setRound] = useState<number>(1);
   const [roundLoading, setRoundLoading] = useState(true);
   const [topPlayers, setTopPlayers] = useState<PlayerOption[]>([]);
+
+  const [gameContext, setGameContext] = useState<GameContext>(() => loadGameContext());
+  const [showContext, setShowContext] = useState(false);
 
   const [comparing, setComparing] = useState(false);
   const [result, setResult] = useState<CompareResult | null>(null);
@@ -177,6 +181,11 @@ export default function StartSitPage() {
           round_number: round ?? 0,
           playerAId: playerA.player_id,
           playerBId: playerB.player_id,
+          context: {
+            match_state: gameContext.matchState,
+            play_style: gameContext.playStyle,
+            timing: gameContext.timing,
+          },
         }),
       });
 
@@ -300,6 +309,25 @@ export default function StartSitPage() {
           />
         </div>
 
+        {/* Game context toggle + selector */}
+        <div className="mb-4">
+          <button
+            onClick={() => setShowContext((v) => !v)}
+            className="flex items-center gap-1.5 text-[10px] font-semibold text-white/28 hover:text-white/45 transition-colors"
+          >
+            <span className={`transition-transform duration-200 ${showContext ? "rotate-90" : ""}`}>▶</span>
+            Game Context
+            <span className="text-white/18 font-normal ml-0.5">
+              — {gameContext.matchState === "close" ? "Close Match" : gameContext.matchState === "leading" ? "Leading" : "Chasing"} · {gameContext.playStyle === "balanced" ? "Balanced" : gameContext.playStyle === "safe" ? "Safe" : "Upside"} · {gameContext.timing === "mid" ? "Mid Round" : gameContext.timing === "early" ? "Early Round" : "Late Round"}
+            </span>
+          </button>
+          {showContext && (
+            <div className="mt-2">
+              <GameContextSelector value={gameContext} onChange={setGameContext} />
+            </div>
+          )}
+        </div>
+
         {/* Action row */}
         <div className="flex items-center gap-3">
           <button
@@ -390,6 +418,7 @@ export default function StartSitPage() {
             playStyle={result.play_style}
             decisionContext={result.decision_context}
             isCloseCall={result.meta?.is_close_call ?? false}
+            gameContext={gameContext}
           />
         )}
         {!comparing && result && authLoading && (

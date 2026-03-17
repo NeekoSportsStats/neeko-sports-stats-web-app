@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Crown, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Share2, Check, RotateCcw, Sparkles, Shield, Zap, ChartBar as BarChart2, TriangleAlert as AlertTriangle } from "lucide-react";
 import { OutcomeDistributionChart } from "./OutcomeDistributionChart";
 import { CloseCallBanner } from "./CloseCallBanner";
+import { ContextInsight } from "./ContextInsight";
+import type { GameContext } from "./GameContextSelector";
 
 interface PlayerData {
   player_id: string;
@@ -33,6 +35,7 @@ interface StartSitResultProps {
   playStyle?: "safe" | "upside" | "balanced" | null;
   decisionContext?: "close" | "lean" | "clear" | "strong" | null;
   isCloseCall?: boolean;
+  gameContext?: GameContext;
 }
 
 function fmt(v: number | null | undefined): string {
@@ -266,6 +269,7 @@ export function StartSitResult({
   playStyle,
   decisionContext,
   isCloseCall = false,
+  gameContext,
 }: StartSitResultProps) {
   const [deepOpen, setDeepOpen] = useState(false);
   const [distOpen, setDistOpen] = useState(false);
@@ -297,16 +301,34 @@ export function StartSitResult({
   const hasStartConds = startConditions && startConditions.length > 0;
   const hasSitConds = sitConditions && sitConditions.length > 0;
 
-  const startList = hasStartConds ? startConditions! : [
+  const rawStartList = hasStartConds ? startConditions! : [
     "You need a reliable floor play this week",
     "You want the higher-projected option to start",
     "You are chasing a safer, risk-adjusted ceiling",
   ];
-  const sitList = hasSitConds ? sitConditions! : [
+  const rawSitList = hasSitConds ? sitConditions! : [
     "You need ceiling over floor — chasing points late",
     "You are comfortable absorbing upside variance",
     "You are chasing a high-risk, high-reward outcome",
   ];
+
+  function reorderByContext(list: string[], prefer: "ceiling" | "floor" | "none"): string[] {
+    if (prefer === "none") return list;
+    const keywords = prefer === "ceiling"
+      ? ["ceiling", "upside", "breakout", "big", "score"]
+      : ["floor", "safe", "reliable", "consistent", "protect"];
+    const matches = list.filter((s) => keywords.some((k) => s.toLowerCase().includes(k)));
+    const rest = list.filter((s) => !keywords.some((k) => s.toLowerCase().includes(k)));
+    return [...matches, ...rest];
+  }
+
+  const contextPrefer: "ceiling" | "floor" | "none" =
+    gameContext?.matchState === "chasing" || gameContext?.playStyle === "upside" ? "ceiling"
+    : gameContext?.matchState === "leading" || gameContext?.playStyle === "safe" ? "floor"
+    : "none";
+
+  const startList = reorderByContext(rawStartList, contextPrefer);
+  const sitList = reorderByContext(rawSitList, contextPrefer === "ceiling" ? "ceiling" : contextPrefer === "floor" ? "floor" : "none");
 
   const wLast = winner.player_name.split(" ").pop() ?? winner.player_name;
   const lLast = loser.player_name.split(" ").pop() ?? loser.player_name;
@@ -366,9 +388,16 @@ export function StartSitResult({
               </div>
             )}
           </div>
-          <span className={`text-[11px] font-semibold tabular-nums opacity-65 ${isCloseCall ? "text-amber-400" : edge.color}`}>
-            {confidence}% confidence
-          </span>
+          <div className="flex items-center gap-2">
+            {gameContext && (
+              <span className="text-[9px] text-white/22 hidden sm:block">
+                {gameContext.matchState === "leading" ? "Leading" : gameContext.matchState === "chasing" ? "Chasing" : "Close"} · {gameContext.playStyle === "safe" ? "Safe" : gameContext.playStyle === "upside" ? "Upside" : "Balanced"} · {gameContext.timing === "early" ? "Early" : gameContext.timing === "late" ? "Late" : "Mid"}
+              </span>
+            )}
+            <span className={`text-[11px] font-semibold tabular-nums opacity-65 ${isCloseCall ? "text-amber-400" : edge.color}`}>
+              {confidence}% confidence
+            </span>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 divide-x divide-white/[0.06]">
@@ -453,6 +482,16 @@ export function StartSitResult({
       {/* ─── CLOSE CALL BANNER ─── */}
       {isCloseCall && <CloseCallBanner onUpgrade={onUpgrade} />}
 
+      {/* ─── CONTEXT INSIGHT ─── */}
+      {gameContext && (
+        <ContextInsight
+          context={gameContext}
+          isCloseCall={isCloseCall}
+          winnerName={winner.player_name}
+          loserName={loser.player_name}
+        />
+      )}
+
       {/* ─── SECTION 2: WHY THIS PICK ─── */}
       <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
         <div className="px-4 sm:px-5 pt-4 pb-4">
@@ -532,7 +571,13 @@ export function StartSitResult({
                   Unlock full reasoning before lockout.
                 </p>
                 <InlineCTA
-                  label={isCloseCall ? "Unlock the full breakdown before lockout" : "Unlock full AI reasoning"}
+                  label={
+                    isCloseCall ? "Unlock the full breakdown before lockout"
+                    : gameContext?.matchState === "chasing" ? "See how this decision changes when chasing"
+                    : gameContext?.matchState === "leading" ? "See full floor protection analysis"
+                    : gameContext?.timing === "late" ? "See late-round risk breakdown"
+                    : "Unlock full AI reasoning"
+                  }
                   onClick={onUpgrade}
                 />
               </div>
@@ -895,6 +940,12 @@ export function StartSitResult({
                 <p className="text-xs text-white/35 mt-0.5 leading-relaxed">
                   {isCloseCall
                     ? "This is one of the tightest calls this round. See exactly when the model flips before lockout."
+                    : gameContext?.matchState === "chasing"
+                    ? "See how this decision changes in your exact matchup when chasing points."
+                    : gameContext?.matchState === "leading"
+                    ? "See how this decision changes when protecting a lead."
+                    : gameContext?.timing === "late"
+                    ? "Late round decisions need full context — see the complete risk breakdown."
                     : "Most users upgrade after seeing their first close call."
                   }
                 </p>

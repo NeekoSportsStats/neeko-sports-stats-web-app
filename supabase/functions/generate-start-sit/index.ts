@@ -10,11 +10,18 @@ const corsHeaders = {
 const CACHE_TTL_MS = 6 * 24 * 60 * 60 * 1000;
 const MODEL_VERSION = "v3";
 
+interface GameContext {
+  match_state?: "leading" | "close" | "chasing";
+  play_style?: "safe" | "balanced" | "upside";
+  timing?: "early" | "mid" | "late";
+}
+
 interface StartSitRequest {
   season: number;
   round_number: number;
   playerAId: string;
   playerBId: string;
+  context?: GameContext | null;
 }
 
 interface PlayerData {
@@ -177,12 +184,42 @@ function buildDeterministicStructured(winner: PlayerData, loser: PlayerData, con
   };
 }
 
+function buildContextBlock(ctx: GameContext | null | undefined): string {
+  if (!ctx) return "";
+  const matchState = ctx.match_state ?? "close";
+  const playStyle = ctx.play_style ?? "balanced";
+  const timing = ctx.timing ?? "mid";
+
+  const lines: string[] = [
+    `User's matchup context:`,
+    `- Match state: ${matchState === "leading" ? "Leading (protect the lead)" : matchState === "chasing" ? "Chasing (need points)" : "Close match (balanced)"}`,
+    `- Play style preference: ${playStyle === "upside" ? "Upside (chasing ceiling)" : playStyle === "safe" ? "Safe (floor protection)" : "Balanced"}`,
+    `- Round timing: ${timing === "late" ? "Late round (minimise variance)" : timing === "early" ? "Early round (projection stability)" : "Mid round"}`,
+  ];
+
+  const advice: string[] = [];
+  if (matchState === "chasing") advice.push("prioritise ceiling outcomes and upside scenarios over floor safety");
+  if (matchState === "leading") advice.push("prioritise floor protection and avoid high-variance picks");
+  if (timing === "late") advice.push("emphasise risk management and variance reduction in your explanation");
+  if (timing === "early") advice.push("emphasise projection stability and model confidence over ceiling chasing");
+  if (playStyle === "upside") advice.push("highlight ceiling outcomes and breakout potential in your reasoning");
+  if (playStyle === "safe") advice.push("highlight floor protection and consistency as primary decision drivers");
+
+  if (advice.length > 0) {
+    lines.push(`\nFor this user's context you must: ${advice.join(", ")}.`);
+  }
+
+  lines.push(`\nYou are NOT allowed to change the winner. Tailor only the explanation and scenario bullets to this context.`);
+  return lines.join("\n");
+}
+
 async function callOpenAIStructured(
   openaiKey: string,
   winner: PlayerData,
   loser: PlayerData,
   confidence: number,
-  round: number
+  round: number,
+  context?: GameContext | null
 ): Promise<StructuredAIOutput | null> {
   const pW = winner.projection_final ?? 0;
   const pL = loser.projection_final ?? 0;
@@ -199,13 +236,15 @@ async function callOpenAIStructured(
   const playStyle = derivePlayStyle(winner, loser);
   const decisionContext = deriveDecisionContext(confidence);
 
+  const contextBlock = buildContextBlock(context);
+
   const systemPrompt = `You are an elite AFL fantasy strategy assistant for Neeko Sports Stats.
 
 The deterministic model has ALREADY selected ${winner.player_name} over ${loser.player_name} with ${confidence}% confidence.
 
 YOUR ROLE: Explain this decision in structured JSON. You are NOT making the decision — you are explaining it.
 
-CRITICAL RULES:
+${contextBlock ? contextBlock + "\n" : ""}CRITICAL RULES:
 - NEVER recommend ${loser.player_name} as the primary start
 - NEVER contradict the model verdict
 - Reference actual numbers from the data provided
@@ -414,7 +453,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body: StartSitRequest = await req.json();
-    const { season } = body;
+    const { season, context: gameContext } = body;
     const playerAId = String(body.playerAId ?? "").trim();
     const playerBId = String(body.playerBId ?? "").trim();
 
@@ -526,7 +565,7 @@ Deno.serve(async (req: Request) => {
     let aiSummary: string;
 
     if (openaiKey) {
-      const aiResult = await callOpenAIStructured(openaiKey, winner, loser, confidence, round_number);
+      const aiResult = await callOpenAIStructured(openaiKey, winner, loser, confidence, round_number, gameContext);
       structured = aiResult ?? buildDeterministicStructured(winner, loser, confidence);
     } else {
       structured = buildDeterministicStructured(winner, loser, confidence);
