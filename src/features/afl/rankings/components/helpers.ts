@@ -220,7 +220,8 @@ export function getValueTagStyle(tag: string | null | undefined) {
   if (t.includes("ELITE")) return { text: "text-green-300", bg: "bg-green-500/10", border: "border-green-500/30" };
   if (t.includes("STRONG")) return { text: "text-[#F5C84C]", bg: "bg-[#F5C84C]/10", border: "border-[#F5C84C]/30" };
   if (t.includes("GOOD")) return { text: "text-[#F5C84C]", bg: "bg-[#F5C84C]/10", border: "border-[#F5C84C]/30" };
-  if (t.includes("FAIR") || t.includes("AVERAGE")) return { text: "text-white/50", bg: "bg-white/5", border: "border-white/10" };
+  if (t.includes("SOLID") || t.includes("FAIR") || t.includes("AVERAGE")) return { text: "text-white/50", bg: "bg-white/5", border: "border-white/10" };
+  if (t.includes("LOW")) return { text: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/30" };
   if (t.includes("OVERPRICED") || t.includes("TRAP") || t.includes("SELL")) return { text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" };
   return { text: "text-white/40", bg: "bg-white/5", border: "border-white/10" };
 }
@@ -409,11 +410,12 @@ export function computeKpiTiles(rows: RankingRow[]) {
 
   // value_score scale: >= 5.5 = ELITE VALUE, >= 4.0 = STRONG VALUE
   const valueUpgrades = rows.filter((r) => (r.value_score ?? 0) >= 4.0).length;
-  const trapAlerts = rows.filter((r) =>
-    (r.value_tag ?? "").toUpperCase() === "OVERPRICED" ||
-    (r.risk_rating ?? 0) >= 65 ||
-    (r.projection_confidence ?? 100) < 50
-  ).length;
+  const trapAlerts = rows.filter((r) => {
+    const t = (r.value_tag ?? "").toUpperCase();
+    return t === "OVERPRICED" || t === "LOW VALUE" ||
+      (r.risk_rating ?? 0) >= 65 ||
+      (r.projection_confidence ?? 100) < 50;
+  }).length;
   const highConfidence = rows.filter((r) => (r.projection_confidence ?? 0) >= 65).length;
 
   return { captainAvgProj, valueUpgrades, trapAlerts, highConfidence };

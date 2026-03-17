@@ -1116,14 +1116,14 @@ function confLabel(conf: number | null): { label: string; textColor: string; bg:
 }
 
 function valueLabel(tag: string | null, score: number | null): { label: string; textColor: string; bg: string; border: string } {
-  const t = tag ?? "";
-  if (t === "ELITE" || t === "STRONG")    return { label: "STRONG",     textColor: "text-green-400", bg: "bg-green-400/10", border: "border-green-400/30" };
-  if (t === "FAIR")                        return { label: "FAIR",        textColor: "text-white/50",  bg: "bg-white/5",      border: "border-white/10" };
-  if (t === "OVERPRICED")                  return { label: "OVERPRICED",  textColor: "text-red-400",   bg: "bg-red-400/10",   border: "border-red-400/30" };
-  if (score == null)                       return { label: "—",           textColor: "text-white/30",  bg: "bg-white/5",      border: "border-white/10" };
-  if (score >= 4.0)                        return { label: "STRONG",     textColor: "text-green-400", bg: "bg-green-400/10", border: "border-green-400/30" };
-  if (score >= 1.7)                        return { label: "FAIR",        textColor: "text-white/50",  bg: "bg-white/5",      border: "border-white/10" };
-  return                                          { label: "OVERPRICED",  textColor: "text-red-400",   bg: "bg-red-400/10",   border: "border-red-400/30" };
+  const t = (tag ?? "").toUpperCase();
+  if (t.includes("ELITE") || t.includes("STRONG"))    return { label: "STRONG",    textColor: "text-green-400",  bg: "bg-green-400/10",  border: "border-green-400/30" };
+  if (t.includes("SOLID") || t.includes("FAIR"))       return { label: "FAIR",       textColor: "text-white/50",   bg: "bg-white/5",       border: "border-white/10" };
+  if (t.includes("LOW") || t.includes("OVERPRICED"))   return { label: "LOW VALUE",  textColor: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/30" };
+  if (score == null)                                    return { label: "—",          textColor: "text-white/30",   bg: "bg-white/5",       border: "border-white/10" };
+  if (score >= 4.0)                                     return { label: "STRONG",    textColor: "text-green-400",  bg: "bg-green-400/10",  border: "border-green-400/30" };
+  if (score >= 1.7)                                     return { label: "FAIR",       textColor: "text-white/50",   bg: "bg-white/5",       border: "border-white/10" };
+  return                                                       { label: "LOW VALUE",  textColor: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/30" };
 }
 
 function RankingsPreview() {
