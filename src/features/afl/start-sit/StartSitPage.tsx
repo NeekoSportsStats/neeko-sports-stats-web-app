@@ -15,13 +15,15 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 interface PlayerOption {
-  player_id: string;
+  player_id: string | number;
   player_name: string;
   team: string | null;
   position: string | null;
   projection_final: number | null;
-  ceiling_estimate: number | null;
-  floor_estimate: number | null;
+  ceiling: number | null;
+  floor: number | null;
+  ceiling_estimate?: number | null;
+  floor_estimate?: number | null;
   projection_confidence: number | null;
   risk_rating: number | null;
   neeko_rating: number | null;
@@ -82,7 +84,7 @@ export default function StartSitPage() {
   useEffect(() => {
     supabase
       .from("v_rankings_master")
-      .select("player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, projection_confidence, risk_rating, neeko_rating")
+      .select("player_id, player_name, team, position, projection_final, ceiling, floor, projection_confidence, risk_rating, neeko_rating")
       .not("player_id", "is", null)
       .order("neeko_rating", { ascending: false })
       .limit(400)
@@ -103,7 +105,7 @@ export default function StartSitPage() {
 
       const { data } = await supabase
         .from("v_rankings_master")
-        .select("player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, projection_confidence, risk_rating, neeko_rating")
+        .select("player_id, player_name, team, position, projection_final, ceiling, floor, projection_confidence, risk_rating, neeko_rating")
         .in("player_name", ids.map((n) => n.replace(/-/g, " ")));
 
       if (!data) return;

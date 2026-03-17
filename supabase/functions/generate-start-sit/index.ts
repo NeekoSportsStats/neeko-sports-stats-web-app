@@ -23,13 +23,12 @@ interface PlayerData {
   team: string | null;
   position: string | null;
   projection_final: number | null;
-  ceiling_estimate: number | null;
-  floor_estimate: number | null;
+  ceiling: number | null;
+  floor: number | null;
   projection_confidence: number | null;
   risk_rating: number | null;
   neeko_rating: number | null;
   value_score: number | null;
-  start_sit_decision: string | null;
 }
 
 interface PromptRecord {
@@ -85,34 +84,18 @@ function compositeScore(p: PlayerData): number {
   return projNorm * 0.35 + neekoNorm * 0.25 + confNorm * 0.20 + valNorm * 0.12 + riskNorm * 0.08;
 }
 
-const DECISION_RANK: Record<string, number> = { START: 2, CONSIDER: 1, SIT: 0 };
-
 function deterministicWinner(
   pA: PlayerData,
   pB: PlayerData
 ): { winner: PlayerData; loser: PlayerData; confidence: number } {
-  const rankA = DECISION_RANK[pA.start_sit_decision ?? "CONSIDER"] ?? 1;
-  const rankB = DECISION_RANK[pB.start_sit_decision ?? "CONSIDER"] ?? 1;
-
-  let winner: PlayerData;
-  let loser: PlayerData;
-
-  if (rankA !== rankB) {
-    winner = rankA > rankB ? pA : pB;
-    loser  = rankA > rankB ? pB : pA;
-  } else {
-    const scoreA = compositeScore(pA);
-    const scoreB = compositeScore(pB);
-    winner = scoreA >= scoreB ? pA : pB;
-    loser  = scoreA >= scoreB ? pB : pA;
-  }
-
   const scoreA = compositeScore(pA);
   const scoreB = compositeScore(pB);
+  const winner = scoreA >= scoreB ? pA : pB;
+  const loser  = scoreA >= scoreB ? pB : pA;
+
   const scoreDiff = Math.abs(scoreA - scoreB);
-  const decisionBoost = Math.abs(rankA - rankB) * 15;
   const avgConf = ((pA.projection_confidence ?? 50) + (pB.projection_confidence ?? 50)) / 2;
-  const raw = 50 + scoreDiff * 60 + (avgConf - 50) * 0.15 + decisionBoost;
+  const raw = 50 + scoreDiff * 60 + (avgConf - 50) * 0.15;
   const confidence = Math.round(Math.min(Math.max(raw, 55), 92));
 
   return { winner, loser, confidence };
@@ -120,8 +103,8 @@ function deterministicWinner(
 
 function estimateRecentForm(p: PlayerData): { last3: number; last5: number } {
   const proj = p.projection_final ?? 80;
-  const floor = p.floor_estimate ?? proj * 0.65;
-  const ceil = p.ceiling_estimate ?? proj * 1.35;
+  const floor = p.floor ?? proj * 0.65;
+  const ceil = p.ceiling ?? proj * 1.35;
   const risk = p.risk_rating ?? 5;
   const spread = ceil - floor;
   const variance = (spread / 4) * (risk / 5);
@@ -159,16 +142,16 @@ function deterministicExplanation(winner: PlayerData, loser: PlayerData): string
     );
   }
 
-  const cW = winner.ceiling_estimate ?? 0;
-  const cL = loser.ceiling_estimate ?? 0;
+  const cW = winner.ceiling ?? 0;
+  const cL = loser.ceiling ?? 0;
   if (cW > cL) {
     lines.push(
       `Higher ceiling (${Math.round(cW)} vs ${Math.round(cL)}) gives ${winner.player_name} more upside potential.`
     );
   }
 
-  const fW = winner.floor_estimate ?? 0;
-  const fL = loser.floor_estimate ?? 0;
+  const fW = winner.floor ?? 0;
+  const fL = loser.floor ?? 0;
   if (fW > fL) {
     lines.push(
       `Stronger floor protection (${Math.round(fW)} vs ${Math.round(fL)}) reduces bust risk.`
@@ -180,6 +163,21 @@ function deterministicExplanation(winner: PlayerData, loser: PlayerData): string
   }
 
   return lines.join(" ");
+}
+
+function toFrontendPlayer(p: PlayerData) {
+  return {
+    player_id: String(p.player_id),
+    player_name: p.player_name,
+    team: p.team,
+    position: p.position,
+    projection_final: p.projection_final,
+    ceiling_estimate: p.ceiling,
+    floor_estimate: p.floor,
+    projection_confidence: p.projection_confidence,
+    risk_rating: p.risk_rating,
+    neeko_rating: p.neeko_rating,
+  };
 }
 
 function containsOpposite(text: string, loserName: string): boolean {
@@ -218,12 +216,12 @@ ${winner.player_name}: ${winner.projection_final ?? "N/A"}
 ${loser.player_name}: ${loser.projection_final ?? "N/A"}
 
 Ceiling
-${winner.player_name}: ${winner.ceiling_estimate ?? "N/A"}
-${loser.player_name}: ${loser.ceiling_estimate ?? "N/A"}
+${winner.player_name}: ${winner.ceiling ?? "N/A"}
+${loser.player_name}: ${loser.ceiling ?? "N/A"}
 
 Floor
-${winner.player_name}: ${winner.floor_estimate ?? "N/A"}
-${loser.player_name}: ${loser.floor_estimate ?? "N/A"}
+${winner.player_name}: ${winner.floor ?? "N/A"}
+${loser.player_name}: ${loser.floor ?? "N/A"}
 
 Neeko Rating
 ${winner.player_name}: ${winner.neeko_rating ?? "N/A"}
@@ -407,11 +405,10 @@ Deno.serve(async (req: Request) => {
         .from("v_rankings_master")
         .select(
           `player_id, player_name, team, position,
-           projection_final, ceiling_estimate, floor_estimate,
-           projection_confidence, risk_rating, neeko_rating, value_score,
-           start_sit_decision`
+           projection_final, ceiling, floor,
+           projection_confidence, risk_rating, neeko_rating, value_score`
         )
-        .in("player_id", [playerAId, playerBId]),
+        .in("player_id", [Number(playerAId), Number(playerBId)]),
     ]);
 
     const { data: players, error: playersError } = playersResult;
@@ -453,8 +450,8 @@ Deno.serve(async (req: Request) => {
           cached: true,
           season,
           round_number,
-          playerA: pA,
-          playerB: pB,
+          playerA: toFrontendPlayer(pA),
+          playerB: toFrontendPlayer(pB),
           winner_player_id: cached.winner_player_id,
           winner_name: cached.winner_name,
           confidence: cached.confidence,
@@ -490,7 +487,7 @@ Deno.serve(async (req: Request) => {
           round_number,
           player_low_id: loId,
           player_high_id: hiId,
-          winner_player_id: winner.player_id,
+          winner_player_id: String(winner.player_id),
           winner_name: winner.player_name,
           confidence,
           ai_summary: aiSummary,
@@ -508,9 +505,9 @@ Deno.serve(async (req: Request) => {
         is_cached: false,
         season,
         round_number,
-        playerA: pA,
-        playerB: pB,
-        winner_player_id: winner.player_id,
+        playerA: toFrontendPlayer(pA),
+        playerB: toFrontendPlayer(pB),
+        winner_player_id: String(winner.player_id),
         winner_name: winner.player_name,
         confidence,
         ai_summary: isPremium ? aiSummary : null,

@@ -3,13 +3,13 @@ import { Flame, Scale, TrendingUp, ChevronRight } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 export interface QuickFillPlayer {
-  player_id: string;
+  player_id: string | number;
   player_name: string;
   team: string | null;
   position: string | null;
   projection_final: number | null;
-  ceiling_estimate: number | null;
-  floor_estimate: number | null;
+  ceiling: number | null;
+  floor: number | null;
   projection_confidence: number | null;
   risk_rating: number | null;
   neeko_rating: number | null;
