@@ -44,6 +44,11 @@ interface CompareResult {
   sit_conditions?: string[] | null;
   play_style?: "safe" | "upside" | "balanced" | null;
   decision_context?: "close" | "lean" | "clear" | "strong" | null;
+  meta?: {
+    is_close_call?: boolean;
+    confidence_percent?: number;
+    probability_gap?: number;
+  } | null;
 }
 
 export default function StartSitPage() {
@@ -200,6 +205,7 @@ export default function StartSitPage() {
         sit_conditions: Array.isArray(json.sit_conditions) ? json.sit_conditions : null,
         play_style: json.play_style ?? null,
         decision_context: json.decision_context ?? null,
+        meta: json.meta ?? null,
       });
 
       supabase.from("start_sit_decisions").insert({
@@ -383,6 +389,7 @@ export default function StartSitPage() {
             sitConditions={result.sit_conditions}
             playStyle={result.play_style}
             decisionContext={result.decision_context}
+            isCloseCall={result.meta?.is_close_call ?? false}
           />
         )}
         {!comparing && result && authLoading && (

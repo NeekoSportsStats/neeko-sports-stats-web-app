@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { Crown, Lock, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Share2, Check, RotateCcw, Sparkles, Shield, Zap, ChartBar as BarChart2 } from "lucide-react";
+import { Crown, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Share2, Check, RotateCcw, Sparkles, Shield, Zap, ChartBar as BarChart2, TriangleAlert as AlertTriangle } from "lucide-react";
 import { OutcomeDistributionChart } from "./OutcomeDistributionChart";
+import { CloseCallBanner } from "./CloseCallBanner";
 
 interface PlayerData {
   player_id: string;
@@ -31,6 +32,7 @@ interface StartSitResultProps {
   sitConditions?: string[] | null;
   playStyle?: "safe" | "upside" | "balanced" | null;
   decisionContext?: "close" | "lean" | "clear" | "strong" | null;
+  isCloseCall?: boolean;
 }
 
 function fmt(v: number | null | undefined): string {
@@ -263,6 +265,7 @@ export function StartSitResult({
   sitConditions,
   playStyle,
   decisionContext,
+  isCloseCall = false,
 }: StartSitResultProps) {
   const [deepOpen, setDeepOpen] = useState(false);
   const [distOpen, setDistOpen] = useState(false);
@@ -316,13 +319,16 @@ export function StartSitResult({
   }
 
   function handleCopyShare() {
+    const edgeStr = isCloseCall
+      ? `CLOSE CALL (${confidence}%). Small edges decide this.`
+      : `${edge.label} — ${confidence}% confidence`;
     const shareText = [
       `Start/Sit — AFL Fantasy`,
       ``,
       `START: ${winner.player_name}${winner.projection_final != null ? " (" + Math.round(winner.projection_final) + " pts projected)" : ""}`,
       `SIT: ${loser.player_name}${loser.projection_final != null ? " (" + Math.round(loser.projection_final) + " pts projected)" : ""}`,
       ``,
-      `${edge.label} — ${confidence}% confidence`,
+      `${edgeStr}`,
       isPremium ? `Based on matchup + risk profile` : "",
       ``,
       `neekostats.com.au/sports/afl/start-sit`,
@@ -337,21 +343,30 @@ export function StartSitResult({
     <div className="space-y-3 mt-6 animate-in fade-in duration-300">
 
       {/* ─── SECTION 1: RESULT HERO ─── */}
-      <div className="rounded-2xl overflow-hidden border border-white/[0.08] bg-[#0d0d0d]">
-        <div className={`px-4 sm:px-5 py-2.5 flex items-center justify-between ${edge.bgColor} border-b ${edge.borderColor}`}>
+      <div className={`rounded-2xl overflow-hidden border bg-[#0d0d0d] transition-all ${isCloseCall ? "border-amber-400/30 shadow-[0_0_20px_rgba(251,191,36,0.06)]" : "border-white/[0.08]"}`}>
+        <div className={`px-4 sm:px-5 py-2.5 flex items-center justify-between ${isCloseCall ? "bg-amber-400/[0.05] border-b border-amber-400/20" : `${edge.bgColor} border-b ${edge.borderColor}`}`}>
           <div className="flex items-center gap-2.5">
-            <span className={`text-[11px] font-bold uppercase tracking-widest ${edge.color}`}>
-              {edge.label}
-            </span>
-            <span className={`text-[10px] ${edge.color} opacity-40`}>·</span>
-            <div className={`flex items-center gap-1 ${psm.bgColor} px-2 py-0.5 rounded-full`}>
-              <PlayStyleIcon type={psm.type} className={`${psm.color} opacity-70`} />
-              <span className={`text-[9px] font-bold uppercase tracking-wider ${psm.color} opacity-75`}>
-                {psm.label}
+            {isCloseCall ? (
+              <div className="flex items-center gap-1.5 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-full">
+                <AlertTriangle size={9} className="text-amber-400/80" />
+                <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400/80">Close Call</span>
+              </div>
+            ) : (
+              <span className={`text-[11px] font-bold uppercase tracking-widest ${edge.color}`}>
+                {edge.label}
               </span>
-            </div>
+            )}
+            {!isCloseCall && <span className={`text-[10px] ${edge.color} opacity-40`}>·</span>}
+            {!isCloseCall && (
+              <div className={`flex items-center gap-1 ${psm.bgColor} px-2 py-0.5 rounded-full`}>
+                <PlayStyleIcon type={psm.type} className={`${psm.color} opacity-70`} />
+                <span className={`text-[9px] font-bold uppercase tracking-wider ${psm.color} opacity-75`}>
+                  {psm.label}
+                </span>
+              </div>
+            )}
           </div>
-          <span className={`text-[11px] font-semibold tabular-nums ${edge.color} opacity-65`}>
+          <span className={`text-[11px] font-semibold tabular-nums opacity-65 ${isCloseCall ? "text-amber-400" : edge.color}`}>
             {confidence}% confidence
           </span>
         </div>
@@ -408,21 +423,35 @@ export function StartSitResult({
           </div>
         </div>
 
-        <div className="border-t border-white/[0.05] px-4 sm:px-5 py-3 space-y-2">
+        <div className={`border-t px-4 sm:px-5 py-3 space-y-2 ${isCloseCall ? "border-amber-400/10" : "border-white/[0.05]"}`}>
           <div className="flex items-center gap-3">
             <div className="flex-1 h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-700 ease-out ${edge.barColor}`}
+                className={`h-full rounded-full transition-all duration-700 ease-out ${isCloseCall ? "bg-gradient-to-r from-amber-500/50 to-amber-400" : edge.barColor}`}
                 style={{ width: `${confidence}%` }}
               />
             </div>
-            <span className={`shrink-0 text-[10px] font-medium ${edge.color} opacity-55`}>{ctxLabel}</span>
+            <span className={`shrink-0 text-[10px] font-medium opacity-55 ${isCloseCall ? "text-amber-400" : edge.color}`}>{ctxLabel}</span>
           </div>
-          <p className={`text-[11px] font-medium leading-tight ${edge.color} opacity-50`}>
-            {edge.label} · {psm.label} · {confidence}% confidence
-          </p>
+          {isCloseCall ? (
+            <div>
+              <p className="text-[11px] font-medium leading-tight text-amber-400/60">
+                This decision is razor thin
+              </p>
+              <p className="text-[10px] text-white/28 mt-0.5 leading-snug">
+                Small differences in role, matchup, or risk can flip this decision.
+              </p>
+            </div>
+          ) : (
+            <p className={`text-[11px] font-medium leading-tight ${edge.color} opacity-50`}>
+              {edge.label} · {psm.label} · {confidence}% confidence
+            </p>
+          )}
         </div>
       </div>
+
+      {/* ─── CLOSE CALL BANNER ─── */}
+      {isCloseCall && <CloseCallBanner onUpgrade={onUpgrade} />}
 
       {/* ─── SECTION 2: WHY THIS PICK ─── */}
       <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
@@ -467,6 +496,11 @@ export function StartSitResult({
             </p>
           ) : (
             <div>
+              {isCloseCall && (
+                <p className="text-xs text-amber-400/60 font-medium mb-2 leading-snug">
+                  This is a high-uncertainty decision.
+                </p>
+              )}
               {displayShortSummary ? (
                 (() => {
                   const { preview, rest } = getLongSummaryPreview(displayShortSummary);
@@ -497,7 +531,10 @@ export function StartSitResult({
                   You're seeing the surface-level read.<br />
                   Unlock full reasoning before lockout.
                 </p>
-                <InlineCTA label="Unlock full AI reasoning" onClick={onUpgrade} />
+                <InlineCTA
+                  label={isCloseCall ? "Unlock the full breakdown before lockout" : "Unlock full AI reasoning"}
+                  onClick={onUpgrade}
+                />
               </div>
             </div>
           )}
@@ -507,11 +544,16 @@ export function StartSitResult({
       {/* ─── SECTION 4: START IF / SIT IF ─── */}
       <div ref={startSitRef} className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
         <div className="px-4 sm:px-5 pt-4 pb-4">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3">
             <p className="text-[10px] font-bold uppercase tracking-widest text-white/20">
               Start If / Sit If
             </p>
           </div>
+          {isCloseCall && (
+            <p className="text-xs text-amber-400/55 font-medium mb-3 leading-snug">
+              These scenarios can completely flip the decision.
+            </p>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             {/* START side */}
@@ -568,7 +610,10 @@ export function StartSitResult({
               </p>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[11px] text-white/22 leading-snug">See all start/sit scenarios</span>
-                <InlineCTA label="See all scenarios" onClick={onUpgrade} />
+                <InlineCTA
+                  label={isCloseCall ? "See what flips this decision" : "See all scenarios"}
+                  onClick={onUpgrade}
+                />
               </div>
             </div>
           )}
@@ -734,7 +779,10 @@ export function StartSitResult({
                     <p className="text-[11px] text-white/35 mb-2.5 leading-snug">
                       Understand what these probabilities actually mean
                     </p>
-                    <InlineCTA label="Get full decision edge" onClick={onUpgrade} />
+                    <InlineCTA
+                      label={isCloseCall ? "Don't risk the wrong call" : "Get full decision edge"}
+                      onClick={onUpgrade}
+                    />
                   </div>
                 </div>
               </div>
@@ -831,18 +879,24 @@ export function StartSitResult({
 
       {/* ─── SECTION 8: PREMIUM CTA BLOCK (free users only) ─── */}
       {!isPremium && (
-        <div className="rounded-xl border border-[#F5C84C]/12 bg-gradient-to-b from-[#F5C84C]/[0.04] to-transparent overflow-hidden">
+        <div className={`rounded-xl border overflow-hidden ${isCloseCall ? "border-amber-400/20 bg-gradient-to-b from-amber-400/[0.04] to-transparent" : "border-[#F5C84C]/12 bg-gradient-to-b from-[#F5C84C]/[0.04] to-transparent"}`}>
           <div className="px-5 py-5">
             <div className="flex items-start gap-3 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-[#F5C84C]/10 border border-[#F5C84C]/15 flex items-center justify-center shrink-0 mt-0.5">
-                <Crown size={14} className="text-[#F5C84C]/70" />
+              <div className={`w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 ${isCloseCall ? "bg-amber-400/10 border-amber-400/20" : "bg-[#F5C84C]/10 border-[#F5C84C]/15"}`}>
+                {isCloseCall
+                  ? <AlertTriangle size={14} className="text-amber-400/70" />
+                  : <Crown size={14} className="text-[#F5C84C]/70" />
+                }
               </div>
               <div>
                 <p className="text-sm font-bold text-white/75 leading-tight">
-                  See the full decision before lockout
+                  {isCloseCall ? "Don't guess on a close call" : "See the full decision before lockout"}
                 </p>
                 <p className="text-xs text-white/35 mt-0.5 leading-relaxed">
-                  Most users upgrade after seeing their first close call.
+                  {isCloseCall
+                    ? "This is one of the tightest calls this round. See exactly when the model flips before lockout."
+                    : "Most users upgrade after seeing their first close call."
+                  }
                 </p>
               </div>
             </div>
@@ -855,7 +909,7 @@ export function StartSitResult({
                 "Confidence & Risk comparison metrics",
               ].map((item) => (
                 <li key={item} className="flex items-center gap-2.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#F5C84C]/35 shrink-0" />
+                  <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isCloseCall ? "bg-amber-400/30" : "bg-[#F5C84C]/35"}`} />
                   <span className="text-xs text-white/40 leading-snug">{item}</span>
                 </li>
               ))}
@@ -865,7 +919,7 @@ export function StartSitResult({
               className="w-full flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold py-3 rounded-xl hover:brightness-110 active:scale-[0.99] transition-all text-sm"
             >
               <Crown size={13} />
-              Unlock Neeko+
+              {isCloseCall ? "Unlock full breakdown" : "Unlock Neeko+"}
             </button>
             <p className="text-[10px] text-white/20 text-center mt-2">
               See why the model prefers one play — not just who it picks.

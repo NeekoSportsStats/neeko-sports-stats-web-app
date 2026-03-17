@@ -92,6 +92,23 @@ function deriveDecisionContext(confidence: number): "close" | "lean" | "clear" |
   return "close";
 }
 
+function deriveCloseCallMeta(
+  confidence: number,
+  scoreA: number,
+  scoreB: number
+): { is_close_call: boolean; confidence_percent: number; probability_gap: number } {
+  const probA = Math.round(50 + (scoreA - scoreB) * 30 + (confidence - 50) * 0.3);
+  const clampedA = Math.min(Math.max(probA, 50), 92);
+  const clampedB = 100 - clampedA;
+  const probabilityGap = Math.abs(clampedA - clampedB);
+  const isCloseCall = confidence <= 55 || probabilityGap <= 10;
+  return {
+    is_close_call: isCloseCall,
+    confidence_percent: confidence,
+    probability_gap: probabilityGap,
+  };
+}
+
 function buildDeterministicStructured(winner: PlayerData, loser: PlayerData, confidence: number): StructuredAIOutput {
   const pW = winner.projection_final ?? 0;
   const pL = loser.projection_final ?? 0;
@@ -450,6 +467,9 @@ Deno.serve(async (req: Request) => {
 
     const { winner, loser, confidence } = deterministicWinner(pA, pB);
     const modelEdge = `${confidence}% probability ${winner.player_name} outscores ${loser.player_name} this round.`;
+    const scoreA = compositeScore(pA);
+    const scoreB = compositeScore(pB);
+    const meta = deriveCloseCallMeta(confidence, scoreA, scoreB);
 
     const { data: cached } = await serviceClient
       .from("start_sit_cache")
@@ -496,6 +516,7 @@ Deno.serve(async (req: Request) => {
           sit_conditions: isPremium ? structured.sit_conditions : [structured.sit_conditions[0]],
           play_style: structured.play_style,
           decision_context: structured.decision_context,
+          meta,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -555,6 +576,7 @@ Deno.serve(async (req: Request) => {
         sit_conditions: isPremium ? structured.sit_conditions : [structured.sit_conditions[0]],
         play_style: structured.play_style,
         decision_context: structured.decision_context,
+        meta,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
