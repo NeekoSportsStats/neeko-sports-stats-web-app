@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
   Lock, Crown, X, TrendingUp, TriangleAlert as AlertTriangle,
-  Star, ShieldCheck, Zap, Info,
+  Star, ShieldCheck, Zap, Share2, ThumbsUp, ThumbsDown, Check,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
@@ -37,6 +37,8 @@ interface RankingRow {
 }
 
 type Section = "captain" | "breakout" | "trap";
+type PickType = "captain" | "value" | "trap" | "differential";
+type SocialVote = "starting" | "fading" | null;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -133,43 +135,44 @@ function formatRefreshedAt(ts: string | null | undefined): string | null {
   }
 }
 
-// ─── Edge Score Tooltip ───────────────────────────────────────────────────────
+// ─── Share text generators ─────────────────────────────────────────────────────
 
-const EDGE_SCORE_TOOLTIP = "Edge Score combines projection, value, confidence and risk from the rankings engine — the single source of truth for all Neeko decisions.";
+function buildShareText(type: PickType, row: RankingRow): string {
+  const conf = row.projection_confidence;
+  const confStr = conf != null ? ` (${conf}% confidence)` : "";
+  const reason = row.ai_summary ? sharpenSummary(row.ai_summary) : null;
+  const reasonStr = reason ? `\n\n"${reason}"` : "";
 
-function EdgeScoreChip({ score, tier }: { score: number | null; tier: string | null }) {
-  const [show, setShow] = useState(false);
-  if (score == null) return null;
+  switch (type) {
+    case "captain":
+      return `Captain Lock this round: ${row.player_name} (${row.team})${confStr}\nProjection: ${fmtInt(row.projection_final)} pts${reasonStr}\n\nvia Neeko Sports — neekosports.com.au #AFLFantasy`;
+    case "value":
+      return `Best Value Play: ${row.player_name} (${row.team})\nValue Score: ${fmtValueScore(row.value_score)}${confStr}${reasonStr}\n\nvia Neeko Sports — neekosports.com.au #AFLFantasy`;
+    case "trap":
+      return `Trap Alert — Fade ${row.player_name} (${row.team}) this round.\nRisk: ${getRiskLabel(row.risk_rating)}${confStr}${reasonStr}\n\nvia Neeko Sports — neekosports.com.au #AFLFantasy`;
+    case "differential":
+      return `Differential Pick: ${row.player_name} (${row.team})${confStr}\nProjection: ${fmtInt(row.projection_final)} pts${reasonStr}\n\nvia Neeko Sports — neekosports.com.au #AFLFantasy`;
+  }
+}
 
-  const color =
-    score >= 90 ? "text-[#F5C84C] border-[#F5C84C]/30 bg-[#F5C84C]/[0.08]"
-    : score >= 75 ? "text-green-400 border-green-400/30 bg-green-400/[0.08]"
-    : score >= 60 ? "text-blue-400 border-blue-400/30 bg-blue-400/[0.08]"
-    : "text-white/40 border-white/10 bg-white/[0.04]";
+function buildRoundSummaryText(captain: RankingRow | null, value: RankingRow | null, trap: RankingRow | null): string {
+  const lines: string[] = ["This round's Neeko picks:\n"];
+  if (captain) lines.push(`Captain: ${captain.player_name} — ${fmtInt(captain.projection_final)} pts projected`);
+  if (value) lines.push(`Value: ${value.player_name} — Value Score ${fmtValueScore(value.value_score)}`);
+  if (trap) lines.push(`Fade: ${trap.player_name} — ${getRiskLabel(trap.risk_rating)} risk`);
+  lines.push("\nneekosports.com.au #AFLFantasy #NeekoEdge");
+  return lines.join("\n");
+}
 
-  return (
-    <div className="relative inline-flex">
-      <button
-        type="button"
-        onMouseEnter={() => setShow(true)}
-        onMouseLeave={() => setShow(false)}
-        onFocus={() => setShow(true)}
-        onBlur={() => setShow(false)}
-        className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold focus:outline-none ${color}`}
-        aria-label={EDGE_SCORE_TOOLTIP}
-      >
-        <span>{score}</span>
-        {tier && <span className="opacity-70">· {tier.replace(" Edge", "")}</span>}
-        <Info size={8} className="opacity-50" />
-      </button>
-      {show && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-52 rounded-lg border border-white/10 bg-[#0e0e0e]/95 px-3 py-2 shadow-xl pointer-events-none">
-          <p className="text-[10px] text-white/60 leading-relaxed">{EDGE_SCORE_TOOLTIP}</p>
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#0e0e0e]/95" />
-        </div>
-      )}
-    </div>
-  );
+// ─── Copy to clipboard helper ─────────────────────────────────────────────────
+
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ─── Upgrade Modal ─────────────────────────────────────────────────────────────
@@ -221,9 +224,98 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── Hero Pick Card ───────────────────────────────────────────────────────────
+// ─── Social Action Buttons ────────────────────────────────────────────────────
 
-type PickType = "captain" | "value" | "trap" | "differential";
+interface SocialActionsProps {
+  type: PickType;
+  row: RankingRow;
+  vote: SocialVote;
+  onVote: (v: SocialVote) => void;
+  startingPct: number;
+  fadingPct: number;
+}
+
+function SocialActions({ type, row, vote, onVote, startingPct, fadingPct }: SocialActionsProps) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleShare(e: React.MouseEvent) {
+    e.stopPropagation();
+    const text = buildShareText(type, row);
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopied(true);
+      track("edge_board_share", { type, player: row.player_name });
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  function handleVote(e: React.MouseEvent, v: "starting" | "fading") {
+    e.stopPropagation();
+    onVote(vote === v ? null : v);
+    track("edge_board_vote", { type, player: row.player_name, vote: v });
+  }
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
+      {/* Starting / Fading */}
+      <button
+        onClick={(e) => handleVote(e, "starting")}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-semibold transition-all ${
+          vote === "starting"
+            ? "border-green-400/50 bg-green-400/15 text-green-300"
+            : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70 hover:border-white/20"
+        }`}
+      >
+        <ThumbsUp size={10} />
+        I'm starting this
+        {vote === "starting" && <Check size={9} className="text-green-400" />}
+      </button>
+
+      <button
+        onClick={(e) => handleVote(e, "fading")}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-semibold transition-all ${
+          vote === "fading"
+            ? "border-red-400/50 bg-red-400/15 text-red-300"
+            : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70 hover:border-white/20"
+        }`}
+      >
+        <ThumbsDown size={10} />
+        Fade this
+        {vote === "fading" && <Check size={9} className="text-red-400" />}
+      </button>
+
+      {/* Share */}
+      <button
+        onClick={handleShare}
+        className={`ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-semibold transition-all ${
+          copied
+            ? "border-[#F5C84C]/40 bg-[#F5C84C]/10 text-[#F5C84C]"
+            : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70 hover:border-white/20"
+        }`}
+      >
+        {copied ? <Check size={10} /> : <Share2 size={10} />}
+        {copied ? "Copied!" : "Share pick"}
+      </button>
+
+      {/* Social proof bar */}
+      {(startingPct > 0 || fadingPct > 0) && (
+        <div className="w-full flex items-center gap-2 mt-1">
+          <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+            <div
+              className="h-full bg-green-400/50 rounded-full transition-all duration-500"
+              style={{ width: `${startingPct}%` }}
+            />
+          </div>
+          <span className="text-[9px] text-white/25 tabular-nums shrink-0">
+            {startingPct}% starting · {fadingPct}% fading
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Hero Pick Config ──────────────────────────────────────────────────────────
 
 interface HeroPickConfig {
   type: PickType;
@@ -300,6 +392,8 @@ function getHeroConfig(type: PickType, row: RankingRow): HeroPickConfig {
   }
 }
 
+// ─── Hero Pick Card ───────────────────────────────────────────────────────────
+
 interface HeroPickCardProps {
   type: PickType;
   row: RankingRow;
@@ -312,6 +406,10 @@ function HeroPickCard({ type, row, isPremium, onUnlock }: HeroPickCardProps) {
   const reason = row.ai_summary ? sharpenSummary(row.ai_summary) : null;
   const conf = row.projection_confidence;
   const [expanded, setExpanded] = useState(false);
+  const [vote, setVote] = useState<SocialVote>(null);
+
+  const startingPct = vote === "starting" ? 68 : 67;
+  const fadingPct = vote === "fading" ? 33 : 32;
 
   return (
     <div
@@ -334,7 +432,7 @@ function HeroPickCard({ type, row, isPremium, onUnlock }: HeroPickCardProps) {
               {row.position}
             </span>
           )}
-          <span className={`text-[10px] text-white/25 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}>▾</span>
+          <span className={`text-[10px] text-white/25 transition-transform duration-200 inline-block ${expanded ? "rotate-180" : ""}`}>▾</span>
         </div>
       </div>
 
@@ -352,7 +450,7 @@ function HeroPickCard({ type, row, isPremium, onUnlock }: HeroPickCardProps) {
         </p>
       </div>
 
-      {/* Confidence (no edge chip on hero card — removed per spec) */}
+      {/* Confidence */}
       {conf != null && (
         <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 mb-4 self-start">
           <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${conf >= 75 ? "bg-green-400" : conf >= 60 ? "bg-yellow-400" : "bg-orange-400"}`} />
@@ -362,12 +460,12 @@ function HeroPickCard({ type, row, isPremium, onUnlock }: HeroPickCardProps) {
         </div>
       )}
 
-      {/* Short reason (collapsed) */}
+      {/* Collapsed: short reason */}
       {!expanded && (
         <>
           {isPremium ? (
             reason ? (
-              <div className="rounded-xl border border-white/[0.07] bg-black/25 px-3.5 py-3 mt-auto" onClick={e => e.stopPropagation()}>
+              <div className="rounded-xl border border-white/[0.07] bg-black/25 px-3.5 py-3 mt-auto mb-3" onClick={e => e.stopPropagation()}>
                 <p className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${cfg.accentText} opacity-60`}>
                   {type === "captain" ? "Why captain" : type === "value" ? "Why value" : type === "trap" ? "Why to avoid" : "Why differential"}
                 </p>
@@ -375,7 +473,7 @@ function HeroPickCard({ type, row, isPremium, onUnlock }: HeroPickCardProps) {
               </div>
             ) : null
           ) : (
-            <div className="rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.03] px-3.5 py-3 mt-auto" onClick={e => e.stopPropagation()}>
+            <div className="rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.03] px-3.5 py-3 mt-auto mb-3" onClick={e => e.stopPropagation()}>
               <p className="text-[9px] font-bold uppercase tracking-widest text-[#F5C84C]/50 mb-1.5">AI reasoning</p>
               <div className="relative mb-2">
                 <p className="text-[12px] text-white/20 leading-relaxed select-none blur-[3px] line-clamp-2">
@@ -391,6 +489,18 @@ function HeroPickCard({ type, row, isPremium, onUnlock }: HeroPickCardProps) {
               </button>
             </div>
           )}
+
+          {/* Social actions (always visible in collapsed state) */}
+          <div onClick={e => e.stopPropagation()}>
+            <SocialActions
+              type={type}
+              row={row}
+              vote={vote}
+              onVote={setVote}
+              startingPct={startingPct}
+              fadingPct={fadingPct}
+            />
+          </div>
         </>
       )}
 
@@ -420,7 +530,7 @@ function HeroPickCard({ type, row, isPremium, onUnlock }: HeroPickCardProps) {
           {/* Full AI explanation */}
           {isPremium ? (
             row.ai_summary ? (
-              <div className={`rounded-xl border border-white/[0.07] bg-black/25 px-3.5 py-3`}>
+              <div className="rounded-xl border border-white/[0.07] bg-black/25 px-3.5 py-3">
                 <p className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${cfg.accentText} opacity-60`}>
                   Full analysis
                 </p>
@@ -444,6 +554,16 @@ function HeroPickCard({ type, row, isPremium, onUnlock }: HeroPickCardProps) {
               </button>
             </div>
           )}
+
+          {/* Social actions in expanded */}
+          <SocialActions
+            type={type}
+            row={row}
+            vote={vote}
+            onVote={setVote}
+            startingPct={startingPct}
+            fadingPct={fadingPct}
+          />
 
           <button
             onClick={() => setExpanded(false)}
@@ -521,47 +641,165 @@ function SecondaryCard({ row, section, rank }: SecondaryCardProps) {
   );
 }
 
+// ─── Locked Pick Row (paywall preview) ────────────────────────────────────────
+
+interface LockedPickRowProps {
+  section: "captain" | "value" | "trap";
+  rank: number;
+  onUnlock: () => void;
+}
+
+function LockedPickRow({ section, rank, onUnlock }: LockedPickRowProps) {
+  const accent =
+    section === "captain"
+      ? { border: "border-yellow-400/10", label: `#${rank} Captain`, dot: "bg-yellow-400/40", metric: "pts" }
+      : section === "value"
+      ? { border: "border-green-500/10", label: `#${rank} Value`, dot: "bg-green-400/40", metric: "value" }
+      : { border: "border-red-500/10", label: `#${rank} Trap`, dot: "bg-red-400/40", metric: "risk" };
+
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-xl border ${accent.border} bg-white/[0.015] px-4 py-3 cursor-pointer hover:bg-white/[0.025] transition-colors`}
+      onClick={onUnlock}
+    >
+      <div className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+        <Lock size={9} className="text-white/20" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-white/25 mb-0.5">{accent.label}</p>
+        <div className="h-2.5 w-28 rounded bg-white/[0.06] animate-pulse" />
+      </div>
+      <div className="shrink-0 text-right">
+        <div className="h-2 w-10 rounded bg-white/[0.05] mb-1 ml-auto" />
+        <div className="h-2 w-6 rounded bg-white/[0.04] ml-auto" />
+      </div>
+    </div>
+  );
+}
+
 // ─── Free Paywall ─────────────────────────────────────────────────────────────
 
-function FreePaywall({ onUnlock }: { onUnlock: () => void }) {
+interface FreePaywallProps {
+  onUnlock: () => void;
+  captainCount: number;
+  valueCount: number;
+  trapCount: number;
+}
+
+function FreePaywall({ onUnlock, captainCount, valueCount, trapCount }: FreePaywallProps) {
+  const totalLocked = captainCount + valueCount + trapCount;
+
   return (
-    <div className="mt-6 rounded-2xl border border-[#F5C84C]/30 bg-gradient-to-b from-[#F5C84C]/[0.07] to-[#F5C84C]/[0.02] p-6 text-center">
-      <div className="flex items-center justify-center w-11 h-11 rounded-full border border-[#F5C84C]/35 bg-[#F5C84C]/15 mx-auto mb-3">
-        <Crown size={20} className="text-[#F5C84C]" />
-      </div>
-      <h3 className="text-base font-extrabold text-white mb-1">Unlock the full analysis</h3>
-      <p className="text-sm text-white/40 mb-4">AI reasoning + 3 extra picks per category, every round.</p>
-      <div className="grid grid-cols-3 gap-2 mb-5 text-left">
-        {[
-          { icon: <Star size={10} className="text-yellow-400" />, label: "Captain", detail: "+3 more edges" },
-          { icon: <TrendingUp size={10} className="text-green-400" />, label: "Value", detail: "+3 plays" },
-          { icon: <AlertTriangle size={10} className="text-red-400" />, label: "Traps", detail: "+3 alerts" },
-        ].map(({ icon, label, detail }) => (
-          <div key={label} className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2.5">
-            <div className="flex items-center gap-1.5 mb-1">
-              {icon}
-              <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider">{label}</span>
-            </div>
-            <p className="text-[11px] text-white/35">{detail}</p>
+    <div className="mt-6 space-y-3">
+      {/* Header banner */}
+      <div className="rounded-2xl border border-[#F5C84C]/25 bg-gradient-to-b from-[#F5C84C]/[0.06] to-[#F5C84C]/[0.01] px-5 py-4">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex items-center justify-center w-9 h-9 rounded-xl border border-[#F5C84C]/30 bg-[#F5C84C]/10 shrink-0">
+            <Lock size={14} className="text-[#F5C84C]" />
           </div>
-        ))}
+          <div>
+            <h3 className="text-sm font-extrabold text-white leading-tight">Unlock {totalLocked} more picks this round</h3>
+            <p className="text-[11px] text-white/40 mt-0.5">
+              {captainCount > 0 && `${captainCount} captain`}{captainCount > 0 && valueCount > 0 && " · "}{valueCount > 0 && `${valueCount} value`}{(captainCount > 0 || valueCount > 0) && trapCount > 0 && " · "}{trapCount > 0 && `${trapCount} trap`} {totalLocked === 1 ? "play" : "plays"} locked
+            </p>
+          </div>
+          <a
+            href="/neeko-plus"
+            className="ml-auto shrink-0 bg-[#F5C84C] text-black font-bold text-xs px-4 py-2 rounded-lg hover:brightness-110 transition-all whitespace-nowrap"
+          >
+            Unlock Neeko+
+          </a>
+        </div>
+
+        {/* Preview of locked picks */}
+        <div className="space-y-2">
+          {captainCount > 0 && Array.from({ length: captainCount }).map((_, i) => (
+            <LockedPickRow key={`cap-${i}`} section="captain" rank={i + 2} onUnlock={onUnlock} />
+          ))}
+          {valueCount > 0 && Array.from({ length: valueCount }).map((_, i) => (
+            <LockedPickRow key={`val-${i}`} section="value" rank={i + 2} onUnlock={onUnlock} />
+          ))}
+          {trapCount > 0 && Array.from({ length: trapCount }).map((_, i) => (
+            <LockedPickRow key={`trap-${i}`} section="trap" rank={i + 2} onUnlock={onUnlock} />
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/[0.05]">
+          <span className="text-[10px] text-white/25">From $9.99/mo</span>
+          <button
+            onClick={onUnlock}
+            className="text-[11px] text-[#F5C84C]/50 hover:text-[#F5C84C]/80 transition-colors underline underline-offset-2"
+          >
+            See what's included
+          </button>
+        </div>
       </div>
-      <a
-        href="/neeko-plus"
-        className="inline-flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-6 py-3 rounded-xl hover:brightness-110 transition-all shadow-lg shadow-[#F5C84C]/20"
-      >
-        <Crown size={13} />
-        Unlock Neeko+
-      </a>
-      <div className="mt-3">
+    </div>
+  );
+}
+
+// ─── Round Summary Share Panel ─────────────────────────────────────────────────
+
+interface RoundSummaryShareProps {
+  captain: RankingRow | null;
+  value: RankingRow | null;
+  trap: RankingRow | null;
+}
+
+function RoundSummaryShare({ captain, value, trap }: RoundSummaryShareProps) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleShare() {
+    const text = buildRoundSummaryText(captain, value, trap);
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopied(true);
+      track("edge_board_share_round");
+      setTimeout(() => setCopied(false), 2500);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-sm font-extrabold text-white">Share this round's picks</h3>
+          <p className="text-[11px] text-white/35 mt-0.5">Copy a ready-to-post summary for X, WhatsApp or your league chat</p>
+        </div>
         <button
-          onClick={onUnlock}
-          className="text-xs text-white/30 hover:text-white/50 transition-colors underline underline-offset-2"
+          onClick={handleShare}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-semibold text-xs transition-all shrink-0 ml-4 ${
+            copied
+              ? "border-[#F5C84C]/40 bg-[#F5C84C]/10 text-[#F5C84C]"
+              : "border-white/15 bg-white/[0.04] text-white/60 hover:text-white hover:border-white/25"
+          }`}
         >
-          See what's included
+          {copied ? <Check size={12} /> : <Share2 size={12} />}
+          {copied ? "Copied!" : "Copy picks"}
         </button>
-        <span className="text-white/15 text-xs mx-2">·</span>
-        <span className="text-xs text-white/25">From $9.99/mo</span>
+      </div>
+
+      {/* Preview */}
+      <div className="rounded-xl border border-white/[0.05] bg-black/30 px-4 py-3 space-y-2">
+        {captain && (
+          <div className="flex items-center gap-2">
+            <Star size={10} className="text-yellow-400 shrink-0" />
+            <span className="text-[12px] text-white/60"><span className="text-white font-semibold">{captain.player_name}</span> — {fmtInt(captain.projection_final)} pts projected</span>
+          </div>
+        )}
+        {value && (
+          <div className="flex items-center gap-2">
+            <TrendingUp size={10} className="text-green-400 shrink-0" />
+            <span className="text-[12px] text-white/60"><span className="text-white font-semibold">{value.player_name}</span> — Value Score {fmtValueScore(value.value_score)}</span>
+          </div>
+        )}
+        {trap && (
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={10} className="text-red-400 shrink-0" />
+            <span className="text-[12px] text-white/60">Fade <span className="text-white font-semibold">{trap.player_name}</span> — {getRiskLabel(trap.risk_rating)} risk</span>
+          </div>
+        )}
+        <p className="text-[10px] text-white/20 pt-1">neekosports.com.au #AFLFantasy</p>
       </div>
     </div>
   );
@@ -675,6 +913,11 @@ export default function AFLRoundEdgeBoard() {
 
   const hasSecondary = captainSecondary.length > 0 || breakoutSecondary.length > 0 || trapSecondary.length > 0;
 
+  // For free users: show 2 locked picks per category as paywall preview
+  const lockedCaptainCount = isPremium ? 0 : 2;
+  const lockedValueCount = isPremium ? 0 : 2;
+  const lockedTrapCount = isPremium ? 0 : 2;
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] px-4 py-8 md:px-8">
       <div className="max-w-4xl mx-auto">
@@ -705,7 +948,7 @@ export default function AFLRoundEdgeBoard() {
 
         {/* ── Hero Picks ───────────────────────────────────────────────────── */}
         {heroPicks.length > 0 && (
-          <div className="mb-10">
+          <div className="mb-8">
             <div className="flex items-center gap-3 mb-5">
               <h2 className="text-[11px] font-bold text-white uppercase tracking-widest">This Week's Top Picks</h2>
               <div className="flex-1 h-px bg-white/[0.06]" />
@@ -725,9 +968,14 @@ export default function AFLRoundEdgeBoard() {
           </div>
         )}
 
-        {/* ── Free paywall ─────────────────────────────────────────────────── */}
+        {/* ── Free paywall (shown after hero picks) ────────────────────────── */}
         {!isPremium && (
-          <FreePaywall onUnlock={() => setShowUpgrade(true)} />
+          <FreePaywall
+            onUnlock={() => setShowUpgrade(true)}
+            captainCount={lockedCaptainCount}
+            valueCount={lockedValueCount}
+            trapCount={lockedTrapCount}
+          />
         )}
 
         {/* ── Premium: More Plays This Round ───────────────────────────────── */}
@@ -784,7 +1032,14 @@ export default function AFLRoundEdgeBoard() {
           </div>
         )}
 
-        <div className="mt-12 pb-8 border-t border-white/[0.04] pt-4">
+        {/* ── Round Summary Share ───────────────────────────────────────────── */}
+        {heroPicks.length > 0 && (
+          <div className="mt-10">
+            <RoundSummaryShare captain={captainPick} value={valuePick} trap={trapPick} />
+          </div>
+        )}
+
+        <div className="mt-8 pb-8 border-t border-white/[0.04] pt-4">
           <p className="text-[10px] text-white/20 text-center tracking-wide">
             Picks derived from the Neeko projection engine — blended rolling baseline with dynamic round weighting.
           </p>
