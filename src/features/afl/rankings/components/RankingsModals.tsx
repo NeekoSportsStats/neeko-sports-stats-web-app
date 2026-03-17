@@ -510,7 +510,7 @@ export function PlayerDetailModal({
   })();
   const valueLabelStyle = getValueTagStyle(valueLabel);
   const matchupLabel = fmtMatchup(row.matchup_rating);
-  const hasMatchup = matchupLabel != null && matchupLabel !== "Neutral";
+  const hasMatchup = matchupLabel != null && matchupLabel !== "—" && matchupLabel.toUpperCase() !== "NEUTRAL";
 
   if (isPartial) {
     return (

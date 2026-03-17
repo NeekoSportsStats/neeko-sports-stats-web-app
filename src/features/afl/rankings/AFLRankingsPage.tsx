@@ -39,8 +39,8 @@ function KpiTiles({ rows }: { rows: RankingRow[] }) {
   const tiles = [
     { label: "Top Captain Avg", value: captainAvgProj != null ? captainAvgProj.toFixed(1) : "—", sub: "Top 5 captain projections", color: "text-[#F5C84C]" },
     { label: "Value Upgrades", value: valueUpgrades.toString(), sub: "Value score ≥ 12.0", color: "text-green-400" },
-    { label: "Trap Alerts", value: trapAlerts.toString(), sub: "Risk rating ≥ 60", color: "text-red-400" },
-    { label: "High Confidence", value: highConfidence.toString(), sub: "Confidence ≥ 85%", color: "text-blue-400" },
+    { label: "Trap Alerts", value: trapAlerts.toString(), sub: "Risk rating ≥ 55", color: "text-red-400" },
+    { label: "High Confidence", value: highConfidence.toString(), sub: "Confidence ≥ 65%", color: "text-blue-400" },
   ];
 
   return (

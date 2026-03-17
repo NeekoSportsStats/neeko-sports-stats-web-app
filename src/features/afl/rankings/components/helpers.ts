@@ -37,12 +37,23 @@ export function getDisplayRecommendation(row: RankingRow, tab: RankingsTab): str
 export function fmtMatchup(v: string | number | null): string {
   if (v == null) return "—";
 
+  if (typeof v === "string") {
+    const u = v.trim().toUpperCase();
+    if (u === "ELITE") return "Elite";
+    if (u === "FAVOURABLE") return "Favourable";
+    if (u === "NEUTRAL") return "Neutral";
+    if (u === "TOUGH") return "Tough";
+    if (u === "DIFFICULT") return "Difficult";
+    if (u === "BRUTAL") return "Brutal";
+    if (u === "—" || u === "") return "—";
+  }
+
   const num = Number(v);
-  if (isNaN(num)) return "—";
+  if (isNaN(num)) return String(v);
 
   if (num >= 0.8 && num <= 1.2) {
     const pct = (num - 1) * 100;
-    if (Math.abs(pct) < 1) return "Neutral";
+    if (Math.abs(pct) < 0.5) return "Neutral";
     return `${pct > 0 ? "+" : ""}${Math.round(pct)}%`;
   }
 
@@ -143,6 +154,7 @@ export function getMatchupColor(v: number | string | null): string {
     if (u === "FAVOURABLE") return "text-emerald-400";
     if (u === "NEUTRAL") return "text-white/50";
     if (u === "DIFFICULT") return "text-orange-400";
+    if (u === "TOUGH") return "text-orange-400";
     if (u === "BRUTAL") return "text-red-400";
     return "text-white/40";
   }
@@ -395,8 +407,8 @@ export function computeKpiTiles(rows: RankingRow[]) {
     : null;
 
   const valueUpgrades = rows.filter((r) => (r.value_score ?? 0) >= 120).length;
-  const trapAlerts = rows.filter((r) => (r.risk_rating ?? 0) >= 60).length;
-  const highConfidence = rows.filter((r) => (r.projection_confidence ?? 0) >= 85).length;
+  const trapAlerts = rows.filter((r) => (r.risk_rating ?? 0) >= 55).length;
+  const highConfidence = rows.filter((r) => (r.projection_confidence ?? 0) >= 65).length;
 
   return { captainAvgProj, valueUpgrades, trapAlerts, highConfidence };
 }
