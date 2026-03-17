@@ -22,16 +22,16 @@ export interface RankingRow {
   value_tag: string | null;
   value_tier: string | null;
   ai_recommendation: string | null;
-  ai_summary: string | null;
+  recommendation_strength: string | null;
   ai_updated_at: string | null;
-  recommendation_short: string | null;
-  recommendation_why: string | null;
   recommendation_color: string | null;
   consistency_tier: string | null;
   total_count: number | null;
   games_played: number | null;
-  signal: string | null;
-  analysis: string | null;
+  /** WHY column — short 1-sentence summary (maps to recommendation_short) */
+  short: string | null;
+  /** Modal extended analysis — full AI paragraph (maps to recommendation_why / ai_summary) */
+  long: string | null;
 }
 
 export interface ScoreHistoryPoint {

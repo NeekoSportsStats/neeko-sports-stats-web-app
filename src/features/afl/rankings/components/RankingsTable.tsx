@@ -221,8 +221,7 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
         {locked("recommendation_why") ? (
           <LockedCell onClick={onUpgrade} />
         ) : (() => {
-          const whyText = row.recommendation_why ?? row.recommendation_short ?? null;
-          if (!whyText) return <span className="text-white/20 text-xs">—</span>;
+          const whyText = row.short ?? "Hold based on current projections";
           return (
             <span className="text-xs text-white/60 leading-snug block line-clamp-2 max-w-[260px]">{whyText}</span>
           );

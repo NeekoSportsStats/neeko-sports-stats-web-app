@@ -22,7 +22,7 @@ import {
   getCaptainStyle, getValueTagStyle, getNeekoRatingBadge, getRiskBadge,
   getConsistencyBadge, getConfidenceColor, getValueScoreColor,
   getFormColor, getMatchupColor, getUpsideColor, getRiskColor,
-  sharpenAIText, resolveRecommendationColor, safeWhyText, isAITextStale,
+  sharpenAIText, resolveRecommendationColor, isAITextStale,
 } from "./helpers";
 
 // ─── InfoTooltip ──────────────────────────────────────────────────────────────
@@ -469,11 +469,11 @@ export function PlayerDetailModal({
 }) {
   const aiAnalysis = useMemo(() => {
     if (!isPremium) return null;
-    const analysis = row.ai_summary ?? row.analysis ?? null;
+    const analysis = row.long ?? null;
     const captain_recommendation = row.captain_rating ?? null;
     if (!analysis) return null;
     return { analysis, captain_recommendation };
-  }, [row.ai_summary, row.analysis, row.captain_rating, isPremium]);
+  }, [row.long, row.captain_rating, isPremium]);
   const loadingAI = false;
 
   useBodyScrollLock(true);
@@ -650,21 +650,9 @@ export function PlayerDetailModal({
               <p className="text-base font-bold mb-2" style={{ color: recColor }}>
                 {row.ai_recommendation}
               </p>
-              {(() => {
-                const safeText = safeWhyText({
-                  recommendation_short: row.recommendation_short,
-                  recommendation_why: row.recommendation_why,
-                  ai_recommendation: row.ai_recommendation,
-                  projection_final: row.projection_final,
-                  value_score: row.value_score,
-                  risk_rating: row.risk_rating,
-                  projection_confidence: row.projection_confidence,
-                  price: row.price,
-                });
-                return safeText ? (
-                  <p className="text-sm text-white/70 leading-relaxed">{safeText}</p>
-                ) : null;
-              })()}
+              {row.short && (
+                <p className="text-sm text-white/70 leading-relaxed">{row.short}</p>
+              )}
             </div>
           )}
 
@@ -816,7 +804,7 @@ export function PlayerDetailModal({
           {/* 7. Extended Analysis */}
           {unlocked ? (() => {
             const aiCtx = { riskRating: row.risk_rating ?? null, confidence: row.projection_confidence ?? null };
-            const rawExtended = aiAnalysis?.analysis ?? row.ai_summary;
+            const rawExtended = row.long ?? aiAnalysis?.analysis ?? null;
             const extendedText = sharpenAIText(rawExtended, aiCtx);
             const showExtended = !loadingAI && extendedText && extendedText !== "Model analysis is currently generating.";
             const isStale = isAITextStale(rawExtended, {
