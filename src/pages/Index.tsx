@@ -37,6 +37,7 @@ interface AccuracyExampleRow {
   error:         number;
   accuracy_tier: "ELITE" | "STRONG";
   round_label:   string;
+  neeko_rank?:   number | null;
 }
 
 interface EdgeRow {
@@ -786,13 +787,13 @@ function EdgeBoardPreview() {
       const built: EdgeSignal[] = [];
 
       if (captain) {
-        built.push({ type: "captain", label: "Captain Edge", desc: "Top projection with high ceiling and confidence.", accentColor: "#F5C84C", icon: Crown, row: captain, rank: captain._rank });
+        built.push({ type: "captain", label: "Captain Lock", desc: "Top projection with high ceiling and confidence.", accentColor: "#F5C84C", icon: Crown, row: captain, rank: captain._rank });
       }
       if (breakout) {
-        built.push({ type: "breakout", label: "Breakout Play", desc: "High upside relative to projection.", accentColor: "#34d399", icon: TrendingUp, row: breakout, rank: breakout._rank });
+        built.push({ type: "breakout", label: "Must Have Value", desc: "High upside relative to projection — strong value play.", accentColor: "#34d399", icon: TrendingUp, row: breakout, rank: breakout._rank });
       }
       if (trap) {
-        built.push({ type: "trap", label: "Trap Alert", desc: "Highly ranked player with lower confidence.", accentColor: "#f87171", icon: AlertTriangle, row: trap, rank: trap._rank });
+        built.push({ type: "trap", label: "Do Not Start", desc: "High-ranked player with low confidence — fade this week.", accentColor: "#f87171", icon: AlertTriangle, row: trap, rank: trap._rank });
       }
 
       setSignals(built);
@@ -1020,7 +1021,14 @@ function OutcomeProofSection() {
 
   useEffect(() => {
     (async () => {
-      const { data: raw } = await supabase.rpc("get_projection_accuracy_examples", { limit_n: 3 });
+      const { data: raw } = await supabase
+        .from("v_projection_accuracy_homepage")
+        .select("player_name,team_name,projection,actual_score,error,accuracy_tier,round_label,neeko_rank")
+        .lte("neeko_rank", 20)
+        .gte("error", 2)
+        .lte("error", 10)
+        .order("neeko_rank", { ascending: true })
+        .limit(3);
       setRows((raw ?? []) as AccuracyExampleRow[]);
       setLoading(false);
     })();
@@ -1054,14 +1062,19 @@ function OutcomeProofSection() {
             : rows.length > 0
               ? rows.map((r, i) => {
                   const err    = Number(r.error);
-                  const errStr = err < 1 ? "< 1 pt" : `${err.toFixed(1)} pt${err.toFixed(1) === "1.0" ? "" : "s"}`;
+                  const errStr = err < 1 ? "< 1 pt" : `${Math.round(err)} pt${Math.round(err) === 1 ? "" : "s"}`;
                   const badge  = accuracyBadge(r.accuracy_tier);
                   return (
                     <div
                       key={`${r.player_name}-${i}`}
                       className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-white/[0.12] transition-all"
                     >
-                      <p className="text-base font-bold text-white leading-tight mb-0.5">{r.player_name}</p>
+                      <div className="flex items-start justify-between mb-0.5">
+                        <p className="text-base font-bold text-white leading-tight">{r.player_name}</p>
+                        {r.neeko_rank != null && (
+                          <span className="text-[10px] font-semibold text-[#F5C84C]/60 tabular-nums shrink-0 ml-2">#{r.neeko_rank}</span>
+                        )}
+                      </div>
                       <p className="text-xs text-white/35 mb-4">{r.team_name}</p>
 
                       <div className="space-y-2 mb-4">
@@ -1168,18 +1181,17 @@ function RankingsPreview() {
 
         {/* Desktop table */}
         <div className="hidden md:block rounded-2xl border border-white/[0.07] overflow-hidden">
-          <div className="grid grid-cols-[2rem_1fr_5rem_6rem_7rem] gap-x-4 px-5 py-3 text-[10px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
+          <div className="grid grid-cols-[2rem_1fr_5rem_7rem] gap-x-4 px-5 py-3 text-[10px] font-semibold text-white/25 uppercase tracking-widest border-b border-white/[0.06] bg-[#0a0a0a]">
             <span>#</span>
             <span>Player</span>
             <span className="text-center text-[#F5C84C]/60">Projection</span>
-            <span className="text-center">Confidence</span>
             <span className="text-right">Value</span>
           </div>
 
           {loading
             ? Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="animate-pulse grid grid-cols-[2rem_1fr_5rem_6rem_7rem] gap-x-4 px-5 py-4 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0">
-                  {Array.from({ length: 5 }).map((__, j) => (
+                <div key={i} className="animate-pulse grid grid-cols-[2rem_1fr_5rem_7rem] gap-x-4 px-5 py-4 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0">
+                  {Array.from({ length: 4 }).map((__, j) => (
                     <div key={j} className="h-4 bg-white/[0.06] rounded" />
                   ))}
                 </div>
@@ -1188,10 +1200,9 @@ function RankingsPreview() {
               ? (
                 <>
                   {rows.map((row, idx) => {
-                    const conf = confLabel(row.projection_confidence);
                     const val  = valueLabel(row.value_tag, row.value_score);
                     return (
-                      <div key={idx} className="grid grid-cols-[2rem_1fr_5rem_6rem_7rem] gap-x-4 px-5 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors last:border-0 items-center">
+                      <div key={idx} className="grid grid-cols-[2rem_1fr_5rem_7rem] gap-x-4 px-5 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] hover:bg-[#111] transition-colors last:border-0 items-center">
                         <span className="text-xs text-white/25 font-mono">{idx + 1}</span>
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-white truncate leading-tight">{row.player_name}</p>
@@ -1200,16 +1211,6 @@ function RankingsPreview() {
                         <span className="text-sm font-bold text-[#F5C84C] text-center tabular-nums">
                           {row.projection_final != null ? Math.round(row.projection_final) : "—"}
                         </span>
-                        <div className="flex justify-center">
-                          {conf.label === "—"
-                            ? <span className="text-xs text-white/30">—</span>
-                            : (
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${conf.bg} ${conf.border} ${conf.textColor}`}>
-                                {conf.label}
-                              </span>
-                            )
-                          }
-                        </div>
                         <div className="flex justify-end">
                           {val.label === "—"
                             ? <span className="text-xs text-white/30">—</span>
@@ -1225,7 +1226,7 @@ function RankingsPreview() {
                   })}
 
                   {[6, 7].map((rank) => (
-                    <div key={rank} className="grid grid-cols-[2rem_1fr_5rem_6rem_7rem] gap-x-4 px-5 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0 items-center select-none">
+                    <div key={rank} className="grid grid-cols-[2rem_1fr_5rem_7rem] gap-x-4 px-5 py-3.5 border-b border-white/[0.04] bg-[#0c0c0c] last:border-0 items-center select-none">
                       <span className="text-xs text-white/15 font-mono">{rank}</span>
                       <div className="flex items-center gap-2">
                         <Lock size={11} className="text-white/20 shrink-0" />
@@ -1234,7 +1235,6 @@ function RankingsPreview() {
                           Neeko+
                         </span>
                       </div>
-                      <span className="text-xs text-white/15 text-center blur-[3px]">—</span>
                       <span className="text-xs text-white/15 text-center blur-[3px]">—</span>
                       <span className="text-xs text-white/15 text-right blur-[3px]">—</span>
                     </div>

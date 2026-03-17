@@ -429,7 +429,7 @@ export const TAB_DESCRIPTIONS: Record<RankingsTab, string> = {
 
 // ─── Gating constants ──────────────────────────────────────────────────────────
 
-export const FREE_FULL_ROWS = 5;
+export const FREE_FULL_ROWS = 8;
 export const FREE_PARTIAL_ROWS = 15;
 
 export function getFreeTier(idx: number): "full" | "partial" | "locked" {

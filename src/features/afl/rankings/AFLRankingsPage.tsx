@@ -180,7 +180,7 @@ const FREE_COLUMNS =
   "projection_final,ceiling,floor," +
   "consistency,form_score,neeko_rating,neeko_rating_scaled,price,value_score,best_value_score,value_tag,value_tier," +
   "projection_confidence,risk_rating,matchup_rating,matchup_label,matchup_multiplier," +
-  "ai_recommendation,recommendation_strength,recommendation_color,recommendation_short," +
+  "ai_recommendation,recommendation_strength,recommendation_color,recommendation_short,recommendation_why,ai_summary," +
   "consistency_tier,access_tier,total_count,cached_at,games_played,row_rank," +
   "start_sit_decision,edge_score,edge_tier,market_watch_category";
 

@@ -1004,17 +1004,6 @@ export default function AFLRoundEdgeBoard() {
   const [error, setError] = useState<string | null>(null);
   const [accuracy, setAccuracy] = useState<number | null>(null);
 
-  // My team personalisation (localStorage)
-  const [myTeam, setMyTeam] = useState<string>(() => {
-    try { return localStorage.getItem("neeko_my_team") ?? ""; } catch { return ""; }
-  });
-
-  function handleSetTeam(team: string) {
-    setMyTeam(team);
-    try { if (team) localStorage.setItem("neeko_my_team", team); else localStorage.removeItem("neeko_my_team"); } catch { /* no-op */ }
-    if (team) track("edge_board_team_connect", { team });
-  }
-
   // Modal state
   const [activeModal, setActiveModal] = useState<{ row: RankingRow; section: Section } | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -1159,9 +1148,6 @@ export default function AFLRoundEdgeBoard() {
             <RoundLockCountdown />
           </div>
         </div>
-
-        {/* ── My Team Edge ─────────────────────────────────────────────────── */}
-        <MyTeamEdge myTeam={myTeam || null} onSetTeam={handleSetTeam} rows={rows} />
 
         {/* ── Hero Picks ───────────────────────────────────────────────────── */}
         {heroPicks.length > 0 && (
