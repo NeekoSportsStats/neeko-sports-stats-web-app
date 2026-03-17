@@ -8,46 +8,41 @@ const corsHeaders = {
 };
 
 const BATCH_SIZE = 5;
-const MAX_PLAYERS_PER_RUN = 20;
-const MAX_ATTEMPTS = 3;
+const DEFAULT_MAX_PLAYERS = 20;
 
-interface PlayerJob {
-  id: number;
-  player_id: number;
-  player_name: string;
-  team: string;
-  projection_final: number | null;
-  input_hash: string | null;
+const SYSTEM_PROMPT = `You are Neeko, an elite AFL fantasy analyst. You write sharp, confident, data-driven player assessments for fantasy coaches.
+
+Your analysis must:
+- Be direct and decisive — no hedging
+- Focus on fantasy scoring potential for the upcoming round
+- Reference the player's projection, form trend, matchup quality, and value tier
+- End with a clear recommendation: STRONG BUY, BUY, HOLD, SELL, or AVOID
+
+Format your response as JSON:
+{
+  "recommendation": "STRONG BUY | BUY | HOLD | SELL | AVOID",
+  "confidence": <number 0-100>,
+  "summary_short": "<one punchy sentence, max 120 chars>",
+  "summary_long": "<2-3 sentence analysis referencing projection, form, matchup, value. Max 280 chars>"
 }
 
-interface PromptRecord {
-  system_prompt: string;
-  user_prompt_template: string;
+Rules:
+- recommendation must be exactly one of: STRONG BUY, BUY, HOLD, SELL, AVOID
+- confidence is your certainty in the recommendation (not the player's reliability)
+- summary_short: single sentence, punchy, no fluff
+- summary_long: factual, reference specific numbers from the data
+- Return ONLY valid JSON, no markdown, no explanation`;
+
+interface AIResult {
+  recommendation: string;
+  confidence: number;
+  summary_short: string;
+  summary_long: string;
 }
 
-async function loadPrompt(
-  supabase: ReturnType<typeof createClient>,
-  promptKey: string
-): Promise<PromptRecord | null> {
-  const { data, error } = await supabase
-    .schema("afl")
-    .from("ai_prompts")
-    .select("system_prompt, user_prompt_template")
-    .eq("prompt_key", promptKey)
-    .eq("is_active", true)
-    .order("version", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+async function callOpenAI(openaiKey: string, playerData: Record<string, unknown>): Promise<AIResult | null> {
+  const userContent = `Analyse this AFL player for fantasy this round:\n${JSON.stringify(playerData, null, 2)}`;
 
-  if (error || !data) return null;
-  return data as PromptRecord;
-}
-
-async function callOpenAI(
-  openaiKey: string,
-  systemPrompt: string,
-  userContent: string
-): Promise<string | null> {
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -57,11 +52,12 @@ async function callOpenAI(
     body: JSON.stringify({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userContent },
       ],
-      temperature: 0.4,
-      max_tokens: 400,
+      temperature: 0.35,
+      max_tokens: 350,
+      response_format: { type: "json_object" },
     }),
   });
 
@@ -71,7 +67,14 @@ async function callOpenAI(
   }
 
   const json = await res.json();
-  return json.choices?.[0]?.message?.content?.trim() ?? null;
+  const content = json.choices?.[0]?.message?.content?.trim();
+  if (!content) return null;
+
+  const parsed = JSON.parse(content);
+  const validRecs = ["STRONG BUY", "BUY", "HOLD", "SELL", "AVOID"];
+  if (!validRecs.includes(parsed.recommendation)) parsed.recommendation = "HOLD";
+  parsed.confidence = Math.min(100, Math.max(0, Number(parsed.confidence) || 65));
+  return parsed as AIResult;
 }
 
 Deno.serve(async (req: Request) => {
@@ -93,23 +96,22 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    let limitPlayers = DEFAULT_MAX_PLAYERS;
+    try {
+      const body = await req.json().catch(() => ({}));
+      if (body?.limit_players && Number(body.limit_players) > 0) {
+        limitPlayers = Number(body.limit_players);
+      }
+    } catch (_) { /* no body fine */ }
+
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const promptKey = "player_ranking_recommendation_v12";
-
-    const prompt = await loadPrompt(supabase, promptKey);
-    if (!prompt) {
-      return new Response(
-        JSON.stringify({ ok: false, error: `No active prompt for key: ${promptKey}` }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
+    // Read from the input view — only players without existing analysis
     const { data: players, error: fetchErr } = await supabase
       .from("v_ai_player_analysis_input")
-      .select("player_id, player_name, team, projection_final, input_hash")
+      .select("player_id, player_name, team, position, price, projection_final, ceiling, floor, risk, confidence, consistency, value_score, matchup_rating, venue_multiplier, rest_days, form_score, form_momentum, neeko_rating, season_avg, last3_avg, last5_avg, last10_avg, opponent_name, is_home, venue, volatility_score, stability_score, ceiling_hit_rate, floor_bust_rate, breakout_probability, input_hash")
       .is("analysis", null)
-      .limit(MAX_PLAYERS_PER_RUN);
+      .limit(limitPlayers);
 
     if (fetchErr) throw fetchErr;
 
@@ -122,63 +124,59 @@ Deno.serve(async (req: Request) => {
 
     let processed = 0;
     let failed = 0;
+    const errors: string[] = [];
 
     for (let i = 0; i < players.length; i += BATCH_SIZE) {
-      const batch = (players as PlayerJob[]).slice(i, i + BATCH_SIZE);
+      const batch = players.slice(i, i + BATCH_SIZE);
 
-      for (const player of batch) {
+      await Promise.all(batch.map(async (player) => {
         try {
-          const { data: inputRow } = await supabase
-            .from("v_ai_player_analysis_input")
-            .select("*")
-            .eq("player_id", player.player_id)
-            .maybeSingle();
+          let result: AIResult;
 
-          if (!inputRow) continue;
-
-          const userContent = prompt.user_prompt_template
-            .replace("{DATA}", JSON.stringify(inputRow, null, 2))
-            .replace("{LABEL}", "HOLD");
-
-          let analysis = "";
           if (openaiKey) {
-            analysis = (await callOpenAI(openaiKey, prompt.system_prompt, userContent)) ?? "";
+            const parsed = await callOpenAI(openaiKey, player);
+            if (!parsed) return;
+            result = parsed;
           } else {
-            analysis = `[mock] Player ${player.player_name} analysis`;
+            result = {
+              recommendation: "HOLD",
+              confidence: 65,
+              summary_short: `${player.player_name} — mock (no OpenAI key)`,
+              summary_long: `Projected ${player.projection_final} for the upcoming round. Mock analysis — configure OPENAI_API_KEY.`,
+            };
           }
 
-          if (analysis && analysis.length >= 10) {
-            await supabase
-              .from("ai_player_content")
-              .upsert(
-                {
-                  player_id: player.player_id,
-                  summary: analysis,
-                  input_hash: player.input_hash,
-                  prompt_version: promptKey,
-                  generated_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                },
-                { onConflict: "player_id" }
-              );
-            processed++;
-          }
+          // Write via public RPC bridge (avoids ai schema PostgREST exposure issue)
+          const { error: rpcErr } = await supabase.rpc("upsert_player_ai_analysis", {
+            p_player_id:      player.player_id,
+            p_recommendation: result.recommendation,
+            p_confidence:     result.confidence,
+            p_summary_short:  result.summary_short,
+            p_summary_long:   result.summary_long,
+            p_model:          "gpt-4o-mini",
+            p_input_hash:     player.input_hash ?? null,
+          });
+
+          if (rpcErr) throw rpcErr;
+          processed++;
         } catch (err) {
-          console.error(`[generate-player-ai] player ${player.player_id} failed:`, err);
+          const msg = err instanceof Error ? err.message : JSON.stringify(err);
+          console.error(`[generate-player-ai] player ${player.player_id} failed:`, msg);
+          errors.push(`${player.player_id}: ${msg}`);
           failed++;
-          if (failed >= MAX_ATTEMPTS) break;
         }
-      }
+      }));
     }
 
     return new Response(
-      JSON.stringify({ ok: true, processed, failed }),
+      JSON.stringify({ ok: true, processed, failed, total_pending: players.length, errors: errors.slice(0, 5) }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("[generate-player-ai] fatal error:", err);
+    const msg = err instanceof Error ? err.message : JSON.stringify(err);
+    console.error("[generate-player-ai] fatal error:", msg);
     return new Response(
-      JSON.stringify({ error: "Internal server error" }),
+      JSON.stringify({ error: "Internal server error", detail: msg }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
