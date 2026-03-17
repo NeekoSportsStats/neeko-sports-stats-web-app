@@ -192,9 +192,9 @@ export function getConfidenceColor(v: number | null): string {
 
 export function getValueScoreColor(v: number | null): string {
   if (v == null) return "text-white/30";
-  if (v >= 110) return "text-green-400";
-  if (v >= 100) return "text-[#F5C84C]";
-  if (v >= 90) return "text-white/50";
+  if (v >= 5.5) return "text-green-400";
+  if (v >= 4.0) return "text-[#F5C84C]";
+  if (v >= 2.5) return "text-white/50";
   return "text-red-400";
 }
 
@@ -401,12 +401,14 @@ export function resolveRecommendationColor(
 export function computeKpiTiles(rows: RankingRow[]) {
   const captainRows = rows
     .filter((r) => r.captain_rating === "Elite Captain" || r.captain_rating === "Strong Captain")
+    .sort((a, b) => (b.projection_final ?? 0) - (a.projection_final ?? 0))
     .slice(0, 5);
   const captainAvgProj = captainRows.length
     ? captainRows.reduce((s, r) => s + (r.projection_final ?? 0), 0) / captainRows.length
     : null;
 
-  const valueUpgrades = rows.filter((r) => (r.value_score ?? 0) >= 105).length;
+  // value_score scale: >= 5.5 = ELITE VALUE, >= 4.0 = STRONG VALUE
+  const valueUpgrades = rows.filter((r) => (r.value_score ?? 0) >= 4.0).length;
   const trapAlerts = rows.filter((r) =>
     (r.value_tag ?? "").toUpperCase() === "OVERPRICED" ||
     (r.risk_rating ?? 0) >= 65 ||
@@ -471,7 +473,7 @@ export function generateMetricFallbackWhy(row: {
   const val = row.value_score;
 
   if (rec === "BUY") {
-    if (val != null && val >= 110) return `Strong value pick. Projects ${Math.round(proj)} with manageable risk.`;
+    if (val != null && val >= 5.5) return `Strong value pick. Projects ${Math.round(proj)} with manageable risk.`;
     return `Good projection of ${Math.round(proj)} and solid confidence back this selection.`;
   }
   if (rec === "START") {
@@ -479,7 +481,7 @@ export function generateMetricFallbackWhy(row: {
     return `Solid projection of ${Math.round(proj)} supports starting this week.`;
   }
   if (rec === "SELL") {
-    if (val != null && val <= 80) return `Overpriced relative to projection of ${Math.round(proj)}. Consider selling.`;
+    if (val != null && val <= 2.0) return `Overpriced relative to projection of ${Math.round(proj)}. Consider selling.`;
     return `Low projection with elevated price suggests this is a sell candidate.`;
   }
   if (rec === "SIT") {

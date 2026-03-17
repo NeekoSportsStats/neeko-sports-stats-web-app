@@ -12,30 +12,22 @@ const DEFAULT_MAX_PLAYERS = 20;
 
 const SYSTEM_PROMPT = `You are Neeko, an elite AFL fantasy analyst. You write sharp, confident, data-driven player assessments for fantasy coaches.
 
-Your analysis must:
-- Be direct and decisive — no hedging
-- Focus on fantasy scoring potential for the upcoming round
-- Reference the player's projection, form trend, matchup quality, and value tier
-- End with a clear recommendation: STRONG BUY, BUY, HOLD, SELL, or AVOID
+Your job is to write explanatory analysis ONLY — the system separately determines the BUY/HOLD/SELL signal. Do NOT include any trade recommendation.
 
 Format your response as JSON:
 {
-  "recommendation": "STRONG BUY | BUY | HOLD | SELL | AVOID",
-  "confidence": <number 0-100>,
-  "summary_short": "<one punchy sentence, max 120 chars>",
-  "summary_long": "<2-3 sentence analysis referencing projection, form, matchup, value. Max 280 chars>"
+  "summary_short": "<one punchy sentence, max 120 chars — the single most important insight about this player right now>",
+  "summary_long": "<3-5 sentences of deeper analysis covering: current form trajectory, projection vs price value, matchup context, risk factors, and a specific fantasy insight. Reference actual numbers.>"
 }
 
 Rules:
-- recommendation must be exactly one of: STRONG BUY, BUY, HOLD, SELL, AVOID
-- confidence is your certainty in the recommendation (not the player's reliability)
-- summary_short: single sentence, punchy, no fluff
-- summary_long: factual, reference specific numbers from the data
-- Return ONLY valid JSON, no markdown, no explanation`;
+- Do NOT include recommendation, BUY, SELL, HOLD, or any trade signal
+- summary_short: single punchy sentence, lead with the player name, quote key numbers (e.g. "Sheezel is scorching — 130+ avg over his last 3 and facing a soft DEF matchup")
+- summary_long: factual analyst voice, reference projection/ceiling/floor/form/value numbers from the data
+- Write in confident present tense, no hedging phrases like "it may be worth" or "based on the data"
+- Return ONLY valid JSON, no markdown, no explanation outside the JSON`;
 
 interface AIResult {
-  recommendation: string;
-  confidence: number;
   summary_short: string;
   summary_long: string;
 }
@@ -71,9 +63,8 @@ async function callOpenAI(openaiKey: string, playerData: Record<string, unknown>
   if (!content) return null;
 
   const parsed = JSON.parse(content);
-  const validRecs = ["STRONG BUY", "BUY", "HOLD", "SELL", "AVOID"];
-  if (!validRecs.includes(parsed.recommendation)) parsed.recommendation = "HOLD";
-  parsed.confidence = Math.min(100, Math.max(0, Number(parsed.confidence) || 65));
+  if (!parsed.summary_short) parsed.summary_short = "";
+  if (!parsed.summary_long) parsed.summary_long = "";
   return parsed as AIResult;
 }
 
@@ -141,19 +132,15 @@ Deno.serve(async (req: Request) => {
             result = parsed;
           } else {
             result = {
-              recommendation: "HOLD",
-              confidence: 65,
-              summary_short: `${player.player_name} — mock (no OpenAI key)`,
-              summary_long: `Projected ${player.projection_final} for the upcoming round. Mock analysis — configure OPENAI_API_KEY.`,
+              summary_short: `${player.player_name} projecting ${player.projection_final} pts — mock analysis (no OpenAI key configured)`,
+              summary_long: `Projected ${player.projection_final} pts for the upcoming round. Mock analysis — configure OPENAI_API_KEY to enable real AI insights.`,
             };
           }
 
-          // Write result + store the live input_hash so future runs can skip this player
-          // if inputs have not changed since this generation.
           const { error: rpcErr } = await supabase.rpc("upsert_player_ai_analysis", {
             p_player_id:      player.player_id,
-            p_recommendation: result.recommendation,
-            p_confidence:     result.confidence,
+            p_recommendation: "HOLD",
+            p_confidence:     65,
             p_summary_short:  result.summary_short,
             p_summary_long:   result.summary_long,
             p_model:          "gpt-4o-mini",

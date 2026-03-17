@@ -170,18 +170,19 @@ const LOAD_MORE_STEP = 50;
 
 const PREMIUM_COLUMNS =
   "player_id,player_name,team,team_name,position,position_group," +
-  "projection_final,ceiling_estimate,floor_estimate," +
-  "consistency_score,form_rating,neeko_rating,price,value_score,best_value_score,value_tag,value_tier," +
-  "signal,projection_confidence,risk_rating,matchup_rating," +
+  "projection_final,ceiling,floor," +
+  "consistency,form_score,neeko_rating,price,value_score,best_value_score,value_tag,value_tier," +
+  "projection_confidence,risk_rating,matchup_rating,matchup_label,matchup_multiplier," +
   "upside_rating,captain_score,captain_rating,ai_recommendation,recommendation_color," +
-  "recommendation_short,recommendation_why,consistency_tier,total_count,cached_at,games_played,ai_updated_at";
+  "recommendation_short,recommendation_why,ai_summary,consistency_tier,total_count,cached_at,games_played,ai_updated_at";
 
 const FREE_COLUMNS =
   "player_id,player_name,team,team_name,position,position_group," +
-  "projection_final,ceiling_estimate,floor_estimate," +
-  "consistency_score,form_rating,neeko_rating,price,value_score,best_value_score,value_tag,value_tier," +
-  "signal,projection_confidence,risk_rating,matchup_rating," +
-  "upside_rating,captain_score,captain_rating,summary,analysis,consistency_tier,total_count,cached_at,games_played";
+  "projection_final,ceiling,floor," +
+  "consistency,form_score,neeko_rating,price,value_score,best_value_score,value_tag,value_tier," +
+  "projection_confidence,risk_rating,matchup_rating,matchup_label,matchup_multiplier," +
+  "ai_recommendation,recommendation_color,recommendation_short," +
+  "consistency_tier,access_tier,total_count,cached_at,games_played,row_rank";
 
 const AI_COLUMNS =
   "player_id,recommendation_short,recommendation_why,ai_summary,ai_updated_at";
@@ -237,33 +238,33 @@ export default function AFLRankingsPage() {
       player_name:           r.player_name,
       team:                  r.team ?? r.team_name ?? "",
       position:              normalisePosition(r.position ?? r.position_group ?? null),
-      projection_final:      Number(r.projection_final ?? r.projection ?? 0),
-      ceiling_estimate:      Number(r.ceiling_estimate ?? r.ceiling ?? 0),
-      floor_estimate:        Number(r.floor_estimate ?? r.floor ?? 0),
-      consistency_score:     Number(r.consistency_score ?? r.consistency ?? 0),
-      form_rating:           Number(r.form_rating ?? r.form_score ?? 0),
-      neeko_rating:          Number(r.neeko_rating ?? 0),
-      projection_confidence: r.projection_confidence ?? null,
-      risk_rating:           r.risk_rating ?? null,
-      matchup_rating:        r.matchup_rating ?? null,
-      upside_rating:         r.upside_rating ?? null,
-      captain_score:         r.captain_score ?? null,
+      projection_final:      r.projection_final != null ? Number(r.projection_final) : null,
+      ceiling_estimate:      r.ceiling != null ? Number(r.ceiling) : (r.ceiling_estimate != null ? Number(r.ceiling_estimate) : null),
+      floor_estimate:        r.floor != null ? Number(r.floor) : (r.floor_estimate != null ? Number(r.floor_estimate) : null),
+      consistency_score:     r.consistency != null ? Number(r.consistency) : (r.consistency_score != null ? Number(r.consistency_score) : null),
+      form_rating:           r.form_score != null ? Number(r.form_score) : (r.form_rating != null ? Number(r.form_rating) : null),
+      neeko_rating:          r.neeko_rating != null ? Number(r.neeko_rating) : null,
+      projection_confidence: r.projection_confidence != null ? Number(r.projection_confidence) : null,
+      risk_rating:           r.risk_rating != null ? Number(r.risk_rating) : null,
+      matchup_rating:        r.matchup_label ?? r.matchup_rating ?? null,
+      upside_rating:         r.upside_rating != null ? Number(r.upside_rating) : null,
+      captain_score:         r.captain_score != null ? Number(r.captain_score) : null,
       captain_rating:        r.captain_rating ?? null,
-      price:                 r.price ?? null,
+      price:                 r.price != null ? Number(r.price) : null,
       value_score:           r.value_score != null ? Number(r.value_score) : null,
       best_value_score:      r.best_value_score != null ? Number(r.best_value_score) : null,
       value_tag:             r.value_tag ?? null,
       value_tier:            r.value_tier ?? null,
       ai_recommendation:     r.ai_recommendation ?? null,
-      ai_summary:            r.ai_summary ?? r.ai_summary_long ?? r.analysis ?? null,
+      ai_summary:            r.ai_summary ?? r.recommendation_why ?? null,
       signal:                r.signal ?? null,
-      analysis:              r.analysis ?? r.ai_summary ?? null,
+      analysis:              r.ai_summary ?? r.recommendation_why ?? null,
       ai_updated_at:         r.ai_updated_at ?? null,
-      recommendation_short:  r.recommendation_short ?? r.summary ?? null,
-      recommendation_why:    r.recommendation_why ?? null,
+      recommendation_short:  r.recommendation_short ?? null,
+      recommendation_why:    r.recommendation_why ?? r.ai_summary ?? null,
       recommendation_color:  r.recommendation_color ?? null,
       consistency_tier:      r.consistency_tier ?? null,
-      total_count:           r.total_count ?? null,
+      total_count:           r.total_count != null ? Number(r.total_count) : null,
       games_played:          r.games_played != null ? Number(r.games_played) : null,
     };
   }
@@ -274,13 +275,12 @@ export default function AFLRankingsPage() {
     if (view === "free") {
       const { data } = await supabase
         .from("v_rankings_free")
-        .select("player_id,summary,analysis")
+        .select("player_id,recommendation_short")
         .eq("player_id", row.player_id)
         .maybeSingle();
       if (!data) return {};
       return {
-        recommendation_short: (data as any).summary ?? row.recommendation_short,
-        ai_summary:           (data as any).analysis ?? row.ai_summary,
+        recommendation_short: (data as any).recommendation_short ?? row.recommendation_short,
       };
     }
     const { data } = await supabase
