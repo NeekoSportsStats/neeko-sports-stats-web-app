@@ -404,13 +404,11 @@ export default function StartSitPage() {
 
         {/* Social proof — only shown when no result is displayed */}
         {showSocialProof && (
-          <div className="mt-8">
-            <StartSitSocialProof
-              players={topPlayers}
-              onFillBoth={handleFillBoth}
-              onScrollToCompare={handleScrollToCompare}
-            />
-          </div>
+          <StartSitSocialProof
+            players={topPlayers}
+            onFillBoth={handleFillBoth}
+            onScrollToCompare={handleScrollToCompare}
+          />
         )}
       </div>
     </div>

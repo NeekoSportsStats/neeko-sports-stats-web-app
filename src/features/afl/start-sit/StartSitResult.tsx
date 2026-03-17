@@ -1,9 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  Crown, Lock, Zap, ChevronDown, ChevronUp,
-  Flame, TrendingUp, Target,
-  TriangleAlert as AlertTriangle, Percent, Swords,
-} from "lucide-react";
+import { Crown, Lock, Zap, ChevronDown, ChevronUp, Flame, TrendingUp, Target, CircleCheck as CheckCircle2, Circle as XCircle } from "lucide-react";
 import { StartProbabilityMeter } from "./StartProbabilityMeter";
 import { OutcomeDistributionChart } from "./OutcomeDistributionChart";
 
@@ -36,241 +32,135 @@ function fmt(v: number | null | undefined): string {
   return String(Math.round(v));
 }
 
-function getDecisionTag(confidence: number): { label: string; icon: React.ReactNode; color: string } {
-  if (confidence > 85) {
-    return { label: "Strong Start", icon: <Flame size={11} />, color: "text-orange-400 bg-orange-400/10 border-orange-400/20" };
-  }
-  if (confidence >= 70) {
-    return { label: "Solid Start", icon: <TrendingUp size={11} />, color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20" };
-  }
-  return { label: "Lean Start", icon: <Target size={11} />, color: "text-blue-400 bg-blue-400/10 border-blue-400/20" };
+function fmtDec(v: number | null | undefined, dp = 1): string {
+  if (v == null) return "—";
+  return Number(v).toFixed(dp);
 }
 
-function getInitials(name: string): string {
-  return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
-}
-
-interface CompareBarProps {
-  label: string;
-  aVal: number | null;
-  bVal: number | null;
-  winnerIsA: boolean;
-  large?: boolean;
-  animated: boolean;
-  dimmed?: boolean;
-}
-
-function CompareBar({ label, aVal, bVal, winnerIsA, large, animated, dimmed }: CompareBarProps) {
-  const a = aVal ?? 0;
-  const b = bVal ?? 0;
-  const max = Math.max(a, b, 1);
-  const aWins = a > b;
-  const bWins = b > a;
-
-  return (
-    <div className={`py-3 border-b border-white/[0.04] last:border-0 ${dimmed ? "opacity-40" : ""}`}>
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-2">{label}</p>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="flex flex-col items-end gap-1">
-          <span className={`font-bold tabular-nums ${large ? "text-xl" : "text-sm"} ${aWins ? "text-[#F5C84C]" : "text-white/40"}`}>
-            {aVal == null ? "—" : Math.round(aVal)}
-          </span>
-          <div className="w-full h-1.5 rounded-full bg-white/[0.06] overflow-hidden flex justify-end">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ease-out ${aWins ? "bg-[#F5C84C]" : "bg-white/20"}`}
-              style={{ width: animated ? `${(a / max) * 100}%` : "0%" }}
-            />
-          </div>
-        </div>
-        <div className="flex flex-col items-start gap-1">
-          <span className={`font-bold tabular-nums ${large ? "text-xl" : "text-sm"} ${bWins ? "text-[#F5C84C]" : "text-white/40"}`}>
-            {bVal == null ? "—" : Math.round(bVal)}
-          </span>
-          <div className="w-full h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ease-out ${bWins ? "bg-[#F5C84C]" : "bg-white/20"}`}
-              style={{ width: animated ? `${(b / max) * 100}%` : "0%" }}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+function getConfidenceStyle(conf: number): { label: string; icon: React.ReactNode; barColor: string; textColor: string } {
+  if (conf >= 85) return {
+    label: "Strong Lean",
+    icon: <Flame size={11} />,
+    barColor: "from-orange-500/70 to-orange-400",
+    textColor: "text-orange-400",
+  };
+  if (conf >= 70) return {
+    label: "Solid Pick",
+    icon: <TrendingUp size={11} />,
+    barColor: "from-emerald-500/70 to-emerald-400",
+    textColor: "text-emerald-400",
+  };
+  return {
+    label: "Lean Pick",
+    icon: <Target size={11} />,
+    barColor: "from-[#F5C84C]/70 to-[#F5C84C]",
+    textColor: "text-[#F5C84C]",
+  };
 }
 
 function buildAIBullets(aiSummary: string | null, winner: PlayerData, loser: PlayerData): string[] {
   const bullets: string[] = [];
-
-  const projW = winner.projection_final ?? 0;
-  const projL = loser.projection_final ?? 0;
-  const projDiff = projW - projL;
   const wName = winner.player_name.split(" ").pop() ?? winner.player_name;
   const lName = loser.player_name.split(" ").pop() ?? loser.player_name;
 
-  if (projDiff > 0) {
-    bullets.push(`Projection edge: ${wName} +${Math.round(projDiff)} pts (${Math.round(projW)} vs ${Math.round(projL)})`);
+  const projW = winner.projection_final ?? 0;
+  const projL = loser.projection_final ?? 0;
+  if (projW > projL) {
+    bullets.push(`Projection edge: ${wName} ${Math.round(projW)} vs ${lName} ${Math.round(projL)} (+${Math.round(projW - projL)} pts)`);
   }
 
   const floorW = winner.floor_estimate ?? 0;
   const floorL = loser.floor_estimate ?? 0;
-  const floorDiff = floorW - floorL;
-  if (floorDiff > 0) {
-    bullets.push(`Higher floor: ${Math.round(floorW)} vs ${Math.round(floorL)} — lower bust risk`);
+  if (floorW > floorL) {
+    bullets.push(`Stronger floor: ${Math.round(floorW)} vs ${Math.round(floorL)} — lower bust risk`);
   }
 
   const ceilW = winner.ceiling_estimate ?? 0;
   const ceilL = loser.ceiling_estimate ?? 0;
-  const ceilDiff = ceilW - ceilL;
-  if (ceilDiff > 0) {
-    bullets.push(`Ceiling upside: ${Math.round(ceilW)} vs ${Math.round(ceilL)} (+${Math.round(ceilDiff)} pts potential)`);
+  if (ceilW > ceilL) {
+    bullets.push(`Higher ceiling: ${Math.round(ceilW)} vs ${Math.round(ceilL)} (+${Math.round(ceilW - ceilL)} pts upside)`);
   }
 
   const nDiff = (winner.neeko_rating ?? 0) - (loser.neeko_rating ?? 0);
-  if (nDiff > 0) {
-    bullets.push(`Neeko Rating edge: ${(winner.neeko_rating ?? 0).toFixed(1)} vs ${(loser.neeko_rating ?? 0).toFixed(1)} (+${nDiff.toFixed(1)})`);
-  }
-
-  const confDiff = (winner.projection_confidence ?? 0) - (loser.projection_confidence ?? 0);
-  if (confDiff > 0) {
-    bullets.push(`Higher model confidence (+${Math.round(confDiff)}%)`);
+  if (nDiff > 0.5) {
+    bullets.push(`Neeko Rating: ${fmtDec(winner.neeko_rating)} vs ${fmtDec(loser.neeko_rating)} (+${fmtDec(nDiff)} edge)`);
   }
 
   if (aiSummary) {
-    const cleanedSummary = aiSummary
+    const skipKeywords = ["projection", "ceiling", "floor", "rating", "confidence", "neeko"];
+    const sentences = aiSummary
       .replace(/\n+/g, " ")
       .replace(/\s+/g, " ")
-      .trim();
-
-    const sentences = cleanedSummary
+      .trim()
       .split(/(?<=[.!?])\s+/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 40);
-
-    const duplicateKeywords = [
-      "projection",
-      "ceiling",
-      "floor",
-      "rating",
-      "confidence",
-      "probability",
-      "neeko"
-    ];
+      .map((s) => s.trim().replace(/^[-•]\s*/, ""))
+      .filter((s) => s.length > 30);
 
     for (const s of sentences) {
       if (bullets.length >= 4) break;
-
       const lower = s.toLowerCase();
-      if (duplicateKeywords.some((k) => lower.includes(k))) continue;
-
-      const cleaned = s
-        .replace(/\s+/g, " ")
-        .replace(/^[-•]\s*/, "")
-        .trim();
-
-      if (cleaned.length < 25) continue;
-      if (/^\d+(\.\d+)?$/.test(cleaned)) continue;
-
-      bullets.push(cleaned);
+      if (skipKeywords.some((k) => lower.includes(k))) continue;
+      bullets.push(s);
     }
   }
 
   return bullets.slice(0, 4);
 }
 
-function buildExplanation(winner: PlayerData, loser: PlayerData): string {
+function buildShortReason(winner: PlayerData, loser: PlayerData): string {
   const parts: string[] = [];
-
-  const projW = winner.projection_final ?? 0;
-  const projL = loser.projection_final ?? 0;
-  const projDiff = projW - projL;
-
-  const floorW = winner.floor_estimate ?? 0;
-  const floorL = loser.floor_estimate ?? 0;
-  const floorDiff = floorW - floorL;
-
-  const nW = winner.neeko_rating ?? 0;
-  const nL = loser.neeko_rating ?? 0;
-  const nDiff = nW - nL;
-
-  const confW = winner.projection_confidence ?? 0;
-  const confL = loser.projection_confidence ?? 0;
-  const confDiff = confW - confL;
-
   const wName = winner.player_name.split(" ").pop() ?? winner.player_name;
   const lName = loser.player_name.split(" ").pop() ?? loser.player_name;
-
-  if (projDiff > 0 && floorDiff > 0) {
-    parts.push(`${wName} projects higher (${Math.round(projW)} vs ${Math.round(projL)}) with a stronger floor (${Math.round(floorW)} vs ${Math.round(floorL)})`);
-  } else if (projDiff > 0) {
-    parts.push(`${wName} has a projection advantage of +${Math.round(projDiff)} pts over ${lName}`);
-  }
-
-  if (nDiff > 2) {
-    parts.push(`stronger Neeko Rating (${nW.toFixed(1)} vs ${nL.toFixed(1)})`);
-  }
-
-  if (confDiff > 5) {
-    parts.push(`higher model confidence (+${Math.round(confDiff)}%)`);
-  }
-
-  if (parts.length === 0) return `${wName} edges ${lName} across key model metrics this round.`;
-
-  const [first, ...rest] = parts;
-  if (rest.length === 0) return `${first}.`;
-  return `${first}, and ${rest.join(", ")}.`;
+  const projDiff = (winner.projection_final ?? 0) - (loser.projection_final ?? 0);
+  if (projDiff > 3) parts.push(`higher projection (+${Math.round(projDiff)} pts)`);
+  const nDiff = (winner.neeko_rating ?? 0) - (loser.neeko_rating ?? 0);
+  if (nDiff > 1) parts.push(`stronger Neeko Rating`);
+  const confDiff = (winner.projection_confidence ?? 0) - (loser.projection_confidence ?? 0);
+  if (confDiff > 5) parts.push(`higher model confidence`);
+  const floorDiff = (winner.floor_estimate ?? 0) - (loser.floor_estimate ?? 0);
+  if (floorDiff > 5) parts.push(`better floor protection`);
+  if (parts.length === 0) return `${wName} edges ${lName} on composite model metrics.`;
+  return parts.join(", ") + ".";
 }
 
-function buildTeaserLine(winner: PlayerData, loser: PlayerData): string {
-  return buildExplanation(winner, loser);
+interface MetricRowProps {
+  label: string;
+  aVal: string;
+  bVal: string;
+  aWins: boolean;
+  bWins: boolean;
+  animated: boolean;
+  aRaw: number;
+  bRaw: number;
 }
 
-function estimateRecentForm(p: PlayerData): { last3: number; last5: number } {
-  const proj = p.projection_final ?? 80;
-  const floor = p.floor_estimate ?? proj * 0.65;
-  const ceil = p.ceiling_estimate ?? proj * 1.35;
-  const risk = p.risk_rating ?? 5;
-  const spread = ceil - floor;
-  const variance = (spread / 4) * (risk / 5);
-  const last3 = Math.round(proj + variance * 0.3);
-  const last5 = Math.round(proj - variance * 0.1);
-  return { last3: Math.max(floor, last3), last5: Math.max(floor, last5) };
-}
-
-function deriveVolatilityLevel(p: PlayerData): "LOW" | "MEDIUM" | "HIGH" {
-  const ceilUpside = (p.ceiling_estimate ?? 0) - (p.projection_final ?? 0);
-  const risk = p.risk_rating ?? 0;
-  const score = Math.min(100, ceilUpside * (risk / 100));
-  if (score >= 70) return "HIGH";
-  if (score >= 40) return "MEDIUM";
-  return "LOW";
-}
-
-function calcBustRisk(p: PlayerData): number {
-  const mean = p.projection_final ?? 80;
-  const floor = p.floor_estimate ?? mean * 0.6;
-  const diff = mean - floor;
-  if (diff <= 0) return 10;
-  const zScore = (80 - mean) / Math.max(diff / 2, 5);
-  const prob = 50 * (1 + Math.tanh(zScore * 0.8));
-  return Math.max(3, Math.min(60, Math.round(prob)));
-}
-
-function calcOutscoreProb(a: PlayerData, b: PlayerData): { probA: number; probB: number } {
-  const scoreA =
-    (a.projection_final ?? 0) * 0.6 +
-    (a.ceiling_estimate ?? 0) * 0.2 +
-    (a.projection_confidence ?? 0) * 0.1 +
-    (a.neeko_rating ?? 0) * 0.1;
-  const scoreB =
-    (b.projection_final ?? 0) * 0.6 +
-    (b.ceiling_estimate ?? 0) * 0.2 +
-    (b.projection_confidence ?? 0) * 0.1 +
-    (b.neeko_rating ?? 0) * 0.1;
-  const total = scoreA + scoreB;
-  if (total === 0) return { probA: 50, probB: 50 };
-  const raw = Math.round((scoreA / total) * 100);
-  const clamped = Math.max(30, Math.min(70, raw));
-  return { probA: clamped, probB: 100 - clamped };
+function MetricRow({ label, aVal, bVal, aWins, bWins, animated, aRaw, bRaw }: MetricRowProps) {
+  const max = Math.max(Math.abs(aRaw), Math.abs(bRaw), 1);
+  return (
+    <div className="py-3 border-b border-white/[0.04] last:border-0">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-2.5">{label}</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col items-end gap-1.5">
+          <span className={`text-sm font-bold tabular-nums ${aWins ? "text-[#F5C84C]" : "text-white/40"}`}>{aVal}</span>
+          <div className="w-full h-1.5 rounded-full bg-white/[0.06] overflow-hidden flex justify-end">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${aWins ? "bg-gradient-to-l from-[#F5C84C] to-[#F5C84C]/60" : "bg-white/15"}`}
+              style={{ width: animated ? `${(Math.abs(aRaw) / max) * 100}%` : "0%" }}
+            />
+          </div>
+        </div>
+        <div className="flex flex-col items-start gap-1.5">
+          <span className={`text-sm font-bold tabular-nums ${bWins ? "text-[#F5C84C]" : "text-white/40"}`}>{bVal}</span>
+          <div className="w-full h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${bWins ? "bg-gradient-to-r from-[#F5C84C]/60 to-[#F5C84C]" : "bg-white/15"}`}
+              style={{ width: animated ? `${(Math.abs(bRaw) / max) * 100}%` : "0%" }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function StartSitResult({
@@ -287,7 +177,8 @@ export function StartSitResult({
   const [barsAnimated, setBarsAnimated] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setBarsAnimated(true), 200);
+    setBarsAnimated(false);
+    const t = setTimeout(() => setBarsAnimated(true), 150);
     return () => clearTimeout(t);
   }, [winnerPlayerId]);
 
@@ -295,116 +186,132 @@ export function StartSitResult({
   const winner = winnerIsA ? playerA : playerB;
   const loser = winnerIsA ? playerB : playerA;
   const isTossUp = !winnerPlayerId;
-  const tag = getDecisionTag(confidence);
+
+  const confStyle = getConfidenceStyle(confidence);
   const bullets = buildAIBullets(aiSummary, winner, loser);
-  const teaserLine = buildTeaserLine(winner, loser);
+  const shortReason = buildShortReason(winner, loser);
 
-  const formA = estimateRecentForm(playerA);
-  const formB = estimateRecentForm(playerB);
-  const volA = deriveVolatilityLevel(playerA);
-  const volB = deriveVolatilityLevel(playerB);
-  const volOrder = { LOW: 0, MEDIUM: 1, HIGH: 2 };
-  const saferPlayer = volOrder[volA] < volOrder[volB]
-    ? playerA.player_name.split(" ").pop()
-    : volOrder[volB] < volOrder[volA]
-      ? playerB.player_name.split(" ").pop()
-      : null;
+  const metrics: { label: string; aRaw: number; bRaw: number; fmt: (v: number) => string; lowerIsBetter?: boolean }[] = [
+    { label: "Projection", aRaw: playerA.projection_final ?? 0, bRaw: playerB.projection_final ?? 0, fmt: (v) => String(Math.round(v)) },
+    { label: "Ceiling", aRaw: playerA.ceiling_estimate ?? 0, bRaw: playerB.ceiling_estimate ?? 0, fmt: (v) => String(Math.round(v)) },
+    { label: "Floor", aRaw: playerA.floor_estimate ?? 0, bRaw: playerB.floor_estimate ?? 0, fmt: (v) => String(Math.round(v)) },
+    { label: "Neeko Rating", aRaw: playerA.neeko_rating ?? 0, bRaw: playerB.neeko_rating ?? 0, fmt: (v) => v.toFixed(1) },
+  ];
 
-  const bustA = calcBustRisk(playerA);
-  const bustB = calcBustRisk(playerB);
-  const { probA: outscoreA, probB: outscoreB } = calcOutscoreProb(playerA, playerB);
+  const premiumMetrics: { label: string; aRaw: number; bRaw: number; fmt: (v: number) => string; lowerIsBetter?: boolean }[] = [
+    { label: "Confidence %", aRaw: playerA.projection_confidence ?? 0, bRaw: playerB.projection_confidence ?? 0, fmt: (v) => `${Math.round(v)}%` },
+    { label: "Risk Rating", aRaw: playerA.risk_rating ?? 0, bRaw: playerB.risk_rating ?? 0, fmt: (v) => String(Math.round(v)), lowerIsBetter: true },
+  ];
 
   return (
-    <div className="space-y-4 mt-6 animate-in fade-in duration-500">
+    <div className="space-y-4 mt-6 animate-in fade-in duration-400">
 
-      {/* ─── VERDICT HERO ─── */}
-      <div className="rounded-2xl border border-[#F5C84C]/35 bg-gradient-to-br from-[#F5C84C]/[0.09] to-[#F5C84C]/[0.02] overflow-hidden">
-        <div className="px-5 pt-5 pb-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Zap size={13} className="text-[#F5C84C]" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#F5C84C]/70">
-              Model Verdict
-            </span>
-          </div>
-
-          {isTossUp ? (
-            <p className="text-2xl font-extrabold text-white">Toss Up</p>
-          ) : (
-            <>
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-2">
-                Start This Week
-              </p>
-              <p className="text-4xl font-extrabold text-[#F5C84C] leading-none tracking-tight">
-                {winner.player_name}
-              </p>
-              <p className="text-sm text-white/35 mt-2">
-                {winner.team}{winner.position ? ` · ${winner.position}` : ""}
-              </p>
-            </>
-          )}
-
-          {!isTossUp && (
-            <div className="mt-4 flex items-center gap-2.5">
-              <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${tag.color}`}>
-                {tag.icon}
-                {tag.label}
-              </span>
-              <span className="text-xs text-white/30">
-                {confidence}% confidence
+      {/* ─── HERO: START / SIT VERDICT ─── */}
+      <div className="rounded-2xl overflow-hidden border border-white/[0.08] bg-[#0d0d0d]">
+        {/* Two-column START/SIT */}
+        <div className="grid grid-cols-2 divide-x divide-white/[0.06]">
+          {/* START side */}
+          <div className={`px-5 py-5 ${winnerIsA || (!winnerIsA && !isTossUp && false) ? "" : ""}`}>
+            <div className="flex items-center gap-1.5 mb-3">
+              <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70">
+                Start
               </span>
             </div>
-          )}
+            <p className={`text-lg font-extrabold leading-tight ${winnerIsA ? "text-white" : "text-white"}`}>
+              {winner.player_name}
+            </p>
+            <p className="text-[11px] text-white/35 mt-1">
+              {winner.team}{winner.position ? ` · ${winner.position}` : ""}
+            </p>
+            {winner.projection_final != null && (
+              <p className="mt-2 text-[#F5C84C] font-bold text-sm">
+                {Math.round(winner.projection_final)} proj
+              </p>
+            )}
+          </div>
+
+          {/* SIT side */}
+          <div className="px-5 py-5 opacity-60">
+            <div className="flex items-center gap-1.5 mb-3">
+              <XCircle size={13} className="text-red-400 shrink-0" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-red-400/70">
+                Sit
+              </span>
+            </div>
+            <p className="text-lg font-extrabold leading-tight text-white/60">
+              {loser.player_name}
+            </p>
+            <p className="text-[11px] text-white/25 mt-1">
+              {loser.team}{loser.position ? ` · ${loser.position}` : ""}
+            </p>
+            {loser.projection_final != null && (
+              <p className="mt-2 text-white/30 font-bold text-sm">
+                {Math.round(loser.projection_final)} proj
+              </p>
+            )}
+          </div>
         </div>
 
-        <div className="px-5 pb-5">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] text-white/30 uppercase tracking-wider">Model Confidence</span>
-            <span className="text-sm font-bold text-white/80">{confidence}%</span>
+        {/* Confidence bar footer */}
+        <div className="border-t border-white/[0.06] px-5 py-3 flex items-center gap-3">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Zap size={11} className="text-[#F5C84C]" />
+            <span className={`text-[11px] font-semibold ${confStyle.textColor}`}>
+              {confidence}% confidence
+            </span>
           </div>
-          <div className="h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
+          <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-[#F5C84C]/70 to-[#F5C84C] transition-all duration-700"
+              className={`h-full rounded-full bg-gradient-to-r ${confStyle.barColor} transition-all duration-700`}
               style={{ width: `${confidence}%` }}
             />
           </div>
+          <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white/[0.05] border border-white/[0.08] ${confStyle.textColor}`}>
+            {confStyle.icon}
+            {confStyle.label}
+          </span>
         </div>
       </div>
 
-      {/* ─── UPGRADE TEASER (free users only, directly below verdict) ─── */}
-      {!isPremium && (
-        <div className="rounded-xl border border-[#F5C84C]/12 bg-[#F5C84C]/[0.025] overflow-hidden">
-          <div className="px-5 py-4">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-[#F5C84C]/40 mb-0.5">
-              Want deeper analysis?
-            </p>
-            <p className="text-sm font-bold text-white/55 mb-3">Unlock with Neeko+</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mb-4">
-              {[
-                "Bust risk analysis",
-                "Score distribution",
-                "Matchup modelling",
-                "Outscore probability",
-                "Model confidence %",
-                "Advanced AI reasoning",
-              ].map((item) => (
-                <div key={item} className="flex items-center gap-1.5 text-[11px] text-white/30">
-                  <span className="h-1 w-1 rounded-full bg-[#F5C84C]/30 shrink-0" />
-                  {item}
-                </div>
-              ))}
-            </div>
-            <button
-              onClick={onUpgrade}
-              className="w-full flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm py-3 rounded-xl hover:brightness-110 active:scale-[0.97] transition-all"
-            >
-              <Crown size={13} />
-              Upgrade to Neeko+
-            </button>
-          </div>
-        </div>
-      )}
+      {/* ─── WHY THIS DECISION ─── */}
+      <div className={`rounded-xl border px-5 py-4 ${isPremium ? "border-[#F5C84C]/15 bg-[#F5C84C]/[0.025]" : "border-white/[0.07] bg-white/[0.02]"}`}>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-2.5">
+          Why {winner.player_name.split(" ").pop()}
+        </p>
 
-      {/* ─── MODEL START PROBABILITY ─── */}
+        {isPremium ? (
+          bullets.length > 0 ? (
+            <ul className="space-y-2">
+              {bullets.map((b, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-sm text-white/70 leading-snug">
+                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-[#F5C84C]/50 shrink-0" />
+                  {b}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-white/50 leading-snug">{shortReason}</p>
+          )
+        ) : (
+          <>
+            <p className="text-sm text-white/55 leading-snug">{shortReason}</p>
+            <div className="mt-3 flex items-center gap-2 pt-3 border-t border-white/[0.06]">
+              <Lock size={10} className="text-white/20 shrink-0" />
+              <p className="text-xs text-white/30 flex-1">Full AI reasoning with Neeko+</p>
+              <button
+                onClick={onUpgrade}
+                className="shrink-0 flex items-center gap-1.5 bg-[#F5C84C] text-black font-bold text-[11px] px-3 py-1.5 rounded-lg hover:brightness-110 active:scale-[0.97] transition-all"
+              >
+                <Crown size={9} />
+                Upgrade
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ─── MODEL PROBABILITY ─── */}
       <StartProbabilityMeter
         playerA={playerA}
         playerB={playerB}
@@ -412,61 +319,10 @@ export function StartSitResult({
         confidence={confidence}
       />
 
-      {/* ─── PLAYER IDENTITY ROW ─── */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        {/* Player A */}
-        <div className={`flex flex-col items-center gap-2 rounded-xl border px-3 py-4 ${winnerIsA ? "border-[#F5C84C]/25 bg-[#F5C84C]/[0.05]" : "border-white/[0.06] bg-white/[0.02]"}`}>
-          <div className={`h-12 w-12 rounded-full flex items-center justify-center text-sm font-extrabold border-2 ${winnerIsA ? "border-[#F5C84C]/60 bg-[#F5C84C]/10 text-[#F5C84C]" : "border-white/10 bg-white/[0.06] text-white/50"}`}>
-            {getInitials(playerA.player_name)}
-          </div>
-          <div className="text-center">
-            <p className={`text-sm font-bold leading-snug ${winnerIsA ? "text-[#F5C84C]" : "text-white/60"}`}>
-              {playerA.player_name}
-            </p>
-            <p className="text-[10px] text-white/30 mt-0.5">{playerA.team}</p>
-            {playerA.position && (
-              <span className="mt-1 inline-block text-[9px] font-semibold uppercase tracking-wider bg-white/[0.06] text-white/30 px-2 py-0.5 rounded-full">
-                {playerA.position}
-              </span>
-            )}
-          </div>
-          {winnerIsA && (
-            <span className="text-[9px] font-bold uppercase tracking-wider text-[#F5C84C] bg-[#F5C84C]/10 px-2 py-0.5 rounded-full">
-              Start
-            </span>
-          )}
-        </div>
-
-        <span className="text-[10px] uppercase tracking-widest text-white/20 font-bold">vs</span>
-
-        {/* Player B */}
-        <div className={`flex flex-col items-center gap-2 rounded-xl border px-3 py-4 ${!winnerIsA && !isTossUp ? "border-[#F5C84C]/25 bg-[#F5C84C]/[0.05]" : "border-white/[0.06] bg-white/[0.02]"}`}>
-          <div className={`h-12 w-12 rounded-full flex items-center justify-center text-sm font-extrabold border-2 ${!winnerIsA && !isTossUp ? "border-[#F5C84C]/60 bg-[#F5C84C]/10 text-[#F5C84C]" : "border-white/10 bg-white/[0.06] text-white/50"}`}>
-            {getInitials(playerB.player_name)}
-          </div>
-          <div className="text-center">
-            <p className={`text-sm font-bold leading-snug ${!winnerIsA && !isTossUp ? "text-[#F5C84C]" : "text-white/60"}`}>
-              {playerB.player_name}
-            </p>
-            <p className="text-[10px] text-white/30 mt-0.5">{playerB.team}</p>
-            {playerB.position && (
-              <span className="mt-1 inline-block text-[9px] font-semibold uppercase tracking-wider bg-white/[0.06] text-white/30 px-2 py-0.5 rounded-full">
-                {playerB.position}
-              </span>
-            )}
-          </div>
-          {!winnerIsA && !isTossUp && (
-            <span className="text-[9px] font-bold uppercase tracking-wider text-[#F5C84C] bg-[#F5C84C]/10 px-2 py-0.5 rounded-full">
-              Start
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* ─── PLAYER COMPARISON TABLE (FREE: Projection/Ceiling/Floor/Neeko) ─── */}
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
-        {/* Header names */}
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-white/[0.06] px-4 py-2.5 gap-2">
+      {/* ─── COMPARISON METRICS ─── */}
+      <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] overflow-hidden">
+        {/* Column headers */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center border-b border-white/[0.05] px-4 py-2.5 gap-2">
           <p className={`text-[11px] font-bold text-right ${winnerIsA ? "text-[#F5C84C]" : "text-white/30"}`}>
             {playerA.player_name.split(" ").pop()}
           </p>
@@ -476,126 +332,77 @@ export function StartSitResult({
           </p>
         </div>
 
-        {/* Free rows */}
         <div className="px-4">
-          <CompareBar label="Projection" aVal={playerA.projection_final} bVal={playerB.projection_final} winnerIsA={winnerIsA} large animated={barsAnimated} />
-          <CompareBar label="Est. Ceiling" aVal={playerA.ceiling_estimate} bVal={playerB.ceiling_estimate} winnerIsA={winnerIsA} animated={barsAnimated} />
-          <CompareBar label="Est. Floor" aVal={playerA.floor_estimate} bVal={playerB.floor_estimate} winnerIsA={winnerIsA} animated={barsAnimated} />
-          <CompareBar label="Neeko Rating" aVal={playerA.neeko_rating} bVal={playerB.neeko_rating} winnerIsA={winnerIsA} animated={barsAnimated} />
-          <CompareBar label="Last 3 Avg" aVal={formA.last3} bVal={formB.last3} winnerIsA={winnerIsA} animated={barsAnimated} />
-          <CompareBar label="Last 5 Avg" aVal={formA.last5} bVal={formB.last5} winnerIsA={winnerIsA} animated={barsAnimated} />
+          {metrics.map(({ label, aRaw, bRaw, fmt: fmtFn }) => {
+            const aWins = aRaw > bRaw;
+            const bWins = bRaw > aRaw;
+            return (
+              <MetricRow
+                key={label}
+                label={label}
+                aVal={fmtFn(aRaw)}
+                bVal={fmtFn(bRaw)}
+                aWins={aWins}
+                bWins={bWins}
+                animated={barsAnimated}
+                aRaw={aRaw}
+                bRaw={bRaw}
+              />
+            );
+          })}
 
-          {/* Volatility row */}
-          <div className="py-3 border-b border-white/[0.04] last:border-0">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-2">Volatility</p>
-            <div className="grid grid-cols-2 gap-2">
-              {([{ vol: volA, isWinner: winnerIsA }, { vol: volB, isWinner: !winnerIsA && !isTossUp }] as const).map(({ vol, isWinner }, i) => {
-                const colors: Record<string, string> = {
-                  HIGH:   "text-red-400 bg-red-400/10 border-red-400/20",
-                  MEDIUM: "text-amber-400 bg-amber-400/10 border-amber-400/20",
-                  LOW:    "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
-                };
-                return (
-                  <div key={i} className={`flex ${i === 0 ? "justify-end" : "justify-start"}`}>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${colors[vol]}`}>
-                      {vol}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Safer option callout */}
-        {saferPlayer && (
-          <div className="mx-4 mb-4 flex items-center gap-2 rounded-lg bg-emerald-400/[0.06] border border-emerald-400/15 px-3 py-2">
-            <span className="text-[10px] text-emerald-400/60">Safer option:</span>
-            <span className="text-[10px] font-bold text-emerald-400">{saferPlayer}</span>
-          </div>
-        )}
-
-        {/* Confidence % — premium only */}
-        {isPremium ? (
-          <div className="border-t border-white/[0.04] px-4">
-            <CompareBar label="Confidence %" aVal={playerA.projection_confidence} bVal={playerB.projection_confidence} winnerIsA={winnerIsA} animated={barsAnimated} />
-          </div>
-        ) : (
-          <div className="border-t border-white/[0.04] relative overflow-hidden">
-            <div className="px-4 pointer-events-none select-none" aria-hidden>
-              <CompareBar label="Confidence %" aVal={72} bVal={45} winnerIsA={winnerIsA} animated dimmed />
-            </div>
-            <div className="absolute inset-0 flex items-center justify-between px-4 bg-[#070707]/70 backdrop-blur-[2px]">
-              <div className="flex items-center gap-2">
-                <Lock size={11} className="text-white/20 shrink-0" />
-                <span className="text-xs text-white/30">Confidence metrics</span>
+          {/* Premium: confidence + risk */}
+          {isPremium ? (
+            premiumMetrics.map(({ label, aRaw, bRaw, fmt: fmtFn, lowerIsBetter }) => {
+              const aWins = lowerIsBetter ? aRaw < bRaw : aRaw > bRaw;
+              const bWins = lowerIsBetter ? bRaw < aRaw : bRaw > aRaw;
+              return (
+                <MetricRow
+                  key={label}
+                  label={label}
+                  aVal={fmtFn(aRaw)}
+                  bVal={fmtFn(bRaw)}
+                  aWins={aWins}
+                  bWins={bWins}
+                  animated={barsAnimated}
+                  aRaw={aRaw}
+                  bRaw={bRaw}
+                />
+              );
+            })
+          ) : (
+            <div className="relative border-t border-white/[0.04] overflow-hidden">
+              <div className="px-0 py-3 pointer-events-none select-none blur-[3px] opacity-50" aria-hidden>
+                <MetricRow
+                  label="Confidence %"
+                  aVal="72%"
+                  bVal="58%"
+                  aWins={winnerIsA}
+                  bWins={!winnerIsA}
+                  animated
+                  aRaw={72}
+                  bRaw={58}
+                />
               </div>
-              <button
-                onClick={onUpgrade}
-                className="flex items-center gap-1.5 bg-[#F5C84C]/10 border border-[#F5C84C]/20 text-[#F5C84C] font-bold text-[11px] px-3 py-1.5 rounded-lg hover:bg-[#F5C84C]/20 transition-all"
-              >
-                <Crown size={9} />
-                Unlock
-              </button>
+              <div className="absolute inset-0 flex items-center justify-between px-4 bg-[#0d0d0d]/75 backdrop-blur-[1px]">
+                <div className="flex items-center gap-2">
+                  <Lock size={10} className="text-white/20" />
+                  <span className="text-xs text-white/30">Confidence metrics</span>
+                </div>
+                <button
+                  onClick={onUpgrade}
+                  className="flex items-center gap-1.5 text-[#F5C84C] font-bold text-[11px] px-3 py-1.5 rounded-lg bg-[#F5C84C]/10 border border-[#F5C84C]/20 hover:bg-[#F5C84C]/20 transition-all"
+                >
+                  <Crown size={9} />
+                  Unlock
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* ─── WHY THIS DECISION ─── */}
-      {isPremium ? (
-        <div className="rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.03] px-5 py-4">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-3">
-            Why the model prefers {winner.player_name.split(" ").pop()}
-          </p>
-          {modelEdge && (
-            <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-[#F5C84C]/[0.07] border border-[#F5C84C]/15">
-              <Zap size={10} className="text-[#F5C84C] shrink-0" />
-              <p className="text-xs font-semibold text-[#F5C84C]/80 leading-snug">{modelEdge}</p>
-            </div>
-          )}
-          {bullets.length > 0 ? (
-            <ul className="space-y-2">
-              {bullets.map((b, i) => (
-                <li key={i} className="flex items-start gap-2.5 text-sm text-white/65 leading-snug">
-                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-[#F5C84C]/50 shrink-0" />
-                  {b}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-white/40">AI analysis generating...</p>
-          )}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">
-          <div className="px-5 py-4">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-2">
-              Why the model prefers {winner.player_name.split(" ").pop()}
-            </p>
-            {modelEdge && (
-              <div className="flex items-center gap-2 mb-2.5 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.07]">
-                <Zap size={10} className="text-[#F5C84C] shrink-0" />
-                <p className="text-xs text-white/50 leading-snug">{modelEdge}</p>
-              </div>
-            )}
-            <p className="text-sm text-white/55 leading-snug">{teaserLine}</p>
-          </div>
-          <div className="border-t border-white/[0.06] px-5 py-3 flex items-center gap-2">
-            <Lock size={11} className="text-white/20 shrink-0" />
-            <p className="text-xs text-white/30 flex-1">Full AI reasoning with Neeko+</p>
-            <button
-              onClick={onUpgrade}
-              className="shrink-0 flex items-center gap-1.5 bg-[#F5C84C] text-black font-bold text-xs px-3.5 py-2 rounded-lg hover:brightness-110 active:scale-[0.97] transition-all"
-            >
-              <Crown size={10} />
-              Upgrade to Neeko+
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ─── OUTCOME DISTRIBUTION ─── */}
+      {/* ─── OUTCOME DISTRIBUTION (premium) ─── */}
       <OutcomeDistributionChart
         playerA={playerA}
         playerB={playerB}
@@ -604,207 +411,70 @@ export function StartSitResult({
         onUpgrade={onUpgrade}
       />
 
-      {/* ─── PREMIUM DEEP STATS (bust risk / outscore / matchup edge) ─── */}
-      {isPremium ? (
-        <div className="space-y-3">
-          {/* Bust Risk */}
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle size={12} className="text-amber-400" />
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30">Bust Risk</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { p: playerA, bust: bustA, isWinner: winnerIsA },
-                { p: playerB, bust: bustB, isWinner: !winnerIsA },
-              ].map(({ p, bust, isWinner }) => (
-                <div key={p.player_id}>
-                  <p className={`text-xs font-semibold mb-1 ${isWinner ? "text-[#F5C84C]" : "text-white/40"}`}>
-                    {p.player_name.split(" ").pop()}
-                  </p>
-                  <p className={`text-2xl font-extrabold tabular-nums ${bust > 25 ? "text-red-400" : "text-white/60"}`}>
-                    {bust}%
-                  </p>
-                  <p className="text-[10px] text-white/20 mt-0.5">chance of &lt;80 pts</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Outscore Probability */}
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Percent size={12} className="text-emerald-400" />
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30">
-                Chance to Outscore Opponent
-              </p>
-            </div>
-            <div className="space-y-2">
-              {[
-                { p: playerA, prob: outscoreA, isWinner: winnerIsA },
-                { p: playerB, prob: outscoreB, isWinner: !winnerIsA },
-              ].map(({ p, prob, isWinner }) => (
-                <div key={p.player_id}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`text-xs font-semibold ${isWinner ? "text-[#F5C84C]" : "text-white/40"}`}>
-                      {p.player_name}
-                    </span>
-                    <span className={`text-sm font-extrabold tabular-nums ${isWinner ? "text-[#F5C84C]" : "text-white/35"}`}>
-                      {prob}%
-                    </span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${isWinner ? "bg-gradient-to-r from-[#F5C84C]/60 to-[#F5C84C]" : "bg-white/15"}`}
-                      style={{ width: `${prob}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Matchup Edge */}
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Swords size={12} className="text-blue-400" />
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30">Matchup Edge</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { p: playerA, isWinner: winnerIsA },
-                { p: playerB, isWinner: !winnerIsA },
-              ].map(({ p, isWinner }) => {
-                const matchupPct = isWinner
-                  ? Math.round(5 + (p.projection_confidence ?? 60) * 0.12)
-                  : Math.round(-3 + (p.risk_rating ?? 5) * 0.8);
-                const positive = matchupPct >= 0;
-                return (
-                  <div key={p.player_id}>
-                    <p className={`text-xs font-semibold mb-1 ${isWinner ? "text-[#F5C84C]" : "text-white/40"}`}>
-                      {p.player_name.split(" ").pop()}
-                    </p>
-                    <p className={`text-xl font-extrabold tabular-nums ${positive ? "text-emerald-400" : "text-red-400"}`}>
-                      {positive ? "+" : ""}{matchupPct}%
-                    </p>
-                    <p className="text-[10px] text-white/20 mt-0.5">vs opposition avg</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* Locked preview for non-premium — blurred stats with single unlock CTA */
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
-          <div className="px-5 pt-4 pb-2 flex items-center gap-2">
-            <Lock size={11} className="text-white/20" />
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25">
-              Advanced Stats
-            </p>
-            <span className="ml-auto text-[10px] font-bold text-[#F5C84C]/60 bg-[#F5C84C]/[0.08] px-2.5 py-1 rounded-full">
-              Neeko+
-            </span>
-          </div>
-          <div className="px-5 pb-1 pointer-events-none select-none blur-sm" aria-hidden>
-            <div className="grid grid-cols-2 gap-4 py-3 border-b border-white/[0.04]">
-              {[playerA, playerB].map((p, i) => (
-                <div key={i}>
-                  <p className="text-xs font-semibold text-white/30 mb-1">{p.player_name.split(" ").pop()}</p>
-                  <p className="text-2xl font-extrabold text-white/50">14%</p>
-                  <p className="text-[10px] text-white/20 mt-0.5">bust risk</p>
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-4 py-3">
-              {[playerA, playerB].map((p, i) => (
-                <div key={i}>
-                  <p className="text-xs font-semibold text-white/30 mb-1">{p.player_name.split(" ").pop()}</p>
-                  <p className="text-xl font-extrabold text-emerald-400/50">+12%</p>
-                  <p className="text-[10px] text-white/20 mt-0.5">matchup edge</p>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="px-5 pb-4">
-            <p className="text-xs text-white/30 text-center mb-3 leading-relaxed">
-              Unlock deeper matchup and volatility analysis with Neeko+
-            </p>
-            <button
-              onClick={onUpgrade}
-              className="w-full flex items-center justify-center gap-2 bg-white/[0.04] border border-white/[0.08] text-white/50 text-xs font-semibold py-3 rounded-xl hover:bg-white/[0.07] hover:text-white/70 transition-all"
-            >
-              <Crown size={11} className="text-[#F5C84C]" />
-              Unlock Advanced Stats with Neeko+
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ─── ADVANCED MODEL INSIGHTS (premium collapsible) ─── */}
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
-        <button
-          onClick={() => isPremium && setAdvancedOpen((o) => !o)}
-          className={`w-full flex items-center justify-between px-5 py-4 ${isPremium ? "cursor-pointer" : "cursor-default"}`}
-        >
-          <div className="flex items-center gap-2.5">
-            {!isPremium && <Lock size={12} className="text-white/20" />}
+      {isPremium ? (
+        <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] overflow-hidden">
+          <button
+            onClick={() => setAdvancedOpen((o) => !o)}
+            className="w-full flex items-center justify-between px-5 py-4 cursor-pointer"
+          >
             <span className="text-[11px] font-semibold uppercase tracking-widest text-white/40">
               Advanced Model Insights
             </span>
-          </div>
-          {isPremium ? (
-            advancedOpen
+            {advancedOpen
               ? <ChevronUp size={14} className="text-white/30" />
-              : <ChevronDown size={14} className="text-white/30" />
-          ) : (
+              : <ChevronDown size={14} className="text-white/30" />}
+          </button>
+
+          {advancedOpen && (
+            <div className="border-t border-white/[0.05] px-5 py-4 space-y-3">
+              {[
+                { label: "Risk Rating", aVal: fmt(playerA.risk_rating), bVal: fmt(playerB.risk_rating), aWins: (playerA.risk_rating ?? 99) <= (playerB.risk_rating ?? 99) },
+                { label: "Confidence %", aVal: `${fmt(playerA.projection_confidence)}%`, bVal: `${fmt(playerB.projection_confidence)}%`, aWins: (playerA.projection_confidence ?? 0) >= (playerB.projection_confidence ?? 0) },
+                { label: "Ceiling Est.", aVal: fmt(playerA.ceiling_estimate), bVal: fmt(playerB.ceiling_estimate), aWins: (playerA.ceiling_estimate ?? 0) >= (playerB.ceiling_estimate ?? 0) },
+              ].map(({ label, aVal, bVal, aWins }) => (
+                <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                  <span className={`text-sm font-bold tabular-nums text-right ${aWins ? "text-[#F5C84C]" : "text-white/35"}`}>{aVal}</span>
+                  <span className="text-[9px] uppercase tracking-widest text-white/20 text-center w-28">{label}</span>
+                  <span className={`text-sm font-bold tabular-nums ${!aWins ? "text-[#F5C84C]" : "text-white/35"}`}>{bVal}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] overflow-hidden">
+          <div className="px-5 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Lock size={11} className="text-white/20" />
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-white/40">
+                Advanced Model Insights
+              </span>
+            </div>
             <span className="text-[10px] font-bold text-[#F5C84C]/60 bg-[#F5C84C]/[0.08] px-2.5 py-1 rounded-full">
               Neeko+
             </span>
-          )}
-        </button>
-
-        {isPremium && advancedOpen && (
-          <div className="border-t border-white/[0.06] px-5 py-4 space-y-3">
-            {[
-              { label: "Risk Rating", aVal: playerA.risk_rating, bVal: playerB.risk_rating },
-              { label: "Consistency Score", aVal: playerA.projection_confidence, bVal: playerB.projection_confidence },
-              { label: "Ceiling", aVal: playerA.ceiling_estimate, bVal: playerB.ceiling_estimate },
-            ].map(({ label, aVal, bVal }) => (
-              <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                <span className={`text-sm font-bold tabular-nums text-right ${(aVal ?? 0) >= (bVal ?? 0) ? "text-[#F5C84C]" : "text-white/40"}`}>
-                  {fmt(aVal)}
-                </span>
-                <span className="text-[9px] uppercase tracking-widest text-white/20 text-center w-28">{label}</span>
-                <span className={`text-sm font-bold tabular-nums ${(bVal ?? 0) >= (aVal ?? 0) ? "text-[#F5C84C]" : "text-white/40"}`}>
-                  {fmt(bVal)}
-                </span>
-              </div>
-            ))}
           </div>
-        )}
-
-        {!isPremium && (
-          <div className="border-t border-white/[0.06] px-5 py-4">
+          <div className="border-t border-white/[0.05] px-5 py-4">
             <div className="blur-sm pointer-events-none select-none space-y-3 mb-4" aria-hidden>
-              {["Matchup Difficulty", "Recent Form Rating", "Consistency Score"].map((label) => (
+              {["Risk Rating", "Matchup Difficulty", "Consistency Score"].map((label) => (
                 <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                  <span className="text-sm font-bold tabular-nums text-right text-white/40">7.2</span>
+                  <span className="text-sm font-bold tabular-nums text-right text-white/35">7.2</span>
                   <span className="text-[9px] uppercase tracking-widest text-white/20 text-center w-28">{label}</span>
-                  <span className="text-sm font-bold tabular-nums text-white/40">5.8</span>
+                  <span className="text-sm font-bold tabular-nums text-white/35">5.8</span>
                 </div>
               ))}
             </div>
             <button
               onClick={onUpgrade}
-              className="w-full flex items-center justify-center gap-2 bg-white/[0.04] border border-white/[0.08] text-white/50 text-xs font-semibold py-3 rounded-xl hover:bg-white/[0.07] hover:text-white/70 transition-all"
+              className="w-full flex items-center justify-center gap-2 bg-white/[0.04] border border-white/[0.07] text-white/50 text-xs font-semibold py-3 rounded-xl hover:bg-white/[0.07] hover:text-white/70 transition-all"
             >
               <Crown size={11} className="text-[#F5C84C]" />
               Unlock Advanced Insights with Neeko+
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
