@@ -125,6 +125,13 @@ export function getFormColor(v: number | null): string {
   return "text-red-400";
 }
 
+export function getFormScoreColor(v: number | null): string {
+  if (v == null) return "text-white/30";
+  if (v > 80) return "text-green-400";
+  if (v >= 60) return "text-white/60";
+  return "text-red-400";
+}
+
 export function getMatchupColor(v: number | string | null): string {
   if (v == null) return "text-white/30";
   if (typeof v === "string") {
@@ -171,9 +178,9 @@ export function getConfidenceColor(v: number | null): string {
 
 export function getValueScoreColor(v: number | null): string {
   if (v == null) return "text-white/30";
-  if (v >= 5.5) return "text-green-400";
-  if (v >= 4.0) return "text-[#F5C84C]";
-  if (v >= 2.5) return "text-white/50";
+  if (v >= 6.0) return "text-green-400";
+  if (v >= 4.5) return "text-[#F5C84C]";
+  if (v >= 3.0) return "text-white/50";
   return "text-red-400";
 }
 
@@ -387,8 +394,8 @@ export function computeKpiTiles(rows: RankingRow[]) {
     ? captainRows.reduce((s, r) => s + (r.projection_final ?? 0), 0) / captainRows.length
     : null;
 
-  // value_score scale: >= 5.5 = ELITE VALUE, >= 4.0 = STRONG VALUE
-  const valueUpgrades = rows.filter((r) => (r.value_score ?? 0) >= 4.0).length;
+  // value_score scale: >= 6.0 = ELITE VALUE, >= 4.5 = STRONG VALUE, >= 3.0 = SOLID VALUE
+  const valueUpgrades = rows.filter((r) => (r.value_score ?? 0) >= 4.5).length;
   const trapAlerts = rows.filter((r) => {
     const t = (r.value_tag ?? "").toUpperCase();
     return t === "OVERPRICED" || t === "LOW VALUE" ||

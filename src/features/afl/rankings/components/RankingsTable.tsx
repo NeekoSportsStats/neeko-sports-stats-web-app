@@ -1,9 +1,9 @@
 import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { RankingRow, SortKey, SortDir, RankingsTab, RowTier } from "./types";
 import {
-  fmt, fmtInt, fmtPrice, fmtValueScore,
-  getNeekoRatingBadge, getRiskBadge, getValueTagStyle,
-  getValueScoreColor, getConfidenceColor, getDisplayRecommendation,
+  fmt, fmtPrice, fmtValueScore,
+  getNeekoRatingBadge, getValueTagStyle,
+  getValueScoreColor, getConfidenceColor, getFormScoreColor, getDisplayRecommendation,
   resolveRecommendationColor,
   FREE_PARTIAL_ROWS, FREE_FULL_ROWS,
 } from "./helpers";
@@ -82,7 +82,7 @@ export function TableHeader({ isPremium, sortKey, sortDir, onSortClick, onRating
       </th>
       <SortableTh label="Projection" col="projection_final" width={100} tooltip="Expected fantasy points this round" />
       <SortableTh label="Confidence" col="projection_confidence" width={100} tooltip="Forecast reliability — how likely the projection is to land near its expected score." />
-      <SortableTh label="Risk" col="risk_rating" width={100} tooltip="Volatility — probability of large deviations from projection." />
+      <SortableTh label="Form" col="form_score" width={100} tooltip="Weighted recent form — blends last 3, last 5 and season average. 0–100 scale." />
       <Th label="Price" locked={!isPremium} width={110} tooltip="AFL Fantasy salary this round" />
       <SortableTh label="Value" col="value_score" width={120} tooltip="Points per dollar of price — higher means better value for money" />
       <Th label="AI Rec" locked={!isPremium} width={150} />
@@ -109,7 +109,6 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
   const rowUnlocked = tier === "premium" || tier === "full";
 
   const neekoRBadge = getNeekoRatingBadge(row.neeko_rating ?? null);
-  const riskBadge = getRiskBadge(Number(row.risk_rating) ?? null);
   const vtStyle = getValueTagStyle(row.value_tag);
   const displayRec = getDisplayRecommendation(row, activeTab);
 
@@ -175,8 +174,8 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
         })()}
       </td>
       <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
-        <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${riskBadge.text} ${riskBadge.bg} ${riskBadge.border}`}>
-          {riskBadge.label}
+        <span className={`text-sm font-semibold tabular-nums ${getFormScoreColor(row.form_score ?? null)}`}>
+          {row.form_score != null ? Math.round(row.form_score) : "—"}
         </span>
       </td>
       <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 110, minWidth: 90 }}>

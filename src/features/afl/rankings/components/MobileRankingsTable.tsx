@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Lock, Crown, ChevronRight } from "lucide-react";
 import { RankingRow, RankingsTab, RowTier } from "./types";
 import {
-  fmt, fmtInt, fmtPrice, fmtValueScore,
-  getNeekoRatingBadge, getRiskBadge, getValueTagStyle,
-  getValueScoreColor, getConfidenceColor, getDisplayRecommendation,
+  fmt, fmtPrice, fmtValueScore,
+  getNeekoRatingBadge, getValueTagStyle,
+  getValueScoreColor, getConfidenceColor, getFormScoreColor, getDisplayRecommendation,
   resolveRecommendationColor,
   FREE_FULL_ROWS, FREE_PARTIAL_ROWS,
 } from "./helpers";
@@ -16,7 +16,7 @@ const COL = {
   rating: 76,
   projection: 72,
   confidence: 72,
-  risk: 72,
+  form: 72,
   price: 84,
   value: 90,
   aiRec: 100,
@@ -26,7 +26,7 @@ const COL = {
 // Only rank + player are sticky now
 const FIXED_W = COL.rank + COL.player;
 const SCROLL_W =
-  COL.rating + COL.projection + COL.confidence + COL.risk +
+  COL.rating + COL.projection + COL.confidence + COL.form +
   COL.price + COL.value + COL.aiRec + COL.why;
 const TABLE_W = FIXED_W + SCROLL_W;
 
@@ -61,7 +61,7 @@ function TableHeader({ isPremium }: { isPremium: boolean }) {
     { key: "rating",     label: "Neeko",  premium: false, width: COL.rating },
     { key: "projection", label: "Proj",   premium: false, width: COL.projection },
     { key: "confidence", label: "Conf",   premium: false, width: COL.confidence },
-    { key: "risk",       label: "Risk",   premium: false, width: COL.risk },
+    { key: "form",       label: "Form",   premium: false, width: COL.form },
     { key: "price",      label: "Price",  premium: true,  width: COL.price },
     { key: "value",      label: "Value",  premium: true,  width: COL.value },
     { key: "aiRec",      label: "AI Rec", premium: true,  width: COL.aiRec },
@@ -119,7 +119,6 @@ interface DataRowProps {
 function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: DataRowProps) {
   const isUnlocked = tier === "full" || tier === "premium";
   const neekoRBadge = getNeekoRatingBadge(row.neeko_rating ?? null);
-  const riskBadge = getRiskBadge(Number(row.risk_rating) ?? null);
   const vtStyle = getValueTagStyle(row.value_tag);
   const displayRec = getDisplayRecommendation(row, activeTab);
 
@@ -197,9 +196,9 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
             );
           })()}
         </div>
-        <div className={`${CELL_BASE} justify-center`} style={{ width: COL.risk, minWidth: COL.risk }}>
-          <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold border ${riskBadge.text} ${riskBadge.bg} ${riskBadge.border}`}>
-            {riskBadge.label}
+        <div className={`${CELL_BASE} justify-center`} style={{ width: COL.form, minWidth: COL.form }}>
+          <span className={`text-sm font-semibold tabular-nums ${getFormScoreColor(row.form_score ?? null)}`}>
+            {row.form_score != null ? Math.round(row.form_score) : "—"}
           </span>
         </div>
         <div className={`${CELL_BASE} justify-center`} style={{ width: COL.price, minWidth: COL.price }}>
@@ -302,7 +301,7 @@ function LoadingSkeleton() {
             </div>
           </div>
           <div className="flex">
-            {[COL.rating, COL.projection, COL.confidence, COL.risk].map((w, j) => (
+            {[COL.rating, COL.projection, COL.confidence, COL.form].map((w, j) => (
               <div key={j} className={`${CELL_BASE} justify-center px-3`} style={{ width: w, minWidth: w }}>
                 <div className="h-3 w-10 animate-pulse rounded bg-white/6" />
               </div>

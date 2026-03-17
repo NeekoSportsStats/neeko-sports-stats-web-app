@@ -11,6 +11,7 @@ export interface RankingRow {
   matchup_rating: string | number | null;
   upside_rating: number | null;
   risk_rating: number | null;
+  form_score: number | null;
   projection_confidence: number | null;
   captain_score: number | null;
   captain_rating: string | null;
@@ -57,7 +58,7 @@ export interface ChartDataPoint {
 export type RankingsTab = "best" | "value" | "projection";
 export type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
 export type PremiumFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC" | "TOP50" | "TOP100" | "ELITE";
-export type SortKey = "neeko_rating" | "projection_final" | "value_score" | "best_value_score" | "projection_confidence" | "risk_rating";
+export type SortKey = "neeko_rating" | "projection_final" | "value_score" | "best_value_score" | "projection_confidence" | "risk_rating" | "form_score";
 export type SortDir = "asc" | "desc";
 
 export type RowTier = "premium" | "full" | "partial" | "locked";

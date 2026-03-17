@@ -243,6 +243,7 @@ export default function AFLRankingsPage() {
       neeko_rating_scaled:    r.neeko_rating_scaled != null ? Number(r.neeko_rating_scaled) : null,
       projection_confidence:  r.projection_confidence != null ? Number(r.projection_confidence) : null,
       risk_rating:            r.risk_rating != null ? Number(r.risk_rating) : null,
+      form_score:             r.form_score != null ? Number(r.form_score) : (r.form_rating != null ? Number(r.form_rating) : null),
       matchup_rating:         r.matchup_label ?? r.matchup_rating ?? null,
       upside_rating:          r.upside_rating != null ? Number(r.upside_rating) : null,
       captain_score:          r.captain_score != null ? Number(r.captain_score) : null,
