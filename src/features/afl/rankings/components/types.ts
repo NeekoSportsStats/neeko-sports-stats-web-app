@@ -17,6 +17,7 @@ export interface RankingRow {
   neeko_rating: number | null;
   price: number | null;
   value_score: number | null;
+  best_value_score: number | null;
   value_tag: string | null;
   value_tier: string | null;
   ai_recommendation: string | null;
@@ -45,7 +46,7 @@ export interface ScoreHistoryPoint {
 export type RankingsTab = "best" | "value" | "projection";
 export type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
 export type PremiumFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC" | "TOP50" | "TOP100" | "ELITE";
-export type SortKey = "neeko_rating" | "projection_final" | "value_score" | "projection_confidence" | "risk_rating";
+export type SortKey = "neeko_rating" | "projection_final" | "value_score" | "best_value_score" | "projection_confidence" | "risk_rating";
 export type SortDir = "asc" | "desc";
 
 export type RowTier = "premium" | "full" | "partial" | "locked";

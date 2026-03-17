@@ -171,7 +171,7 @@ const LOAD_MORE_STEP = 50;
 const PREMIUM_COLUMNS =
   "player_id,player_name,team,position,team_name,position_group," +
   "projection_final,ceiling,floor,ceiling_estimate,floor_estimate," +
-  "consistency_score,form_rating,neeko_rating,price,value_score,value_tag,value_tier," +
+  "consistency_score,form_rating,neeko_rating,price,value_score,best_value_score,value_tag,value_tier," +
   "signal,ai_summary,ai_summary_short,ai_summary_long,analysis," +
   "projection_confidence,risk_rating,matchup_rating," +
   "upside_rating,captain_score,captain_rating,ai_recommendation,recommendation_color," +
@@ -181,9 +181,9 @@ const PREMIUM_COLUMNS =
 const FREE_COLUMNS =
   "player_id,player_name,team,position,team_name,position_group," +
   "projection_final,ceiling,floor,ceiling_estimate,floor_estimate," +
-  "consistency_score,form_rating,neeko_rating,price,value_score,value_tag,value_tier," +
+  "consistency_score,form_rating,neeko_rating,price,value_score,best_value_score,value_tag,value_tier," +
   "signal,summary,analysis,projection_confidence,risk_rating,matchup_rating," +
-  "upside_rating,captain_score,captain_rating,consistency_tier,total_count,cached_at";
+  "upside_rating,captain_score,captain_rating,consistency_tier,total_count,cached_at,games_played";
 
 export default function AFLRankingsPage() {
   const { isPremium } = useAuth();
@@ -246,6 +246,7 @@ export default function AFLRankingsPage() {
       captain_rating:       r.captain_rating ?? null,
       price:                r.price ?? null,
       value_score:          r.value_score != null ? Number(r.value_score) : null,
+      best_value_score:     r.best_value_score != null ? Number(r.best_value_score) : null,
       value_tag:            r.value_tag ?? null,
       value_tier:           r.value_tier ?? null,
       ai_recommendation:    r.ai_recommendation ?? null,
@@ -355,11 +356,7 @@ export default function AFLRankingsPage() {
   }
 
   function adjustedOverallScore(r: RankingRow): number {
-    const base = r.neeko_rating ?? 0;
-    const gp = r.games_played ?? 0;
-    if (gp >= 5) return base;
-    if (gp >= 3) return base * 0.92;
-    return base * 0.82;
+    return r.neeko_rating ?? 0;
   }
 
   const displayRows = useMemo(() => {
@@ -398,7 +395,7 @@ export default function AFLRankingsPage() {
       if (activeTab === "best") {
         filtered = [...filtered].sort((a, b) => adjustedOverallScore(b) - adjustedOverallScore(a));
       } else if (activeTab === "value") {
-        filtered = [...filtered].sort((a, b) => ((b.value_score ?? -Infinity) - (a.value_score ?? -Infinity)));
+        filtered = [...filtered].sort((a, b) => ((b.best_value_score ?? b.value_score ?? -Infinity) - (a.best_value_score ?? a.value_score ?? -Infinity)));
       } else if (activeTab === "projection") {
         filtered = [...filtered].sort((a, b) => ((b.projection_final ?? -Infinity) - (a.projection_final ?? -Infinity)));
       }
