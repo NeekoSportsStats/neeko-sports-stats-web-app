@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   Lock, Crown, X, ShieldCheck, Zap, Share2, Check,
-  ChevronRight,
+  ChevronRight, Timer, TrendingUp, Users,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
@@ -37,11 +37,65 @@ interface RankingRow {
 }
 
 type Section = "captain" | "breakout" | "trap";
-type PickType = "captain" | "value" | "trap" | "differential";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PREMIUM_SECONDARY = 3;
+
+const AFL_TEAMS = [
+  "Adelaide", "Brisbane Lions", "Carlton", "Collingwood", "Essendon",
+  "Fremantle", "Geelong", "Gold Coast", "GWS Giants", "Hawthorn",
+  "Melbourne", "North Melbourne", "Port Adelaide", "Richmond",
+  "St Kilda", "Sydney Swans", "West Coast", "Western Bulldogs",
+];
+
+// Round lock: Round 1 lockout was Thu 13 Mar 2026 19:35 AEDT.
+// Each round locks Thursday ~7:35pm AEDT. UTC = AEDT - 11h (DST in March).
+// We'll compute next Thursday 19:35 AEDT from now.
+function getNextRoundLock(): Date {
+  const now = new Date();
+  const d = new Date(now);
+  // Find next Thursday (day 4)
+  const day = d.getUTCDay();
+  const daysUntilThursday = (4 - day + 7) % 7 || 7;
+  d.setUTCDate(d.getUTCDate() + daysUntilThursday);
+  // Set to 08:35 UTC (= 19:35 AEDT / 18:35 AEST)
+  d.setUTCHours(8, 35, 0, 0);
+  // If that time has already passed, add 7 days
+  if (d.getTime() < now.getTime()) d.setUTCDate(d.getUTCDate() + 7);
+  return d;
+}
+
+function useCountdown(target: Date) {
+  const [remaining, setRemaining] = useState(() => target.getTime() - Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setRemaining(target.getTime() - Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [target]);
+  const totalSec = Math.max(0, Math.floor(remaining / 1000));
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  return { days, hours, mins, secs, expired: totalSec === 0 };
+}
+
+function useRelativeTime(ts: string | null | undefined): string | null {
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    if (!ts) return;
+    const id = setInterval(() => forceUpdate((n) => n + 1), 30_000);
+    return () => clearInterval(id);
+  }, [ts]);
+  if (!ts) return null;
+  try {
+    const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+    if (diff < 60) return "just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)} min${Math.floor(diff / 60) === 1 ? "" : "s"} ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} hr${Math.floor(diff / 3600) === 1 ? "" : "s"} ago`;
+    return `${Math.floor(diff / 86400)} day${Math.floor(diff / 86400) === 1 ? "" : "s"} ago`;
+  } catch { return null; }
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -126,24 +180,11 @@ function getRiskColor(v: number | null): string {
   return "text-red-500";
 }
 
-function formatRefreshedAt(ts: string | null | undefined): string | null {
-  if (!ts) return null;
-  try {
-    const d = new Date(ts);
-    return d.toLocaleDateString("en-AU", {
-      weekday: "short", day: "numeric", month: "short",
-      hour: "2-digit", minute: "2-digit", timeZone: "Australia/Melbourne",
-    });
-  } catch {
-    return null;
-  }
-}
-
 function getSectionLabel(section: Section): { emoji: string; label: string; accentText: string; border: string; bg: string } {
   switch (section) {
     case "captain": return { emoji: "🔥", label: "CAPTAIN LOCK", accentText: "text-yellow-400", border: "border-yellow-400/30", bg: "bg-yellow-400/[0.05]" };
-    case "breakout": return { emoji: "🟢", label: "BEST VALUE", accentText: "text-green-400", border: "border-green-500/30", bg: "bg-green-500/[0.05]" };
-    case "trap": return { emoji: "🚨", label: "FADE THIS", accentText: "text-red-400", border: "border-red-500/30", bg: "bg-red-500/[0.05]" };
+    case "breakout": return { emoji: "🟢", label: "MUST HAVE VALUE", accentText: "text-green-400", border: "border-green-500/30", bg: "bg-green-500/[0.05]" };
+    case "trap": return { emoji: "🚨", label: "DO NOT START", accentText: "text-red-400", border: "border-red-500/30", bg: "bg-red-500/[0.05]" };
   }
 }
 
@@ -155,13 +196,43 @@ function getPrimaryMetric(row: RankingRow, section: Section): { label: string; v
   }
 }
 
-function rowToSection(row: RankingRow): Section {
-  if (row.section === "breakout") return "breakout";
-  if (row.section === "trap") return "trap";
-  return "captain";
+function getRecommendationLabel(section: Section): { label: string; color: string; bg: string; border: string } {
+  switch (section) {
+    case "captain": return { label: "START — Captain", color: "text-yellow-300", bg: "bg-yellow-400/10", border: "border-yellow-400/25" };
+    case "breakout": return { label: "START — Value", color: "text-green-300", bg: "bg-green-500/10", border: "border-green-500/25" };
+    case "trap": return { label: "FADE — Do Not Start", color: "text-red-300", bg: "bg-red-500/10", border: "border-red-500/25" };
+  }
 }
 
-// ─── Copy helper ──────────────────────────────────────────────────────────────
+function buildConfidenceReasons(row: RankingRow, section: Section): string[] {
+  const reasons: string[] = [];
+  const conf = row.projection_confidence;
+  if (conf != null) {
+    if (conf >= 80) reasons.push("Model confidence is very high this round");
+    else if (conf >= 65) reasons.push("Moderate-to-high model confidence");
+    else reasons.push("Below-average model confidence — treat as speculative");
+  }
+  if (row.ceiling_estimate != null && row.projection_final != null) {
+    const upside = row.ceiling_estimate - row.projection_final;
+    if (upside >= 30) reasons.push(`${fmtInt(upside)} pt upside ceiling above projection`);
+    else if (upside <= 5) reasons.push("Ceiling is tightly capped — limited upside");
+  }
+  if (section === "breakout" && row.value_score != null) {
+    if (row.value_score >= 1.25) reasons.push("Exceptional value relative to price point");
+    else if (row.value_score >= 1.10) reasons.push("Priced below projected output — value play");
+  }
+  if (section === "trap" && row.risk_rating != null) {
+    if (row.risk_rating >= 35) reasons.push("Very high risk — multiple negative signals");
+    else if (row.risk_rating >= 25) reasons.push("Elevated risk profile — caution advised");
+  }
+  if (row.neeko_rating != null) {
+    if (row.neeko_rating >= 7.5) reasons.push(`Strong Neeko rating of ${row.neeko_rating.toFixed(1)}`);
+    else if (row.neeko_rating < 5) reasons.push(`Low Neeko rating of ${row.neeko_rating.toFixed(1)} — weak signal`);
+  }
+  return reasons.length > 0 ? reasons : ["Based on combined projection and matchup modelling"];
+}
+
+// ─── Copy / Share helpers ─────────────────────────────────────────────────────
 
 async function copyToClipboard(text: string): Promise<boolean> {
   try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
@@ -173,37 +244,193 @@ function buildShareText(row: RankingRow, section: Section): string {
   const oneLiner = row.ai_summary ? getOneLiner(row.ai_summary) : null;
   const reasonStr = oneLiner ? `\n"${oneLiner}"` : "";
   switch (section) {
-    case "captain": return `Captain Lock: ${row.player_name} (${row.team})${confStr}\nProjection: ${fmtInt(row.projection_final)} pts${reasonStr}\n\nvia Neeko Sports — neekosports.com.au #AFLFantasy`;
-    case "breakout": return `Best Value: ${row.player_name} (${row.team})\nValue Score: ${fmtValueScore(row.value_score)}${confStr}${reasonStr}\n\nvia Neeko Sports — neekosports.com.au #AFLFantasy`;
-    case "trap": return `Fade Alert: ${row.player_name} (${row.team}) — ${getRiskLabel(row.risk_rating)} risk${confStr}${reasonStr}\n\nvia Neeko Sports — neekosports.com.au #AFLFantasy`;
+    case "captain": return `🔥 AFL Fantasy Captain Pick (Neeko)\n${row.player_name} (${row.team}) — ${fmtInt(row.projection_final)} pts${confStr}${reasonStr}\n\nneekosports.com.au #AFLFantasy`;
+    case "breakout": return `🟢 AFL Fantasy Value Play (Neeko)\n${row.player_name} (${row.team}) — Value Score ${fmtValueScore(row.value_score)}${confStr}${reasonStr}\n\nneekosports.com.au #AFLFantasy`;
+    case "trap": return `🚨 AFL Fantasy Fade Alert (Neeko)\n${row.player_name} (${row.team}) — ${getRiskLabel(row.risk_rating)} Risk${confStr}${reasonStr}\n\nneekosports.com.au #AFLFantasy`;
   }
 }
 
 function buildRoundSummaryText(captain: RankingRow | null, value: RankingRow | null, trap: RankingRow | null): string {
-  const lines: string[] = ["This round's Neeko picks:\n"];
-  if (captain) lines.push(`Captain: ${captain.player_name} — ${fmtInt(captain.projection_final)} pts`);
-  if (value) lines.push(`Value: ${value.player_name} — Value Score ${fmtValueScore(value.value_score)}`);
-  if (trap) lines.push(`Fade: ${trap.player_name} — ${getRiskLabel(trap.risk_rating)} risk`);
+  const lines: string[] = ["🔥 My AFL Fantasy Picks (Neeko)\n"];
+  if (captain) lines.push(`C: ${captain.player_name} (${fmtInt(captain.projection_final)} pts)`);
+  if (value) lines.push(`Value: ${value.player_name} — Score ${fmtValueScore(value.value_score)}`);
+  if (trap) lines.push(`Avoid: ${trap.player_name} — ${getRiskLabel(trap.risk_rating)} risk`);
   lines.push("\nneekosports.com.au #AFLFantasy #NeekoEdge");
   return lines.join("\n");
 }
 
+// ─── Round Lock Countdown ─────────────────────────────────────────────────────
+
+function RoundLockCountdown() {
+  const lockDate = useRef(getNextRoundLock()).current;
+  const { days, hours, mins, secs, expired } = useCountdown(lockDate);
+
+  if (expired) return null;
+
+  const urgent = days === 0 && hours < 6;
+
+  return (
+    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold ${urgent ? "border-red-500/30 bg-red-500/[0.06] text-red-400" : "border-white/10 bg-white/[0.03] text-white/50"}`}>
+      <Timer size={11} className={urgent ? "text-red-400" : "text-white/30"} />
+      <span>Round locks in&nbsp;</span>
+      {days > 0 && <span className={`font-extrabold tabular-nums ${urgent ? "text-red-400" : "text-white/70"}`}>{days}d </span>}
+      <span className={`font-extrabold tabular-nums ${urgent ? "text-red-400" : "text-white/70"}`}>{String(hours).padStart(2, "0")}h {String(mins).padStart(2, "0")}m {String(secs).padStart(2, "0")}s</span>
+    </div>
+  );
+}
+
+// ─── My Team Edge Section ─────────────────────────────────────────────────────
+
+function MyTeamEdge({
+  myTeam,
+  onSetTeam,
+  rows,
+}: {
+  myTeam: string | null;
+  onSetTeam: (team: string) => void;
+  rows: RankingRow[];
+}) {
+  const [selecting, setSelecting] = useState(false);
+
+  if (!myTeam) {
+    return (
+      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-5 py-4 mb-5">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.08] shrink-0">
+            <Users size={14} className="text-white/30" />
+          </div>
+          <div>
+            <h3 className="text-sm font-extrabold text-white">Your Team Edge This Week</h3>
+            <p className="text-[11px] text-white/35">Connect your team to get personalised picks</p>
+          </div>
+        </div>
+        {!selecting ? (
+          <button
+            onClick={() => setSelecting(true)}
+            className="mt-2 w-full py-2.5 rounded-xl border border-[#F5C84C]/30 bg-[#F5C84C]/[0.06] text-[12px] font-bold text-[#F5C84C]/80 hover:text-[#F5C84C] hover:border-[#F5C84C]/50 hover:bg-[#F5C84C]/10 transition-all"
+          >
+            Connect your team
+          </button>
+        ) : (
+          <div className="mt-2">
+            <p className="text-[10px] text-white/30 mb-2 uppercase tracking-widest">Select your AFL Fantasy team</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {AFL_TEAMS.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => { onSetTeam(t); setSelecting(false); }}
+                  className="text-[10px] text-white/60 font-semibold px-2 py-1.5 rounded-lg border border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.06] hover:text-white hover:border-white/20 transition-all text-left truncate"
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Filter rows relevant to team
+  const teamCaptain = rows.find(r => r.section === "captain" && r.team === myTeam);
+  const teamValue = rows.find(r => r.section === "breakout" && r.team === myTeam);
+  const teamTrap = rows.find(r => r.section === "trap" && r.team === myTeam);
+  const hasTeamPicks = teamCaptain || teamValue || teamTrap;
+
+  return (
+    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] px-5 py-4 mb-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-base">🏉</span>
+          <div>
+            <h3 className="text-[11px] font-extrabold text-white uppercase tracking-widest">Your Team Edge This Week</h3>
+            <p className="text-[10px] text-white/35">{myTeam} players in this week's picks</p>
+          </div>
+        </div>
+        <button
+          onClick={() => onSetTeam("")}
+          className="text-[10px] text-white/25 hover:text-white/50 transition-colors underline underline-offset-2"
+        >
+          Change
+        </button>
+      </div>
+
+      {!hasTeamPicks ? (
+        <p className="text-[12px] text-white/35 italic">No {myTeam} players featured in this week's top picks.</p>
+      ) : (
+        <div className="space-y-2">
+          {teamCaptain && (
+            <div className="flex items-center gap-3 rounded-xl border border-yellow-400/15 bg-yellow-400/[0.04] px-3 py-2.5">
+              <span className="text-xs">🔥</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold text-yellow-400/70 uppercase tracking-widest">Captain Option</p>
+                <p className="text-sm font-extrabold text-white truncate">{teamCaptain.player_name}</p>
+              </div>
+              <span className="text-[11px] text-white/50 shrink-0">{fmtInt(teamCaptain.projection_final)} pts</span>
+            </div>
+          )}
+          {teamValue && (
+            <div className="flex items-center gap-3 rounded-xl border border-green-500/15 bg-green-500/[0.04] px-3 py-2.5">
+              <span className="text-xs">🟢</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold text-green-400/70 uppercase tracking-widest">Value Target</p>
+                <p className="text-sm font-extrabold text-white truncate">{teamValue.player_name}</p>
+              </div>
+              <span className="text-[11px] text-white/50 shrink-0">Score {fmtValueScore(teamValue.value_score)}</span>
+            </div>
+          )}
+          {teamTrap && (
+            <div className="flex items-center gap-3 rounded-xl border border-red-500/15 bg-red-500/[0.04] px-3 py-2.5">
+              <span className="text-xs">🚨</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold text-red-400/70 uppercase tracking-widest">Fade This Player</p>
+                <p className="text-sm font-extrabold text-white truncate">{teamTrap.player_name}</p>
+              </div>
+              <span className="text-[11px] text-white/50 shrink-0">{getRiskLabel(teamTrap.risk_rating)} risk</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Trust Badge ──────────────────────────────────────────────────────────────
+
+function TrustBadge({ accuracy }: { accuracy: number | null }) {
+  if (accuracy == null) return null;
+  const pct = Math.round(accuracy);
+  const good = pct >= 60;
+  return (
+    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold ${good ? "border-green-500/25 bg-green-500/[0.08] text-green-400" : "border-white/10 bg-white/[0.03] text-white/40"}`}>
+      <TrendingUp size={10} />
+      <span>Last week hit rate: {pct}%</span>
+    </div>
+  );
+}
+
 // ─── Upgrade Paywall Modal ─────────────────────────────────────────────────────
 
-function UpgradePaywallModal({ onClose }: { onClose: () => void }) {
+function UpgradePaywallModal({ onClose, openCount }: { onClose: () => void; openCount: number }) {
+  const unlocked = openCount;
+  const total = 3;
+
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-4 sm:p-6" onClick={onClose}>
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
       <div
-        className="relative w-full max-w-sm rounded-2xl border border-[#F5C84C]/30 bg-[#0e0e0e] p-7 shadow-2xl text-center"
+        className="relative w-full max-w-sm rounded-2xl border border-[#F5C84C]/30 bg-[#0e0e0e] p-7 shadow-2xl text-center animate-in fade-in slide-in-from-bottom-4 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <button onClick={onClose} className="absolute right-4 top-4 text-white/30 hover:text-white/70 transition-colors">
           <X size={16} />
         </button>
-        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30 mx-auto mb-4">
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[#F5C84C]/15 border border-[#F5C84C]/30 mx-auto mb-3">
           <Crown size={22} className="text-[#F5C84C]" />
         </div>
+        <p className="text-[11px] font-bold text-[#F5C84C]/60 uppercase tracking-widest mb-1">
+          You've unlocked {unlocked}/{total} picks
+        </p>
         <h3 className="text-lg font-bold text-white mb-1">Unlock Full Analysis</h3>
         <p className="text-sm text-white/45 leading-relaxed mb-5">
           Get complete reasoning for every pick — captain locks, value plays, and traps.
@@ -250,7 +477,9 @@ interface PlayerAnalysisModalProps {
 function PlayerAnalysisModal({ row, section, isPremium, onClose, onUpgrade }: PlayerAnalysisModalProps) {
   const cfg = getSectionLabel(section);
   const metric = getPrimaryMetric(row, section);
+  const reco = getRecommendationLabel(section);
   const conf = row.projection_confidence;
+  const reasons = buildConfidenceReasons(row, section);
   const [shared, setShared] = useState(false);
 
   useEffect(() => {
@@ -272,6 +501,18 @@ function PlayerAnalysisModal({ row, section, isPremium, onClose, onUpgrade }: Pl
     }
   }
 
+  function handleWhatsApp() {
+    const text = encodeURIComponent(buildShareText(row, section));
+    window.open(`https://wa.me/?text=${text}`, "_blank");
+    track("edge_board_share_whatsapp", { section, player: row.player_name });
+  }
+
+  function handleTwitter() {
+    const text = encodeURIComponent(buildShareText(row, section));
+    window.open(`https://twitter.com/intent/tweet?text=${text}`, "_blank");
+    track("edge_board_share_twitter", { section, player: row.player_name });
+  }
+
   const keyFactors: string[] = [];
   if (row.projection_final != null) keyFactors.push(`Projection: ${fmtInt(row.projection_final)} pts`);
   if (row.ceiling_estimate != null) keyFactors.push(`Ceiling: ${fmtInt(row.ceiling_estimate)} pts`);
@@ -284,9 +525,9 @@ function PlayerAnalysisModal({ row, section, isPremium, onClose, onUpgrade }: Pl
       className="fixed inset-0 z-[9998] flex items-end sm:items-center justify-center p-0 sm:p-6"
       onClick={onClose}
     >
-      <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150" />
       <div
-        className={`relative w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl border ${cfg.border} bg-[#0d0d0d] shadow-2xl overflow-hidden flex flex-col max-h-[92vh]`}
+        className={`relative w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl border ${cfg.border} bg-[#0d0d0d] shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in slide-in-from-bottom-6 sm:slide-in-from-bottom-2 duration-200`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Drag handle (mobile) */}
@@ -336,6 +577,27 @@ function PlayerAnalysisModal({ row, section, isPremium, onClose, onUpgrade }: Pl
 
         {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+
+          {/* Recommendation verdict */}
+          <div className={`flex items-center gap-3 rounded-xl border ${reco.border} ${reco.bg} px-4 py-3`}>
+            <div className="flex-1">
+              <p className="text-[9px] text-white/30 uppercase tracking-widest mb-0.5">Recommendation</p>
+              <p className={`text-sm font-extrabold ${reco.color}`}>{reco.label}</p>
+            </div>
+          </div>
+
+          {/* Confidence breakdown */}
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-white/30 mb-2">Why this pick</p>
+            <ul className="space-y-1.5">
+              {reasons.map((r) => (
+                <li key={r} className="flex items-start gap-2">
+                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${cfg.accentText.replace("text-", "bg-").replace("/70", "")}`} />
+                  <span className="text-[12px] text-white/60 leading-snug">{r}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
 
           {/* AI Analysis */}
           {isPremium ? (
@@ -405,14 +667,29 @@ function PlayerAnalysisModal({ row, section, isPremium, onClose, onUpgrade }: Pl
             </button>
             <button
               onClick={handleShare}
-              className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border text-[12px] font-semibold transition-all ${
+              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-[12px] font-semibold transition-all ${
                 shared
                   ? "border-[#F5C84C]/40 bg-[#F5C84C]/10 text-[#F5C84C]"
                   : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70 hover:border-white/20"
               }`}
+              title="Copy to clipboard"
             >
               {shared ? <Check size={12} /> : <Share2 size={12} />}
-              {shared ? "Copied!" : "Share"}
+              {shared ? "Copied!" : "Copy"}
+            </button>
+            <button
+              onClick={handleWhatsApp}
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-white/10 bg-white/[0.03] text-[12px] font-semibold text-white/40 hover:text-green-400 hover:border-green-500/30 hover:bg-green-500/[0.05] transition-all"
+              title="Share on WhatsApp"
+            >
+              <span className="text-[11px]">WhatsApp</span>
+            </button>
+            <button
+              onClick={handleTwitter}
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-white/10 bg-white/[0.03] text-[12px] font-semibold text-white/40 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/[0.05] transition-all"
+              title="Share on X"
+            >
+              <span className="text-[11px]">X</span>
             </button>
           </div>
         </div>
@@ -436,12 +713,21 @@ function HeroPickCard({ row, section, isPremium, onOpen }: HeroPickCardProps) {
   const metric = getPrimaryMetric(row, section);
   const conf = row.projection_confidence;
   const oneLiner = row.ai_summary ? truncateWords(getOneLiner(row.ai_summary), 9) : null;
+  const isCaptain = section === "captain";
 
   return (
     <button
-      className={`relative flex flex-col w-full rounded-2xl border ${cfg.border} ${cfg.bg} overflow-hidden text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/40 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20`}
+      className={`relative flex flex-col w-full rounded-2xl border ${cfg.border} ${cfg.bg} overflow-hidden text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/40 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20 ${isCaptain ? "ring-1 ring-yellow-400/20" : ""}`}
       onClick={() => onOpen(row, section)}
     >
+      {/* Captain pulse dot */}
+      {isCaptain && (
+        <span className="absolute top-3 right-3 flex h-2.5 w-2.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-50" />
+          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-yellow-400/70" />
+        </span>
+      )}
+
       {/* Label */}
       <div className="px-4 pt-4 pb-2">
         <span className={`text-[10px] font-extrabold tracking-widest uppercase ${cfg.accentText}`}>
@@ -501,7 +787,7 @@ function HeroPickCard({ row, section, isPremium, onOpen }: HeroPickCardProps) {
   );
 }
 
-// ─── Bullet List Section (Premium more plays) ─────────────────────────────────
+// ─── Bullet List Section ──────────────────────────────────────────────────────
 
 interface BulletListSectionProps {
   title: string;
@@ -548,7 +834,7 @@ function BulletListSection({ title, emoji, accentText, rows, section, onOpen }: 
   );
 }
 
-// ─── Locked Pick Row (paywall preview) ────────────────────────────────────────
+// ─── Locked Pick Row ──────────────────────────────────────────────────────────
 
 function LockedPickRow({ section, rank, onUnlock }: { section: "captain" | "value" | "trap"; rank: number; onUnlock: () => void }) {
   const accent =
@@ -615,10 +901,21 @@ function FreePaywall({ onUnlock, captainCount, valueCount, trapCount }: { onUnlo
 
 function RoundSummaryShare({ captain, value, trap }: { captain: RankingRow | null; value: RankingRow | null; trap: RankingRow | null }) {
   const [copied, setCopied] = useState(false);
+  const summaryText = buildRoundSummaryText(captain, value, trap);
 
-  async function handleShare() {
-    const ok = await copyToClipboard(buildRoundSummaryText(captain, value, trap));
+  async function handleCopy() {
+    const ok = await copyToClipboard(summaryText);
     if (ok) { setCopied(true); track("edge_board_share_round"); setTimeout(() => setCopied(false), 2500); }
+  }
+
+  function handleWhatsApp() {
+    window.open(`https://wa.me/?text=${encodeURIComponent(summaryText)}`, "_blank");
+    track("edge_board_share_round_whatsapp");
+  }
+
+  function handleTwitter() {
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(summaryText)}`, "_blank");
+    track("edge_board_share_round_twitter");
   }
 
   return (
@@ -628,9 +925,34 @@ function RoundSummaryShare({ captain, value, trap }: { captain: RankingRow | nul
           <h3 className="text-sm font-extrabold text-white">Share this round's picks</h3>
           <p className="text-[11px] text-white/35 mt-0.5">Ready-to-post for X, WhatsApp or your league chat</p>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-white/[0.06] bg-black/30 px-4 py-3 space-y-1.5 mb-3">
+        {captain && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px]">🔥</span>
+            <span className="text-[12px] text-white/60">C: <span className="text-white font-semibold">{captain.player_name}</span> ({fmtInt(captain.projection_final)} pts)</span>
+          </div>
+        )}
+        {value && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px]">🟢</span>
+            <span className="text-[12px] text-white/60">Value: <span className="text-white font-semibold">{value.player_name}</span> — Score {fmtValueScore(value.value_score)}</span>
+          </div>
+        )}
+        {trap && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px]">🚨</span>
+            <span className="text-[12px] text-white/60">Avoid: <span className="text-white font-semibold">{trap.player_name}</span> — {getRiskLabel(trap.risk_rating)} risk</span>
+          </div>
+        )}
+        <p className="text-[10px] text-white/20 pt-1">neekosports.com.au #AFLFantasy</p>
+      </div>
+
+      <div className="flex gap-2">
         <button
-          onClick={handleShare}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-bold text-xs transition-all shrink-0 ml-4 ${
+          onClick={handleCopy}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border font-bold text-xs transition-all ${
             copied
               ? "border-[#F5C84C]/50 bg-[#F5C84C]/15 text-[#F5C84C]"
               : "border-[#F5C84C]/30 bg-[#F5C84C]/[0.07] text-[#F5C84C]/70 hover:text-[#F5C84C] hover:border-[#F5C84C]/50"
@@ -639,27 +961,18 @@ function RoundSummaryShare({ captain, value, trap }: { captain: RankingRow | nul
           {copied ? <Check size={12} /> : <Share2 size={12} />}
           {copied ? "Copied!" : "Copy picks"}
         </button>
-      </div>
-      <div className="rounded-xl border border-white/[0.06] bg-black/30 px-4 py-3 space-y-1.5">
-        {captain && (
-          <div className="flex items-center gap-2">
-            <span className="text-[10px]">🔥</span>
-            <span className="text-[12px] text-white/60"><span className="text-white font-semibold">{captain.player_name}</span> — {fmtInt(captain.projection_final)} pts</span>
-          </div>
-        )}
-        {value && (
-          <div className="flex items-center gap-2">
-            <span className="text-[10px]">🟢</span>
-            <span className="text-[12px] text-white/60"><span className="text-white font-semibold">{value.player_name}</span> — Value {fmtValueScore(value.value_score)}</span>
-          </div>
-        )}
-        {trap && (
-          <div className="flex items-center gap-2">
-            <span className="text-[10px]">🚨</span>
-            <span className="text-[12px] text-white/60">Fade <span className="text-white font-semibold">{trap.player_name}</span> — {getRiskLabel(trap.risk_rating)} risk</span>
-          </div>
-        )}
-        <p className="text-[10px] text-white/20 pt-1">neekosports.com.au #AFLFantasy</p>
+        <button
+          onClick={handleWhatsApp}
+          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl border border-white/10 bg-white/[0.03] text-xs font-semibold text-white/40 hover:text-green-400 hover:border-green-500/30 hover:bg-green-500/[0.05] transition-all"
+        >
+          WhatsApp
+        </button>
+        <button
+          onClick={handleTwitter}
+          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl border border-white/10 bg-white/[0.03] text-xs font-semibold text-white/40 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/[0.05] transition-all"
+        >
+          X
+        </button>
       </div>
     </div>
   );
@@ -689,6 +1002,18 @@ export default function AFLRoundEdgeBoard() {
   const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
+
+  // My team personalisation (localStorage)
+  const [myTeam, setMyTeam] = useState<string>(() => {
+    try { return localStorage.getItem("neeko_my_team") ?? ""; } catch { return ""; }
+  });
+
+  function handleSetTeam(team: string) {
+    setMyTeam(team);
+    try { if (team) localStorage.setItem("neeko_my_team", team); else localStorage.removeItem("neeko_my_team"); } catch { /* no-op */ }
+    if (team) track("edge_board_team_connect", { team });
+  }
 
   // Modal state
   const [activeModal, setActiveModal] = useState<{ row: RankingRow; section: Section } | null>(null);
@@ -697,17 +1022,21 @@ export default function AFLRoundEdgeBoard() {
   // Free user interaction gate: 1 free open, then paywall
   const freeOpenCount = useRef(0);
 
+  const relativeTime = useRelativeTime(refreshedAt);
+
   useEffect(() => { track("edge_board_view"); }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: rpcErr } = await supabase.rpc("get_edge_board_data", {
-        limit_n: isPremium ? 5 : 4,
-      });
-      if (rpcErr) throw rpcErr;
-      const mapped = ((data as any[]) ?? []).map((r: any): RankingRow => ({
+      const [rpcResult, accResult] = await Promise.all([
+        supabase.rpc("get_edge_board_data", { limit_n: isPremium ? 5 : 4 }),
+        supabase.from("v_projection_accuracy_homepage").select("within_20").maybeSingle(),
+      ]);
+
+      if (rpcResult.error) throw rpcResult.error;
+      const mapped = ((rpcResult.data as any[]) ?? []).map((r: any): RankingRow => ({
         player_id:             r.player_id ?? null,
         player_name:           r.player_name ?? "",
         team:                  r.team ?? "",
@@ -734,6 +1063,12 @@ export default function AFLRoundEdgeBoard() {
       }));
       setRows(mapped);
       setRefreshedAt(mapped[0]?.refreshed_at ?? null);
+
+      if (!accResult.error && accResult.data) {
+        const raw = (accResult.data as any).within_20;
+        const parsed = raw != null ? Number(raw) : null;
+        setAccuracy(!isNaN(parsed as number) ? parsed : null);
+      }
     } catch {
       setError("Unable to load picks. Please try again.");
     } finally {
@@ -773,9 +1108,9 @@ export default function AFLRoundEdgeBoard() {
     );
   }
 
-  const captainRows = rows.filter(r => r.section === "captain").sort((a, b) => Number(a.section_rank) - Number(b.section_rank));
+  const captainRows  = rows.filter(r => r.section === "captain").sort((a, b) => Number(a.section_rank) - Number(b.section_rank));
   const breakoutRows = rows.filter(r => r.section === "breakout").sort((a, b) => Number(a.section_rank) - Number(b.section_rank));
-  const trapRows = rows.filter(r => r.section === "trap").sort((a, b) => Number(a.section_rank) - Number(b.section_rank));
+  const trapRows     = rows.filter(r => r.section === "trap").sort((a, b) => Number(a.section_rank) - Number(b.section_rank));
 
   const captainPick = captainRows[0] ?? null;
   const valuePick   = breakoutRows[0] ?? null;
@@ -796,7 +1131,7 @@ export default function AFLRoundEdgeBoard() {
       <div className="max-w-4xl mx-auto">
 
         {/* ── Page header ─────────────────────────────────────────────────── */}
-        <div className="mb-6">
+        <div className="mb-5">
           <div className="flex items-center gap-2 mb-2">
             <Zap size={13} className="text-[#F5C84C]" />
             <span className="text-[10px] font-semibold uppercase tracking-widest text-[#F5C84C]/60">AFL Fantasy · Edge Board</span>
@@ -811,13 +1146,22 @@ export default function AFLRoundEdgeBoard() {
           <p className="text-sm text-white/40 mt-1">
             Captain lock, best value, and who to fade — decided by the model.
           </p>
-          {formatRefreshedAt(refreshedAt) && (
-            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-white/10 bg-white/[0.03]">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-400/70" />
-              <span className="text-[10px] text-white/35">Updated {formatRefreshedAt(refreshedAt)}</span>
-            </div>
-          )}
+
+          {/* Meta row: updated + trust + countdown */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {relativeTime && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-white/10 bg-white/[0.03]">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-400/70" />
+                <span className="text-[10px] text-white/35">Updated {relativeTime}</span>
+              </div>
+            )}
+            <TrustBadge accuracy={accuracy} />
+            <RoundLockCountdown />
+          </div>
         </div>
+
+        {/* ── My Team Edge ─────────────────────────────────────────────────── */}
+        <MyTeamEdge myTeam={myTeam || null} onSetTeam={handleSetTeam} rows={rows} />
 
         {/* ── Hero Picks ───────────────────────────────────────────────────── */}
         {heroPicks.length > 0 && (
@@ -887,7 +1231,12 @@ export default function AFLRoundEdgeBoard() {
           onUpgrade={() => { handleCloseModal(); setShowUpgradeModal(true); }}
         />
       )}
-      {showUpgradeModal && <UpgradePaywallModal onClose={() => setShowUpgradeModal(false)} />}
+      {showUpgradeModal && (
+        <UpgradePaywallModal
+          onClose={() => setShowUpgradeModal(false)}
+          openCount={freeOpenCount.current}
+        />
+      )}
     </div>
   );
 }
