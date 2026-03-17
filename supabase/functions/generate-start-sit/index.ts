@@ -28,6 +28,7 @@ interface PlayerData {
   projection_confidence: number | null;
   risk_rating: number | null;
   neeko_rating: number | null;
+  value_score: number | null;
 }
 
 interface PromptRecord {
@@ -67,42 +68,35 @@ CRITICAL RULES:
   return data as PromptRecord;
 }
 
+function compositeScore(p: PlayerData): number {
+  const proj = p.projection_final ?? 0;
+  const conf = p.projection_confidence ?? 50;
+  const risk = p.risk_rating ?? 50;
+  const val  = p.value_score ?? 1.0;
+  const neeko = p.neeko_rating ?? 50;
+
+  const projNorm  = Math.min(Math.max((proj - 60) / 60, 0), 1);
+  const confNorm  = Math.min(Math.max(conf / 100, 0), 1);
+  const riskNorm  = Math.min(Math.max(1 - risk / 100, 0), 1);
+  const valNorm   = Math.min(Math.max((val - 0.8) / 0.7, 0), 1);
+  const neekoNorm = Math.min(Math.max(neeko / 100, 0), 1);
+
+  return projNorm * 0.35 + neekoNorm * 0.25 + confNorm * 0.20 + valNorm * 0.12 + riskNorm * 0.08;
+}
+
 function deterministicWinner(
   pA: PlayerData,
   pB: PlayerData
 ): { winner: PlayerData; loser: PlayerData; confidence: number } {
-  const nA = pA.neeko_rating ?? 0;
-  const nB = pB.neeko_rating ?? 0;
-  const pjA = pA.projection_final ?? 0;
-  const pjB = pB.projection_final ?? 0;
-  const cA = pA.projection_confidence ?? 0;
-  const cB = pB.projection_confidence ?? 0;
-  const rA = (pA.ceiling_estimate ?? 0) - (pA.floor_estimate ?? 0);
-  const rB = (pB.ceiling_estimate ?? 0) - (pB.floor_estimate ?? 0);
+  const scoreA = compositeScore(pA);
+  const scoreB = compositeScore(pB);
 
-  let winner: PlayerData;
-  let loser: PlayerData;
+  const winner = scoreA >= scoreB ? pA : pB;
+  const loser  = scoreA >= scoreB ? pB : pA;
 
-  if (nA !== nB) {
-    winner = nA > nB ? pA : pB;
-    loser = nA > nB ? pB : pA;
-  } else if (pjA !== pjB) {
-    winner = pjA > pjB ? pA : pB;
-    loser = pjA > pjB ? pB : pA;
-  } else if (cA !== cB) {
-    winner = cA > cB ? pA : pB;
-    loser = cA > cB ? pB : pA;
-  } else if (rA !== rB) {
-    winner = rA < rB ? pA : pB;
-    loser = rA < rB ? pB : pA;
-  } else {
-    winner = pA;
-    loser = pB;
-  }
-
-  const neekoDiff = Math.abs(nA - nB);
-  const projDiff = Math.abs(pjA - pjB);
-  const raw = 50 + neekoDiff * 0.8 + projDiff * 0.4;
+  const scoreDiff = Math.abs(scoreA - scoreB);
+  const avgConf = ((pA.projection_confidence ?? 50) + (pB.projection_confidence ?? 50)) / 2;
+  const raw = 50 + scoreDiff * 60 + (avgConf - 50) * 0.15;
   const confidence = Math.round(Math.min(Math.max(raw, 55), 92));
 
   return { winner, loser, confidence };
@@ -405,7 +399,7 @@ Deno.serve(async (req: Request) => {
         .select(
           `player_id, player_name, team, position,
            projection_final, ceiling_estimate, floor_estimate,
-           projection_confidence, risk_rating, neeko_rating`
+           projection_confidence, risk_rating, neeko_rating, value_score`
         )
         .in("player_id", [playerAId, playerBId]),
     ]);

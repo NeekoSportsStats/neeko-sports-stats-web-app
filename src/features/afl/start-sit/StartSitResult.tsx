@@ -165,8 +165,6 @@ function buildAIBullets(aiSummary: string | null, winner: PlayerData, loser: Pla
       const cleaned = s
         .replace(/\s+/g, " ")
         .replace(/^[-•]\s*/, "")
-        .replace(/\bChristian Petracca\b/gi, winner.player_name)
-        .replace(/\bDayne Zorko\b/gi, loser.player_name)
         .trim();
 
       if (cleaned.length < 25) continue;

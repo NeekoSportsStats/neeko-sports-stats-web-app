@@ -88,7 +88,8 @@ function computeEdgeScore(row: RankingRow): number | null {
   const risk = row.risk_rating;
   const val  = row.value_score;
 
-  if (proj == null && conf == null && risk == null && val == null) return null;
+  const nullCount = [proj, conf, risk, val].filter((v) => v == null).length;
+  if (nullCount >= 2) return null;
 
   const projNorm  = proj  != null ? Math.min(Math.max((proj - 60) / 60, 0), 1)   : 0.5;
   const confNorm  = conf  != null ? Math.min(Math.max(conf / 100, 0), 1)          : 0.5;
@@ -122,6 +123,7 @@ function EdgeScoreBadge({ row, large = false }: { row: RankingRow; large?: boole
   const score = computeEdgeScore(row);
   const color = getEdgeScoreColor(score);
   const tier  = getEdgeScoreTierLabel(score);
+  const limited = score == null;
 
   return (
     <div className="relative inline-flex flex-col items-center">
@@ -138,13 +140,21 @@ function EdgeScoreBadge({ row, large = false }: { row: RankingRow; large?: boole
           <p className="text-[9px] font-bold uppercase tracking-widest text-white/30">Edge Score</p>
           <Info size={8} className="text-white/20" />
         </div>
-        <p className={`${large ? "text-4xl" : "text-2xl"} font-extrabold tabular-nums leading-none ${color}`}>
-          {score ?? "—"}
-        </p>
-        {tier && (
-          <p className={`text-[9px] font-semibold uppercase tracking-wider leading-none mt-0.5 ${color} opacity-70`}>
-            {tier}
+        {limited ? (
+          <p className="text-[10px] font-semibold text-white/25 border border-white/10 rounded px-2 py-0.5 mt-0.5">
+            Limited data
           </p>
+        ) : (
+          <>
+            <p className={`${large ? "text-4xl" : "text-2xl"} font-extrabold tabular-nums leading-none ${color}`}>
+              {score}
+            </p>
+            {tier && (
+              <p className={`text-[9px] font-semibold uppercase tracking-wider leading-none mt-0.5 ${color} opacity-70`}>
+                {tier}
+              </p>
+            )}
+          </>
         )}
       </button>
 
@@ -424,6 +434,14 @@ function PlayerCard({ row, rank, section, locked, isPremium, onUnlock, isFeature
           <EdgeScoreBadge row={row} />
         </div>
       </div>
+
+      {/* Data quality guard */}
+      {row.projection_final == null && row.ceiling_estimate == null && row.floor_estimate == null && (
+        <div className="flex items-center gap-1.5 mb-3 px-2.5 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+          <AlertTriangle size={10} className="text-white/30 shrink-0" />
+          <span className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">Limited data — projection unavailable</span>
+        </div>
+      )}
 
       {/* Stats grid — always visible regardless of lock state */}
       {section === "captain" && !locked && <CaptainStatsBar row={row} />}

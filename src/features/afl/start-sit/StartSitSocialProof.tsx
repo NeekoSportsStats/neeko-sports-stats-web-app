@@ -38,42 +38,15 @@ interface SocialProofProps {
   onScrollToCompare: () => void;
 }
 
-const POPULAR_PAIRS: [string, string][] = [
-  ["Marcus Bontempelli", "Nick Daicos"],
-  ["Zak Butters", "Errol Gulden"],
-  ["Max Gawn", "Rowan Marshall"],
-  ["Lachie Neale", "Caleb Serong"],
-];
-
-const CLOSE_PAIRS: [string, string, number][] = [
-  ["Zak Butters", "Errol Gulden", 52],
-  ["Zach Merrett", "Lachie Neale", 51],
-  ["Isaac Heeney", "Jy Simpkin", 54],
-];
-
-function seed(s: number): number {
-  const x = Math.sin(s) * 10000;
-  return x - Math.floor(x);
-}
-
-function pseudoCount(offset: number): number {
-  const today = new Date();
-  const daySeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-  return Math.floor(40 + seed(daySeed + offset) * 380);
-}
-
 export function StartSitSocialProof({ players, onFillBoth, onScrollToCompare }: SocialProofProps) {
-  const weeklyCount = useMemo(() => {
-    const today = new Date();
-    const daySeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-    return Math.floor(1100 + seed(daySeed) * 400);
-  }, []);
-
-  const [livePopularity, setLivePopularity] = useState<PopularityRow[]>([]);
+  const [livePopularity, setLivePopularity] = useState<PopularityRow[] | null>(null);
 
   useEffect(() => {
     supabase.rpc("get_start_sit_popularity", { days_back: 7, limit_n: 6 })
-      .then(({ data }) => { if (data) setLivePopularity(data as PopularityRow[]); });
+      .then(({ data }) => {
+        setLivePopularity(data ? (data as PopularityRow[]) : []);
+      })
+      .catch(() => setLivePopularity([]));
   }, []);
 
   const playerMap = useMemo(() => {
@@ -86,58 +59,56 @@ export function StartSitSocialProof({ players, onFillBoth, onScrollToCompare }: 
   }, [players]);
 
   const popularMatchups = useMemo((): SocialProofMatchup[] => {
-    if (livePopularity.length >= 2) {
-      return livePopularity
-        .map((row) => {
-          const pA = playerMap.get(row.player_a_name) ?? playerMap.get(row.player_a_id);
-          const pB = playerMap.get(row.player_b_name) ?? playerMap.get(row.player_b_id);
-          if (!pA || !pB) return null;
-          return {
-            playerA: pA, playerB: pB,
-            comparisons: Number(row.comparison_count),
-            splitA: row.win_a_pct != null ? Number(row.win_a_pct) : undefined,
-          };
-        })
-        .filter((m): m is SocialProofMatchup => m !== null)
-        .slice(0, 4);
-    }
-    return POPULAR_PAIRS
-      .map(([nameA, nameB], i) => {
-        const pA = playerMap.get(nameA);
-        const pB = playerMap.get(nameB);
+    if (!livePopularity) return [];
+    return livePopularity
+      .map((row) => {
+        const pA = playerMap.get(row.player_a_name) ?? playerMap.get(row.player_a_id);
+        const pB = playerMap.get(row.player_b_name) ?? playerMap.get(row.player_b_id);
         if (!pA || !pB) return null;
-        return { playerA: pA, playerB: pB, comparisons: pseudoCount(i + 1) };
+        return {
+          playerA: pA,
+          playerB: pB,
+          comparisons: Number(row.comparison_count),
+          splitA: row.win_a_pct != null ? Number(row.win_a_pct) : undefined,
+        };
       })
-      .filter((m): m is SocialProofMatchup => m !== null);
+      .filter((m): m is SocialProofMatchup => m !== null)
+      .slice(0, 4);
   }, [livePopularity, playerMap]);
 
-  const closeDecisions = useMemo((): SocialProofMatchup[] =>
-    CLOSE_PAIRS
-      .map(([nameA, nameB, split]) => {
-        const pA = playerMap.get(nameA);
-        const pB = playerMap.get(nameB);
-        if (!pA || !pB) return null;
-        return { playerA: pA, playerB: pB, comparisons: 0, splitA: split };
+  const closeDecisions = useMemo((): SocialProofMatchup[] => {
+    if (!livePopularity) return [];
+    return livePopularity
+      .filter((row) => {
+        const pct = row.win_a_pct != null ? Number(row.win_a_pct) : null;
+        return pct != null && pct >= 45 && pct <= 55;
       })
-      .filter((m): m is SocialProofMatchup => m !== null),
-    [playerMap]);
+      .map((row) => {
+        const pA = playerMap.get(row.player_a_name) ?? playerMap.get(row.player_a_id);
+        const pB = playerMap.get(row.player_b_name) ?? playerMap.get(row.player_b_id);
+        if (!pA || !pB) return null;
+        return {
+          playerA: pA,
+          playerB: pB,
+          comparisons: Number(row.comparison_count),
+          splitA: Number(row.win_a_pct),
+        };
+      })
+      .filter((m): m is SocialProofMatchup => m !== null)
+      .slice(0, 3);
+  }, [livePopularity, playerMap]);
 
   function handleMatchupClick(a: QuickFillPlayer, b: QuickFillPlayer) {
     onFillBoth(a, b);
     onScrollToCompare();
   }
 
+  const loading = livePopularity === null;
+
+  if (loading) return null;
+
   return (
     <div className="space-y-6 mt-8">
-      {/* Activity indicator */}
-      <div className="flex items-center gap-2">
-        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-        <span className="text-xs text-white/30">
-          <span className="text-white/45 font-semibold tabular-nums">{weeklyCount.toLocaleString()}+</span>
-          {" "}start/sit comparisons made this week
-        </span>
-      </div>
-
       {/* Popular Decisions */}
       <div>
         <div className="flex items-center gap-2 mb-3">
@@ -146,78 +117,86 @@ export function StartSitSocialProof({ players, onFillBoth, onScrollToCompare }: 
             Popular Decisions This Week
           </p>
         </div>
-        <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 overflow-hidden">
-          {popularMatchups.map((m, i) => (
-            <button
-              key={i}
-              onClick={() => handleMatchupClick(m.playerA, m.playerB)}
-              className={`w-full group flex justify-between items-center px-4 py-3 hover:bg-neutral-900/70 transition-colors ${i < popularMatchups.length - 1 ? "border-b border-neutral-800" : ""}`}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-sm font-semibold text-white/65 truncate group-hover:text-white/85 transition-colors">
-                  {m.playerA.player_name}
-                </span>
-                <span className="text-[10px] text-white/20 shrink-0">vs</span>
-                <span className="text-sm font-semibold text-white/65 truncate group-hover:text-white/85 transition-colors">
-                  {m.playerB.player_name}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 shrink-0 ml-3">
-                <span className="text-[11px] tabular-nums text-white/25 hidden sm:inline">
-                  {m.comparisons > 0 ? `${m.comparisons} this week` : ""}
-                </span>
-                <ChevronRight size={13} className="text-white/15 group-hover:text-white/35 transition-colors" />
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Toughest Decisions */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <Scale size={12} className="text-blue-400" />
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-white/30">
-            Toughest Decisions This Week
-          </p>
-        </div>
-        <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 overflow-hidden">
-          {closeDecisions.map((m, i) => {
-            const splitA = m.splitA ?? 52;
-            const splitB = 100 - splitA;
-            return (
+        {popularMatchups.length === 0 ? (
+          <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-5 text-center">
+            <p className="text-xs text-white/25">Not enough data yet</p>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 overflow-hidden">
+            {popularMatchups.map((m, i) => (
               <button
                 key={i}
                 onClick={() => handleMatchupClick(m.playerA, m.playerB)}
-                className={`w-full group px-4 py-3 hover:bg-neutral-900/70 transition-colors ${i < closeDecisions.length - 1 ? "border-b border-neutral-800" : ""}`}
+                className={`w-full group flex justify-between items-center px-4 py-3 hover:bg-neutral-900/70 transition-colors ${i < popularMatchups.length - 1 ? "border-b border-neutral-800" : ""}`}
               >
-                <div className="flex justify-between items-center gap-3 mb-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm font-semibold text-white/65 truncate group-hover:text-white/85 transition-colors">
-                      {m.playerA.player_name.split(" ").pop()}
-                    </span>
-                    <span className="text-[10px] text-white/20 shrink-0">vs</span>
-                    <span className="text-sm font-semibold text-white/65 truncate group-hover:text-white/85 transition-colors">
-                      {m.playerB.player_name.split(" ").pop()}
-                    </span>
-                  </div>
-                  <span className="text-[11px] tabular-nums text-white/25 shrink-0 font-semibold">
-                    {splitA}% / {splitB}%
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm font-semibold text-white/65 truncate group-hover:text-white/85 transition-colors">
+                    {m.playerA.player_name}
+                  </span>
+                  <span className="text-[10px] text-white/20 shrink-0">vs</span>
+                  <span className="text-sm font-semibold text-white/65 truncate group-hover:text-white/85 transition-colors">
+                    {m.playerB.player_name}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden">
-                    <div
-                      className="h-full rounded-l-full bg-[#F5C84C]/50"
-                      style={{ width: `${splitA}%` }}
-                    />
-                  </div>
+                <div className="flex items-center gap-2 shrink-0 ml-3">
+                  <span className="text-[11px] tabular-nums text-white/25 hidden sm:inline">
+                    {m.comparisons > 0 ? `${m.comparisons.toLocaleString()} this week` : ""}
+                  </span>
+                  <ChevronRight size={13} className="text-white/15 group-hover:text-white/35 transition-colors" />
                 </div>
               </button>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Toughest Decisions — only shown if real close matchups exist */}
+      {closeDecisions.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Scale size={12} className="text-blue-400" />
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-white/30">
+              Toughest Decisions This Week
+            </p>
+          </div>
+          <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 overflow-hidden">
+            {closeDecisions.map((m, i) => {
+              const splitA = m.splitA ?? 50;
+              const splitB = 100 - splitA;
+              return (
+                <button
+                  key={i}
+                  onClick={() => handleMatchupClick(m.playerA, m.playerB)}
+                  className={`w-full group px-4 py-3 hover:bg-neutral-900/70 transition-colors ${i < closeDecisions.length - 1 ? "border-b border-neutral-800" : ""}`}
+                >
+                  <div className="flex justify-between items-center gap-3 mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-sm font-semibold text-white/65 truncate group-hover:text-white/85 transition-colors">
+                        {m.playerA.player_name.split(" ").pop()}
+                      </span>
+                      <span className="text-[10px] text-white/20 shrink-0">vs</span>
+                      <span className="text-sm font-semibold text-white/65 truncate group-hover:text-white/85 transition-colors">
+                        {m.playerB.player_name.split(" ").pop()}
+                      </span>
+                    </div>
+                    <span className="text-[11px] tabular-nums text-white/25 shrink-0 font-semibold">
+                      {splitA}% / {splitB}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                      <div
+                        className="h-full rounded-l-full bg-[#F5C84C]/50"
+                        style={{ width: `${splitA}%` }}
+                      />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

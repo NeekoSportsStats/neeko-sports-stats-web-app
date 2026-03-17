@@ -23,10 +23,25 @@ type Buckets = Record<string, number>;
 
 const BUCKET_LABELS = ["<60", "60–80", "80–100", "100–120", "120–140", "140+"];
 
-function randomNormal(mean: number, stdDev: number): number {
-  // Box-Muller transform
-  const u1 = Math.random();
-  const u2 = Math.random();
+function seededRandom(seed: number): () => number {
+  let s = seed;
+  return () => {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return (s >>> 0) / 0xffffffff;
+  };
+}
+
+function playerIdToSeed(id: string): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (Math.imul(31, hash) + id.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash) || 1;
+}
+
+function randomNormal(rand: () => number, mean: number, stdDev: number): number {
+  const u1 = rand();
+  const u2 = rand();
   const z = Math.sqrt(-2 * Math.log(u1 + 1e-10)) * Math.cos(2 * Math.PI * u2);
   return mean + z * stdDev;
 }
@@ -39,9 +54,10 @@ function simulateScores(p: PlayerData): number[] {
   const lo = floor * 0.8;
   const hi = ceil * 1.2;
 
+  const rand = seededRandom(playerIdToSeed(p.player_id));
   const scores: number[] = [];
   for (let i = 0; i < 100; i++) {
-    const s = randomNormal(mean, stdDev);
+    const s = randomNormal(rand, mean, stdDev);
     scores.push(Math.max(lo, Math.min(hi, s)));
   }
   return scores;
