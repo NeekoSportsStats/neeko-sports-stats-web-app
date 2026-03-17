@@ -34,35 +34,18 @@ export function getDisplayRecommendation(row: RankingRow, tab: RankingsTab): str
 // DB stores matchup_rating as a decimal multiplier string e.g. "1.023", "0.912", "1.0"
 // We convert to a signed percentage label: +2.3%, -8.8%, Neutral
 
-export function fmtMatchup(v: string | number | null): string | null {
-  if (v == null) return null;
+export function fmtMatchup(v: string | number | null): string {
+  if (v == null) return "—";
 
-  const str = String(v).trim();
-  if (!str || str === "0") return null;
+  const num = Number(v);
+  if (isNaN(num)) return "—";
 
-  const LABEL_MAP: Record<string, string> = {
-    "ELITE MATCHUP": "Elite",
-    "FAVOURABLE":    "Favourable",
-    "NEUTRAL":       "Neutral",
-    "DIFFICULT":     "Difficult",
-    "BRUTAL":        "Brutal",
-  };
-  const upper = str.toUpperCase();
-  if (LABEL_MAP[upper]) return LABEL_MAP[upper];
-
-  const num = parseFloat(str);
-  if (isNaN(num) || num === 0) return null;
-
-  // Detect decimal multiplier format (e.g. 0.85 – 1.25 range)
-  if (num >= 0.5 && num <= 2.0) {
+  if (num >= 0.8 && num <= 1.2) {
     const pct = (num - 1) * 100;
-    const rounded = Math.round(pct * 10) / 10;
-    if (Math.abs(rounded) < 0.5) return "Neutral";
-    const sign = rounded > 0 ? "+" : "";
-    return `${sign}${rounded.toFixed(1)}%`;
+    if (Math.abs(pct) < 1) return "Neutral";
+    return `${pct > 0 ? "+" : ""}${Math.round(pct)}%`;
   }
 
-  // Already a scaled integer score (e.g. 103, 88)
   return Math.round(num).toString();
 }
 

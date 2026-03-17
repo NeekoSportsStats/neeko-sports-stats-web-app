@@ -5,7 +5,7 @@ import {
   fmt, fmtInt, fmtPrice, fmtValueScore,
   getNeekoRatingBadge, getRiskBadge, getValueTagStyle,
   getValueScoreColor, getConfidenceColor, getDisplayRecommendation,
-  resolveRecommendationColor, truncateWhySummary,
+  resolveRecommendationColor,
   FREE_FULL_ROWS, FREE_PARTIAL_ROWS,
 } from "./helpers";
 
@@ -239,7 +239,7 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
             <LockedPlaceholder onUpgrade={onUpgrade} />
           ) : (
             <span className="text-xs text-white/50 leading-snug line-clamp-2 py-2">
-              {truncateWhySummary(row) ?? "—"}
+              {row.recommendation_why ?? row.recommendation_short ?? "—"}
             </span>
           )}
         </div>

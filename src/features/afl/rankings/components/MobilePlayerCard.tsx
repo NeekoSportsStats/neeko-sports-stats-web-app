@@ -154,9 +154,9 @@ export function MobilePlayerCard({
               >
                 <p className="text-[9px] text-white/35 uppercase tracking-wider mb-0.5">AI Rec</p>
                 <p className="text-xs font-bold" style={{ color: rc }}>{displayRec}</p>
-                {(row.ai_summary || row.recommendation_why) && (
+                {(row.recommendation_why || row.recommendation_short) && (
                   <p className="text-[11px] text-white/50 mt-1 leading-snug line-clamp-3">
-                    {row.ai_summary ?? row.recommendation_why}
+                    {row.recommendation_why ?? row.recommendation_short}
                   </p>
                 )}
               </div>

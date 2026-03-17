@@ -249,11 +249,11 @@ export default function AFLRankingsPage() {
       value_tag:            r.value_tag ?? null,
       value_tier:           r.value_tier ?? null,
       ai_recommendation:    r.ai_recommendation ?? null,
-      ai_summary:           r.ai_summary_long ?? r.ai_summary ?? r.summary ?? null,
+      ai_summary:           r.ai_summary_long ?? r.analysis ?? r.ai_summary ?? null,
       signal:               r.signal ?? null,
-      analysis:             r.recommendation_why ?? r.analysis ?? null,
+      analysis:             r.ai_summary_long ?? r.analysis ?? null,
       ai_updated_at:        r.ai_updated_at ?? null,
-      recommendation_short: r.recommendation_short ?? null,
+      recommendation_short: r.recommendation_short ?? r.ai_summary ?? null,
       recommendation_why:   r.recommendation_why ?? null,
       recommendation_color: r.recommendation_color ?? null,
       consistency_tier:     r.consistency_tier ?? null,
@@ -388,32 +388,19 @@ export default function AFLRankingsPage() {
       }
     }
 
-    if (isPremium && sortKey) {
+    if (isPremium && sortKey && sortKey !== TAB_DEFAULT_SORT[activeTab]) {
       filtered = [...filtered].sort((a, b) => {
-        let av: number;
-        let bv: number;
-        if (sortKey === "neeko_rating" && activeTab === "best") {
-          av = adjustedOverallScore(a);
-          bv = adjustedOverallScore(b);
-        } else {
-          av = ((a as any)[sortKey] as number | null | undefined) ?? -Infinity;
-          bv = ((b as any)[sortKey] as number | null | undefined) ?? -Infinity;
-        }
+        const av = ((a as any)[sortKey] as number | null | undefined) ?? -Infinity;
+        const bv = ((b as any)[sortKey] as number | null | undefined) ?? -Infinity;
         return sortDir === "desc" ? bv - av : av - bv;
       });
-    } else if (!isPremium) {
-      // For free users, apply tab-based sort client-side
-      const freeKey = TAB_DEFAULT_SORT[activeTab];
-      if (freeKey === "neeko_rating") {
-        filtered = [...filtered].sort((a, b) =>
-          (adjustedOverallScore(b)) - (adjustedOverallScore(a))
-        );
-      } else {
-        filtered = [...filtered].sort((a, b) => {
-          const av = ((a as any)[freeKey] as number | null | undefined) ?? -Infinity;
-          const bv = ((b as any)[freeKey] as number | null | undefined) ?? -Infinity;
-          return bv - av;
-        });
+    } else {
+      if (activeTab === "best") {
+        filtered = [...filtered].sort((a, b) => adjustedOverallScore(b) - adjustedOverallScore(a));
+      } else if (activeTab === "value") {
+        filtered = [...filtered].sort((a, b) => ((b.value_score ?? -Infinity) - (a.value_score ?? -Infinity)));
+      } else if (activeTab === "projection") {
+        filtered = [...filtered].sort((a, b) => ((b.projection_final ?? -Infinity) - (a.projection_final ?? -Infinity)));
       }
     }
 

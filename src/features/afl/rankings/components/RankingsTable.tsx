@@ -4,7 +4,7 @@ import {
   fmt, fmtInt, fmtPrice, fmtValueScore,
   getNeekoRatingBadge, getRiskBadge, getValueTagStyle,
   getValueScoreColor, getConfidenceColor, getDisplayRecommendation,
-  resolveRecommendationColor, safeWhyText, truncateWhySummary,
+  resolveRecommendationColor,
   FREE_PARTIAL_ROWS, FREE_FULL_ROWS,
 } from "./helpers";
 import { InfoTooltip, LockedCell } from "./RankingsModals";
@@ -221,7 +221,7 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
         {locked("recommendation_why") ? (
           <LockedCell onClick={onUpgrade} />
         ) : (() => {
-          const whyText = truncateWhySummary(row);
+          const whyText = row.recommendation_why ?? row.recommendation_short ?? null;
           if (!whyText) return <span className="text-white/20 text-xs">—</span>;
           return (
             <span className="text-xs text-white/60 leading-snug block line-clamp-2 max-w-[260px]">{whyText}</span>
