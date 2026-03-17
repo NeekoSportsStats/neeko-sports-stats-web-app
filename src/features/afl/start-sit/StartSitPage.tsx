@@ -10,6 +10,7 @@ import { StartSitSocialProof } from "./StartSitSocialProof";
 import type { QuickFillPlayer } from "./StartSitSocialProof";
 import { GameContextSelector, loadGameContext, type GameContext } from "./GameContextSelector";
 import { OpponentInput, loadOpponentModel, deriveOpponentState, getMargin, type OpponentModel } from "./OpponentInput";
+import type { WinProbabilityData } from "./WinProbabilityPanel";
 import { getAflRoundLabel } from "@/features/afl/shared/data/getAflRoundLabel";
 
 const CURRENT_SEASON = 2026;
@@ -51,6 +52,7 @@ interface CompareResult {
     confidence_percent?: number;
     probability_gap?: number;
   } | null;
+  win_probability?: WinProbabilityData | null;
 }
 
 export default function StartSitPage() {
@@ -221,6 +223,7 @@ export default function StartSitPage() {
         play_style: json.play_style ?? null,
         decision_context: json.decision_context ?? null,
         meta: json.meta ?? null,
+        win_probability: json.win_probability ?? null,
       });
 
       supabase.from("start_sit_decisions").insert({
@@ -264,11 +267,20 @@ export default function StartSitPage() {
         : gameContext.matchState !== "close"
         ? ` — ${gameContext.matchState} match`
         : "";
+    const wp = result.win_probability;
+    const wpLine = wp?.enabled && wp.option_a && wp.option_b
+      ? (() => {
+          const recId = wp.matchup_recommendation === "start_a" ? wp.option_a.player_id : wp.matchup_recommendation === "start_b" ? wp.option_b.player_id : null;
+          const recOpt = recId === wp.option_a.player_id ? wp.option_a : recId === wp.option_b.player_id ? wp.option_b : null;
+          return recOpt ? `Win odds: ${recOpt.player_name.split(" ").pop()} gives ${recOpt.win_probability}% win chance` : null;
+        })()
+      : null;
     const shareText = [
       `START: ${result.winner_name} (${winnerProj != null ? Math.round(winnerProj) + " proj" : "—"})${contextSuffix}`,
       `${edgeLabel} — ${result.confidence}% model confidence`,
+      wpLine,
       `Neeko Start/Sit: ${url.toString()}`,
-    ].join("\n");
+    ].filter(Boolean).join("\n");
     navigator.clipboard.writeText(shareText).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -459,6 +471,7 @@ export default function StartSitPage() {
             isCloseCall={result.meta?.is_close_call ?? false}
             gameContext={gameContext}
             opponentModel={opponentModel}
+            winProbability={result.win_probability}
           />
         )}
         {!comparing && result && authLoading && (

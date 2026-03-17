@@ -6,6 +6,7 @@ import { ContextInsight } from "./ContextInsight";
 import type { GameContext } from "./GameContextSelector";
 import { MatchupStatus } from "./MatchupStatus";
 import { deriveOpponentState, getMargin, type OpponentModel } from "./OpponentInput";
+import { WinProbabilityPanel, type WinProbabilityData } from "./WinProbabilityPanel";
 
 interface PlayerData {
   player_id: string;
@@ -39,6 +40,7 @@ interface StartSitResultProps {
   isCloseCall?: boolean;
   gameContext?: GameContext;
   opponentModel?: OpponentModel;
+  winProbability?: WinProbabilityData | null;
 }
 
 function fmt(v: number | null | undefined): string {
@@ -274,6 +276,7 @@ export function StartSitResult({
   isCloseCall = false,
   gameContext,
   opponentModel,
+  winProbability,
 }: StartSitResultProps) {
   const [deepOpen, setDeepOpen] = useState(false);
   const [distOpen, setDistOpen] = useState(false);
@@ -695,6 +698,17 @@ export function StartSitResult({
           )}
         </div>
       </div>
+
+      {/* ─── SECTION 4b: WIN PROBABILITY ENGINE ─── */}
+      {winProbability?.enabled && (
+        <WinProbabilityPanel
+          data={winProbability}
+          winnerPlayerId={winnerPlayerId}
+          isPremium={isPremium}
+          onUpgrade={onUpgrade}
+          isCloseCall={isCloseCall}
+        />
+      )}
 
       {/* ─── SECTION 5: COMPARISON BARS ─── */}
       <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">

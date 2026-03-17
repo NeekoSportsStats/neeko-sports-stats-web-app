@@ -186,6 +186,155 @@ function buildDeterministicStructured(winner: PlayerData, loser: PlayerData, con
   };
 }
 
+interface WinProbabilityOption {
+  player_id: string;
+  player_name: string;
+  win_probability: number;
+  lose_probability: number;
+}
+
+interface WinProbabilityResult {
+  enabled: boolean;
+  user_projected_score?: number | null;
+  opponent_projected_score?: number | null;
+  current_margin?: number | null;
+  option_a?: WinProbabilityOption | null;
+  option_b?: WinProbabilityOption | null;
+  delta?: number | null;
+  matchup_recommendation?: "start_a" | "start_b" | "neutral" | null;
+  matchup_context_label?: "protect_lead" | "chase_upside" | "coin_flip" | "small_edge" | null;
+  summary?: string | null;
+}
+
+function approximateWinProbability(
+  playerProj: number,
+  playerFloor: number,
+  playerCeiling: number,
+  playerRisk: number,
+  opponentScore: number,
+  margin: number
+): number {
+  // Approximate win probability using a normal-distribution-like sigmoid
+  // We model the player's score as a distribution centred on projection
+  // with std dev derived from the floor/ceiling spread and risk rating
+  const spread = Math.max((playerCeiling - playerFloor) / 2, 5);
+  const riskPenalty = (playerRisk / 100) * 5;
+  const stdDev = spread + riskPenalty;
+
+  // Effective target: need player score > (opponentScore - currentTeamOther)
+  // Simplified: we need player to exceed the gap. With margin already computed,
+  // a player whose proj == opponentScore has ~50% win chance at baseline.
+  // We adjust based on how much the player's proj covers the gap.
+  const projToTarget = playerProj - opponentScore;
+
+  // z-score approximation: (projToTarget) / stdDev
+  const z = projToTarget / stdDev;
+
+  // Sigmoid approximation of normal CDF
+  const winProb = 1 / (1 + Math.exp(-1.7 * z));
+
+  // Clamp to realistic range 20-80 to avoid fake certainty
+  return Math.round(Math.min(Math.max(winProb * 100, 18), 82));
+}
+
+function computeWinProbability(
+  pA: PlayerData,
+  pB: PlayerData,
+  ctx: GameContext | null | undefined
+): WinProbabilityResult {
+  const oppMargin = ctx?.opponent_margin ?? null;
+  const userScore = ctx?.opponent_margin != null && ctx?.opponent_state !== "neutral"
+    ? null
+    : null;
+
+  if (oppMargin == null || ctx?.opponent_state === "neutral" || ctx?.opponent_state == null) {
+    return { enabled: false };
+  }
+
+  // We need both scores — derive them from margin
+  // opponent_margin = user_projected_score - opponent_projected_score
+  // We don't have absolute values from context alone, so use 1500 as neutral baseline
+  // and derive opponent from margin
+  const BASELINE = 1500;
+  const userProjectedScore = BASELINE + Math.round(oppMargin / 2);
+  const opponentProjectedScore = BASELINE - Math.round(oppMargin / 2);
+  const currentMargin = oppMargin;
+
+  const projA = pA.projection_final ?? 80;
+  const projB = pB.projection_final ?? 80;
+  const floorA = pA.floor ?? Math.max(projA - 30, 30);
+  const floorB = pB.floor ?? Math.max(projB - 30, 30);
+  const ceilA = pA.ceiling ?? projA + 30;
+  const ceilB = pB.ceiling ?? projB + 30;
+  const riskA = pA.risk_rating ?? 40;
+  const riskB = pB.risk_rating ?? 40;
+
+  // Each option: win probability = probability team score (with this player) > opponent score baseline
+  // Simplified: treat the opponent score as fixed, player contributes their projection
+  // to the user's fantasy team total. Net effect: swap projA vs projB, all else equal.
+  // The effective "target" the player must beat is opponentScore adjusted for the team deficit.
+  // Since we don't have full team context, we compare each player's individual win contribution.
+  const targetScore = opponentProjectedScore - (userProjectedScore - projA);
+
+  const winProbA = approximateWinProbability(projA, floorA, ceilA, riskA, targetScore, currentMargin);
+  const winProbB = approximateWinProbability(projB, floorB, ceilB, riskB, targetScore, currentMargin);
+
+  const delta = winProbA - winProbB;
+  const absDelta = Math.abs(delta);
+
+  const matchupRecommendation: "start_a" | "start_b" | "neutral" =
+    absDelta < 3 ? "neutral" : delta > 0 ? "start_a" : "start_b";
+
+  const isChasing = currentMargin < -2;
+  const isLeading = currentMargin > 2;
+
+  const matchupContextLabel: WinProbabilityResult["matchup_context_label"] =
+    isLeading && absDelta >= 3 ? "protect_lead"
+    : isChasing && absDelta >= 3 ? "chase_upside"
+    : absDelta >= 3 ? "small_edge"
+    : "coin_flip";
+
+  const wLast = pA.player_name.split(" ").pop() ?? pA.player_name;
+  const lLast = pB.player_name.split(" ").pop() ?? pB.player_name;
+  const recName = matchupRecommendation === "start_a" ? wLast : matchupRecommendation === "start_b" ? lLast : null;
+
+  let summary: string | null = null;
+  if (recName && absDelta >= 3) {
+    if (isChasing) {
+      summary = `Because you are trailing by ${Math.abs(currentMargin)} points, ${recName}'s ceiling profile gives you a better chance to win this matchup (${matchupRecommendation === "start_a" ? winProbA : winProbB}% vs ${matchupRecommendation === "start_a" ? winProbB : winProbA}%).`;
+    } else if (isLeading) {
+      summary = `With a ${currentMargin}-point lead, ${recName}'s floor and consistency profile better protect your position (${matchupRecommendation === "start_a" ? winProbA : winProbB}% vs ${matchupRecommendation === "start_a" ? winProbB : winProbA}%).`;
+    } else {
+      summary = `In a tight matchup, ${recName} offers a marginal win probability edge of ${absDelta}%.`;
+    }
+  } else if (absDelta < 3) {
+    summary = `Both options offer near-identical win odds. The model's composite verdict is the most reliable guide here.`;
+  }
+
+  return {
+    enabled: true,
+    user_projected_score: userProjectedScore,
+    opponent_projected_score: opponentProjectedScore,
+    current_margin: currentMargin,
+    option_a: {
+      player_id: String(pA.player_id),
+      player_name: pA.player_name,
+      win_probability: winProbA,
+      lose_probability: 100 - winProbA,
+    },
+    option_b: {
+      player_id: String(pB.player_id),
+      player_name: pB.player_name,
+      win_probability: winProbB,
+      lose_probability: 100 - winProbB,
+    },
+    delta,
+    matchup_recommendation: matchupRecommendation,
+    matchup_context_label: matchupContextLabel,
+    summary,
+  };
+}
+
 function buildContextBlock(ctx: GameContext | null | undefined): string {
   if (!ctx) return "";
   const matchState = ctx.match_state ?? "close";
@@ -241,7 +390,8 @@ async function callOpenAIStructured(
   loser: PlayerData,
   confidence: number,
   round: number,
-  context?: GameContext | null
+  context?: GameContext | null,
+  winProb?: WinProbabilityResult | null
 ): Promise<StructuredAIOutput | null> {
   const pW = winner.projection_final ?? 0;
   const pL = loser.projection_final ?? 0;
@@ -260,13 +410,33 @@ async function callOpenAIStructured(
 
   const contextBlock = buildContextBlock(context);
 
+  let winProbBlock = "";
+  if (winProb?.enabled && winProb.option_a && winProb.option_b) {
+    const recName = winProb.matchup_recommendation === "start_a"
+      ? winProb.option_a.player_name
+      : winProb.matchup_recommendation === "start_b"
+      ? winProb.option_b.player_name
+      : null;
+    const winA = winProb.option_a.win_probability;
+    const winB = winProb.option_b.win_probability;
+    const delta = winProb.delta != null ? Math.abs(winProb.delta) : 0;
+    winProbBlock = `\nMATCHUP WIN PROBABILITY (pre-computed — do NOT invent different numbers):
+- ${winProb.option_a.player_name}: ${winA}% win probability
+- ${winProb.option_b.player_name}: ${winB}% win probability
+- Delta: ${delta}% in favour of ${recName ?? "neither"}
+- Context: ${winProb.matchup_context_label ?? "neutral"}
+${winProb.summary ? `- Engine summary: ${winProb.summary}` : ""}
+
+CRITICAL: You must reference these pre-computed win percentages in your long_summary. Do NOT calculate or invent different percentages. Do NOT contradict the deterministic verdict. If the matchup recommendation differs from the model verdict, explain both clearly and distinguish between "neutral best play" and "matchup-specific best play".`;
+  }
+
   const systemPrompt = `You are an elite AFL fantasy strategy assistant for Neeko Sports Stats.
 
 The deterministic model has ALREADY selected ${winner.player_name} over ${loser.player_name} with ${confidence}% confidence.
 
 YOUR ROLE: Explain this decision in structured JSON. You are NOT making the decision — you are explaining it.
 
-${contextBlock ? contextBlock + "\n" : ""}CRITICAL RULES:
+${contextBlock ? contextBlock + "\n" : ""}${winProbBlock ? winProbBlock + "\n" : ""}CRITICAL RULES:
 - NEVER recommend ${loser.player_name} as the primary start
 - NEVER contradict the model verdict
 - Reference actual numbers from the data provided
@@ -531,6 +701,7 @@ Deno.serve(async (req: Request) => {
     const scoreA = compositeScore(pA);
     const scoreB = compositeScore(pB);
     const meta = deriveCloseCallMeta(confidence, scoreA, scoreB);
+    const winProbability = computeWinProbability(pA, pB, gameContext);
 
     const { data: cached } = await serviceClient
       .from("start_sit_cache")
@@ -578,6 +749,7 @@ Deno.serve(async (req: Request) => {
           play_style: structured.play_style,
           decision_context: structured.decision_context,
           meta,
+          win_probability: winProbability,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -587,7 +759,7 @@ Deno.serve(async (req: Request) => {
     let aiSummary: string;
 
     if (openaiKey) {
-      const aiResult = await callOpenAIStructured(openaiKey, winner, loser, confidence, round_number, gameContext);
+      const aiResult = await callOpenAIStructured(openaiKey, winner, loser, confidence, round_number, gameContext, winProbability);
       structured = aiResult ?? buildDeterministicStructured(winner, loser, confidence);
     } else {
       structured = buildDeterministicStructured(winner, loser, confidence);
@@ -638,6 +810,7 @@ Deno.serve(async (req: Request) => {
         play_style: structured.play_style,
         decision_context: structured.decision_context,
         meta,
+        win_probability: winProbability,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
