@@ -43,6 +43,16 @@ export interface ScoreHistoryPoint {
   projection?: number | null;
 }
 
+export interface ChartDataPoint {
+  round_label: string;
+  round_number: number;
+  season: number;
+  game_id: number | null;
+  actual_score: number | null;
+  projected_score: number | null;
+  is_future: boolean;
+}
+
 export type RankingsTab = "best" | "value" | "projection";
 export type PositionFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC";
 export type PremiumFilter = "ALL" | "DEF" | "MID" | "FWD" | "RUC" | "TOP50" | "TOP100" | "ELITE";

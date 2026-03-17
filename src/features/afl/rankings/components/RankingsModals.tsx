@@ -15,7 +15,7 @@ function useBodyScrollLock(active: boolean) {
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Dot } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import {
-  RankingRow, ScoreHistoryPoint, RowTier,
+  RankingRow, ChartDataPoint, RowTier,
 } from "./types";
 import {
   fmt, fmtInt, fmtPrice, fmtValueScore, fmtMatchup,
@@ -203,71 +203,87 @@ export function UpgradeModal({ onClose }: { onClose: () => void }) {
 
 // ─── Score History Chart ───────────────────────────────────────────────────────
 
+function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  const actual = payload.find((p: any) => p.dataKey === "actual_score")?.value ?? null;
+  const projected = payload.find((p: any) => p.dataKey === "projected_score")?.value ?? null;
+  const diff = actual != null && projected != null ? Math.round(actual - projected) : null;
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-[#181818] px-3 py-2.5 shadow-xl min-w-[120px]">
+      <p className="text-[11px] text-white/40 font-medium mb-1.5">{label}</p>
+      {projected != null && (
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[11px] text-emerald-400/80">Projected</span>
+          <span className="text-[12px] font-semibold text-emerald-400 tabular-nums">{Math.round(projected)}</span>
+        </div>
+      )}
+      {actual != null && (
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[11px] text-[#F5C84C]/80">Actual</span>
+          <span className="text-[12px] font-semibold text-[#F5C84C] tabular-nums">{Math.round(actual)}</span>
+        </div>
+      )}
+      {diff != null && (
+        <div className="flex items-center justify-between gap-3 mt-1 pt-1 border-t border-white/8">
+          <span className="text-[10px] text-white/35">Diff</span>
+          <span className={`text-[11px] font-semibold tabular-nums ${diff >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+            {diff >= 0 ? "+" : ""}{diff}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ScoreHistoryChart({ playerName, playerId }: { playerName: string; playerId?: string | null }) {
-  const [data, setData] = useState<ScoreHistoryPoint[]>([]);
+  const [data, setData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      let rows: ScoreHistoryPoint[] | null = null;
+      let rows: ChartDataPoint[] = [];
 
       if (playerId) {
-        const { data: byId } = await supabase.rpc("get_player_score_history_by_id", {
-          player_id_in: playerId,
+        const { data: res } = await supabase.rpc("get_player_chart_data", {
+          p_player_id: playerId,
           n_games: 10,
         });
-        rows = (byId as ScoreHistoryPoint[]) ?? [];
+        if (res && (res as any[]).length > 0) {
+          rows = (res as any[]).map((r) => ({
+            round_label:     r.round_label,
+            round_number:    Number(r.round_number),
+            season:          Number(r.season),
+            game_id:         r.game_id ?? null,
+            actual_score:    r.actual_score != null ? Number(r.actual_score) : null,
+            projected_score: r.projected_score != null ? Number(r.projected_score) : null,
+            is_future:       r.is_future === true,
+          }));
+        }
       }
 
-      if (!rows?.length && playerName) {
+      if (!rows.length && playerName) {
         const { data: byName } = await supabase.rpc("get_player_score_history", {
           player_name_in: playerName,
           n_games: 10,
         });
-        rows = (byName as ScoreHistoryPoint[]) ?? [];
-      }
-
-      const baseRows = rows ?? [];
-
-      let finalRows: ScoreHistoryPoint[] = baseRows;
-
-      if (playerId && baseRows.length) {
-        const { data: projData } = await supabase
-          .schema("afl" as never)
-          .from("player_projection_history")
-          .select("game_id,projection_final,game_date,season")
-          .eq("player_id", Number(playerId))
-          .order("game_date", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (projData) {
-          const p = projData as { game_id: number; projection_final: string; game_date: string; season: number };
-          const lastActual = baseRows[baseRows.length - 1];
-          const nextRound = (lastActual?.round_number ?? 0) + 1;
-          const nextLabel = nextRound === 0 ? "OR" : `R${nextRound}`;
-          const projVal = Number(p.projection_final);
-          const lastActualScore = lastActual?.fantasy_points != null ? Number(lastActual.fantasy_points) : null;
-          finalRows = [
-            ...baseRows.slice(0, -1),
-            ...(lastActual ? [{ ...lastActual, projection: lastActualScore }] : []),
-            {
-              game_index: (lastActual?.game_index ?? 0) + 1,
-              round_label: nextLabel,
-              round_number: nextRound,
-              fantasy_points: null,
-              season: p.season,
-              game_id: p.game_id,
-              projection: projVal,
-            },
-          ];
+        if (byName && (byName as any[]).length > 0) {
+          rows = (byName as any[]).map((r) => ({
+            round_label:     r.round_label,
+            round_number:    Number(r.round_number),
+            season:          Number(r.season),
+            game_id:         null,
+            actual_score:    r.fantasy_points != null ? Number(r.fantasy_points) : null,
+            projected_score: null,
+            is_future:       false,
+          }));
         }
       }
 
       if (!cancelled) {
-        setData(finalRows);
+        setData(rows);
         setLoading(false);
       }
     }
@@ -292,52 +308,118 @@ function ScoreHistoryChart({ playerName, playerId }: { playerName: string; playe
     );
   }
 
-  const scores = data.map((d) => d.fantasy_points != null ? Number(d.fantasy_points) : null).filter((v): v is number => v !== null);
-  const projScores = data.map((d) => d.projection != null ? Number(d.projection) : null).filter((v): v is number => v !== null);
-  const allVals = [...scores, ...projScores];
+  const actuals = data.map((d) => d.actual_score).filter((v): v is number => v !== null);
+  const projected = data.map((d) => d.projected_score).filter((v): v is number => v !== null);
+  const allVals = [...actuals, ...projected];
   const minVal = allVals.length ? Math.min(...allVals) : 0;
   const maxVal = allVals.length ? Math.max(...allVals) : 100;
-  const padding = Math.max(10, (maxVal - minVal) * 0.15);
-  const hasProjections = projScores.length > 0;
+  const pad = Math.max(10, (maxVal - minVal) * 0.18);
+
+  const hasActuals = actuals.length > 0;
+  const hasHistoricalProj = data.some((d) => !d.is_future && d.projected_score != null);
+  const hasFutureProj = data.some((d) => d.is_future && d.projected_score != null);
+  const hasAnyProj = hasHistoricalProj || hasFutureProj;
+
+  // Split projected into two series: past solid + future dotted
+  // Recharts can't switch strokeDasharray mid-line, so we use two separate Line components
+  // Past projected: set to null for future rows; Future projected: set to null for past rows
+  const chartData = data.map((d) => ({
+    ...d,
+    proj_past:   !d.is_future ? d.projected_score : null,
+    proj_future: d.is_future  ? d.projected_score : null,
+    // Bridge: for the last past point, also carry projected_score into proj_future so the dotted line connects
+  }));
+
+  // Find the last past row index to bridge the two projected series visually
+  const lastPastIdx = chartData.reduce((acc, d, i) => (!d.is_future ? i : acc), -1);
+  if (lastPastIdx >= 0 && hasFutureProj && chartData[lastPastIdx].proj_past != null) {
+    chartData[lastPastIdx] = {
+      ...chartData[lastPastIdx],
+      proj_future: chartData[lastPastIdx].proj_past,
+    };
+  }
 
   return (
     <>
-      <ResponsiveContainer width="100%" height={180}>
-        <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
-          <XAxis dataKey="round_label" tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }} axisLine={false} tickLine={false} />
-          <YAxis domain={[minVal - padding, maxVal + padding]} tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }} axisLine={false} tickLine={false} width={32} />
-          <RechartsTooltip
-            contentStyle={{ background: "#181818", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "6px 10px" }}
-            labelStyle={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}
-            itemStyle={{ fontSize: 12, fontWeight: 600 }}
-            formatter={(v: number, name: string) => [Math.round(v), name === "projection" ? "Projection" : "Score"]}
+      <ResponsiveContainer width="100%" height={185}>
+        <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+          <XAxis
+            dataKey="round_label"
+            tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }}
+            axisLine={false}
+            tickLine={false}
           />
-          <Line type="monotone" dataKey="fantasy_points" stroke="#F5C84C" strokeWidth={2}
-            dot={<Dot r={3} fill="#F5C84C" strokeWidth={0} />}
-            activeDot={{ r: 5, fill: "#F5C84C", strokeWidth: 2, stroke: "#0e0e0e" }}
+          <YAxis
+            domain={[minVal - pad, maxVal + pad]}
+            tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }}
+            axisLine={false}
+            tickLine={false}
+            width={32}
           />
-          {hasProjections && (
-            <Line type="monotone" dataKey="projection" stroke="rgba(99,179,237,0.75)" strokeWidth={1.5}
-              strokeDasharray="4 3"
-              dot={<Dot r={3} fill="rgba(99,179,237,0.9)" strokeWidth={0} />}
-              activeDot={{ r: 4, fill: "rgba(99,179,237,0.9)", strokeWidth: 0 }}
+          <RechartsTooltip content={<ChartTooltip />} />
+
+          {/* Actual scores — yellow solid, no connect through nulls */}
+          {hasActuals && (
+            <Line
+              type="monotone"
+              dataKey="actual_score"
+              name="Actual"
+              stroke="#F5C84C"
+              strokeWidth={2}
+              connectNulls={false}
+              dot={<Dot r={3} fill="#F5C84C" strokeWidth={0} />}
+              activeDot={{ r: 5, fill: "#F5C84C", strokeWidth: 2, stroke: "#0e0e0e" }}
+            />
+          )}
+
+          {/* Historical projections — green solid, past games only */}
+          {hasHistoricalProj && (
+            <Line
+              type="monotone"
+              dataKey="proj_past"
+              name="Projected"
+              stroke="#4ade80"
+              strokeWidth={1.5}
+              connectNulls={false}
+              dot={<Dot r={2.5} fill="#4ade80" strokeWidth={0} />}
+              activeDot={{ r: 4, fill: "#4ade80", strokeWidth: 0 }}
+            />
+          )}
+
+          {/* Upcoming projection — green dotted extension */}
+          {hasFutureProj && (
+            <Line
+              type="monotone"
+              dataKey="proj_future"
+              name="Projected"
+              stroke="#4ade80"
+              strokeWidth={1.5}
+              strokeDasharray="5 3"
               connectNulls={true}
+              dot={<Dot r={3.5} fill="#4ade80" strokeWidth={0} />}
+              activeDot={{ r: 4, fill: "#4ade80", strokeWidth: 0 }}
             />
           )}
         </LineChart>
       </ResponsiveContainer>
-      {hasProjections && (
-        <div className="flex items-center gap-4 mt-1.5 px-1">
+
+      <div className="flex items-center gap-4 mt-1.5 px-1">
+        {hasActuals && (
           <div className="flex items-center gap-1.5">
             <div className="h-0.5 w-4 rounded bg-[#F5C84C]" />
             <span className="text-[10px] text-white/35">Actual</span>
           </div>
+        )}
+        {hasAnyProj && (
           <div className="flex items-center gap-1.5">
-            <div className="h-0.5 w-4 rounded bg-[rgba(99,179,237,0.7)] border-dashed" style={{ borderTop: "1.5px dashed rgba(99,179,237,0.7)", height: 0, background: "none" }} />
-            <span className="text-[10px] text-white/35">Projected</span>
+            <div className="h-0.5 w-4 rounded bg-emerald-400" />
+            <span className="text-[10px] text-white/35">{hasHistoricalProj ? "Projected" : "Next Round Projection"}</span>
           </div>
-        </div>
-      )}
+        )}
+        {hasFutureProj && !hasActuals && (
+          <span className="text-[10px] text-white/20 italic">Season starts soon</span>
+        )}
+      </div>
     </>
   );
 }
