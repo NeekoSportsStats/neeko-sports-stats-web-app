@@ -31,39 +31,60 @@ export function getDisplayRecommendation(row: RankingRow, tab: RankingsTab): str
 }
 
 // ─── Matchup display helper ───────────────────────────────────────────────────
+// DB stores matchup_rating as a decimal multiplier string e.g. "1.023", "0.912", "1.0"
+// We convert to a signed percentage label: +2.3%, -8.8%, Neutral
 
 export function fmtMatchup(v: string | number | null): string | null {
   if (v == null) return null;
-  if (typeof v === "string") {
-    const u = v.toUpperCase().trim();
-    if (!u || u === "0") return null;
-    const MAP: Record<string, string> = {
-      "ELITE MATCHUP": "Elite",
-      "FAVOURABLE": "Favourable",
-      "NEUTRAL": "Neutral",
-      "DIFFICULT": "Difficult",
-      "BRUTAL": "Brutal",
-    };
-    return MAP[u] ?? v;
+
+  const str = String(v).trim();
+  if (!str || str === "0") return null;
+
+  const LABEL_MAP: Record<string, string> = {
+    "ELITE MATCHUP": "Elite",
+    "FAVOURABLE":    "Favourable",
+    "NEUTRAL":       "Neutral",
+    "DIFFICULT":     "Difficult",
+    "BRUTAL":        "Brutal",
+  };
+  const upper = str.toUpperCase();
+  if (LABEL_MAP[upper]) return LABEL_MAP[upper];
+
+  const num = parseFloat(str);
+  if (isNaN(num) || num === 0) return null;
+
+  // Detect decimal multiplier format (e.g. 0.85 – 1.25 range)
+  if (num >= 0.5 && num <= 2.0) {
+    const pct = (num - 1) * 100;
+    const rounded = Math.round(pct * 10) / 10;
+    if (Math.abs(rounded) < 0.5) return "Neutral";
+    const sign = rounded > 0 ? "+" : "";
+    return `${sign}${rounded.toFixed(1)}%`;
   }
-  if (isNaN(Number(v)) || Number(v) === 0) return null;
-  return Math.round(Number(v)).toString();
+
+  // Already a scaled integer score (e.g. 103, 88)
+  return Math.round(num).toString();
 }
 
 // ─── Generic AI text detector ─────────────────────────────────────────────────
 
-const GENERIC_OPENINGS = [
+const GENERIC_PATTERNS = [
   /^[\w\s]+ has a solid projection of \d/i,
   /^[\w\s]+ has a strong projection of \d/i,
   /^[\w\s]+ has an impressive projection of \d/i,
   /^[\w\s]+ is projected to score \d/i,
   /^[\w\s]+ carries a projection of \d/i,
   /^[\w\s]+ boasts a projection of \d/i,
+  /is primed for a (solid|strong|big) (fantasy outing|fantasy performance|score|round)/i,
+  /is a (solid|strong) buy this round/i,
+  /is poised for a (strong|solid|big) (fantasy|score)/i,
+  /is set for a (solid|strong|big)/i,
+  /looks (set|poised) for a/i,
 ];
 
 export function isGenericAIText(text: string | null | undefined): boolean {
   if (!text) return false;
-  return GENERIC_OPENINGS.some((p) => p.test(text.trim()));
+  return GENERIC_PATTERNS.some((p) => p.test(text.trim()));
 }
 
 // ─── Position normalisation ───────────────────────────────────────────────────
@@ -486,10 +507,10 @@ export function truncateWhySummary(row: {
   projection_confidence?: number | null;
   price?: number | null;
 }): string | null {
-  const why = (row.recommendation_why ?? "").trim();
+  const why   = (row.recommendation_why ?? "").trim();
   const short = (row.recommendation_short ?? "").trim();
 
-  // Try to extract first sentence from ai_summary (never show the full blob in the table)
+  // Extract first sentence from ai_summary for table display
   const rawSummary = (row.ai_summary ?? "").trim();
   const summaryFirstSentence = (() => {
     if (!rawSummary) return "";
@@ -497,13 +518,16 @@ export function truncateWhySummary(row: {
     return end > 0 ? rawSummary.slice(0, end + 1).trim() : rawSummary.slice(0, 120);
   })();
 
-  const candidates = [why, short, summaryFirstSentence].filter(
+  // Priority 1: non-generic content
+  const nonGeneric = [why, short, summaryFirstSentence].find(
     (s) => s.length >= 10 && !isGenericAIText(s)
   );
 
-  let best = candidates[0] ?? [why, short, summaryFirstSentence].find((s) => s.length >= 10) ?? null;
+  // Priority 2: any content even if generic (show something rather than nothing)
+  const anyContent = [why, short, summaryFirstSentence].find((s) => s.length >= 10);
 
-  // If no AI content at all, use metric-based fallback
+  let best = nonGeneric ?? anyContent ?? null;
+
   if (!best) {
     return generateMetricFallbackWhy(row);
   }
@@ -542,13 +566,13 @@ export function safeWhyText(row: {
   const short = (row.recommendation_short ?? "").trim();
   const why   = (row.recommendation_why ?? "").trim();
 
-  // Priority 1 — recommendation_short (compact modal summary)
+  // Priority 1 — recommendation_short if non-generic and long enough
   if (short.length >= 20 && !isGenericAIText(short)) return trunc(short);
 
-  // Priority 2 — recommendation_why if distinct from short
+  // Priority 2 — recommendation_why if distinct from short and non-generic
   if (why.length >= 20 && !isGenericAIText(why) && why !== short) return trunc(why);
 
-  // Priority 3 — any non-empty field even if generic
+  // Priority 3 — show any non-empty AI field even if generic (better than metric fallback)
   if (short.length >= 10) return trunc(short);
   if (why.length >= 10)   return trunc(why);
 

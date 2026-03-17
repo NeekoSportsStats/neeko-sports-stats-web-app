@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { X, Crown, Lock, Info } from "lucide-react";
 
 function useBodyScrollLock(active: boolean) {
@@ -323,62 +323,14 @@ export function PlayerDetailModal({
   tier: RowTier;
   onClose: () => void;
 }) {
-  const [aiAnalysis, setAiAnalysis] = useState<{ analysis: string | null; captain_recommendation: string | null } | null>(null);
-  const [loadingAI, setLoadingAI] = useState(true);
-
-  useEffect(() => {
-    setAiAnalysis(null);
-    setLoadingAI(true);
-
-    let cancelled = false;
-
-    async function fetchAI() {
-      if (!row.player_id || !isPremium) { setLoadingAI(false); return; }
-      const { data } = await supabase
-        .from("ai_player_content")
-        .select("summary, recommendation")
-        .eq("player_id", row.player_id)
-        .maybeSingle();
-      if (!cancelled) {
-        const mapped = data
-          ? { analysis: (data as { summary: string | null; recommendation: string | null }).summary, captain_recommendation: (data as { summary: string | null; recommendation: string | null }).recommendation }
-          : null;
-        setAiAnalysis(mapped);
-        setLoadingAI(false);
-      }
-    }
-
-    fetchAI();
-
-    if (row.player_id && isPremium) {
-      const channel = supabase
-        .channel(`ai_content_${row.player_id}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "ai_player_content",
-            filter: `player_id=eq.${row.player_id}`,
-          },
-          (payload) => {
-            if (!cancelled && payload.new) {
-              const record = payload.new as { summary: string | null; recommendation: string | null };
-              setAiAnalysis({ analysis: record.summary, captain_recommendation: record.recommendation });
-              setLoadingAI(false);
-            }
-          }
-        )
-        .subscribe();
-
-      return () => {
-        cancelled = true;
-        supabase.removeChannel(channel);
-      };
-    }
-
-    return () => { cancelled = true; };
-  }, [row.player_id, isPremium]);
+  const aiAnalysis = useMemo(() => {
+    if (!isPremium) return null;
+    const analysis = row.ai_summary ?? row.analysis ?? null;
+    const captain_recommendation = row.captain_rating ?? null;
+    if (!analysis) return null;
+    return { analysis, captain_recommendation };
+  }, [row.ai_summary, row.analysis, row.captain_rating, isPremium]);
+  const loadingAI = false;
 
   useBodyScrollLock(true);
   void rank;

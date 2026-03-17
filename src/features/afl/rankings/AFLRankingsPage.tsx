@@ -172,10 +172,11 @@ const PREMIUM_COLUMNS =
   "player_id,player_name,team,position,team_name,position_group," +
   "projection_final,ceiling,floor,ceiling_estimate,floor_estimate," +
   "consistency_score,form_rating,neeko_rating,price,value_score,value_tag,value_tier," +
-  "signal,ai_summary,analysis,projection_confidence,risk_rating,matchup_rating," +
+  "signal,ai_summary,ai_summary_short,ai_summary_long,analysis," +
+  "projection_confidence,risk_rating,matchup_rating," +
   "upside_rating,captain_score,captain_rating,ai_recommendation,recommendation_color," +
   "recommendation_short,recommendation_why,consistency_tier,total_count,cached_at," +
-  "games_played,ai_updated_at";
+  "games_played,ai_updated_at,season_avg,last3_avg,last5_avg,opponent_name,venue,is_home";
 
 const FREE_COLUMNS =
   "player_id,player_name,team,position,team_name,position_group," +
@@ -248,9 +249,9 @@ export default function AFLRankingsPage() {
       value_tag:            r.value_tag ?? null,
       value_tier:           r.value_tier ?? null,
       ai_recommendation:    r.ai_recommendation ?? null,
-      ai_summary:           r.ai_summary ?? r.summary ?? null,
+      ai_summary:           r.ai_summary_long ?? r.ai_summary ?? r.summary ?? null,
       signal:               r.signal ?? null,
-      analysis:             r.analysis ?? null,
+      analysis:             r.recommendation_why ?? r.analysis ?? null,
       ai_updated_at:        r.ai_updated_at ?? null,
       recommendation_short: r.recommendation_short ?? null,
       recommendation_why:   r.recommendation_why ?? null,
@@ -353,6 +354,15 @@ export default function AFLRankingsPage() {
     }
   }
 
+  function dampedNeekoRating(r: RankingRow): number {
+    const base = r.neeko_rating ?? 0;
+    const gp = r.games_played ?? 0;
+    if (gp >= 5) return base;
+    if (gp >= 3) return base * 0.88;
+    if (gp >= 1) return base * 0.72;
+    return base * 0.55;
+  }
+
   const displayRows = useMemo(() => {
     let filtered = [...rows];
 
@@ -381,14 +391,35 @@ export default function AFLRankingsPage() {
 
     if (isPremium && sortKey) {
       filtered = [...filtered].sort((a, b) => {
-        const av = (a as any)[sortKey] ?? -Infinity;
-        const bv = (b as any)[sortKey] ?? -Infinity;
+        let av: number;
+        let bv: number;
+        if (sortKey === "neeko_rating" && activeTab === "best") {
+          av = dampedNeekoRating(a);
+          bv = dampedNeekoRating(b);
+        } else {
+          av = ((a as any)[sortKey] as number | null | undefined) ?? -Infinity;
+          bv = ((b as any)[sortKey] as number | null | undefined) ?? -Infinity;
+        }
         return sortDir === "desc" ? bv - av : av - bv;
       });
+    } else if (!isPremium) {
+      // For free users, apply tab-based sort client-side
+      const freeKey = TAB_DEFAULT_SORT[activeTab];
+      if (freeKey === "neeko_rating") {
+        filtered = [...filtered].sort((a, b) =>
+          (dampedNeekoRating(b)) - (dampedNeekoRating(a))
+        );
+      } else {
+        filtered = [...filtered].sort((a, b) => {
+          const av = ((a as any)[freeKey] as number | null | undefined) ?? -Infinity;
+          const bv = ((b as any)[freeKey] as number | null | undefined) ?? -Infinity;
+          return bv - av;
+        });
+      }
     }
 
     return filtered;
-  }, [rows, debouncedSearch, isPremium, premiumFilter, sortKey, sortDir]);
+  }, [rows, debouncedSearch, isPremium, premiumFilter, sortKey, sortDir, activeTab]);
 
   const TABS: { key: RankingsTab; label: string }[] = [
     { key: "best", label: "Best Overall" },
