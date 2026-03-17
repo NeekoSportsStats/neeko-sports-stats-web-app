@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ArrowRight, RotateCcw, Zap, Share2, Check, LogIn } from "lucide-react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { ArrowRight, RotateCcw, Zap, Share2, Check } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
@@ -38,6 +38,12 @@ interface CompareResult {
   is_cached: boolean;
   playerA: PlayerOption;
   playerB: PlayerOption;
+  short_summary?: string | null;
+  long_summary?: string | null;
+  start_conditions?: string[] | null;
+  sit_conditions?: string[] | null;
+  play_style?: "safe" | "upside" | "balanced" | null;
+  decision_context?: "close" | "lean" | "clear" | "strong" | null;
 }
 
 export default function StartSitPage() {
@@ -171,11 +177,6 @@ export default function StartSitPage() {
 
       const json = await res.json();
 
-      if (res.status === 401) {
-        setError("Sign in to use Start / Sit.");
-        return;
-      }
-
       if (!res.ok || json.error) {
         setError(json.error ?? "Unable to generate comparison. Please try again.");
         return;
@@ -193,6 +194,12 @@ export default function StartSitPage() {
         is_cached: json.is_cached ?? false,
         playerA: resultPlayerA,
         playerB: resultPlayerB,
+        short_summary: json.short_summary ?? null,
+        long_summary: json.long_summary ?? null,
+        start_conditions: Array.isArray(json.start_conditions) ? json.start_conditions : null,
+        sit_conditions: Array.isArray(json.sit_conditions) ? json.sit_conditions : null,
+        play_style: json.play_style ?? null,
+        decision_context: json.decision_context ?? null,
       });
 
       supabase.from("start_sit_decisions").insert({
@@ -338,23 +345,13 @@ export default function StartSitPage() {
         {error && (
           <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 flex items-start justify-between gap-3">
             <p className="text-sm text-red-400 leading-snug">{error}</p>
-            {error === "Sign in to use Start / Sit." ? (
-              <Link
-                to="/auth"
-                className="shrink-0 flex items-center gap-1 text-xs text-red-400/70 hover:text-red-400 underline underline-offset-2 transition-colors"
-              >
-                <LogIn size={11} />
-                Sign in
-              </Link>
-            ) : (
-              <button
-                onClick={handleCompare}
-                disabled={!canCompare}
-                className="shrink-0 text-xs text-red-400/70 hover:text-red-400 underline underline-offset-2 transition-colors disabled:opacity-40"
-              >
-                Retry
-              </button>
-            )}
+            <button
+              onClick={handleCompare}
+              disabled={!canCompare}
+              className="shrink-0 text-xs text-red-400/70 hover:text-red-400 underline underline-offset-2 transition-colors disabled:opacity-40"
+            >
+              Retry
+            </button>
           </div>
         )}
 
@@ -380,6 +377,12 @@ export default function StartSitPage() {
             isPremium={isPremium}
             onUpgrade={() => navigate("/neeko-plus")}
             onReset={reset}
+            shortSummary={result.short_summary}
+            longSummary={result.long_summary}
+            startConditions={result.start_conditions}
+            sitConditions={result.sit_conditions}
+            playStyle={result.play_style}
+            decisionContext={result.decision_context}
           />
         )}
         {!comparing && result && authLoading && (

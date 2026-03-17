@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Crown, Lock, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Share2, Check, RotateCcw, Sparkles } from "lucide-react";
+import { Crown, Lock, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Share2, Check, RotateCcw, Sparkles, Shield, Zap, ChartBar as BarChart2 } from "lucide-react";
 import { OutcomeDistributionChart } from "./OutcomeDistributionChart";
 
 interface PlayerData {
@@ -25,6 +25,12 @@ interface StartSitResultProps {
   isPremium: boolean;
   onUpgrade: () => void;
   onReset?: () => void;
+  shortSummary?: string | null;
+  longSummary?: string | null;
+  startConditions?: string[] | null;
+  sitConditions?: string[] | null;
+  playStyle?: "safe" | "upside" | "balanced" | null;
+  decisionContext?: "close" | "lean" | "clear" | "strong" | null;
 }
 
 function fmt(v: number | null | undefined): string {
@@ -34,7 +40,6 @@ function fmt(v: number | null | undefined): string {
 
 function getEdgeLabel(confidence: number): {
   label: string;
-  sublabel: string;
   color: string;
   bgColor: string;
   borderColor: string;
@@ -42,7 +47,6 @@ function getEdgeLabel(confidence: number): {
 } {
   if (confidence >= 80) return {
     label: "Strong Edge",
-    sublabel: "Clear model preference",
     color: "text-emerald-400",
     bgColor: "bg-emerald-400/[0.07]",
     borderColor: "border-emerald-400/20",
@@ -50,7 +54,6 @@ function getEdgeLabel(confidence: number): {
   };
   if (confidence >= 58) return {
     label: "Clear Edge",
-    sublabel: "Meaningful model gap",
     color: "text-[#F5C84C]",
     bgColor: "bg-[#F5C84C]/[0.07]",
     borderColor: "border-[#F5C84C]/20",
@@ -58,7 +61,6 @@ function getEdgeLabel(confidence: number): {
   };
   return {
     label: "Lean Edge",
-    sublabel: "Close call — slight lean",
     color: "text-sky-400",
     bgColor: "bg-sky-400/[0.06]",
     borderColor: "border-sky-400/15",
@@ -66,28 +68,24 @@ function getEdgeLabel(confidence: number): {
   };
 }
 
-function buildOneLiner(winner: PlayerData, loser: PlayerData): string {
-  const wLast = winner.player_name.split(" ").pop() ?? winner.player_name;
-  const lLast = loser.player_name.split(" ").pop() ?? loser.player_name;
-  const projDiff = (winner.projection_final ?? 0) - (loser.projection_final ?? 0);
-  const floorDiff = (winner.floor_estimate ?? 0) - (loser.floor_estimate ?? 0);
-
-  if (projDiff >= 12 && floorDiff > 5) {
-    return `${wLast} leads on projection and offers a safer floor than ${lLast} this round.`;
-  }
-  if (projDiff >= 12) {
-    return `${wLast} holds a meaningful projection edge over ${lLast} this round.`;
-  }
-  if (floorDiff > 8) {
-    return `${wLast} and ${lLast} are close, but ${wLast} carries far less bust risk.`;
-  }
-  if ((winner.neeko_rating ?? 0) > (loser.neeko_rating ?? 0) + 1) {
-    return `${wLast} edges ${lLast} across composite model metrics — stronger overall profile.`;
-  }
-  return `Close call. The model gives ${wLast} a slight edge over ${lLast} this round.`;
+function getPlayStyleMeta(style: "safe" | "upside" | "balanced" | null | undefined): {
+  label: string;
+  color: string;
+  bgColor: string;
+  type: "shield" | "zap" | "bar";
+} {
+  if (style === "safe") return { label: "Safe Play", color: "text-emerald-400", bgColor: "bg-emerald-400/[0.08]", type: "shield" };
+  if (style === "upside") return { label: "Upside Play", color: "text-[#F5C84C]", bgColor: "bg-[#F5C84C]/[0.08]", type: "zap" };
+  return { label: "Balanced Play", color: "text-sky-400", bgColor: "bg-sky-400/[0.08]", type: "bar" };
 }
 
-function buildReasons(winner: PlayerData, loser: PlayerData, aiSummary: string | null): string[] {
+function PlayStyleIcon({ type, className }: { type: "shield" | "zap" | "bar"; className?: string }) {
+  if (type === "shield") return <Shield size={10} className={className} />;
+  if (type === "zap") return <Zap size={10} className={className} />;
+  return <BarChart2 size={10} className={className} />;
+}
+
+function buildFallbackReasons(winner: PlayerData, loser: PlayerData, aiSummary: string | null): string[] {
   const reasons: string[] = [];
 
   const projDiff = (winner.projection_final ?? 0) - (loser.projection_final ?? 0);
@@ -122,7 +120,7 @@ function buildReasons(winner: PlayerData, loser: PlayerData, aiSummary: string |
     reasons.push(`${wLast} edges ${lLast} on composite model metrics this round`);
   }
 
-  if (aiSummary) {
+  if (aiSummary && reasons.length < 4) {
     const sentences = aiSummary
       .split(/\n|(?<=\.)\s+/)
       .map((s) => s.replace(/^[-•*]\s*/, "").trim())
@@ -196,6 +194,12 @@ export function StartSitResult({
   isPremium,
   onUpgrade,
   onReset,
+  shortSummary,
+  longSummary,
+  startConditions,
+  sitConditions,
+  playStyle,
+  decisionContext,
 }: StartSitResultProps) {
   const [deepOpen, setDeepOpen] = useState(false);
   const [distOpen, setDistOpen] = useState(false);
@@ -212,18 +216,27 @@ export function StartSitResult({
   const loser = winnerIsA ? playerB : playerA;
 
   const edge = getEdgeLabel(confidence);
-  const oneLiner = buildOneLiner(winner, loser);
-  const reasons = buildReasons(winner, loser, aiSummary);
+  const psm = getPlayStyleMeta(playStyle);
+  const ctx = decisionContext ?? (confidence >= 80 ? "strong" : confidence >= 65 ? "clear" : confidence >= 55 ? "lean" : "close");
+  const ctxLabel = ctx === "strong" ? "Clear model preference" : ctx === "clear" ? "Meaningful gap" : ctx === "lean" ? "Slight lean" : "Very close call";
+
+  const displayShortSummary = shortSummary ?? aiSummary ?? null;
+  const premiumAI = isPremium ? (longSummary ?? aiSummary) : null;
+
+  const reasons = buildFallbackReasons(winner, loser, aiSummary);
   const freeReasons = reasons.slice(0, 2);
   const premiumReasons = reasons;
   const hiddenCount = premiumReasons.length - freeReasons.length;
+
+  const hasStartConds = startConditions && startConditions.length > 0;
+  const hasSitConds = sitConditions && sitConditions.length > 0;
 
   function handleCopyShare() {
     const url = new URL(window.location.href);
     url.searchParams.set("playerA", playerA.player_name.replace(/\s+/g, "-"));
     url.searchParams.set("playerB", playerB.player_name.replace(/\s+/g, "-"));
     const shareText = [
-      `Start/Sit this week:`,
+      `Start/Sit — AFL Fantasy`,
       ``,
       `START: ${winner.player_name}${winner.projection_final != null ? " (" + Math.round(winner.projection_final) + " pts projected)" : ""}`,
       `SIT: ${loser.player_name}${loser.projection_final != null ? " (" + Math.round(loser.projection_final) + " pts projected)" : ""}`,
@@ -241,24 +254,26 @@ export function StartSitResult({
   return (
     <div className="space-y-3 mt-6 animate-in fade-in duration-300">
 
-      {/* ─── VERDICT HERO ─── */}
+      {/* ─── SECTION 1: RESULT HERO ─── */}
       <div className="rounded-2xl overflow-hidden border border-white/[0.08] bg-[#0d0d0d]">
-
-        {/* Edge label bar */}
         <div className={`px-4 sm:px-5 py-2.5 flex items-center justify-between ${edge.bgColor} border-b ${edge.borderColor}`}>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <span className={`text-[11px] font-bold uppercase tracking-widest ${edge.color}`}>
               {edge.label}
             </span>
-            <span className={`text-[10px] ${edge.color} opacity-50`}>·</span>
-            <span className={`text-[10px] ${edge.color} opacity-55 hidden sm:inline`}>{edge.sublabel}</span>
+            <span className={`text-[10px] ${edge.color} opacity-40`}>·</span>
+            <div className={`flex items-center gap-1 ${psm.bgColor} px-2 py-0.5 rounded-full`}>
+              <PlayStyleIcon type={psm.type} className={`${psm.color} opacity-70`} />
+              <span className={`text-[9px] font-bold uppercase tracking-wider ${psm.color} opacity-75`}>
+                {psm.label}
+              </span>
+            </div>
           </div>
           <span className={`text-[11px] font-semibold tabular-nums ${edge.color} opacity-65`}>
             {confidence}% confidence
           </span>
         </div>
 
-        {/* START / SIT columns */}
         <div className="grid grid-cols-2 divide-x divide-white/[0.06]">
           <div className="px-4 pt-5 pb-4 sm:px-5">
             <div className="flex items-center gap-1.5 mb-2.5">
@@ -311,7 +326,6 @@ export function StartSitResult({
           </div>
         </div>
 
-        {/* Confidence bar + one-liner */}
         <div className="border-t border-white/[0.05] px-4 sm:px-5 py-3 space-y-2.5">
           <div className="flex items-center gap-3">
             <div className="flex-1 h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
@@ -320,15 +334,15 @@ export function StartSitResult({
                 style={{ width: `${confidence}%` }}
               />
             </div>
-            <span className={`shrink-0 text-[10px] font-medium ${edge.color} opacity-55`}>
-              {edge.sublabel}
-            </span>
+            <span className={`shrink-0 text-[10px] font-medium ${edge.color} opacity-55`}>{ctxLabel}</span>
           </div>
-          <p className="text-xs text-white/45 leading-relaxed">{oneLiner}</p>
+          {displayShortSummary && (
+            <p className="text-xs text-white/45 leading-relaxed">{displayShortSummary}</p>
+          )}
         </div>
       </div>
 
-      {/* ─── WHY SECTION ─── */}
+      {/* ─── SECTION 2: WHY THIS PICK ─── */}
       <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
         <div className="px-4 sm:px-5 pt-4 pb-4">
           <p className="text-[10px] font-bold uppercase tracking-widest text-white/20 mb-3">
@@ -360,22 +374,136 @@ export function StartSitResult({
             </div>
           )}
         </div>
-
-        {/* Premium AI insight panel — within the Why card */}
-        {isPremium && aiSummary && (
-          <div className="border-t border-white/[0.06] px-4 sm:px-5 py-4">
-            <div className="flex items-center gap-2 mb-2.5">
-              <Sparkles size={11} className="text-[#F5C84C]/55 shrink-0" />
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/20">
-                AI Insight
-              </p>
-            </div>
-            <p className="text-xs text-white/42 leading-relaxed">{aiSummary}</p>
-          </div>
-        )}
       </div>
 
-      {/* ─── QUICK COMPARISON SUMMARY ─── */}
+      {/* ─── SECTION 3: AI INSIGHT ─── */}
+      <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
+        <div className="px-4 sm:px-5 pt-4 pb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={11} className="text-[#F5C84C]/55 shrink-0" />
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/20">
+              AI Insight
+            </p>
+            {!isPremium && (
+              <span className="ml-auto text-[9px] font-bold text-[#F5C84C]/50 bg-[#F5C84C]/[0.07] border border-[#F5C84C]/10 px-2 py-0.5 rounded-full">
+                Neeko+
+              </span>
+            )}
+          </div>
+
+          {isPremium && premiumAI ? (
+            <p className="text-xs text-white/50 leading-relaxed">{premiumAI}</p>
+          ) : (
+            <div>
+              {displayShortSummary ? (
+                <div>
+                  <p className="text-xs text-white/45 leading-relaxed line-clamp-2">{displayShortSummary}</p>
+                  <div className="relative mt-1 overflow-hidden h-7">
+                    <p className="text-xs text-white/18 leading-relaxed">Full reasoning locked. Upgrade to see why the model selected this play in full detail.</p>
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#0d0d0d]/70 to-[#0d0d0d]" />
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-white/20 italic">AI insight available after your first comparison.</p>
+              )}
+              <div className="mt-3 pt-3 border-t border-white/[0.05] flex items-center justify-between gap-3">
+                <span className="text-[11px] text-white/25 flex items-center gap-1.5">
+                  <Lock size={9} className="text-white/20" />
+                  Full AI reasoning
+                </span>
+                <button
+                  onClick={onUpgrade}
+                  className="flex items-center gap-1 text-[10px] font-bold text-[#F5C84C]/70 bg-[#F5C84C]/[0.08] border border-[#F5C84C]/15 px-2.5 py-1 rounded-lg hover:bg-[#F5C84C]/[0.14] transition-all"
+                >
+                  <Crown size={8} />
+                  Unlock full AI reasoning
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ─── SECTION 4: START IF / SIT IF ─── */}
+      <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
+        <div className="px-4 sm:px-5 pt-4 pb-4">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/20">
+              Start If / Sit If
+            </p>
+            {!isPremium && (
+              <span className="text-[9px] font-bold text-[#F5C84C]/50 bg-[#F5C84C]/[0.07] border border-[#F5C84C]/10 px-2 py-0.5 rounded-full">
+                Neeko+
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg border border-emerald-400/10 bg-emerald-400/[0.03] p-3">
+              <p className="text-[10px] font-bold text-emerald-400/60 uppercase tracking-wider mb-2.5">
+                Start {winner.player_name.split(" ").pop()} if:
+              </p>
+              <ul className="space-y-1.5">
+                {(isPremium
+                  ? (hasStartConds ? startConditions : ["You need a reliable floor play", "You want the higher-projected option"])
+                  : [(hasStartConds ? startConditions![0] : "You need a reliable floor play")]
+                ).map((c, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="mt-[4px] h-1 w-1 rounded-full bg-emerald-400/30 shrink-0" />
+                    <span className="text-[11px] text-white/45 leading-snug">{c}</span>
+                  </li>
+                ))}
+                {!isPremium && (
+                  <li className="flex items-center gap-1.5 mt-0.5">
+                    <Lock size={8} className="text-white/20 shrink-0" />
+                    <span className="text-[10px] text-white/20">More scenarios locked</span>
+                  </li>
+                )}
+              </ul>
+            </div>
+
+            <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+              <p className="text-[10px] font-bold text-white/28 uppercase tracking-wider mb-2.5">
+                Consider {loser.player_name.split(" ").pop()} if:
+              </p>
+              <ul className="space-y-1.5">
+                {(isPremium
+                  ? (hasSitConds ? sitConditions : ["You need ceiling over floor", "You are chasing points late"])
+                  : [(hasSitConds ? sitConditions![0] : "You need ceiling over floor")]
+                ).map((c, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="mt-[4px] h-1 w-1 rounded-full bg-white/15 shrink-0" />
+                    <span className="text-[11px] text-white/30 leading-snug">{c}</span>
+                  </li>
+                ))}
+                {!isPremium && (
+                  <li className="flex items-center gap-1.5 mt-0.5">
+                    <Lock size={8} className="text-white/15 shrink-0" />
+                    <span className="text-[10px] text-white/18">More scenarios locked</span>
+                  </li>
+                )}
+              </ul>
+            </div>
+          </div>
+
+          {!isPremium && (
+            <div className="mt-3 pt-3 border-t border-white/[0.05] flex items-center justify-between gap-3">
+              <span className="text-[11px] text-white/22 leading-snug">
+                Unlock exact start/sit scenarios before lockout
+              </span>
+              <button
+                onClick={onUpgrade}
+                className="shrink-0 flex items-center gap-1.5 bg-[#F5C84C] text-black font-bold text-[11px] px-3 py-1.5 rounded-lg hover:brightness-110 active:scale-[0.97] transition-all"
+              >
+                <Crown size={9} />
+                Unlock
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ─── SECTION 5: COMPARISON BARS ─── */}
       <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
         <div className="grid grid-cols-[1fr_80px_1fr] items-center px-4 sm:px-5 py-2.5 border-b border-white/[0.05] gap-2">
           <p className={`text-[11px] font-bold text-right truncate ${winnerIsA ? "text-[#F5C84C]" : "text-white/25"}`}>
@@ -471,51 +599,60 @@ export function StartSitResult({
         </div>
       </div>
 
-      {/* ─── PREMIUM INSIGHTS BLOCK (free users: blurred teaser) ─── */}
-      {!isPremium && (
+      {/* ─── SECTION 6: OUTCOME DISTRIBUTION ─── */}
+      {isPremium ? (
+        <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
+          <button
+            onClick={() => setDistOpen((o) => !o)}
+            className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 hover:bg-white/[0.02] transition-colors"
+          >
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-white/28">
+              Outcome Distribution
+            </span>
+            {distOpen
+              ? <ChevronUp size={13} className="text-white/20" />
+              : <ChevronDown size={13} className="text-white/20" />}
+          </button>
+          {distOpen && (
+            <div className="border-t border-white/[0.05]">
+              <OutcomeDistributionChart
+                playerA={playerA}
+                playerB={playerB}
+                winnerPlayerId={winnerPlayerId}
+                isPremium={isPremium}
+                onUpgrade={onUpgrade}
+                embedded
+              />
+            </div>
+          )}
+        </div>
+      ) : (
         <div className="rounded-xl border border-white/[0.07] overflow-hidden">
           <div className="px-4 sm:px-5 py-3 border-b border-white/[0.05] flex items-center justify-between bg-white/[0.01]">
             <div className="flex items-center gap-2">
               <Lock size={10} className="text-white/20" />
               <span className="text-[11px] font-bold uppercase tracking-widest text-white/20">
-                Neeko+ Insights
+                Outcome Distribution
               </span>
             </div>
             <span className="text-[9px] font-bold text-[#F5C84C]/50 bg-[#F5C84C]/[0.08] px-2 py-0.5 rounded-full border border-[#F5C84C]/10">
-              Premium
+              Neeko+
             </span>
           </div>
-
           <div className="relative bg-white/[0.01]">
             <div className="px-4 sm:px-5 py-4 blur-[4px] pointer-events-none select-none opacity-35" aria-hidden>
-              <div className="space-y-3">
-                <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-3">
-                  <p className="text-[9px] uppercase tracking-widest text-white/30 mb-2">Outcome Distribution</p>
-                  <div className="space-y-1.5">
-                    {["60–80", "80–100", "100–120", "120–140"].map((label, i) => (
-                      <div key={label} className="flex items-center gap-2">
-                        <span className="text-[9px] text-white/30 w-12 text-right">{label}</span>
-                        <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-                          <div className="h-full rounded-full bg-[#F5C84C]/50" style={{ width: `${[18, 32, 28, 14][i]}%` }} />
-                        </div>
-                        <span className="text-[9px] text-white/20 w-6">{[18, 32, 28, 14][i]}%</span>
-                      </div>
-                    ))}
+              <div className="space-y-1.5">
+                {["60–80", "80–100", "100–120", "120–140"].map((label, i) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <span className="text-[9px] text-white/30 w-12 text-right">{label}</span>
+                    <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                      <div className="h-full rounded-full bg-[#F5C84C]/50" style={{ width: `${[18, 32, 28, 14][i]}%` }} />
+                    </div>
+                    <span className="text-[9px] text-white/20 w-6">{[18, 32, 28, 14][i]}%</span>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
-                    <p className="text-[9px] uppercase tracking-widest text-white/25 mb-1">Bust Risk</p>
-                    <p className="text-lg font-extrabold text-[#F5C84C]">12%</p>
-                  </div>
-                  <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
-                    <p className="text-[9px] uppercase tracking-widest text-white/25 mb-1">Ceiling Chance</p>
-                    <p className="text-lg font-extrabold text-white/50">8%</p>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
-
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/75 to-transparent px-6 pb-2">
               <p className="text-sm font-semibold text-white/60 text-center leading-snug">
                 Unlock scoring range, bust risk &amp; advanced model insights
@@ -532,37 +669,7 @@ export function StartSitResult({
         </div>
       )}
 
-      {/* ─── OUTCOME DISTRIBUTION (premium, collapsible) ─── */}
-      {isPremium && (
-        <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
-          <button
-            onClick={() => setDistOpen((o) => !o)}
-            className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 hover:bg-white/[0.02] transition-colors"
-          >
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-white/28">
-              Outcome Distribution
-            </span>
-            {distOpen
-              ? <ChevronUp size={13} className="text-white/20" />
-              : <ChevronDown size={13} className="text-white/20" />}
-          </button>
-
-          {distOpen && (
-            <div className="border-t border-white/[0.05]">
-              <OutcomeDistributionChart
-                playerA={playerA}
-                playerB={playerB}
-                winnerPlayerId={winnerPlayerId}
-                isPremium={isPremium}
-                onUpgrade={onUpgrade}
-                embedded
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ─── ADVANCED MODEL DETAIL (premium, collapsible) ─── */}
+      {/* ─── SECTION 7: ADVANCED MODEL DETAIL (premium collapsible) ─── */}
       {isPremium && (
         <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
           <button
@@ -576,7 +683,6 @@ export function StartSitResult({
               ? <ChevronUp size={13} className="text-white/20" />
               : <ChevronDown size={13} className="text-white/20" />}
           </button>
-
           {deepOpen && (
             <div className="border-t border-white/[0.05] px-4 sm:px-5 py-4">
               <div className="grid grid-cols-[1fr_80px_1fr] gap-2 mb-1.5">
@@ -588,7 +694,6 @@ export function StartSitResult({
                   {playerB.player_name.split(" ").pop()}
                 </p>
               </div>
-
               {[
                 {
                   label: "Risk Rating",
@@ -609,7 +714,6 @@ export function StartSitResult({
                   <span className={`text-sm font-bold tabular-nums ${!aWins ? "text-white" : "text-white/25"}`}>{bVal}</span>
                 </div>
               ))}
-
               <div className="mt-3 pt-3 border-t border-white/[0.05] flex items-center gap-2">
                 {(winner.projection_final ?? 0) > (loser.projection_final ?? 0) ? (
                   <TrendingUp size={11} className="text-emerald-400 shrink-0" />
@@ -627,13 +731,58 @@ export function StartSitResult({
         </div>
       )}
 
-      {/* ─── SHARE CARD ─── */}
+      {/* ─── SECTION 8: PREMIUM CTA BLOCK (free users only) ─── */}
+      {!isPremium && (
+        <div className="rounded-xl border border-[#F5C84C]/12 bg-gradient-to-b from-[#F5C84C]/[0.04] to-transparent overflow-hidden">
+          <div className="px-5 py-5">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-8 h-8 rounded-lg bg-[#F5C84C]/10 border border-[#F5C84C]/15 flex items-center justify-center shrink-0 mt-0.5">
+                <Crown size={14} className="text-[#F5C84C]/70" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white/75 leading-tight">
+                  Unlock the full decision edge
+                </p>
+                <p className="text-xs text-white/35 mt-0.5 leading-relaxed">
+                  See exact start/sit scenarios before lockout
+                </p>
+              </div>
+            </div>
+            <ul className="space-y-2 mb-4">
+              {[
+                "Full AI decision reasoning — not just a preview",
+                "Complete Start If / Sit If scenarios",
+                "Confidence & Risk comparison metrics",
+                "Scoring range probabilities — bust risk, ceiling chance",
+                "Advanced model detail — full breakdown",
+              ].map((item) => (
+                <li key={item} className="flex items-center gap-2.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#F5C84C]/35 shrink-0" />
+                  <span className="text-xs text-white/40 leading-snug">{item}</span>
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={onUpgrade}
+              className="w-full flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold py-3 rounded-xl hover:brightness-110 active:scale-[0.99] transition-all text-sm"
+            >
+              <Crown size={13} />
+              Upgrade to Neeko+
+            </button>
+            <p className="text-[10px] text-white/20 text-center mt-2">
+              See why the model prefers one play — not just who it picks.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ─── SECTION 9: SHARE CARD ─── */}
       <div className="rounded-xl border border-white/[0.06] bg-white/[0.01] overflow-hidden">
         <div className="px-4 sm:px-5 py-4">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-bold uppercase tracking-widest text-white/18 mb-2">
-                Share
+                Share Result
               </p>
               <div className="space-y-1">
                 <p className="text-xs text-white/50 font-semibold leading-snug">
@@ -653,7 +802,6 @@ export function StartSitResult({
                 </p>
               </div>
             </div>
-
             <div className="flex flex-col gap-2 shrink-0">
               <button
                 onClick={handleCopyShare}
