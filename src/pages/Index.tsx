@@ -26,12 +26,13 @@ interface RankingRow {
 }
 
 interface AccuracyExampleRow {
-  player_name: string;
-  team: string;
-  projection: number;
-  actual_score: number;
-  error: number;
-  round_label: string;
+  player_name:   string;
+  team_name:     string;
+  projection:    number;
+  actual_score:  number;
+  error:         number;
+  accuracy_tier: "ELITE" | "STRONG";
+  round_label:   string;
 }
 
 interface EdgeRow {
@@ -992,25 +993,31 @@ function ProblemSection() {
 
 // ─── Outcome Proof ────────────────────────────────────────────────────────────
 
+function accuracyBadge(tier: "ELITE" | "STRONG" | undefined) {
+  if (tier === "ELITE") {
+    return {
+      label:     "ELITE ACCURACY",
+      textColor: "text-green-400",
+      bg:        "bg-green-400/10",
+      border:    "border-green-400/30",
+    };
+  }
+  return {
+    label:     "STRONG ACCURACY",
+    textColor: "text-[#F5C84C]",
+    bg:        "bg-[#F5C84C]/10",
+    border:    "border-[#F5C84C]/30",
+  };
+}
+
 function OutcomeProofSection() {
   const [rows, setRows]       = useState<AccuracyExampleRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
-      const { data: raw } = await supabase.rpc("get_projection_accuracy_examples", { limit_n: 30 });
-      const all = (raw ?? []) as AccuracyExampleRow[];
-
-      const filtered = all.filter((r) => Number(r.error) >= 1 && Number(r.error) <= 10);
-      const picked = filtered.slice(0, 3);
-
-      if (picked.length >= 3) {
-        setRows(picked);
-      } else {
-        const fallback = all.filter((r) => Number(r.error) > 0).slice(0, 3);
-        setRows(fallback.length > 0 ? fallback : all.slice(0, 3));
-      }
-
+      const { data: raw } = await supabase.rpc("get_projection_accuracy_examples", { limit_n: 3 });
+      setRows((raw ?? []) as AccuracyExampleRow[]);
       setLoading(false);
     })();
   }, []);
@@ -1025,7 +1032,7 @@ function OutcomeProofSection() {
           <SectionHeading>Real Projection Accuracy</SectionHeading>
           <GoldDivider />
           <p className="text-sm text-white/40 max-w-lg mx-auto leading-relaxed">
-            Recent projections that landed within 1–10 points of the final AFL Fantasy score.
+            Top-ranked players from the latest round where projections landed within 10 points of the final AFL Fantasy score.
           </p>
         </div>
 
@@ -1037,20 +1044,21 @@ function OutcomeProofSection() {
                   <div className="h-3 w-24 bg-white/[0.05] rounded mb-4" />
                   <div className="h-3 w-28 bg-white/[0.05] rounded mb-1.5" />
                   <div className="h-3 w-28 bg-white/[0.05] rounded mb-3" />
-                  <div className="h-5 w-20 bg-green-400/10 rounded" />
+                  <div className="h-5 w-28 bg-green-400/10 rounded" />
                 </div>
               ))
             : rows.length > 0
               ? rows.map((r, i) => {
-                  const err = Number(r.error);
-                  const errDisplay = err < 1 ? "< 1 pt" : `${Math.round(err)} pt${Math.round(err) === 1 ? "" : "s"}`;
+                  const err    = Number(r.error);
+                  const errStr = err < 1 ? "< 1 pt" : `${err.toFixed(1)} pt${err.toFixed(1) === "1.0" ? "" : "s"}`;
+                  const badge  = accuracyBadge(r.accuracy_tier);
                   return (
                     <div
                       key={`${r.player_name}-${i}`}
-                      className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-green-400/20 transition-all"
+                      className="rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-5 hover:border-white/[0.12] transition-all"
                     >
                       <p className="text-base font-bold text-white leading-tight mb-0.5">{r.player_name}</p>
-                      <p className="text-xs text-white/35 mb-4">{r.team}</p>
+                      <p className="text-xs text-white/35 mb-4">{r.team_name}</p>
 
                       <div className="space-y-2 mb-4">
                         <div className="flex items-center justify-between">
@@ -1063,11 +1071,13 @@ function OutcomeProofSection() {
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] text-white/30 uppercase tracking-widest font-semibold">Error</span>
-                          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-green-400/10 border border-green-400/25">
-                            <Check size={9} className="text-green-400" />
-                            <span className="text-xs font-bold text-green-400">{errDisplay} error</span>
-                          </div>
+                          <span className="text-xs font-bold text-white/50">{errStr} off</span>
                         </div>
+                      </div>
+
+                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${badge.bg} ${badge.border}`}>
+                        <Check size={9} className={badge.textColor} />
+                        <span className={`text-[10px] font-bold uppercase tracking-wide ${badge.textColor}`}>{badge.label}</span>
                       </div>
                     </div>
                   );
