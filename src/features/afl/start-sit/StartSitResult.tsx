@@ -769,9 +769,9 @@ export function StartSitResult({
         {isPremium && advancedOpen && (
           <div className="border-t border-white/[0.06] px-5 py-4 space-y-3">
             {[
-              { label: "Matchup Difficulty", aVal: playerA.risk_rating, bVal: playerB.risk_rating },
+              { label: "Risk Rating", aVal: playerA.risk_rating, bVal: playerB.risk_rating },
               { label: "Consistency Score", aVal: playerA.projection_confidence, bVal: playerB.projection_confidence },
-              { label: "Volatility Rating", aVal: playerA.risk_rating, bVal: playerB.risk_rating },
+              { label: "Ceiling", aVal: playerA.ceiling_estimate, bVal: playerB.ceiling_estimate },
             ].map(({ label, aVal, bVal }) => (
               <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                 <span className={`text-sm font-bold tabular-nums text-right ${(aVal ?? 0) >= (bVal ?? 0) ? "text-[#F5C84C]" : "text-white/40"}`}>

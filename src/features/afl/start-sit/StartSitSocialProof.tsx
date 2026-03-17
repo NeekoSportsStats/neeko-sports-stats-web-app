@@ -123,7 +123,6 @@ export function StartSitSocialProof({ players, onFillBoth, onScrollToCompare }: 
     [playerMap]);
 
   function handleMatchupClick(a: QuickFillPlayer, b: QuickFillPlayer) {
-    console.log("StartSit quick-fill payload", { playerAId: a.player_id, playerBId: b.player_id, playerA: a.player_name, playerB: b.player_name });
     onFillBoth(a, b);
     onScrollToCompare();
   }

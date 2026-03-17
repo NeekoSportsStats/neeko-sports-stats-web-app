@@ -318,7 +318,6 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
 // ─── Captain structured stats bar ─────────────────────────────────────────────
 
 function CaptainStatsBar({ row }: { row: RankingRow }) {
-  const matchupLabel = row.captain_rating ?? "—";
   return (
     <div className="grid grid-cols-2 gap-x-4 gap-y-1 mb-3 rounded-lg border border-white/[0.07] bg-black/30 px-3 py-2.5">
       <div className="flex items-center justify-between">
@@ -336,8 +335,8 @@ function CaptainStatsBar({ row }: { row: RankingRow }) {
         </span>
       </div>
       <div className="flex items-center justify-between">
-        <span className="text-[10px] text-white/35 uppercase tracking-wider">Matchup</span>
-        <span className="text-xs font-semibold text-white/70">{matchupLabel}</span>
+        <span className="text-[10px] text-white/35 uppercase tracking-wider">Captain Tier</span>
+        <span className="text-xs font-semibold text-white/70">{row.captain_rating ?? "—"}</span>
       </div>
     </div>
   );
