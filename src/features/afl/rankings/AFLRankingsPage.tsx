@@ -656,6 +656,7 @@ export default function AFLRankingsPage() {
           isPremium={isPremium}
           isUnlocked={selected.isUnlocked}
           tier={selected.tier}
+          isFreeTop5={!isPremium && selected.tier === "full"}
           onClose={() => setSelected(null)}
         />
       )}

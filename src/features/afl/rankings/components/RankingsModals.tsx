@@ -458,6 +458,7 @@ export function PlayerDetailModal({
   isPremium,
   isUnlocked,
   tier,
+  isFreeTop5 = false,
   onClose,
 }: {
   row: RankingRow;
@@ -465,15 +466,17 @@ export function PlayerDetailModal({
   isPremium: boolean;
   isUnlocked: boolean;
   tier: RowTier;
+  isFreeTop5?: boolean;
   onClose: () => void;
 }) {
+  const canSeeAI = isPremium || isFreeTop5;
   const aiAnalysis = useMemo(() => {
-    if (!isPremium) return null;
+    if (!canSeeAI) return null;
     const analysis = row.long ?? null;
     const captain_recommendation = row.captain_rating ?? null;
     if (!analysis) return null;
     return { analysis, captain_recommendation };
-  }, [row.long, row.captain_rating, isPremium]);
+  }, [row.long, row.captain_rating, canSeeAI]);
   const loadingAI = false;
 
   useBodyScrollLock(true);
@@ -802,7 +805,7 @@ export function PlayerDetailModal({
           )}
 
           {/* 7. Extended Analysis */}
-          {unlocked ? (() => {
+          {(unlocked && canSeeAI) ? (() => {
             const aiCtx = { riskRating: row.risk_rating ?? null, confidence: row.projection_confidence ?? null };
             const rawExtended = row.long ?? aiAnalysis?.analysis ?? null;
             const extendedText = sharpenAIText(rawExtended, aiCtx);
@@ -841,7 +844,7 @@ export function PlayerDetailModal({
                 )}
               </>
             );
-          })() : (
+          })() : unlocked ? (
             <div className="rounded-lg border border-[#111] bg-[#111] px-4 py-4">
               <div className="flex items-center gap-2 mb-2">
                 <div className="h-1.5 w-1.5 rounded-full bg-white/20" />
@@ -850,10 +853,10 @@ export function PlayerDetailModal({
               </div>
               <p className="text-sm text-white/25 italic">Upgrade to Neeko+ to unlock AI analysis.</p>
             </div>
-          )}
+          ) : null}
 
           {/* 8. Last 10 Games */}
-          {unlocked && (
+          {(unlocked && canSeeAI) && (
             <div className="rounded-lg bg-white/[0.03] border border-white/5 px-4 py-4">
               <p className="text-[10px] text-white/40 uppercase tracking-wider mb-3">Last 10 Completed Games</p>
               <ScoreHistoryChart playerName={row.player_name} playerId={row.player_id} />
