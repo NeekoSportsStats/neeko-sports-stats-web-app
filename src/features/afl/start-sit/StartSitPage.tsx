@@ -40,14 +40,6 @@ interface CompareResult {
   playerB: PlayerOption;
 }
 
-
-function getConfidenceLabel(confidence: number): { label: string; color: string } {
-  if (confidence >= 90) return { label: "Elite Confidence", color: "text-emerald-400" };
-  if (confidence >= 75) return { label: "Strong Pick", color: "text-emerald-400" };
-  if (confidence >= 60) return { label: "Lean Pick", color: "text-[#F5C84C]" };
-  return { label: "Risky Decision", color: "text-red-400" };
-}
-
 export default function StartSitPage() {
   const { isPremium, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -226,11 +218,20 @@ export default function StartSitPage() {
   }
 
   function handleShare() {
-    if (!playerA || !playerB) return;
+    if (!playerA || !playerB || !result) return;
     const url = new URL(window.location.href);
     url.searchParams.set("playerA", playerA.player_name.replace(/\s+/g, "-"));
     url.searchParams.set("playerB", playerB.player_name.replace(/\s+/g, "-"));
-    navigator.clipboard.writeText(url.toString()).then(() => {
+    const winnerProj = result.playerA && String(result.winner_player_id) === String(result.playerA.player_id)
+      ? result.playerA.projection_final
+      : result.playerB?.projection_final;
+    const edgeLabel = result.confidence >= 80 ? "Strong Edge" : result.confidence >= 68 ? "Clear Edge" : "Lean Edge";
+    const shareText = [
+      `START: ${result.winner_name} (${winnerProj != null ? Math.round(winnerProj) + " proj" : "—"})`,
+      `${edgeLabel} — ${result.confidence}% model confidence`,
+      `Neeko Start/Sit: ${url.toString()}`,
+    ].join("\n");
+    navigator.clipboard.writeText(shareText).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -238,7 +239,6 @@ export default function StartSitPage() {
 
   const canCompare = !!playerA && !!playerB && !comparing;
   const showSocialProof = !result && !comparing;
-  const confidenceLabel = result ? getConfidenceLabel(result.confidence) : null;
 
   return (
     <div className="min-h-screen bg-[#070707] text-white">
@@ -333,19 +333,6 @@ export default function StartSitPage() {
             </button>
           )}
         </div>
-
-        {/* Confidence tier label — shown only after a result */}
-        {result && confidenceLabel && (
-          <div className="mt-2 flex items-center gap-1.5 px-1">
-            <span className={`text-xs font-semibold ${confidenceLabel.color}`}>
-              {result.confidence}% confidence
-            </span>
-            <span className="text-white/20 text-xs">·</span>
-            <span className={`text-xs ${confidenceLabel.color} opacity-70`}>
-              {confidenceLabel.label}
-            </span>
-          </div>
-        )}
 
         {/* Error banner */}
         {error && (

@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState } from "react";
-import { Flame, Scale, TrendingUp, ChevronRight } from "lucide-react";
+import { Flame, Scale, ChevronRight, Users } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 export interface QuickFillPlayer {
@@ -57,102 +57,46 @@ function MatchupRow({
   return (
     <button
       onClick={onClick}
-      className={`w-full group flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] transition-colors text-left ${
+      className={`w-full group flex items-center gap-3 px-4 py-3 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors text-left ${
         !isLast ? "border-b border-white/[0.05]" : ""
       }`}
     >
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-sm font-semibold text-white/70 truncate group-hover:text-white/90 transition-colors">
+        <div className="flex items-center gap-1 min-w-0">
+          <span className="text-sm font-semibold text-white/65 truncate group-hover:text-white/85 transition-colors">
             {matchup.playerA.player_name}
           </span>
-          <span className="text-[10px] text-white/20 shrink-0">vs</span>
-          <span className="text-sm font-semibold text-white/70 truncate group-hover:text-white/90 transition-colors">
+          <span className="text-[10px] text-white/20 shrink-0 px-0.5">vs</span>
+          <span className="text-sm font-semibold text-white/65 truncate group-hover:text-white/85 transition-colors">
             {matchup.playerB.player_name}
           </span>
         </div>
 
         {showSplit && !matchup.isSeeded && (
           <div className="mt-1.5 flex items-center gap-2">
-            <div className="flex-1 h-0.5 rounded-full bg-white/[0.06] overflow-hidden max-w-[120px]">
+            <div className="flex-1 h-0.5 rounded-full bg-white/[0.06] overflow-hidden max-w-[100px]">
               <div
-                className={`h-full rounded-l-full transition-all ${
-                  isTight ? "bg-[#F5C84C]/40" : "bg-[#F5C84C]/60"
-                }`}
+                className={`h-full rounded-l-full ${isTight ? "bg-[#F5C84C]/35" : "bg-[#F5C84C]/55"}`}
                 style={{ width: `${splitA}%` }}
               />
             </div>
-            <span className="text-[10px] tabular-nums text-white/25 font-semibold">
+            <span className="text-[10px] tabular-nums text-white/25 font-medium">
               {splitA}% / {splitB}%
             </span>
           </div>
         )}
 
-        {matchup.isSeeded && (
-          <p className="text-[10px] text-white/20 mt-0.5">
-            {[matchup.playerA.team, matchup.playerA.position].filter(Boolean).join(" · ")} vs{" "}
+        {matchup.isSeeded && (matchup.playerA.position || matchup.playerB.position) && (
+          <p className="text-[10px] text-white/20 mt-0.5 truncate">
+            {[matchup.playerA.team, matchup.playerA.position].filter(Boolean).join(" · ")}
+            {" "}vs{" "}
             {[matchup.playerB.team, matchup.playerB.position].filter(Boolean).join(" · ")}
           </p>
         )}
       </div>
 
-      <div className="shrink-0 flex items-center gap-2">
-        {!matchup.isSeeded && matchup.comparisons > 0 && (
-          <span className="text-[10px] tabular-nums text-white/20 hidden sm:inline">
-            {matchup.comparisons.toLocaleString()}
-          </span>
-        )}
-        <ChevronRight
-          size={13}
-          className="text-white/15 group-hover:text-white/40 transition-colors"
-        />
-      </div>
+      <ChevronRight size={12} className="text-white/15 group-hover:text-white/35 transition-colors shrink-0" />
     </button>
-  );
-}
-
-function FallbackState({
-  seededMatchups,
-  onMatchupClick,
-}: {
-  seededMatchups: SocialProofMatchup[];
-  onMatchupClick: (a: QuickFillPlayer, b: QuickFillPlayer) => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
-        <div className="px-4 py-3 border-b border-white/[0.05]">
-          <div className="flex items-center gap-2">
-            <TrendingUp size={11} className="text-[#F5C84C]/50" />
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-white/25">
-              Suggested Comparisons
-            </p>
-          </div>
-          <p className="text-xs text-white/20 mt-1 leading-relaxed">
-            Popular decisions will appear as coaches compare players this round.
-          </p>
-        </div>
-        {seededMatchups.length > 0 ? (
-          <div>
-            {seededMatchups.map((m, i) => (
-              <MatchupRow
-                key={i}
-                matchup={m}
-                showSplit={false}
-                isLast={i === seededMatchups.length - 1}
-                onClick={() => onMatchupClick(m.playerA, m.playerB)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="px-4 py-5 text-center">
-            <p className="text-xs text-white/20">
-              Select two players above to run a comparison.
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -172,7 +116,7 @@ export function StartSitSocialProof({ players, onFillBoth, onScrollToCompare }: 
     const map = new Map<string, QuickFillPlayer>();
     for (const p of players) {
       map.set(p.player_name, p);
-      map.set(p.player_id, p);
+      map.set(String(p.player_id), p);
     }
     return map;
   }, [players]);
@@ -199,7 +143,7 @@ export function StartSitSocialProof({ players, onFillBoth, onScrollToCompare }: 
     return popularMatchups
       .filter((m) => {
         const pct = m.splitA ?? null;
-        return pct != null && pct >= 45 && pct <= 55;
+        return pct != null && pct >= 44 && pct <= 56;
       })
       .slice(0, 3);
   }, [popularMatchups]);
@@ -210,31 +154,35 @@ export function StartSitSocialProof({ players, onFillBoth, onScrollToCompare }: 
     const pairs: SocialProofMatchup[] = [];
     const usedIds = new Set<string>();
 
-    for (let i = 0; i < top.length && pairs.length < 3; i++) {
-      for (let j = i + 1; j < top.length && pairs.length < 3; j++) {
+    for (let i = 0; i < top.length && pairs.length < 4; i++) {
+      for (let j = i + 1; j < top.length && pairs.length < 4; j++) {
         const a = top[i];
         const b = top[j];
+        const aId = String(a.player_id);
+        const bId = String(b.player_id);
         if (
           a.position === b.position &&
-          !usedIds.has(a.player_id) &&
-          !usedIds.has(b.player_id)
+          !usedIds.has(aId) &&
+          !usedIds.has(bId)
         ) {
           pairs.push({ playerA: a, playerB: b, comparisons: 0, isSeeded: true });
-          usedIds.add(a.player_id);
-          usedIds.add(b.player_id);
+          usedIds.add(aId);
+          usedIds.add(bId);
         }
       }
     }
 
-    if (pairs.length < 3) {
-      for (let i = 0; i < top.length && pairs.length < 3; i += 2) {
+    if (pairs.length < 4) {
+      for (let i = 0; i < top.length && pairs.length < 4; i += 2) {
         if (i + 1 < top.length) {
           const a = top[i];
           const b = top[i + 1];
-          if (!usedIds.has(a.player_id) && !usedIds.has(b.player_id)) {
+          const aId = String(a.player_id);
+          const bId = String(b.player_id);
+          if (!usedIds.has(aId) && !usedIds.has(bId)) {
             pairs.push({ playerA: a, playerB: b, comparisons: 0, isSeeded: true });
-            usedIds.add(a.player_id);
-            usedIds.add(b.player_id);
+            usedIds.add(aId);
+            usedIds.add(bId);
           }
         }
       }
@@ -252,48 +200,48 @@ export function StartSitSocialProof({ players, onFillBoth, onScrollToCompare }: 
 
   const hasLiveData = popularMatchups.length > 0;
 
-  if (!hasLiveData) {
-    return (
-      <div className="mt-6">
-        <FallbackState
-          seededMatchups={seededMatchups}
-          onMatchupClick={handleMatchupClick}
-        />
-      </div>
-    );
-  }
+  const matchupsToShow = hasLiveData ? popularMatchups : seededMatchups;
+  const sectionLabel = hasLiveData ? "Popular This Week" : "Try These Matchups";
+  const SectionIcon = hasLiveData ? Flame : Users;
 
   return (
-    <div className="space-y-5 mt-6">
-      <div>
-        <div className="flex items-center gap-2 mb-2.5">
-          <Flame size={11} className="text-orange-400/70" />
+    <div className="mt-5">
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.05]">
+          <SectionIcon size={11} className={hasLiveData ? "text-orange-400/60" : "text-white/25"} />
           <p className="text-[11px] font-semibold uppercase tracking-widest text-white/25">
-            Popular This Week
+            {sectionLabel}
           </p>
         </div>
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
-          {popularMatchups.map((m, i) => (
-            <MatchupRow
-              key={i}
-              matchup={m}
-              showSplit={false}
-              isLast={i === popularMatchups.length - 1}
-              onClick={() => handleMatchupClick(m.playerA, m.playerB)}
-            />
-          ))}
-        </div>
+
+        {matchupsToShow.length > 0 ? (
+          <div>
+            {matchupsToShow.map((m, i) => (
+              <MatchupRow
+                key={i}
+                matchup={m}
+                showSplit={hasLiveData}
+                isLast={i === matchupsToShow.length - 1}
+                onClick={() => handleMatchupClick(m.playerA, m.playerB)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="px-4 py-5 text-center">
+            <p className="text-xs text-white/25">Select two players above to compare.</p>
+          </div>
+        )}
       </div>
 
-      {closeDecisions.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-2.5">
-            <Scale size={11} className="text-sky-400/70" />
+      {hasLiveData && closeDecisions.length > 0 && (
+        <div className="mt-3 rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.05]">
+            <Scale size={11} className="text-sky-400/60" />
             <p className="text-[11px] font-semibold uppercase tracking-widest text-white/25">
               Toughest Calls
             </p>
           </div>
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+          <div>
             {closeDecisions.map((m, i) => (
               <MatchupRow
                 key={i}

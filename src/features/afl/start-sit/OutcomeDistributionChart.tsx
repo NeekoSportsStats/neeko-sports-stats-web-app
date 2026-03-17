@@ -17,6 +17,7 @@ interface OutcomeDistributionChartProps {
   winnerPlayerId: string;
   isPremium: boolean;
   onUpgrade: () => void;
+  embedded?: boolean;
 }
 
 type Buckets = Record<string, number>;
@@ -183,6 +184,7 @@ export function OutcomeDistributionChart({
   winnerPlayerId,
   isPremium,
   onUpgrade,
+  embedded = false,
 }: OutcomeDistributionChartProps) {
   const [animated, setAnimated] = useState(false);
 
@@ -210,21 +212,23 @@ export function OutcomeDistributionChart({
   const winnerIsA = String(winnerPlayerId) === String(playerA.player_id);
 
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/[0.05]">
-        <div className="flex items-center gap-2">
-          <BarChart2 size={12} className="text-[#F5C84C]" />
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-white/35">
-            Outcome Distribution
-          </span>
+    <div className={embedded ? "" : "rounded-xl border border-white/[0.08] bg-white/[0.02] overflow-hidden"}>
+      {/* Header — hidden when embedded in parent accordion */}
+      {!embedded && (
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/[0.05]">
+          <div className="flex items-center gap-2">
+            <BarChart2 size={12} className="text-[#F5C84C]" />
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-white/35">
+              Outcome Distribution
+            </span>
+          </div>
+          {!isPremium && (
+            <span className="text-[10px] font-bold text-[#F5C84C]/60 bg-[#F5C84C]/[0.08] px-2.5 py-1 rounded-full">
+              Neeko+
+            </span>
+          )}
         </div>
-        {!isPremium && (
-          <span className="text-[10px] font-bold text-[#F5C84C]/60 bg-[#F5C84C]/[0.08] px-2.5 py-1 rounded-full">
-            Neeko+
-          </span>
-        )}
-      </div>
+      )}
 
       {isPremium ? (
         <div className="px-5 py-4 space-y-5">
