@@ -14,6 +14,8 @@ interface GameContext {
   match_state?: "leading" | "close" | "chasing";
   play_style?: "safe" | "balanced" | "upside";
   timing?: "early" | "mid" | "late";
+  opponent_margin?: number | null;
+  opponent_state?: "leading_strong" | "leading" | "coin_flip" | "chasing" | "chasing_heavy" | "neutral" | null;
 }
 
 interface StartSitRequest {
@@ -197,9 +199,29 @@ function buildContextBlock(ctx: GameContext | null | undefined): string {
     `- Round timing: ${timing === "late" ? "Late round (minimise variance)" : timing === "early" ? "Early round (projection stability)" : "Mid round"}`,
   ];
 
+  const oppMargin = ctx.opponent_margin ?? null;
+  const oppState = ctx.opponent_state ?? "neutral";
+
+  if (oppMargin != null && oppState !== "neutral") {
+    const absMargin = Math.abs(oppMargin);
+    const isChasing = oppState === "chasing" || oppState === "chasing_heavy";
+    const isLeading = oppState === "leading" || oppState === "leading_strong";
+    lines.push(`- Live matchup margin: user is ${isChasing ? `trailing by ${absMargin} points` : isLeading ? `leading by ${absMargin} points` : "tied"}`);
+    if (isChasing) lines.push(`  → The user NEEDS upside to win. You MUST reference this ${absMargin}-point deficit in your explanation.`);
+    if (isLeading) lines.push(`  → The user needs to protect their lead. You MUST reference this ${absMargin}-point advantage in your floor/safety reasoning.`);
+    if (oppState === "coin_flip") lines.push(`  → Coin-flip matchup. Every point matters. Reference this in your explanation.`);
+  }
+
   const advice: string[] = [];
-  if (matchState === "chasing") advice.push("prioritise ceiling outcomes and upside scenarios over floor safety");
-  if (matchState === "leading") advice.push("prioritise floor protection and avoid high-variance picks");
+  if (oppState === "chasing" || oppState === "chasing_heavy") {
+    advice.push("lead with ceiling and upside scenarios — the user is chasing and needs a big score");
+  } else if (oppState === "leading" || oppState === "leading_strong") {
+    advice.push("lead with floor and safe scenarios — the user is protecting a lead");
+  } else if (matchState === "chasing") {
+    advice.push("prioritise ceiling outcomes and upside scenarios over floor safety");
+  } else if (matchState === "leading") {
+    advice.push("prioritise floor protection and avoid high-variance picks");
+  }
   if (timing === "late") advice.push("emphasise risk management and variance reduction in your explanation");
   if (timing === "early") advice.push("emphasise projection stability and model confidence over ceiling chasing");
   if (playStyle === "upside") advice.push("highlight ceiling outcomes and breakout potential in your reasoning");

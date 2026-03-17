@@ -4,6 +4,8 @@ import { OutcomeDistributionChart } from "./OutcomeDistributionChart";
 import { CloseCallBanner } from "./CloseCallBanner";
 import { ContextInsight } from "./ContextInsight";
 import type { GameContext } from "./GameContextSelector";
+import { MatchupStatus } from "./MatchupStatus";
+import { deriveOpponentState, getMargin, type OpponentModel } from "./OpponentInput";
 
 interface PlayerData {
   player_id: string;
@@ -36,6 +38,7 @@ interface StartSitResultProps {
   decisionContext?: "close" | "lean" | "clear" | "strong" | null;
   isCloseCall?: boolean;
   gameContext?: GameContext;
+  opponentModel?: OpponentModel;
 }
 
 function fmt(v: number | null | undefined): string {
@@ -270,6 +273,7 @@ export function StartSitResult({
   decisionContext,
   isCloseCall = false,
   gameContext,
+  opponentModel,
 }: StartSitResultProps) {
   const [deepOpen, setDeepOpen] = useState(false);
   const [distOpen, setDistOpen] = useState(false);
@@ -290,6 +294,12 @@ export function StartSitResult({
   const psm = getPlayStyleMeta(playStyle);
   const ctx = decisionContext ?? (confidence >= 80 ? "strong" : confidence >= 65 ? "clear" : confidence >= 55 ? "lean" : "close");
   const ctxLabel = ctx === "strong" ? "Clear model preference" : ctx === "clear" ? "Meaningful gap" : ctx === "lean" ? "Slight lean" : "Very close call";
+
+  const oppState = opponentModel ? deriveOpponentState(opponentModel) : "neutral";
+  const oppMargin = opponentModel ? getMargin(opponentModel) : null;
+  const oppIsChasing = oppState === "chasing" || oppState === "chasing_heavy";
+  const oppIsLeading = oppState === "leading" || oppState === "leading_strong";
+  const oppActive = oppState !== "neutral";
 
   const displayShortSummary = shortSummary ?? aiSummary ?? null;
 
@@ -323,7 +333,9 @@ export function StartSitResult({
   }
 
   const contextPrefer: "ceiling" | "floor" | "none" =
-    gameContext?.matchState === "chasing" || gameContext?.playStyle === "upside" ? "ceiling"
+    oppIsChasing ? "ceiling"
+    : oppIsLeading ? "floor"
+    : gameContext?.matchState === "chasing" || gameContext?.playStyle === "upside" ? "ceiling"
     : gameContext?.matchState === "leading" || gameContext?.playStyle === "safe" ? "floor"
     : "none";
 
@@ -389,7 +401,12 @@ export function StartSitResult({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {gameContext && (
+            {oppActive && oppMargin != null && (
+              <span className={`text-[9px] font-semibold hidden sm:block ${oppIsChasing ? "text-red-400/60" : oppIsLeading ? "text-emerald-400/60" : "text-[#F5C84C]/55"}`}>
+                {oppIsChasing ? `Chasing by ${Math.abs(oppMargin)}` : oppIsLeading ? `Up by ${Math.abs(oppMargin)}` : "Tied"}
+              </span>
+            )}
+            {!oppActive && gameContext && (
               <span className="text-[9px] text-white/22 hidden sm:block">
                 {gameContext.matchState === "leading" ? "Leading" : gameContext.matchState === "chasing" ? "Chasing" : "Close"} · {gameContext.playStyle === "safe" ? "Safe" : gameContext.playStyle === "upside" ? "Upside" : "Balanced"} · {gameContext.timing === "early" ? "Early" : gameContext.timing === "late" ? "Late" : "Mid"}
               </span>
@@ -482,8 +499,20 @@ export function StartSitResult({
       {/* ─── CLOSE CALL BANNER ─── */}
       {isCloseCall && <CloseCallBanner onUpgrade={onUpgrade} />}
 
+      {/* ─── MATCHUP STATUS ─── */}
+      {opponentModel && oppActive && (
+        <MatchupStatus
+          model={opponentModel}
+          isCloseCall={isCloseCall}
+          winnerName={winner.player_name}
+          loserName={loser.player_name}
+          isPremium={isPremium}
+          onUpgrade={onUpgrade}
+        />
+      )}
+
       {/* ─── CONTEXT INSIGHT ─── */}
-      {gameContext && (
+      {gameContext && !oppActive && (
         <ContextInsight
           context={gameContext}
           isCloseCall={isCloseCall}
@@ -572,9 +601,11 @@ export function StartSitResult({
                 </p>
                 <InlineCTA
                   label={
-                    isCloseCall ? "Unlock the full breakdown before lockout"
+                    isCloseCall && oppIsChasing ? "See the exact path to winning this matchup"
+                    : isCloseCall ? "Unlock the full breakdown before lockout"
+                    : oppIsChasing ? "Don't lose this matchup on the wrong call"
+                    : oppIsLeading ? "See full floor protection analysis"
                     : gameContext?.matchState === "chasing" ? "See how this decision changes when chasing"
-                    : gameContext?.matchState === "leading" ? "See full floor protection analysis"
                     : gameContext?.timing === "late" ? "See late-round risk breakdown"
                     : "Unlock full AI reasoning"
                   }
@@ -935,15 +966,25 @@ export function StartSitResult({
               </div>
               <div>
                 <p className="text-sm font-bold text-white/75 leading-tight">
-                  {isCloseCall ? "Don't guess on a close call" : "See the full decision before lockout"}
+                  {isCloseCall && oppIsChasing
+                    ? "Don't lose this matchup on the wrong call"
+                    : isCloseCall
+                    ? "Don't guess on a close call"
+                    : oppIsChasing
+                    ? "See the exact path to winning this matchup"
+                    : oppIsLeading
+                    ? "See the full decision before lockout"
+                    : "See the full decision before lockout"}
                 </p>
                 <p className="text-xs text-white/35 mt-0.5 leading-relaxed">
-                  {isCloseCall
+                  {isCloseCall && oppIsChasing
+                    ? `You're trailing and this is razor thin — see exactly how each outcome affects your win chances.`
+                    : isCloseCall
                     ? "This is one of the tightest calls this round. See exactly when the model flips before lockout."
-                    : gameContext?.matchState === "chasing"
-                    ? "See how this decision changes in your exact matchup when chasing points."
-                    : gameContext?.matchState === "leading"
-                    ? "See how this decision changes when protecting a lead."
+                    : oppIsChasing
+                    ? `You're chasing by ${Math.abs(oppMargin ?? 0)} pts — see how this decision affects your win probability.`
+                    : oppIsLeading
+                    ? `You're up by ${Math.abs(oppMargin ?? 0)} pts — see which play best protects your lead.`
                     : gameContext?.timing === "late"
                     ? "Late round decisions need full context — see the complete risk breakdown."
                     : "Most users upgrade after seeing their first close call."
@@ -970,7 +1011,13 @@ export function StartSitResult({
               className="w-full flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold py-3 rounded-xl hover:brightness-110 active:scale-[0.99] transition-all text-sm"
             >
               <Crown size={13} />
-              {isCloseCall ? "Unlock full breakdown" : "Unlock Neeko+"}
+              {isCloseCall && oppIsChasing
+                ? "See the exact path to winning"
+                : isCloseCall
+                ? "Unlock full breakdown"
+                : oppIsChasing
+                ? "Don't lose this matchup"
+                : "Unlock Neeko+"}
             </button>
             <p className="text-[10px] text-white/20 text-center mt-2">
               See why the model prefers one play — not just who it picks.

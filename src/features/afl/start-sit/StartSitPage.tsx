@@ -9,6 +9,7 @@ import { StartSitResult } from "./StartSitResult";
 import { StartSitSocialProof } from "./StartSitSocialProof";
 import type { QuickFillPlayer } from "./StartSitSocialProof";
 import { GameContextSelector, loadGameContext, type GameContext } from "./GameContextSelector";
+import { OpponentInput, loadOpponentModel, deriveOpponentState, getMargin, type OpponentModel } from "./OpponentInput";
 import { getAflRoundLabel } from "@/features/afl/shared/data/getAflRoundLabel";
 
 const CURRENT_SEASON = 2026;
@@ -65,6 +66,9 @@ export default function StartSitPage() {
 
   const [gameContext, setGameContext] = useState<GameContext>(() => loadGameContext());
   const [showContext, setShowContext] = useState(false);
+
+  const [opponentModel, setOpponentModel] = useState<OpponentModel>(() => loadOpponentModel());
+  const [showOpponent, setShowOpponent] = useState(false);
 
   const [comparing, setComparing] = useState(false);
   const [result, setResult] = useState<CompareResult | null>(null);
@@ -185,6 +189,8 @@ export default function StartSitPage() {
             match_state: gameContext.matchState,
             play_style: gameContext.playStyle,
             timing: gameContext.timing,
+            opponent_margin: getMargin(opponentModel),
+            opponent_state: deriveOpponentState(opponentModel),
           },
         }),
       });
@@ -248,8 +254,18 @@ export default function StartSitPage() {
       ? result.playerA.projection_final
       : result.playerB?.projection_final;
     const edgeLabel = result.confidence >= 80 ? "Strong Edge" : result.confidence >= 68 ? "Clear Edge" : "Lean Edge";
+    const oppState = deriveOpponentState(opponentModel);
+    const oppMargin = getMargin(opponentModel);
+    const contextSuffix =
+      oppState === "chasing" || oppState === "chasing_heavy"
+        ? ` — chasing by ${Math.abs(oppMargin ?? 0)}, need ceiling`
+        : oppState === "leading" || oppState === "leading_strong"
+        ? ` — up by ${Math.abs(oppMargin ?? 0)}, playing safe`
+        : gameContext.matchState !== "close"
+        ? ` — ${gameContext.matchState} match`
+        : "";
     const shareText = [
-      `START: ${result.winner_name} (${winnerProj != null ? Math.round(winnerProj) + " proj" : "—"})`,
+      `START: ${result.winner_name} (${winnerProj != null ? Math.round(winnerProj) + " proj" : "—"})${contextSuffix}`,
       `${edgeLabel} — ${result.confidence}% model confidence`,
       `Neeko Start/Sit: ${url.toString()}`,
     ].join("\n");
@@ -324,6 +340,29 @@ export default function StartSitPage() {
           {showContext && (
             <div className="mt-2">
               <GameContextSelector value={gameContext} onChange={setGameContext} />
+            </div>
+          )}
+        </div>
+
+        {/* Opponent matchup toggle + input */}
+        <div className="mb-4">
+          <button
+            onClick={() => setShowOpponent((v) => !v)}
+            className="flex items-center gap-1.5 text-[10px] font-semibold text-white/28 hover:text-white/45 transition-colors"
+          >
+            <span className={`transition-transform duration-200 ${showOpponent ? "rotate-90" : ""}`}>▶</span>
+            Matchup Scores
+            {opponentModel.userProjection != null && opponentModel.opponentProjection != null ? (
+              <span className="text-white/18 font-normal ml-0.5">
+                — {opponentModel.userProjection} vs {opponentModel.opponentProjection}
+              </span>
+            ) : (
+              <span className="text-white/18 font-normal ml-0.5">— optional</span>
+            )}
+          </button>
+          {showOpponent && (
+            <div className="mt-2">
+              <OpponentInput value={opponentModel} onChange={setOpponentModel} />
             </div>
           )}
         </div>
@@ -419,6 +458,7 @@ export default function StartSitPage() {
             decisionContext={result.decision_context}
             isCloseCall={result.meta?.is_close_call ?? false}
             gameContext={gameContext}
+            opponentModel={opponentModel}
           />
         )}
         {!comparing && result && authLoading && (
