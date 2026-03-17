@@ -18,7 +18,7 @@ interface StartSitRequest {
 }
 
 interface PlayerData {
-  player_id: number;
+  player_id: string;
   player_name: string;
   team: string | null;
   position: string | null;
@@ -367,24 +367,17 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    if (!isPremium) {
-      return new Response(
-        JSON.stringify({ error: "Neeko+ subscription required. Upgrade to access Start / Sit." }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const body: StartSitRequest = await req.json();
     const { season } = body;
-    const playerAId = Number(body.playerAId);
-    const playerBId = Number(body.playerBId);
+    const playerAId = String(body.playerAId ?? "").trim();
+    const playerBId = String(body.playerBId ?? "").trim();
     const round_number = body.round_number !== undefined && body.round_number !== null
       ? body.round_number
       : 1;
 
-    console.log("generate-start-sit received:", JSON.stringify({ playerAId, playerBId, round_number, season }));
+    console.log("generate-start-sit received:", JSON.stringify({ playerAId, playerBId, round_number, season, isPremium }));
 
-    if (!body.playerAId || !body.playerBId || isNaN(playerAId) || isNaN(playerBId)) {
+    if (!playerAId || !playerBId) {
       return new Response(
         JSON.stringify({ error: "Missing players" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -405,8 +398,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const loId = Math.min(playerAId, playerBId);
-    const hiId = Math.max(playerAId, playerBId);
+    const loId = playerAId < playerBId ? playerAId : playerBId;
+    const hiId = playerAId < playerBId ? playerBId : playerAId;
 
     const [promptResult, playersResult] = await Promise.all([
       loadPrompt(serviceClient),
@@ -431,8 +424,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const pA = (players.find((p) => Number(p.player_id) === playerAId) ?? players[0]) as PlayerData;
-    const pB = (players.find((p) => Number(p.player_id) === playerBId) ?? players[1]) as PlayerData;
+    const pA = (players.find((p) => String(p.player_id) === playerAId) ?? players[0]) as PlayerData;
+    const pB = (players.find((p) => String(p.player_id) === playerBId) ?? players[1]) as PlayerData;
 
     const { winner, loser, confidence } = deterministicWinner(pA, pB);
 
@@ -443,16 +436,17 @@ Deno.serve(async (req: Request) => {
       .select("*")
       .eq("season", season)
       .eq("round_number", round_number)
-      .eq("player_low_id", String(loId))
-      .eq("player_high_id", String(hiId))
+      .eq("player_low_id", loId)
+      .eq("player_high_id", hiId)
       .maybeSingle();
 
-    const isFresh =
-      cached != null &&
-      cached.ai_summary != null &&
-      Date.now() - new Date(cached.updated_at ?? cached.created_at).getTime() < CACHE_TTL_MS;
+    const cacheAge = cached
+      ? Date.now() - new Date(cached.updated_at ?? cached.created_at).getTime()
+      : Infinity;
+    const isFresh = cached != null && cached.ai_summary != null && cacheAge < CACHE_TTL_MS;
+    const hasVerdict = cached != null && cached.winner_player_id != null && cacheAge < CACHE_TTL_MS;
 
-    if (isFresh) {
+    if (isFresh || (hasVerdict && !isPremium)) {
       return new Response(
         JSON.stringify({
           ok: true,
@@ -466,13 +460,14 @@ Deno.serve(async (req: Request) => {
           confidence: cached.confidence,
           ai_summary: isPremium ? cached.ai_summary : null,
           model_edge: modelEdge,
+          is_cached: true,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     let aiSummary: string | null = null;
-    if (isPremium && openaiKey) {
+    if (openaiKey) {
       const attempt1 = await callOpenAI(openaiKey, winner, loser, confidence, round_number, 1, promptResult);
       if (attempt1 && containsOpposite(attempt1, loser.player_name)) {
         const attempt2 = await callOpenAI(openaiKey, winner, loser, confidence, round_number, 2, promptResult);
@@ -483,6 +478,8 @@ Deno.serve(async (req: Request) => {
       } else {
         aiSummary = attempt1 ?? deterministicExplanation(winner, loser);
       }
+    } else {
+      aiSummary = deterministicExplanation(winner, loser);
     }
 
     await serviceClient
@@ -491,9 +488,9 @@ Deno.serve(async (req: Request) => {
         {
           season,
           round_number,
-          player_low_id: String(loId),
-          player_high_id: String(hiId),
-          winner_player_id: String(winner.player_id),
+          player_low_id: loId,
+          player_high_id: hiId,
+          winner_player_id: winner.player_id,
           winner_name: winner.player_name,
           confidence,
           ai_summary: aiSummary,
@@ -508,6 +505,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         ok: true,
         cached: false,
+        is_cached: false,
         season,
         round_number,
         playerA: pA,

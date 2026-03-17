@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ArrowRight, RotateCcw, Zap, Share2, Check } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowRight, RotateCcw, Zap, Share2, Check, LogIn } from "lucide-react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
@@ -177,6 +177,11 @@ export default function StartSitPage() {
 
       const json = await res.json();
 
+      if (res.status === 401) {
+        setError("Sign in to use Start / Sit.");
+        return;
+      }
+
       if (!res.ok || json.error) {
         setError(json.error ?? "Unable to generate comparison. Please try again.");
         return;
@@ -344,13 +349,23 @@ export default function StartSitPage() {
         {error && (
           <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 flex items-start justify-between gap-3">
             <p className="text-sm text-red-400 leading-snug">{error}</p>
-            <button
-              onClick={handleCompare}
-              disabled={!canCompare}
-              className="shrink-0 text-xs text-red-400/70 hover:text-red-400 underline underline-offset-2 transition-colors disabled:opacity-40"
-            >
-              Retry
-            </button>
+            {error === "Sign in to use Start / Sit." ? (
+              <Link
+                to="/auth"
+                className="shrink-0 flex items-center gap-1 text-xs text-red-400/70 hover:text-red-400 underline underline-offset-2 transition-colors"
+              >
+                <LogIn size={11} />
+                Sign in
+              </Link>
+            ) : (
+              <button
+                onClick={handleCompare}
+                disabled={!canCompare}
+                className="shrink-0 text-xs text-red-400/70 hover:text-red-400 underline underline-offset-2 transition-colors disabled:opacity-40"
+              >
+                Retry
+              </button>
+            )}
           </div>
         )}
 
