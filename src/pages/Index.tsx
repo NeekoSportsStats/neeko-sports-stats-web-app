@@ -16,15 +16,13 @@ import MobileUpgradeBar from "@/components/mobile/MobileUpgradeBar";
 
 interface RankingRow {
   player_name: string;
-  team: string;
-  position: string | null;
+  player_team: string;
+  player_position: string | null;
   projection_final: number | null;
   neeko_rating: number | null;
   projection_confidence: number | null;
   risk_rating: number | null;
-  price: number | null;
   value_score: number | null;
-  recommendation_color: string | null;
 }
 
 interface AccuracyExampleRow {
@@ -754,7 +752,7 @@ function EdgeBoardPreview() {
   useEffect(() => {
     (async () => {
       const { data } = await supabase
-        .from("v_rankings_canonical")
+        .from("v_edge_board_safe")
         .select("player_name, team, position, neeko_rating, projection_final, ceiling_estimate, projection_confidence, risk_rating, upside_rating")
         .order("neeko_rating", { ascending: false })
         .limit(25);
@@ -1165,7 +1163,7 @@ function RankingsPreview() {
                         <span className="text-xs text-white/25 font-mono">{idx + 1}</span>
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-white truncate leading-tight">{row.player_name}</p>
-                          {row.position && <p className="text-[10px] text-white/30 leading-tight">{row.position}</p>}
+                          {row.player_position && <p className="text-[10px] text-white/30 leading-tight">{row.player_position}</p>}
                         </div>
                         <span className="text-sm font-bold text-[#F5C84C] text-center tabular-nums">
                           {row.projection_final != null ? Math.round(row.projection_final) : "—"}
@@ -1313,6 +1311,19 @@ function RankingsPreview() {
 
 export default function Index() {
   const { isPremium } = useAuth();
+
+  useEffect(() => {
+    document.title = "Neeko Sports Stats — AI AFL Fantasy Intelligence";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute("content", "AI-powered AFL fantasy projections, rankings, and trade insights. Captain picks, breakout alerts and trade signals updated every round.");
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) ogTitle.setAttribute("content", "Neeko Sports Stats — AI AFL Fantasy Intelligence");
+    const ogDesc = document.querySelector('meta[property="og:description"]');
+    if (ogDesc) ogDesc.setAttribute("content", "AI-powered AFL fantasy projections, rankings, and trade insights.");
+    return () => {
+      document.title = "Neeko Sports Stats — AI AFL Fantasy Projections";
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#070707] text-white pb-[80px] sm:pb-0">
