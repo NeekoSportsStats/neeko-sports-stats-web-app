@@ -106,18 +106,20 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Read from the input view — only players without existing analysis
+    // Fetch only players whose input_hash has changed (or who have no analysis yet).
+    // needs_regen = true when: no existing analysis, stored hash is NULL,
+    // or stored hash differs from the live computed hash.
     const { data: players, error: fetchErr } = await supabase
       .from("v_ai_player_analysis_input")
-      .select("player_id, player_name, team, position, price, projection_final, ceiling, floor, risk, confidence, consistency, value_score, matchup_rating, venue_multiplier, rest_days, form_score, form_momentum, neeko_rating, season_avg, last3_avg, last5_avg, last10_avg, opponent_name, is_home, venue, volatility_score, stability_score, ceiling_hit_rate, floor_bust_rate, breakout_probability, input_hash")
-      .is("analysis", null)
+      .select("player_id, player_name, team, position, price, projection_final, ceiling, floor, risk, confidence, consistency, value_score, matchup_rating, venue_multiplier, rest_days, form_score, form_momentum, neeko_rating, season_avg, last3_avg, last5_avg, last10_avg, opponent_name, is_home, venue, volatility_score, stability_score, ceiling_hit_rate, floor_bust_rate, breakout_probability, input_hash, needs_regen")
+      .eq("needs_regen", true)
       .limit(limitPlayers);
 
     if (fetchErr) throw fetchErr;
 
     if (!players || players.length === 0) {
       return new Response(
-        JSON.stringify({ ok: true, message: "No players pending analysis", processed: 0 }),
+        JSON.stringify({ ok: true, message: "All player analyses are up to date", processed: 0, skipped_unchanged: true }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -146,7 +148,8 @@ Deno.serve(async (req: Request) => {
             };
           }
 
-          // Write via public RPC bridge (avoids ai schema PostgREST exposure issue)
+          // Write result + store the live input_hash so future runs can skip this player
+          // if inputs have not changed since this generation.
           const { error: rpcErr } = await supabase.rpc("upsert_player_ai_analysis", {
             p_player_id:      player.player_id,
             p_recommendation: result.recommendation,
