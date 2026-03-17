@@ -169,21 +169,22 @@ const INITIAL_LIMIT = 50;
 const LOAD_MORE_STEP = 50;
 
 const PREMIUM_COLUMNS =
-  "player_id,player_name,team,position,team_name,position_group," +
-  "projection_final,ceiling,floor,ceiling_estimate,floor_estimate," +
+  "player_id,player_name,team,position," +
+  "projection_final,ceiling_estimate,floor_estimate," +
   "consistency_score,form_rating,neeko_rating,price,value_score,best_value_score,value_tag,value_tier," +
-  "signal,ai_summary,ai_summary_short,ai_summary_long,analysis," +
-  "projection_confidence,risk_rating,matchup_rating," +
+  "signal,projection_confidence,risk_rating,matchup_rating," +
   "upside_rating,captain_score,captain_rating,ai_recommendation,recommendation_color," +
-  "recommendation_short,recommendation_why,consistency_tier,total_count,cached_at," +
-  "games_played,ai_updated_at,season_avg,last3_avg,last5_avg,opponent_name,venue,is_home";
+  "recommendation_short,consistency_tier,total_count,cached_at,games_played,ai_updated_at";
 
 const FREE_COLUMNS =
-  "player_id,player_name,team,position,team_name,position_group," +
-  "projection_final,ceiling,floor,ceiling_estimate,floor_estimate," +
+  "player_id,player_name,team,position," +
+  "projection_final,ceiling_estimate,floor_estimate," +
   "consistency_score,form_rating,neeko_rating,price,value_score,best_value_score,value_tag,value_tier," +
-  "signal,summary,analysis,projection_confidence,risk_rating,matchup_rating," +
+  "signal,projection_confidence,risk_rating,matchup_rating," +
   "upside_rating,captain_score,captain_rating,consistency_tier,total_count,cached_at,games_played";
+
+const AI_COLUMNS =
+  "player_id,recommendation_short,recommendation_why,ai_summary,ai_updated_at";
 
 export default function AFLRankingsPage() {
   const { isPremium } = useAuth();
@@ -228,38 +229,54 @@ export default function AFLRankingsPage() {
 
   function normalizeRow(r: any): RankingRow {
     return {
-      player_id:            r.player_id,
-      player_name:          r.player_name,
-      team:                 r.team ?? r.team_name ?? "",
-      position:             normalisePosition(r.position ?? r.position_group ?? null),
-      projection_final:     Number(r.projection_final ?? r.projection ?? 0),
-      ceiling_estimate:     Number(r.ceiling_estimate ?? r.ceiling ?? 0),
-      floor_estimate:       Number(r.floor_estimate ?? r.floor ?? 0),
-      consistency_score:    Number(r.consistency_score ?? r.consistency ?? 0),
-      form_rating:          Number(r.form_rating ?? r.form_score ?? 0),
-      neeko_rating:         Number(r.neeko_rating ?? 0),
+      player_id:             r.player_id,
+      player_name:           r.player_name,
+      team:                  r.team ?? r.team_name ?? "",
+      position:              normalisePosition(r.position ?? r.position_group ?? null),
+      projection_final:      Number(r.projection_final ?? r.projection ?? 0),
+      ceiling_estimate:      Number(r.ceiling_estimate ?? r.ceiling ?? 0),
+      floor_estimate:        Number(r.floor_estimate ?? r.floor ?? 0),
+      consistency_score:     Number(r.consistency_score ?? r.consistency ?? 0),
+      form_rating:           Number(r.form_rating ?? r.form_score ?? 0),
+      neeko_rating:          Number(r.neeko_rating ?? 0),
       projection_confidence: r.projection_confidence ?? null,
-      risk_rating:          r.risk_rating ?? null,
-      matchup_rating:       r.matchup_rating ?? null,
-      upside_rating:        r.upside_rating ?? null,
-      captain_score:        r.captain_score ?? null,
-      captain_rating:       r.captain_rating ?? null,
-      price:                r.price ?? null,
-      value_score:          r.value_score != null ? Number(r.value_score) : null,
-      best_value_score:     r.best_value_score != null ? Number(r.best_value_score) : null,
-      value_tag:            r.value_tag ?? null,
-      value_tier:           r.value_tier ?? null,
-      ai_recommendation:    r.ai_recommendation ?? null,
-      ai_summary:           r.ai_summary_long ?? r.analysis ?? r.ai_summary ?? null,
-      signal:               r.signal ?? null,
-      analysis:             r.ai_summary_long ?? r.analysis ?? null,
-      ai_updated_at:        r.ai_updated_at ?? null,
-      recommendation_short: r.recommendation_short ?? null,
-      recommendation_why:   r.recommendation_why ?? null,
-      recommendation_color: r.recommendation_color ?? null,
-      consistency_tier:     r.consistency_tier ?? null,
-      total_count:          r.total_count ?? null,
-      games_played:         r.games_played != null ? Number(r.games_played) : null,
+      risk_rating:           r.risk_rating ?? null,
+      matchup_rating:        r.matchup_rating ?? null,
+      upside_rating:         r.upside_rating ?? null,
+      captain_score:         r.captain_score ?? null,
+      captain_rating:        r.captain_rating ?? null,
+      price:                 r.price ?? null,
+      value_score:           r.value_score != null ? Number(r.value_score) : null,
+      best_value_score:      r.best_value_score != null ? Number(r.best_value_score) : null,
+      value_tag:             r.value_tag ?? null,
+      value_tier:            r.value_tier ?? null,
+      ai_recommendation:     r.ai_recommendation ?? null,
+      ai_summary:            r.ai_summary ?? r.ai_summary_long ?? r.analysis ?? null,
+      signal:                r.signal ?? null,
+      analysis:              r.analysis ?? r.ai_summary ?? null,
+      ai_updated_at:         r.ai_updated_at ?? null,
+      recommendation_short:  r.recommendation_short ?? null,
+      recommendation_why:    r.recommendation_why ?? null,
+      recommendation_color:  r.recommendation_color ?? null,
+      consistency_tier:      r.consistency_tier ?? null,
+      total_count:           r.total_count ?? null,
+      games_played:          r.games_played != null ? Number(r.games_played) : null,
+    };
+  }
+
+  async function fetchAIForRow(row: RankingRow): Promise<Partial<RankingRow>> {
+    if (!row.player_id || !isPremium) return {};
+    const { data } = await supabase
+      .from("v_rankings_master")
+      .select(AI_COLUMNS)
+      .eq("player_id", row.player_id)
+      .maybeSingle();
+    if (!data) return {};
+    return {
+      recommendation_short: (data as any).recommendation_short ?? row.recommendation_short,
+      recommendation_why:   (data as any).recommendation_why ?? row.recommendation_why,
+      ai_summary:           (data as any).ai_summary ?? row.ai_summary,
+      ai_updated_at:        (data as any).ai_updated_at ?? row.ai_updated_at,
     };
   }
 
@@ -315,7 +332,7 @@ export default function AFLRankingsPage() {
       .range(currentLimit, nextLimit - 1);
 
     if (!error && data) {
-      setRows((prev) => [...prev, ...((data as any[]).map(normalizeRow))]);
+      setRows((prev) => [...prev, ...(data as any[]).map(normalizeRow)]);
       setCurrentLimit(nextLimit);
     }
     setLoadingMore(false);
@@ -345,13 +362,23 @@ export default function AFLRankingsPage() {
     }
   }
 
+  async function openRow(row: RankingRow, rank: number, tier: RowTier, isUnlocked: boolean) {
+    setSelected({ row, rank, tier, isUnlocked });
+    if (isUnlocked && !row.ai_summary && !row.recommendation_why) {
+      const aiData = await fetchAIForRow(row);
+      if (Object.keys(aiData).length > 0) {
+        setSelected((prev) => prev ? { ...prev, row: { ...prev.row, ...aiData } } : prev);
+      }
+    }
+  }
+
   function handleSearchSelect(row: RankingRow) {
     setHighlightedPlayerId(row.player_id ?? null);
     const idx = displayRows.findIndex((r) => r.player_id === row.player_id);
     if (idx >= 0) {
       const tier: RowTier = isPremium ? "premium" : getFreeTier(idx);
       const isUnlocked = isPremium || tier === "full" || tier === "partial";
-      setSelected({ row, rank: idx + 1, tier, isUnlocked });
+      openRow(row, idx + 1, tier, isUnlocked);
     }
   }
 
@@ -553,7 +580,7 @@ export default function AFLRankingsPage() {
                           tier={tier}
                           activeTab={activeTab}
                           isHighlighted={isHighlighted}
-                          onRowClick={() => setSelected({ row, rank: idx + 1, tier, isUnlocked })}
+                          onRowClick={() => openRow(row, idx + 1, tier, isUnlocked)}
                           onUpgrade={() => setShowUpgradeModal(true)}
                         />
                       );
@@ -591,7 +618,7 @@ export default function AFLRankingsPage() {
             onOpenRow={(row, idx) => {
               const tier: RowTier = isPremium ? "premium" : getFreeTier(idx);
               const isUnlocked = isPremium || tier === "full" || tier === "partial";
-              setSelected({ row, rank: idx + 1, tier, isUnlocked });
+              openRow(row, idx + 1, tier, isUnlocked);
             }}
             onUpgrade={() => setShowUpgradeModal(true)}
           />
