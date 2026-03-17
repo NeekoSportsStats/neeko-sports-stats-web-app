@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Search, Clock, X } from "lucide-react";
+import { Search, Clock, X, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
@@ -360,7 +360,13 @@ export default function AFLRankingsPage() {
     fetchRankings(INITIAL_LIMIT);
   }, [fetchRankings]);
 
+  const PREMIUM_TABS: RankingsTab[] = ["value", "projection"];
+
   function handleTabChange(tab: RankingsTab) {
+    if (!isPremium && PREMIUM_TABS.includes(tab)) {
+      setShowUpgradeModal(true);
+      return;
+    }
     setActiveTab(tab);
     setPremiumFilter("ALL");
     setSearchTerm("");
@@ -408,6 +414,8 @@ export default function AFLRankingsPage() {
     return r.neeko_rating_scaled ?? r.neeko_rating ?? 0;
   }
 
+  const safeActiveTab: RankingsTab = (!isPremium && PREMIUM_TABS.includes(activeTab)) ? "best" : activeTab;
+
   const displayRows = useMemo(() => {
     let filtered = [...rows];
 
@@ -434,29 +442,29 @@ export default function AFLRankingsPage() {
       }
     }
 
-    if (isPremium && sortKey && sortKey !== TAB_DEFAULT_SORT[activeTab]) {
+    if (isPremium && sortKey && sortKey !== TAB_DEFAULT_SORT[safeActiveTab]) {
       filtered = [...filtered].sort((a, b) => {
         const av = ((a as any)[sortKey] as number | null | undefined) ?? -Infinity;
         const bv = ((b as any)[sortKey] as number | null | undefined) ?? -Infinity;
         return sortDir === "desc" ? bv - av : av - bv;
       });
     } else {
-      if (activeTab === "best") {
+      if (safeActiveTab === "best") {
         filtered = [...filtered].sort((a, b) => adjustedOverallScore(b) - adjustedOverallScore(a));
-      } else if (activeTab === "value") {
+      } else if (safeActiveTab === "value") {
         filtered = [...filtered].sort((a, b) => ((b.best_value_score ?? b.value_score ?? -Infinity) - (a.best_value_score ?? a.value_score ?? -Infinity)));
-      } else if (activeTab === "projection") {
+      } else if (safeActiveTab === "projection") {
         filtered = [...filtered].sort((a, b) => ((b.projection_final ?? -Infinity) - (a.projection_final ?? -Infinity)));
       }
     }
 
     return filtered;
-  }, [rows, debouncedSearch, isPremium, premiumFilter, sortKey, sortDir, activeTab]);
+  }, [rows, debouncedSearch, isPremium, premiumFilter, sortKey, sortDir, safeActiveTab]);
 
-  const TABS: { key: RankingsTab; label: string }[] = [
-    { key: "best", label: "Best Overall" },
-    { key: "value", label: "Best Value" },
-    { key: "projection", label: "Top Projections" },
+  const TABS: { key: RankingsTab; label: string; premiumOnly: boolean }[] = [
+    { key: "best", label: "Best Overall", premiumOnly: false },
+    { key: "value", label: "Best Value", premiumOnly: true },
+    { key: "projection", label: "Top Projections", premiumOnly: true },
   ];
 
   return (
@@ -494,23 +502,31 @@ export default function AFLRankingsPage() {
       <div className="px-4 pb-16 md:px-8">
 
         <div className="mb-0 flex items-center gap-2 border-b border-white/[0.06]">
-          {TABS.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => handleTabChange(key)}
-              className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                activeTab === key
-                  ? "border-[#F5C84C] text-[#F5C84C]"
-                  : "border-transparent text-white/40 hover:text-white/70"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+          {TABS.map(({ key, label, premiumOnly }) => {
+            const isLocked = premiumOnly && !isPremium;
+            const isActive = activeTab === key;
+            return (
+              <button
+                key={key}
+                onClick={() => handleTabChange(key)}
+                title={isLocked ? "Premium feature — upgrade to Neeko+" : undefined}
+                className={`relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  isActive
+                    ? "border-[#F5C84C] text-[#F5C84C]"
+                    : isLocked
+                    ? "border-transparent text-white/25 hover:text-white/45 opacity-70"
+                    : "border-transparent text-white/40 hover:text-white/70"
+                }`}
+              >
+                {label}
+                {isLocked && <Lock size={11} className="text-white/30 shrink-0" />}
+              </button>
+            );
+          })}
         </div>
 
         <p className="text-xs text-white/30 mt-3 mb-4 leading-relaxed max-w-2xl">
-          {TAB_DESCRIPTIONS[activeTab]}
+          {TAB_DESCRIPTIONS[safeActiveTab]}
         </p>
 
         <div className="mb-3">
