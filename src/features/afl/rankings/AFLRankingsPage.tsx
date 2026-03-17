@@ -165,8 +165,6 @@ function SearchAutocomplete({
   );
 }
 
-const INITIAL_LIMIT = 50;
-const LOAD_MORE_STEP = 50;
 
 const PREMIUM_COLUMNS =
   "player_id,player_name,team,team_name,position,position_group," +
@@ -193,9 +191,7 @@ export default function AFLRankingsPage() {
   const [activeTab, setActiveTab] = useState<RankingsTab>("best");
   const [rows, setRows] = useState<RankingRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [currentLimit, setCurrentLimit] = useState(INITIAL_LIMIT);
-  const [totalRows, setTotalRows] = useState<number | null>(null);
+  const [visibleCount, setVisibleCount] = useState(50);
   const [positionFilter, setPositionFilter] = useState<PositionFilter>("ALL");
   const [premiumFilter, setPremiumFilter] = useState<PremiumFilter>("ALL");
   const [searchTerm, setSearchTerm] = useState("");
@@ -243,7 +239,7 @@ export default function AFLRankingsPage() {
       floor_estimate:         r.floor != null ? Number(r.floor) : (r.floor_estimate != null ? Number(r.floor_estimate) : null),
       consistency_score:      r.consistency != null ? Number(r.consistency) : (r.consistency_score != null ? Number(r.consistency_score) : null),
       form_rating:            r.form_score != null ? Number(r.form_score) : (r.form_rating != null ? Number(r.form_rating) : null),
-      neeko_rating:           r.neeko_rating != null ? Number(r.neeko_rating) : null,
+      neeko_rating:           r.neeko_rating_scaled != null ? Number(r.neeko_rating_scaled) : (r.neeko_rating != null ? Number(r.neeko_rating) : null),
       neeko_rating_scaled:    r.neeko_rating_scaled != null ? Number(r.neeko_rating_scaled) : null,
       projection_confidence:  r.projection_confidence != null ? Number(r.projection_confidence) : null,
       risk_rating:            r.risk_rating != null ? Number(r.risk_rating) : null,
@@ -302,18 +298,16 @@ export default function AFLRankingsPage() {
     };
   }
 
-  const fetchRankings = useCallback(async (limit: number = INITIAL_LIMIT) => {
+  const fetchRankings = useCallback(async () => {
     setLoading(true);
     setSelected(null);
     setHighlightedPlayerId(null);
-    setCurrentLimit(limit);
 
     if (isPremium) {
-      const { data, error, count } = await supabase
+      const { data, error } = await supabase
         .from("v_rankings_master")
-        .select(PREMIUM_COLUMNS, { count: "exact" })
-        .order("neeko_rating_scaled", { ascending: false })
-        .limit(limit);
+        .select(PREMIUM_COLUMNS)
+        .order("neeko_rating_scaled", { ascending: false });
 
       if (error) {
         console.error("Rankings fetch error (premium):", error);
@@ -322,7 +316,6 @@ export default function AFLRankingsPage() {
         return;
       }
       setRows(((data as any[]) ?? []).map(normalizeRow));
-      setTotalRows(count ?? null);
     } else {
       const { data, error } = await supabase
         .from("v_rankings_free")
@@ -336,32 +329,13 @@ export default function AFLRankingsPage() {
         return;
       }
       setRows(((data as any[]) ?? []).map(normalizeRow));
-      setTotalRows(null);
     }
 
     setLoading(false);
   }, [isPremium]);
 
-  const handleLoadMore = useCallback(async () => {
-    if (!isPremium) return;
-    const nextLimit = currentLimit + LOAD_MORE_STEP;
-    setLoadingMore(true);
-
-    const { data, error } = await supabase
-      .from("v_rankings_master")
-      .select(PREMIUM_COLUMNS)
-      .order("neeko_rating_scaled", { ascending: false })
-      .range(currentLimit, nextLimit - 1);
-
-    if (!error && data) {
-      setRows((prev) => [...prev, ...(data as any[]).map(normalizeRow)]);
-      setCurrentLimit(nextLimit);
-    }
-    setLoadingMore(false);
-  }, [currentLimit, isPremium]);
-
   useEffect(() => {
-    fetchRankings(INITIAL_LIMIT);
+    fetchRankings();
   }, [fetchRankings]);
 
   const PREMIUM_TABS: RankingsTab[] = ["value", "projection"];
@@ -377,7 +351,7 @@ export default function AFLRankingsPage() {
     setDebouncedSearch("");
     setSortKey(TAB_DEFAULT_SORT[tab]);
     setSortDir("desc");
-    setCurrentLimit(INITIAL_LIMIT);
+    setVisibleCount(50);
   }
 
   function handleSortClick(col: SortKey) {
@@ -414,13 +388,9 @@ export default function AFLRankingsPage() {
     }
   }
 
-  function adjustedOverallScore(r: RankingRow): number {
-    return r.neeko_rating_scaled ?? r.neeko_rating ?? 0;
-  }
-
   const safeActiveTab: RankingsTab = (!isPremium && PREMIUM_TABS.includes(activeTab)) ? "best" : activeTab;
 
-  const displayRows = useMemo(() => {
+  const sortedRows = useMemo(() => {
     let filtered = [...rows];
 
     if (isPremium && debouncedSearch.trim()) {
@@ -434,9 +404,7 @@ export default function AFLRankingsPage() {
 
     if (isPremium && premiumFilter !== "ALL") {
       if (premiumFilter === "TOP50") {
-        filtered = filtered
-          .filter((r) => (r.games_played ?? 0) >= 3)
-          .slice(0, 50);
+        filtered = filtered.filter((r) => (r.games_played ?? 0) >= 3);
       } else if (premiumFilter === "TOP100") {
         filtered = filtered.slice(0, 100);
       } else if (premiumFilter === "ELITE") {
@@ -454,7 +422,7 @@ export default function AFLRankingsPage() {
       });
     } else {
       if (safeActiveTab === "best") {
-        filtered = [...filtered].sort((a, b) => adjustedOverallScore(b) - adjustedOverallScore(a));
+        filtered = [...filtered].sort((a, b) => (b.neeko_rating_scaled ?? b.neeko_rating ?? 0) - (a.neeko_rating_scaled ?? a.neeko_rating ?? 0));
       } else if (safeActiveTab === "value") {
         filtered = [...filtered].sort((a, b) => ((b.best_value_score ?? b.value_score ?? -Infinity) - (a.best_value_score ?? a.value_score ?? -Infinity)));
       } else if (safeActiveTab === "projection") {
@@ -462,8 +430,15 @@ export default function AFLRankingsPage() {
       }
     }
 
+    console.log({ activeTab: safeActiveTab, firstRow: filtered[0], totalRows: filtered.length });
+
     return filtered;
   }, [rows, debouncedSearch, isPremium, premiumFilter, sortKey, sortDir, safeActiveTab]);
+
+  const displayRows = useMemo(() => {
+    if (!isPremium) return sortedRows.slice(0, 5);
+    return sortedRows.slice(0, visibleCount);
+  }, [sortedRows, isPremium, visibleCount]);
 
   const TABS: { key: RankingsTab; label: string; premiumOnly: boolean }[] = [
     { key: "best", label: "Best Overall", premiumOnly: false },
@@ -609,7 +584,7 @@ export default function AFLRankingsPage() {
                   </tr>
                 ) : (
                   <>
-                    {(isPremium ? displayRows : displayRows.slice(0, FREE_PARTIAL_ROWS)).map((row, idx) => {
+                    {displayRows.map((row, idx) => {
                       const tier: RowTier = isPremium ? "premium" : getFreeTier(idx);
                       const isUnlocked = isPremium || tier === "full" || tier === "partial";
                       const isHighlighted = highlightedPlayerId != null && row.player_id === highlightedPlayerId;
@@ -636,16 +611,13 @@ export default function AFLRankingsPage() {
             </table>
           </div>
 
-          {isPremium && !loading && totalRows != null && currentLimit < totalRows && !debouncedSearch.trim() && premiumFilter === "ALL" && (
+          {isPremium && !loading && visibleCount < sortedRows.length && (
             <div className="mt-4 flex flex-col items-center gap-2">
               <button
-                onClick={handleLoadMore}
-                disabled={loadingMore}
-                className="rounded-xl border border-white/10 bg-white/[0.03] px-6 py-2.5 text-sm font-medium text-white/60 hover:border-white/20 hover:text-white/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={() => setVisibleCount((v) => v + 50)}
+                className="rounded-xl border border-white/10 bg-white/[0.03] px-6 py-2.5 text-sm font-medium text-white/60 hover:border-white/20 hover:text-white/80 transition-colors"
               >
-                {loadingMore
-                  ? "Loading..."
-                  : `Show More  (${rows.length} of ${totalRows} players)`}
+                Load More ({displayRows.length} of {sortedRows.length} players)
               </button>
             </div>
           )}
