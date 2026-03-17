@@ -38,8 +38,8 @@ function KpiTiles({ rows }: { rows: RankingRow[] }) {
 
   const tiles = [
     { label: "Top Captain Avg", value: captainAvgProj != null ? captainAvgProj.toFixed(1) : "—", sub: "Top 5 captain projections", color: "text-[#F5C84C]" },
-    { label: "Value Upgrades", value: valueUpgrades.toString(), sub: "Value score ≥ 12.0", color: "text-green-400" },
-    { label: "Trap Alerts", value: trapAlerts.toString(), sub: "Risk rating ≥ 55", color: "text-red-400" },
+    { label: "Value Upgrades", value: valueUpgrades.toString(), sub: "Value score ≥ 105", color: "text-green-400" },
+    { label: "Trap Alerts", value: trapAlerts.toString(), sub: "Overpriced or high risk", color: "text-red-400" },
     { label: "High Confidence", value: highConfidence.toString(), sub: "Confidence ≥ 65%", color: "text-blue-400" },
   ];
 
@@ -169,19 +169,19 @@ const INITIAL_LIMIT = 50;
 const LOAD_MORE_STEP = 50;
 
 const PREMIUM_COLUMNS =
-  "player_id,player_name,team,position," +
+  "player_id,player_name,team,team_name,position,position_group," +
   "projection_final,ceiling_estimate,floor_estimate," +
   "consistency_score,form_rating,neeko_rating,price,value_score,best_value_score,value_tag,value_tier," +
   "signal,projection_confidence,risk_rating,matchup_rating," +
   "upside_rating,captain_score,captain_rating,ai_recommendation,recommendation_color," +
-  "recommendation_short,consistency_tier,total_count,cached_at,games_played,ai_updated_at";
+  "recommendation_short,recommendation_why,consistency_tier,total_count,cached_at,games_played,ai_updated_at";
 
 const FREE_COLUMNS =
-  "player_id,player_name,team,position," +
+  "player_id,player_name,team,team_name,position,position_group," +
   "projection_final,ceiling_estimate,floor_estimate," +
   "consistency_score,form_rating,neeko_rating,price,value_score,best_value_score,value_tag,value_tier," +
   "signal,projection_confidence,risk_rating,matchup_rating," +
-  "upside_rating,captain_score,captain_rating,consistency_tier,total_count,cached_at,games_played";
+  "upside_rating,captain_score,captain_rating,summary,analysis,consistency_tier,total_count,cached_at,games_played";
 
 const AI_COLUMNS =
   "player_id,recommendation_short,recommendation_why,ai_summary,ai_updated_at";
@@ -219,9 +219,13 @@ export default function AFLRankingsPage() {
 
   useEffect(() => {
     async function fetchUpdatedAt() {
-      const { data } = await supabase.rpc("get_rankings_updated_at");
-      if (data && data[0]) {
-        setUpdatedAt({ ts: data[0].updated_at, round: data[0].round_label });
+      try {
+        const { data, error } = await supabase.rpc("get_rankings_updated_at");
+        if (!error && data && Array.isArray(data) && data[0]) {
+          setUpdatedAt({ ts: data[0].updated_at, round: data[0].round_label ?? "Current Round" });
+        }
+      } catch {
+        // RPC unavailable — silently ignore
       }
     }
     fetchUpdatedAt();
@@ -255,7 +259,7 @@ export default function AFLRankingsPage() {
       signal:                r.signal ?? null,
       analysis:              r.analysis ?? r.ai_summary ?? null,
       ai_updated_at:         r.ai_updated_at ?? null,
-      recommendation_short:  r.recommendation_short ?? null,
+      recommendation_short:  r.recommendation_short ?? r.summary ?? null,
       recommendation_why:    r.recommendation_why ?? null,
       recommendation_color:  r.recommendation_color ?? null,
       consistency_tier:      r.consistency_tier ?? null,
@@ -264,8 +268,21 @@ export default function AFLRankingsPage() {
     };
   }
 
-  async function fetchAIForRow(row: RankingRow): Promise<Partial<RankingRow>> {
-    if (!row.player_id || !isPremium) return {};
+  async function fetchAIForRow(row: RankingRow, forceView?: "master" | "free"): Promise<Partial<RankingRow>> {
+    if (!row.player_id) return {};
+    const view = forceView ?? (isPremium ? "master" : "free");
+    if (view === "free") {
+      const { data } = await supabase
+        .from("v_rankings_free")
+        .select("player_id,summary,analysis")
+        .eq("player_id", row.player_id)
+        .maybeSingle();
+      if (!data) return {};
+      return {
+        recommendation_short: (data as any).summary ?? row.recommendation_short,
+        ai_summary:           (data as any).analysis ?? row.ai_summary,
+      };
+    }
     const { data } = await supabase
       .from("v_rankings_master")
       .select(AI_COLUMNS)
@@ -364,10 +381,14 @@ export default function AFLRankingsPage() {
 
   async function openRow(row: RankingRow, rank: number, tier: RowTier, isUnlocked: boolean) {
     setSelected({ row, rank, tier, isUnlocked });
-    if (isUnlocked && !row.ai_summary && !row.recommendation_why) {
-      const aiData = await fetchAIForRow(row);
-      if (Object.keys(aiData).length > 0) {
-        setSelected((prev) => prev ? { ...prev, row: { ...prev.row, ...aiData } } : prev);
+    const isFreeTop5 = !isPremium && tier === "full";
+    if (isUnlocked || isFreeTop5) {
+      const needsAI = !row.ai_summary && !row.recommendation_why && !row.recommendation_short;
+      if (needsAI) {
+        const aiData = await fetchAIForRow(row, isFreeTop5 && !isPremium ? "free" : undefined);
+        if (Object.keys(aiData).length > 0) {
+          setSelected((prev) => prev ? { ...prev, row: { ...prev.row, ...aiData } } : prev);
+        }
       }
     }
   }

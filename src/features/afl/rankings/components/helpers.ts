@@ -192,9 +192,9 @@ export function getConfidenceColor(v: number | null): string {
 
 export function getValueScoreColor(v: number | null): string {
   if (v == null) return "text-white/30";
-  if (v >= 120) return "text-green-400";
+  if (v >= 110) return "text-green-400";
   if (v >= 100) return "text-[#F5C84C]";
-  if (v >= 80) return "text-white/50";
+  if (v >= 90) return "text-white/50";
   return "text-red-400";
 }
 
@@ -406,8 +406,12 @@ export function computeKpiTiles(rows: RankingRow[]) {
     ? captainRows.reduce((s, r) => s + (r.projection_final ?? 0), 0) / captainRows.length
     : null;
 
-  const valueUpgrades = rows.filter((r) => (r.value_score ?? 0) >= 120).length;
-  const trapAlerts = rows.filter((r) => (r.risk_rating ?? 0) >= 55).length;
+  const valueUpgrades = rows.filter((r) => (r.value_score ?? 0) >= 105).length;
+  const trapAlerts = rows.filter((r) =>
+    (r.value_tag ?? "").toUpperCase() === "OVERPRICED" ||
+    (r.risk_rating ?? 0) >= 65 ||
+    (r.projection_confidence ?? 100) < 50
+  ).length;
   const highConfidence = rows.filter((r) => (r.projection_confidence ?? 0) >= 65).length;
 
   return { captainAvgProj, valueUpgrades, trapAlerts, highConfidence };

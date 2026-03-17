@@ -41,8 +41,12 @@ export function logEvent(event: string, properties?: Record<string, unknown>) {
         user_id: data?.user?.id ?? null,
         properties: properties ?? {},
       })
-      .then(() => {});
-  });
+      .then(({ error }) => {
+        if (error) {
+          // Silently discard — analytics table may not exist in all environments
+        }
+      });
+  }).catch(() => {});
 }
 
 export function identifyUser(user: { id: string; email?: string }) {
