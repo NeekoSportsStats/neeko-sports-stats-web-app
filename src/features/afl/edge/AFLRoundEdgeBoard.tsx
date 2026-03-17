@@ -69,15 +69,14 @@ function fmtPrice(v: number | null | undefined): string {
   return `$${n}`;
 }
 
-function sharpenSummary(text: string): string {
-  const sentences = text
+function getOneLiner(text: string): string {
+  const cleaned = text
     .replace(/is expected to /gi, "")
     .replace(/projects to /gi, "")
     .replace(/may see /gi, "")
-    .replace(/could see /gi, "")
-    .split(". ")
-    .filter(s => s.trim().length > 0);
-  return sentences.slice(0, 2).join(". ").trim() + (sentences.length > 2 ? "." : "");
+    .replace(/could see /gi, "");
+  const first = cleaned.split(". ")[0].trim();
+  return first.length > 0 ? first : cleaned.slice(0, 90).trim();
 }
 
 function getPositionBadgeStyle(pos: string | null): string {
@@ -140,7 +139,7 @@ function formatRefreshedAt(ts: string | null | undefined): string | null {
 function buildShareText(type: PickType, row: RankingRow): string {
   const conf = row.projection_confidence;
   const confStr = conf != null ? ` (${conf}% confidence)` : "";
-  const reason = row.ai_summary ? sharpenSummary(row.ai_summary) : null;
+  const reason = row.ai_summary ? getOneLiner(row.ai_summary) : null;
   const reasonStr = reason ? `\n\n"${reason}"` : "";
 
   switch (type) {
@@ -224,111 +223,18 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── Social Action Buttons ────────────────────────────────────────────────────
-
-interface SocialActionsProps {
-  type: PickType;
-  row: RankingRow;
-  vote: SocialVote;
-  onVote: (v: SocialVote) => void;
-  startingPct: number;
-  fadingPct: number;
-}
-
-function SocialActions({ type, row, vote, onVote, startingPct, fadingPct }: SocialActionsProps) {
-  const [copied, setCopied] = useState(false);
-
-  async function handleShare(e: React.MouseEvent) {
-    e.stopPropagation();
-    const text = buildShareText(type, row);
-    const ok = await copyToClipboard(text);
-    if (ok) {
-      setCopied(true);
-      track("edge_board_share", { type, player: row.player_name });
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }
-
-  function handleVote(e: React.MouseEvent, v: "starting" | "fading") {
-    e.stopPropagation();
-    onVote(vote === v ? null : v);
-    track("edge_board_vote", { type, player: row.player_name, vote: v });
-  }
-
-  return (
-    <div className="flex items-center gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
-      {/* Starting / Fading */}
-      <button
-        onClick={(e) => handleVote(e, "starting")}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-semibold transition-all ${
-          vote === "starting"
-            ? "border-green-400/50 bg-green-400/15 text-green-300"
-            : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70 hover:border-white/20"
-        }`}
-      >
-        <ThumbsUp size={10} />
-        I'm starting this
-        {vote === "starting" && <Check size={9} className="text-green-400" />}
-      </button>
-
-      <button
-        onClick={(e) => handleVote(e, "fading")}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-semibold transition-all ${
-          vote === "fading"
-            ? "border-red-400/50 bg-red-400/15 text-red-300"
-            : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70 hover:border-white/20"
-        }`}
-      >
-        <ThumbsDown size={10} />
-        Fade this
-        {vote === "fading" && <Check size={9} className="text-red-400" />}
-      </button>
-
-      {/* Share */}
-      <button
-        onClick={handleShare}
-        className={`ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-semibold transition-all ${
-          copied
-            ? "border-[#F5C84C]/40 bg-[#F5C84C]/10 text-[#F5C84C]"
-            : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70 hover:border-white/20"
-        }`}
-      >
-        {copied ? <Check size={10} /> : <Share2 size={10} />}
-        {copied ? "Copied!" : "Share pick"}
-      </button>
-
-      {/* Social proof bar */}
-      {(startingPct > 0 || fadingPct > 0) && (
-        <div className="w-full flex items-center gap-2 mt-1">
-          <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden">
-            <div
-              className="h-full bg-green-400/50 rounded-full transition-all duration-500"
-              style={{ width: `${startingPct}%` }}
-            />
-          </div>
-          <span className="text-[9px] text-white/25 tabular-nums shrink-0">
-            {startingPct}% starting · {fadingPct}% fading
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Hero Pick Config ──────────────────────────────────────────────────────────
 
 interface HeroPickConfig {
   type: PickType;
-  label: string;
-  sublabel: string;
-  icon: React.ReactNode;
-  border: string;
-  bg: string;
-  badge: string;
-  accentText: string;
+  heroLabel: string;
+  heroEmoji: string;
   metricLabel: string;
   metricValue: string;
   metricColor: string;
+  border: string;
+  bg: string;
+  accentText: string;
 }
 
 function getHeroConfig(type: PickType, row: RankingRow): HeroPickConfig {
@@ -336,12 +242,10 @@ function getHeroConfig(type: PickType, row: RankingRow): HeroPickConfig {
     case "captain":
       return {
         type,
-        label: "Captain Lock",
-        sublabel: "Start with the armband",
-        icon: <Star size={13} className="text-yellow-400" />,
-        border: "border-yellow-400/25",
-        bg: "bg-yellow-400/[0.04]",
-        badge: "bg-yellow-400/15 text-yellow-300 border-yellow-400/30",
+        heroLabel: "CAPTAIN LOCK",
+        heroEmoji: "🔥",
+        border: "border-yellow-400/30",
+        bg: "bg-yellow-400/[0.05]",
         accentText: "text-yellow-400",
         metricLabel: "Projection",
         metricValue: fmtInt(row.projection_final),
@@ -350,12 +254,10 @@ function getHeroConfig(type: PickType, row: RankingRow): HeroPickConfig {
     case "value":
       return {
         type,
-        label: "Best Value Play",
-        sublabel: "Underpriced relative to output",
-        icon: <TrendingUp size={13} className="text-green-400" />,
-        border: "border-green-500/25",
-        bg: "bg-green-500/[0.04]",
-        badge: "bg-green-500/15 text-green-300 border-green-500/30",
+        heroLabel: "BEST VALUE",
+        heroEmoji: "🟢",
+        border: "border-green-500/30",
+        bg: "bg-green-500/[0.05]",
         accentText: "text-green-400",
         metricLabel: "Value Score",
         metricValue: fmtValueScore(row.value_score),
@@ -364,12 +266,10 @@ function getHeroConfig(type: PickType, row: RankingRow): HeroPickConfig {
     case "trap":
       return {
         type,
-        label: "Trap / Fade",
-        sublabel: "Avoid or leave on bench",
-        icon: <AlertTriangle size={13} className="text-red-400" />,
-        border: "border-red-500/25",
-        bg: "bg-red-500/[0.04]",
-        badge: "bg-red-500/15 text-red-300 border-red-500/30",
+        heroLabel: "FADE THIS",
+        heroEmoji: "🚨",
+        border: "border-red-500/30",
+        bg: "bg-red-500/[0.05]",
         accentText: "text-red-400",
         metricLabel: "Risk",
         metricValue: getRiskLabel(row.risk_rating),
@@ -378,12 +278,10 @@ function getHeroConfig(type: PickType, row: RankingRow): HeroPickConfig {
     case "differential":
       return {
         type,
-        label: "Differential",
-        sublabel: "Low ownership, high upside",
-        icon: <Zap size={13} className="text-blue-400" />,
-        border: "border-blue-500/25",
-        bg: "bg-blue-500/[0.04]",
-        badge: "bg-blue-500/15 text-blue-300 border-blue-500/30",
+        heroLabel: "DIFFERENTIAL",
+        heroEmoji: "⚡",
+        border: "border-blue-500/30",
+        bg: "bg-blue-500/[0.05]",
         accentText: "text-blue-400",
         metricLabel: "Projection",
         metricValue: fmtInt(row.projection_final),
@@ -403,239 +301,242 @@ interface HeroPickCardProps {
 
 function HeroPickCard({ type, row, isPremium, onUnlock }: HeroPickCardProps) {
   const cfg = getHeroConfig(type, row);
-  const reason = row.ai_summary ? sharpenSummary(row.ai_summary) : null;
   const conf = row.projection_confidence;
-  const [expanded, setExpanded] = useState(false);
+  const oneLiner = row.ai_summary ? getOneLiner(row.ai_summary) : null;
   const [vote, setVote] = useState<SocialVote>(null);
+  const [copied, setCopied] = useState(false);
 
-  const startingPct = vote === "starting" ? 68 : 67;
-  const fadingPct = vote === "fading" ? 33 : 32;
+  async function handleShare(e: React.MouseEvent) {
+    e.stopPropagation();
+    const text = buildShareText(type, row);
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopied(true);
+      track("edge_board_share", { type, player: row.player_name });
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  function handleVote(e: React.MouseEvent, v: "starting" | "fading") {
+    e.stopPropagation();
+    setVote(vote === v ? null : v);
+    track("edge_board_vote", { type, player: row.player_name, vote: v });
+  }
 
   return (
-    <div
-      className={`relative flex flex-col rounded-2xl border ${cfg.border} ${cfg.bg} p-5 transition-all duration-200 cursor-pointer
-        ${expanded ? "shadow-2xl shadow-black/40" : "hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/30"}`}
-      onClick={() => setExpanded(e => !e)}
-      role="button"
-      aria-expanded={expanded}
-    >
+    <div className={`relative flex flex-col rounded-2xl border ${cfg.border} ${cfg.bg} overflow-hidden`}>
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider ${cfg.badge}`}>
-          {cfg.icon}
-          {cfg.label}
-        </div>
-        <div className="flex items-center gap-2">
+      {/* Bold label banner */}
+      <div className={`px-4 pt-4 pb-2`}>
+        <span className={`text-xs font-extrabold tracking-widest uppercase ${cfg.accentText}`}>
+          {cfg.heroEmoji} {cfg.heroLabel}
+        </span>
+      </div>
+
+      {/* Player name + team */}
+      <div className="px-4 pb-3 border-b border-white/[0.06]">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h3 className="text-2xl font-extrabold text-white leading-tight">{row.player_name}</h3>
+            <p className="text-xs text-white/40 mt-0.5">{row.team}</p>
+          </div>
           {row.position && (
-            <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${getPositionBadgeStyle(row.position)}`}>
+            <span className={`mt-1 shrink-0 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${getPositionBadgeStyle(row.position)}`}>
               {row.position}
             </span>
           )}
-          <span className={`text-[10px] text-white/25 transition-transform duration-200 inline-block ${expanded ? "rotate-180" : ""}`}>▾</span>
         </div>
       </div>
 
-      {/* Player identity */}
-      <div className="mb-4">
-        <h3 className="text-xl font-extrabold text-white leading-tight">{row.player_name}</h3>
-        <p className="text-xs text-white/40 mt-0.5">{row.team}</p>
-      </div>
-
-      {/* Primary metric */}
-      <div className="mb-4">
-        <p className="text-[10px] text-white/30 uppercase tracking-widest mb-1">{cfg.metricLabel}</p>
-        <p className={`text-4xl font-extrabold tabular-nums leading-none ${cfg.metricColor}`}>
-          {cfg.metricValue}
-        </p>
-      </div>
-
-      {/* Confidence */}
-      {conf != null && (
-        <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 mb-4 self-start">
-          <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${conf >= 75 ? "bg-green-400" : conf >= 60 ? "bg-yellow-400" : "bg-orange-400"}`} />
-          <span className={`text-[11px] font-semibold ${getConfidenceColor(conf)}`}>
-            {conf}% confidence
-          </span>
+      {/* Primary stat + confidence */}
+      <div className="px-4 py-3 flex items-center gap-4">
+        <div>
+          <p className="text-[10px] text-white/30 uppercase tracking-widest mb-0.5">{cfg.metricLabel}</p>
+          <p className={`text-3xl font-extrabold tabular-nums leading-none ${cfg.metricColor}`}>
+            {cfg.metricValue}
+          </p>
         </div>
-      )}
-
-      {/* Collapsed: short reason */}
-      {!expanded && (
-        <>
-          {isPremium ? (
-            reason ? (
-              <div className="rounded-xl border border-white/[0.07] bg-black/25 px-3.5 py-3 mt-auto mb-3" onClick={e => e.stopPropagation()}>
-                <p className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${cfg.accentText} opacity-60`}>
-                  {type === "captain" ? "Why captain" : type === "value" ? "Why value" : type === "trap" ? "Why to avoid" : "Why differential"}
-                </p>
-                <p className="text-[12px] text-white/70 leading-relaxed">{reason}</p>
-              </div>
-            ) : null
-          ) : (
-            <div className="rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.03] px-3.5 py-3 mt-auto mb-3" onClick={e => e.stopPropagation()}>
-              <p className="text-[9px] font-bold uppercase tracking-widest text-[#F5C84C]/50 mb-1.5">AI reasoning</p>
-              <div className="relative mb-2">
-                <p className="text-[12px] text-white/20 leading-relaxed select-none blur-[3px] line-clamp-2">
-                  Advanced ceiling modelling and matchup delta scoring indicates significant upside leverage this round.
-                </p>
-              </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); onUnlock(); }}
-                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-[#F5C84C]/20 bg-[#F5C84C]/[0.05] text-[11px] font-semibold text-[#F5C84C]/70 hover:text-[#F5C84C] hover:border-[#F5C84C]/35 transition-all"
-              >
-                <Lock size={9} />
-                Unlock with Neeko+
-              </button>
-            </div>
-          )}
-
-          {/* Social actions (always visible in collapsed state) */}
-          <div onClick={e => e.stopPropagation()}>
-            <SocialActions
-              type={type}
-              row={row}
-              vote={vote}
-              onVote={setVote}
-              startingPct={startingPct}
-              fadingPct={fadingPct}
-            />
+        {conf != null && (
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.04] self-end`}>
+            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${conf >= 75 ? "bg-green-400" : conf >= 60 ? "bg-yellow-400" : "bg-orange-400"}`} />
+            <span className={`text-[11px] font-bold ${getConfidenceColor(conf)}`}>
+              {conf}% confidence
+            </span>
           </div>
-        </>
-      )}
+        )}
+      </div>
 
-      {/* Expanded detail panel */}
-      {expanded && (
-        <div className="mt-2 space-y-3" onClick={e => e.stopPropagation()}>
-
-          {/* Full stat grid */}
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { label: "Projection", value: fmtInt(row.projection_final), color: "text-white" },
-              { label: "Value Score", value: fmtValueScore(row.value_score), color: getValueScoreColor(row.value_score) },
-              { label: "Risk", value: getRiskLabel(row.risk_rating), color: getRiskColor(row.risk_rating) },
-              { label: "Confidence", value: conf != null ? `${conf}%` : "—", color: getConfidenceColor(conf) },
-              { label: "Ceiling", value: fmtInt(row.ceiling_estimate), color: "text-white/60" },
-              { label: "Floor", value: fmtInt(row.floor_estimate), color: "text-white/60" },
-              { label: "Price", value: fmtPrice(row.price), color: "text-white/60" },
-              { label: "Neeko Rating", value: row.neeko_rating != null ? row.neeko_rating.toFixed(1) : "—", color: "text-white/60" },
-            ].map(({ label, value, color }) => (
-              <div key={label} className="rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2">
-                <p className="text-[9px] text-white/30 uppercase tracking-widest mb-0.5">{label}</p>
-                <p className={`text-sm font-bold tabular-nums ${color}`}>{value}</p>
-              </div>
-            ))}
+      {/* Short reason: 1 line only */}
+      <div className="px-4 pb-4 flex-1">
+        {isPremium ? (
+          oneLiner ? (
+            <p className="text-[12px] text-white/60 leading-snug line-clamp-1">{oneLiner}</p>
+          ) : null
+        ) : (
+          <div className="flex items-center gap-1.5 cursor-pointer" onClick={(e) => { e.stopPropagation(); onUnlock(); }}>
+            <Lock size={9} className="text-[#F5C84C]/50 shrink-0" />
+            <p className="text-[11px] text-[#F5C84C]/50 hover:text-[#F5C84C]/80 transition-colors">
+              Unlock reasoning — Neeko+
+            </p>
           </div>
+        )}
+      </div>
 
-          {/* Full AI explanation */}
-          {isPremium ? (
-            row.ai_summary ? (
-              <div className="rounded-xl border border-white/[0.07] bg-black/25 px-3.5 py-3">
-                <p className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${cfg.accentText} opacity-60`}>
-                  Full analysis
-                </p>
-                <p className="text-[12px] text-white/70 leading-relaxed">{row.ai_summary}</p>
-              </div>
-            ) : null
-          ) : (
-            <div className="rounded-xl border border-[#F5C84C]/15 bg-[#F5C84C]/[0.03] px-3.5 py-3">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-[#F5C84C]/50 mb-1.5">Full AI analysis</p>
-              <div className="relative mb-2">
-                <p className="text-[12px] text-white/20 leading-relaxed select-none blur-[3px]">
-                  Advanced ceiling modelling and matchup delta scoring indicates significant upside leverage this round. Position scarcity and opponent concession profile align strongly.
-                </p>
-              </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); onUnlock(); }}
-                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-[#F5C84C]/20 bg-[#F5C84C]/[0.05] text-[11px] font-semibold text-[#F5C84C]/70 hover:text-[#F5C84C] hover:border-[#F5C84C]/35 transition-all"
-              >
-                <Lock size={9} />
-                Unlock full analysis
-              </button>
-            </div>
-          )}
+      {/* Social row */}
+      <div className="px-4 pb-4 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={(e) => handleVote(e, "starting")}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-all ${
+            vote === "starting"
+              ? "border-green-400/50 bg-green-400/15 text-green-300"
+              : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70 hover:border-white/20"
+          }`}
+        >
+          <ThumbsUp size={10} />
+          Starting
+          {vote === "starting" && <Check size={9} className="text-green-400" />}
+        </button>
 
-          {/* Social actions in expanded */}
-          <SocialActions
-            type={type}
-            row={row}
-            vote={vote}
-            onVote={setVote}
-            startingPct={startingPct}
-            fadingPct={fadingPct}
-          />
+        <button
+          onClick={(e) => handleVote(e, "fading")}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-all ${
+            vote === "fading"
+              ? "border-red-400/50 bg-red-400/15 text-red-300"
+              : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70 hover:border-white/20"
+          }`}
+        >
+          <ThumbsDown size={10} />
+          Fading
+          {vote === "fading" && <Check size={9} className="text-red-400" />}
+        </button>
 
-          <button
-            onClick={() => setExpanded(false)}
-            className="w-full text-[10px] text-white/25 hover:text-white/50 transition-colors py-1"
-          >
-            Collapse ▴
-          </button>
-        </div>
-      )}
+        <button
+          onClick={handleShare}
+          className={`ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition-all ${
+            copied
+              ? "border-[#F5C84C]/40 bg-[#F5C84C]/10 text-[#F5C84C]"
+              : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70 hover:border-white/20"
+          }`}
+        >
+          {copied ? <Check size={10} /> : <Share2 size={10} />}
+          {copied ? "Copied!" : "Share"}
+        </button>
+      </div>
     </div>
   );
 }
 
-// ─── Secondary Play Card ──────────────────────────────────────────────────────
+// ─── Round Summary Share Panel ─────────────────────────────────────────────────
 
-interface SecondaryCardProps {
-  row: RankingRow;
-  section: Section;
-  rank: number;
+interface RoundSummaryShareProps {
+  captain: RankingRow | null;
+  value: RankingRow | null;
+  trap: RankingRow | null;
 }
 
-function SecondaryCard({ row, section, rank }: SecondaryCardProps) {
-  const accent =
-    section === "captain"
-      ? { border: "border-yellow-400/15", badge: "text-yellow-300", dot: "bg-yellow-400" }
-      : section === "breakout"
-      ? { border: "border-green-500/15", badge: "text-green-300", dot: "bg-green-400" }
-      : { border: "border-red-500/15", badge: "text-red-300", dot: "bg-red-400" };
+function RoundSummaryShare({ captain, value, trap }: RoundSummaryShareProps) {
+  const [copied, setCopied] = useState(false);
 
-  const label =
-    section === "captain" ? `#${rank} Captain`
-    : section === "breakout" ? `#${rank} Value`
-    : `#${rank} Trap`;
-
-  const metricLabel = section === "captain" ? "Projection" : section === "breakout" ? "Value" : "Risk";
-  const metricValue =
-    section === "captain" ? fmtInt(row.projection_final)
-    : section === "breakout" ? fmtValueScore(row.value_score)
-    : getRiskLabel(row.risk_rating);
-
-  const metricColor =
-    section === "captain" ? "text-yellow-400"
-    : section === "breakout" ? getValueScoreColor(row.value_score)
-    : getRiskColor(row.risk_rating);
+  async function handleShare() {
+    const text = buildRoundSummaryText(captain, value, trap);
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopied(true);
+      track("edge_board_share_round");
+      setTimeout(() => setCopied(false), 2500);
+    }
+  }
 
   return (
-    <div className={`flex items-center gap-3 rounded-xl border ${accent.border} bg-white/[0.02] px-4 py-3 transition-colors hover:bg-white/[0.04]`}>
-      <div className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg bg-white/[0.05] border border-white/10">
-        <span className={`w-1.5 h-1.5 rounded-full ${accent.dot}`} />
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <span className={`text-[10px] font-bold uppercase tracking-wider ${accent.badge}`}>{label}</span>
-          {row.position && (
-            <span className={`text-[9px] font-semibold uppercase px-1 py-0.5 rounded ${getPositionBadgeStyle(row.position)}`}>
-              {row.position}
-            </span>
-          )}
+    <div className="rounded-2xl border border-[#F5C84C]/20 bg-[#F5C84C]/[0.03] p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="text-sm font-extrabold text-white">Share this round's picks</h3>
+          <p className="text-[11px] text-white/35 mt-0.5">Ready-to-post for X, WhatsApp or your league chat</p>
         </div>
-        <p className="text-sm font-bold text-white leading-tight truncate">{row.player_name}</p>
-        <p className="text-[11px] text-white/35 truncate">{row.team}</p>
+        <button
+          onClick={handleShare}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-bold text-xs transition-all shrink-0 ml-4 ${
+            copied
+              ? "border-[#F5C84C]/50 bg-[#F5C84C]/15 text-[#F5C84C]"
+              : "border-[#F5C84C]/30 bg-[#F5C84C]/[0.07] text-[#F5C84C]/70 hover:text-[#F5C84C] hover:border-[#F5C84C]/50"
+          }`}
+        >
+          {copied ? <Check size={12} /> : <Share2 size={12} />}
+          {copied ? "Copied!" : "Copy picks"}
+        </button>
       </div>
 
-      <div className="shrink-0 text-right">
-        <p className="text-[10px] text-white/30 uppercase tracking-wider mb-0.5">{metricLabel}</p>
-        <p className={`text-sm font-extrabold tabular-nums ${metricColor}`}>{metricValue}</p>
-        {row.projection_confidence != null && (
-          <p className={`text-[10px] font-semibold tabular-nums ${getConfidenceColor(row.projection_confidence)}`}>
-            {row.projection_confidence}% conf.
-          </p>
+      <div className="rounded-xl border border-white/[0.06] bg-black/30 px-4 py-3 space-y-1.5">
+        {captain && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px]">🔥</span>
+            <span className="text-[12px] text-white/60">
+              <span className="text-white font-semibold">{captain.player_name}</span> — {fmtInt(captain.projection_final)} pts
+            </span>
+          </div>
         )}
+        {value && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px]">🟢</span>
+            <span className="text-[12px] text-white/60">
+              <span className="text-white font-semibold">{value.player_name}</span> — Value {fmtValueScore(value.value_score)}
+            </span>
+          </div>
+        )}
+        {trap && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px]">🚨</span>
+            <span className="text-[12px] text-white/60">
+              Fade <span className="text-white font-semibold">{trap.player_name}</span> — {getRiskLabel(trap.risk_rating)} risk
+            </span>
+          </div>
+        )}
+        <p className="text-[10px] text-white/20 pt-1">neekosports.com.au #AFLFantasy</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Bullet List Section (Premium more plays) ─────────────────────────────────
+
+interface BulletListSectionProps {
+  title: string;
+  emoji: string;
+  accentText: string;
+  rows: RankingRow[];
+  section: Section;
+}
+
+function BulletListSection({ title, emoji, accentText, rows, section }: BulletListSectionProps) {
+  if (rows.length === 0) return null;
+
+  return (
+    <div>
+      <p className={`text-[11px] font-bold uppercase tracking-widest mb-2 ${accentText}`}>
+        {emoji} {title}
+      </p>
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 space-y-2">
+        {rows.map((row) => {
+          const stat =
+            section === "captain"
+              ? `${fmtInt(row.projection_final)} pts`
+              : section === "breakout"
+              ? `Value ${fmtValueScore(row.value_score)}`
+              : `${getRiskLabel(row.risk_rating)} risk`;
+
+          const confStr = row.projection_confidence != null
+            ? ` · ${row.projection_confidence}% conf`
+            : "";
+
+          return (
+            <div key={row.player_id ?? row.player_name} className="flex items-center gap-2">
+              <span className="text-white/20 text-sm shrink-0">•</span>
+              <span className="text-sm text-white font-semibold">{row.player_name}</span>
+              <span className="text-[12px] text-white/40">({stat}{confStr})</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -652,10 +553,10 @@ interface LockedPickRowProps {
 function LockedPickRow({ section, rank, onUnlock }: LockedPickRowProps) {
   const accent =
     section === "captain"
-      ? { border: "border-yellow-400/10", label: `#${rank} Captain`, dot: "bg-yellow-400/40", metric: "pts" }
+      ? { border: "border-yellow-400/10", label: `#${rank} Captain`, dot: "bg-yellow-400/40" }
       : section === "value"
-      ? { border: "border-green-500/10", label: `#${rank} Value`, dot: "bg-green-400/40", metric: "value" }
-      : { border: "border-red-500/10", label: `#${rank} Trap`, dot: "bg-red-400/40", metric: "risk" };
+      ? { border: "border-green-500/10", label: `#${rank} Value`, dot: "bg-green-400/40" }
+      : { border: "border-red-500/10", label: `#${rank} Trap`, dot: "bg-red-400/40" };
 
   return (
     <div
@@ -691,7 +592,6 @@ function FreePaywall({ onUnlock, captainCount, valueCount, trapCount }: FreePayw
 
   return (
     <div className="mt-6 space-y-3">
-      {/* Header banner */}
       <div className="rounded-2xl border border-[#F5C84C]/25 bg-gradient-to-b from-[#F5C84C]/[0.06] to-[#F5C84C]/[0.01] px-5 py-4">
         <div className="flex items-center gap-3 mb-3">
           <div className="flex items-center justify-center w-9 h-9 rounded-xl border border-[#F5C84C]/30 bg-[#F5C84C]/10 shrink-0">
@@ -711,7 +611,6 @@ function FreePaywall({ onUnlock, captainCount, valueCount, trapCount }: FreePayw
           </a>
         </div>
 
-        {/* Preview of locked picks */}
         <div className="space-y-2">
           {captainCount > 0 && Array.from({ length: captainCount }).map((_, i) => (
             <LockedPickRow key={`cap-${i}`} section="captain" rank={i + 2} onUnlock={onUnlock} />
@@ -738,73 +637,6 @@ function FreePaywall({ onUnlock, captainCount, valueCount, trapCount }: FreePayw
   );
 }
 
-// ─── Round Summary Share Panel ─────────────────────────────────────────────────
-
-interface RoundSummaryShareProps {
-  captain: RankingRow | null;
-  value: RankingRow | null;
-  trap: RankingRow | null;
-}
-
-function RoundSummaryShare({ captain, value, trap }: RoundSummaryShareProps) {
-  const [copied, setCopied] = useState(false);
-
-  async function handleShare() {
-    const text = buildRoundSummaryText(captain, value, trap);
-    const ok = await copyToClipboard(text);
-    if (ok) {
-      setCopied(true);
-      track("edge_board_share_round");
-      setTimeout(() => setCopied(false), 2500);
-    }
-  }
-
-  return (
-    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-sm font-extrabold text-white">Share this round's picks</h3>
-          <p className="text-[11px] text-white/35 mt-0.5">Copy a ready-to-post summary for X, WhatsApp or your league chat</p>
-        </div>
-        <button
-          onClick={handleShare}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-semibold text-xs transition-all shrink-0 ml-4 ${
-            copied
-              ? "border-[#F5C84C]/40 bg-[#F5C84C]/10 text-[#F5C84C]"
-              : "border-white/15 bg-white/[0.04] text-white/60 hover:text-white hover:border-white/25"
-          }`}
-        >
-          {copied ? <Check size={12} /> : <Share2 size={12} />}
-          {copied ? "Copied!" : "Copy picks"}
-        </button>
-      </div>
-
-      {/* Preview */}
-      <div className="rounded-xl border border-white/[0.05] bg-black/30 px-4 py-3 space-y-2">
-        {captain && (
-          <div className="flex items-center gap-2">
-            <Star size={10} className="text-yellow-400 shrink-0" />
-            <span className="text-[12px] text-white/60"><span className="text-white font-semibold">{captain.player_name}</span> — {fmtInt(captain.projection_final)} pts projected</span>
-          </div>
-        )}
-        {value && (
-          <div className="flex items-center gap-2">
-            <TrendingUp size={10} className="text-green-400 shrink-0" />
-            <span className="text-[12px] text-white/60"><span className="text-white font-semibold">{value.player_name}</span> — Value Score {fmtValueScore(value.value_score)}</span>
-          </div>
-        )}
-        {trap && (
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={10} className="text-red-400 shrink-0" />
-            <span className="text-[12px] text-white/60">Fade <span className="text-white font-semibold">{trap.player_name}</span> — {getRiskLabel(trap.risk_rating)} risk</span>
-          </div>
-        )}
-        <p className="text-[10px] text-white/20 pt-1">neekosports.com.au #AFLFantasy</p>
-      </div>
-    </div>
-  );
-}
-
 // ─── Loading Skeleton ─────────────────────────────────────────────────────────
 
 function LoadingSkeleton() {
@@ -815,7 +647,7 @@ function LoadingSkeleton() {
         <div className="h-4 w-72 rounded-lg bg-white/5 animate-pulse" />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-64 rounded-2xl bg-white/[0.03] animate-pulse" />
+            <div key={i} className="h-48 rounded-2xl bg-white/[0.03] animate-pulse" />
           ))}
         </div>
       </div>
@@ -913,7 +745,6 @@ export default function AFLRoundEdgeBoard() {
 
   const hasSecondary = captainSecondary.length > 0 || breakoutSecondary.length > 0 || trapSecondary.length > 0;
 
-  // For free users: show 2 locked picks per category as paywall preview
   const lockedCaptainCount = isPremium ? 0 : 2;
   const lockedValueCount = isPremium ? 0 : 2;
   const lockedTrapCount = isPremium ? 0 : 2;
@@ -923,7 +754,7 @@ export default function AFLRoundEdgeBoard() {
       <div className="max-w-4xl mx-auto">
 
         {/* ── Page header ─────────────────────────────────────────────────── */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
             <Zap size={13} className="text-[#F5C84C]" />
             <span className="text-[10px] font-semibold uppercase tracking-widest text-[#F5C84C]/60">AFL Fantasy · Edge Board</span>
@@ -935,8 +766,8 @@ export default function AFLRoundEdgeBoard() {
             )}
           </div>
           <h1 className="text-2xl font-extrabold text-white leading-tight">This Week's Picks</h1>
-          <p className="text-sm text-white/45 mt-1">
-            The model's highest-conviction plays this round — captain, value, and who to avoid.
+          <p className="text-sm text-white/40 mt-1">
+            Captain lock, best value, and who to fade — decided by the model.
           </p>
           {formatRefreshedAt(refreshedAt) && (
             <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-white/10 bg-white/[0.03]">
@@ -948,12 +779,7 @@ export default function AFLRoundEdgeBoard() {
 
         {/* ── Hero Picks ───────────────────────────────────────────────────── */}
         {heroPicks.length > 0 && (
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-5">
-              <h2 className="text-[11px] font-bold text-white uppercase tracking-widest">This Week's Top Picks</h2>
-              <div className="flex-1 h-px bg-white/[0.06]" />
-              <span className="text-[10px] text-white/20 uppercase tracking-widest shrink-0">#1 per category</span>
-            </div>
+          <div className="mb-5">
             <div className={`grid gap-4 ${heroPicks.length === 3 ? "grid-cols-1 sm:grid-cols-3" : heroPicks.length === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 max-w-xl"}`}>
               {heroPicks.map(({ type, row }) => (
                 <HeroPickCard
@@ -968,7 +794,14 @@ export default function AFLRoundEdgeBoard() {
           </div>
         )}
 
-        {/* ── Free paywall (shown after hero picks) ────────────────────────── */}
+        {/* ── Share section (directly below hero cards) ────────────────────── */}
+        {heroPicks.length > 0 && (
+          <div className="mb-6">
+            <RoundSummaryShare captain={captainPick} value={valuePick} trap={trapPick} />
+          </div>
+        )}
+
+        {/* ── Free paywall ─────────────────────────────────────────────────── */}
         {!isPremium && (
           <FreePaywall
             onUnlock={() => setShowUpgrade(true)}
@@ -978,68 +811,41 @@ export default function AFLRoundEdgeBoard() {
           />
         )}
 
-        {/* ── Premium: More Plays This Round ───────────────────────────────── */}
+        {/* ── Premium: More Plays This Round (bullet lists) ────────────────── */}
         {isPremium && hasSecondary && (
           <div className="mt-2">
-            <div className="flex items-center gap-3 mb-5">
+            <div className="flex items-center gap-3 mb-4">
               <h2 className="text-[11px] font-bold text-white uppercase tracking-widest">More Plays This Round</h2>
               <div className="flex-1 h-px bg-white/[0.06]" />
             </div>
 
-            <div className="space-y-6">
-              {captainSecondary.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Star size={11} className="text-yellow-400" />
-                    <p className="text-[11px] font-semibold text-yellow-400/80 uppercase tracking-wider">Additional Captain Edges</p>
-                  </div>
-                  <div className="space-y-2">
-                    {captainSecondary.map((row, i) => (
-                      <SecondaryCard key={row.player_id ?? row.player_name} row={row} section="captain" rank={i + 2} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {breakoutSecondary.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <TrendingUp size={11} className="text-green-400" />
-                    <p className="text-[11px] font-semibold text-green-400/80 uppercase tracking-wider">Additional Value Plays</p>
-                  </div>
-                  <div className="space-y-2">
-                    {breakoutSecondary.map((row, i) => (
-                      <SecondaryCard key={row.player_id ?? row.player_name} row={row} section="breakout" rank={i + 2} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {trapSecondary.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <AlertTriangle size={11} className="text-red-400" />
-                    <p className="text-[11px] font-semibold text-red-400/80 uppercase tracking-wider">Additional Trap Alerts</p>
-                  </div>
-                  <div className="space-y-2">
-                    {trapSecondary.map((row, i) => (
-                      <SecondaryCard key={row.player_id ?? row.player_name} row={row} section="trap" rank={i + 2} />
-                    ))}
-                  </div>
-                </div>
-              )}
+            <div className="space-y-4">
+              <BulletListSection
+                title="Other Captain Options"
+                emoji="🔥"
+                accentText="text-yellow-400"
+                rows={captainSecondary}
+                section="captain"
+              />
+              <BulletListSection
+                title="Other Value Plays"
+                emoji="🟢"
+                accentText="text-green-400"
+                rows={breakoutSecondary}
+                section="breakout"
+              />
+              <BulletListSection
+                title="Other Traps"
+                emoji="🚨"
+                accentText="text-red-400"
+                rows={trapSecondary}
+                section="trap"
+              />
             </div>
           </div>
         )}
 
-        {/* ── Round Summary Share ───────────────────────────────────────────── */}
-        {heroPicks.length > 0 && (
-          <div className="mt-10">
-            <RoundSummaryShare captain={captainPick} value={valuePick} trap={trapPick} />
-          </div>
-        )}
-
-        <div className="mt-8 pb-8 border-t border-white/[0.04] pt-4">
+        <div className="mt-10 pb-8 border-t border-white/[0.04] pt-4">
           <p className="text-[10px] text-white/20 text-center tracking-wide">
             Picks derived from the Neeko projection engine — blended rolling baseline with dynamic round weighting.
           </p>
