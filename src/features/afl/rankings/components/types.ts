@@ -38,6 +38,8 @@ export interface ScoreHistoryPoint {
   round_number: number;
   fantasy_points: number | null;
   season: number;
+  game_id?: number | null;
+  projection?: number | null;
 }
 
 export type RankingsTab = "best" | "value" | "projection";

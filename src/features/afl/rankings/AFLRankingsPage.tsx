@@ -354,13 +354,12 @@ export default function AFLRankingsPage() {
     }
   }
 
-  function dampedNeekoRating(r: RankingRow): number {
+  function adjustedOverallScore(r: RankingRow): number {
     const base = r.neeko_rating ?? 0;
     const gp = r.games_played ?? 0;
     if (gp >= 5) return base;
-    if (gp >= 3) return base * 0.88;
-    if (gp >= 1) return base * 0.72;
-    return base * 0.55;
+    if (gp >= 3) return base * 0.92;
+    return base * 0.82;
   }
 
   const displayRows = useMemo(() => {
@@ -394,8 +393,8 @@ export default function AFLRankingsPage() {
         let av: number;
         let bv: number;
         if (sortKey === "neeko_rating" && activeTab === "best") {
-          av = dampedNeekoRating(a);
-          bv = dampedNeekoRating(b);
+          av = adjustedOverallScore(a);
+          bv = adjustedOverallScore(b);
         } else {
           av = ((a as any)[sortKey] as number | null | undefined) ?? -Infinity;
           bv = ((b as any)[sortKey] as number | null | undefined) ?? -Infinity;
@@ -407,7 +406,7 @@ export default function AFLRankingsPage() {
       const freeKey = TAB_DEFAULT_SORT[activeTab];
       if (freeKey === "neeko_rating") {
         filtered = [...filtered].sort((a, b) =>
-          (dampedNeekoRating(b)) - (dampedNeekoRating(a))
+          (adjustedOverallScore(b)) - (adjustedOverallScore(a))
         );
       } else {
         filtered = [...filtered].sort((a, b) => {

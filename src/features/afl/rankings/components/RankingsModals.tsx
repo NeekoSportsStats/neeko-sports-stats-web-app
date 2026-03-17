@@ -229,8 +229,45 @@ function ScoreHistoryChart({ playerName, playerId }: { playerName: string; playe
         rows = (byName as ScoreHistoryPoint[]) ?? [];
       }
 
+      const baseRows = rows ?? [];
+
+      let finalRows: ScoreHistoryPoint[] = baseRows;
+
+      if (playerId && baseRows.length) {
+        const { data: projData } = await supabase
+          .schema("afl" as never)
+          .from("player_projection_history")
+          .select("game_id,projection_final,game_date,season")
+          .eq("player_id", Number(playerId))
+          .order("game_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (projData) {
+          const p = projData as { game_id: number; projection_final: string; game_date: string; season: number };
+          const lastActual = baseRows[baseRows.length - 1];
+          const nextRound = (lastActual?.round_number ?? 0) + 1;
+          const nextLabel = nextRound === 0 ? "OR" : `R${nextRound}`;
+          const projVal = Number(p.projection_final);
+          const lastActualScore = lastActual?.fantasy_points != null ? Number(lastActual.fantasy_points) : null;
+          finalRows = [
+            ...baseRows.slice(0, -1),
+            ...(lastActual ? [{ ...lastActual, projection: lastActualScore }] : []),
+            {
+              game_index: (lastActual?.game_index ?? 0) + 1,
+              round_label: nextLabel,
+              round_number: nextRound,
+              fantasy_points: null,
+              season: p.season,
+              game_id: p.game_id,
+              projection: projVal,
+            },
+          ];
+        }
+      }
+
       if (!cancelled) {
-        setData(rows ?? []);
+        setData(finalRows);
         setLoading(false);
       }
     }
@@ -255,28 +292,53 @@ function ScoreHistoryChart({ playerName, playerId }: { playerName: string; playe
     );
   }
 
-  const scores = data.map((d) => Number(d.fantasy_points ?? 0));
-  const minVal = Math.min(...scores);
-  const maxVal = Math.max(...scores);
+  const scores = data.map((d) => d.fantasy_points != null ? Number(d.fantasy_points) : null).filter((v): v is number => v !== null);
+  const projScores = data.map((d) => d.projection != null ? Number(d.projection) : null).filter((v): v is number => v !== null);
+  const allVals = [...scores, ...projScores];
+  const minVal = allVals.length ? Math.min(...allVals) : 0;
+  const maxVal = allVals.length ? Math.max(...allVals) : 100;
   const padding = Math.max(10, (maxVal - minVal) * 0.15);
+  const hasProjections = projScores.length > 0;
 
   return (
-    <ResponsiveContainer width="100%" height={180}>
-      <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
-        <XAxis dataKey="round_label" tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }} axisLine={false} tickLine={false} />
-        <YAxis domain={[minVal - padding, maxVal + padding]} tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }} axisLine={false} tickLine={false} width={32} />
-        <RechartsTooltip
-          contentStyle={{ background: "#181818", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "6px 10px" }}
-          labelStyle={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}
-          itemStyle={{ color: "#F5C84C", fontSize: 12, fontWeight: 600 }}
-          formatter={(v: number) => [Math.round(v), "Score"]}
-        />
-        <Line type="monotone" dataKey="fantasy_points" stroke="#F5C84C" strokeWidth={2}
-          dot={<Dot r={3} fill="#F5C84C" strokeWidth={0} />}
-          activeDot={{ r: 5, fill: "#F5C84C", strokeWidth: 2, stroke: "#0e0e0e" }}
-        />
-      </LineChart>
-    </ResponsiveContainer>
+    <>
+      <ResponsiveContainer width="100%" height={180}>
+        <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+          <XAxis dataKey="round_label" tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }} axisLine={false} tickLine={false} />
+          <YAxis domain={[minVal - padding, maxVal + padding]} tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }} axisLine={false} tickLine={false} width={32} />
+          <RechartsTooltip
+            contentStyle={{ background: "#181818", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "6px 10px" }}
+            labelStyle={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}
+            itemStyle={{ fontSize: 12, fontWeight: 600 }}
+            formatter={(v: number, name: string) => [Math.round(v), name === "projection" ? "Projection" : "Score"]}
+          />
+          <Line type="monotone" dataKey="fantasy_points" stroke="#F5C84C" strokeWidth={2}
+            dot={<Dot r={3} fill="#F5C84C" strokeWidth={0} />}
+            activeDot={{ r: 5, fill: "#F5C84C", strokeWidth: 2, stroke: "#0e0e0e" }}
+          />
+          {hasProjections && (
+            <Line type="monotone" dataKey="projection" stroke="rgba(99,179,237,0.75)" strokeWidth={1.5}
+              strokeDasharray="4 3"
+              dot={<Dot r={3} fill="rgba(99,179,237,0.9)" strokeWidth={0} />}
+              activeDot={{ r: 4, fill: "rgba(99,179,237,0.9)", strokeWidth: 0 }}
+              connectNulls={true}
+            />
+          )}
+        </LineChart>
+      </ResponsiveContainer>
+      {hasProjections && (
+        <div className="flex items-center gap-4 mt-1.5 px-1">
+          <div className="flex items-center gap-1.5">
+            <div className="h-0.5 w-4 rounded bg-[#F5C84C]" />
+            <span className="text-[10px] text-white/35">Actual</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="h-0.5 w-4 rounded bg-[rgba(99,179,237,0.7)] border-dashed" style={{ borderTop: "1.5px dashed rgba(99,179,237,0.7)", height: 0, background: "none" }} />
+            <span className="text-[10px] text-white/35">Projected</span>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
