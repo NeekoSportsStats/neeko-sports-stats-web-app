@@ -70,7 +70,6 @@ export default function StartSitPage() {
   const [showContext, setShowContext] = useState(false);
 
   const [opponentModel, setOpponentModel] = useState<OpponentModel>(() => loadOpponentModel());
-  const [showOpponent, setShowOpponent] = useState(false);
 
   const [comparing, setComparing] = useState(false);
   const [result, setResult] = useState<CompareResult | null>(null);
@@ -337,44 +336,22 @@ export default function StartSitPage() {
           />
         </div>
 
-        {/* Game context toggle + selector */}
+        {/* Combined matchup context expander */}
         <div className="mb-4">
           <button
             onClick={() => setShowContext((v) => !v)}
-            className="flex items-center gap-1.5 text-[10px] font-semibold text-white/28 hover:text-white/45 transition-colors"
+            className="flex items-center gap-1.5 text-[10px] font-semibold text-white/28 hover:text-white/45 transition-colors group"
           >
-            <span className={`transition-transform duration-200 ${showContext ? "rotate-90" : ""}`}>▶</span>
-            Game Context
-            <span className="text-white/18 font-normal ml-0.5">
-              — {gameContext.matchState === "close" ? "Close Match" : gameContext.matchState === "leading" ? "Leading" : "Chasing"} · {gameContext.playStyle === "balanced" ? "Balanced" : gameContext.playStyle === "safe" ? "Safe" : "Upside"} · {gameContext.timing === "mid" ? "Mid Round" : gameContext.timing === "early" ? "Early Round" : "Late Round"}
-            </span>
+            <span className={`transition-transform duration-200 text-white/20 ${showContext ? "rotate-90" : ""}`}>▶</span>
+            Add matchup context
+            <span className="text-white/16 font-normal ml-0.5">— optional, personalises advice</span>
           </button>
           {showContext && (
-            <div className="mt-2">
+            <div className="mt-3 space-y-3 rounded-xl border border-white/[0.07] bg-white/[0.015] p-4">
               <GameContextSelector value={gameContext} onChange={setGameContext} />
-            </div>
-          )}
-        </div>
-
-        {/* Opponent matchup toggle + input */}
-        <div className="mb-4">
-          <button
-            onClick={() => setShowOpponent((v) => !v)}
-            className="flex items-center gap-1.5 text-[10px] font-semibold text-white/28 hover:text-white/45 transition-colors"
-          >
-            <span className={`transition-transform duration-200 ${showOpponent ? "rotate-90" : ""}`}>▶</span>
-            Matchup Scores
-            {opponentModel.userProjection != null && opponentModel.opponentProjection != null ? (
-              <span className="text-white/18 font-normal ml-0.5">
-                — {opponentModel.userProjection} vs {opponentModel.opponentProjection}
-              </span>
-            ) : (
-              <span className="text-white/18 font-normal ml-0.5">— optional</span>
-            )}
-          </button>
-          {showOpponent && (
-            <div className="mt-2">
-              <OpponentInput value={opponentModel} onChange={setOpponentModel} />
+              <div className="border-t border-white/[0.05] pt-3">
+                <OpponentInput value={opponentModel} onChange={setOpponentModel} />
+              </div>
             </div>
           )}
         </div>
@@ -460,7 +437,7 @@ export default function StartSitPage() {
             aiSummary={result.ai_summary}
             modelEdge={result.model_edge}
             isPremium={isPremium}
-            onUpgrade={() => navigate("/neeko-plus")}
+            onUpgrade={isPremium ? () => {} : () => navigate("/neeko-plus")}
             onReset={reset}
             shortSummary={result.short_summary}
             longSummary={result.long_summary}
