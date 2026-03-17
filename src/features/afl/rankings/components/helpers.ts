@@ -411,7 +411,7 @@ export const TAB_SORT_KEY: Record<RankingsTab, string> = {
 
 export const TAB_DEFAULT_SORT: Record<RankingsTab, SortKey> = {
   best: "neeko_rating",
-  value: "value_score",
+  value: "best_value_score",
   projection: "projection_final",
 };
 
@@ -501,15 +501,7 @@ export function truncateWhySummary(row: {
     return end > 0 ? rawSummary.slice(0, end + 1).trim() : rawSummary.slice(0, 120);
   })();
 
-  // Priority 1: non-generic content
-  const nonGeneric = [why, short, summaryFirstSentence].find(
-    (s) => s.length >= 10 && !isGenericAIText(s)
-  );
-
-  // Priority 2: any content even if generic (show something rather than nothing)
-  const anyContent = [why, short, summaryFirstSentence].find((s) => s.length >= 10);
-
-  let best = nonGeneric ?? anyContent ?? null;
+  let best = [why, short, summaryFirstSentence].find((s) => s.length >= 10) ?? null;
 
   if (!best) {
     return generateMetricFallbackWhy(row);
@@ -549,16 +541,8 @@ export function safeWhyText(row: {
   const short = (row.recommendation_short ?? "").trim();
   const why   = (row.recommendation_why ?? "").trim();
 
-  // Priority 1 — recommendation_short if non-generic and long enough
-  if (short.length >= 20 && !isGenericAIText(short)) return trunc(short);
-
-  // Priority 2 — recommendation_why if distinct from short and non-generic
-  if (why.length >= 20 && !isGenericAIText(why) && why !== short) return trunc(why);
-
-  // Priority 3 — show any non-empty AI field even if generic (better than metric fallback)
   if (short.length >= 10) return trunc(short);
   if (why.length >= 10)   return trunc(why);
 
-  // Priority 4 — metric-based fallback (never blank)
   return generateMetricFallbackWhy(row);
 }

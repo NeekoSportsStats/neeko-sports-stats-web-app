@@ -254,7 +254,7 @@ export default function AFLRankingsPage() {
       signal:               r.signal ?? null,
       analysis:             r.ai_summary_long ?? r.analysis ?? null,
       ai_updated_at:        r.ai_updated_at ?? null,
-      recommendation_short: r.recommendation_short ?? r.ai_summary ?? null,
+      recommendation_short: r.recommendation_short ?? null,
       recommendation_why:   r.recommendation_why ?? null,
       recommendation_color: r.recommendation_color ?? null,
       consistency_tier:     r.consistency_tier ?? null,
