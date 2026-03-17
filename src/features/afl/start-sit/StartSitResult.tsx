@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Crown, Lock, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Minus, Share2, Check, RotateCcw, Sparkles, Shield, Zap, ChartBar as BarChart2 } from "lucide-react";
 import { OutcomeDistributionChart } from "./OutcomeDistributionChart";
 
@@ -120,13 +120,13 @@ function buildFallbackReasons(winner: PlayerData, loser: PlayerData, aiSummary: 
     reasons.push(`${wLast} edges ${lLast} on composite model metrics this round`);
   }
 
-  if (aiSummary && reasons.length < 4) {
+  if (aiSummary && reasons.length < 5) {
     const sentences = aiSummary
       .split(/\n|(?<=\.)\s+/)
       .map((s) => s.replace(/^[-•*]\s*/, "").trim())
       .filter((s) => s.length > 25 && s.length < 200);
     for (const s of sentences) {
-      if (reasons.length >= 5) break;
+      if (reasons.length >= 6) break;
       const lower = s.toLowerCase();
       if (!reasons.some((r) => r.toLowerCase().startsWith(lower.slice(0, 12)))) {
         reasons.push(s);
@@ -134,7 +134,27 @@ function buildFallbackReasons(winner: PlayerData, loser: PlayerData, aiSummary: 
     }
   }
 
-  return reasons.slice(0, 5);
+  return reasons.slice(0, 6);
+}
+
+function buildAdvancedReasons(winner: PlayerData, loser: PlayerData): string[] {
+  const advanced: string[] = [];
+  const wLast = winner.player_name.split(" ").pop() ?? winner.player_name;
+  const lLast = loser.player_name.split(" ").pop() ?? loser.player_name;
+
+  const riskDiff = (loser.risk_rating ?? 0) - (winner.risk_rating ?? 0);
+  if (riskDiff > 3) {
+    advanced.push(`Model volatility index favours ${wLast} — lower risk profile in this matchup`);
+  }
+
+  const confDiff = (winner.projection_confidence ?? 0) - (loser.projection_confidence ?? 0);
+  if (confDiff > 8) {
+    advanced.push(`Confidence driven by consistency delta, not just projection gap — ${wLast} is the more predictable play`);
+  } else {
+    advanced.push(`${lLast}'s ceiling exists but carries elevated variance — the model penalises unpredictability`);
+  }
+
+  return advanced;
 }
 
 function MetricCompareRow({
@@ -185,6 +205,49 @@ function MetricCompareRow({
   );
 }
 
+function InlineCTA({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1 text-[10px] font-bold text-[#F5C84C]/70 bg-[#F5C84C]/[0.08] border border-[#F5C84C]/15 px-2.5 py-1 rounded-lg hover:bg-[#F5C84C]/[0.14] transition-all whitespace-nowrap"
+    >
+      <Crown size={8} />
+      {label}
+    </button>
+  );
+}
+
+function useScrollCTA(onUpgrade: () => void) {
+  const aiRef = useRef<HTMLDivElement>(null);
+  const startSitRef = useRef<HTMLDivElement>(null);
+  const distRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const refs = [aiRef, startSitRef, distRef];
+    const observers: IntersectionObserver[] = [];
+
+    refs.forEach((ref) => {
+      if (!ref.current) return;
+      const obs = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              (e.target as HTMLElement).dataset.seen = "1";
+            }
+          });
+        },
+        { threshold: 0.5 }
+      );
+      obs.observe(ref.current);
+      observers.push(obs);
+    });
+
+    return () => observers.forEach((o) => o.disconnect());
+  }, [onUpgrade]);
+
+  return { aiRef, startSitRef, distRef };
+}
+
 export function StartSitResult({
   playerA,
   playerB,
@@ -204,6 +267,7 @@ export function StartSitResult({
   const [deepOpen, setDeepOpen] = useState(false);
   const [distOpen, setDistOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const { aiRef, startSitRef, distRef } = useScrollCTA(onUpgrade);
 
   useEffect(() => {
     setDeepOpen(false);
@@ -221,20 +285,37 @@ export function StartSitResult({
   const ctxLabel = ctx === "strong" ? "Clear model preference" : ctx === "clear" ? "Meaningful gap" : ctx === "lean" ? "Slight lean" : "Very close call";
 
   const displayShortSummary = shortSummary ?? aiSummary ?? null;
-  const premiumAI = isPremium ? (longSummary ?? aiSummary) : null;
 
   const reasons = buildFallbackReasons(winner, loser, aiSummary);
-  const freeReasons = reasons.slice(0, 2);
-  const premiumReasons = reasons;
-  const hiddenCount = premiumReasons.length - freeReasons.length;
+  const freeReasons = reasons.slice(0, 3);
+  const advancedReasons = buildAdvancedReasons(winner, loser);
+  const premiumReasons = [...reasons.slice(0, 4), ...advancedReasons].slice(0, 6);
 
   const hasStartConds = startConditions && startConditions.length > 0;
   const hasSitConds = sitConditions && sitConditions.length > 0;
 
+  const startList = hasStartConds ? startConditions! : [
+    "You need a reliable floor play this week",
+    "You want the higher-projected option to start",
+    "You are chasing a safer, risk-adjusted ceiling",
+  ];
+  const sitList = hasSitConds ? sitConditions! : [
+    "You need ceiling over floor — chasing points late",
+    "You are comfortable absorbing upside variance",
+    "You are chasing a high-risk, high-reward outcome",
+  ];
+
+  const wLast = winner.player_name.split(" ").pop() ?? winner.player_name;
+  const lLast = loser.player_name.split(" ").pop() ?? loser.player_name;
+
+  function getLongSummaryPreview(text: string): { preview: string; rest: string } {
+    const sentences = text.split(/(?<=[.!?])\s+/);
+    const preview = sentences.slice(0, 2).join(" ");
+    const rest = sentences.slice(2).join(" ");
+    return { preview, rest };
+  }
+
   function handleCopyShare() {
-    const url = new URL(window.location.href);
-    url.searchParams.set("playerA", playerA.player_name.replace(/\s+/g, "-"));
-    url.searchParams.set("playerB", playerB.player_name.replace(/\s+/g, "-"));
     const shareText = [
       `Start/Sit — AFL Fantasy`,
       ``,
@@ -242,9 +323,10 @@ export function StartSitResult({
       `SIT: ${loser.player_name}${loser.projection_final != null ? " (" + Math.round(loser.projection_final) + " pts projected)" : ""}`,
       ``,
       `${edge.label} — ${confidence}% confidence`,
+      isPremium ? `Based on matchup + risk profile` : "",
       ``,
       `neekostats.com.au/sports/afl/start-sit`,
-    ].join("\n");
+    ].filter(l => l !== undefined).join("\n");
     navigator.clipboard.writeText(shareText).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2200);
@@ -326,7 +408,7 @@ export function StartSitResult({
           </div>
         </div>
 
-        <div className="border-t border-white/[0.05] px-4 sm:px-5 py-3 space-y-2.5">
+        <div className="border-t border-white/[0.05] px-4 sm:px-5 py-3 space-y-2">
           <div className="flex items-center gap-3">
             <div className="flex-1 h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
               <div
@@ -336,9 +418,9 @@ export function StartSitResult({
             </div>
             <span className={`shrink-0 text-[10px] font-medium ${edge.color} opacity-55`}>{ctxLabel}</span>
           </div>
-          {displayShortSummary && (
-            <p className="text-xs text-white/45 leading-relaxed">{displayShortSummary}</p>
-          )}
+          <p className={`text-[11px] font-medium leading-tight ${edge.color} opacity-50`}>
+            {edge.label} · {psm.label} · {confidence}% confidence
+          </p>
         </div>
       </div>
 
@@ -346,7 +428,7 @@ export function StartSitResult({
       <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
         <div className="px-4 sm:px-5 pt-4 pb-4">
           <p className="text-[10px] font-bold uppercase tracking-widest text-white/20 mb-3">
-            Why {winner.player_name.split(" ").pop()}
+            Why {wLast}
           </p>
 
           <ul className="space-y-2">
@@ -358,66 +440,64 @@ export function StartSitResult({
             ))}
           </ul>
 
-          {!isPremium && hiddenCount > 0 && (
+          {!isPremium && (
             <div className="mt-3 pt-3 border-t border-white/[0.06] flex items-center justify-between gap-3">
-              <span className="text-xs text-white/25 flex items-center gap-1.5">
-                <Lock size={9} className="shrink-0 text-white/20" />
-                {hiddenCount} more reason{hiddenCount > 1 ? "s" : ""} with Neeko+
+              <span className="text-xs text-white/30 leading-snug">
+                See full model breakdown
               </span>
-              <button
-                onClick={onUpgrade}
-                className="shrink-0 flex items-center gap-1.5 bg-[#F5C84C] text-black font-bold text-[11px] px-3 py-1.5 rounded-lg hover:brightness-110 active:scale-[0.97] transition-all"
-              >
-                <Crown size={9} />
-                Upgrade
-              </button>
+              <InlineCTA label="See full model breakdown →" onClick={onUpgrade} />
             </div>
           )}
         </div>
       </div>
 
       {/* ─── SECTION 3: AI INSIGHT ─── */}
-      <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
+      <div ref={aiRef} className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
         <div className="px-4 sm:px-5 pt-4 pb-4">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles size={11} className="text-[#F5C84C]/55 shrink-0" />
             <p className="text-[10px] font-bold uppercase tracking-widest text-white/20">
               AI Insight
             </p>
-            {!isPremium && (
-              <span className="ml-auto text-[9px] font-bold text-[#F5C84C]/50 bg-[#F5C84C]/[0.07] border border-[#F5C84C]/10 px-2 py-0.5 rounded-full">
-                Neeko+
-              </span>
-            )}
           </div>
 
-          {isPremium && premiumAI ? (
-            <p className="text-xs text-white/50 leading-relaxed">{premiumAI}</p>
+          {isPremium ? (
+            <p className="text-xs text-white/50 leading-relaxed">
+              {longSummary ?? aiSummary ?? "Full AI reasoning generated from model inputs."}
+            </p>
           ) : (
             <div>
               {displayShortSummary ? (
-                <div>
-                  <p className="text-xs text-white/45 leading-relaxed line-clamp-2">{displayShortSummary}</p>
-                  <div className="relative mt-1 overflow-hidden h-7">
-                    <p className="text-xs text-white/18 leading-relaxed">Full reasoning locked. Upgrade to see why the model selected this play in full detail.</p>
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#0d0d0d]/70 to-[#0d0d0d]" />
-                  </div>
-                </div>
+                (() => {
+                  const { preview, rest } = getLongSummaryPreview(displayShortSummary);
+                  return (
+                    <div className="relative">
+                      <p className="text-xs text-white/50 leading-relaxed">{displayShortSummary}</p>
+                      {rest && (
+                        <div className="relative mt-1 overflow-hidden">
+                          <p className="text-xs text-white/30 leading-relaxed line-clamp-2">{rest}</p>
+                          <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[#0e0e0e] to-transparent pointer-events-none" />
+                        </div>
+                      )}
+                      {!rest && preview && (
+                        <div className="relative mt-1 overflow-hidden h-7">
+                          <p className="text-xs text-white/18 leading-relaxed">Full reasoning considers matchup context, confidence delta, and model variance not shown here.</p>
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#0d0d0d]/70 to-[#0d0d0d]" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               ) : (
                 <p className="text-xs text-white/20 italic">AI insight available after your first comparison.</p>
               )}
-              <div className="mt-3 pt-3 border-t border-white/[0.05] flex items-center justify-between gap-3">
-                <span className="text-[11px] text-white/25 flex items-center gap-1.5">
-                  <Lock size={9} className="text-white/20" />
-                  Full AI reasoning
-                </span>
-                <button
-                  onClick={onUpgrade}
-                  className="flex items-center gap-1 text-[10px] font-bold text-[#F5C84C]/70 bg-[#F5C84C]/[0.08] border border-[#F5C84C]/15 px-2.5 py-1 rounded-lg hover:bg-[#F5C84C]/[0.14] transition-all"
-                >
-                  <Crown size={8} />
-                  Unlock full AI reasoning
-                </button>
+
+              <div className="mt-3 p-3 rounded-lg bg-white/[0.02] border border-white/[0.05]">
+                <p className="text-[11px] text-white/35 leading-snug mb-2.5">
+                  You're seeing the surface-level read.<br />
+                  Unlock full reasoning before lockout.
+                </p>
+                <InlineCTA label="Unlock full AI reasoning" onClick={onUpgrade} />
               </div>
             </div>
           )}
@@ -425,61 +505,56 @@ export function StartSitResult({
       </div>
 
       {/* ─── SECTION 4: START IF / SIT IF ─── */}
-      <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
+      <div ref={startSitRef} className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
         <div className="px-4 sm:px-5 pt-4 pb-4">
           <div className="flex items-center justify-between mb-4">
             <p className="text-[10px] font-bold uppercase tracking-widest text-white/20">
               Start If / Sit If
             </p>
-            {!isPremium && (
-              <span className="text-[9px] font-bold text-[#F5C84C]/50 bg-[#F5C84C]/[0.07] border border-[#F5C84C]/10 px-2 py-0.5 rounded-full">
-                Neeko+
-              </span>
-            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
+            {/* START side */}
             <div className="rounded-lg border border-emerald-400/10 bg-emerald-400/[0.03] p-3">
               <p className="text-[10px] font-bold text-emerald-400/60 uppercase tracking-wider mb-2.5">
-                Start {winner.player_name.split(" ").pop()} if:
+                Start {wLast} if:
               </p>
               <ul className="space-y-1.5">
-                {(isPremium
-                  ? (hasStartConds ? startConditions : ["You need a reliable floor play", "You want the higher-projected option"])
-                  : [(hasStartConds ? startConditions![0] : "You need a reliable floor play")]
-                ).map((c, i) => (
+                {(isPremium ? startList : startList.slice(0, 2)).map((c, i) => (
                   <li key={i} className="flex items-start gap-1.5">
                     <span className="mt-[4px] h-1 w-1 rounded-full bg-emerald-400/30 shrink-0" />
                     <span className="text-[11px] text-white/45 leading-snug">{c}</span>
                   </li>
                 ))}
-                {!isPremium && (
-                  <li className="flex items-center gap-1.5 mt-0.5">
-                    <Lock size={8} className="text-white/20 shrink-0" />
-                    <span className="text-[10px] text-white/20">More scenarios locked</span>
+                {!isPremium && startList.length > 2 && (
+                  <li className="flex items-start gap-1.5 mt-0.5">
+                    <span className="mt-[4px] h-1 w-1 rounded-full bg-emerald-400/15 shrink-0" />
+                    <span className="text-[11px] text-white/20 leading-snug line-clamp-1 overflow-hidden">
+                      {startList[2].slice(0, Math.floor(startList[2].length * 0.55))}—
+                    </span>
                   </li>
                 )}
               </ul>
             </div>
 
+            {/* SIT side */}
             <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
               <p className="text-[10px] font-bold text-white/28 uppercase tracking-wider mb-2.5">
-                Consider {loser.player_name.split(" ").pop()} if:
+                Consider {lLast} if:
               </p>
               <ul className="space-y-1.5">
-                {(isPremium
-                  ? (hasSitConds ? sitConditions : ["You need ceiling over floor", "You are chasing points late"])
-                  : [(hasSitConds ? sitConditions![0] : "You need ceiling over floor")]
-                ).map((c, i) => (
+                {(isPremium ? sitList : sitList.slice(0, 2)).map((c, i) => (
                   <li key={i} className="flex items-start gap-1.5">
                     <span className="mt-[4px] h-1 w-1 rounded-full bg-white/15 shrink-0" />
                     <span className="text-[11px] text-white/30 leading-snug">{c}</span>
                   </li>
                 ))}
-                {!isPremium && (
-                  <li className="flex items-center gap-1.5 mt-0.5">
-                    <Lock size={8} className="text-white/15 shrink-0" />
-                    <span className="text-[10px] text-white/18">More scenarios locked</span>
+                {!isPremium && sitList.length > 2 && (
+                  <li className="flex items-start gap-1.5 mt-0.5">
+                    <span className="mt-[4px] h-1 w-1 rounded-full bg-white/08 shrink-0" />
+                    <span className="text-[11px] text-white/18 leading-snug line-clamp-1 overflow-hidden">
+                      {sitList[2].slice(0, Math.floor(sitList[2].length * 0.55))}—
+                    </span>
                   </li>
                 )}
               </ul>
@@ -487,17 +562,14 @@ export function StartSitResult({
           </div>
 
           {!isPremium && (
-            <div className="mt-3 pt-3 border-t border-white/[0.05] flex items-center justify-between gap-3">
-              <span className="text-[11px] text-white/22 leading-snug">
-                Unlock exact start/sit scenarios before lockout
-              </span>
-              <button
-                onClick={onUpgrade}
-                className="shrink-0 flex items-center gap-1.5 bg-[#F5C84C] text-black font-bold text-[11px] px-3 py-1.5 rounded-lg hover:brightness-110 active:scale-[0.97] transition-all"
-              >
-                <Crown size={9} />
-                Unlock
-              </button>
+            <div className="mt-3 p-3 rounded-lg bg-white/[0.02] border border-white/[0.05]">
+              <p className="text-[11px] text-white/35 mb-2">
+                These scenarios flip the decision.
+              </p>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] text-white/22 leading-snug">See all start/sit scenarios</span>
+                <InlineCTA label="See all scenarios" onClick={onUpgrade} />
+              </div>
             </div>
           )}
         </div>
@@ -571,7 +643,7 @@ export function StartSitResult({
             </>
           ) : (
             <div className="relative py-3 border-t border-white/[0.04]">
-              <div className="blur-[3px] opacity-30 pointer-events-none select-none" aria-hidden>
+              <div className="blur-[3px] opacity-25 pointer-events-none select-none" aria-hidden>
                 <MetricCompareRow
                   label="Confidence"
                   aVal="72%"
@@ -582,17 +654,8 @@ export function StartSitResult({
                 />
               </div>
               <div className="absolute inset-0 flex items-center justify-between px-1">
-                <div className="flex items-center gap-1.5">
-                  <Lock size={9} className="text-white/20 shrink-0" />
-                  <span className="text-[11px] text-white/25">Confidence &amp; Risk</span>
-                </div>
-                <button
-                  onClick={onUpgrade}
-                  className="flex items-center gap-1 text-[10px] font-bold text-[#F5C84C]/70 bg-[#F5C84C]/[0.08] border border-[#F5C84C]/15 px-2.5 py-1 rounded-lg hover:bg-[#F5C84C]/[0.14] transition-all"
-                >
-                  <Crown size={8} />
-                  Unlock
-                </button>
+                <span className="text-[11px] text-white/25">Confidence &amp; risk breakdown expanded in Neeko+</span>
+                <InlineCTA label="Unlock" onClick={onUpgrade} />
               </div>
             </div>
           )}
@@ -600,77 +663,88 @@ export function StartSitResult({
       </div>
 
       {/* ─── SECTION 6: OUTCOME DISTRIBUTION ─── */}
-      {isPremium ? (
-        <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
-          <button
-            onClick={() => setDistOpen((o) => !o)}
-            className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 hover:bg-white/[0.02] transition-colors"
-          >
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-white/28">
-              Outcome Distribution
-            </span>
-            {distOpen
-              ? <ChevronUp size={13} className="text-white/20" />
-              : <ChevronDown size={13} className="text-white/20" />}
-          </button>
-          {distOpen && (
-            <div className="border-t border-white/[0.05]">
-              <OutcomeDistributionChart
-                playerA={playerA}
-                playerB={playerB}
-                winnerPlayerId={winnerPlayerId}
-                isPremium={isPremium}
-                onUpgrade={onUpgrade}
-                embedded
-              />
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-white/[0.07] overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 border-b border-white/[0.05] flex items-center justify-between bg-white/[0.01]">
-            <div className="flex items-center gap-2">
-              <Lock size={10} className="text-white/20" />
-              <span className="text-[11px] font-bold uppercase tracking-widest text-white/20">
+      <div ref={distRef} className="rounded-xl border border-white/[0.07] overflow-hidden">
+        {isPremium ? (
+          <>
+            <button
+              onClick={() => setDistOpen((o) => !o)}
+              className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 bg-white/[0.015] hover:bg-white/[0.025] transition-colors"
+            >
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-white/28">
                 Outcome Distribution
               </span>
-            </div>
-            <span className="text-[9px] font-bold text-[#F5C84C]/50 bg-[#F5C84C]/[0.08] px-2 py-0.5 rounded-full border border-[#F5C84C]/10">
-              Neeko+
-            </span>
-          </div>
-          <div className="relative bg-white/[0.01]">
-            <div className="px-4 sm:px-5 py-4 blur-[4px] pointer-events-none select-none opacity-35" aria-hidden>
-              <div className="space-y-1.5">
-                {["60–80", "80–100", "100–120", "120–140"].map((label, i) => (
-                  <div key={label} className="flex items-center gap-2">
-                    <span className="text-[9px] text-white/30 w-12 text-right">{label}</span>
-                    <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-                      <div className="h-full rounded-full bg-[#F5C84C]/50" style={{ width: `${[18, 32, 28, 14][i]}%` }} />
-                    </div>
-                    <span className="text-[9px] text-white/20 w-6">{[18, 32, 28, 14][i]}%</span>
-                  </div>
-                ))}
+              {distOpen
+                ? <ChevronUp size={13} className="text-white/20" />
+                : <ChevronDown size={13} className="text-white/20" />}
+            </button>
+            {distOpen && (
+              <div className="border-t border-white/[0.05]">
+                <OutcomeDistributionChart
+                  playerA={playerA}
+                  playerB={playerB}
+                  winnerPlayerId={winnerPlayerId}
+                  isPremium={isPremium}
+                  onUpgrade={onUpgrade}
+                  embedded
+                />
               </div>
-            </div>
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/75 to-transparent px-6 pb-2">
-              <p className="text-sm font-semibold text-white/60 text-center leading-snug">
-                Unlock scoring range, bust risk &amp; advanced model insights
-              </p>
-              <button
-                onClick={onUpgrade}
-                className="flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-5 py-2.5 rounded-xl hover:brightness-110 active:scale-[0.97] transition-all"
-              >
-                <Crown size={12} />
-                Upgrade to Neeko+
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            )}
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => setDistOpen((o) => !o)}
+              className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 bg-white/[0.015] hover:bg-white/[0.025] transition-colors"
+            >
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-white/28">
+                Outcome Distribution
+              </span>
+              {distOpen
+                ? <ChevronUp size={13} className="text-white/20" />
+                : <ChevronDown size={13} className="text-white/20" />}
+            </button>
+            {distOpen && (
+              <div className="border-t border-white/[0.05] bg-white/[0.01]">
+                <div className="px-4 sm:px-5 py-4">
+                  <div className="space-y-1.5 mb-4">
+                    {["60–80", "80–100", "100–120", "120–140", "140+"].map((label, i) => (
+                      <div key={label} className="flex items-center gap-2">
+                        <span className="text-[9px] text-white/30 w-12 text-right">{label}</span>
+                        <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                          <div className="h-full rounded-full bg-[#F5C84C]/50" style={{ width: `${[18, 32, 28, 14, 8][i]}%` }} />
+                        </div>
+                        <span className="text-[9px] text-white/20 w-6">{[18, 32, 28, 14, 8][i]}%</span>
+                      </div>
+                    ))}
+                  </div>
 
-      {/* ─── SECTION 7: ADVANCED MODEL DETAIL (premium collapsible) ─── */}
-      {isPremium && (
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    {[
+                      { label: "Bust Risk", value: "—" },
+                      { label: "Ceiling Prob.", value: "—" },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="rounded-lg bg-white/[0.03] border border-white/[0.06] px-3 py-2.5">
+                        <p className="text-[9px] uppercase tracking-widest text-white/20 mb-1">{label}</p>
+                        <p className="text-sm font-bold text-white/20 blur-[5px] select-none">{value || "XX%"}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.05]">
+                    <p className="text-[11px] text-white/35 mb-2.5 leading-snug">
+                      Understand what these probabilities actually mean
+                    </p>
+                    <InlineCTA label="Get full decision edge" onClick={onUpgrade} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ─── SECTION 7: ADVANCED MODEL DETAIL ─── */}
+      {isPremium ? (
         <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
           <button
             onClick={() => setDeepOpen((o) => !o)}
@@ -723,11 +797,35 @@ export function StartSitResult({
                   <Minus size={11} className="text-white/25 shrink-0" />
                 )}
                 <span className="text-[10px] text-white/25">
-                  Model verdict: {winner.player_name.split(" ").pop()} is the more reliable play this round
+                  Model verdict: {wLast} is the more reliable play this round
                 </span>
               </div>
             </div>
           )}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
+          <div className="px-4 sm:px-5 pt-4 pb-4">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/20 mb-3">
+              Advanced Model Detail
+            </p>
+            <p className="text-xs text-white/30 mb-3 leading-snug">
+              This is where the model explains itself.
+            </p>
+            <div className="space-y-2 mb-3">
+              {[
+                { label: "Risk Rating", value: "—" },
+                { label: "Confidence Breakdown", value: "—" },
+                { label: "Volatility Profile", value: "—" },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex items-center justify-between py-1.5 border-b border-white/[0.04] last:border-0">
+                  <span className="text-[11px] text-white/30">{label}</span>
+                  <span className="text-sm font-bold text-white/20 blur-[4px] select-none tabular-nums">{value || "XX"}</span>
+                </div>
+              ))}
+            </div>
+            <InlineCTA label="Understand the risk" onClick={onUpgrade} />
+          </div>
         </div>
       )}
 
@@ -741,20 +839,20 @@ export function StartSitResult({
               </div>
               <div>
                 <p className="text-sm font-bold text-white/75 leading-tight">
-                  Unlock the full decision edge
+                  See the full decision before lockout
                 </p>
                 <p className="text-xs text-white/35 mt-0.5 leading-relaxed">
-                  See exact start/sit scenarios before lockout
+                  Most users upgrade after seeing their first close call.
                 </p>
               </div>
             </div>
             <ul className="space-y-2 mb-4">
               {[
-                "Full AI decision reasoning — not just a preview",
-                "Complete Start If / Sit If scenarios",
+                "Full AI reasoning — not just a surface summary",
+                "Exact start/sit scenarios for your matchup",
+                "True risk vs upside breakdown",
+                "Model-backed probability insights",
                 "Confidence & Risk comparison metrics",
-                "Scoring range probabilities — bust risk, ceiling chance",
-                "Advanced model detail — full breakdown",
               ].map((item) => (
                 <li key={item} className="flex items-center gap-2.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#F5C84C]/35 shrink-0" />
@@ -767,7 +865,7 @@ export function StartSitResult({
               className="w-full flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold py-3 rounded-xl hover:brightness-110 active:scale-[0.99] transition-all text-sm"
             >
               <Crown size={13} />
-              Upgrade to Neeko+
+              Unlock Neeko+
             </button>
             <p className="text-[10px] text-white/20 text-center mt-2">
               See why the model prefers one play — not just who it picks.
@@ -800,6 +898,11 @@ export function StartSitResult({
                 <p className={`text-[11px] font-semibold mt-0.5 ${edge.color} opacity-55`}>
                   {edge.label} · {confidence}% confidence
                 </p>
+                {isPremium && (
+                  <p className="text-[10px] text-white/22 mt-0.5">
+                    Based on matchup + risk profile
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex flex-col gap-2 shrink-0">
