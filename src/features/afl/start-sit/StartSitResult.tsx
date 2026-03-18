@@ -225,19 +225,6 @@ function MetricCompareRow({
   );
 }
 
-function InlineCTA({ label, onClick, isPremium }: { label: string; onClick: () => void; isPremium?: boolean }) {
-  if (isPremium) return null;
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-1 text-[10px] font-bold text-[#F5C84C]/70 bg-[#F5C84C]/[0.08] border border-[#F5C84C]/15 px-2.5 py-1 rounded-lg hover:bg-[#F5C84C]/[0.14] transition-all whitespace-nowrap shrink-0"
-    >
-      <Crown size={8} />
-      {label}
-    </button>
-  );
-}
-
 type TabKey = "overview" | "scenarios" | "model";
 
 export function StartSitResult({
@@ -331,6 +318,9 @@ export function StartSitResult({
 
   const decisionContextCopy = buildDecisionContextCopy(winner, loser, confidence, playStyle, isCloseCall);
 
+  const winnerProj = winner.projection_final != null ? Math.round(winner.projection_final) : null;
+  const loserProj = loser.projection_final != null ? Math.round(loser.projection_final) : null;
+
   function handleCopyShare() {
     const edgeStr = isCloseCall
       ? `CLOSE CALL (${confidence}%). Small edges decide this.`
@@ -358,7 +348,7 @@ export function StartSitResult({
   return (
     <div className="space-y-3 mt-6 animate-in fade-in duration-300">
 
-      {/* ─── RESULT HERO V3 ─── */}
+      {/* ─── RESULT HERO V4 ─── */}
       <div className={`rounded-2xl overflow-hidden border bg-[#0d0d0d] ${isCloseCall ? "border-amber-400/25" : "border-white/[0.08]"}`}>
         {/* Top bar — edge label + confidence */}
         <div className={`px-4 sm:px-5 py-2 flex items-center justify-between ${isCloseCall ? "bg-amber-400/[0.04] border-b border-amber-400/15" : `${edge.bgColor} border-b ${edge.borderColor}`}`}>
@@ -451,6 +441,40 @@ export function StartSitResult({
         </div>
       </div>
 
+      {/* ─── EARLY CONVERSION TRIGGER (free only) ─── */}
+      {!isPremium && (
+        <div className={`rounded-xl border overflow-hidden ${isCloseCall ? "border-amber-400/20 bg-amber-400/[0.03]" : "border-[#F5C84C]/12 bg-[#F5C84C]/[0.025]"}`}>
+          <div className="px-4 py-3.5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className={`text-xs font-bold mb-1 ${isCloseCall ? "text-amber-400/80" : "text-white/60"}`}>
+                  {isCloseCall ? "Stop guessing on close calls" : "See who actually wins"}
+                </p>
+                <ul className="space-y-0.5 mb-3">
+                  {[
+                    "Win probability for your matchup",
+                    "Full risk profile + scenario engine",
+                    "Advanced model: Neeko rating + confidence",
+                  ].map((item) => (
+                    <li key={item} className="flex items-center gap-1.5">
+                      <span className={`h-1 w-1 rounded-full shrink-0 ${isCloseCall ? "bg-amber-400/35" : "bg-[#F5C84C]/30"}`} />
+                      <span className="text-[11px] text-white/32">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  onClick={onUpgrade}
+                  className="flex items-center gap-1.5 text-[10px] font-bold text-[#F5C84C]/75 bg-[#F5C84C]/[0.1] border border-[#F5C84C]/18 px-3 py-1.5 rounded-lg hover:bg-[#F5C84C]/[0.16] transition-all"
+                >
+                  <Crown size={9} />
+                  Unlock the full decision model
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── TABS ─── */}
       <div className="flex gap-1 bg-white/[0.025] rounded-xl p-1 border border-white/[0.05]">
         {tabs.map((tab) => (
@@ -472,7 +496,7 @@ export function StartSitResult({
       {activeTab === "overview" && (
         <div className="space-y-3">
 
-          {/* Decision Context V3 */}
+          {/* Decision Context */}
           {hasMatchupContext && (
             <div className={`rounded-xl border px-4 py-3 ${
               isCloseCall
@@ -518,22 +542,28 @@ export function StartSitResult({
             </div>
           )}
 
-          {/* Why This Pick — 3 bullets V3 */}
+          {/* Why This Pick — V4: single line for free, full bullets for premium */}
           <div className="rounded-xl border border-white/[0.07] bg-white/[0.012] overflow-hidden">
             <div className="px-4 sm:px-5 pt-4 pb-4">
               <p className="text-[10px] font-bold uppercase tracking-widest text-white/18 mb-3">Why {wLast}</p>
-              <ul className="space-y-2">
-                {reasons.map((r, i) => (
-                  <li key={i} className="flex items-start gap-2.5">
-                    <span className="mt-[5px] h-1.5 w-1.5 rounded-full bg-[#F5C84C]/35 shrink-0" />
-                    <span className="text-sm text-white/55 leading-snug">{r}</span>
-                  </li>
-                ))}
-              </ul>
+              {isPremium ? (
+                <ul className="space-y-2">
+                  {reasons.map((r, i) => (
+                    <li key={i} className="flex items-start gap-2.5">
+                      <span className="mt-[5px] h-1.5 w-1.5 rounded-full bg-[#F5C84C]/35 shrink-0" />
+                      <span className="text-sm text-white/55 leading-snug">{r}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-white/38 leading-snug">
+                  Edge detected in projection and matchup factors.
+                </p>
+              )}
             </div>
           </div>
 
-          {/* AI Insight V3 — compact teaser free / expandable premium */}
+          {/* AI Insight — 1 sentence free / expandable premium */}
           <div className="rounded-xl border border-white/[0.07] bg-white/[0.012] overflow-hidden">
             <div className="px-4 sm:px-5 pt-4 pb-4">
               <div className="flex items-center justify-between mb-2.5">
@@ -578,89 +608,97 @@ export function StartSitResult({
                   )}
                   <div className="mt-2.5 flex items-center justify-between gap-3">
                     <span className="text-[11px] text-white/25 leading-snug">
-                      {isCloseCall ? "Full breakdown before lockout" : "Full AI reasoning"}
+                      {isCloseCall ? "See who actually wins this matchup" : "Full AI reasoning"}
                     </span>
-                    <InlineCTA
-                      label={isCloseCall ? "Unlock full breakdown" : "Unlock reasoning"}
+                    <button
                       onClick={onUpgrade}
-                    />
+                      className="flex items-center gap-1 text-[10px] font-bold text-[#F5C84C]/70 bg-[#F5C84C]/[0.08] border border-[#F5C84C]/15 px-2.5 py-1 rounded-lg hover:bg-[#F5C84C]/[0.14] transition-all whitespace-nowrap shrink-0"
+                    >
+                      <Crown size={8} />
+                      {isCloseCall ? "See the full model" : "Unlock reasoning"}
+                    </button>
                   </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Comparison bars — 4 metrics free, same 4 for premium (clean parity) */}
+          {/* Comparison metrics — V4: free sees "Projection: X vs Y" only, premium sees all 4 bars */}
           <div className="rounded-xl border border-white/[0.07] bg-white/[0.012] overflow-hidden">
-            <div className="grid grid-cols-[1fr_80px_1fr] items-center px-4 sm:px-5 py-2 border-b border-white/[0.05] gap-2">
-              <p className={`text-[11px] font-bold text-right truncate ${winnerIsA ? "text-[#F5C84C]" : "text-white/22"}`}>
-                {playerA.player_name.split(" ").pop()}
-              </p>
-              <span className="text-[9px] uppercase tracking-widest text-white/12 text-center">vs</span>
-              <p className={`text-[11px] font-bold truncate ${!winnerIsA ? "text-[#F5C84C]" : "text-white/22"}`}>
-                {playerB.player_name.split(" ").pop()}
-              </p>
-            </div>
-            <div className="px-4 sm:px-5">
-              <MetricCompareRow
-                label="Proj"
-                aVal={fmt(playerA.projection_final)}
-                bVal={fmt(playerB.projection_final)}
-                aRaw={playerA.projection_final ?? 0}
-                bRaw={playerB.projection_final ?? 0}
-                aIsWinner={winnerIsA}
-              />
-              <MetricCompareRow
-                label="Ceil"
-                aVal={fmt(playerA.ceiling_estimate)}
-                bVal={fmt(playerB.ceiling_estimate)}
-                aRaw={playerA.ceiling_estimate ?? 0}
-                bRaw={playerB.ceiling_estimate ?? 0}
-                aIsWinner={winnerIsA}
-              />
-              <MetricCompareRow
-                label="Floor"
-                aVal={fmt(playerA.floor_estimate)}
-                bVal={fmt(playerB.floor_estimate)}
-                aRaw={playerA.floor_estimate ?? 0}
-                bRaw={playerB.floor_estimate ?? 0}
-                aIsWinner={winnerIsA}
-              />
-              <MetricCompareRow
-                label="Neeko"
-                aVal={(playerA.neeko_rating ?? 0).toFixed(1)}
-                bVal={(playerB.neeko_rating ?? 0).toFixed(1)}
-                aRaw={playerA.neeko_rating ?? 0}
-                bRaw={playerB.neeko_rating ?? 0}
-                aIsWinner={winnerIsA}
-              />
-            </div>
+            {isPremium ? (
+              <>
+                <div className="grid grid-cols-[1fr_80px_1fr] items-center px-4 sm:px-5 py-2 border-b border-white/[0.05] gap-2">
+                  <p className={`text-[11px] font-bold text-right truncate ${winnerIsA ? "text-[#F5C84C]" : "text-white/22"}`}>
+                    {playerA.player_name.split(" ").pop()}
+                  </p>
+                  <span className="text-[9px] uppercase tracking-widest text-white/12 text-center">vs</span>
+                  <p className={`text-[11px] font-bold truncate ${!winnerIsA ? "text-[#F5C84C]" : "text-white/22"}`}>
+                    {playerB.player_name.split(" ").pop()}
+                  </p>
+                </div>
+                <div className="px-4 sm:px-5">
+                  <MetricCompareRow
+                    label="Proj"
+                    aVal={fmt(playerA.projection_final)}
+                    bVal={fmt(playerB.projection_final)}
+                    aRaw={playerA.projection_final ?? 0}
+                    bRaw={playerB.projection_final ?? 0}
+                    aIsWinner={winnerIsA}
+                  />
+                  <MetricCompareRow
+                    label="Ceil"
+                    aVal={fmt(playerA.ceiling_estimate)}
+                    bVal={fmt(playerB.ceiling_estimate)}
+                    aRaw={playerA.ceiling_estimate ?? 0}
+                    bRaw={playerB.ceiling_estimate ?? 0}
+                    aIsWinner={winnerIsA}
+                  />
+                  <MetricCompareRow
+                    label="Floor"
+                    aVal={fmt(playerA.floor_estimate)}
+                    bVal={fmt(playerB.floor_estimate)}
+                    aRaw={playerA.floor_estimate ?? 0}
+                    bRaw={playerB.floor_estimate ?? 0}
+                    aIsWinner={winnerIsA}
+                  />
+                  <MetricCompareRow
+                    label="Neeko"
+                    aVal={(playerA.neeko_rating ?? 0).toFixed(1)}
+                    bVal={(playerB.neeko_rating ?? 0).toFixed(1)}
+                    aRaw={playerA.neeko_rating ?? 0}
+                    bRaw={playerB.neeko_rating ?? 0}
+                    aIsWinner={winnerIsA}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="px-4 sm:px-5 py-3.5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-white/18">Projection</p>
+                  <p className="text-xs font-bold text-white/45 tabular-nums">
+                    {winnerProj != null && loserProj != null
+                      ? `${winnerProj} vs ${loserProj}`
+                      : winnerProj != null
+                      ? `${winnerProj} pts`
+                      : "—"}
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  {[
+                    { label: "Ceiling", hint: "unlock to see" },
+                    { label: "Floor", hint: "unlock to see" },
+                    { label: "Neeko Rating", hint: "unlock to see" },
+                  ].map((row) => (
+                    <div key={row.label} className="flex items-center justify-between py-0.5">
+                      <span className="text-[11px] text-white/22">{row.label}</span>
+                      <span className="text-[11px] text-white/12 blur-[3px] select-none tabular-nums">XX / XX</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Free CTA — single block at bottom */}
-          {!isPremium && (
-            <div className={`rounded-xl border overflow-hidden ${isCloseCall ? "border-amber-400/18 bg-gradient-to-b from-amber-400/[0.035] to-transparent" : "border-[#F5C84C]/10 bg-gradient-to-b from-[#F5C84C]/[0.03] to-transparent"}`}>
-              <div className="px-5 py-4">
-                <p className="text-sm font-bold text-white/65 leading-tight mb-1">
-                  {isCloseCall ? "Don't guess on a close call" : "See the full decision engine"}
-                </p>
-                <p className="text-xs text-white/30 mb-4 leading-relaxed">
-                  {isCloseCall && oppIsChasing
-                    ? `Trailing and razor thin — see exactly how each option affects your win chances.`
-                    : isCloseCall
-                    ? "Full breakdown: risk, confidence, scenarios, and win probability."
-                    : "Full AI reasoning, risk profile, start/sit scenarios, and matchup win odds."}
-                </p>
-                <button
-                  onClick={onUpgrade}
-                  className="w-full flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold py-3 rounded-xl hover:brightness-108 active:scale-[0.99] transition-all text-sm"
-                >
-                  <Crown size={13} />
-                  {isCloseCall ? "Unlock full breakdown" : "Unlock Neeko+"}
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -668,7 +706,7 @@ export function StartSitResult({
       {activeTab === "scenarios" && (
         <div className="space-y-3">
 
-          {/* Start If / Sit If V3 */}
+          {/* Start If / Sit If V4 */}
           <div className="rounded-xl border border-white/[0.07] bg-white/[0.012] overflow-hidden">
             <div className="px-4 sm:px-5 pt-4 pb-4">
               <div className="flex items-center justify-between mb-3">
@@ -712,10 +750,10 @@ export function StartSitResult({
                           <span className="text-[11px] text-white/45 leading-snug">{startList[0]}</span>
                         </li>
                         {startList.length > 1 && (
-                          <li className="flex items-start gap-1.5">
+                          <li className="flex items-start gap-1.5 opacity-30 pointer-events-none select-none" aria-hidden>
                             <span className="mt-[4px] h-1 w-1 rounded-full bg-emerald-400/12 shrink-0" />
-                            <span className="text-[11px] text-white/20 leading-snug line-clamp-1">
-                              {startList[1].slice(0, Math.floor(startList[1].length * 0.5))}—
+                            <span className="text-[11px] text-white/40 leading-snug blur-[3px]">
+                              {startList[1]}
                             </span>
                           </li>
                         )}
@@ -727,38 +765,33 @@ export function StartSitResult({
                 {/* Sit side */}
                 <div className="rounded-lg border border-white/[0.05] bg-white/[0.015] p-3">
                   <p className="text-[10px] font-bold text-white/25 uppercase tracking-wider mb-2.5">Consider {lLast} if:</p>
-                  <ul className="space-y-1.5">
-                    {isPremium ? (
-                      sitList.map((c, i) => (
+                  {isPremium ? (
+                    <ul className="space-y-1.5">
+                      {sitList.map((c, i) => (
                         <li key={i} className="flex items-start gap-1.5">
                           <span className="mt-[4px] h-1 w-1 rounded-full bg-white/12 shrink-0" />
                           <span className="text-[11px] text-white/30 leading-snug">{c}</span>
                         </li>
-                      ))
-                    ) : (
-                      <>
-                        <li className="flex items-start gap-1.5">
-                          <span className="mt-[4px] h-1 w-1 rounded-full bg-white/12 shrink-0" />
-                          <span className="text-[11px] text-white/28 leading-snug">{sitList[0]}</span>
-                        </li>
-                        {sitList.length > 1 && (
-                          <li className="flex items-start gap-1.5">
-                            <span className="mt-[4px] h-1 w-1 rounded-full bg-white/06 shrink-0" />
-                            <span className="text-[11px] text-white/15 leading-snug line-clamp-1">
-                              {sitList[1].slice(0, Math.floor(sitList[1].length * 0.5))}—
-                            </span>
-                          </li>
-                        )}
-                      </>
-                    )}
-                  </ul>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-[11px] text-white/28 leading-snug">
+                      {sitList[0] ?? `Only if you need maximum ceiling from ${lLast} this week.`}
+                    </p>
+                  )}
                 </div>
               </div>
 
               {!isPremium && (
                 <div className="mt-3 flex items-center justify-between gap-3 pt-2.5 border-t border-white/[0.04]">
-                  <span className="text-[11px] text-white/25">All scenarios + flip conditions</span>
-                  <InlineCTA label={isCloseCall ? "See what flips this" : "Unlock all scenarios"} onClick={onUpgrade} />
+                  <span className="text-[11px] text-white/25">See full scenario engine</span>
+                  <button
+                    onClick={onUpgrade}
+                    className="flex items-center gap-1 text-[10px] font-bold text-[#F5C84C]/70 bg-[#F5C84C]/[0.08] border border-[#F5C84C]/15 px-2.5 py-1 rounded-lg hover:bg-[#F5C84C]/[0.14] transition-all whitespace-nowrap shrink-0"
+                  >
+                    <Crown size={8} />
+                    {isCloseCall ? "See what flips this" : "Unlock all scenarios"}
+                  </button>
                 </div>
               )}
             </div>
@@ -788,20 +821,48 @@ export function StartSitResult({
       {activeTab === "model" && (
         <div className="space-y-3">
 
-          {/* Confidence & Risk — premium metric rows, free has clean lock */}
-          <div className="rounded-xl border border-white/[0.07] bg-white/[0.012] overflow-hidden">
-            <div className="grid grid-cols-[1fr_80px_1fr] items-center px-4 sm:px-5 py-2 border-b border-white/[0.05] gap-2">
-              <p className={`text-[11px] font-bold text-right truncate ${winnerIsA ? "text-[#F5C84C]" : "text-white/22"}`}>
-                {playerA.player_name.split(" ").pop()}
-              </p>
-              <span className="text-[9px] uppercase tracking-widest text-white/12 text-center">vs</span>
-              <p className={`text-[11px] font-bold truncate ${!winnerIsA ? "text-[#F5C84C]" : "text-white/22"}`}>
-                {playerB.player_name.split(" ").pop()}
-              </p>
+          {/* V4: Hard lock for free — single upgrade card */}
+          {!isPremium ? (
+            <div className="rounded-xl border border-[#F5C84C]/12 bg-[#F5C84C]/[0.025] px-5 py-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Crown size={13} className="text-[#F5C84C]/55 shrink-0" />
+                <p className="text-sm font-bold text-white/60">Advanced Model (Neeko+)</p>
+              </div>
+              <ul className="space-y-2 mb-4">
+                {[
+                  "Win probability for your weekly matchup",
+                  "Risk profile + volatility scoring",
+                  "Score distribution: bust floor, safe range, ceiling",
+                  "Confidence breakdown by model component",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <span className="mt-[5px] h-1.5 w-1.5 rounded-full bg-[#F5C84C]/28 shrink-0" />
+                    <span className="text-[11px] text-white/35 leading-snug">{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={onUpgrade}
+                className="w-full flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold py-3 rounded-xl hover:brightness-108 active:scale-[0.99] transition-all text-sm"
+              >
+                <Crown size={13} />
+                Unlock the full decision model
+              </button>
             </div>
-            <div className="px-4 sm:px-5">
-              {isPremium ? (
-                <>
+          ) : (
+            <>
+              {/* Confidence & Risk — premium only */}
+              <div className="rounded-xl border border-white/[0.07] bg-white/[0.012] overflow-hidden">
+                <div className="grid grid-cols-[1fr_80px_1fr] items-center px-4 sm:px-5 py-2 border-b border-white/[0.05] gap-2">
+                  <p className={`text-[11px] font-bold text-right truncate ${winnerIsA ? "text-[#F5C84C]" : "text-white/22"}`}>
+                    {playerA.player_name.split(" ").pop()}
+                  </p>
+                  <span className="text-[9px] uppercase tracking-widest text-white/12 text-center">vs</span>
+                  <p className={`text-[11px] font-bold truncate ${!winnerIsA ? "text-[#F5C84C]" : "text-white/22"}`}>
+                    {playerB.player_name.split(" ").pop()}
+                  </p>
+                </div>
+                <div className="px-4 sm:px-5">
                   <MetricCompareRow
                     label="Confidence"
                     aVal={`${fmt(playerA.projection_confidence)}%`}
@@ -819,113 +880,76 @@ export function StartSitResult({
                     aIsWinner={winnerIsA}
                     lowerIsBetter
                   />
-                </>
-              ) : (
-                <div className="relative py-4">
-                  <div className="blur-[3px] opacity-20 pointer-events-none select-none" aria-hidden>
-                    <MetricCompareRow
-                      label="Confidence"
-                      aVal="72%"
-                      bVal="58%"
-                      aRaw={72}
-                      bRaw={58}
-                      aIsWinner={winnerIsA}
+                </div>
+              </div>
+
+              {/* Outcome Distribution — premium expandable */}
+              <div className="rounded-xl border border-white/[0.07] overflow-hidden">
+                <button
+                  onClick={() => setDistOpen((o) => !o)}
+                  className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 bg-white/[0.012] hover:bg-white/[0.022] transition-colors"
+                >
+                  <span className="text-[11px] font-semibold uppercase tracking-widest text-white/25">
+                    Outcome Distribution
+                  </span>
+                  {distOpen
+                    ? <ChevronUp size={12} className="text-white/18" />
+                    : <ChevronDown size={12} className="text-white/18" />}
+                </button>
+                {distOpen && (
+                  <div className="border-t border-white/[0.05]">
+                    <OutcomeDistributionChart
+                      playerA={playerA}
+                      playerB={playerB}
+                      winnerPlayerId={winnerPlayerId}
+                      isPremium={isPremium}
+                      onUpgrade={onUpgrade}
+                      embedded
                     />
                   </div>
-                  <div className="absolute inset-0 flex items-center justify-between px-1">
-                    <span className="text-[11px] text-white/22">Confidence &amp; risk — Neeko+</span>
-                    <InlineCTA label="Unlock" onClick={onUpgrade} />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Outcome Distribution — premium expandable, free teaser */}
-          <div className="rounded-xl border border-white/[0.07] overflow-hidden">
-            <button
-              onClick={() => setDistOpen((o) => !o)}
-              className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 bg-white/[0.012] hover:bg-white/[0.022] transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-widest text-white/25">
-                  Outcome Distribution
-                </span>
-                {!isPremium && (
-                  <span className="text-[9px] font-bold text-[#F5C84C]/40 uppercase tracking-wider">Neeko+</span>
                 )}
               </div>
-              {distOpen
-                ? <ChevronUp size={12} className="text-white/18" />
-                : <ChevronDown size={12} className="text-white/18" />}
-            </button>
-            {distOpen && (
-              <div className="border-t border-white/[0.05]">
-                <OutcomeDistributionChart
-                  playerA={playerA}
-                  playerB={playerB}
-                  winnerPlayerId={winnerPlayerId}
-                  isPremium={isPremium}
-                  onUpgrade={onUpgrade}
-                  embedded
-                />
-              </div>
-            )}
-          </div>
 
-          {/* Advanced detail — premium only, clean */}
-          {isPremium ? (
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.01] px-4 py-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/18 mb-3">Model Detail</p>
-              {[
-                {
-                  label: "Risk Rating",
-                  aVal: fmt(playerA.risk_rating),
-                  bVal: fmt(playerB.risk_rating),
-                  aWins: (playerA.risk_rating ?? 99) <= (playerB.risk_rating ?? 99),
-                },
-                {
-                  label: "Confidence %",
-                  aVal: `${fmt(playerA.projection_confidence)}%`,
-                  bVal: `${fmt(playerB.projection_confidence)}%`,
-                  aWins: (playerA.projection_confidence ?? 0) >= (playerB.projection_confidence ?? 0),
-                },
-              ].map(({ label, aVal, bVal, aWins }) => (
-                <div key={label} className="grid grid-cols-[1fr_80px_1fr] items-center gap-2 py-2.5 border-b border-white/[0.04] last:border-0">
-                  <span className={`text-sm font-bold tabular-nums text-right ${aWins ? "text-white" : "text-white/25"}`}>{aVal}</span>
-                  <span className="text-[9px] uppercase tracking-widest text-white/18 text-center">{label}</span>
-                  <span className={`text-sm font-bold tabular-nums ${!aWins ? "text-white" : "text-white/25"}`}>{bVal}</span>
-                </div>
-              ))}
-              <div className="mt-3 pt-3 border-t border-white/[0.04] flex items-center gap-2">
-                {(winner.projection_final ?? 0) > (loser.projection_final ?? 0) ? (
-                  <TrendingUp size={10} className="text-emerald-400 shrink-0" />
-                ) : (
-                  <TrendingDown size={10} className="text-red-400 shrink-0" />
-                )}
-                <span className="text-[10px] text-white/22">
-                  {wLast} is the more reliable composite play this round
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.01] px-4 py-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/18 mb-3">Model Detail</p>
-              <div className="space-y-2 mb-4">
-                {["Risk Rating", "Confidence", "Volatility Profile"].map((label) => (
-                  <div key={label} className="flex items-center justify-between py-1 border-b border-white/[0.04] last:border-0">
-                    <span className="text-[11px] text-white/28">{label}</span>
-                    <span className="text-sm font-bold text-white/15 blur-[4px] select-none tabular-nums">XX</span>
+              {/* Model Detail — premium */}
+              <div className="rounded-xl border border-white/[0.06] bg-white/[0.01] px-4 py-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/18 mb-3">Model Detail</p>
+                {[
+                  {
+                    label: "Risk Rating",
+                    aVal: fmt(playerA.risk_rating),
+                    bVal: fmt(playerB.risk_rating),
+                    aWins: (playerA.risk_rating ?? 99) <= (playerB.risk_rating ?? 99),
+                  },
+                  {
+                    label: "Confidence %",
+                    aVal: `${fmt(playerA.projection_confidence)}%`,
+                    bVal: `${fmt(playerB.projection_confidence)}%`,
+                    aWins: (playerA.projection_confidence ?? 0) >= (playerB.projection_confidence ?? 0),
+                  },
+                ].map(({ label, aVal, bVal, aWins }) => (
+                  <div key={label} className="grid grid-cols-[1fr_80px_1fr] items-center gap-2 py-2.5 border-b border-white/[0.04] last:border-0">
+                    <span className={`text-sm font-bold tabular-nums text-right ${aWins ? "text-white" : "text-white/25"}`}>{aVal}</span>
+                    <span className="text-[9px] uppercase tracking-widest text-white/18 text-center">{label}</span>
+                    <span className={`text-sm font-bold tabular-nums ${!aWins ? "text-white" : "text-white/25"}`}>{bVal}</span>
                   </div>
                 ))}
+                <div className="mt-3 pt-3 border-t border-white/[0.04] flex items-center gap-2">
+                  {(winner.projection_final ?? 0) > (loser.projection_final ?? 0) ? (
+                    <TrendingUp size={10} className="text-emerald-400 shrink-0" />
+                  ) : (
+                    <TrendingDown size={10} className="text-red-400 shrink-0" />
+                  )}
+                  <span className="text-[10px] text-white/22">
+                    {wLast} is the more reliable composite play this round
+                  </span>
+                </div>
               </div>
-              <InlineCTA label="Understand the risk" onClick={onUpgrade} />
-            </div>
+            </>
           )}
         </div>
       )}
 
-      {/* ─── SHARE UTILITY ROW V3 ─── */}
+      {/* ─── SHARE UTILITY ROW ─── */}
       <div className="flex items-center justify-between gap-3 px-1 pt-1 pb-2">
         <p className={`text-[11px] font-semibold truncate ${edge.color} opacity-45`}>
           {winner.player_name.split(" ").pop()} · {edge.label} · {confidence}%

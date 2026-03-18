@@ -71,7 +71,7 @@ export default function SeasonRoundSelector({
           <div className="flex items-center justify-between">
             <div className="text-sm font-semibold text-white">Round</div>
             <div className="text-xs text-white/45">
-              {roundNumber === 0 ? "Opening Round" : getAflRoundLabel(roundNumber)}
+              {getAflRoundLabel(roundNumber)}
             </div>
           </div>
 
