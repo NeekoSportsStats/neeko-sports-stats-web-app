@@ -1,167 +1,147 @@
-import { Flame, ArrowRight } from "lucide-react";
-import { MWBestTrade } from "./types";
-import { fmtPrice, fmtNum, fmtPriceChange, confidenceBadge, positionBadge } from "./helpers";
+import { Flame, ArrowRight, Crown, TrendingUp } from "lucide-react";
+import { MWSummaryCard } from "./types";
+import { fmtPrice, fmtNum, fmtPriceChange, priceChangeColor } from "./helpers";
 
 interface Props {
-  trade: MWBestTrade;
-  onCompare: (trade: MWBestTrade) => void;
+  card: MWSummaryCard | null;
+  loading: boolean;
+  onCompare?: (outId: number, inId: number) => void;
+  onUnlock: () => void;
+  isPremium: boolean;
 }
 
-export function TopTradeOfWeek({ trade, onCompare }: Props) {
-  const ptsGain = Number(trade.projected_points_gain ?? 0);
-  const priceGain = Number(trade.expected_price_gain ?? 0);
+export function TopTradeOfWeek({ card, loading, onCompare, onUnlock, isPremium }: Props) {
+  if (loading) {
+    return (
+      <div className="mb-8 rounded-2xl border border-white/8 bg-white/[0.02] p-6 animate-pulse h-44" />
+    );
+  }
+
+  if (!card) return null;
+
+  const ptGain = card.metric_a;
+  const priceGain = card.metric_b;
+  const confidence = card.metric_c;
 
   return (
-    <div
-      className="mb-6 rounded-2xl p-5 border"
+    <div className="mb-8 relative rounded-2xl overflow-hidden border border-green-400/20"
       style={{
-        background: "linear-gradient(135deg, rgba(245,200,76,0.06) 0%, rgba(245,200,76,0.02) 100%)",
-        border: "1px solid rgba(245,200,76,0.2)",
+        background: "linear-gradient(135deg, rgba(74,222,128,0.07) 0%, rgba(10,10,10,0.0) 60%)",
       }}
     >
-      <div className="flex items-center gap-2 mb-4">
-        <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-[#F5C84C]/15 border border-[#F5C84C]/25">
-          <Flame className="h-4 w-4 text-[#F5C84C]" />
-        </div>
-        <span className="text-[11px] font-bold uppercase tracking-widest text-[#F5C84C]">Top Trade of the Week</span>
-        <span className="text-[10px] text-white/30 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full ml-auto">
-          Highest Trade Score
-        </span>
-      </div>
+      <div
+        className="absolute top-0 left-0 w-64 h-64 pointer-events-none"
+        style={{
+          background: "radial-gradient(ellipse at 0% 0%, rgba(74,222,128,0.10) 0%, transparent 70%)",
+        }}
+      />
 
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
-        <TradePlayerBlock
-          side="out"
-          name={trade.out_player_name}
-          team={trade.out_team}
-          position={trade.out_position}
-          price={trade.out_price}
-          projection={trade.out_projection}
-          expectedChange={trade.out_expected_change}
-        />
-
-        <div className="flex items-center justify-center shrink-0">
-          <div className="hidden sm:flex flex-col items-center gap-1">
-            <ArrowRight className="h-5 w-5 text-white/20" />
+      <div className="relative px-5 pt-5 pb-5">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-green-400/15 border border-green-400/25">
+            <Flame className="h-3.5 w-3.5 text-green-400" />
           </div>
-          <div className="flex sm:hidden items-center gap-2 w-full">
-            <div className="flex-1 h-px bg-white/10" />
-            <ArrowRight className="h-4 w-4 text-white/20 shrink-0 rotate-90" />
-            <div className="flex-1 h-px bg-white/10" />
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-green-400/70 font-bold">#1 Trade of the Week</p>
+            <p className="text-[11px] text-white/25">Biggest value gap detected by Neeko this round</p>
           </div>
         </div>
 
-        <TradePlayerBlock
-          side="in"
-          name={trade.in_player_name}
-          team={trade.in_team}
-          position={trade.in_position}
-          price={trade.in_price}
-          projection={trade.in_projection}
-          expectedChange={trade.in_expected_change}
-        />
+        <div className="flex items-stretch gap-3 flex-wrap sm:flex-nowrap mb-4">
+          <PlayerBlock name={card.label_a ?? "—"} price={card.out_price} side="out" />
+          <div className="hidden sm:flex items-center justify-center px-1">
+            <ArrowRight className="h-5 w-5 text-green-400/50" />
+          </div>
+          <div className="flex sm:hidden items-center self-stretch">
+            <ArrowRight className="h-4 w-4 text-green-400/40 rotate-90 sm:rotate-0" />
+          </div>
+          <PlayerBlock name={card.label_b ?? "—"} price={card.in_price} side="in" />
+        </div>
 
-        <div className="hidden sm:block w-px bg-white/8 self-stretch" />
-
-        <div className="flex sm:flex-col gap-4 sm:gap-2 justify-around sm:justify-center shrink-0">
-          <ImpactStat
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <MetricBox
             label="Pts Gain"
-            value={ptsGain >= 0 ? `+${fmtNum(ptsGain, 1)}` : fmtNum(ptsGain, 1)}
-            valueClass={ptsGain >= 0 ? "text-green-400" : "text-red-400"}
+            value={ptGain != null ? `+${fmtNum(ptGain, 1)}` : "—"}
+            valueClass="text-green-400"
+            icon={<TrendingUp className="h-3 w-3" />}
           />
-          <ImpactStat
-            label="Price Gain"
-            value={fmtPriceChange(priceGain)}
-            valueClass={priceGain >= 0 ? "text-green-300" : "text-red-400"}
+          <MetricBox
+            label="Price Impact"
+            value={priceGain != null ? fmtPriceChange(priceGain) : "—"}
+            valueClass={priceGain != null ? priceChangeColor(priceGain) : "text-white/40"}
           />
-          <ImpactStat
+          <MetricBox
             label="Confidence"
-            value={`${fmtNum(trade.confidence, 0)}%`}
-            valueClass={confidenceBadge(trade.confidence).split(" ")[0]}
+            value={confidence != null ? `${fmtNum(confidence, 0)}%` : "—"}
+            valueClass={
+              (confidence ?? 0) >= 70 ? "text-green-400" :
+              (confidence ?? 0) >= 50 ? "text-[#F5C84C]" :
+              "text-white/40"
+            }
           />
         </div>
 
-        <button
-          onClick={() => onCompare(trade)}
-          className="shrink-0 self-center sm:self-auto px-4 py-2 rounded-lg bg-[#F5C84C]/10 border border-[#F5C84C]/25 text-[#F5C84C] text-[12px] font-semibold hover:bg-[#F5C84C]/20 transition-colors"
-        >
-          Full Analysis
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          {isPremium && card.player_id_a != null && card.player_id_b != null && onCompare ? (
+            <button
+              onClick={() => onCompare(card.player_id_a!, card.player_id_b!)}
+              className="flex items-center gap-2 bg-green-400 text-black font-bold text-xs px-4 py-2.5 rounded-lg hover:brightness-110 transition-all shadow-lg shadow-green-400/15"
+            >
+              Make this trade
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          ) : (
+            <button
+              onClick={onUnlock}
+              className="flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-xs px-4 py-2.5 rounded-lg hover:brightness-110 transition-all shadow-lg shadow-[#F5C84C]/15"
+            >
+              <Crown className="h-3.5 w-3.5" />
+              Unlock to act on this trade
+            </button>
+          )}
+          {card.description && (
+            <p className="text-[11px] text-white/30 line-clamp-1 flex-1 min-w-0 italic">
+              {card.description}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function TradePlayerBlock({
-  side,
-  name,
-  team,
-  position,
-  price,
-  projection,
-  expectedChange,
-}: {
-  side: "in" | "out";
-  name: string;
-  team: string;
-  position: string;
-  price: number;
-  projection?: number | null;
-  expectedChange?: number | null;
-}) {
+function PlayerBlock({ name, price, side }: { name: string; price: number | null; side: "in" | "out" }) {
   const isOut = side === "out";
   return (
-    <div
-      className={`flex-1 min-w-0 rounded-xl border p-3 ${
-        isOut
-          ? "border-red-400/20 bg-red-400/[0.04]"
-          : "border-green-400/20 bg-green-400/[0.04]"
-      }`}
-    >
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <span
-          className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-            isOut ? "bg-red-400/20 text-red-400" : "bg-green-400/20 text-green-400"
-          }`}
-        >
-          {isOut ? "Trade Out" : "Trade In"}
-        </span>
-        {position && (
-          <span className={`text-[9px] font-semibold px-1 py-0 rounded border ${positionBadge(position)}`}>
-            {position}
-          </span>
-        )}
-      </div>
+    <div className={`flex-1 min-w-[130px] rounded-xl border px-3 py-2.5 ${
+      isOut
+        ? "border-red-400/20 bg-red-400/[0.04]"
+        : "border-green-400/25 bg-green-400/[0.05]"
+    }`}>
+      <p className={`text-[9px] font-bold uppercase tracking-widest mb-1.5 ${isOut ? "text-red-400/60" : "text-green-400/60"}`}>
+        {isOut ? "Sell" : "Buy"}
+      </p>
       <p className="text-sm font-bold text-white truncate leading-tight">{name}</p>
-      <p className="text-[11px] text-white/40 truncate mb-2">{team}</p>
-      <div className="flex items-center gap-3">
-        <span className="text-[11px] text-white/40">{fmtPrice(price)}</span>
-        {projection != null && (
-          <span className="text-[11px] font-semibold text-[#F5C84C]">{fmtNum(projection, 1)} proj</span>
-        )}
-        {expectedChange != null && (
-          <span className={`text-[11px] font-medium ${expectedChange >= 0 ? "text-green-400" : "text-red-400"}`}>
-            {fmtPriceChange(expectedChange)}
-          </span>
-        )}
-      </div>
+      {price != null && (
+        <p className="text-[11px] text-white/35 mt-0.5">{fmtPrice(price)}</p>
+      )}
     </div>
   );
 }
 
-function ImpactStat({
-  label,
-  value,
-  valueClass,
-}: {
+function MetricBox({ label, value, valueClass, icon }: {
   label: string;
   value: string;
   valueClass: string;
+  icon?: React.ReactNode;
 }) {
   return (
-    <div className="text-center">
-      <p className="text-[9px] text-white/30 uppercase tracking-wider mb-0.5">{label}</p>
-      <p className={`text-sm font-bold tabular-nums ${valueClass}`}>{value}</p>
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-2.5">
+      <div className="flex items-center gap-1 mb-1">
+        {icon && <span className="text-white/20">{icon}</span>}
+        <p className="text-[9px] text-white/30 uppercase tracking-wider">{label}</p>
+      </div>
+      <p className={`text-base font-extrabold tabular-nums ${valueClass}`}>{value}</p>
     </div>
   );
 }
