@@ -382,7 +382,6 @@ function ModelAccuracySection() {
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase
-        .schema("afl")
         .from("v_projection_accuracy_homepage")
         .select("*")
         .maybeSingle();
@@ -1022,13 +1021,7 @@ function OutcomeProofSection() {
   useEffect(() => {
     (async () => {
       const { data: raw } = await supabase
-        .from("v_projection_accuracy_homepage")
-        .select("player_name,team_name,projection,actual_score,error,accuracy_tier,round_label,neeko_rank")
-        .lte("neeko_rank", 20)
-        .gte("error", 2)
-        .lte("error", 10)
-        .order("neeko_rank", { ascending: true })
-        .limit(3);
+        .rpc("get_projection_accuracy_examples");
       setRows((raw ?? []) as AccuracyExampleRow[]);
       setLoading(false);
     })();
