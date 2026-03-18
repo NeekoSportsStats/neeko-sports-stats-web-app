@@ -62,6 +62,30 @@ export function useCommitPrices() {
   return { committing, commitPrices };
 }
 
+export function useSavePending() {
+  const [saving, setSaving] = useState(false);
+
+  const savePending = useCallback(async (
+    rows: MappingRow[],
+  ): Promise<{ saved: number; total: number } | null> => {
+    setSaving(true);
+    try {
+      const payload = rows.map(r => ({
+        source_name: r.source_name,
+        cleaned_price: r.cleaned_price,
+      }));
+      const result = await callAdminCommand("save_pending_players", { rows: payload });
+      return result as { saved: number; total: number };
+    } catch {
+      return null;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  return { saving, savePending };
+}
+
 export async function resolvePlayerName(
   normalizedName: string,
   playerId: number,

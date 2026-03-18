@@ -210,6 +210,36 @@ async function dispatchCommand(
         break;
       }
 
+      case "save_pending_players": {
+        const pendingRows = payload.rows as unknown[];
+        if (!Array.isArray(pendingRows) || pendingRows.length === 0) {
+          return { success: false, error: "rows must be a non-empty array" };
+        }
+        for (const row of pendingRows) {
+          const r = row as Record<string, unknown>;
+          if (typeof r.source_name !== "string" || !r.source_name.trim()) {
+            return { success: false, error: "each row must have a source_name string" };
+          }
+          if (typeof r.cleaned_price !== "number") {
+            return { success: false, error: `row "${r.source_name}" has invalid cleaned_price (must be number)` };
+          }
+        }
+
+        console.log(`[save_pending_players] saving ${pendingRows.length} rows`);
+
+        const { data: pendingData, error: pendingErr } = await admin.rpc(
+          "save_pending_price_rows" as never,
+          { p_rows: pendingRows } as never,
+        );
+        if (pendingErr) throw new Error((pendingErr as { message: string }).message);
+
+        const pendingResult = pendingData as { saved: number; total: number };
+        console.log(`[save_pending_players] saved=${pendingResult?.saved}`);
+
+        result = pendingData;
+        break;
+      }
+
       case "resolve_player_name": {
         const normName = payload.normalized_name as string;
         const resolvePlayerId = payload.player_id as number;

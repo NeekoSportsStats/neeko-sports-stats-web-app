@@ -13,11 +13,27 @@ export interface PreviewRow {
   status: "matched" | "duplicate" | "unmatched";
 }
 
+export interface PlayerOption {
+  player_id: number;
+  player_name: string;
+  position_group: string | null;
+}
+
+export type MatchStatus =
+  | "auto_matched"
+  | "suggested"
+  | "manual_required"
+  | "pending_player_record"
+  | "manually_matched";
+
 export interface MappingRow {
   source_name: string;
   cleaned_price: number;
   player_id: number | null;
   player_name: string | null;
+  match_status: MatchStatus;
+  confidence: number;
+  suggestions: PlayerOption[];
 }
 
 export interface IngestByIdResult {
@@ -41,10 +57,4 @@ export interface UnmatchedRow {
   resolved: boolean;
   resolved_player_id: number | null;
   created_at: string;
-}
-
-export interface PlayerOption {
-  player_id: number;
-  player_name: string;
-  position_group: string | null;
 }

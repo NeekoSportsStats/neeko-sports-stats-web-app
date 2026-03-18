@@ -1,14 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Upload, FileText, RefreshCw, CircleCheck as CheckCircle,
-  TriangleAlert as AlertTriangle, ArrowLeft,
-} from "lucide-react";
+import { Upload, FileText, RefreshCw, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, ArrowLeft, Zap, Clock, CircleHelp as HelpCircle, User } from "lucide-react";
 import { parseCSVText, parseCSVFile, fmtPrice, type ParseError } from "./parseUtils";
-import { usePlayerOptions, useCommitPrices } from "./usePriceIngest";
+import { usePlayerOptions, useCommitPrices, useSavePending } from "./usePriceIngest";
 import { PlayerSearchDropdown } from "./PlayerSearchDropdown";
-import type { ParsedPriceRow, MappingRow, IngestByIdResult } from "./types";
+import { applyAutoMatch } from "./matchEngine";
+import type { ParsedPriceRow, MappingRow, IngestByIdResult, MatchStatus } from "./types";
 
 type Step = "input" | "mapping" | "done";
 
@@ -23,10 +20,43 @@ function sortByLastName(rows: MappingRow[]): MappingRow[] {
   );
 }
 
-function MappingStatusBadge({ row }: { row: MappingRow }) {
-  if (row.player_id !== null)
-    return <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/25 text-[10px]">MAPPED</Badge>;
-  return <Badge className="bg-red-500/15 text-red-400 border-red-500/25 text-[10px]">UNMAPPED</Badge>;
+interface StatusBadgeProps { status: MatchStatus; confidence: number }
+function StatusBadge({ status, confidence }: StatusBadgeProps) {
+  if (status === "auto_matched")
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+        <Zap className="h-2.5 w-2.5" />AUTO {confidence}%
+      </span>
+    );
+  if (status === "manually_matched")
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/25">
+        <User className="h-2.5 w-2.5" />MANUAL
+      </span>
+    );
+  if (status === "suggested")
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25">
+        <HelpCircle className="h-2.5 w-2.5" />SUGGEST
+      </span>
+    );
+  if (status === "manual_required")
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/25">
+        <AlertTriangle className="h-2.5 w-2.5" />MANUAL
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-500/15 text-slate-400 border border-slate-500/25">
+      <Clock className="h-2.5 w-2.5" />PENDING
+    </span>
+  );
+}
+
+function rowBgClass(row: MappingRow): string {
+  if (row.player_id !== null) return "hover:bg-emerald-950/10";
+  if (row.match_status === "pending_player_record") return "bg-slate-500/5 hover:bg-slate-500/10";
+  return "bg-amber-950/5 hover:bg-amber-950/10";
 }
 
 export function FantasyPricesTab() {
@@ -37,15 +67,30 @@ export function FantasyPricesTab() {
   const [mappingRows, setMappingRows] = useState<MappingRow[]>([]);
   const [commitResult, setCommitResult] = useState<IngestByIdResult | null>(null);
   const [commitError, setCommitError] = useState<string | null>(null);
+  const [pendingSaved, setPendingSaved] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const players = usePlayerOptions();
   const { committing, commitPrices } = useCommitPrices();
+  const { saving, savePending } = useSavePending();
 
   function buildMappingRows(parsed: ParsedPriceRow[]): MappingRow[] {
-    return sortByLastName(
-      parsed.map(r => ({ source_name: r.source_name, cleaned_price: r.cleaned_price, player_id: null, player_name: null }))
-    );
+    const raw: MappingRow[] = parsed.map(r => ({
+      source_name: r.source_name,
+      cleaned_price: r.cleaned_price,
+      player_id: null,
+      player_name: null,
+      match_status: "manual_required" as const,
+      confidence: 0,
+      suggestions: [],
+    }));
+
+    if (players.length > 0) {
+      const matched = applyAutoMatch(raw, players);
+      return sortByLastName(matched);
+    }
+
+    return sortByLastName(raw);
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -65,7 +110,15 @@ export function FantasyPricesTab() {
 
   function handlePlayerSelect(sourceName: string, playerId: number | null, playerName: string | null) {
     setMappingRows(prev =>
-      prev.map(r => r.source_name === sourceName ? { ...r, player_id: playerId, player_name: playerName } : r)
+      prev.map(r => {
+        if (r.source_name !== sourceName) return r;
+        return {
+          ...r,
+          player_id: playerId,
+          player_name: playerName,
+          match_status: playerId !== null ? "manually_matched" : r.match_status,
+        };
+      })
     );
   }
 
@@ -82,6 +135,13 @@ export function FantasyPricesTab() {
     }
   }
 
+  async function handleSavePending() {
+    const pending = mappingRows.filter(r => r.match_status === "pending_player_record");
+    if (pending.length === 0) return;
+    const result = await savePending(pending);
+    if (result) setPendingSaved(true);
+  }
+
   function handleReset() {
     setStep("input");
     setPasteText("");
@@ -89,11 +149,30 @@ export function FantasyPricesTab() {
     setParseErrors([]);
     setCommitResult(null);
     setCommitError(null);
+    setPendingSaved(false);
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  const mappedCount = mappingRows.filter(r => r.player_id !== null).length;
-  const unmappedCount = mappingRows.filter(r => r.player_id === null).length;
+  function handleGoToMapping() {
+    if (players.length > 0) {
+      const matched = applyAutoMatch(
+        mappingRows.map(r => ({ ...r, player_id: null, player_name: null, match_status: "manual_required" as const, confidence: 0, suggestions: [] })),
+        players,
+      );
+      setMappingRows(sortByLastName(matched));
+    }
+    setStep("mapping");
+  }
+
+  const counts = useMemo(() => {
+    const auto = mappingRows.filter(r => r.match_status === "auto_matched").length;
+    const manual = mappingRows.filter(r => r.match_status === "manually_matched").length;
+    const suggested = mappingRows.filter(r => r.match_status === "suggested" && r.player_id === null).length;
+    const manualReq = mappingRows.filter(r => r.match_status === "manual_required").length;
+    const pending = mappingRows.filter(r => r.match_status === "pending_player_record").length;
+    const readyToInsert = auto + manual;
+    return { auto, manual, suggested, manualReq, pending, readyToInsert, total: mappingRows.length };
+  }, [mappingRows]);
 
   if (step === "done" && commitResult) {
     return (
@@ -115,9 +194,8 @@ export function FantasyPricesTab() {
 
   return (
     <div className="space-y-5">
-
       <div className="rounded-lg border border-amber-500/20 bg-amber-950/10 px-4 py-3 text-sm text-amber-300">
-        <strong>Interactive mapper.</strong> Paste your price list, then assign each player using the search dropdown. Only mapped rows are inserted. Existing prices are never overwritten.
+        <strong>Interactive mapper with auto-match.</strong> Paste your price list — common players auto-match instantly. Ambiguous names require manual selection. Players not yet in the database are held safely.
         <br />
         <span className="text-amber-400/70 text-xs mt-0.5 block">
           Format: Column 1 = player name (e.g. <code className="font-mono">N Daicos</code>), Column 2 = price (e.g. <code className="font-mono">$1,182,000</code>). Comma or tab separated.
@@ -168,13 +246,13 @@ export function FantasyPricesTab() {
           )}
 
           {mappingRows.length > 0 && (
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">{mappingRows.length}</span> rows parsed
-                {parseErrors.length > 0 && (
-                  <span className="text-amber-400 ml-2">· {parseErrors.length} parse errors</span>
-                )}
-              </div>
+            <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-6">
+              <StatTile label="Total" value={counts.total} />
+              <StatTile label="Auto-matched" value={counts.auto} color="emerald" />
+              <StatTile label="Suggested" value={counts.suggested} color="amber" />
+              <StatTile label="Manual Req." value={counts.manualReq} color="orange" />
+              <StatTile label="Pending" value={counts.pending} color="slate" />
+              <StatTile label="Ready" value={counts.readyToInsert} color="emerald" />
             </div>
           )}
 
@@ -191,10 +269,11 @@ export function FantasyPricesTab() {
           )}
 
           <Button
-            onClick={() => setStep("mapping")}
+            onClick={handleGoToMapping}
             disabled={mappingRows.length === 0}
           >
-            Map Players ({mappingRows.length} rows)
+            <Zap className="h-4 w-4 mr-2" />
+            Review &amp; Map Players ({mappingRows.length} rows)
           </Button>
         </>
       )}
@@ -203,12 +282,14 @@ export function FantasyPricesTab() {
         <MappingStep
           rows={mappingRows}
           players={players}
-          mappedCount={mappedCount}
-          unmappedCount={unmappedCount}
+          counts={counts}
           committing={committing}
+          saving={saving}
+          pendingSaved={pendingSaved}
           commitError={commitError}
           onSelect={handlePlayerSelect}
           onCommit={handleCommit}
+          onSavePending={handleSavePending}
           onBack={() => setStep("input")}
         />
       )}
@@ -216,42 +297,85 @@ export function FantasyPricesTab() {
   );
 }
 
+function StatTile({ label, value, color }: { label: string; value: number; color?: "emerald" | "amber" | "orange" | "slate" }) {
+  const colorCls = {
+    emerald: "text-emerald-400",
+    amber: "text-amber-400",
+    orange: "text-orange-400",
+    slate: "text-slate-400",
+  }[color ?? ""] ?? "text-foreground";
+
+  return (
+    <div className="rounded-lg border border-border bg-muted/10 px-3 py-2.5 text-center">
+      <div className={`text-xl font-bold tabular-nums ${colorCls}`}>{value}</div>
+      <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{label}</div>
+    </div>
+  );
+}
+
+interface MappingCounts {
+  auto: number;
+  manual: number;
+  suggested: number;
+  manualReq: number;
+  pending: number;
+  readyToInsert: number;
+  total: number;
+}
+
 interface MappingStepProps {
   rows: MappingRow[];
   players: ReturnType<typeof usePlayerOptions>;
-  mappedCount: number;
-  unmappedCount: number;
+  counts: MappingCounts;
   committing: boolean;
+  saving: boolean;
+  pendingSaved: boolean;
   commitError: string | null;
   onSelect: (sourceName: string, playerId: number | null, playerName: string | null) => void;
   onCommit: () => void;
+  onSavePending: () => void;
   onBack: () => void;
 }
 
 function MappingStep({
-  rows, players, mappedCount, unmappedCount, committing, commitError, onSelect, onCommit, onBack,
+  rows, players, counts, committing, saving, pendingSaved, commitError,
+  onSelect, onCommit, onSavePending, onBack,
 }: MappingStepProps) {
   return (
     <>
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-lg border border-border bg-muted/10 px-4 py-3 text-center">
-          <div className="text-2xl font-bold tabular-nums">{rows.length}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Total Rows</div>
-        </div>
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-950/10 px-4 py-3 text-center">
-          <div className="text-2xl font-bold text-emerald-400 tabular-nums">{mappedCount}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Mapped</div>
-        </div>
-        <div className={`rounded-lg px-4 py-3 text-center border ${unmappedCount > 0 ? "border-red-500/30 bg-red-950/10" : "border-border bg-muted/10"}`}>
-          <div className={`text-2xl font-bold tabular-nums ${unmappedCount > 0 ? "text-red-400" : ""}`}>{unmappedCount}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Unmapped</div>
-        </div>
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+        <StatTile label="Total" value={counts.total} />
+        <StatTile label="Auto-matched" value={counts.auto} color="emerald" />
+        <StatTile label="Manual Match" value={counts.manual} color="emerald" />
+        <StatTile label="Suggested" value={counts.suggested} color="amber" />
+        <StatTile label="Manual Req." value={counts.manualReq} color="orange" />
+        <StatTile label="Pending Record" value={counts.pending} color="slate" />
       </div>
 
-      {unmappedCount > 0 && (
-        <div className="rounded-lg border border-amber-500/25 bg-amber-950/10 px-4 py-3 text-sm text-amber-300 flex items-start gap-2.5">
-          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-          <span>{unmappedCount} rows without a player selected. Only mapped rows will be inserted. Unmapped rows are skipped.</span>
+      {counts.auto > 0 && (
+        <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 px-4 py-2.5 text-sm text-emerald-300 flex items-center gap-2">
+          <Zap className="h-4 w-4 shrink-0" />
+          <span>{counts.auto} players auto-matched with high confidence (95%+). Review and override if needed.</span>
+        </div>
+      )}
+
+      {counts.pending > 0 && !pendingSaved && (
+        <div className="rounded-lg border border-slate-500/20 bg-slate-500/5 px-4 py-2.5 text-sm text-slate-300 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 shrink-0" />
+            <span>{counts.pending} players not yet in the database. Save them as pending for later resolution.</span>
+          </div>
+          <Button size="sm" variant="outline" onClick={onSavePending} disabled={saving} className="shrink-0 text-xs h-7">
+            {saving ? <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" /> : <Clock className="h-3 w-3 mr-1.5" />}
+            Save Pending
+          </Button>
+        </div>
+      )}
+
+      {pendingSaved && (
+        <div className="rounded-lg border border-emerald-500/25 bg-emerald-950/10 px-4 py-2.5 text-sm text-emerald-300 flex items-center gap-2">
+          <CheckCircle className="h-4 w-4 shrink-0" />
+          Pending players saved. They will appear in the Name Resolver once their player records are created.
         </div>
       )}
 
@@ -263,37 +387,20 @@ function MappingStep({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border/60 bg-muted/20">
-              <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-24">Status</th>
-              <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-32">Input Name</th>
-              <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Map to Player</th>
+              <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-28">Status</th>
+              <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-28">Input Name</th>
+              <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Matched Player</th>
               <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-24">Price</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, i) => (
-              <tr
+              <MappingTableRow
                 key={i}
-                className={`border-b border-border/20 last:border-0 transition-colors ${
-                  row.player_id !== null
-                    ? "hover:bg-emerald-950/10"
-                    : "bg-red-950/5 hover:bg-red-950/10"
-                }`}
-              >
-                <td className="py-2 px-3">
-                  <MappingStatusBadge row={row} />
-                </td>
-                <td className="py-2 px-3 font-mono text-xs text-muted-foreground">{row.source_name}</td>
-                <td className="py-2 px-3">
-                  <PlayerSearchDropdown
-                    players={players}
-                    value={row.player_id}
-                    onChange={(id, name) => onSelect(row.source_name, id, name)}
-                  />
-                </td>
-                <td className="py-2 px-3 text-right tabular-nums font-mono text-xs">
-                  {fmtPrice(row.cleaned_price)}
-                </td>
-              </tr>
+                row={row}
+                players={players}
+                onSelect={onSelect}
+              />
             ))}
           </tbody>
         </table>
@@ -302,21 +409,58 @@ function MappingStep({
       <div className="flex items-center gap-3 flex-wrap">
         <Button
           onClick={onCommit}
-          disabled={mappedCount === 0 || committing}
+          disabled={counts.readyToInsert === 0 || committing}
         >
           {committing
             ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
             : <CheckCircle className="h-4 w-4 mr-2" />}
-          Commit Prices {mappedCount > 0 ? `(${mappedCount})` : ""}
+          Commit Prices {counts.readyToInsert > 0 ? `(${counts.readyToInsert})` : ""}
         </Button>
         <Button variant="outline" onClick={onBack} disabled={committing}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
-        {mappedCount === 0 && (
-          <span className="text-xs text-muted-foreground">Select at least one player to enable commit.</span>
+        {counts.readyToInsert === 0 && (
+          <span className="text-xs text-muted-foreground">Map at least one player to enable commit.</span>
         )}
       </div>
     </>
+  );
+}
+
+function MappingTableRow({
+  row, players, onSelect,
+}: {
+  row: MappingRow;
+  players: ReturnType<typeof usePlayerOptions>;
+  onSelect: (sourceName: string, playerId: number | null, playerName: string | null) => void;
+}) {
+  const isPending = row.match_status === "pending_player_record";
+
+  return (
+    <tr className={`border-b border-border/20 last:border-0 transition-colors ${rowBgClass(row)}`}>
+      <td className="py-2 px-3">
+        <StatusBadge status={row.match_status} confidence={row.confidence} />
+      </td>
+      <td className="py-2 px-3 font-mono text-xs text-muted-foreground">{row.source_name}</td>
+      <td className="py-2 px-3 min-w-[220px]">
+        {isPending ? (
+          <span className="text-xs text-slate-500 italic">Not in player database yet</span>
+        ) : (
+          <PlayerSearchDropdown
+            players={row.suggestions.length > 0 && row.player_id === null
+              ? row.suggestions.concat(players.filter(p => !row.suggestions.find(s => s.player_id === p.player_id)))
+              : players
+            }
+            value={row.player_id}
+            onChange={(id, name) => onSelect(row.source_name, id, name)}
+            placeholder={row.player_name ?? "Search player…"}
+          />
+        )}
+      </td>
+      <td className="py-2 px-3 text-right tabular-nums font-mono text-xs">
+        {fmtPrice(row.cleaned_price)}
+      </td>
+    </tr>
   );
 }
