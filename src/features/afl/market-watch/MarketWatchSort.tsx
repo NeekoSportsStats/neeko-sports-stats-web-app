@@ -1,16 +1,14 @@
-export type SortKey = "trade_score" | "projection" | "expected_price_change" | "breakeven" | "risk_pct";
+import { MWSortKey } from "./types";
 
 interface Props {
-  value: SortKey;
-  onChange: (key: SortKey) => void;
+  value: MWSortKey;
+  onChange: (key: MWSortKey) => void;
 }
 
-const OPTIONS: { key: SortKey; label: string }[] = [
-  { key: "trade_score",            label: "Trade Score" },
-  { key: "projection",             label: "Projection" },
-  { key: "expected_price_change",  label: "Price Growth" },
-  { key: "breakeven",              label: "Breakeven" },
-  { key: "risk_pct",               label: "Risk" },
+const OPTIONS: { key: MWSortKey; label: string; description: string }[] = [
+  { key: "value_score",  label: "Value Score",      description: "Overall value vs price" },
+  { key: "projection",   label: "Projection",        description: "Highest projected score" },
+  { key: "price_change", label: "Price Movement",    description: "Expected $ change" },
 ];
 
 export function MarketWatchSort({ value, onChange }: Props) {
@@ -22,6 +20,7 @@ export function MarketWatchSort({ value, onChange }: Props) {
           <button
             key={opt.key}
             onClick={() => onChange(opt.key)}
+            title={opt.description}
             className={`text-[11px] px-2.5 py-1 rounded-lg border transition-colors ${
               value === opt.key
                 ? "bg-[#F5C84C]/15 border-[#F5C84C]/30 text-[#F5C84C] font-semibold"

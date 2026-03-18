@@ -80,9 +80,12 @@ async function dispatchCommand(
       case "refresh_rankings":
         result = await callRpc(admin, "refresh_player_rankings_cache");
         break;
-      case "populate_rankings":
-        result = await callRpc(admin, "populate_rankings_cache_from_source");
+      case "populate_rankings": {
+        await callRpc(admin, "populate_rankings_cache_from_source");
+        await admin.schema("market" as never).rpc("build_market_watch_snapshot" as never);
+        result = { populated: true, snapshot_rebuilt: true };
         break;
+      }
       case "refresh_market_watch":
         result = await callRpc(admin, "fn_refresh_market_watch");
         break;
@@ -260,6 +263,13 @@ async function dispatchCommand(
         } catch (e) {
           refreshSteps.refresh_rankings.error = e instanceof Error ? e.message : String(e);
           console.warn("[commit_price_ingest] refresh_player_rankings_cache failed:", refreshSteps.refresh_rankings.error);
+        }
+
+        try {
+          await admin.schema("market" as never).rpc("build_market_watch_snapshot" as never);
+          console.log("[commit_price_ingest] build_market_watch_snapshot: ok");
+        } catch (e) {
+          console.warn("[commit_price_ingest] build_market_watch_snapshot failed:", e instanceof Error ? e.message : String(e));
         }
 
         result = { ...commitResult, refresh: refreshSteps };

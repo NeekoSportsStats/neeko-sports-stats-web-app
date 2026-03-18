@@ -6,11 +6,12 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
-import { MWPlayerRow, MWSummary, MWStatus, MWCategoryFilter } from "./types";
+import { MWPlayerRow, MWSummary, MWStatus, MWCategoryFilter, MWSortKey } from "./types";
 import { PlayerTradeCard } from "./PlayerTradeCard";
 import { MarketWatchBanner } from "./MarketWatchBanner";
 import { HorizontalRail } from "./HorizontalRail";
 import { MarketWatchSkeleton } from "./MarketWatchSkeleton";
+import { MarketWatchSort } from "./MarketWatchSort";
 import { UpgradeModal } from "./UpgradeModal";
 import { fmtPriceChange, fmtNum, fmtPrice } from "./helpers";
 
@@ -22,6 +23,14 @@ const SECTION_IDS = [
   "section-cash-cows",
   "section-traps",
 ] as const;
+
+function sortPlayers(arr: MWPlayerRow[], key: MWSortKey): MWPlayerRow[] {
+  return [...arr].sort((a, b) => {
+    if (key === "projection")   return (b.projection ?? 0) - (a.projection ?? 0);
+    if (key === "price_change") return (b.expected_price_change ?? 0) - (a.expected_price_change ?? 0);
+    return (b.value_score ?? b.trade_score ?? 0) - (a.value_score ?? a.trade_score ?? 0);
+  });
+}
 
 export default function MarketWatchPage() {
   const { isPremium, loading: authLoading } = useAuth();
@@ -36,6 +45,7 @@ export default function MarketWatchPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<MWCategoryFilter>("all");
+  const [sortKey, setSortKey] = useState<MWSortKey>("value_score");
 
   const [showMoreBuy, setShowMoreBuy] = useState(false);
   const [showMoreSell, setShowMoreSell] = useState(false);
@@ -103,9 +113,8 @@ export default function MarketWatchPage() {
   }, []);
 
   const buyTargets = useMemo(() =>
-    [...players.filter(p => p.category === "buy")]
-      .sort((a, b) => (b.trade_score ?? 0) - (a.trade_score ?? 0)),
-    [players]
+    sortPlayers(players.filter(p => p.category === "buy"), sortKey),
+    [players, sortKey]
   );
   const sellPlayers = useMemo(() =>
     [...players.filter(p => p.category === "sell_now" || p.category === "sell_consider")]
@@ -113,9 +122,8 @@ export default function MarketWatchPage() {
     [players]
   );
   const cashCows = useMemo(() =>
-    [...players.filter(p => p.category === "cash_cow")]
-      .sort((a, b) => (b.expected_price_change ?? 0) - (a.expected_price_change ?? 0)),
-    [players]
+    sortPlayers(players.filter(p => p.category === "cash_cow"), sortKey),
+    [players, sortKey]
   );
   const traps = useMemo(() =>
     [...players.filter(p => p.category === "fade")]
@@ -207,7 +215,9 @@ export default function MarketWatchPage() {
             showMoreTraps={showMoreTraps}
             showSecondary={showSecondary}
             categoryFilter={categoryFilter}
+            sortKey={sortKey}
             onFilterChange={setCategoryFilter}
+            onSortChange={setSortKey}
             onToggleBuy={() => setShowMoreBuy(e => !e)}
             onToggleSell={() => setShowMoreSell(e => !e)}
             onToggleCashCows={() => setShowMoreCashCows(e => !e)}
@@ -263,7 +273,7 @@ function CategoryFilterBar({
   };
 
   return (
-    <div className="flex items-center gap-2 mb-6 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
+    <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
       {CATEGORY_FILTERS.map(f => {
         const isActive = value === f.id;
         const count = counts[f.id];
@@ -380,7 +390,7 @@ interface FreeViewProps {
   onUnlock: () => void;
 }
 
-function FreeUserView({ players, buyTargets, sellPlayers, cashCows, traps, topBuy, summary, onUnlock }: FreeViewProps) {
+function FreeUserView({ players: _players, buyTargets, sellPlayers, cashCows, traps, topBuy, summary, onUnlock }: FreeViewProps) {
   const topSell = sellPlayers[0] ?? null;
   const topCow  = cashCows[0] ?? null;
   const topTrap = traps[0] ?? null;
@@ -494,7 +504,9 @@ interface PremiumViewProps {
   showMoreTraps: boolean;
   showSecondary: boolean;
   categoryFilter: MWCategoryFilter;
+  sortKey: MWSortKey;
   onFilterChange: (v: MWCategoryFilter) => void;
+  onSortChange: (v: MWSortKey) => void;
   onToggleBuy: () => void;
   onToggleSell: () => void;
   onToggleCashCows: () => void;
@@ -507,9 +519,9 @@ interface PremiumViewProps {
 function PremiumView({
   buyTargets, sellPlayers, cashCows, traps, topBuy,
   showMoreBuy, showMoreSell, showMoreCashCows, showMoreTraps, showSecondary,
-  categoryFilter, onFilterChange,
+  categoryFilter, sortKey, onFilterChange, onSortChange,
   onToggleBuy, onToggleSell, onToggleCashCows, onToggleTraps, onToggleSecondary,
-  onUnlock, onScrollToSection,
+  onUnlock: _onUnlock, onScrollToSection,
 }: PremiumViewProps) {
   const getVisible = (arr: MWPlayerRow[], showMore: boolean) =>
     showMore ? arr : arr.slice(0, SECTION_DEFAULT);
@@ -525,14 +537,22 @@ function PremiumView({
         <TopBuyHero player={topBuy} onScrollToBuy={() => onScrollToSection("section-buy")} />
       )}
 
-      <CategoryFilterBar
-        value={categoryFilter}
-        onChange={onFilterChange}
-        buyCount={buyTargets.length}
-        sellCount={sellPlayers.length}
-        cowCount={cashCows.length}
-        trapCount={traps.length}
-      />
+      {/* Filter + Sort bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+        <div className="flex-1 min-w-0">
+          <CategoryFilterBar
+            value={categoryFilter}
+            onChange={onFilterChange}
+            buyCount={buyTargets.length}
+            sellCount={sellPlayers.length}
+            cowCount={cashCows.length}
+            trapCount={traps.length}
+          />
+        </div>
+        <div className="shrink-0">
+          <MarketWatchSort value={sortKey} onChange={onSortChange} />
+        </div>
+      </div>
 
       {showBuy && (
         buyTargets.length > 0 ? (
@@ -545,8 +565,8 @@ function PremiumView({
             count={buyTargets.length}
           >
             {getVisible(buyTargets, showMoreBuy).map((p, i) => (
-              <div key={p.player_id} className="w-[270px] flex-shrink-0">
-                <PlayerTradeCard row={p} rank={i + 1} />
+              <div key={p.player_id} className="w-[290px] flex-shrink-0">
+                <PlayerTradeCard row={p} rank={i + 1} isPremium={true} />
               </div>
             ))}
             {buyTargets.length > SECTION_DEFAULT && (
@@ -578,8 +598,8 @@ function PremiumView({
             count={sellPlayers.length}
           >
             {getVisible(sellPlayers, showMoreSell).map((p, i) => (
-              <div key={p.player_id} className="w-[270px] flex-shrink-0">
-                <PlayerTradeCard row={p} rank={i + 1} />
+              <div key={p.player_id} className="w-[290px] flex-shrink-0">
+                <PlayerTradeCard row={p} rank={i + 1} isPremium={true} />
               </div>
             ))}
             {sellPlayers.length > SECTION_DEFAULT && (
@@ -638,8 +658,8 @@ function PremiumView({
                   count={cashCows.length}
                 >
                   {getVisible(cashCows, showMoreCashCows).map((p, i) => (
-                    <div key={p.player_id} className="w-[270px] flex-shrink-0">
-                      <PlayerTradeCard row={p} rank={i + 1} />
+                    <div key={p.player_id} className="w-[290px] flex-shrink-0">
+                      <PlayerTradeCard row={p} rank={i + 1} isPremium={true} />
                     </div>
                   ))}
                   {cashCows.length > SECTION_DEFAULT && (
@@ -669,8 +689,8 @@ function PremiumView({
                   count={traps.length}
                 >
                   {getVisible(traps, showMoreTraps).map((p, i) => (
-                    <div key={p.player_id} className="w-[270px] flex-shrink-0">
-                      <PlayerTradeCard row={p} rank={i + 1} />
+                    <div key={p.player_id} className="w-[290px] flex-shrink-0">
+                      <PlayerTradeCard row={p} rank={i + 1} isPremium={true} />
                     </div>
                   ))}
                   {traps.length > SECTION_DEFAULT && (
@@ -705,8 +725,8 @@ function PremiumView({
             count={cashCows.length}
           >
             {getVisible(cashCows, showMoreCashCows).map((p, i) => (
-              <div key={p.player_id} className="w-[270px] flex-shrink-0">
-                <PlayerTradeCard row={p} rank={i + 1} />
+              <div key={p.player_id} className="w-[290px] flex-shrink-0">
+                <PlayerTradeCard row={p} rank={i + 1} isPremium={true} />
               </div>
             ))}
             {cashCows.length > SECTION_DEFAULT && (
@@ -733,8 +753,8 @@ function PremiumView({
             count={traps.length}
           >
             {getVisible(traps, showMoreTraps).map((p, i) => (
-              <div key={p.player_id} className="w-[270px] flex-shrink-0">
-                <PlayerTradeCard row={p} rank={i + 1} />
+              <div key={p.player_id} className="w-[290px] flex-shrink-0">
+                <PlayerTradeCard row={p} rank={i + 1} isPremium={true} />
               </div>
             ))}
             {traps.length > SECTION_DEFAULT && (
