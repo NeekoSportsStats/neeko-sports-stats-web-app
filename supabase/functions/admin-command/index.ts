@@ -104,25 +104,74 @@ async function dispatchCommand(
 
       case "preview_price_ingest": {
         const previewRows = payload.rows as unknown[];
-        if (!Array.isArray(previewRows) || previewRows.length === 0) {
+        if (!Array.isArray(previewRows)) {
+          return { success: false, error: "rows must be an array" };
+        }
+        if (previewRows.length === 0) {
           return { success: false, error: "rows must be a non-empty array" };
         }
-        const { data: previewData, error: previewErr } = await admin
-          .schema("afl" as never)
-          .rpc("preview_price_ingest" as never, { p_rows: previewRows } as never);
+        for (const row of previewRows) {
+          const r = row as Record<string, unknown>;
+          if (!r.source_name || typeof r.source_name !== "string") {
+            return { success: false, error: "each row must have a source_name string" };
+          }
+          if (typeof r.cleaned_price !== "number") {
+            return { success: false, error: `row "${r.source_name}" has invalid cleaned_price (must be number)` };
+          }
+        }
+
+        console.log(`[preview_price_ingest] incoming rows: ${previewRows.length}`);
+
+        const { data: previewData, error: previewErr } = await admin.rpc(
+          "preview_price_ingest_public" as never,
+          { p_rows: previewRows } as never,
+        );
         if (previewErr) throw new Error((previewErr as { message: string }).message);
-        result = previewData;
+
+        const rows = previewData as Array<{
+          status: string;
+          source_name: string;
+          normalized_name: string;
+          cleaned_price: number;
+          player_id: number | null;
+          player_name: string | null;
+          existing_price: number | null;
+        }>;
+
+        const matched = rows.filter(r => r.status === "matched");
+        const unmatched = rows.filter(r => r.status === "unmatched");
+        const duplicate = rows.filter(r => r.status === "duplicate");
+
+        console.log(`[preview_price_ingest] matched=${matched.length} unmatched=${unmatched.length} duplicate=${duplicate.length}`);
+
+        result = rows;
         break;
       }
 
       case "process_price_ingest": {
         const ingestRows = payload.rows as unknown[];
-        if (!Array.isArray(ingestRows) || ingestRows.length === 0) {
+        if (!Array.isArray(ingestRows)) {
+          return { success: false, error: "rows must be an array" };
+        }
+        if (ingestRows.length === 0) {
           return { success: false, error: "rows must be a non-empty array" };
         }
-        const { data: ingestData, error: ingestErr } = await admin
-          .schema("afl" as never)
-          .rpc("process_price_ingest" as never, { p_rows: ingestRows } as never);
+        for (const row of ingestRows) {
+          const r = row as Record<string, unknown>;
+          if (!r.source_name || typeof r.source_name !== "string") {
+            return { success: false, error: "each row must have a source_name string" };
+          }
+          if (typeof r.cleaned_price !== "number") {
+            return { success: false, error: `row "${r.source_name}" has invalid cleaned_price (must be number)` };
+          }
+        }
+
+        console.log(`[process_price_ingest] incoming rows: ${ingestRows.length}`);
+
+        const { data: ingestData, error: ingestErr } = await admin.rpc(
+          "process_price_ingest_public" as never,
+          { p_rows: ingestRows } as never,
+        );
         if (ingestErr) throw new Error((ingestErr as { message: string }).message);
         result = ingestData;
         break;
