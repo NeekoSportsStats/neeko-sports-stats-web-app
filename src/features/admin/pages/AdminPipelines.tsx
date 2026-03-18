@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, Database, Activity, Bot, TrendingUp, Zap } from "lucide-react";
+import { RefreshCw, CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, Database, Activity, Bot, TrendingUp, Zap, ChevronRight } from "lucide-react";
 import { useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
 import { supabase as supabaseClient } from "@/lib/supabaseClient";
 
@@ -88,16 +88,90 @@ function fmtDuration(secs: number | null | undefined) {
   return `${(secs / 60).toFixed(1)}m`;
 }
 
+function ConfidenceBar({ pct, label, note }: { pct: number; label: string; note?: string }) {
+  const color = pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-red-500";
+  const textColor = pct >= 80 ? "text-emerald-400" : pct >= 50 ? "text-amber-400" : "text-red-400";
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2.5">
+        <span className="text-xs text-muted-foreground w-32 shrink-0">{label}</span>
+        <div className="flex-1 h-1.5 bg-muted/50 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+        </div>
+        <span className={`text-xs font-semibold tabular-nums w-10 text-right ${textColor}`}>{pct}%</span>
+      </div>
+      {note && <p className="text-[11px] text-muted-foreground pl-36">{note}</p>}
+    </div>
+  );
+}
+
+interface FlowNode {
+  id: string;
+  label: string;
+  sublabel: string;
+  icon: React.ElementType;
+  status: Status;
+  confidence: number;
+  action?: { label: string; key: string };
+}
+
+function PipelineFlowDiagram({ nodes, running, onAction }: { nodes: FlowNode[]; running: string | null; onAction: (key: string) => void }) {
+  return (
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="px-4 py-3 border-b border-border">
+        <h3 className="text-xs font-semibold text-foreground">Pipeline Flow</h3>
+        <p className="text-[11px] text-muted-foreground mt-0.5">Data travels through each stage in sequence — a failure upstream blocks downstream outputs</p>
+      </div>
+      <div className="px-4 py-4">
+        <div className="flex flex-wrap items-center gap-1">
+          {nodes.map((node, i) => {
+            const Icon = node.icon;
+            const borderColor = node.status === "ok" ? "border-emerald-500/40" : node.status === "warn" ? "border-amber-500/40" : node.status === "error" ? "border-red-500/40" : node.status === "running" ? "border-sky-500/40" : "border-border";
+            const bgColor = node.status === "ok" ? "bg-emerald-950/20" : node.status === "warn" ? "bg-amber-950/20" : node.status === "error" ? "bg-red-950/20" : node.status === "running" ? "bg-sky-950/20" : "bg-card";
+            const confidenceColor = node.confidence >= 80 ? "text-emerald-400" : node.confidence >= 50 ? "text-amber-400" : "text-red-400";
+            const barColor = node.confidence >= 80 ? "bg-emerald-500" : node.confidence >= 50 ? "bg-amber-500" : "bg-red-500";
+            return (
+              <div key={node.id} className="flex items-center gap-1">
+                <div className={`rounded-lg border ${borderColor} ${bgColor} px-3 py-2.5 min-w-[120px]`}>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    {statusIcon(node.status)}
+                    <span className="text-xs font-semibold truncate">{node.label}</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mb-1.5">{node.sublabel}</p>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className={`text-[11px] font-bold tabular-nums ${confidenceColor}`}>{node.confidence}%</span>
+                    {node.action && (
+                      <button onClick={() => onAction(node.action!.key)} disabled={running !== null} className="text-[10px] text-muted-foreground hover:text-foreground underline underline-offset-2 disabled:opacity-40 disabled:no-underline">
+                        {running === node.action.key ? "Running…" : node.action.label}
+                      </button>
+                    )}
+                  </div>
+                  <div className="h-1 bg-muted/40 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${barColor}`} style={{ width: `${Math.min(node.confidence, 100)}%` }} />
+                  </div>
+                </div>
+                {i < nodes.length - 1 && <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface PipelineCardProps {
   icon: React.ElementType;
   title: string;
   status: Status;
+  confidence: number;
+  confidenceNote: string;
   rows: { label: string; value: React.ReactNode }[];
   loading: boolean;
   action?: { label: string; onClick: () => void; disabled: boolean };
 }
 
-function PipelineCard({ icon: Icon, title, status, rows, loading, action }: PipelineCardProps) {
+function PipelineCard({ icon: Icon, title, status, confidence, confidenceNote, rows, loading, action }: PipelineCardProps) {
   const border = status === "ok" ? "border-emerald-200/20"
     : status === "warn" ? "border-amber-200/20"
     : status === "error" ? "border-red-300/30"
@@ -113,6 +187,7 @@ function PipelineCard({ icon: Icon, title, status, rows, loading, action }: Pipe
           </div>
           {statusIcon(status)}
         </CardTitle>
+        <ConfidenceBar pct={confidence} label="Confidence" note={confidenceNote} />
       </CardHeader>
       <CardContent className="space-y-0">
         {loading ? (
@@ -225,6 +300,52 @@ export default function AdminPipelines() {
     : pipelineHealth.latest_status === "failed" ? "error"
     : "warn";
 
+  const rankingsConfidence = cmdStatus
+    ? Math.min(100, Math.round((cmdStatus.rankings_cache_rows / 700) * 100))
+    : 0;
+
+  const aiConfidence = cmdStatus
+    ? Math.min(100, Math.round((cmdStatus.ai_analysis_rows / Math.max(1, cmdStatus.ai_analysis_rows + cmdStatus.ai_missing_players)) * 100))
+    : 0;
+
+  const mwConfidence = cmdStatus?.market_watch_last_refresh
+    ? Math.min(100, Math.round(Math.max(0, 100 - ((Date.now() - new Date(cmdStatus.market_watch_last_refresh).getTime()) / 3_600_000) * 5)))
+    : 0;
+
+  const startSitConfidence = startSitCache
+    ? (() => {
+        const rows = startSitCache.cache_rows ?? 0;
+        const stale = startSitCache.stale_rows ?? 0;
+        if (rows === 0) return 0;
+        const stalePenalty = Math.min(40, Math.round((stale / rows) * 100));
+        return Math.min(100, Math.max(0, Math.round((rows / 500) * 100) - stalePenalty));
+      })()
+    : 0;
+
+  const pipelineConfidence = pipelineHealth
+    ? pipelineHealth.latest_status === "completed" ? 100
+      : pipelineHealth.latest_status === "running" ? 60
+      : pipelineHealth.latest_status === "failed" ? 10
+      : 50
+    : 0;
+
+  const overallConfidence = loading ? 0
+    : Math.round((rankingsConfidence + aiConfidence + mwConfidence + startSitConfidence + pipelineConfidence) / 5);
+
+  const flowNodes: FlowNode[] = [
+    { id: "pipeline", label: "AFL Pipeline", sublabel: "Ingests & transforms match data", icon: Activity, status: pipelineRunStatus, confidence: pipelineConfidence, action: { label: "Run now", key: "pipeline" } },
+    { id: "rankings", label: "Rankings Cache", sublabel: "Projection engine output", icon: Database, status: rankingsCacheStatus, confidence: rankingsConfidence, action: { label: "Refresh", key: "rankings" } },
+    { id: "ai", label: "AI Generation", sublabel: "Player analysis & recommendations", icon: Bot, status: aiPipelineStatus, confidence: aiConfidence },
+    { id: "market", label: "Market Watch", sublabel: "Price & trade signals", icon: TrendingUp, status: mwStatus, confidence: mwConfidence, action: { label: "Refresh", key: "mw" } },
+    { id: "startsit", label: "Start / Sit", sublabel: "Matchup cache", icon: Zap, status: startSitStatus, confidence: startSitConfidence },
+  ];
+
+  function handleFlowAction(key: string) {
+    if (key === "pipeline") runRpc("Running AFL Pipeline…", "pipeline", "run_neeko_pipeline_orchestrator");
+    if (key === "rankings") runRpc("Refreshing Rankings Cache…", "rankings", "refresh_player_rankings_cache");
+    if (key === "mw") runRpc("Refreshing Market Watch…", "mw", "refresh_market_watch");
+  }
+
   const currentRun = runs.find(r => r.status === "running");
   const recentRuns = runs.slice(0, 10);
 
@@ -239,10 +360,18 @@ export default function AdminPipelines() {
               : "Monitor and control all data and AI pipelines"}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchAll} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          {!loading && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">System confidence</span>
+              <span className={`font-bold tabular-nums ${overallConfidence >= 80 ? "text-emerald-400" : overallConfidence >= 50 ? "text-amber-400" : "text-red-400"}`}>{overallConfidence}%</span>
+            </div>
+          )}
+          <Button variant="outline" size="sm" onClick={fetchAll} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Current run banner */}
@@ -260,12 +389,33 @@ export default function AdminPipelines() {
         </div>
       )}
 
+      {/* Pipeline Flow Diagram */}
+      {loading ? (
+        <div className="h-36 rounded-lg border border-border bg-card animate-pulse" />
+      ) : (
+        <PipelineFlowDiagram nodes={flowNodes} running={running} onAction={handleFlowAction} />
+      )}
+
+      {/* Confidence Summary */}
+      {!loading && (
+        <div className="rounded-lg border border-border bg-card px-4 py-4 space-y-3">
+          <h3 className="text-xs font-semibold text-foreground">Confidence by Stage</h3>
+          <ConfidenceBar pct={pipelineConfidence} label="AFL Pipeline" note={pipelineHealth?.latest_status === "failed" ? `Last run failed — ${pipelineHealth.last_error ?? "unknown error"}` : pipelineHealth?.last_pipeline_run ? `Last run ${fmtTs(pipelineHealth.last_pipeline_run)}` : "No recent run"} />
+          <ConfidenceBar pct={rankingsConfidence} label="Rankings Cache" note={`${cmdStatus?.rankings_cache_rows?.toLocaleString() ?? 0} of ~700 players cached`} />
+          <ConfidenceBar pct={aiConfidence} label="AI Generation" note={`${cmdStatus?.ai_analysis_rows?.toLocaleString() ?? 0} analysed — ${cmdStatus?.ai_missing_players?.toLocaleString() ?? 0} missing — ${cmdStatus?.queue_failed ?? 0} failed jobs`} />
+          <ConfidenceBar pct={mwConfidence} label="Market Watch" note={cmdStatus?.market_watch_last_refresh ? `Last refresh ${fmtTs(cmdStatus.market_watch_last_refresh)}` : "Never refreshed — run snapshot now"} />
+          <ConfidenceBar pct={startSitConfidence} label="Start / Sit Cache" note={`${startSitCache?.cache_rows?.toLocaleString() ?? 0} rows — ${startSitCache?.stale_rows ?? 0} stale`} />
+        </div>
+      )}
+
       {/* Pipeline cards */}
       <div className="grid gap-4 sm:grid-cols-2">
         <PipelineCard
           icon={Activity}
           title="AFL Rankings Pipeline"
           status={pipelineRunStatus}
+          confidence={pipelineConfidence}
+          confidenceNote={pipelineHealth?.latest_status === "failed" ? "Pipeline failed — rerun to recover" : "Based on last run outcome"}
           loading={loading}
           rows={[
             { label: "Last Run",      value: fmtTs(pipelineHealth?.last_pipeline_run) },
@@ -285,6 +435,8 @@ export default function AdminPipelines() {
           icon={Database}
           title="Rankings Cache"
           status={rankingsCacheStatus}
+          confidence={rankingsConfidence}
+          confidenceNote={`${cmdStatus?.rankings_cache_rows ?? 0} players — healthy is 600+`}
           loading={loading}
           rows={[
             { label: "Cached Players",  value: <span className="font-semibold">{cmdStatus?.rankings_cache_rows?.toLocaleString() ?? "—"}</span> },
@@ -302,6 +454,8 @@ export default function AdminPipelines() {
           icon={Bot}
           title="AI Generation Pipeline"
           status={aiPipelineStatus}
+          confidence={aiConfidence}
+          confidenceNote={`${cmdStatus?.ai_missing_players ?? 0} players without analysis — ${cmdStatus?.queue_failed ?? 0} failed jobs in queue`}
           loading={loading}
           rows={[
             { label: "AI Analysis Rows",  value: <span className="font-semibold">{cmdStatus?.ai_analysis_rows?.toLocaleString() ?? "—"}</span> },
@@ -325,6 +479,8 @@ export default function AdminPipelines() {
           icon={TrendingUp}
           title="Market Watch Pipeline"
           status={mwStatus}
+          confidence={mwConfidence}
+          confidenceNote={mwConfidence < 50 ? "Snapshot is stale — refresh to restore price signals" : "Price model is fresh"}
           loading={loading}
           rows={[
             { label: "Last Refresh",    value: fmtTs(cmdStatus?.market_watch_last_refresh) },
@@ -341,6 +497,8 @@ export default function AdminPipelines() {
           icon={Zap}
           title="Start/Sit Cache"
           status={startSitStatus}
+          confidence={startSitConfidence}
+          confidenceNote={`${startSitCache?.cache_rows ?? 0} rows, ${startSitCache?.stale_rows ?? 0} stale — healthy is 500+ rows, 0 stale`}
           loading={loading}
           rows={[
             { label: "Cache Rows",        value: <span className="font-semibold">{startSitCache?.cache_rows?.toLocaleString() ?? "—"}</span> },
