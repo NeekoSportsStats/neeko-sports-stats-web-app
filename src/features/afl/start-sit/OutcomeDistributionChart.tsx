@@ -314,20 +314,20 @@ export function OutcomeDistributionChart({
           </div>
 
           {/* Overlay CTA */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#070707]/60 px-6">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 bg-[#070707]/55 px-6">
             <div className="flex items-center gap-2">
-              <Lock size={14} className="text-white/40" />
-              <p className="text-sm font-semibold text-white/65">Scoring Range Probabilities</p>
+              <Lock size={12} className="text-white/35" />
+              <p className="text-sm font-semibold text-white/55">Scoring Range Probabilities</p>
             </div>
-            <p className="text-xs text-white/35 text-center leading-relaxed">
-              See full scoring range probabilities — bust risk, ceiling chance and safe score floor — with Neeko+
+            <p className="text-xs text-white/30 text-center leading-snug">
+              Bust risk, ceiling chance and safe score floor — Neeko+
             </p>
             <button
               onClick={onUpgrade}
-              className="flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-xs px-5 py-2.5 rounded-xl hover:brightness-110 active:scale-[0.97] transition-all mt-1"
+              className="flex items-center gap-1.5 bg-[#F5C84C] text-black font-bold text-xs px-4 py-2 rounded-lg hover:brightness-108 active:scale-[0.98] transition-all mt-0.5"
             >
-              <Crown size={11} />
-              Upgrade to Neeko+
+              <Crown size={10} />
+              Unlock with Neeko+
             </button>
           </div>
         </div>
