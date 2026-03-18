@@ -2,7 +2,7 @@ export type MWCategory = "buy" | "sell_now" | "sell_consider" | "cash_cow" | "fa
 
 export type MWCategoryFilter = "all" | "buy" | "sell" | "cash_cow" | "trap";
 
-export type MWSortKey = "value_score" | "projection" | "price_change";
+export type MWSortKey = "value_score" | "projection" | "price_change" | "price_rise" | "price_fall" | "cash_gen" | "confidence";
 
 export interface MWPlayerRow {
   snapshot_id: string;

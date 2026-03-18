@@ -6,9 +6,12 @@ interface Props {
 }
 
 const OPTIONS: { key: MWSortKey; label: string; description: string }[] = [
-  { key: "value_score",  label: "Value Score",      description: "Overall value vs price" },
-  { key: "projection",   label: "Projection",        description: "Highest projected score" },
-  { key: "price_change", label: "Price Movement",    description: "Expected $ change" },
+  { key: "value_score",  label: "Value Score",       description: "Overall value relative to price" },
+  { key: "price_rise",   label: "Biggest Rise",      description: "Highest expected price increase" },
+  { key: "price_fall",   label: "Biggest Drop",      description: "Steepest expected price fall" },
+  { key: "cash_gen",     label: "Cash Generation",   description: "Best cash cow growth rate" },
+  { key: "projection",   label: "Projection",        description: "Highest projected fantasy score" },
+  { key: "confidence",   label: "Confidence",        description: "Highest projection confidence" },
 ];
 
 export function MarketWatchSort({ value, onChange }: Props) {
