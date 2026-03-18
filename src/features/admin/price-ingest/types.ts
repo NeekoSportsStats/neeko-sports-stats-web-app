@@ -49,6 +49,8 @@ export interface IngestByIdResult {
   skipped_dup: number;
   total: number;
   refresh?: {
+    projection_engine: RefreshStepResult;
+    rankings_cache: RefreshStepResult;
     rebuild_projection: RefreshStepResult;
     refresh_mv: RefreshStepResult;
     refresh_rankings: RefreshStepResult;

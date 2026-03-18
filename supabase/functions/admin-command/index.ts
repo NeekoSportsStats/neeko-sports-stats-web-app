@@ -207,11 +207,33 @@ async function dispatchCommand(
         console.log(`[commit_price_ingest] inserted=${commitResult?.inserted} skipped=${commitResult?.skipped_dup}`);
 
         // ── Post-commit: refresh projections + rankings (best-effort, non-fatal) ──
+        // SQL functions already call refresh_projection_engine + populate_rankings_cache_from_source
+        // internally. The edge function runs additional steps for belt-and-braces coverage.
         const refreshSteps = {
+          projection_engine:  { ok: false, error: undefined as string | undefined },
+          rankings_cache:     { ok: false, error: undefined as string | undefined },
           rebuild_projection: { ok: false, error: undefined as string | undefined },
           refresh_mv:         { ok: false, error: undefined as string | undefined },
           refresh_rankings:   { ok: false, error: undefined as string | undefined },
         };
+
+        try {
+          await admin.schema("afl" as never).rpc("refresh_projection_engine" as never);
+          refreshSteps.projection_engine.ok = true;
+          console.log("[commit_price_ingest] refresh_projection_engine: ok");
+        } catch (e) {
+          refreshSteps.projection_engine.error = e instanceof Error ? e.message : String(e);
+          console.warn("[commit_price_ingest] refresh_projection_engine failed:", refreshSteps.projection_engine.error);
+        }
+
+        try {
+          await admin.schema("afl" as never).rpc("populate_rankings_cache_from_source" as never);
+          refreshSteps.rankings_cache.ok = true;
+          console.log("[commit_price_ingest] populate_rankings_cache_from_source: ok");
+        } catch (e) {
+          refreshSteps.rankings_cache.error = e instanceof Error ? e.message : String(e);
+          console.warn("[commit_price_ingest] populate_rankings_cache_from_source failed:", refreshSteps.rankings_cache.error);
+        }
 
         try {
           await admin.schema("afl" as never).rpc("rebuild_player_projection" as never);

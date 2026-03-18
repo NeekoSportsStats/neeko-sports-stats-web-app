@@ -224,17 +224,19 @@ export function FantasyPricesTab() {
   if (step === "done" && commitResult) {
     const refresh = commitResult.refresh;
     const allRefreshed = refresh
-      ? refresh.rebuild_projection.ok && refresh.refresh_mv.ok && refresh.refresh_rankings.ok
+      ? refresh.projection_engine.ok && refresh.rankings_cache.ok && refresh.refresh_rankings.ok
       : false;
     const anyRefreshFailed = refresh
-      ? !refresh.rebuild_projection.ok || !refresh.refresh_mv.ok || !refresh.refresh_rankings.ok
+      ? !refresh.projection_engine.ok || !refresh.rankings_cache.ok || !refresh.refresh_rankings.ok
       : false;
 
     const refreshSteps = refresh
       ? [
-          { label: "Projection engine rebuilt", ok: refresh.rebuild_projection.ok, error: refresh.rebuild_projection.error },
+          { label: "Projection engine refreshed", ok: refresh.projection_engine.ok, error: refresh.projection_engine.error },
+          { label: "Rankings cache rebuilt", ok: refresh.rankings_cache.ok, error: refresh.rankings_cache.error },
+          { label: "Projection model rebuilt", ok: refresh.rebuild_projection.ok, error: refresh.rebuild_projection.error },
           { label: "Materialized view refreshed", ok: refresh.refresh_mv.ok, error: refresh.refresh_mv.error },
-          { label: "Rankings cache updated", ok: refresh.refresh_rankings.ok, error: refresh.refresh_rankings.error },
+          { label: "Rankings finalised", ok: refresh.refresh_rankings.ok, error: refresh.refresh_rankings.error },
         ]
       : [];
 
@@ -243,7 +245,7 @@ export function FantasyPricesTab() {
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-6 py-8 text-center">
           <CheckCircle className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
           <h3 className="text-base font-semibold">
-            {allRefreshed ? "Prices updated + projections refreshed" : "Import Complete"}
+            {allRefreshed ? "Prices updated — projections refreshed" : "Prices imported — refresh partial"}
           </h3>
           <p className="text-sm text-muted-foreground mt-1.5">
             {commitResult.inserted} prices inserted &nbsp;·&nbsp; {commitResult.skipped_dup} already existed
