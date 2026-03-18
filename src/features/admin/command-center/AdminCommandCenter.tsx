@@ -2,23 +2,10 @@ import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import {
-  RefreshCw,
-  Activity,
-  Database,
-  Bot,
-  TrendingUp,
-  Clock,
-  ScrollText,
-  CircleCheck as CheckCircle,
-  TriangleAlert as AlertTriangle,
-  Circle as XCircle,
-  Grid2x2 as Grid,
-  ListOrdered,
-  Play,
-  ShieldAlert,
-} from "lucide-react";
+import { runCommand } from "@/hooks/useAdminCommand";
+import { RefreshCw, Activity, Database, Bot, TrendingUp, Grid2x2 as Grid, ListOrdered, Play, Zap, Server, ScrollText, Clock, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, SquareCheck as CheckSquare } from "lucide-react";
 import { formatDate } from "../shared/adminUtils";
 import CronJobMonitor, { fetchCronJobs, type CronJob } from "./CronJobMonitor";
 import SystemLogsPanel, { fetchSystemLogs, type SystemLogRow } from "./SystemLogsPanel";
@@ -56,6 +43,15 @@ interface CommandCenterStatus {
   logs_health: string;
 }
 
+interface CommandLogRow {
+  id: string;
+  command: string;
+  status: "running" | "success" | "error";
+  duration_ms: number | null;
+  error: string | null;
+  created_at: string;
+}
+
 function toLevel(s: string | undefined): HealthStatus {
   if (s === "ok") return "ok";
   if (s === "warn") return "warn";
@@ -65,161 +61,215 @@ function toLevel(s: string | undefined): HealthStatus {
 
 function StatusChip({ level, label }: { level: HealthStatus; label: string }) {
   const cfg: Record<HealthStatus, { cls: string; dot: string }> = {
-    ok:      { cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400", dot: "bg-emerald-500" },
-    warn:    { cls: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400", dot: "bg-amber-500" },
-    error:   { cls: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400", dot: "bg-red-500 animate-pulse" },
+    ok:      { cls: "bg-emerald-950 text-emerald-400", dot: "bg-emerald-500" },
+    warn:    { cls: "bg-amber-950 text-amber-400", dot: "bg-amber-500" },
+    error:   { cls: "bg-red-950 text-red-400", dot: "bg-red-500 animate-pulse" },
     loading: { cls: "bg-muted text-muted-foreground", dot: "bg-muted-foreground animate-pulse" },
   };
   const { cls, dot } = cfg[level];
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${cls}`}>
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
       {label}
     </span>
   );
 }
 
-function HealthSummaryCard({
-  icon: Icon,
-  label,
-  status,
-  value,
-  sub,
-  loading,
-}: {
-  icon: React.ElementType;
+interface ActionDef {
+  key: string;
   label: string;
-  status: HealthStatus;
-  value: React.ReactNode;
-  sub?: string;
-  loading: boolean;
-}) {
-  const borderColor: Record<HealthStatus, string> = {
-    ok:      "border-emerald-200 dark:border-emerald-900",
-    warn:    "border-amber-200 dark:border-amber-900",
-    error:   "border-red-300 dark:border-red-800",
-    loading: "border-border",
-  };
-  const statusIcon = {
-    ok:      <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />,
-    warn:    <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />,
-    error:   <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />,
-    loading: <RefreshCw className="h-3.5 w-3.5 text-muted-foreground animate-spin shrink-0" />,
-  }[status];
+  command: string;
+  variant?: "default" | "outline";
+  payload?: Record<string, unknown>;
+}
+
+function ActionButton({ action, onComplete }: { action: ActionDef; onComplete?: () => void }) {
+  const { toast } = useToast();
+  const [running, setRunning] = useState(false);
+  const [lastStatus, setLastStatus] = useState<"idle" | "success" | "error">("idle");
+
+  async function handle() {
+    setRunning(true);
+    setLastStatus("idle");
+    try {
+      const res = await runCommand(action.command, action.payload);
+      if (res.success) {
+        setLastStatus("success");
+        toast({
+          title: `${action.label} started`,
+          description: res.duration_ms ? `Completed in ${res.duration_ms}ms` : "Running in background",
+        });
+        onComplete?.();
+      } else {
+        setLastStatus("error");
+        toast({
+          title: `${action.label} failed`,
+          description: res.error ?? "Unknown error",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      setLastStatus("error");
+      toast({
+        title: `${action.label} failed`,
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setRunning(false);
+      setTimeout(() => setLastStatus("idle"), 4000);
+    }
+  }
+
+  const icon = running ? (
+    <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
+  ) : lastStatus === "success" ? (
+    <CheckSquare className="h-3 w-3 mr-1.5 text-emerald-400" />
+  ) : lastStatus === "error" ? (
+    <XCircle className="h-3 w-3 mr-1.5 text-red-400" />
+  ) : (
+    <Play className="h-3 w-3 mr-1.5" />
+  );
 
   return (
-    <Card className={`border ${borderColor[status]} transition-colors`}>
-      <CardContent className="pt-4 pb-4 px-4">
-        {loading ? (
-          <div className="space-y-2">
-            <div className="h-4 w-24 rounded bg-muted animate-pulse" />
-            <div className="h-7 w-20 rounded bg-muted animate-pulse" />
+    <Button
+      variant={action.variant ?? "outline"}
+      size="sm"
+      disabled={running}
+      onClick={handle}
+      className={`text-xs transition-colors ${
+        lastStatus === "success" ? "border-emerald-500/40 text-emerald-400" :
+        lastStatus === "error" ? "border-red-500/40 text-red-400" : ""
+      }`}
+    >
+      {icon}
+      {action.label}
+    </Button>
+  );
+}
+
+function ActionCard({
+  icon: Icon, title, description, status, statusLabel, detail, actions, loading, onComplete,
+}: {
+  icon: React.ElementType; title: string; description: string;
+  status: HealthStatus; statusLabel: string; detail?: string;
+  actions: ActionDef[];
+  loading: boolean;
+  onComplete?: () => void;
+}) {
+  const border = status === "ok" ? "border-emerald-900/40"
+    : status === "warn" ? "border-amber-900/40"
+    : status === "error" ? "border-red-900/40"
+    : "border-border";
+  return (
+    <Card className={`border ${border}`}>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between text-sm font-semibold">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-md bg-muted flex items-center justify-center shrink-0">
+              <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+            </span>
+            {title}
           </div>
+          <StatusChip level={status} label={statusLabel} />
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">{description}</p>
+        {detail && <p className="text-[11px] text-muted-foreground/70 mt-0.5">{detail}</p>}
+      </CardHeader>
+      <CardContent className="pt-0">
+        {loading ? (
+          <div className="h-8 rounded bg-muted animate-pulse" />
         ) : (
-          <>
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-1.5">
-                <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">{label}</span>
-              </div>
-              {statusIcon}
-            </div>
-            <div className={`text-xl font-bold tabular-nums leading-tight ${status === "error" ? "text-red-600 dark:text-red-400" : status === "warn" ? "text-amber-600 dark:text-amber-400" : "text-foreground"}`}>
-              {value}
-            </div>
-            {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
-          </>
+          <div className="flex flex-wrap gap-2">
+            {actions.map(a => <ActionButton key={a.key} action={a} onComplete={onComplete} />)}
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function StatRow({ label, value, highlight }: { label: string; value: React.ReactNode; highlight?: "good" | "warn" | "bad" }) {
-  const cls = highlight === "good" ? "text-emerald-600 dark:text-emerald-400 font-semibold"
-    : highlight === "warn" ? "text-amber-600 dark:text-amber-400 font-semibold"
-    : highlight === "bad" ? "text-red-600 dark:text-red-400 font-semibold"
-    : "font-medium";
+function CommandLogsPanel({ logs, loading }: { logs: CommandLogRow[]; loading: boolean }) {
+  if (loading) {
+    return <div className="space-y-1.5">{[1,2,3].map(i => <div key={i} className="h-8 rounded bg-muted animate-pulse" />)}</div>;
+  }
+  if (logs.length === 0) {
+    return <p className="text-xs text-muted-foreground py-4 text-center">No commands run yet.</p>;
+  }
   return (
-    <div className="flex justify-between items-center py-1.5 border-b border-border/40 last:border-0">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className={`text-sm ${cls}`}>{value}</span>
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-border/40">
+            <th className="text-left py-2 pr-3 font-medium text-muted-foreground">Command</th>
+            <th className="text-left py-2 pr-3 font-medium text-muted-foreground">Status</th>
+            <th className="text-right py-2 pr-3 font-medium text-muted-foreground">Duration</th>
+            <th className="text-left py-2 font-medium text-muted-foreground">Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {logs.map(log => (
+            <tr key={log.id} className="border-b border-border/20 last:border-0 hover:bg-muted/20">
+              <td className="py-1.5 pr-3 font-mono text-muted-foreground">{log.command}</td>
+              <td className="py-1.5 pr-3">
+                <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                  log.status === "success" ? "bg-emerald-500/10 text-emerald-400"
+                  : log.status === "error" ? "bg-red-500/10 text-red-400"
+                  : "bg-amber-500/10 text-amber-400"
+                }`}>
+                  {log.status.toUpperCase()}
+                </span>
+                {log.error && <span className="ml-2 text-red-400 truncate max-w-[180px] inline-block">{log.error}</span>}
+              </td>
+              <td className="py-1.5 pr-3 text-right tabular-nums text-muted-foreground">
+                {log.duration_ms != null ? `${log.duration_ms}ms` : "—"}
+              </td>
+              <td className="py-1.5 text-muted-foreground">{formatDate(log.created_at)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
 
-function DetailCard({
-  icon: Icon,
-  title,
-  status,
-  loading,
-  children,
-}: {
-  icon: React.ElementType;
-  title: string;
-  status: HealthStatus;
-  loading: boolean;
-  children: React.ReactNode;
-}) {
-  const borderColor: Record<HealthStatus, string> = {
-    ok:      "border-emerald-200 dark:border-emerald-900",
-    warn:    "border-amber-200 dark:border-amber-900",
-    error:   "border-red-300 dark:border-red-800",
-    loading: "border-border",
-  };
-  return (
-    <Card className={`border ${borderColor[status]} transition-colors`}>
-      <CardHeader className="pb-3 pt-4 px-5">
-        <CardTitle className="flex items-center justify-between text-sm font-semibold">
-          <span className="flex items-center gap-2">
-            <span className="flex items-center justify-center w-7 h-7 rounded-md bg-muted">
-              <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-            </span>
-            {title}
-          </span>
-          {loading ? (
-            <RefreshCw className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-          ) : status === "ok" ? (
-            <CheckCircle className="h-4 w-4 text-emerald-500" />
-          ) : status === "warn" ? (
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-          ) : status === "error" ? (
-            <XCircle className="h-4 w-4 text-red-500" />
-          ) : null}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="px-5 pb-4">
-        {loading ? (
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => <div key={i} className="h-5 rounded bg-muted animate-pulse" />)}
-          </div>
-        ) : children}
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function AdminCommandCenter() {
-  const { toast } = useToast();
-
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<CommandCenterStatus | null>(null);
   const [cronJobs, setCronJobs] = useState<CronJob[]>([]);
   const [logs, setLogs] = useState<SystemLogRow[]>([]);
+  const [commandLogs, setCommandLogs] = useState<CommandLogRow[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const [actionRunning, setActionRunning] = useState<string | null>(null);
+
+  const fetchCommandLogs = useCallback(async () => {
+    setLogsLoading(true);
+    try {
+      const { data } = await supabase
+        .schema("admin" as never)
+        .from("command_logs" as never)
+        .select("id,command,status,duration_ms,error,created_at")
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (data) setCommandLogs(data as CommandLogRow[]);
+    } finally {
+      setLogsLoading(false);
+    }
+  }, []);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [statusRes, cronRes, logsRes] = await Promise.all([
+      const [statusRes, cronRes, logsRes] = await Promise.allSettled([
         supabase.from("v_command_center_status").select("*").maybeSingle(),
         fetchCronJobs(),
         fetchSystemLogs(20),
       ]);
-      if (statusRes.data) setStatus(statusRes.data as CommandCenterStatus);
-      setCronJobs(cronRes);
-      setLogs(logsRes);
+      if (statusRes.status === "fulfilled" && statusRes.value.data) {
+        setStatus(statusRes.value.data as CommandCenterStatus);
+      }
+      if (cronRes.status === "fulfilled") setCronJobs(cronRes.value);
+      if (logsRes.status === "fulfilled") setLogs(logsRes.value);
       setLastRefreshed(new Date());
     } finally {
       setLoading(false);
@@ -228,28 +278,10 @@ export default function AdminCommandCenter() {
 
   useEffect(() => {
     fetchAll();
+    fetchCommandLogs();
     const interval = setInterval(fetchAll, 60_000);
     return () => clearInterval(interval);
-  }, [fetchAll]);
-
-  const runAction = async (key: string, label: string, fn: () => Promise<void>) => {
-    setActionRunning(key);
-    try {
-      await fn();
-      toast({ title: `${label} complete` });
-      await fetchAll();
-    } catch (err) {
-      toast({
-        title: `${label} failed`,
-        description: err instanceof Error ? err.message : "Unknown error",
-        variant: "destructive",
-      });
-    } finally {
-      setActionRunning(null);
-    }
-  };
-
-  const isActing = actionRunning !== null;
+  }, [fetchAll, fetchCommandLogs]);
 
   const overallHealth: HealthStatus = !status ? "loading"
     : [status.rankings_cache_status, status.pipeline_health, status.ai_health,
@@ -260,22 +292,30 @@ export default function AdminCommandCenter() {
         .includes("warn") ? "warn"
     : "ok";
 
-  const overallLabel = overallHealth === "ok" ? "All Systems Operational"
-    : overallHealth === "warn" ? "Warnings Detected"
-    : overallHealth === "error" ? "Issues Require Attention"
-    : "Checking...";
+  const handleComplete = () => {
+    setTimeout(fetchCommandLogs, 1500);
+  };
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-6">
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold">Command Center</h2>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-base font-semibold">Command Center</h2>
+            <StatusChip
+              level={overallHealth}
+              label={
+                overallHealth === "ok" ? "Operational"
+                : overallHealth === "warn" ? "Warnings"
+                : overallHealth === "error" ? "Issues"
+                : "Checking…"
+              }
+            />
+          </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {lastRefreshed
-              ? `Updated ${lastRefreshed.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
-              : "Platform-wide health, pipeline status, and operational controls"}
+            All actions live here — every button calls the real backend via admin-command
+            {lastRefreshed && ` · Status updated ${lastRefreshed.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchAll} disabled={loading}>
@@ -284,196 +324,288 @@ export default function AdminCommandCenter() {
         </Button>
       </div>
 
-      {/* Overall status banner */}
+      {/* Status Banner */}
       <div className={`rounded-lg border px-4 py-3 flex items-center gap-3 ${
-        overallHealth === "ok" ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20"
-        : overallHealth === "warn" ? "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20"
-        : overallHealth === "error" ? "border-red-300 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20"
+        overallHealth === "ok" ? "border-emerald-900/40 bg-emerald-950/20"
+        : overallHealth === "warn" ? "border-amber-900/40 bg-amber-950/15"
+        : overallHealth === "error" ? "border-red-900/40 bg-red-950/20"
         : "border-border bg-muted/30"
       }`}>
         {overallHealth === "ok" ? <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
           : overallHealth === "warn" ? <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-          : overallHealth === "error" ? <ShieldAlert className="h-4 w-4 text-red-500 shrink-0" />
+          : overallHealth === "error" ? <XCircle className="h-4 w-4 text-red-500 shrink-0" />
           : <RefreshCw className="h-4 w-4 text-muted-foreground animate-spin shrink-0" />}
-        <div>
+        <div className="min-w-0 flex-1">
           <p className={`text-sm font-semibold ${
-            overallHealth === "ok" ? "text-emerald-700 dark:text-emerald-400"
-            : overallHealth === "warn" ? "text-amber-700 dark:text-amber-400"
-            : overallHealth === "error" ? "text-red-700 dark:text-red-400"
+            overallHealth === "ok" ? "text-emerald-400"
+            : overallHealth === "warn" ? "text-amber-400"
+            : overallHealth === "error" ? "text-red-400"
             : "text-foreground"
-          }`}>{overallLabel}</p>
+          }`}>
+            {overallHealth === "ok" ? "All Systems Operational"
+            : overallHealth === "warn" ? "Warnings Detected — Review Below"
+            : overallHealth === "error" ? "Issues Require Attention"
+            : "Checking platform status…"}
+          </p>
           {status && (
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              {status.rankings_cache_rows.toLocaleString()} players cached &middot;{" "}
-              {status.reco_rows.toLocaleString()} AI recos &middot;{" "}
-              {status.cron_active_count} cron jobs active
+            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+              {status.rankings_cache_rows.toLocaleString()} players cached &middot; {status.reco_rows.toLocaleString()} AI recos &middot; {status.cron_active_count} cron active
               {status.cron_failed_count > 0 && ` · ${status.cron_failed_count} cron failed`}
+              {status.ai_missing_players > 0 && ` · ${status.ai_missing_players} players missing AI`}
             </p>
           )}
         </div>
       </div>
 
-      {/* Health Summary Row — 6 tiles */}
-      <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">System Health</p>
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
-          <HealthSummaryCard
-            icon={ListOrdered}
-            label="Rankings Cache"
-            status={toLevel(status?.rankings_cache_status)}
-            value={status ? `${status.rankings_cache_rows.toLocaleString()}` : "—"}
-            sub="players cached"
+      {/* Action Tabs */}
+      <Tabs defaultValue="pipeline">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="pipeline" className="text-xs">Pipeline</TabsTrigger>
+          <TabsTrigger value="ai" className="text-xs">AI</TabsTrigger>
+          <TabsTrigger value="data" className="text-xs">Data</TabsTrigger>
+          <TabsTrigger value="system" className="text-xs">System</TabsTrigger>
+        </TabsList>
+
+        {/* PIPELINE TAB */}
+        <TabsContent value="pipeline" className="space-y-4 mt-4">
+          <p className="text-xs text-muted-foreground">Control the AFL data ingestion and processing pipeline. All buttons call admin-command → backend RPC or edge function.</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ActionCard
+              icon={Activity}
+              title="AFL Full Pipeline"
+              description="Runs the complete AFL orchestrator — ingest, transform, project, cache."
+              status={toLevel(status?.pipeline_health)}
+              statusLabel={status?.pipeline_status ?? "Unknown"}
+              detail={status?.pipeline_last_run ? `Last run: ${formatDate(status.pipeline_last_run)}` : "No recent run"}
+              loading={loading}
+              onComplete={handleComplete}
+              actions={[
+                { key: "full", label: "Run Full Pipeline", variant: "default", command: "run_full_pipeline" },
+                { key: "controller", label: "Run Controller Only", command: "run_controller" },
+              ]}
+            />
+            <ActionCard
+              icon={ListOrdered}
+              title="Rankings Cache"
+              description="Refreshes the player rankings cache from projection data."
+              status={toLevel(status?.rankings_cache_status)}
+              statusLabel={`${status?.rankings_cache_rows?.toLocaleString() ?? "—"} players`}
+              detail={status?.rankings_cache_refreshed_at ? `Refreshed: ${formatDate(status.rankings_cache_refreshed_at)}` : undefined}
+              loading={loading}
+              onComplete={handleComplete}
+              actions={[
+                { key: "rankings", label: "Refresh Rankings Cache", variant: "default", command: "refresh_rankings" },
+                { key: "populate", label: "Populate From Source", command: "populate_rankings" },
+              ]}
+            />
+            <ActionCard
+              icon={Database}
+              title="Ingest AFL Games"
+              description="Triggers the AFL worker to ingest latest games and player stats."
+              status="ok"
+              statusLabel="Manual trigger"
+              loading={loading}
+              onComplete={handleComplete}
+              actions={[
+                { key: "ingest-player", label: "Ingest Player Stats", command: "ingest_player_stats" },
+                { key: "ingest-team", label: "Ingest Team Stats", command: "ingest_team_stats" },
+              ]}
+            />
+            <ActionCard
+              icon={Grid}
+              title="Edge Board"
+              description="Refreshes the Edge Board materialized view — captains, breakouts, traps."
+              status={toLevel(status?.market_watch_health)}
+              statusLabel="Edge Board"
+              loading={loading}
+              onComplete={handleComplete}
+              actions={[
+                { key: "edge", label: "Refresh Edge Board", variant: "default", command: "refresh_edge_board" },
+              ]}
+            />
+          </div>
+        </TabsContent>
+
+        {/* AI TAB */}
+        <TabsContent value="ai" className="space-y-4 mt-4">
+          <p className="text-xs text-muted-foreground">Control AI generation for player analyses, rankings, and summaries. All buttons call admin-command → generate-* edge functions.</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ActionCard
+              icon={Bot}
+              title="AI Worker"
+              description="Drains the AI generation queue — processes player analysis and ranking reco jobs."
+              status={toLevel(status?.ai_health)}
+              statusLabel={status?.queue_pending != null ? `${status.queue_pending} pending` : "Unknown"}
+              detail={`${status?.queue_failed ?? 0} failed · ${status?.queue_complete?.toLocaleString() ?? "—"} complete`}
+              loading={loading}
+              onComplete={handleComplete}
+              actions={[
+                { key: "worker", label: "Run AI Worker Batch", variant: "default", command: "run_ai_worker" },
+                { key: "generate-all", label: "Generate All AI", command: "generate_all_ai" },
+              ]}
+            />
+            <ActionCard
+              icon={Zap}
+              title="Ranking Recommendations"
+              description="Enqueues ranking recommendation AI jobs for all players."
+              status={toLevel(status?.queue_health)}
+              statusLabel={`${status?.reco_rows?.toLocaleString() ?? "—"} recos`}
+              detail={status?.reco_last_updated ? `Last updated: ${formatDate(status.reco_last_updated)}` : undefined}
+              loading={loading}
+              onComplete={handleComplete}
+              actions={[
+                { key: "enqueue-recos", label: "Enqueue Reco Jobs", variant: "default", command: "enqueue_reco_jobs" },
+                { key: "generate-ranking", label: "Run Ranking AI", command: "generate_ranking_ai" },
+              ]}
+            />
+            <ActionCard
+              icon={Bot}
+              title="Player Analysis"
+              description="Generates individual AI analysis for all players missing summaries."
+              status={toLevel(status?.ai_health)}
+              statusLabel={`${status?.ai_missing_players ?? "—"} missing`}
+              loading={loading}
+              onComplete={handleComplete}
+              actions={[
+                { key: "player-ai", label: "Generate Player AI", variant: "default", command: "generate_player_ai" },
+              ]}
+            />
+            <ActionCard
+              icon={TrendingUp}
+              title="Market Watch AI"
+              description="Generates AI summary for the Market Watch page."
+              status={toLevel(status?.market_watch_health)}
+              statusLabel="Summary"
+              loading={loading}
+              onComplete={handleComplete}
+              actions={[
+                { key: "mw-ai", label: "Generate Market Watch Summary", command: "generate_market_watch_ai" },
+              ]}
+            />
+          </div>
+        </TabsContent>
+
+        {/* DATA TAB */}
+        <TabsContent value="data" className="space-y-4 mt-4">
+          <p className="text-xs text-muted-foreground">Refresh data snapshots, prices, projections, and accuracy. All buttons call admin-command → backend RPCs.</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ActionCard
+              icon={TrendingUp}
+              title="Market Watch"
+              description="Rebuilds the Market Watch snapshot from current rankings and prices."
+              status={toLevel(status?.market_watch_health)}
+              statusLabel={status?.market_watch_quality ?? "Unknown"}
+              detail={status?.market_watch_last_refresh ? `Last refresh: ${formatDate(status.market_watch_last_refresh)}` : "Never refreshed"}
+              loading={loading}
+              onComplete={handleComplete}
+              actions={[
+                { key: "mw", label: "Refresh Market Watch", variant: "default", command: "refresh_market_watch" },
+              ]}
+            />
+            <ActionCard
+              icon={Activity}
+              title="Projection Accuracy"
+              description="Recalculates projection accuracy against real game results."
+              status="ok"
+              statusLabel="Manual trigger"
+              loading={loading}
+              onComplete={handleComplete}
+              actions={[
+                { key: "accuracy", label: "Refresh Accuracy", variant: "default", command: "refresh_projections" },
+              ]}
+            />
+            <ActionCard
+              icon={Zap}
+              title="Start/Sit Cache"
+              description="Rebuilds the Start/Sit decision cache for all players."
+              status="ok"
+              statusLabel="Manual"
+              loading={loading}
+              onComplete={handleComplete}
+              actions={[
+                { key: "startsit", label: "Rebuild Start/Sit Cache", variant: "default", command: "rebuild_start_sit" },
+              ]}
+            />
+            <ActionCard
+              icon={Database}
+              title="Dispatch AFL Master"
+              description="Triggers the AFL master dispatcher edge function — coordinates all workers."
+              status="ok"
+              statusLabel="Manual"
+              loading={loading}
+              onComplete={handleComplete}
+              actions={[
+                { key: "dispatch", label: "Run AFL Master Dispatcher", variant: "default", command: "run_ingest" },
+              ]}
+            />
+          </div>
+        </TabsContent>
+
+        {/* SYSTEM TAB */}
+        <TabsContent value="system" className="space-y-4 mt-4">
+          <p className="text-xs text-muted-foreground">Cron job monitor, system logs, and command history.</p>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  Cron Jobs
+                  <StatusChip level={toLevel(status?.cron_health)} label={`${status?.cron_active_count ?? "—"} active`} />
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CronJobMonitor jobs={cronJobs} loading={loading} />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                  <ScrollText className="h-4 w-4 text-muted-foreground" />
+                  System Logs
+                  <StatusChip level={toLevel(status?.logs_health)} label={`${status?.recent_error_count ?? "—"} errors (24h)`} />
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SystemLogsPanel logs={logs} loading={loading} />
+              </CardContent>
+            </Card>
+          </div>
+
+          <ActionCard
+            icon={Server}
+            title="Pipeline Alerts"
+            description="Manually trigger the pipeline alert function to check for issues and notify."
+            status="ok"
+            statusLabel="Manual"
             loading={loading}
+            onComplete={handleComplete}
+            actions={[
+              { key: "alerts", label: "Run Pipeline Alerts", command: "run_pipeline_alerts" },
+            ]}
           />
-          <HealthSummaryCard
-            icon={Activity}
-            label="AFL Pipeline"
-            status={toLevel(status?.pipeline_health)}
-            value={<StatusChip level={toLevel(status?.pipeline_health)} label={status?.pipeline_status ?? "Unknown"} />}
-            sub={status?.pipeline_last_run ? `Last: ${formatDate(status.pipeline_last_run)}` : "No runs"}
-            loading={loading}
-          />
-          <HealthSummaryCard
-            icon={Bot}
-            label="AI Content"
-            status={toLevel(status?.ai_health)}
-            value={status ? `${status.ai_missing_players}` : "—"}
-            sub="players missing AI"
-            loading={loading}
-          />
-          <HealthSummaryCard
-            icon={TrendingUp}
-            label="Market Watch"
-            status={toLevel(status?.market_watch_health)}
-            value={<StatusChip level={toLevel(status?.market_watch_health)} label={status?.market_watch_health ?? "—"} />}
-            sub={status?.market_watch_last_refresh ? formatDate(status.market_watch_last_refresh) : "Never"}
-            loading={loading}
-          />
-          <HealthSummaryCard
-            icon={Clock}
-            label="Cron Jobs"
-            status={toLevel(status?.cron_health)}
-            value={status ? `${status.cron_active_count}` : "—"}
-            sub={status?.cron_failed_count ? `${status.cron_failed_count} failed` : "all active"}
-            loading={loading}
-          />
-          <HealthSummaryCard
-            icon={ScrollText}
-            label="Error Logs"
-            status={toLevel(status?.logs_health)}
-            value={status ? `${status.recent_error_count}` : "—"}
-            sub="errors (24h)"
-            loading={loading}
-          />
-        </div>
-      </div>
 
-      {/* Operations Detail Row */}
-      <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Operations Detail</p>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-
-          <DetailCard icon={ListOrdered} title="Rankings Cache" status={toLevel(status?.rankings_cache_status)} loading={loading}>
-            <StatRow label="Cached players" value={status?.rankings_cache_rows?.toLocaleString() ?? "—"} highlight={status?.rankings_cache_rows ? "good" : "bad"} />
-            <StatRow label="Last refresh" value={formatDate(status?.rankings_cache_refreshed_at ?? null)} />
-            <StatRow label="Status" value={<StatusChip level={toLevel(status?.rankings_cache_status)} label={status?.rankings_cache_status ?? "—"} />} />
-          </DetailCard>
-
-          <DetailCard icon={Activity} title="AFL Pipeline" status={toLevel(status?.pipeline_health)} loading={loading}>
-            <StatRow label="Last run" value={formatDate(status?.pipeline_last_run ?? null)} />
-            <StatRow label="Finished" value={formatDate(status?.pipeline_finished_at ?? null)} />
-            <StatRow label="Status" value={<StatusChip level={toLevel(status?.pipeline_health)} label={status?.pipeline_status ?? "No runs"} />} />
-          </DetailCard>
-
-          <DetailCard icon={Bot} title="AI Generation" status={toLevel(status?.ai_health)} loading={loading}>
-            <StatRow label="With AI summary" value={status?.ai_analysis_rows?.toLocaleString() ?? "—"} highlight={status && status.ai_analysis_rows > 0 ? "good" : "bad"} />
-            <StatRow label="Missing AI" value={status?.ai_missing_players ?? "—"} highlight={status?.ai_missing_players === 0 ? "good" : status && status.ai_missing_players <= 10 ? "warn" : "bad"} />
-            <StatRow label="Recos generated" value={status?.reco_rows?.toLocaleString() ?? "—"} highlight={status && status.reco_rows >= 500 ? "good" : "warn"} />
-            <StatRow label="Last updated" value={formatDate(status?.ai_last_updated ?? null)} />
-          </DetailCard>
-
-          <DetailCard icon={Database} title="AI Queue" status={toLevel(status?.queue_health)} loading={loading}>
-            <StatRow label="Pending" value={status?.queue_pending ?? "—"} highlight={status?.queue_pending === 0 ? "good" : "warn"} />
-            <StatRow label="Processing" value={status?.queue_processing ?? "—"} />
-            <StatRow label="Complete" value={status?.queue_complete?.toLocaleString() ?? "—"} highlight="good" />
-            <StatRow label="Failed" value={status?.queue_failed ?? "—"} highlight={status?.queue_failed === 0 ? "good" : "bad"} />
-          </DetailCard>
-
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Actions</p>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <Button
-                variant="default"
-                size="sm"
-                disabled={isActing}
-                onClick={() => runAction("controller", "AFL pipeline controller", async () => {
-                  const { error } = await supabase.rpc("run_afl_pipeline_controller");
-                  if (error) throw error;
-                })}
-                className="justify-start"
-              >
-                {actionRunning === "controller" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-                Run AFL Pipeline
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isActing}
-                onClick={() => runAction("rankings", "Rankings cache refresh", async () => {
-                  const { error } = await supabase.schema("afl" as never).rpc("refresh_player_rankings_cache");
-                  if (error) throw error;
-                })}
-                className="justify-start"
-              >
-                {actionRunning === "rankings" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <ListOrdered className="h-4 w-4 mr-2" />}
-                Refresh Rankings Cache
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isActing}
-                onClick={() => runAction("market", "Market Watch refresh", async () => {
-                  const { error } = await supabase.rpc("fn_refresh_market_watch");
-                  if (error) throw error;
-                })}
-                className="justify-start"
-              >
-                {actionRunning === "market" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <TrendingUp className="h-4 w-4 mr-2" />}
-                Refresh Market Watch
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isActing}
-                onClick={() => runAction("edge", "Edge Board refresh", async () => {
-                  const { error } = await supabase.rpc("fn_refresh_edge_board");
-                  if (error) throw error;
-                })}
-                className="justify-start"
-              >
-                {actionRunning === "edge" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Grid className="h-4 w-4 mr-2" />}
-                Refresh Edge Board
-              </Button>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-3">For AI queue controls and all other pipeline actions, go to <strong>Operations</strong>.</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Cron Monitor + Logs */}
-      <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Cron Jobs & Logs</p>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <CronJobMonitor jobs={cronJobs} loading={loading} />
-          <SystemLogsPanel logs={logs} loading={loading} />
-        </div>
-      </div>
+          {/* Command Logs */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-sm font-semibold">
+                <span className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                  Command History
+                </span>
+                <Button variant="ghost" size="sm" onClick={fetchCommandLogs} disabled={logsLoading} className="h-7 text-xs">
+                  <RefreshCw className={`h-3 w-3 mr-1 ${logsLoading ? "animate-spin" : ""}`} />
+                  Refresh
+                </Button>
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">Last 30 commands run from this panel — stored in admin.command_logs</p>
+            </CardHeader>
+            <CardContent>
+              <CommandLogsPanel logs={commandLogs} loading={logsLoading} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
     </div>
   );

@@ -1,21 +1,17 @@
 import { lazy, Suspense } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import {
-  RefreshCw, Shield, Terminal, Server, ChartBar as BarChart3,
-  Zap, Database, Activity, Users, ShieldAlert,
-} from "lucide-react";
+import { RefreshCw, Shield, Terminal, HeartPulse, Zap, Database, Activity, Users, SquareCheck as CheckSquare, ChartBar as BarChart3 } from "lucide-react";
 import { AdminUIStateProvider, useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
 
 const TABS: { path: string; label: string; icon: React.ElementType }[] = [
   { path: "/admin/overview",             label: "Overview",            icon: Activity },
+  { path: "/admin/health",               label: "Health",              icon: HeartPulse },
   { path: "/admin/command-center",       label: "Command Center",      icon: Terminal },
-  { path: "/admin/data-integrity",       label: "Data Integrity",      icon: ShieldAlert },
-  { path: "/admin/players-intelligence", label: "Player Intelligence", icon: Users },
-  { path: "/admin/pipelines",            label: "Pipelines",           icon: Database },
-  { path: "/admin/ai-content",           label: "AI / Content",        icon: Zap },
-  { path: "/admin/analytics",            label: "Analytics",           icon: BarChart3 },
-  { path: "/admin/system-health",        label: "System Health",       icon: Server },
+  { path: "/admin/analytics",            label: "User Metrics",        icon: Users },
+  { path: "/admin/players-intelligence", label: "Player Data",         icon: Database },
+  { path: "/admin/ai-content",           label: "Marketing",           icon: Zap },
+  { path: "/admin/todo",                 label: "To Do",               icon: CheckSquare },
 ];
 
 function TabLoadingFallback() {
@@ -113,13 +109,12 @@ function AdminShellWithProvider() {
 }
 
 export const AdminOverview            = lazy(() => import("@/features/admin/pages/AdminDashboard"));
+export const AdminHealth              = lazy(() => import("@/features/admin/pages/AdminHealth"));
 export const AdminCommandCenter       = lazy(() => import("@/features/admin/command-center/AdminCommandCenter"));
-export const AdminDataIntegrity       = lazy(() => import("@/features/admin/pages/AdminDataIntegrity"));
 export const AdminPlayersIntelligence = lazy(() => import("@/features/admin/pages/AdminPlayersIntelligence"));
-export const AdminPipelines           = lazy(() => import("@/features/admin/pages/AdminPipelines"));
 export const AdminAIContent           = lazy(() => import("@/features/admin/pages/AdminAIContent"));
 export const AdminAnalytics           = lazy(() => import("@/features/admin/pages/AdminAnalytics"));
-export const AdminSystemHealth        = lazy(() => import("@/features/admin/pages/AdminSystemHealth"));
+export const AdminTodo                = lazy(() => import("@/features/admin/pages/AdminTodo"));
 
 export { AdminShellWithProvider as AdminShell };
 export default AdminShellWithProvider;

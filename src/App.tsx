@@ -23,13 +23,12 @@ import NotFound from "@/pages/NotFound";
 import {
   AdminShell,
   AdminOverview,
+  AdminHealth,
   AdminCommandCenter,
-  AdminDataIntegrity,
   AdminPlayersIntelligence,
-  AdminPipelines,
   AdminAIContent,
-  AdminSystemHealth,
   AdminAnalytics,
+  AdminTodo,
 } from "@/pages/Admin";
 
 const NeekoPlusPurchase = React.lazy(() => import("@/pages/NeekoPlusPurchase"));
@@ -155,13 +154,15 @@ function App() {
       >
         <Route index element={<Navigate to="/admin/overview" replace />} />
         <Route path="overview"              element={<S fallback={Generic}><AdminOverview /></S>} />
+        <Route path="health"                element={<S fallback={Generic}><AdminHealth /></S>} />
         <Route path="command-center"        element={<S fallback={Generic}><AdminCommandCenter /></S>} />
-        <Route path="data-integrity"        element={<S fallback={Generic}><AdminDataIntegrity /></S>} />
         <Route path="players-intelligence"  element={<S fallback={Generic}><AdminPlayersIntelligence /></S>} />
-        <Route path="pipelines"             element={<S fallback={Generic}><AdminPipelines /></S>} />
         <Route path="ai-content"            element={<S fallback={Generic}><AdminAIContent /></S>} />
         <Route path="analytics"             element={<S fallback={Generic}><AdminAnalytics /></S>} />
-        <Route path="system-health"         element={<S fallback={Generic}><AdminSystemHealth /></S>} />
+        <Route path="todo"                  element={<S fallback={Generic}><AdminTodo /></S>} />
+        <Route path="data-integrity"        element={<Navigate to="/admin/health" replace />} />
+        <Route path="pipelines"             element={<Navigate to="/admin/command-center" replace />} />
+        <Route path="system-health"         element={<Navigate to="/admin/health" replace />} />
       </Route>
 
       <Route

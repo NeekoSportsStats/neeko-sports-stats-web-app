@@ -199,7 +199,7 @@ export default function AdminAnalytics() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold">Analytics</h2>
+          <h2 className="text-base font-semibold">User Metrics</h2>
           <p className="text-xs text-muted-foreground mt-0.5">Site usage, visitor intelligence, and growth metrics.</p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchAll} disabled={isLoading}>
