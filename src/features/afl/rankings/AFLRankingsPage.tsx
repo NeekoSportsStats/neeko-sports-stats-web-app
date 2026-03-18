@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Search, Clock, X, Lock } from "lucide-react";
+import { Search, Clock, X, Lock, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
@@ -205,6 +205,7 @@ export default function AFLRankingsPage() {
   const [sortKey, setSortKey] = useState<SortKey>(TAB_DEFAULT_SORT["best"]);
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [updatedAt, setUpdatedAt] = useState<{ ts: string; round: string } | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -346,6 +347,23 @@ export default function AFLRankingsPage() {
     fetchRankings();
   }, [fetchRankings]);
 
+  async function handleRefresh() {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    track("rankings_refresh_click");
+    try {
+      await fetchRankings();
+      try {
+        const { data, error } = await supabase.rpc("get_rankings_updated_at");
+        if (!error && data && Array.isArray(data) && data[0]) {
+          setUpdatedAt({ ts: data[0].updated_at, round: data[0].round_label ?? "Current Round" });
+        }
+      } catch { /* ignore */ }
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
   const PREMIUM_TABS: RankingsTab[] = ["value", "projection"];
 
   function handleTabChange(tab: RankingsTab) {
@@ -473,6 +491,15 @@ export default function AFLRankingsPage() {
                 )}
               </div>
             )}
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              title="Refresh rankings data"
+              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-white/50 hover:border-white/20 hover:text-white/70 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <RefreshCw size={12} className={isRefreshing ? "animate-spin" : ""} />
+              <span className="hidden sm:inline">{isRefreshing ? "Refreshing..." : "Refresh"}</span>
+            </button>
           </div>
         </div>
         {updatedAt && (

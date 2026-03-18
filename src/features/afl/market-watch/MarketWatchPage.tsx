@@ -30,7 +30,6 @@ export default function MarketWatchPage() {
   const [summary, setSummary] = useState<MWSummary | null>(null);
   const [status, setStatus] = useState<MWStatus | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
-  const fetchedRef = useRef(false);
   const isPremiumRef = useRef(isPremium);
 
   const [showUpgrade, setShowUpgrade] = useState(false);
@@ -78,8 +77,6 @@ export default function MarketWatchPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (fetchedRef.current) return;
-    fetchedRef.current = true;
     fetchData(isPremiumRef.current).then(() => setLastUpdated(new Date()));
   }, [authLoading, fetchData]);
 
