@@ -3,7 +3,9 @@ import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Users, TrendingUp, TrendingDown, TriangleAlert as AlertTriangle, Gem, Flame, Shield, Crown, ChevronDown, ChevronUp, ChartBar as BarChart3, Database, DollarSign, Swords, Upload, CircleCheck as CheckCircle2, Circle as XCircle } from "lucide-react";
+import { RefreshCw, Users, TrendingUp, TrendingDown, TriangleAlert as AlertTriangle, Gem, Flame, Shield, Crown, ChevronDown, ChevronUp, ChartBar as BarChart3, Database, DollarSign, Swords } from "lucide-react";
+import { FantasyPricesTab } from "../price-ingest/FantasyPricesTab";
+import { NameResolverTab } from "../price-ingest/NameResolverTab";
 
 type MainTab = "players" | "projections" | "rankings-source" | "fantasy-prices" | "player-metrics";
 
@@ -77,15 +79,7 @@ interface RankingsSourceRow {
   price: number;
 }
 
-interface PriceImportRow {
-  raw: string;
-  name: string;
-  price: number;
-  matched: boolean;
-  player_id?: number;
-  existing_price?: number;
-  status: "new" | "duplicate" | "unmatched";
-}
+type PriceSubTab = "prices" | "name-resolver";
 
 type MetricTabKey =
   | "hot" | "cold" | "overrated" | "undervalued"
@@ -381,181 +375,22 @@ function RankingsSourceTab({ players, loading }: { players: PlayerRow[]; loading
   );
 }
 
-function parsePriceLine(line: string): { name: string; price: number } | null {
-  const trimmed = line.trim();
-  if (!trimmed) return null;
-  const match = trimmed.match(/^(.+?)\s+(\d[\d,]+)\s*$/);
-  if (!match) return null;
-  const name = match[1].trim();
-  const price = parseInt(match[2].replace(/,/g, ""), 10);
-  if (isNaN(price) || price < 100_000 || price > 2_000_000) return null;
-  return { name, price };
-}
+const PRICE_SUB_TABS: { id: PriceSubTab; label: string }[] = [
+  { id: "prices",        label: "Fantasy Prices" },
+  { id: "name-resolver", label: "Name Resolver" },
+];
 
-function FantasyPricesTab({ players }: { players: PlayerRow[] }) {
-  const [rawInput, setRawInput] = useState("");
-  const [parsed, setParsed] = useState<PriceImportRow[]>([]);
-  const [step, setStep] = useState<"input" | "preview" | "done">("input");
-  const [inserting, setInserting] = useState(false);
-  const [insertResult, setInsertResult] = useState<{ inserted: number; skipped: number } | null>(null);
-
-  function handleParse() {
-    const lines = rawInput.split("\n").filter(l => l.trim());
-    const result: PriceImportRow[] = [];
-
-    for (const line of lines) {
-      const parsed = parsePriceLine(line);
-      if (!parsed) {
-        result.push({ raw: line, name: line, price: 0, matched: false, status: "unmatched" });
-        continue;
-      }
-
-      const nameLower = parsed.name.toLowerCase();
-      const match = players.find(p => {
-        const pLower = p.player_name.toLowerCase();
-        return pLower === nameLower || pLower.includes(nameLower) || nameLower.includes(pLower.split(" ").pop() ?? "");
-      });
-
-      if (!match) {
-        result.push({ raw: line, name: parsed.name, price: parsed.price, matched: false, status: "unmatched" });
-      } else if (match.price === parsed.price) {
-        result.push({ raw: line, name: parsed.name, price: parsed.price, matched: true, player_id: match.player_id, existing_price: match.price, status: "duplicate" });
-      } else {
-        result.push({ raw: line, name: parsed.name, price: parsed.price, matched: true, player_id: match.player_id, existing_price: match.price, status: "new" });
-      }
-    }
-
-    setParsed(result);
-    setStep("preview");
-  }
-
-  async function handleInsert() {
-    const toInsert = parsed.filter(r => r.status === "new" && r.player_id);
-    if (toInsert.length === 0) return;
-
-    setInserting(true);
-    let inserted = 0;
-    let skipped = 0;
-
-    for (const row of toInsert) {
-      const { error } = await supabase.from("afl_player_prices_import").insert({
-        player_id: row.player_id,
-        price: row.price,
-        source: "admin_paste",
-        imported_at: new Date().toISOString(),
-      });
-      if (error) {
-        skipped++;
-      } else {
-        inserted++;
-      }
-    }
-
-    setInsertResult({ inserted, skipped });
-    setInserting(false);
-    setStep("done");
-  }
-
-  const newCount = parsed.filter(r => r.status === "new").length;
-  const dupCount = parsed.filter(r => r.status === "duplicate").length;
-  const unmatchedCount = parsed.filter(r => r.status === "unmatched").length;
-
-  if (step === "done" && insertResult) {
-    return (
-      <div className="space-y-4">
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-6 py-8 text-center">
-          <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
-          <h3 className="text-base font-semibold">Import Complete</h3>
-          <p className="text-sm text-muted-foreground mt-1">{insertResult.inserted} prices inserted · {insertResult.skipped} skipped (errors)</p>
-        </div>
-        <Button variant="outline" onClick={() => { setStep("input"); setRawInput(""); setParsed([]); setInsertResult(null); }}>
-          Import More
-        </Button>
-      </div>
-    );
-  }
-
+function FantasyPricesSection() {
+  const [subTab, setSubTab] = useState<PriceSubTab>("prices");
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-amber-500/20 bg-amber-950/10 px-4 py-3 text-sm text-amber-300">
-        <strong>Safe insert only.</strong> Existing prices are never overwritten — only new/changed prices are inserted. Format: <code className="font-mono text-xs">M GAWN 1182000</code> (one player per line).
-      </div>
-
-      {step === "input" && (
-        <>
-          <textarea
-            value={rawInput}
-            onChange={e => setRawInput(e.target.value)}
-            placeholder={"M GAWN 1182000\nP LAIRD 987500\nL NEALE 945000"}
-            rows={12}
-            className="w-full border border-border rounded-md px-3 py-2 text-sm font-mono bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y"
-          />
-          <div className="flex items-center gap-3">
-            <Button onClick={handleParse} disabled={!rawInput.trim()}>
-              <Upload className="h-4 w-4 mr-2" />
-              Parse & Preview
-            </Button>
-            <span className="text-xs text-muted-foreground">{rawInput.split("\n").filter(l => l.trim()).length} lines</span>
-          </div>
-        </>
-      )}
-
-      {step === "preview" && (
-        <>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-center">
-              <div className="text-2xl font-bold text-emerald-400 tabular-nums">{newCount}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">New / Changed</div>
-            </div>
-            <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 text-center">
-              <div className="text-2xl font-bold tabular-nums">{dupCount}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Already Same</div>
-            </div>
-            <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-center">
-              <div className="text-2xl font-bold text-red-400 tabular-nums">{unmatchedCount}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Unmatched</div>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/40">
-                  <th className="text-left py-2 pr-3 text-xs font-medium text-muted-foreground uppercase">Status</th>
-                  <th className="text-left py-2 pr-3 text-xs font-medium text-muted-foreground uppercase">Name (parsed)</th>
-                  <th className="text-right py-2 pr-3 text-xs font-medium text-muted-foreground uppercase">New Price</th>
-                  <th className="text-right py-2 text-xs font-medium text-muted-foreground uppercase">Existing</th>
-                </tr>
-              </thead>
-              <tbody>
-                {parsed.map((row, i) => (
-                  <tr key={i} className="border-b border-border/20 last:border-0 hover:bg-muted/20">
-                    <td className="py-1.5 pr-3">
-                      {row.status === "new" && <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/25 text-[10px]">NEW</Badge>}
-                      {row.status === "duplicate" && <Badge variant="secondary" className="text-[10px]">SAME</Badge>}
-                      {row.status === "unmatched" && <Badge className="bg-red-500/15 text-red-400 border-red-500/25 text-[10px]">NO MATCH</Badge>}
-                    </td>
-                    <td className="py-1.5 pr-3 font-medium">{row.name}</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums font-mono text-xs">{row.price ? fmtPrice(row.price) : "—"}</td>
-                    <td className="py-1.5 text-right tabular-nums font-mono text-xs text-muted-foreground">{row.existing_price ? fmtPrice(row.existing_price) : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button onClick={handleInsert} disabled={newCount === 0 || inserting}>
-              {inserting ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-              Insert {newCount} New Prices
-            </Button>
-            <Button variant="outline" onClick={() => setStep("input")} disabled={inserting}>
-              Back
-            </Button>
-            {newCount === 0 && <span className="text-xs text-muted-foreground">No new prices to insert.</span>}
-          </div>
-        </>
-      )}
+      <TabStrip
+        tabs={PRICE_SUB_TABS}
+        activeId={subTab}
+        onChange={id => setSubTab(id as PriceSubTab)}
+      />
+      {subTab === "prices"        && <FantasyPricesTab />}
+      {subTab === "name-resolver" && <NameResolverTab />}
     </div>
   );
 }
@@ -735,7 +570,7 @@ export default function AdminPlayersIntelligence() {
         {activeTab === "players"         && <PlayersTab players={players} loading={loading} onRefresh={fetchPlayers} />}
         {activeTab === "projections"     && <ProjectionsTab players={players} loading={loading} />}
         {activeTab === "rankings-source" && <RankingsSourceTab players={players} loading={loading} />}
-        {activeTab === "fantasy-prices"  && <FantasyPricesTab players={players} />}
+        {activeTab === "fantasy-prices"  && <FantasyPricesSection />}
         {activeTab === "player-metrics"  && <PlayerMetricsTab players={players} loading={loading} />}
       </div>
     </div>

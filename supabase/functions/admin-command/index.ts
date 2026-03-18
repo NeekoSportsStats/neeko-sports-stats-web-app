@@ -101,6 +101,50 @@ async function dispatchCommand(
       case "health_check":
         result = { status: "ok", timestamp: new Date().toISOString() };
         break;
+
+      case "preview_price_ingest": {
+        const previewRows = payload.rows as unknown[];
+        if (!Array.isArray(previewRows) || previewRows.length === 0) {
+          return { success: false, error: "rows must be a non-empty array" };
+        }
+        const { data: previewData, error: previewErr } = await admin
+          .schema("afl" as never)
+          .rpc("preview_price_ingest" as never, { p_rows: previewRows } as never);
+        if (previewErr) throw new Error((previewErr as { message: string }).message);
+        result = previewData;
+        break;
+      }
+
+      case "process_price_ingest": {
+        const ingestRows = payload.rows as unknown[];
+        if (!Array.isArray(ingestRows) || ingestRows.length === 0) {
+          return { success: false, error: "rows must be a non-empty array" };
+        }
+        const { data: ingestData, error: ingestErr } = await admin
+          .schema("afl" as never)
+          .rpc("process_price_ingest" as never, { p_rows: ingestRows } as never);
+        if (ingestErr) throw new Error((ingestErr as { message: string }).message);
+        result = ingestData;
+        break;
+      }
+
+      case "resolve_player_name": {
+        const normName = payload.normalized_name as string;
+        const resolvePlayerId = payload.player_id as number;
+        if (!normName || !resolvePlayerId) {
+          return { success: false, error: "normalized_name and player_id are required" };
+        }
+        const { data: resolveData, error: resolveErr } = await admin
+          .schema("afl" as never)
+          .rpc("resolve_player_name" as never, {
+            p_normalized_name: normName,
+            p_player_id: resolvePlayerId,
+          } as never);
+        if (resolveErr) throw new Error((resolveErr as { message: string }).message);
+        result = resolveData;
+        break;
+      }
+
       default:
         return { success: false, error: `Unknown command: ${command}` };
     }
