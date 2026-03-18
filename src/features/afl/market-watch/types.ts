@@ -1,5 +1,7 @@
 export type MWCategory = "buy" | "sell_now" | "sell_consider" | "cash_cow" | "fade" | "monitor";
 
+export type MWCategoryFilter = "all" | "buy" | "sell" | "cash_cow" | "trap";
+
 export interface MWPlayerRow {
   snapshot_id: string;
   player_id: number;
@@ -20,9 +22,9 @@ export interface MWPlayerRow {
   projected_price_r3: number | null;
   category: MWCategory;
   category_reason: string;
-  action: "BUY" | "SELL" | "HOLD";
+  action: "BUY" | "SELL" | "HOLD" | "AVOID";
   trade_score: number;
-  reasons: string[];
+  reasons: Record<string, unknown>;
   neeko_rating: number | null;
   consistency_score: number | null;
   projection_confidence: number | null;
@@ -35,35 +37,8 @@ export interface MWPlayerRow {
   momentum_label: "rising" | "improving" | "stable" | "cooling" | "falling" | null;
 }
 
-export interface MWBestTrade {
-  trade_id: string;
-  snapshot_id: string;
-  out_player_id: number;
-  in_player_id: number;
-  out_player_name: string;
-  in_player_name: string;
-  out_team: string;
-  in_team: string;
-  out_position: string;
-  in_position: string;
-  out_price: number;
-  in_price: number;
-  out_projection?: number | null;
-  in_projection?: number | null;
-  out_expected_change?: number | null;
-  in_expected_change?: number | null;
-  projected_points_gain: number;
-  expected_price_gain: number;
-  risk_change: number;
-  confidence: number;
-  rationale: string;
-  season: number;
-  round_number: number;
-  snapshot_updated_at: string;
-}
-
 export interface MWSummaryCard {
-  card_type: "best_trade" | "best_cow" | "biggest_trap";
+  card_type: "best_cow" | "biggest_trap" | string;
   label_a: string | null;
   label_b: string | null;
   metric_a: number | null;
@@ -92,37 +67,4 @@ export interface MWSummary {
   trap_count: number;
   monitor_count: number;
   latest_update: string | null;
-}
-
-export interface MWAISummary {
-  season: number;
-  round_number: number;
-  generated_at: string;
-  summary: string;
-}
-
-export interface MarketRow {
-  player_id: number | null;
-  player_name: string;
-  team: string;
-  position: string | null;
-  price: number | null;
-  breakeven: number | null;
-  avg_2025: number | null;
-  games_2025: number | null;
-  projection_final: number | null;
-  ceiling_estimate: number | null;
-  floor_estimate: number | null;
-  consistency_score: number | null;
-  risk_rating: number | null;
-  projection_confidence: number | null;
-  neeko_rating: number | null;
-  ai_recommendation: string | null;
-  recommendation_why: string | null;
-  trade_signal: "BUY" | "SELL" | "HOLD" | null;
-  trade_score: number | null;
-  price_momentum: number | null;
-  breakout_flag: boolean | null;
-  breakout_score: number | null;
-  volatility_level: "LOW" | "MEDIUM" | "HIGH" | null;
 }
