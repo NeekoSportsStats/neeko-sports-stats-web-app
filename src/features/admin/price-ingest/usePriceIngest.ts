@@ -1,6 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import type { ParsedPriceRow, PreviewRow, IngestResult } from "./types";
+import type { MappingRow, IngestByIdResult, PlayerOption } from "./types";
 
 async function callAdminCommand(command: string, payload: Record<string, unknown>) {
   const { data: { session } } = await supabase.auth.getSession();
@@ -21,48 +21,45 @@ async function callAdminCommand(command: string, payload: Record<string, unknown
   return json.result;
 }
 
-export function usePriceIngest() {
-  const [previewing, setPreviewing] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [previewRows, setPreviewRows] = useState<PreviewRow[] | null>(null);
-  const [ingestResult, setIngestResult] = useState<IngestResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export function usePlayerOptions(): PlayerOption[] {
+  const [players, setPlayers] = useState<PlayerOption[]>([]);
 
-  const preview = useCallback(async (rows: ParsedPriceRow[]) => {
-    setError(null);
-    setPreviewing(true);
-    try {
-      const result = await callAdminCommand("preview_price_ingest", { rows });
-      setPreviewRows(result as PreviewRow[]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Preview failed");
-    } finally {
-      setPreviewing(false);
-    }
+  useEffect(() => {
+    supabase
+      .schema("afl" as never)
+      .from("players" as never)
+      .select("player_id,player_name,position_group")
+      .eq("active" as never, true)
+      .order("player_name" as never)
+      .limit(1500)
+      .then(({ data }) => {
+        if (data) setPlayers(data as unknown as PlayerOption[]);
+      });
   }, []);
 
-  const confirm = useCallback(async (rows: ParsedPriceRow[]) => {
-    setError(null);
-    setConfirming(true);
+  return players;
+}
+
+export function useCommitPrices() {
+  const [committing, setCommitting] = useState(false);
+
+  const commitPrices = useCallback(async (rows: MappingRow[]): Promise<IngestByIdResult | null> => {
+    setCommitting(true);
     try {
-      const result = await callAdminCommand("process_price_ingest", { rows });
-      setIngestResult(result as IngestResult);
-      return result as IngestResult;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Insert failed");
+      const payload = rows
+        .filter(r => r.player_id !== null)
+        .map(r => ({ player_id: r.player_id, cleaned_price: r.cleaned_price }));
+
+      const result = await callAdminCommand("commit_price_ingest", { rows: payload });
+      return result as IngestByIdResult;
+    } catch {
       return null;
     } finally {
-      setConfirming(false);
+      setCommitting(false);
     }
   }, []);
 
-  const reset = useCallback(() => {
-    setPreviewRows(null);
-    setIngestResult(null);
-    setError(null);
-  }, []);
-
-  return { preview, confirm, reset, previewing, confirming, previewRows, ingestResult, error };
+  return { committing, commitPrices };
 }
 
 export async function resolvePlayerName(

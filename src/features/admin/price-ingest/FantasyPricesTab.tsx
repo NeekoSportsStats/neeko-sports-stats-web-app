@@ -3,95 +3,108 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Upload, FileText, RefreshCw, CircleCheck as CheckCircle,
-  TriangleAlert as AlertTriangle, ArrowLeft, Eye,
+  TriangleAlert as AlertTriangle, ArrowLeft,
 } from "lucide-react";
 import { parseCSVText, parseCSVFile, fmtPrice, type ParseError } from "./parseUtils";
-import { usePriceIngest } from "./usePriceIngest";
-import type { ParsedPriceRow, PreviewRow } from "./types";
+import { usePlayerOptions, useCommitPrices } from "./usePriceIngest";
+import { PlayerSearchDropdown } from "./PlayerSearchDropdown";
+import type { ParsedPriceRow, MappingRow, IngestByIdResult } from "./types";
 
-type Step = "input" | "preview" | "done";
+type Step = "input" | "mapping" | "done";
 
-function StatusBadge({ status }: { status: PreviewRow["status"] }) {
-  if (status === "matched")
-    return <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/25 text-[10px]">MATCHED</Badge>;
-  if (status === "duplicate")
-    return <Badge variant="secondary" className="text-[10px]">SAME PRICE</Badge>;
-  return <Badge className="bg-red-500/15 text-red-400 border-red-500/25 text-[10px]">UNMATCHED</Badge>;
+function extractLastName(sourceName: string): string {
+  const parts = sourceName.trim().split(/\s+/);
+  return parts.length >= 2 ? parts[parts.length - 1].toLowerCase() : sourceName.toLowerCase();
+}
+
+function sortByLastName(rows: MappingRow[]): MappingRow[] {
+  return [...rows].sort((a, b) =>
+    extractLastName(a.source_name).localeCompare(extractLastName(b.source_name))
+  );
+}
+
+function MappingStatusBadge({ row }: { row: MappingRow }) {
+  if (row.player_id !== null)
+    return <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/25 text-[10px]">MAPPED</Badge>;
+  return <Badge className="bg-red-500/15 text-red-400 border-red-500/25 text-[10px]">UNMAPPED</Badge>;
 }
 
 export function FantasyPricesTab() {
   const [step, setStep] = useState<Step>("input");
   const [pasteText, setPasteText] = useState("");
-  const [parsedRows, setParsedRows] = useState<ParsedPriceRow[]>([]);
   const [parseErrors, setParseErrors] = useState<ParseError[]>([]);
   const [inputMode, setInputMode] = useState<"paste" | "csv">("paste");
+  const [mappingRows, setMappingRows] = useState<MappingRow[]>([]);
+  const [commitResult, setCommitResult] = useState<IngestByIdResult | null>(null);
+  const [commitError, setCommitError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const { preview, confirm, reset, previewing, confirming, previewRows, ingestResult, error } = usePriceIngest();
+  const players = usePlayerOptions();
+  const { committing, commitPrices } = useCommitPrices();
 
-  function handleParse(rows: ParsedPriceRow[], errors: ParseError[]) {
-    setParsedRows(rows);
-    setParseErrors(errors);
+  function buildMappingRows(parsed: ParsedPriceRow[]): MappingRow[] {
+    return sortByLastName(
+      parsed.map(r => ({ source_name: r.source_name, cleaned_price: r.cleaned_price, player_id: null, player_name: null }))
+    );
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const result = await parseCSVFile(file);
-    handleParse(result.rows, result.errors);
+    setParseErrors(result.errors);
+    setMappingRows(buildMappingRows(result.rows));
   }
 
   function handlePasteChange(text: string) {
     setPasteText(text);
     const result = parseCSVText(text);
-    handleParse(result.rows, result.errors);
+    setParseErrors(result.errors);
+    setMappingRows(buildMappingRows(result.rows));
   }
 
-  async function handlePreview() {
-    if (parsedRows.length === 0) return;
-    await preview(parsedRows);
-    setStep("preview");
+  function handlePlayerSelect(sourceName: string, playerId: number | null, playerName: string | null) {
+    setMappingRows(prev =>
+      prev.map(r => r.source_name === sourceName ? { ...r, player_id: playerId, player_name: playerName } : r)
+    );
   }
 
-  async function handleConfirm() {
-    if (!previewRows) return;
-    const matchedRows = parsedRows.filter(r => {
-      const pr = previewRows.find(p => p.source_name === r.source_name);
-      return pr?.status === "matched";
-    });
-    const result = await confirm(matchedRows);
-    if (result) setStep("done");
+  async function handleCommit() {
+    const mapped = mappingRows.filter(r => r.player_id !== null);
+    if (mapped.length === 0) return;
+    setCommitError(null);
+    const result = await commitPrices(mapped);
+    if (result) {
+      setCommitResult(result);
+      setStep("done");
+    } else {
+      setCommitError("Commit failed — check admin logs");
+    }
   }
 
   function handleReset() {
-    reset();
     setStep("input");
     setPasteText("");
-    setParsedRows([]);
+    setMappingRows([]);
     setParseErrors([]);
+    setCommitResult(null);
+    setCommitError(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  const matchedCount = previewRows?.filter(r => r.status === "matched").length ?? 0;
-  const duplicateCount = previewRows?.filter(r => r.status === "duplicate").length ?? 0;
-  const unmatchedCount = previewRows?.filter(r => r.status === "unmatched").length ?? 0;
+  const mappedCount = mappingRows.filter(r => r.player_id !== null).length;
+  const unmappedCount = mappingRows.filter(r => r.player_id === null).length;
 
-  if (step === "done" && ingestResult) {
+  if (step === "done" && commitResult) {
     return (
       <div className="space-y-5">
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-6 py-10 text-center">
           <CheckCircle className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
           <h3 className="text-base font-semibold">Import Complete</h3>
           <p className="text-sm text-muted-foreground mt-1.5">
-            {ingestResult.inserted} prices inserted &nbsp;·&nbsp; {ingestResult.skipped_dup} already existed &nbsp;·&nbsp; {ingestResult.unmatched} unmatched (check Name Resolver)
+            {commitResult.inserted} prices inserted &nbsp;·&nbsp; {commitResult.skipped_dup} already existed
           </p>
         </div>
-        {ingestResult.unmatched > 0 && (
-          <div className="rounded-lg border border-amber-500/25 bg-amber-950/10 px-4 py-3 text-sm text-amber-300 flex items-start gap-2.5">
-            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-            <span>{ingestResult.unmatched} player names could not be matched. Switch to the <strong>Name Resolver</strong> tab to map them, then re-run the import.</span>
-          </div>
-        )}
         <Button variant="outline" onClick={handleReset}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Import More
@@ -104,7 +117,7 @@ export function FantasyPricesTab() {
     <div className="space-y-5">
 
       <div className="rounded-lg border border-amber-500/20 bg-amber-950/10 px-4 py-3 text-sm text-amber-300">
-        <strong>Safe insert only.</strong> Existing prices are never overwritten. Unmatched names are stored in the Name Resolver for manual mapping.
+        <strong>Interactive mapper.</strong> Paste your price list, then assign each player using the search dropdown. Only mapped rows are inserted. Existing prices are never overwritten.
         <br />
         <span className="text-amber-400/70 text-xs mt-0.5 block">
           Format: Column 1 = player name (e.g. <code className="font-mono">N Daicos</code>), Column 2 = price (e.g. <code className="font-mono">$1,182,000</code>). Comma or tab separated.
@@ -154,10 +167,10 @@ export function FantasyPricesTab() {
             </div>
           )}
 
-          {parsedRows.length > 0 && (
+          {mappingRows.length > 0 && (
             <div className="flex items-center gap-3 flex-wrap">
               <div className="text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">{parsedRows.length}</span> rows parsed
+                <span className="font-semibold text-foreground">{mappingRows.length}</span> rows parsed
                 {parseErrors.length > 0 && (
                   <span className="text-amber-400 ml-2">· {parseErrors.length} parse errors</span>
                 )}
@@ -177,100 +190,133 @@ export function FantasyPricesTab() {
             </div>
           )}
 
-          {error && (
-            <div className="rounded-lg border border-red-500/25 bg-red-950/15 px-4 py-3 text-sm text-red-400">{error}</div>
-          )}
-
-          <Button onClick={handlePreview} disabled={parsedRows.length === 0 || previewing}>
-            {previewing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Eye className="h-4 w-4 mr-2" />}
-            Preview {parsedRows.length > 0 ? `${parsedRows.length} rows` : ""}
+          <Button
+            onClick={() => setStep("mapping")}
+            disabled={mappingRows.length === 0}
+          >
+            Map Players ({mappingRows.length} rows)
           </Button>
         </>
       )}
 
-      {step === "preview" && previewRows && (
-        <>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-lg border border-emerald-500/30 bg-emerald-950/10 px-4 py-3 text-center">
-              <div className="text-2xl font-bold text-emerald-400 tabular-nums">{matchedCount}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Ready to Insert</div>
-            </div>
-            <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 text-center">
-              <div className="text-2xl font-bold tabular-nums">{duplicateCount}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Same Price (skip)</div>
-            </div>
-            <div className="rounded-lg border border-red-500/30 bg-red-950/10 px-4 py-3 text-center">
-              <div className="text-2xl font-bold text-red-400 tabular-nums">{unmatchedCount}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Unmatched</div>
-            </div>
-          </div>
-
-          {unmatchedCount > 0 && (
-            <div className="rounded-lg border border-amber-500/25 bg-amber-950/10 px-4 py-3 text-sm text-amber-300 flex items-start gap-2.5">
-              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>{unmatchedCount} names have no match in the name map. They will be stored in the Name Resolver — use that tab to map them, then re-run.</span>
-            </div>
-          )}
-
-          {error && (
-            <div className="rounded-lg border border-red-500/25 bg-red-950/15 px-4 py-3 text-sm text-red-400">{error}</div>
-          )}
-
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/60 bg-muted/20">
-                  <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-28">Status</th>
-                  <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Input Name</th>
-                  <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Matched Player</th>
-                  <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">New Price</th>
-                  <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Existing</th>
-                </tr>
-              </thead>
-              <tbody>
-                {previewRows.map((row, i) => (
-                  <tr
-                    key={i}
-                    className={`border-b border-border/20 last:border-0 transition-colors ${
-                      row.status === "matched" ? "hover:bg-emerald-950/10"
-                      : row.status === "unmatched" ? "bg-red-950/5 hover:bg-red-950/10"
-                      : "hover:bg-muted/10"
-                    }`}
-                  >
-                    <td className="py-1.5 px-3"><StatusBadge status={row.status} /></td>
-                    <td className="py-1.5 px-3 font-mono text-xs">{row.source_name}</td>
-                    <td className="py-1.5 px-3 font-medium text-xs hidden sm:table-cell">
-                      {row.player_name ?? <span className="text-red-400/70 italic">no match</span>}
-                    </td>
-                    <td className="py-1.5 px-3 text-right tabular-nums font-mono text-xs">
-                      {fmtPrice(row.cleaned_price)}
-                    </td>
-                    <td className="py-1.5 px-3 text-right tabular-nums font-mono text-xs text-muted-foreground hidden sm:table-cell">
-                      {fmtPrice(row.existing_price)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <Button onClick={handleConfirm} disabled={matchedCount === 0 || confirming}>
-              {confirming
-                ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                : <CheckCircle className="h-4 w-4 mr-2" />}
-              Confirm Insert {matchedCount > 0 ? `(${matchedCount} prices)` : ""}
-            </Button>
-            <Button variant="outline" onClick={() => { reset(); setStep("input"); }} disabled={confirming}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            {matchedCount === 0 && (
-              <span className="text-xs text-muted-foreground">No matched prices to insert.</span>
-            )}
-          </div>
-        </>
+      {step === "mapping" && (
+        <MappingStep
+          rows={mappingRows}
+          players={players}
+          mappedCount={mappedCount}
+          unmappedCount={unmappedCount}
+          committing={committing}
+          commitError={commitError}
+          onSelect={handlePlayerSelect}
+          onCommit={handleCommit}
+          onBack={() => setStep("input")}
+        />
       )}
     </div>
+  );
+}
+
+interface MappingStepProps {
+  rows: MappingRow[];
+  players: ReturnType<typeof usePlayerOptions>;
+  mappedCount: number;
+  unmappedCount: number;
+  committing: boolean;
+  commitError: string | null;
+  onSelect: (sourceName: string, playerId: number | null, playerName: string | null) => void;
+  onCommit: () => void;
+  onBack: () => void;
+}
+
+function MappingStep({
+  rows, players, mappedCount, unmappedCount, committing, commitError, onSelect, onCommit, onBack,
+}: MappingStepProps) {
+  return (
+    <>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-lg border border-border bg-muted/10 px-4 py-3 text-center">
+          <div className="text-2xl font-bold tabular-nums">{rows.length}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">Total Rows</div>
+        </div>
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-950/10 px-4 py-3 text-center">
+          <div className="text-2xl font-bold text-emerald-400 tabular-nums">{mappedCount}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">Mapped</div>
+        </div>
+        <div className={`rounded-lg px-4 py-3 text-center border ${unmappedCount > 0 ? "border-red-500/30 bg-red-950/10" : "border-border bg-muted/10"}`}>
+          <div className={`text-2xl font-bold tabular-nums ${unmappedCount > 0 ? "text-red-400" : ""}`}>{unmappedCount}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">Unmapped</div>
+        </div>
+      </div>
+
+      {unmappedCount > 0 && (
+        <div className="rounded-lg border border-amber-500/25 bg-amber-950/10 px-4 py-3 text-sm text-amber-300 flex items-start gap-2.5">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{unmappedCount} rows without a player selected. Only mapped rows will be inserted. Unmapped rows are skipped.</span>
+        </div>
+      )}
+
+      {commitError && (
+        <div className="rounded-lg border border-red-500/25 bg-red-950/15 px-4 py-3 text-sm text-red-400">{commitError}</div>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border/60 bg-muted/20">
+              <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-24">Status</th>
+              <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-32">Input Name</th>
+              <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Map to Player</th>
+              <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-24">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr
+                key={i}
+                className={`border-b border-border/20 last:border-0 transition-colors ${
+                  row.player_id !== null
+                    ? "hover:bg-emerald-950/10"
+                    : "bg-red-950/5 hover:bg-red-950/10"
+                }`}
+              >
+                <td className="py-2 px-3">
+                  <MappingStatusBadge row={row} />
+                </td>
+                <td className="py-2 px-3 font-mono text-xs text-muted-foreground">{row.source_name}</td>
+                <td className="py-2 px-3">
+                  <PlayerSearchDropdown
+                    players={players}
+                    value={row.player_id}
+                    onChange={(id, name) => onSelect(row.source_name, id, name)}
+                  />
+                </td>
+                <td className="py-2 px-3 text-right tabular-nums font-mono text-xs">
+                  {fmtPrice(row.cleaned_price)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button
+          onClick={onCommit}
+          disabled={mappedCount === 0 || committing}
+        >
+          {committing
+            ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            : <CheckCircle className="h-4 w-4 mr-2" />}
+          Commit Prices {mappedCount > 0 ? `(${mappedCount})` : ""}
+        </Button>
+        <Button variant="outline" onClick={onBack} disabled={committing}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+        {mappedCount === 0 && (
+          <span className="text-xs text-muted-foreground">Select at least one player to enable commit.</span>
+        )}
+      </div>
+    </>
   );
 }

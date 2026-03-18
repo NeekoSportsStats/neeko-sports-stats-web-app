@@ -177,6 +177,39 @@ async function dispatchCommand(
         break;
       }
 
+      case "commit_price_ingest": {
+        const commitRows = payload.rows as unknown[];
+        if (!Array.isArray(commitRows)) {
+          return { success: false, error: "rows must be an array" };
+        }
+        if (commitRows.length === 0) {
+          return { success: false, error: "rows must be a non-empty array" };
+        }
+        for (const row of commitRows) {
+          const r = row as Record<string, unknown>;
+          if (typeof r.player_id !== "number") {
+            return { success: false, error: "each row must have a numeric player_id" };
+          }
+          if (typeof r.cleaned_price !== "number") {
+            return { success: false, error: `row player_id=${r.player_id} has invalid cleaned_price (must be number)` };
+          }
+        }
+
+        console.log(`[commit_price_ingest] incoming rows: ${commitRows.length}`);
+
+        const { data: commitData, error: commitErr } = await admin.rpc(
+          "process_price_ingest_by_id_public" as never,
+          { p_rows: commitRows } as never,
+        );
+        if (commitErr) throw new Error((commitErr as { message: string }).message);
+
+        const commitResult = commitData as { inserted: number; skipped_dup: number; total: number };
+        console.log(`[commit_price_ingest] inserted=${commitResult?.inserted} skipped=${commitResult?.skipped_dup}`);
+
+        result = commitData;
+        break;
+      }
+
       case "resolve_player_name": {
         const normName = payload.normalized_name as string;
         const resolvePlayerId = payload.player_id as number;

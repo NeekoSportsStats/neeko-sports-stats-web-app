@@ -13,6 +13,19 @@ export interface PreviewRow {
   status: "matched" | "duplicate" | "unmatched";
 }
 
+export interface MappingRow {
+  source_name: string;
+  cleaned_price: number;
+  player_id: number | null;
+  player_name: string | null;
+}
+
+export interface IngestByIdResult {
+  inserted: number;
+  skipped_dup: number;
+  total: number;
+}
+
 export interface IngestResult {
   inserted: number;
   skipped_dup: number;
