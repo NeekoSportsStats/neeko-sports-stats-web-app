@@ -206,7 +206,41 @@ async function dispatchCommand(
         const commitResult = commitData as { inserted: number; skipped_dup: number; total: number };
         console.log(`[commit_price_ingest] inserted=${commitResult?.inserted} skipped=${commitResult?.skipped_dup}`);
 
-        result = commitData;
+        // ── Post-commit: refresh projections + rankings (best-effort, non-fatal) ──
+        const refreshSteps = {
+          rebuild_projection: { ok: false, error: undefined as string | undefined },
+          refresh_mv:         { ok: false, error: undefined as string | undefined },
+          refresh_rankings:   { ok: false, error: undefined as string | undefined },
+        };
+
+        try {
+          await admin.schema("afl" as never).rpc("rebuild_player_projection" as never);
+          refreshSteps.rebuild_projection.ok = true;
+          console.log("[commit_price_ingest] rebuild_player_projection: ok");
+        } catch (e) {
+          refreshSteps.rebuild_projection.error = e instanceof Error ? e.message : String(e);
+          console.warn("[commit_price_ingest] rebuild_player_projection failed:", refreshSteps.rebuild_projection.error);
+        }
+
+        try {
+          await admin.schema("afl" as never).rpc("refresh_mv_player_projection" as never);
+          refreshSteps.refresh_mv.ok = true;
+          console.log("[commit_price_ingest] refresh_mv_player_projection: ok");
+        } catch (e) {
+          refreshSteps.refresh_mv.error = e instanceof Error ? e.message : String(e);
+          console.warn("[commit_price_ingest] refresh_mv_player_projection failed:", refreshSteps.refresh_mv.error);
+        }
+
+        try {
+          await admin.rpc("refresh_player_rankings_cache" as never);
+          refreshSteps.refresh_rankings.ok = true;
+          console.log("[commit_price_ingest] refresh_player_rankings_cache: ok");
+        } catch (e) {
+          refreshSteps.refresh_rankings.error = e instanceof Error ? e.message : String(e);
+          console.warn("[commit_price_ingest] refresh_player_rankings_cache failed:", refreshSteps.refresh_rankings.error);
+        }
+
+        result = { ...commitResult, refresh: refreshSteps };
         break;
       }
 

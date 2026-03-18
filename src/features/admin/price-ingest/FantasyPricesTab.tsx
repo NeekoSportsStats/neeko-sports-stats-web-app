@@ -165,12 +165,12 @@ export function FantasyPricesTab() {
     const mapped = mappingRows.filter(r => r.player_id !== null);
     if (mapped.length === 0) return;
     setCommitError(null);
-    const result = await commitPrices(mapped);
+    const { result, error } = await commitPrices(mapped);
     if (result) {
       setCommitResult(result);
       setStep("done");
     } else {
-      setCommitError("Commit failed — check admin logs");
+      setCommitError(error ?? "Commit failed — check admin logs");
     }
   }
 
@@ -222,15 +222,61 @@ export function FantasyPricesTab() {
   }, [mappingRows]);
 
   if (step === "done" && commitResult) {
+    const refresh = commitResult.refresh;
+    const allRefreshed = refresh
+      ? refresh.rebuild_projection.ok && refresh.refresh_mv.ok && refresh.refresh_rankings.ok
+      : false;
+    const anyRefreshFailed = refresh
+      ? !refresh.rebuild_projection.ok || !refresh.refresh_mv.ok || !refresh.refresh_rankings.ok
+      : false;
+
+    const refreshSteps = refresh
+      ? [
+          { label: "Projection engine rebuilt", ok: refresh.rebuild_projection.ok, error: refresh.rebuild_projection.error },
+          { label: "Materialized view refreshed", ok: refresh.refresh_mv.ok, error: refresh.refresh_mv.error },
+          { label: "Rankings cache updated", ok: refresh.refresh_rankings.ok, error: refresh.refresh_rankings.error },
+        ]
+      : [];
+
     return (
-      <div className="space-y-5">
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-6 py-10 text-center">
+      <div className="space-y-4">
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-6 py-8 text-center">
           <CheckCircle className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
-          <h3 className="text-base font-semibold">Import Complete</h3>
+          <h3 className="text-base font-semibold">
+            {allRefreshed ? "Prices updated + projections refreshed" : "Import Complete"}
+          </h3>
           <p className="text-sm text-muted-foreground mt-1.5">
             {commitResult.inserted} prices inserted &nbsp;·&nbsp; {commitResult.skipped_dup} already existed
           </p>
         </div>
+
+        {refreshSteps.length > 0 && (
+          <div className="rounded-lg border border-border bg-card px-4 py-3 space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Post-ingest refresh
+            </p>
+            {refreshSteps.map((s, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                {s.ok
+                  ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                  : <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                }
+                <span className={s.ok ? "text-foreground" : "text-amber-400"}>{s.label}</span>
+                {!s.ok && s.error && (
+                  <span className="text-muted-foreground truncate max-w-[240px]" title={s.error}>
+                    — {s.error}
+                  </span>
+                )}
+              </div>
+            ))}
+            {anyRefreshFailed && (
+              <p className="text-[10px] text-amber-400/70 mt-1">
+                Prices were saved. Failed refresh steps can be re-run from the Command Center.
+              </p>
+            )}
+          </div>
+        )}
+
         <Button variant="outline" onClick={handleReset}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Import More

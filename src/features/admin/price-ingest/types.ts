@@ -39,10 +39,20 @@ export interface MappingRow {
   suggestions: PlayerOption[];
 }
 
+export interface RefreshStepResult {
+  ok: boolean;
+  error?: string;
+}
+
 export interface IngestByIdResult {
   inserted: number;
   skipped_dup: number;
   total: number;
+  refresh?: {
+    rebuild_projection: RefreshStepResult;
+    refresh_mv: RefreshStepResult;
+    refresh_rankings: RefreshStepResult;
+  };
 }
 
 export interface IngestResult {

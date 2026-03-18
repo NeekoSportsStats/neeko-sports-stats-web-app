@@ -43,7 +43,7 @@ export function usePlayerOptions(): PlayerOption[] {
 export function useCommitPrices() {
   const [committing, setCommitting] = useState(false);
 
-  const commitPrices = useCallback(async (rows: MappingRow[]): Promise<IngestByIdResult | null> => {
+  const commitPrices = useCallback(async (rows: MappingRow[]): Promise<{ result: IngestByIdResult | null; error: string | null }> => {
     setCommitting(true);
     try {
       const payload = rows
@@ -51,9 +51,9 @@ export function useCommitPrices() {
         .map(r => ({ player_id: r.player_id, cleaned_price: r.cleaned_price }));
 
       const result = await callAdminCommand("commit_price_ingest", { rows: payload });
-      return result as IngestByIdResult;
-    } catch {
-      return null;
+      return { result: result as IngestByIdResult, error: null };
+    } catch (e) {
+      return { result: null, error: e instanceof Error ? e.message : "Commit failed" };
     } finally {
       setCommitting(false);
     }
