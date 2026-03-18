@@ -15,6 +15,7 @@ type Step = "input" | "mapping" | "done";
 
 const GROUP_ORDER: MatchStatus[] = [
   "pending_player_record",
+  "manual_input",
   "manual_required",
   "suggested",
   "manually_matched",
@@ -53,6 +54,12 @@ function StatusBadge({ status, confidence }: StatusBadgeProps) {
         <User className="h-2.5 w-2.5" />MANUAL
       </span>
     );
+  if (status === "manual_input")
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25 whitespace-nowrap">
+        <Clock className="h-2.5 w-2.5" />PENDING PLAYER
+      </span>
+    );
   if (status === "suggested")
     return (
       <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25 whitespace-nowrap">
@@ -75,6 +82,7 @@ function StatusBadge({ status, confidence }: StatusBadgeProps) {
 function rowBgClass(row: MappingRow): string {
   if (row.player_id !== null) return "hover:bg-emerald-950/10";
   if (row.match_status === "pending_player_record") return "bg-red-950/5 hover:bg-red-950/10";
+  if (row.match_status === "manual_input") return "bg-amber-950/5 hover:bg-amber-950/10";
   if (row.match_status === "manual_required") return "bg-orange-950/5 hover:bg-orange-950/10";
   if (row.match_status === "suggested") return "bg-amber-950/5 hover:bg-amber-950/10";
   return "hover:bg-muted/10";
@@ -102,6 +110,7 @@ export function FantasyPricesTab() {
       cleaned_price: r.cleaned_price,
       player_id: null,
       player_name: null,
+      manual_input_name: null,
       match_status: "manual_required" as const,
       confidence: 0,
       suggestions: [],
@@ -128,14 +137,24 @@ export function FantasyPricesTab() {
     setMappingRows(buildMappingRows(result.rows));
   }
 
-  const handlePlayerSelect = useCallback((rowId: string, playerId: number | null, playerName: string | null) => {
+  const handlePlayerSelect = useCallback((rowId: string, playerId: number | null, playerName: string | null, isManualInput?: boolean) => {
     setMappingRows(prev =>
       prev.map(r => {
         if (r.id !== rowId) return r;
+        if (isManualInput) {
+          return {
+            ...r,
+            player_id: null,
+            player_name: null,
+            manual_input_name: playerName,
+            match_status: "manual_input" as const,
+          };
+        }
         return {
           ...r,
           player_id: playerId,
           player_name: playerName,
+          manual_input_name: null,
           match_status: playerId !== null ? "manually_matched" : r.match_status,
         };
       })
@@ -156,7 +175,9 @@ export function FantasyPricesTab() {
   }
 
   async function handleSavePending() {
-    const pending = mappingRows.filter(r => r.match_status === "pending_player_record");
+    const pending = mappingRows.filter(
+      r => r.match_status === "pending_player_record" || r.match_status === "manual_input"
+    );
     if (pending.length === 0) return;
     const result = await savePending(pending);
     if (result) setPendingSaved(true);
@@ -179,7 +200,8 @@ export function FantasyPricesTab() {
         ...r,
         player_id: null,
         player_name: null,
-        match_status: "manual_required" as const,
+        manual_input_name: r.manual_input_name,
+        match_status: r.match_status === "manual_input" ? ("manual_input" as const) : ("manual_required" as const),
         confidence: 0,
         suggestions: [],
       }));
@@ -194,8 +216,9 @@ export function FantasyPricesTab() {
     const suggested = mappingRows.filter(r => r.match_status === "suggested" && r.player_id === null).length;
     const manualReq = mappingRows.filter(r => r.match_status === "manual_required").length;
     const pending = mappingRows.filter(r => r.match_status === "pending_player_record").length;
+    const manualInput = mappingRows.filter(r => r.match_status === "manual_input").length;
     const readyToInsert = auto + manual;
-    return { auto, manual, suggested, manualReq, pending, readyToInsert, total: mappingRows.length };
+    return { auto, manual, suggested, manualReq, pending, manualInput, readyToInsert, total: mappingRows.length };
   }, [mappingRows]);
 
   if (step === "done" && commitResult) {
@@ -341,6 +364,7 @@ interface MappingCounts {
   suggested: number;
   manualReq: number;
   pending: number;
+  manualInput: number;
   readyToInsert: number;
   total: number;
 }
@@ -353,7 +377,7 @@ interface MappingStepProps {
   saving: boolean;
   pendingSaved: boolean;
   commitError: string | null;
-  onSelect: (rowId: string, playerId: number | null, playerName: string | null) => void;
+  onSelect: (rowId: string, playerId: number | null, playerName: string | null, isManualInput?: boolean) => void;
   onCommit: () => void;
   onSavePending: () => void;
   onBack: () => void;
@@ -385,13 +409,14 @@ function MappingStep({
 
   return (
     <>
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-6 lg:grid-cols-7">
         <StatTile label="Total" value={counts.total} />
         <StatTile label="Auto-matched" value={counts.auto} color="emerald" />
         <StatTile label="Manual Match" value={counts.manual} color="emerald" />
         <StatTile label="Suggested" value={counts.suggested} color="amber" />
         <StatTile label="Needs Search" value={counts.manualReq} color="orange" />
-        <StatTile label="Pending" value={counts.pending} color="red" />
+        <StatTile label="Pending Player" value={counts.manualInput} color="amber" />
+        <StatTile label="Not In DB" value={counts.pending} color="red" />
       </div>
 
       {counts.auto > 0 && (
@@ -401,11 +426,22 @@ function MappingStep({
         </div>
       )}
 
-      {counts.pending > 0 && !pendingSaved && (
+      {counts.manualInput > 0 && (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-950/10 px-4 py-2.5 text-sm text-amber-300 flex items-center gap-2">
+          <Clock className="h-4 w-4 shrink-0" />
+          <span>
+            {counts.manualInput} row{counts.manualInput !== 1 ? "s" : ""} marked as <strong>Pending Player</strong> — stored with custom name, will not be inserted until a player record is mapped.
+          </span>
+        </div>
+      )}
+
+      {(counts.pending > 0 || counts.manualInput > 0) && !pendingSaved && (
         <div className="rounded-lg border border-red-500/20 bg-red-950/10 px-4 py-2.5 text-sm text-red-300 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 shrink-0" />
-            <span>{counts.pending} players not in the database. Save for later resolution once records exist.</span>
+            <span>
+              {counts.pending + counts.manualInput} player{counts.pending + counts.manualInput !== 1 ? "s" : ""} unresolved. Save for later resolution once player records exist.
+            </span>
           </div>
           <Button size="sm" variant="outline" onClick={onSavePending} disabled={saving} className="shrink-0 text-xs h-7 border-red-500/30 text-red-400 hover:bg-red-950/20">
             {saving ? <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" /> : <Clock className="h-3 w-3 mr-1.5" />}
@@ -504,6 +540,7 @@ function MappingStep({
 
 const GROUP_LABELS: Partial<Record<MatchStatus, string>> = {
   pending_player_record: "Not in database — pending player record",
+  manual_input: "Custom name entered — pending player record",
   manual_required: "No match found — search manually",
   suggested: "Multiple candidates — select the correct player",
   manually_matched: "Manually matched",
@@ -515,10 +552,10 @@ function MappingTableRow({
 }: {
   row: MappingRow;
   players: ReturnType<typeof usePlayerOptions>;
-  onSelect: (rowId: string, playerId: number | null, playerName: string | null) => void;
+  onSelect: (rowId: string, playerId: number | null, playerName: string | null, isManualInput?: boolean) => void;
   showGroupDivider: boolean;
 }) {
-  const isPending = row.match_status === "pending_player_record";
+  const isHardPending = row.match_status === "pending_player_record";
 
   const dropdownPlayers = useMemo(() => {
     if (row.suggestions.length > 0 && row.player_id === null) {
@@ -545,13 +582,20 @@ function MappingTableRow({
         </td>
         <td className="py-2 px-3 font-mono text-xs text-muted-foreground">{row.source_name}</td>
         <td className="py-2 px-3 min-w-[220px]">
-          {isPending ? (
-            <span className="text-xs text-red-400/70 italic">Not in player database — save as pending above</span>
+          {isHardPending ? (
+            <PlayerSearchDropdown
+              players={dropdownPlayers}
+              value={row.player_id}
+              manualInputName={row.manual_input_name}
+              onChange={(id, name, isManual) => onSelect(row.id, id, name, isManual)}
+              placeholder="Type name or search…"
+            />
           ) : (
             <PlayerSearchDropdown
               players={dropdownPlayers}
               value={row.player_id}
-              onChange={(id, name) => onSelect(row.id, id, name)}
+              manualInputName={row.manual_input_name}
+              onChange={(id, name, isManual) => onSelect(row.id, id, name, isManual)}
               placeholder={row.player_name ?? "Search player…"}
             />
           )}

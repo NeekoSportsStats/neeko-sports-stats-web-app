@@ -4,7 +4,9 @@ export type MatchStatus =
   | "auto_matched"
   | "suggested"
   | "manual_required"
-  | "pending_player_record";
+  | "pending_player_record"
+  | "manually_matched"
+  | "manual_input";
 
 export interface MatchResult {
   status: MatchStatus;
@@ -136,6 +138,8 @@ export function matchPlayer(sourceName: string, players: PlayerOption[]): MatchR
 
 export function applyAutoMatch(rows: MappingRow[], players: PlayerOption[]): MappingRow[] {
   return rows.map(row => {
+    if (row.match_status === "manual_input") return row;
+
     const result = matchPlayer(row.source_name, players);
 
     if (result.status === "auto_matched") {

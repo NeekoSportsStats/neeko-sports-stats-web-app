@@ -72,6 +72,7 @@ export function useSavePending() {
     try {
       const payload = rows.map(r => ({
         source_name: r.source_name,
+        manual_input_name: r.manual_input_name ?? null,
         cleaned_price: r.cleaned_price,
       }));
       const result = await callAdminCommand("save_pending_players", { rows: payload });

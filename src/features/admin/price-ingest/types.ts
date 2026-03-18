@@ -24,7 +24,8 @@ export type MatchStatus =
   | "suggested"
   | "manual_required"
   | "pending_player_record"
-  | "manually_matched";
+  | "manually_matched"
+  | "manual_input";
 
 export interface MappingRow {
   id: string;
@@ -32,6 +33,7 @@ export interface MappingRow {
   cleaned_price: number;
   player_id: number | null;
   player_name: string | null;
+  manual_input_name: string | null;
   match_status: MatchStatus;
   confidence: number;
   suggestions: PlayerOption[];
