@@ -3,15 +3,15 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  RefreshCw,
-  BarChart3 as BarChart3Icon,
-  Users,
-  Activity,
-  TrendingUp,
-  CalendarDays,
-  ArrowUpRight,
-} from "lucide-react";
+import { RefreshCw, ChartBar as BarChart3Icon, Users, Activity, TrendingUp, CalendarDays, ArrowUpRight } from "lucide-react";
+
+type AnalyticsTab = "usage" | "product" | "growth";
+
+const ANALYTICS_TABS: { id: AnalyticsTab; label: string }[] = [
+  { id: "usage",   label: "Site Usage" },
+  { id: "product", label: "Product" },
+  { id: "growth",  label: "Growth" },
+];
 import {
   StatRow,
   SectionCard,
@@ -41,6 +41,9 @@ import {
 } from "../shared/adminUtils";
 
 export default function AdminAnalytics() {
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>("usage");
+  const loadedTabs = useRef<Set<AnalyticsTab>>(new Set());
+
   const [analytics24h, setAnalytics24h] = useState<AnalyticsSummary | null>(null);
   const [analytics7d, setAnalytics7d] = useState<AnalyticsSummary7d | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -160,19 +163,34 @@ export default function AdminAnalytics() {
     }
   }, []);
 
-  const fetchAll = useCallback(() => {
-    fetchAnalytics();
-    fetchProductMetrics();
-    fetchV2Metrics();
-    fetchGrowthMetrics();
+  const loadTab = useCallback((tab: AnalyticsTab) => {
+    if (loadedTabs.current.has(tab)) return;
+    loadedTabs.current.add(tab);
+    if (tab === "usage") { fetchAnalytics(); fetchV2Metrics(); }
+    if (tab === "product") fetchProductMetrics();
+    if (tab === "growth") fetchGrowthMetrics();
   }, [fetchAnalytics, fetchProductMetrics, fetchV2Metrics, fetchGrowthMetrics]);
+
+  const fetchAll = useCallback(() => {
+    loadedTabs.current.clear();
+    fetchAnalytics();
+    fetchV2Metrics();
+    if (activeTab === "product") fetchProductMetrics();
+    if (activeTab === "growth") fetchGrowthMetrics();
+    loadedTabs.current.add(activeTab);
+    if (activeTab === "usage") { loadedTabs.current.add("usage"); }
+  }, [activeTab, fetchAnalytics, fetchProductMetrics, fetchV2Metrics, fetchGrowthMetrics]);
 
   useEffect(() => {
     if (!hasLoaded.current) {
       hasLoaded.current = true;
-      fetchAll();
+      loadTab("usage");
     }
-  }, [fetchAll]);
+  }, [loadTab]);
+
+  useEffect(() => {
+    loadTab(activeTab);
+  }, [activeTab, loadTab]);
 
   const isLoading = analyticsLoading || productMetricsLoading || v2MetricsLoading || growthLoading;
 
@@ -186,9 +204,31 @@ export default function AdminAnalytics() {
         </div>
         <Button variant="outline" size="sm" onClick={fetchAll} disabled={isLoading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-          Refresh All
+          Refresh
         </Button>
       </div>
+
+      {/* Section tabs */}
+      <div className="border-b border-border -mb-2">
+        <nav className="flex gap-0 -mb-px">
+          {ANALYTICS_TABS.map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                activeTab === id
+                  ? "border-foreground text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Site Usage tab */}
+      {activeTab === "usage" && (<>
 
       {/* 24h + 7d */}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -216,8 +256,10 @@ export default function AdminAnalytics() {
         </SectionCard>
       </div>
 
-      {/* Product Metrics */}
-      <div>
+      </>)}
+
+      {/* Product Metrics tab */}
+      {activeTab === "product" && (<div>
         <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Product Metrics</h3>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-4">
           <SectionCard icon={Activity} title="Live Now (5 min)" loading={v2MetricsLoading}>
@@ -455,10 +497,10 @@ export default function AdminAnalytics() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </div>)}
 
-      {/* Growth & Acquisition */}
-      <div>
+      {/* Growth & Acquisition tab */}
+      {activeTab === "growth" && (<div>
         <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Growth &amp; Acquisition</h3>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-4">
           <SectionCard icon={Users} title="New Signups" loading={growthLoading}>
@@ -578,7 +620,8 @@ export default function AdminAnalytics() {
             )}
           </SectionCard>
         </div>
-      </div>
+      </div>)}
+
     </div>
   );
 }

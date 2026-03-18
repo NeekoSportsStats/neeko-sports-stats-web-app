@@ -46,6 +46,37 @@ function HealthBadge({ health, status }: { health: string; status: string }) {
   );
 }
 
+function describeCron(expr: string): string {
+  if (!expr) return expr;
+  const e = expr.trim();
+  if (e === "0 * * * *")          return "Every hour";
+  if (e === "*/5 * * * *")        return "Every 5 min";
+  if (e === "*/10 * * * *")       return "Every 10 min";
+  if (e === "*/15 * * * *")       return "Every 15 min";
+  if (e === "*/30 * * * *")       return "Every 30 min";
+  if (e === "0 0 * * *")          return "Daily at midnight";
+  if (e === "0 2 * * *")          return "Daily at 2 AM";
+  if (e === "0 15 * * *")         return "Daily at 3 PM";
+  if (e === "0 6 * * 1")          return "Mondays at 6 AM";
+  if (e === "0 8 * * 1")          return "Mondays at 8 AM";
+  if (e === "0 6 * * 2")          return "Tuesdays at 6 AM";
+  if (e === "0 8 * * 2")          return "Tuesdays at 8 AM";
+  if (e === "0 6 * * 0")          return "Sundays at 6 AM";
+  const parts = e.split(" ");
+  if (parts.length !== 5) return e;
+  const [min, hr, , , dow] = parts;
+  const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const dayName = dow !== "*" && !isNaN(Number(dow)) ? days[Number(dow)] : null;
+  if (hr !== "*" && min !== "*") {
+    const h = Number(hr);
+    const m = Number(min);
+    const time = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")} UTC`;
+    if (dayName) return `${dayName}s at ${time}`;
+    return `Daily at ${time}`;
+  }
+  return e;
+}
+
 export async function fetchCronJobs(): Promise<CronJob[]> {
   const { data } = await supabase.from("v_admin_cron_status").select("*");
   return (data ?? []) as CronJob[];
@@ -97,8 +128,8 @@ export default function CronJobMonitor({ jobs, loading }: Props) {
                       )}
                     </div>
                     <div className="flex items-center gap-3 mt-1 flex-wrap">
-                      <span className="text-[11px] text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
-                        {job.schedule}
+                      <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded" title={job.schedule}>
+                        {describeCron(job.schedule)}
                       </span>
                       {job.last_success && (
                         <span className="text-[11px] text-muted-foreground">

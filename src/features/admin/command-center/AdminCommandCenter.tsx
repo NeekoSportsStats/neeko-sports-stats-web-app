@@ -226,7 +226,11 @@ export default function AdminCommandCenter() {
     }
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    fetchAll();
+    const interval = setInterval(fetchAll, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchAll]);
 
   const runAction = async (key: string, label: string, fn: () => Promise<void>) => {
     setActionRunning(key);
