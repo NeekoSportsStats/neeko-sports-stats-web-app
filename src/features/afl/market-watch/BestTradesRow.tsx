@@ -1,4 +1,4 @@
-import { ArrowRight, Zap } from "lucide-react";
+import { ArrowRight, ChevronRight } from "lucide-react";
 import { MWBestTrade } from "./types";
 import { fmtPrice, fmtNum, fmtPriceChange, confidenceBadge, positionBadge, confidenceLabel } from "./helpers";
 import { track } from "@/lib/analytics";
@@ -14,11 +14,11 @@ interface Props {
 export function BestTradesRow({ trades, loading, onCompare, isPremium, onShowUpgrade }: Props) {
   if (loading) {
     return (
-      <div className="mb-6">
+      <div className="mb-8">
         <SectionHeader />
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
           {[0,1,2,3].map(i => (
-            <div key={i} className="rounded-xl border border-white/5 bg-white/[0.02] p-4 animate-pulse flex-shrink-0 w-[270px] h-[160px]" />
+            <div key={i} className="rounded-xl border border-white/5 bg-white/[0.02] p-4 animate-pulse flex-shrink-0 w-[280px] h-[160px]" />
           ))}
         </div>
       </div>
@@ -31,7 +31,7 @@ export function BestTradesRow({ trades, loading, onCompare, isPremium, onShowUpg
   const lockedCount = isPremium ? 0 : Math.max(0, trades.length - 2);
 
   return (
-    <div className="mb-8">
+    <div className="mb-10">
       <SectionHeader count={trades.length} />
       <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-none -mx-1 px-1">
         {visibleTrades.map((trade) => (
@@ -57,15 +57,21 @@ export function BestTradesRow({ trades, loading, onCompare, isPremium, onShowUpg
 
 function SectionHeader({ count }: { count?: number }) {
   return (
-    <div className="flex items-center gap-2 mb-3">
-      <Zap className="h-4 w-4 text-[#F5C84C]" />
-      <h2 className="text-sm font-bold text-white">Best Trades This Week</h2>
-      <span className="text-[10px] text-white/30 bg-white/5 border border-white/8 px-2 py-0.5 rounded-full ml-1">
-        OUT → IN
-      </span>
-      {count != null && count > 0 && (
-        <span className="text-[10px] text-white/20 ml-auto">{count} trade combo{count !== 1 ? "s" : ""}</span>
-      )}
+    <div className="flex items-start justify-between gap-3 mb-3">
+      <div>
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-bold text-white">Other Strong Trade Options</h2>
+          {count != null && count > 0 && (
+            <span className="text-[10px] text-white/25 bg-white/5 border border-white/8 px-2 py-0.5 rounded-full">
+              {count} combo{count !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+        <p className="text-[11px] text-white/30 mt-0.5">
+          Alternative upgrades if the top move doesn't fit your team
+        </p>
+      </div>
+      <ChevronRight className="h-4 w-4 text-white/15 shrink-0 mt-0.5" />
     </div>
   );
 }
@@ -77,7 +83,7 @@ function TradeCard({ trade, onCompare }: { trade: MWBestTrade; onCompare: () => 
   const confLabel = confidenceLabel(trade.confidence);
 
   return (
-    <div className="rounded-xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/12 hover:-translate-y-0.5 transition-all duration-200 flex-shrink-0 w-[270px] p-4">
+    <div className="rounded-xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/14 hover:-translate-y-0.5 transition-all duration-200 flex-shrink-0 w-[280px] p-4">
       <div className="flex items-start gap-2 mb-3">
         <PlayerPill
           name={trade.out_player_name}
@@ -86,7 +92,9 @@ function TradeCard({ trade, onCompare }: { trade: MWBestTrade; onCompare: () => 
           price={trade.out_price}
           side="out"
         />
-        <ArrowRight className="h-3.5 w-3.5 text-white/25 shrink-0 mt-2" />
+        <div className="shrink-0 mt-2">
+          <ArrowRight className="h-3.5 w-3.5 text-white/25" />
+        </div>
         <PlayerPill
           name={trade.in_player_name}
           team={trade.in_team}
@@ -98,17 +106,17 @@ function TradeCard({ trade, onCompare }: { trade: MWBestTrade; onCompare: () => 
 
       <div className="grid grid-cols-3 gap-1.5 mb-3">
         <MetricCell
-          label="+Pts"
+          label="Pts Gain"
           value={ptsGain >= 0 ? `+${fmtNum(ptsGain, 1)}` : fmtNum(ptsGain, 1)}
           valueClass={ptsGain >= 0 ? "text-green-400" : "text-red-400"}
         />
         <MetricCell
-          label="Price"
+          label="Value"
           value={fmtPriceChange(priceGain)}
           valueClass={priceGain >= 0 ? "text-green-300" : "text-red-400"}
         />
         <MetricCell
-          label="Risk Δ"
+          label="Risk"
           value={riskChange <= 0 ? `${fmtNum(riskChange, 0)}%` : `+${fmtNum(riskChange, 0)}%`}
           valueClass={riskChange <= 0 ? "text-green-400" : "text-orange-400"}
         />

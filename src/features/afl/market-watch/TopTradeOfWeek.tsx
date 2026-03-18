@@ -1,4 +1,4 @@
-import { Flame, ArrowRight, Crown, TrendingUp, Users, CircleCheck as CheckCircle } from "lucide-react";
+import { ArrowRight, Crown, TrendingUp, ShieldCheck, Zap } from "lucide-react";
 import { MWSummaryCard } from "./types";
 import { fmtPrice, fmtNum, fmtPriceChange, priceChangeColor, confidenceLabel } from "./helpers";
 
@@ -13,7 +13,7 @@ interface Props {
 export function TopTradeOfWeek({ card, loading, onCompare, onUnlock, isPremium }: Props) {
   if (loading) {
     return (
-      <div className="mb-8 rounded-2xl border border-white/8 bg-white/[0.02] p-6 animate-pulse h-56" />
+      <div className="mb-8 rounded-2xl border border-white/8 bg-white/[0.02] p-6 animate-pulse h-64" />
     );
   }
 
@@ -25,58 +25,64 @@ export function TopTradeOfWeek({ card, loading, onCompare, onUnlock, isPremium }
   const confLabel = confidence != null ? confidenceLabel(confidence) : null;
 
   return (
-    <div className="mb-8 relative rounded-2xl overflow-hidden border border-green-400/25"
+    <div
+      className="mb-8 relative rounded-2xl overflow-hidden"
       style={{
-        background: "linear-gradient(135deg, rgba(74,222,128,0.09) 0%, rgba(10,10,10,0.0) 55%)",
+        border: "1px solid rgba(74,222,128,0.3)",
+        background: "linear-gradient(145deg, rgba(74,222,128,0.08) 0%, rgba(10,10,10,0) 60%)",
       }}
     >
       <div
-        className="absolute top-0 left-0 w-72 h-72 pointer-events-none"
+        className="absolute inset-0 pointer-events-none"
         style={{
-          background: "radial-gradient(ellipse at 0% 0%, rgba(74,222,128,0.12) 0%, transparent 70%)",
+          background: "radial-gradient(ellipse at 15% 40%, rgba(74,222,128,0.10) 0%, transparent 65%)",
         }}
       />
 
-      <div className="relative px-5 pt-5 pb-5">
-        <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-400/20 border border-green-400/30">
-              <Flame className="h-4 w-4 text-green-400" />
-            </div>
-            <div>
-              <p className="text-sm font-extrabold text-white leading-tight">Best Trade You Should Make</p>
-              <p className="text-[11px] text-white/35 mt-0.5">This trade gives you the biggest projected gain this round</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 text-[10px] text-white/30 bg-white/[0.04] border border-white/8 px-2.5 py-1.5 rounded-full shrink-0">
-            <Users className="h-3 w-3 text-green-400/60" />
-            <span>High confidence trade window</span>
-          </div>
+      <div className="relative px-6 pt-6 pb-6">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-green-400/70 bg-green-400/10 border border-green-400/20 px-2.5 py-1 rounded-full">
+            This Week's Best Move
+          </span>
+          <span className="flex items-center gap-1 text-[10px] text-white/25">
+            <Zap className="h-3 w-3 text-[#F5C84C]/50" />
+            Powered by Neeko rankings + trade engine
+          </span>
         </div>
 
-        <div className="flex items-stretch gap-3 flex-wrap sm:flex-nowrap mb-4">
+        <p className="text-[12px] text-white/35 mb-5 mt-1">
+          Best overall upgrade based on projection, value and trade score.
+        </p>
+
+        <div className="flex items-stretch gap-3 mb-5 flex-col sm:flex-row">
           <PlayerBlock name={card.label_a ?? "—"} price={card.out_price} side="out" />
-          <div className="hidden sm:flex items-center justify-center px-2">
-            <div className="flex flex-col items-center gap-1">
-              <ArrowRight className="h-5 w-5 text-green-400/60" />
+
+          <div className="hidden sm:flex items-center justify-center px-3 shrink-0">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-green-400/15 border border-green-400/25 flex items-center justify-center">
+                <ArrowRight className="h-4 w-4 text-green-400" />
+              </div>
+              <span className="text-[9px] text-white/20 uppercase tracking-wider">Trade</span>
             </div>
           </div>
-          <div className="flex sm:hidden items-center self-stretch">
-            <ArrowRight className="h-4 w-4 text-green-400/40 rotate-90 sm:rotate-0" />
+
+          <div className="flex sm:hidden items-center justify-center py-1">
+            <ArrowRight className="h-4 w-4 text-green-400/40 rotate-90" />
           </div>
+
           <PlayerBlock name={card.label_b ?? "—"} price={card.in_price} side="in" />
         </div>
 
-        <div className="grid grid-cols-3 gap-2 mb-4">
+        <div className="grid grid-cols-3 gap-3 mb-5">
           <ImpactBox
-            label="Pts Gain"
-            value={ptGain != null ? `+${fmtNum(ptGain, 1)}` : "—"}
+            label="Projected Pts Gain"
+            value={ptGain != null ? `+${fmtNum(ptGain, 1)} pts` : "—"}
             valueClass="text-green-400"
             icon={<TrendingUp className="h-3.5 w-3.5" />}
             highlight
           />
           <ImpactBox
-            label="Price Impact"
+            label="Value Swing"
             value={priceGain != null ? fmtPriceChange(priceGain) : "—"}
             valueClass={priceGain != null ? priceChangeColor(priceGain) : "text-white/40"}
           />
@@ -88,24 +94,33 @@ export function TopTradeOfWeek({ card, loading, onCompare, onUnlock, isPremium }
               (confidence ?? 0) >= 60 ? "text-[#F5C84C]" :
               "text-orange-400"
             }
+            icon={<ShieldCheck className="h-3.5 w-3.5" />}
           />
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
           {isPremium && card.player_id_a != null && card.player_id_b != null && onCompare ? (
-            <button
-              onClick={() => onCompare(card.player_id_a!, card.player_id_b!)}
-              className="flex items-center gap-2 bg-green-400 text-black font-extrabold text-xs px-5 py-2.5 rounded-lg hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-green-400/20"
-            >
-              <CheckCircle className="h-3.5 w-3.5" />
-              Make this trade now
-            </button>
+            <>
+              <button
+                onClick={() => onCompare(card.player_id_a!, card.player_id_b!)}
+                className="flex items-center gap-2 bg-green-400 text-black font-extrabold text-sm px-6 py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-green-400/25"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                Make this trade
+              </button>
+              <button
+                onClick={() => onCompare(card.player_id_a!, card.player_id_b!)}
+                className="flex items-center gap-2 text-sm text-white/50 hover:text-white/80 transition-colors px-4 py-3 rounded-xl border border-white/10 hover:border-white/20"
+              >
+                Open Trade Calculator
+              </button>
+            </>
           ) : (
             <button
               onClick={onUnlock}
-              className="flex items-center gap-2 bg-[#F5C84C] text-black font-extrabold text-xs px-5 py-2.5 rounded-lg hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-[#F5C84C]/20"
+              className="flex items-center gap-2 bg-[#F5C84C] text-black font-extrabold text-sm px-6 py-3 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-[#F5C84C]/20"
             >
-              <Crown className="h-3.5 w-3.5" />
+              <Crown className="h-4 w-4" />
               Unlock your full trade plan
             </button>
           )}
@@ -123,17 +138,17 @@ export function TopTradeOfWeek({ card, loading, onCompare, onUnlock, isPremium }
 function PlayerBlock({ name, price, side }: { name: string; price: number | null; side: "in" | "out" }) {
   const isOut = side === "out";
   return (
-    <div className={`flex-1 min-w-[130px] rounded-xl border px-3 py-3 ${
+    <div className={`flex-1 rounded-xl border px-4 py-4 ${
       isOut
-        ? "border-red-400/25 bg-red-400/[0.05]"
-        : "border-green-400/30 bg-green-400/[0.06]"
+        ? "border-red-400/25 bg-red-400/[0.04]"
+        : "border-green-400/35 bg-green-400/[0.07]"
     }`}>
-      <p className={`text-[9px] font-extrabold uppercase tracking-widest mb-1.5 ${isOut ? "text-red-400/70" : "text-green-400/70"}`}>
+      <p className={`text-[9px] font-extrabold uppercase tracking-[0.18em] mb-2 ${isOut ? "text-red-400/70" : "text-green-400/70"}`}>
         {isOut ? "Sell" : "Buy"}
       </p>
-      <p className="text-sm font-bold text-white truncate leading-tight">{name}</p>
+      <p className="text-base font-bold text-white truncate leading-tight">{name}</p>
       {price != null && (
-        <p className="text-[11px] text-white/35 mt-0.5">{fmtPrice(price)}</p>
+        <p className="text-[12px] text-white/40 mt-1">{fmtPrice(price)}</p>
       )}
     </div>
   );
@@ -147,14 +162,14 @@ function ImpactBox({ label, value, valueClass, icon, highlight }: {
   highlight?: boolean;
 }) {
   return (
-    <div className={`rounded-xl border px-3 py-2.5 ${
-      highlight ? "border-green-400/20 bg-green-400/[0.04]" : "border-white/[0.06] bg-white/[0.025]"
+    <div className={`rounded-xl border px-3 py-3 ${
+      highlight ? "border-green-400/25 bg-green-400/[0.05]" : "border-white/[0.07] bg-white/[0.025]"
     }`}>
-      <div className="flex items-center gap-1 mb-1">
+      <div className="flex items-center gap-1.5 mb-1.5">
         {icon && <span className={highlight ? "text-green-400/60" : "text-white/20"}>{icon}</span>}
-        <p className="text-[9px] text-white/30 uppercase tracking-wider">{label}</p>
+        <p className="text-[9px] text-white/30 uppercase tracking-wider leading-none">{label}</p>
       </div>
-      <p className={`text-base font-extrabold tabular-nums ${valueClass}`}>{value}</p>
+      <p className={`text-lg font-extrabold tabular-nums leading-none ${valueClass}`}>{value}</p>
     </div>
   );
 }

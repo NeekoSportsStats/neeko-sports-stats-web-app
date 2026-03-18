@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, Copy, Check, TrendingUp, TrendingDown, Minus, Search } from "lucide-react";
+import { X, Copy, Check, TrendingUp, TrendingDown, Minus, Search, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { MWPlayerRow } from "./types";
-import { fmtPrice, fmtNum, fmtPriceChange, riskColor, priceChangeColor } from "./helpers";
+import { fmtPrice, fmtNum, fmtPriceChange, priceChangeColor, tradeVerdict } from "./helpers";
 import { track } from "@/lib/analytics";
 
 interface Props {
@@ -22,6 +22,7 @@ export function TradeImpactModal({ onClose, prefillOutId, prefillInId, allPlayer
   const [outSearching, setOutSearching] = useState(false);
   const [inSearching, setInSearching] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const outDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,12 +97,12 @@ export function TradeImpactModal({ onClose, prefillOutId, prefillInId, allPlayer
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-2xl rounded-2xl overflow-hidden"
+        className="relative w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl overflow-hidden max-h-[92vh] flex flex-col"
         style={{
           background: "linear-gradient(160deg, #111 0%, #0d0d0d 100%)",
           border: "1px solid rgba(255,255,255,0.08)",
@@ -109,59 +110,68 @@ export function TradeImpactModal({ onClose, prefillOutId, prefillInId, allPlayer
         }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0">
           <div>
             <h2 className="text-base font-bold text-white">Trade Impact Calculator</h2>
-            <p className="text-[11px] text-white/35 mt-0.5">Compare any OUT and IN player side-by-side</p>
+            <p className="text-[11px] text-white/35 mt-0.5">Compare any OUT and IN player</p>
           </div>
           <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors p-1">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="p-6">
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <PlayerSelector
-              label="OUT (Selling)"
-              search={outSearch}
-              onSearchChange={handleOutSearch}
-              results={outResults}
-              searching={outSearching}
-              selected={outPlayer}
-              onSelect={(p) => { setOutPlayer(p); setOutSearch(p.player_name); setOutResults([]); }}
-              accentClass="border-red-400/25 focus:border-red-400/50"
-              labelClass="text-red-400"
-            />
-            <PlayerSelector
-              label="IN (Buying)"
-              search={inSearch}
-              onSearchChange={handleInSearch}
-              results={inResults}
-              searching={inSearching}
-              selected={inPlayer}
-              onSelect={(p) => { setInPlayer(p); setInSearch(p.player_name); setInResults([]); }}
-              accentClass="border-green-400/25 focus:border-green-400/50"
-              labelClass="text-green-400"
-            />
-          </div>
-
-          {showComparison ? (
-            <ComparisonPanel out={outPlayer!} inn={inPlayer!} />
-          ) : (
-            <div className="rounded-xl border border-white/5 bg-white/[0.02] p-8 text-center text-white/25 text-sm">
-              Search and select both players to see the trade impact
+        <div className="overflow-y-auto flex-1">
+          <div className="p-5">
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <PlayerSelector
+                label="OUT (Selling)"
+                search={outSearch}
+                onSearchChange={handleOutSearch}
+                results={outResults}
+                searching={outSearching}
+                selected={outPlayer}
+                onSelect={(p) => { setOutPlayer(p); setOutSearch(p.player_name); setOutResults([]); }}
+                accentClass="border-red-400/25 focus:border-red-400/50"
+                labelClass="text-red-400"
+              />
+              <PlayerSelector
+                label="IN (Buying)"
+                search={inSearch}
+                onSearchChange={handleInSearch}
+                results={inResults}
+                searching={inSearching}
+                selected={inPlayer}
+                onSelect={(p) => { setInPlayer(p); setInSearch(p.player_name); setInResults([]); }}
+                accentClass="border-green-400/25 focus:border-green-400/50"
+                labelClass="text-green-400"
+              />
             </div>
-          )}
 
-          {showComparison && (
-            <button
-              onClick={handleCopy}
-              className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-white/10 text-sm text-white/50 hover:text-white/80 hover:border-white/20 transition-all"
-            >
-              {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
-              {copied ? "Copied!" : "Copy trade summary"}
-            </button>
-          )}
+            {showComparison ? (
+              <ComparisonPanel
+                out={outPlayer!}
+                inn={inPlayer!}
+                showAdvanced={showAdvanced}
+                onToggleAdvanced={() => setShowAdvanced(a => !a)}
+              />
+            ) : (
+              <div className="rounded-xl border border-white/5 bg-white/[0.02] p-8 text-center text-white/25 text-sm">
+                Search and select both players to see the trade impact
+              </div>
+            )}
+
+            {showComparison && (
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={handleCopy}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-white/10 text-sm text-white/50 hover:text-white/80 hover:border-white/20 transition-all"
+                >
+                  {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+                  {copied ? "Copied!" : "Copy trade summary"}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -225,13 +235,26 @@ function PlayerSelector({
   );
 }
 
-function ComparisonPanel({ out, inn }: { out: MWPlayerRow; inn: MWPlayerRow }) {
-  const rows: { label: string; outVal: string; inVal: string; delta: number | null; higherIsBetter: boolean }[] = [
+function ComparisonPanel({ out, inn, showAdvanced, onToggleAdvanced }: {
+  out: MWPlayerRow;
+  inn: MWPlayerRow;
+  showAdvanced: boolean;
+  onToggleAdvanced: () => void;
+}) {
+  const ptsDelta = inn.projection - out.projection;
+  const priceDelta = inn.expected_price_change - out.expected_price_change;
+  const riskDelta = inn.risk_pct - out.risk_pct;
+  const scoreDelta = inn.trade_score - out.trade_score;
+  const verdict = tradeVerdict(ptsDelta, priceDelta, riskDelta, scoreDelta);
+
+  const isPositiveVerdict = verdict.startsWith("Recommended") || verdict.startsWith("Strong");
+
+  const coreRows: { label: string; outVal: string; inVal: string; delta: number | null; higherIsBetter: boolean }[] = [
     {
       label: "Projection",
       outVal: fmtNum(out.projection, 1),
       inVal: fmtNum(inn.projection, 1),
-      delta: inn.projection - out.projection,
+      delta: ptsDelta,
       higherIsBetter: true,
     },
     {
@@ -242,17 +265,41 @@ function ComparisonPanel({ out, inn }: { out: MWPlayerRow; inn: MWPlayerRow }) {
       higherIsBetter: false,
     },
     {
+      label: "Exp. Price Change",
+      outVal: fmtPriceChange(out.expected_price_change),
+      inVal: fmtPriceChange(inn.expected_price_change),
+      delta: priceDelta,
+      higherIsBetter: true,
+    },
+    {
+      label: "Trade Score",
+      outVal: fmtNum(out.trade_score, 0),
+      inVal: fmtNum(inn.trade_score, 0),
+      delta: scoreDelta,
+      higherIsBetter: true,
+    },
+    {
+      label: "Risk %",
+      outVal: `${fmtNum(out.risk_pct, 0)}%`,
+      inVal: `${fmtNum(inn.risk_pct, 0)}%`,
+      delta: riskDelta,
+      higherIsBetter: false,
+    },
+    {
+      label: "Price",
+      outVal: fmtPrice(out.price),
+      inVal: fmtPrice(inn.price),
+      delta: inn.price - out.price,
+      higherIsBetter: false,
+    },
+  ];
+
+  const advancedRows: { label: string; outVal: string; inVal: string; delta: number | null; higherIsBetter: boolean }[] = [
+    {
       label: "Price Edge",
       outVal: `${fmtNum(out.price_edge_pts, 1)} pts`,
       inVal: `${fmtNum(inn.price_edge_pts, 1)} pts`,
       delta: inn.price_edge_pts - out.price_edge_pts,
-      higherIsBetter: true,
-    },
-    {
-      label: "Exp. Price Change",
-      outVal: fmtPriceChange(out.expected_price_change),
-      inVal: fmtPriceChange(inn.expected_price_change),
-      delta: inn.expected_price_change - out.expected_price_change,
       higherIsBetter: true,
     },
     {
@@ -269,75 +316,112 @@ function ComparisonPanel({ out, inn }: { out: MWPlayerRow; inn: MWPlayerRow }) {
       delta: (inn.projected_price_r3 ?? inn.price) - (out.projected_price_r3 ?? out.price),
       higherIsBetter: true,
     },
-    {
-      label: "Risk %",
-      outVal: `${fmtNum(out.risk_pct, 0)}%`,
-      inVal: `${fmtNum(inn.risk_pct, 0)}%`,
-      delta: inn.risk_pct - out.risk_pct,
-      higherIsBetter: false,
-    },
-    {
-      label: "Trade Score",
-      outVal: fmtNum(out.trade_score, 0),
-      inVal: fmtNum(inn.trade_score, 0),
-      delta: inn.trade_score - out.trade_score,
-      higherIsBetter: true,
-    },
-    {
-      label: "Price",
-      outVal: fmtPrice(out.price),
-      inVal: fmtPrice(inn.price),
-      delta: inn.price - out.price,
-      higherIsBetter: false,
-    },
   ];
 
   return (
-    <div className="rounded-xl border border-white/8 bg-white/[0.02] overflow-hidden">
-      <div className="grid grid-cols-3 border-b border-white/5 text-[10px] font-bold uppercase tracking-wider text-white/30">
-        <div className="px-3 py-2 text-red-400">OUT — {out.player_name}</div>
-        <div className="px-3 py-2 text-center">Metric</div>
-        <div className="px-3 py-2 text-right text-green-400">IN — {inn.player_name}</div>
+    <div className="space-y-3">
+      <div className={`rounded-xl border px-4 py-3 ${
+        isPositiveVerdict
+          ? "border-green-400/25 bg-green-400/[0.05]"
+          : "border-white/8 bg-white/[0.02]"
+      }`}>
+        <p className="text-[9px] uppercase tracking-widest text-white/30 mb-1">Trade Verdict</p>
+        <p className={`text-base font-bold ${isPositiveVerdict ? "text-green-300" : "text-white/70"}`}>
+          {verdict}
+        </p>
+        <div className="flex gap-4 mt-2 flex-wrap">
+          <VerdictStat
+            label="Points"
+            value={ptsDelta >= 0 ? `+${ptsDelta.toFixed(1)}` : ptsDelta.toFixed(1)}
+            positive={ptsDelta > 0}
+          />
+          <VerdictStat
+            label="Value Swing"
+            value={fmtPriceChange(priceDelta)}
+            positive={priceDelta > 0}
+          />
+          <VerdictStat
+            label="Risk Change"
+            value={riskDelta >= 0 ? `+${riskDelta.toFixed(0)}%` : `${riskDelta.toFixed(0)}%`}
+            positive={riskDelta < 0}
+          />
+        </div>
       </div>
-      {rows.map(row => {
-        const isPositive = row.delta != null && (row.higherIsBetter ? row.delta > 0 : row.delta < 0);
-        const isNegative = row.delta != null && (row.higherIsBetter ? row.delta < 0 : row.delta > 0);
-        const deltaIcon = isPositive
-          ? <TrendingUp className="h-3 w-3 text-green-400" />
-          : isNegative
-            ? <TrendingDown className="h-3 w-3 text-red-400" />
-            : <Minus className="h-3 w-3 text-white/20" />;
 
-        return (
-          <div key={row.label} className="grid grid-cols-3 border-b border-white/5 last:border-0 items-center">
-            <div className="px-3 py-2 text-sm font-medium text-white/60 tabular-nums">{row.outVal}</div>
-            <div className="px-3 py-2 flex items-center justify-center gap-1">
-              <span className="text-[10px] text-white/30">{row.label}</span>
-              {deltaIcon}
-            </div>
-            <div className={`px-3 py-2 text-sm font-semibold text-right tabular-nums ${
-              isPositive ? "text-green-400" : isNegative ? "text-red-400" : "text-white/60"
-            }`}>{row.inVal}</div>
-          </div>
-        );
-      })}
+      <div className="rounded-xl border border-white/8 bg-white/[0.02] overflow-hidden">
+        <div className="grid grid-cols-3 border-b border-white/5 text-[10px] font-bold uppercase tracking-wider text-white/30">
+          <div className="px-3 py-2 text-red-400 truncate">OUT — {out.player_name}</div>
+          <div className="px-3 py-2 text-center">Metric</div>
+          <div className="px-3 py-2 text-right text-green-400 truncate">IN — {inn.player_name}</div>
+        </div>
+        {coreRows.map(row => <ComparisonRow key={row.label} row={row} />)}
+      </div>
 
       {(out.category_reason || inn.category_reason) && (
-        <div className="grid grid-cols-2 gap-0 border-t border-white/5">
-          <div className="px-3 py-3 border-r border-white/5">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-red-400/15 bg-red-400/[0.03] px-3 py-3">
             <p className="text-[9px] text-red-400/60 uppercase tracking-wider mb-1.5">Why sell</p>
-            {out.category_reason && (
-              <p className="text-[10px] text-white/30 leading-snug">· {out.category_reason}</p>
-            )}
+            <p className="text-[11px] text-white/40 leading-snug">{out.category_reason || "—"}</p>
           </div>
-          <div className="px-3 py-3">
+          <div className="rounded-xl border border-green-400/15 bg-green-400/[0.03] px-3 py-3">
             <p className="text-[9px] text-green-400/60 uppercase tracking-wider mb-1.5">Why buy</p>
-            {inn.category_reason && (
-              <p className="text-[10px] text-white/30 leading-snug">· {inn.category_reason}</p>
-            )}
+            <p className="text-[11px] text-white/40 leading-snug">{inn.category_reason || "—"}</p>
           </div>
         </div>
       )}
+
+      <button
+        onClick={onToggleAdvanced}
+        className="w-full flex items-center justify-center gap-1.5 text-[11px] text-white/25 hover:text-white/50 transition-colors py-1"
+      >
+        {showAdvanced ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        {showAdvanced ? "Hide advanced metrics" : "Show advanced metrics"}
+      </button>
+
+      {showAdvanced && (
+        <div className="rounded-xl border border-white/8 bg-white/[0.02] overflow-hidden">
+          <div className="grid grid-cols-3 border-b border-white/5 text-[10px] font-bold uppercase tracking-wider text-white/30">
+            <div className="px-3 py-2 text-red-400">OUT</div>
+            <div className="px-3 py-2 text-center">Metric</div>
+            <div className="px-3 py-2 text-right text-green-400">IN</div>
+          </div>
+          {advancedRows.map(row => <ComparisonRow key={row.label} row={row} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VerdictStat({ label, value, positive }: { label: string; value: string; positive: boolean }) {
+  return (
+    <div>
+      <p className="text-[9px] text-white/30 uppercase tracking-wider">{label}</p>
+      <p className={`text-sm font-bold tabular-nums ${positive ? "text-green-400" : "text-red-400"}`}>{value}</p>
+    </div>
+  );
+}
+
+function ComparisonRow({ row }: {
+  row: { label: string; outVal: string; inVal: string; delta: number | null; higherIsBetter: boolean };
+}) {
+  const isPositive = row.delta != null && (row.higherIsBetter ? row.delta > 0 : row.delta < 0);
+  const isNegative = row.delta != null && (row.higherIsBetter ? row.delta < 0 : row.delta > 0);
+  const deltaIcon = isPositive
+    ? <TrendingUp className="h-3 w-3 text-green-400" />
+    : isNegative
+      ? <TrendingDown className="h-3 w-3 text-red-400" />
+      : <Minus className="h-3 w-3 text-white/20" />;
+
+  return (
+    <div className="grid grid-cols-3 border-b border-white/5 last:border-0 items-center">
+      <div className="px-3 py-2 text-sm font-medium text-white/60 tabular-nums">{row.outVal}</div>
+      <div className="px-3 py-2 flex items-center justify-center gap-1">
+        <span className="text-[10px] text-white/30">{row.label}</span>
+        {deltaIcon}
+      </div>
+      <div className={`px-3 py-2 text-sm font-semibold text-right tabular-nums ${
+        isPositive ? "text-green-400" : isNegative ? "text-red-400" : "text-white/60"
+      }`}>{row.inVal}</div>
     </div>
   );
 }
@@ -346,12 +430,16 @@ function buildSummaryText(out: MWPlayerRow, inn: MWPlayerRow): string {
   const ptsDelta = inn.projection - out.projection;
   const priceDelta = inn.expected_price_change - out.expected_price_change;
   const r3Delta = (inn.projected_price_r3 ?? inn.price) - (out.projected_price_r3 ?? out.price);
+  const riskDelta = inn.risk_pct - out.risk_pct;
+  const scoreDelta = inn.trade_score - out.trade_score;
+  const verdict = tradeVerdict(ptsDelta, priceDelta, riskDelta, scoreDelta);
   return [
     `Trade Analysis: OUT ${out.player_name} → IN ${inn.player_name}`,
+    `Verdict: ${verdict}`,
     `Points Gain: ${ptsDelta >= 0 ? "+" : ""}${ptsDelta.toFixed(1)}`,
-    `Price Change Delta: ${priceDelta >= 0 ? "+" : ""}$${Math.round(Math.abs(priceDelta) / 1000)}k`,
+    `Value Swing: ${priceDelta >= 0 ? "+" : ""}$${Math.round(Math.abs(priceDelta) / 1000)}k`,
     `Price Growth (3 Rounds): OUT ${fmtPrice(out.projected_price_r3 ?? out.price)} | IN ${fmtPrice(inn.projected_price_r3 ?? inn.price)} | Net ${r3Delta >= 0 ? "+" : ""}$${Math.round(Math.abs(r3Delta) / 1000)}k`,
-    `Risk Change: ${(inn.risk_pct - out.risk_pct) >= 0 ? "+" : ""}${(inn.risk_pct - out.risk_pct).toFixed(0)}%`,
+    `Risk Change: ${riskDelta >= 0 ? "+" : ""}${riskDelta.toFixed(0)}%`,
     `Trade Score: ${out.trade_score.toFixed(0)} → ${inn.trade_score.toFixed(0)}`,
     `Generated by Neeko Sports`,
   ].join("\n");

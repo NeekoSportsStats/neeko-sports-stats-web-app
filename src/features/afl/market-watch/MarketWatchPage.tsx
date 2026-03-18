@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { TrendingUp, RefreshCw, Crown, ChevronDown, Lock, CircleAlert as AlertCircle, Zap, Target, Star, SlidersHorizontal, X } from "lucide-react";
+import { TrendingUp, RefreshCw, Crown, ChevronDown, Lock, CircleAlert as AlertCircle, Zap, Target, Star, SlidersHorizontal, X, ChevronRight } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
@@ -14,7 +14,6 @@ import { MarketWatchSkeleton } from "./MarketWatchSkeleton";
 import { MarketWatchSort, SortKey } from "./MarketWatchSort";
 import { MarketWatchFilters, FilterState } from "./MarketWatchFilters";
 import { TopTradeOfWeek } from "./TopTradeOfWeek";
-import { TradePlanCard } from "./TradePlanCard";
 import { BestTradesRow } from "./BestTradesRow";
 
 const SECTION_DEFAULT = 12;
@@ -52,6 +51,7 @@ export default function MarketWatchPage() {
   const [showMoreSell, setShowMoreSell] = useState(false);
   const [showMoreCashCows, setShowMoreCashCows] = useState(false);
   const [showMoreTraps, setShowMoreTraps] = useState(false);
+  const [showSecondary, setShowSecondary] = useState(false);
 
   const [sortKey, setSortKey] = useState<SortKey>("trade_score");
   const [filters, setFilters] = useState<FilterState>({
@@ -197,7 +197,12 @@ export default function MarketWatchPage() {
     return out;
   }, [filters, sortKey]);
 
-  const buyTargets  = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "buy")), [players, applyFiltersAndSort]);
+  const buyTargets  = useMemo(() =>
+    applyFiltersAndSort(
+      players.filter(p => p.category === "buy" && Number(p.expected_price_change ?? 0) >= -50000)
+    ),
+    [players, applyFiltersAndSort]
+  );
   const sellPlayers = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "sell_now" || p.category === "sell_consider")), [players, applyFiltersAndSort]);
   const cashCows    = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "cash_cow")), [players, applyFiltersAndSort]);
   const traps       = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "fade")), [players, applyFiltersAndSort]);
@@ -320,10 +325,12 @@ export default function MarketWatchPage() {
             showMoreSell={showMoreSell}
             showMoreCashCows={showMoreCashCows}
             showMoreTraps={showMoreTraps}
+            showSecondary={showSecondary}
             onToggleBuy={() => setShowMoreBuy(e => !e)}
             onToggleSell={() => setShowMoreSell(e => !e)}
             onToggleCashCows={() => setShowMoreCashCows(e => !e)}
             onToggleTraps={() => setShowMoreTraps(e => !e)}
+            onToggleSecondary={() => setShowSecondary(e => !e)}
             onUnlock={() => setShowUpgrade(true)}
             onCompare={(outId, inId) => setCompareModal({ outId, inId })}
             onScrollToSection={scrollToSection}
@@ -381,23 +388,23 @@ function FreeUserView({ rawPlayers, summaryCards, bestTrades, onUnlock, summary 
   const sections = [
     {
       player: topBuy,
-      label: "Buy Target",
+      label: "Upgrade Target",
       dot: "bg-green-400",
       labelColor: "text-green-400",
-      description: "Undervalued — strong buy",
+      description: "Undervalued — strong buy signal",
       total: totalBuy,
     },
     {
       player: topSell,
-      label: "Sell Signal",
+      label: "Trade Out",
       dot: "bg-red-400",
       labelColor: "text-red-400",
-      description: "Overpriced — sell before drop",
+      description: "Overpriced — sell before value drops",
       total: totalSell,
     },
     {
       player: topCow,
-      label: "Cash Cow",
+      label: "Cash Growth",
       dot: "bg-[#F5C84C]",
       labelColor: "text-[#F5C84C]",
       description: "Fastest cash growth this round",
@@ -421,15 +428,6 @@ function FreeUserView({ rawPlayers, summaryCards, bestTrades, onUnlock, summary 
         onUnlock={onUnlock}
         isPremium={false}
       />
-
-      {(topSell || topBuy || topCow) && (
-        <TradePlanCard
-          topSell={topSell}
-          topBuy={topBuy}
-          topCow={topCow}
-          onScrollToSection={() => onUnlock()}
-        />
-      )}
 
       {bestTrades.length > 0 && (
         <BestTradesRow
@@ -518,10 +516,12 @@ interface PremiumViewProps {
   showMoreSell: boolean;
   showMoreCashCows: boolean;
   showMoreTraps: boolean;
+  showSecondary: boolean;
   onToggleBuy: () => void;
   onToggleSell: () => void;
   onToggleCashCows: () => void;
   onToggleTraps: () => void;
+  onToggleSecondary: () => void;
   onUnlock: () => void;
   onCompare: (outId?: number, inId?: number) => void;
   onScrollToSection: (section: string) => void;
@@ -530,12 +530,10 @@ interface PremiumViewProps {
 function PremiumUserView({
   buyTargets, sellPlayers, cashCows, traps,
   bestTradeCard, bestTrades,
-  showMoreBuy, showMoreSell, showMoreCashCows, showMoreTraps,
-  onToggleBuy, onToggleSell, onToggleCashCows, onToggleTraps,
+  showMoreBuy, showMoreSell, showMoreCashCows, showMoreTraps, showSecondary,
+  onToggleBuy, onToggleSell, onToggleCashCows, onToggleTraps, onToggleSecondary,
   onUnlock, onCompare, onScrollToSection,
 }: PremiumViewProps) {
-  const [compareTradeModal, setCompareTradeModal] = useState<{ outId?: number; inId?: number } | null>(null);
-
   const getVisible = (arr: MWPlayerRow[], showMore: boolean) =>
     showMore ? arr : arr.slice(0, SECTION_DEFAULT);
 
@@ -544,9 +542,7 @@ function PremiumUserView({
   const visibleCashCows = getVisible(cashCows, showMoreCashCows);
   const visibleTraps    = getVisible(traps, showMoreTraps);
 
-  const topSell = sellPlayers[0] ?? null;
-  const topBuy  = buyTargets[0] ?? null;
-  const topCow  = cashCows[0] ?? null;
+  const hasSecondary = cashCows.length > 0 || traps.length > 0;
 
   return (
     <>
@@ -558,21 +554,11 @@ function PremiumUserView({
         isPremium={true}
       />
 
-      {(topSell || topBuy || topCow) && (
-        <TradePlanCard
-          topSell={topSell}
-          topBuy={topBuy}
-          topCow={topCow}
-          onScrollToSection={onScrollToSection}
-        />
-      )}
-
       {bestTrades.length > 0 && (
         <BestTradesRow
           trades={bestTrades}
           loading={false}
           onCompare={(trade) => {
-            setCompareTradeModal({ outId: trade.out_player_id, inId: trade.in_player_id });
             onCompare(trade.out_player_id, trade.in_player_id);
           }}
           isPremium={true}
@@ -583,10 +569,10 @@ function PremiumUserView({
       {buyTargets.length > 0 ? (
         <HorizontalRail
           id="section-buy"
-          label="Buy Targets"
+          label="Upgrade Targets"
           labelColor="text-green-400"
           dot="bg-green-400"
-          description="Undervalued — strong buy signals for this round"
+          description="Undervalued players — strong buy signals for this round"
           count={buyTargets.length}
         >
           {visibleBuy.map((p, i) => (
@@ -611,8 +597,8 @@ function PremiumUserView({
         </HorizontalRail>
       ) : (
         <EmptySectionBanner
-          label="Buy Targets"
-          message="No strong buy signals this round"
+          label="Upgrade Targets"
+          message="No strong upgrade targets this round"
           subtext="The model didn't detect significant underpriced opportunities right now."
           id="section-buy"
         />
@@ -621,10 +607,10 @@ function PremiumUserView({
       {sellPlayers.length > 0 ? (
         <HorizontalRail
           id="section-sell"
-          label="Sell Signals"
+          label="Players to Trade Out"
           labelColor="text-red-400"
           dot="bg-red-400"
-          description="Overpriced — sell before drop. Use Find Replacement on any card."
+          description="Overpriced — trade out before value drops. Use Find Replacement on any card."
           count={sellPlayers.length}
         >
           {visibleSell.map((p, i) => (
@@ -650,91 +636,119 @@ function PremiumUserView({
         </HorizontalRail>
       ) : (
         <EmptySectionBanner
-          label="Sell Signals"
-          message="No strong sell signals this round"
+          label="Players to Trade Out"
+          message="No sell signals this round"
           subtext="No significantly overpriced players detected in the current snapshot."
           id="section-sell"
         />
       )}
 
-      {cashCows.length > 0 ? (
-        <HorizontalRail
-          id="section-cash-cows"
-          label="Cash Cows"
-          labelColor="text-[#F5C84C]"
-          dot="bg-[#F5C84C]"
-          description="Fastest cash growth this round — scoring above breakeven, generating price rise"
-          count={cashCows.length}
-        >
-          {visibleCashCows.map((p, i) => (
-            <div key={p.player_id} className="w-[270px] flex-shrink-0">
-              <PlayerTradeCard
-                row={p}
-                rank={i + 1}
-                locked={false}
-                onUnlock={onUnlock}
-                isPremium={true}
-                onCompare={(id) => onCompare(undefined, id)}
-              />
+      {hasSecondary && (
+        <div className="mb-8">
+          <button
+            onClick={onToggleSecondary}
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-white/8 bg-white/[0.02] hover:bg-white/[0.035] hover:border-white/14 transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                {cashCows.length > 0 && (
+                  <span className="text-[10px] font-semibold text-[#F5C84C]/70 bg-[#F5C84C]/10 border border-[#F5C84C]/20 px-2 py-0.5 rounded-full">
+                    {cashCows.length} Cash Growth
+                  </span>
+                )}
+                {traps.length > 0 && (
+                  <span className="text-[10px] font-semibold text-orange-400/70 bg-orange-400/10 border border-orange-400/20 px-2 py-0.5 rounded-full">
+                    {traps.length} Trap Alert{traps.length !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+              <span className="text-[11px] text-white/30">
+                {showSecondary ? "Hide" : "Show"} Cash Growth Targets & Trap Alerts
+              </span>
             </div>
-          ))}
-          {cashCows.length > SECTION_DEFAULT && (
-            <ShowMoreRailCard
-              count={cashCows.length - visibleCashCows.length}
-              expanded={showMoreCashCows}
-              onToggle={onToggleCashCows}
-            />
-          )}
-        </HorizontalRail>
-      ) : (
-        <EmptySectionBanner
-          label="Cash Cows"
-          message="No cash cow signals this round"
-          subtext="No low-priced players flagged for strong breakeven-beating performance."
-          id="section-cash-cows"
-        />
-      )}
+            <ChevronRight className={`h-4 w-4 text-white/20 transition-transform duration-200 ${showSecondary ? "rotate-90" : ""}`} />
+          </button>
 
-      {traps.length > 0 ? (
-        <HorizontalRail
-          id="section-traps"
-          label="Trap Alerts"
-          labelColor="text-orange-400"
-          dot="bg-orange-400"
-          description="High risk — avoid at current price. Premium cost not justified by projection."
-          count={traps.length}
-        >
-          {visibleTraps.map((p, i) => (
-            <div key={p.player_id} className="w-[270px] flex-shrink-0">
-              <PlayerTradeCard
-                row={p}
-                rank={i + 1}
-                locked={false}
-                onUnlock={onUnlock}
-                isPremium={true}
-                onCompare={(id) => onCompare(id, undefined)}
-              />
+          {showSecondary && (
+            <div className="mt-4 space-y-0">
+              {cashCows.length > 0 ? (
+                <HorizontalRail
+                  id="section-cash-cows"
+                  label="Cash Growth Targets"
+                  labelColor="text-[#F5C84C]"
+                  dot="bg-[#F5C84C]"
+                  description="Scoring above breakeven — generating price rise this round"
+                  count={cashCows.length}
+                >
+                  {visibleCashCows.map((p, i) => (
+                    <div key={p.player_id} className="w-[270px] flex-shrink-0">
+                      <PlayerTradeCard
+                        row={p}
+                        rank={i + 1}
+                        locked={false}
+                        onUnlock={onUnlock}
+                        isPremium={true}
+                        onCompare={(id) => onCompare(undefined, id)}
+                      />
+                    </div>
+                  ))}
+                  {cashCows.length > SECTION_DEFAULT && (
+                    <ShowMoreRailCard
+                      count={cashCows.length - visibleCashCows.length}
+                      expanded={showMoreCashCows}
+                      onToggle={onToggleCashCows}
+                    />
+                  )}
+                </HorizontalRail>
+              ) : (
+                <EmptySectionBanner
+                  label="Cash Growth Targets"
+                  message="No cash growth targets this round"
+                  subtext="No low-priced players flagged for strong breakeven-beating performance."
+                  id="section-cash-cows"
+                />
+              )}
+
+              {traps.length > 0 ? (
+                <HorizontalRail
+                  id="section-traps"
+                  label="Trap Alerts"
+                  labelColor="text-orange-400"
+                  dot="bg-orange-400"
+                  description="High risk — premium cost not justified by projection. Avoid this round."
+                  count={traps.length}
+                >
+                  {visibleTraps.map((p, i) => (
+                    <div key={p.player_id} className="w-[270px] flex-shrink-0">
+                      <PlayerTradeCard
+                        row={p}
+                        rank={i + 1}
+                        locked={false}
+                        onUnlock={onUnlock}
+                        isPremium={true}
+                        onCompare={(id) => onCompare(id, undefined)}
+                      />
+                    </div>
+                  ))}
+                  {traps.length > SECTION_DEFAULT && (
+                    <ShowMoreRailCard
+                      count={traps.length - visibleTraps.length}
+                      expanded={showMoreTraps}
+                      onToggle={onToggleTraps}
+                    />
+                  )}
+                </HorizontalRail>
+              ) : (
+                <EmptySectionBanner
+                  label="Trap Alerts"
+                  message="No trap alerts this round"
+                  subtext="No significantly overpriced high-risk players detected."
+                  id="section-traps"
+                />
+              )}
             </div>
-          ))}
-          {traps.length > SECTION_DEFAULT && (
-            <ShowMoreRailCard
-              count={traps.length - visibleTraps.length}
-              expanded={showMoreTraps}
-              onToggle={onToggleTraps}
-            />
           )}
-        </HorizontalRail>
-      ) : (
-        <EmptySectionBanner
-          label="Trap Alerts"
-          message="No trap alerts this round"
-          subtext="No significantly overpriced high-risk players detected."
-          id="section-traps"
-        />
-      )}
-
-      {compareTradeModal !== null && (
-        <span style={{ display: "none" }} />
+        </div>
       )}
     </>
   );
@@ -775,16 +789,16 @@ function MarketWatchPaywall({
   const displayExtra = totalExtra > 0 ? totalExtra : 120;
 
   const lines = [
-    extraBuy  > 0 && `${extraBuy} more buy target${extraBuy !== 1 ? "s" : ""} — undervalued picks`,
-    extraSell > 0 && `${extraSell} more sell signal${extraSell !== 1 ? "s" : ""} — overpriced before drop`,
-    extraCow  > 0 && `${extraCow} cash cow${extraCow !== 1 ? "s" : ""} — fastest price growth this round`,
+    extraBuy  > 0 && `${extraBuy} more upgrade target${extraBuy !== 1 ? "s" : ""} — undervalued picks`,
+    extraSell > 0 && `${extraSell} more player${extraSell !== 1 ? "s" : ""} to trade out — overpriced before drop`,
+    extraCow  > 0 && `${extraCow} cash growth target${extraCow !== 1 ? "s" : ""} — fastest price growth this round`,
     extraTrap > 0 && `${extraTrap} trap alert${extraTrap !== 1 ? "s" : ""} — high risk, avoid`,
   ].filter(Boolean) as string[];
 
   if (lines.length === 0) {
     lines.push(
-      "Full buy/sell signal lists",
-      "Breakout cash cows generating price growth",
+      "Full upgrade targets and trade out lists",
+      "Breakout cash growth targets generating price rise",
       "Trap alerts to avoid this round",
       "AI-powered trade rationale per player",
     );
