@@ -99,6 +99,40 @@ export function confidenceBadge(v: number): string {
   return "text-orange-400 bg-orange-400/10 border-orange-400/25";
 }
 
+export function confidenceLabel(v: number): string {
+  if (v >= 80) return "High confidence";
+  if (v >= 60) return "Strong";
+  return "Risky";
+}
+
+export function actionMicrocopy(category: string, edgePts?: number | null, expChange?: number | null, risk?: number | null): string {
+  const edge = Number(edgePts ?? 0);
+  const change = Number(expChange ?? 0);
+  const riskV = Number(risk ?? 0);
+
+  if (category === "buy") {
+    if (edge > 20) return "Undervalued — strong buy";
+    return "Buy signal — priced below projection";
+  }
+  if (category === "sell_now") {
+    if (change < -10000) return "Overpriced — sell before drop";
+    return "Sell window open — value declining";
+  }
+  if (category === "sell_consider") {
+    return "Consider selling — marginal value gap";
+  }
+  if (category === "cash_cow") {
+    if (change > 20000) return "Fastest cash growth this round";
+    return "Cash cow — generating fast price rise";
+  }
+  if (category === "fade") {
+    if (riskV > 70) return "High risk — avoid";
+    return "Trap alert — avoid at current price";
+  }
+  if (category === "monitor") return "Monitor — watch this round";
+  return "Signal detected";
+}
+
 export function tradeScoreExplanation(): string {
   return "Trade Score 0–100: percentile rank across all players. 80+ = elite value, 60–79 = strong, 40–59 = neutral, below 40 = avoid.";
 }

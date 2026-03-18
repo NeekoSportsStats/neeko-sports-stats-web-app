@@ -1,6 +1,6 @@
 import { ArrowRight, Zap } from "lucide-react";
 import { MWBestTrade } from "./types";
-import { fmtPrice, fmtNum, fmtPriceChange, confidenceBadge, positionBadge } from "./helpers";
+import { fmtPrice, fmtNum, fmtPriceChange, confidenceBadge, positionBadge, confidenceLabel } from "./helpers";
 import { track } from "@/lib/analytics";
 
 interface Props {
@@ -14,11 +14,11 @@ interface Props {
 export function BestTradesRow({ trades, loading, onCompare, isPremium, onShowUpgrade }: Props) {
   if (loading) {
     return (
-      <div>
+      <div className="mb-6">
         <SectionHeader />
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
           {[0,1,2,3].map(i => (
-            <div key={i} className="rounded-xl border border-white/5 bg-white/[0.02] p-4 animate-pulse flex-shrink-0 w-[260px] h-[160px]" />
+            <div key={i} className="rounded-xl border border-white/5 bg-white/[0.02] p-4 animate-pulse flex-shrink-0 w-[270px] h-[160px]" />
           ))}
         </div>
       </div>
@@ -31,9 +31,9 @@ export function BestTradesRow({ trades, loading, onCompare, isPremium, onShowUpg
   const lockedCount = isPremium ? 0 : Math.max(0, trades.length - 2);
 
   return (
-    <div className="mb-6">
-      <SectionHeader />
-      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
+    <div className="mb-8">
+      <SectionHeader count={trades.length} />
+      <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-none -mx-1 px-1">
         {visibleTrades.map((trade) => (
           <TradeCard
             key={trade.trade_id}
@@ -55,7 +55,7 @@ export function BestTradesRow({ trades, loading, onCompare, isPremium, onShowUpg
   );
 }
 
-function SectionHeader() {
+function SectionHeader({ count }: { count?: number }) {
   return (
     <div className="flex items-center gap-2 mb-3">
       <Zap className="h-4 w-4 text-[#F5C84C]" />
@@ -63,6 +63,9 @@ function SectionHeader() {
       <span className="text-[10px] text-white/30 bg-white/5 border border-white/8 px-2 py-0.5 rounded-full ml-1">
         OUT → IN
       </span>
+      {count != null && count > 0 && (
+        <span className="text-[10px] text-white/20 ml-auto">{count} trade combo{count !== 1 ? "s" : ""}</span>
+      )}
     </div>
   );
 }
@@ -71,9 +74,10 @@ function TradeCard({ trade, onCompare }: { trade: MWBestTrade; onCompare: () => 
   const ptsGain = trade.projected_points_gain;
   const priceGain = trade.expected_price_gain;
   const riskChange = trade.risk_change;
+  const confLabel = confidenceLabel(trade.confidence);
 
   return (
-    <div className="rounded-xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/12 transition-all duration-200 flex-shrink-0 w-[270px] p-4">
+    <div className="rounded-xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/12 hover:-translate-y-0.5 transition-all duration-200 flex-shrink-0 w-[270px] p-4">
       <div className="flex items-start gap-2 mb-3">
         <PlayerPill
           name={trade.out_player_name}
@@ -112,7 +116,7 @@ function TradeCard({ trade, onCompare }: { trade: MWBestTrade; onCompare: () => 
 
       <div className="flex items-center justify-between">
         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${confidenceBadge(trade.confidence)}`}>
-          {fmtNum(trade.confidence, 0)}% confidence
+          {confLabel} · {fmtNum(trade.confidence, 0)}%
         </span>
         <button
           onClick={onCompare}

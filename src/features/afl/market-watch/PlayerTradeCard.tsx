@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Lock, ArrowUpRight, Crown, Flame, TrendingUp, TrendingDown, DollarSign, TriangleAlert as AlertTriangle } from "lucide-react";
+import { Lock, ArrowUpRight, Crown, Flame, TrendingUp, TrendingDown, DollarSign, TriangleAlert as AlertTriangle, Search } from "lucide-react";
 import { MWPlayerRow } from "./types";
 import {
   fmtPrice, fmtNum, fmtPriceChange,
-  positionBadge, riskColor, priceChangeColor,
+  positionBadge, priceChangeColor,
   categoryLabel, categoryColor, tradeScoreBadge,
+  confidenceLabel, actionMicrocopy,
 } from "./helpers";
 
 interface Props {
@@ -12,38 +13,9 @@ interface Props {
   locked?: boolean;
   onUnlock?: () => void;
   onCompare?: (playerId: number) => void;
+  onFindReplacement?: () => void;
   rank: number;
   isPremium?: boolean;
-}
-
-function getActionVerdict(row: MWPlayerRow): string {
-  const cat = row.category;
-  const expChange = Number(row.expected_price_change ?? 0);
-  const edgePts = Number(row.price_edge_pts ?? 0);
-  const risk = Number(row.risk_pct ?? 0);
-
-  if (cat === "buy") {
-    if (edgePts > 20) return "Strong buy — significantly underpriced for projection";
-    return "Buy signal — underpriced relative to projection";
-  }
-  if (cat === "sell_now") {
-    if (expChange < -10000) return "Sell now — expected price drop incoming";
-    return "Overpriced — value expected to fall this round";
-  }
-  if (cat === "sell_consider") {
-    return "Consider selling — marginal value, projection gap widening";
-  }
-  if (cat === "cash_cow") {
-    if (expChange > 20000) return "Fast cash growth — breakeven smashed, generating big price rise";
-    return "Cash cow — scoring above breakeven, price growing";
-  }
-  if (cat === "fade") {
-    if (risk > 70) return "High risk — avoid this week, volatile pricing";
-    return "Trap alert — premium price not justified by projection";
-  }
-  if (cat === "monitor") return "Monitor — signals mixed, watch this round";
-
-  return row.category_reason ?? "—";
 }
 
 function getImpactBadges(row: MWPlayerRow): Array<{ icon: React.ReactNode; label: string; cls: string }> {
@@ -63,20 +35,20 @@ function getImpactBadges(row: MWPlayerRow): Array<{ icon: React.ReactNode; label
   if (risk >= 70) {
     badges.push({ icon: <AlertTriangle className="h-2.5 w-2.5" />, label: "RISK", cls: "text-red-400 bg-red-400/10 border-red-400/25" });
   }
-  if (momentum === "rising" || momentum === "improving") {
+  if ((momentum === "rising" || momentum === "improving") && !badges.some(b => b.label === "RISING")) {
     badges.push({ icon: <TrendingUp className="h-2.5 w-2.5" />, label: "RISING", cls: "text-green-300 bg-green-300/10 border-green-300/20" });
   }
   if (momentum === "falling" || momentum === "cooling") {
     badges.push({ icon: <TrendingDown className="h-2.5 w-2.5" />, label: "DROPPING", cls: "text-red-300 bg-red-300/10 border-red-300/20" });
   }
-  if (expChange > 15000) {
+  if (expChange > 15000 && !badges.some(b => b.label === "RISING")) {
     badges.push({ icon: <TrendingUp className="h-2.5 w-2.5" />, label: "RISING", cls: "text-green-300 bg-green-300/10 border-green-300/20" });
   }
 
   return badges.slice(0, 2);
 }
 
-export function PlayerTradeCard({ row, locked, onUnlock, onCompare, rank, isPremium = true }: Props) {
+export function PlayerTradeCard({ row, locked, onUnlock, onCompare, onFindReplacement, rank, isPremium = true }: Props) {
   const [hovered, setHovered] = useState(false);
 
   if (locked) {
@@ -88,9 +60,12 @@ export function PlayerTradeCard({ row, locked, onUnlock, onCompare, rank, isPrem
   const confidence = Number(row.projection_confidence ?? 0);
   const confPct = Math.min(100, Math.max(0, confidence));
   const confBars = Math.round((confPct / 100) * 8);
+  const confLabel = confPct > 0 ? confidenceLabel(confPct) : null;
 
-  const actionVerdict = getActionVerdict(row);
+  const microcopy = actionMicrocopy(row.category, row.price_edge_pts, row.expected_price_change, row.risk_pct);
   const impactBadges = getImpactBadges(row);
+
+  const isSell = row.category === "sell_now" || row.category === "sell_consider";
 
   const glowClass = score >= 80
     ? "shadow-[0_0_20px_rgba(74,222,128,0.06)]"
@@ -178,7 +153,9 @@ export function PlayerTradeCard({ row, locked, onUnlock, onCompare, rank, isPrem
 
         {confPct > 0 && (
           <div className="shrink-0 ml-2">
-            <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1 text-right">Confidence</p>
+            <p className="text-[9px] text-white/30 uppercase tracking-wider mb-1 text-right">
+              {confLabel ?? "Confidence"}
+            </p>
             <div className="flex items-center gap-0.5 justify-end">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div
@@ -203,29 +180,38 @@ export function PlayerTradeCard({ row, locked, onUnlock, onCompare, rank, isPrem
           row.category === "fade" ? "text-orange-300/70" :
           "text-white/35"
         }`}>
-          {actionVerdict}
+          {microcopy}
         </p>
       </div>
 
-      {isPremium && onCompare && (
-        <button
-          onClick={() => onCompare(row.player_id)}
-          className={`
-            mt-2 flex items-center gap-1 text-[11px] transition-colors
-            ${hovered ? "text-[#F5C84C]" : "text-white/25"}
-          `}
-        >
-          <ArrowUpRight className="h-3 w-3" />
-          Compare
-        </button>
-      )}
+      <div className="flex items-center gap-3 mt-2 flex-wrap">
+        {isPremium && onCompare && (
+          <button
+            onClick={() => onCompare(row.player_id)}
+            className={`flex items-center gap-1 text-[11px] transition-colors ${hovered ? "text-[#F5C84C]" : "text-white/25"}`}
+          >
+            <ArrowUpRight className="h-3 w-3" />
+            Compare
+          </button>
+        )}
 
-      {!isPremium && (
-        <span className="mt-2 flex items-center gap-1 text-[11px] text-white/15 cursor-default select-none">
-          <Crown className="h-3 w-3 text-[#F5C84C]/30" />
-          Compare (Neeko+)
-        </span>
-      )}
+        {isPremium && isSell && onFindReplacement && (
+          <button
+            onClick={onFindReplacement}
+            className={`flex items-center gap-1 text-[11px] transition-colors ${hovered ? "text-green-400" : "text-white/20"}`}
+          >
+            <Search className="h-3 w-3" />
+            Find replacement
+          </button>
+        )}
+
+        {!isPremium && (
+          <span className="flex items-center gap-1 text-[11px] text-white/15 cursor-default select-none">
+            <Crown className="h-3 w-3 text-[#F5C84C]/30" />
+            Compare (Neeko+)
+          </span>
+        )}
+      </div>
     </div>
   );
 }

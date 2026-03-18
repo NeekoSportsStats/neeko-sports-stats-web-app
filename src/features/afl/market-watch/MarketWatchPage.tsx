@@ -3,7 +3,7 @@ import { TrendingUp, RefreshCw, Crown, ChevronDown, Lock, CircleAlert as AlertCi
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
-import { MWPlayerRow, MWSummaryCard, MWSummary, MWStatus } from "./types";
+import { MWPlayerRow, MWSummaryCard, MWSummary, MWStatus, MWBestTrade } from "./types";
 
 import { UpgradeModal } from "./UpgradeModal";
 import { PlayerTradeCard } from "./PlayerTradeCard";
@@ -14,6 +14,8 @@ import { MarketWatchSkeleton } from "./MarketWatchSkeleton";
 import { MarketWatchSort, SortKey } from "./MarketWatchSort";
 import { MarketWatchFilters, FilterState } from "./MarketWatchFilters";
 import { TopTradeOfWeek } from "./TopTradeOfWeek";
+import { TradePlanCard } from "./TradePlanCard";
+import { BestTradesRow } from "./BestTradesRow";
 
 const SECTION_DEFAULT = 12;
 
@@ -27,12 +29,13 @@ const SECTION_IDS = [
 interface PageData {
   players: MWPlayerRow[];
   summaryCards: MWSummaryCard[];
+  bestTrades: MWBestTrade[];
 }
 
 export default function MarketWatchPage() {
   const { isPremium, loading: authLoading } = useAuth();
 
-  const [data, setData] = useState<PageData>({ players: [], summaryCards: [] });
+  const [data, setData] = useState<PageData>({ players: [], summaryCards: [], bestTrades: [] });
   const [summary, setSummary] = useState<MWSummary | null>(null);
   const [status, setStatus] = useState<MWStatus | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
@@ -64,20 +67,22 @@ export default function MarketWatchPage() {
     setDataLoading(true);
     try {
       if (premium) {
-        const [playersRes, cardsRes, summaryRes, statusRes] = await Promise.all([
+        const [playersRes, cardsRes, summaryRes, statusRes, tradesRes] = await Promise.all([
           supabase.from("v_mw_premium").select("*").limit(400),
           supabase.from("v_mw_summary_cards").select("*"),
           supabase.from("v_mw_summary").select("*").maybeSingle(),
           supabase.from("v_mw_status").select("*").maybeSingle(),
+          supabase.from("v_mw_best_trades").select("*").limit(20),
         ]);
         setData({
           players: (playersRes.data ?? []) as MWPlayerRow[],
           summaryCards: (cardsRes.data ?? []) as MWSummaryCard[],
+          bestTrades: (tradesRes.data ?? []) as MWBestTrade[],
         });
         if (summaryRes.data) setSummary(summaryRes.data as MWSummary);
         if (statusRes.data) setStatus(statusRes.data as MWStatus);
       } else {
-        const [buyRes, sellRes, cowRes, trapRes, cardsRes, summaryRes, statusRes] = await Promise.all([
+        const [buyRes, sellRes, cowRes, trapRes, cardsRes, summaryRes, statusRes, tradesRes] = await Promise.all([
           supabase.from("v_mw_premium").select("*").eq("category", "buy").order("trade_score", { ascending: false }).limit(1),
           supabase.from("v_mw_premium").select("*").in("category", ["sell_now", "sell_consider"]).order("trade_score", { ascending: false }).limit(1),
           supabase.from("v_mw_premium").select("*").eq("category", "cash_cow").order("trade_score", { ascending: false }).limit(1),
@@ -85,6 +90,7 @@ export default function MarketWatchPage() {
           supabase.from("v_mw_summary_cards").select("*"),
           supabase.from("v_mw_summary").select("*").maybeSingle(),
           supabase.from("v_mw_status").select("*").maybeSingle(),
+          supabase.from("v_mw_best_trades").select("*").limit(2),
         ]);
         const freePlayers = [
           ...(buyRes.data ?? []),
@@ -95,6 +101,7 @@ export default function MarketWatchPage() {
         setData({
           players: freePlayers,
           summaryCards: (cardsRes.data ?? []) as MWSummaryCard[],
+          bestTrades: (tradesRes.data ?? []) as MWBestTrade[],
         });
         if (summaryRes.data) setSummary(summaryRes.data as MWSummary);
         if (statusRes.data) setStatus(statusRes.data as MWStatus);
@@ -146,7 +153,14 @@ export default function MarketWatchPage() {
     return () => observer.disconnect();
   }, [data.players]);
 
-  const { players, summaryCards } = data;
+  const scrollToSection = useCallback((sectionId: string) => {
+    const el = document.getElementById(sectionId);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
+
+  const { players, summaryCards, bestTrades } = data;
   const bestTradeCard = summaryCards.find(c => c.card_type === "best_trade") ?? null;
 
   const allTeams = useMemo(() => {
@@ -210,7 +224,7 @@ export default function MarketWatchPage() {
                 <h1 className="text-2xl font-bold tracking-tight text-white">Market Watch</h1>
               </div>
               <p className="text-sm text-white/40">
-                Weekly trade intelligence — buys, sells, cash cows, and traps powered by the Neeko projection model.
+                Weekly trade decisions — know exactly what trades to make this round.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -278,6 +292,7 @@ export default function MarketWatchPage() {
           <FreeUserView
             rawPlayers={players}
             summaryCards={summaryCards}
+            bestTrades={bestTrades}
             onUnlock={() => setShowUpgrade(true)}
             summary={summary}
           />
@@ -300,6 +315,7 @@ export default function MarketWatchPage() {
             cashCows={cashCows}
             traps={traps}
             bestTradeCard={bestTradeCard}
+            bestTrades={bestTrades}
             showMoreBuy={showMoreBuy}
             showMoreSell={showMoreSell}
             showMoreCashCows={showMoreCashCows}
@@ -310,6 +326,7 @@ export default function MarketWatchPage() {
             onToggleTraps={() => setShowMoreTraps(e => !e)}
             onUnlock={() => setShowUpgrade(true)}
             onCompare={(outId, inId) => setCompareModal({ outId, inId })}
+            onScrollToSection={scrollToSection}
           />
         )}
 
@@ -338,11 +355,12 @@ export default function MarketWatchPage() {
 interface FreeViewProps {
   rawPlayers: MWPlayerRow[];
   summaryCards: MWSummaryCard[];
+  bestTrades: MWBestTrade[];
   onUnlock: () => void;
   summary: MWSummary | null;
 }
 
-function FreeUserView({ rawPlayers, summaryCards, onUnlock, summary }: FreeViewProps) {
+function FreeUserView({ rawPlayers, summaryCards, bestTrades, onUnlock, summary }: FreeViewProps) {
   const byCategory = (cat: string) =>
     [...rawPlayers.filter(p => p.category === cat)]
       .sort((a, b) => (b.trade_score ?? 0) - (a.trade_score ?? 0))[0] ?? null;
@@ -366,7 +384,7 @@ function FreeUserView({ rawPlayers, summaryCards, onUnlock, summary }: FreeViewP
       label: "Buy Target",
       dot: "bg-green-400",
       labelColor: "text-green-400",
-      description: "Underpriced relative to projection — highest ROI trade this round",
+      description: "Undervalued — strong buy",
       total: totalBuy,
     },
     {
@@ -374,7 +392,7 @@ function FreeUserView({ rawPlayers, summaryCards, onUnlock, summary }: FreeViewP
       label: "Sell Signal",
       dot: "bg-red-400",
       labelColor: "text-red-400",
-      description: "Overpriced — value expected to drop, prime selling window",
+      description: "Overpriced — sell before drop",
       total: totalSell,
     },
     {
@@ -382,7 +400,7 @@ function FreeUserView({ rawPlayers, summaryCards, onUnlock, summary }: FreeViewP
       label: "Cash Cow",
       dot: "bg-[#F5C84C]",
       labelColor: "text-[#F5C84C]",
-      description: "Budget player smashing breakeven — generating fast price growth",
+      description: "Fastest cash growth this round",
       total: totalCow,
     },
     {
@@ -390,7 +408,7 @@ function FreeUserView({ rawPlayers, summaryCards, onUnlock, summary }: FreeViewP
       label: "Trap Alert",
       dot: "bg-orange-400",
       labelColor: "text-orange-400",
-      description: "Premium-priced — projection does not justify the cost",
+      description: "High risk — avoid at current price",
       total: totalTrap,
     },
   ];
@@ -404,10 +422,29 @@ function FreeUserView({ rawPlayers, summaryCards, onUnlock, summary }: FreeViewP
         isPremium={false}
       />
 
+      {(topSell || topBuy || topCow) && (
+        <TradePlanCard
+          topSell={topSell}
+          topBuy={topBuy}
+          topCow={topCow}
+          onScrollToSection={() => onUnlock()}
+        />
+      )}
+
+      {bestTrades.length > 0 && (
+        <BestTradesRow
+          trades={bestTrades}
+          loading={false}
+          onCompare={() => onUnlock()}
+          isPremium={false}
+          onShowUpgrade={onUnlock}
+        />
+      )}
+
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-sm font-bold text-white">Top Signal per Category</h2>
-          <p className="text-[11px] text-white/25 mt-0.5">Neeko detected the strongest trade opportunity in each category.</p>
+          <p className="text-[11px] text-white/25 mt-0.5">Neeko's strongest trade opportunity in each category this round.</p>
         </div>
         <div className="h-px flex-1 mx-4 bg-white/[0.05]" />
         <span className="text-[10px] text-white/15 uppercase tracking-widest shrink-0">#1 per category</span>
@@ -476,6 +513,7 @@ interface PremiumViewProps {
   cashCows: MWPlayerRow[];
   traps: MWPlayerRow[];
   bestTradeCard: MWSummaryCard | null;
+  bestTrades: MWBestTrade[];
   showMoreBuy: boolean;
   showMoreSell: boolean;
   showMoreCashCows: boolean;
@@ -486,15 +524,18 @@ interface PremiumViewProps {
   onToggleTraps: () => void;
   onUnlock: () => void;
   onCompare: (outId?: number, inId?: number) => void;
+  onScrollToSection: (section: string) => void;
 }
 
 function PremiumUserView({
   buyTargets, sellPlayers, cashCows, traps,
-  bestTradeCard,
+  bestTradeCard, bestTrades,
   showMoreBuy, showMoreSell, showMoreCashCows, showMoreTraps,
   onToggleBuy, onToggleSell, onToggleCashCows, onToggleTraps,
-  onUnlock, onCompare,
+  onUnlock, onCompare, onScrollToSection,
 }: PremiumViewProps) {
+  const [compareTradeModal, setCompareTradeModal] = useState<{ outId?: number; inId?: number } | null>(null);
+
   const getVisible = (arr: MWPlayerRow[], showMore: boolean) =>
     showMore ? arr : arr.slice(0, SECTION_DEFAULT);
 
@@ -502,6 +543,10 @@ function PremiumUserView({
   const visibleSell     = getVisible(sellPlayers, showMoreSell);
   const visibleCashCows = getVisible(cashCows, showMoreCashCows);
   const visibleTraps    = getVisible(traps, showMoreTraps);
+
+  const topSell = sellPlayers[0] ?? null;
+  const topBuy  = buyTargets[0] ?? null;
+  const topCow  = cashCows[0] ?? null;
 
   return (
     <>
@@ -513,13 +558,35 @@ function PremiumUserView({
         isPremium={true}
       />
 
+      {(topSell || topBuy || topCow) && (
+        <TradePlanCard
+          topSell={topSell}
+          topBuy={topBuy}
+          topCow={topCow}
+          onScrollToSection={onScrollToSection}
+        />
+      )}
+
+      {bestTrades.length > 0 && (
+        <BestTradesRow
+          trades={bestTrades}
+          loading={false}
+          onCompare={(trade) => {
+            setCompareTradeModal({ outId: trade.out_player_id, inId: trade.in_player_id });
+            onCompare(trade.out_player_id, trade.in_player_id);
+          }}
+          isPremium={true}
+          onShowUpgrade={onUnlock}
+        />
+      )}
+
       {buyTargets.length > 0 ? (
         <HorizontalRail
           id="section-buy"
           label="Buy Targets"
           labelColor="text-green-400"
           dot="bg-green-400"
-          description="Players underpriced relative to projection — highest ROI trades this round"
+          description="Undervalued — strong buy signals for this round"
           count={buyTargets.length}
         >
           {visibleBuy.map((p, i) => (
@@ -557,7 +624,7 @@ function PremiumUserView({
           label="Sell Signals"
           labelColor="text-red-400"
           dot="bg-red-400"
-          description="Players overpriced relative to projection — selling window before price falls"
+          description="Overpriced — sell before drop. Use Find Replacement on any card."
           count={sellPlayers.length}
         >
           {visibleSell.map((p, i) => (
@@ -569,6 +636,7 @@ function PremiumUserView({
                 onUnlock={onUnlock}
                 isPremium={true}
                 onCompare={(id) => onCompare(id, undefined)}
+                onFindReplacement={() => onScrollToSection("section-buy")}
               />
             </div>
           ))}
@@ -595,7 +663,7 @@ function PremiumUserView({
           label="Cash Cows"
           labelColor="text-[#F5C84C]"
           dot="bg-[#F5C84C]"
-          description="Budget players scoring above breakeven — generating price growth each round"
+          description="Fastest cash growth this round — scoring above breakeven, generating price rise"
           count={cashCows.length}
         >
           {visibleCashCows.map((p, i) => (
@@ -633,7 +701,7 @@ function PremiumUserView({
           label="Trap Alerts"
           labelColor="text-orange-400"
           dot="bg-orange-400"
-          description="Premium-priced players whose projection doesn't justify current cost — avoid or sell"
+          description="High risk — avoid at current price. Premium cost not justified by projection."
           count={traps.length}
         >
           {visibleTraps.map((p, i) => (
@@ -663,6 +731,10 @@ function PremiumUserView({
           subtext="No significantly overpriced high-risk players detected."
           id="section-traps"
         />
+      )}
+
+      {compareTradeModal !== null && (
+        <span style={{ display: "none" }} />
       )}
     </>
   );
@@ -703,14 +775,19 @@ function MarketWatchPaywall({
   const displayExtra = totalExtra > 0 ? totalExtra : 120;
 
   const lines = [
-    extraBuy  > 0 && `${extraBuy} more buy target${extraBuy !== 1 ? "s" : ""}`,
-    extraSell > 0 && `${extraSell} more sell signal${extraSell !== 1 ? "s" : ""}`,
-    extraCow  > 0 && `${extraCow} cash cow${extraCow !== 1 ? "s" : ""} generating price growth`,
-    extraTrap > 0 && `${extraTrap} trap alert${extraTrap !== 1 ? "s" : ""} to avoid this round`,
+    extraBuy  > 0 && `${extraBuy} more buy target${extraBuy !== 1 ? "s" : ""} — undervalued picks`,
+    extraSell > 0 && `${extraSell} more sell signal${extraSell !== 1 ? "s" : ""} — overpriced before drop`,
+    extraCow  > 0 && `${extraCow} cash cow${extraCow !== 1 ? "s" : ""} — fastest price growth this round`,
+    extraTrap > 0 && `${extraTrap} trap alert${extraTrap !== 1 ? "s" : ""} — high risk, avoid`,
   ].filter(Boolean) as string[];
 
   if (lines.length === 0) {
-    lines.push("Full buy/sell signal lists", "Breakout cash cows", "Trap alerts", "AI-powered trade insights");
+    lines.push(
+      "Full buy/sell signal lists",
+      "Breakout cash cows generating price growth",
+      "Trap alerts to avoid this round",
+      "AI-powered trade rationale per player",
+    );
   }
 
   return (
@@ -721,10 +798,10 @@ function MarketWatchPaywall({
 
       <p className="text-[10px] uppercase tracking-widest text-white/25 mb-2">You're seeing the top signals only</p>
       <h3 className="text-xl font-extrabold text-white mb-1">
-        Unlock the full trade engine
+        Unlock your full trade plan
       </h3>
       <p className="text-sm text-white/35 mb-5">
-        {displayExtra}+ trade signals updated every round
+        See every trade opportunity this round — {displayExtra}+ signals
       </p>
 
       <div className="mb-5 space-y-1.5">
@@ -759,7 +836,7 @@ function MarketWatchPaywall({
           className="inline-flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-7 py-3.5 rounded-xl hover:brightness-110 transition-all shadow-lg shadow-[#F5C84C]/20"
         >
           <Crown size={14} />
-          Unlock full trade engine
+          Unlock your full trade plan
         </a>
         <button
           onClick={onUnlock}
