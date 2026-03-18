@@ -22,10 +22,15 @@ import NotFound from "@/pages/NotFound";
 ========================= */
 import {
   AdminShell,
+  AdminOverview,
   AdminCommandCenter,
+  AdminDataIntegrity,
+  AdminPlayersIntelligence,
+  AdminPipelines,
+  AdminAIContent,
   AdminSystemHealth,
-  AdminOperations,
   AdminAnalytics,
+  AdminOperations,
   AdminAccuracy,
   AdminQueue,
   AdminContentEngine,
@@ -157,19 +162,24 @@ function App() {
           </RequireAdmin>
         }
       >
-        <Route index element={<Navigate to="/admin/command-center" replace />} />
-        <Route path="command-center"   element={<S fallback={Generic}><AdminCommandCenter /></S>} />
-        <Route path="system-health"    element={<S fallback={Generic}><AdminSystemHealth /></S>} />
-        <Route path="operations"       element={<S fallback={Generic}><AdminOperations /></S>} />
-        <Route path="analytics"        element={<S fallback={Generic}><AdminAnalytics /></S>} />
-        <Route path="accuracy"         element={<S fallback={Generic}><AdminAccuracy /></S>} />
-        <Route path="queue"            element={<S fallback={Generic}><AdminQueue /></S>} />
-        <Route path="content-engine"   element={<S fallback={Generic}><AdminContentEngine /></S>} />
-        <Route path="content-planner"  element={<S fallback={Generic}><AdminContentPlanner /></S>} />
-        <Route path="founder-tasks"    element={<S fallback={Generic}><AdminFounderTasks /></S>} />
-        <Route path="brownlow-lab"     element={<S fallback={Generic}><AdminBrownlowLab /></S>} />
-        <Route path="leaderboard-lab"  element={<S fallback={Generic}><AdminLeaderboardLab /></S>} />
-        <Route path="model-lab"        element={<S fallback={Generic}><AdminModelLab /></S>} />
+        <Route index element={<Navigate to="/admin/overview" replace />} />
+        <Route path="overview"              element={<S fallback={Generic}><AdminOverview /></S>} />
+        <Route path="command-center"        element={<S fallback={Generic}><AdminCommandCenter /></S>} />
+        <Route path="data-integrity"        element={<S fallback={Generic}><AdminDataIntegrity /></S>} />
+        <Route path="players-intelligence"  element={<S fallback={Generic}><AdminPlayersIntelligence /></S>} />
+        <Route path="pipelines"             element={<S fallback={Generic}><AdminPipelines /></S>} />
+        <Route path="ai-content"            element={<S fallback={Generic}><AdminAIContent /></S>} />
+        <Route path="analytics"             element={<S fallback={Generic}><AdminAnalytics /></S>} />
+        <Route path="system-health"         element={<S fallback={Generic}><AdminSystemHealth /></S>} />
+        <Route path="operations"            element={<S fallback={Generic}><AdminOperations /></S>} />
+        <Route path="accuracy"              element={<S fallback={Generic}><AdminAccuracy /></S>} />
+        <Route path="queue"                 element={<S fallback={Generic}><AdminQueue /></S>} />
+        <Route path="content-engine"        element={<S fallback={Generic}><AdminContentEngine /></S>} />
+        <Route path="content-planner"       element={<S fallback={Generic}><AdminContentPlanner /></S>} />
+        <Route path="founder-tasks"         element={<S fallback={Generic}><AdminFounderTasks /></S>} />
+        <Route path="brownlow-lab"          element={<S fallback={Generic}><AdminBrownlowLab /></S>} />
+        <Route path="leaderboard-lab"       element={<S fallback={Generic}><AdminLeaderboardLab /></S>} />
+        <Route path="model-lab"             element={<S fallback={Generic}><AdminModelLab /></S>} />
       </Route>
 
       <Route
