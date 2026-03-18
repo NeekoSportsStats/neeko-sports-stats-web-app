@@ -10,24 +10,31 @@ const corsHeaders = {
 const BATCH_SIZE = 5;
 const DEFAULT_MAX_PLAYERS = 20;
 
-const SYSTEM_PROMPT = `You are Neeko, an elite AFL fantasy analyst. Write sharp, confident, data-driven player assessments for fantasy coaches.
+function buildSystemPrompt(recommendation: string): string {
+  return `You are Neeko, an elite AFL fantasy analyst explaining model-driven recommendations to fantasy coaches.
 
-Your job is analysis ONLY — the system separately determines the BUY/HOLD/SELL signal. Do NOT include any trade recommendation.
+The model has already determined this player's recommendation: ${recommendation}
+
+Your ONLY job is to explain WHY this recommendation exists using the data provided.
+
+DO NOT change the recommendation.
+DO NOT contradict the recommendation.
+DO NOT include any trade signal in your output.
 
 Format your response as JSON with exactly three fields:
 {
-  "short": "<one punchy sentence, max 100 chars — the single most important insight right now. Lead with player name and a key number.>",
-  "why": "<one sentence explaining the core reason behind the rating, max 120 chars. Reference a specific number or context factor.>",
-  "long": "<3-4 sentences of deeper analysis covering: current form trajectory, projection vs price value, matchup context, and a specific fantasy coaching insight. Reference actual numbers from the data.>"
+  "short": "<one punchy sentence, max 100 chars — lead with player name and the single most important data point supporting the ${recommendation} call>",
+  "why": "<one crisp sentence, max 120 chars — the core quantitative reason behind the ${recommendation} rating>",
+  "long": "<3-4 sentences of deeper explanation supporting the ${recommendation} call — cover form trajectory, projection vs price, matchup context, and a specific coaching insight. Reference actual numbers.>"
 }
 
 Rules:
-- Do NOT include recommendation, BUY, SELL, HOLD, or any trade signal in any field
-- short: punchy, lead with name, quote a number (e.g. "Sheezel is on fire — 130+ avg last 3, facing a soft DEF matchup")
-- why: one crisp reason grounding the rating (e.g. "Value score of 6.2 with ceiling of 148 makes him hard to ignore")
-- long: analyst voice, reference projection/ceiling/floor/value numbers, no hedging phrases
-- Write in confident present tense
-- Return ONLY valid JSON, no markdown, no text outside the JSON`;
+- Every sentence must support and reinforce the ${recommendation} recommendation
+- short: lead with player name and a key number (e.g. "Sheezel's 6.8 value score and 130+ ceiling make him a clear BUY")
+- why: one crisp reason referencing a specific metric
+- long: analyst voice, no hedging, reference projection/ceiling/floor/value numbers
+- Return ONLY valid JSON — no markdown, no text outside the JSON`;
+}
 
 interface AIResult {
   short: string;
@@ -51,20 +58,28 @@ interface PlayerRow {
   value_tag: string | null;
   best_value_score: number | null;
   matchup_rating: string | null;
+  matchup_label: string | null;
   venue_multiplier: number | null;
   form_score: number | null;
   neeko_rating: number | null;
   neeko_rating_scaled: number | null;
   games_played: number | null;
   upside_rating: number | null;
+  upside_pct: number | null;
   captain_score: number | null;
   captain_rating: string | null;
+  ai_recommendation: string | null;
+  recommendation_strength: string | null;
   input_hash: string | null;
   needs_regen: boolean;
 }
 
-async function callOpenAI(openaiKey: string, playerData: Record<string, unknown>): Promise<AIResult | null> {
-  const userContent = `Analyse this AFL player for fantasy this round:\n${JSON.stringify(playerData, null, 2)}`;
+async function callOpenAI(
+  openaiKey: string,
+  recommendation: string,
+  playerData: Record<string, unknown>
+): Promise<AIResult | null> {
+  const userContent = `Explain why this AFL player has a ${recommendation} recommendation:\n${JSON.stringify(playerData, null, 2)}`;
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -75,10 +90,10 @@ async function callOpenAI(openaiKey: string, playerData: Record<string, unknown>
     body: JSON.stringify({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: buildSystemPrompt(recommendation) },
         { role: "user", content: userContent },
       ],
-      temperature: 0.35,
+      temperature: 0.3,
       max_tokens: 400,
       response_format: { type: "json_object" },
     }),
@@ -94,9 +109,9 @@ async function callOpenAI(openaiKey: string, playerData: Record<string, unknown>
   if (!content) return null;
 
   const parsed = JSON.parse(content);
-  if (!parsed.short)  parsed.short = parsed.summary_short ?? "";
-  if (!parsed.why)    parsed.why   = "";
-  if (!parsed.long)   parsed.long  = parsed.summary_long ?? "";
+  if (!parsed.short) parsed.short = parsed.summary_short ?? "";
+  if (!parsed.why)   parsed.why   = "";
+  if (!parsed.long)  parsed.long  = parsed.summary_long ?? "";
   return parsed as AIResult;
 }
 
@@ -135,16 +150,20 @@ Deno.serve(async (req: Request) => {
 
     // DATA SOURCE: public.v_ai_player_analysis_input
     // This view reads from afl.player_rankings_cache — the SAME source as public.v_rankings_master.
-    // Both views are backed by the same table, so AI and frontend always use identical numbers.
+    // ai_recommendation comes from the SQL model in afl.player_rankings_cache.
+    // AI never determines the recommendation — it only explains it.
     const { data: players, error: fetchErr } = await supabase
       .from("v_ai_player_analysis_input")
       .select([
         "player_id", "player_name", "team", "position",
         "price", "projection_final", "ceiling", "floor",
-        "risk", "confidence", "consistency", "value_score", "value_tag", "best_value_score",
-        "matchup_rating", "venue_multiplier", "form_score",
-        "neeko_rating", "neeko_rating_scaled", "games_played",
-        "upside_rating", "captain_score", "captain_rating",
+        "risk", "confidence", "consistency",
+        "value_score", "value_tag", "best_value_score",
+        "matchup_rating", "matchup_label", "venue_multiplier",
+        "form_score", "neeko_rating", "neeko_rating_scaled",
+        "games_played", "upside_rating", "upside_pct",
+        "captain_score", "captain_rating",
+        "ai_recommendation", "recommendation_strength",
         "input_hash", "needs_regen",
       ].join(","))
       .eq("needs_regen", true)
@@ -154,12 +173,18 @@ Deno.serve(async (req: Request) => {
 
     if (!players || players.length === 0) {
       return new Response(
-        JSON.stringify({ ok: true, message: "All player analyses are up to date", processed: 0, skipped_unchanged: true, data_source: "afl.player_rankings_cache (= v_rankings_master)" }),
+        JSON.stringify({
+          ok: true,
+          message: "All player analyses are up to date",
+          processed: 0,
+          skipped_unchanged: true,
+          data_source: "afl.player_rankings_cache (= v_rankings_master)",
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const debugData: Record<number, unknown>[] = [];
+    const debugData: unknown[] = [];
     let processed = 0;
     let failed = 0;
     const errors: string[] = [];
@@ -169,66 +194,82 @@ Deno.serve(async (req: Request) => {
 
       await Promise.all(batch.map(async (player) => {
         try {
+          // The recommendation is MODEL-DETERMINED — never AI-generated
+          const recommendation = player.ai_recommendation ?? "HOLD";
+
           const promptPayload = {
-            player_name:         player.player_name,
-            team:                player.team,
-            position:            player.position,
-            price:               player.price,
-            projection_final:    player.projection_final,
-            ceiling:             player.ceiling,
-            floor:               player.floor,
-            consistency:         player.consistency,
-            form_score:          player.form_score,
-            value_score:         player.value_score,
-            value_tag:           player.value_tag,
-            matchup_rating:      player.matchup_rating,
-            risk:                player.risk,
-            confidence:          player.confidence,
-            neeko_rating_scaled: player.neeko_rating_scaled,
-            captain_score:       player.captain_score,
-            captain_rating:      player.captain_rating,
-            games_played:        player.games_played,
+            player_name:              player.player_name,
+            team:                     player.team,
+            position:                 player.position,
+            price:                    player.price,
+            projection_final:         player.projection_final,
+            ceiling:                  player.ceiling,
+            floor:                    player.floor,
+            consistency:              player.consistency,
+            form_score:               player.form_score,
+            value_score:              player.value_score,
+            value_tag:                player.value_tag,
+            matchup_rating:           player.matchup_rating,
+            matchup_label:            player.matchup_label,
+            risk:                     player.risk,
+            confidence:               player.confidence,
+            neeko_rating_scaled:      player.neeko_rating_scaled,
+            upside_pct:               player.upside_pct,
+            captain_score:            player.captain_score,
+            captain_rating:           player.captain_rating,
+            games_played:             player.games_played,
+            // Passed so AI can explain — AI cannot change this
+            model_recommendation:     recommendation,
+            recommendation_strength:  player.recommendation_strength,
           };
 
           if (debugMode) {
-            debugData.push({ player_id: player.player_id, prompt_payload: promptPayload, data_source: "afl.player_rankings_cache (= v_rankings_master)" });
+            debugData.push({
+              player_id:          player.player_id,
+              model_recommendation: recommendation,
+              prompt_payload:     promptPayload,
+              data_source:        "afl.player_rankings_cache (= v_rankings_master)",
+            });
           }
 
           let result: AIResult;
 
           if (openaiKey) {
-            const parsed = await callOpenAI(openaiKey, promptPayload);
+            const parsed = await callOpenAI(openaiKey, recommendation, promptPayload);
             if (!parsed) return;
             result = parsed;
           } else {
             result = {
-              short: `${player.player_name} projecting ${player.projection_final} pts — mock analysis (no OpenAI key)`,
-              why:   `Value score ${player.value_score ?? "N/A"} with confidence ${player.confidence ?? "N/A"}`,
-              long:  `Projected ${player.projection_final} pts for the upcoming round. Mock analysis — configure OPENAI_API_KEY to enable real AI insights.`,
+              short: `${player.player_name} projecting ${player.projection_final} pts — model says ${recommendation} (no OpenAI key)`,
+              why:   `Value score ${player.value_score ?? "N/A"}, risk ${player.risk ?? "N/A"}, form ${player.form_score ?? "N/A"}`,
+              long:  `Model recommendation: ${recommendation}. Projection ${player.projection_final} pts, ceiling ${player.ceiling}, floor ${player.floor}. Configure OPENAI_API_KEY for real AI explanations.`,
             };
           }
 
-          // Write to ai.player_ai_analysis (canonical AI store)
+          const summaryLong = `${result.why}\n\n${result.long}`.trim();
+
+          // Write explanation to ai.player_ai_analysis
+          // NOTE: p_recommendation stores the MODEL recommendation, not an AI-generated one
           const { error: rpcErr } = await supabase.rpc("upsert_player_ai_analysis", {
             p_player_id:      player.player_id,
-            p_recommendation: "HOLD",
+            p_recommendation: recommendation,
             p_confidence:     65,
             p_summary_short:  result.short,
-            p_summary_long:   `${result.why}\n\n${result.long}`.trim(),
+            p_summary_long:   summaryLong,
             p_model:          "gpt-4o-mini",
             p_input_hash:     player.input_hash ?? null,
           });
           if (rpcErr) throw rpcErr;
 
-          // Immediate writeback to afl.player_rankings_cache so frontend sees updated AI
-          // content without waiting for the next full pipeline run.
+          // Immediate writeback to afl.player_rankings_cache
+          // ONLY writes explanation text — does NOT touch ai_recommendation
           const { error: cacheErr } = await supabase
             .schema("afl" as any)
             .from("player_rankings_cache")
             .update({
               recommendation_short: result.short,
-              recommendation_why:   `${result.why}\n\n${result.long}`.trim(),
-              ai_summary:           `${result.why}\n\n${result.long}`.trim(),
+              recommendation_why:   summaryLong,
+              ai_summary:           summaryLong,
               ai_updated_at:        new Date().toISOString(),
             })
             .eq("player_id", player.player_id);
@@ -254,7 +295,8 @@ Deno.serve(async (req: Request) => {
       total_pending: (players as PlayerRow[]).length,
       errors: errors.slice(0, 5),
       data_source: "afl.player_rankings_cache (= v_rankings_master)",
-      writeback: "immediate — afl.player_rankings_cache updated after each player",
+      ai_role: "explain model recommendation — never generate it",
+      writeback: "recommendation_short + ai_summary only — ai_recommendation never touched",
     };
 
     if (debugMode) {
