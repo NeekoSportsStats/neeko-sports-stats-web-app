@@ -294,7 +294,7 @@ export default function StartSitPage() {
       <div className="max-w-2xl mx-auto px-4 py-8 pb-28">
 
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-5">
           <div className="flex items-center gap-2 mb-1">
             <Zap size={16} className="text-[#F5C84C]" />
             <span className="text-[11px] font-semibold uppercase tracking-widest text-[#F5C84C]/60">
@@ -305,19 +305,6 @@ export default function StartSitPage() {
           <p className="text-sm text-white/40 mt-1">
             Compare two players and get a verdict on who to start this round.
           </p>
-        </div>
-
-        {/* Round pill */}
-        <div className="flex items-center gap-2 mb-5">
-          <span className="text-[11px] text-white/30 uppercase tracking-wider">Round</span>
-          {roundLoading ? (
-            <span className="h-6 w-16 rounded-md bg-white/[0.06] animate-pulse" />
-          ) : (
-            <span className="rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1 text-sm font-bold text-white/70">
-              {getAflRoundLabel(round)}
-            </span>
-          )}
-          <span className="text-[11px] text-white/20">{CURRENT_SEASON}</span>
         </div>
 
         {/* Player selectors */}
