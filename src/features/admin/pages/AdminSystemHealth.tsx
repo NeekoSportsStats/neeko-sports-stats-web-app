@@ -6,6 +6,7 @@ import {
   Activity, Database, ChartBar as BarChart2, ShieldCheck, Zap,
   RefreshCw, MonitorCheck, TriangleAlert as AlertTriangle,
   CircleCheck as CheckCircle, Circle as XCircle, Target, Grid2x2 as Grid,
+  TrendingUp,
 } from "lucide-react";
 import { formatDate, StatRow } from "../shared/adminUtils";
 
@@ -134,6 +135,18 @@ interface WorkerHealth {
   errors_last_hour: number;
 }
 
+interface MWDiagnostics {
+  total_players:   number;
+  buy_count:       number;
+  sell_now_count:  number;
+  cash_cow_count:  number;
+  fade_count:      number;
+  monitor_count:   number;
+  best_trades:     number;
+  snapshot_age_hrs: number | null;
+  health_status:   string | null;
+}
+
 export default function AdminSystemHealth() {
   const [loading, setLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
@@ -142,21 +155,24 @@ export default function AdminSystemHealth() {
   const [canonical, setCanonical] = useState<CanonicalData | null>(null);
   const [integrity, setIntegrity] = useState<DataChecks | null>(null);
   const [worker, setWorker] = useState<WorkerHealth | null>(null);
+  const [mwDiag, setMwDiag] = useState<MWDiagnostics | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryRes, canonicalRes, integrityRes, workerRes] = await Promise.all([
+      const [summaryRes, canonicalRes, integrityRes, workerRes, mwRes] = await Promise.all([
         supabase.from("v_admin_system_health_summary").select("*").maybeSingle(),
         supabase.from("v_canonical_health").select("*").maybeSingle(),
         supabase.from("v_data_integrity_checks").select("*").maybeSingle(),
         supabase.from("v_ai_worker_health").select("*").maybeSingle(),
+        supabase.from("v_mw_diagnostics").select("*").maybeSingle(),
       ]);
 
       if (summaryRes.data) setSummary(summaryRes.data as HealthSummary);
       if (canonicalRes.data) setCanonical(canonicalRes.data as CanonicalData);
       if (integrityRes.data) setIntegrity(integrityRes.data as DataChecks);
       if (workerRes.data) setWorker(workerRes.data as WorkerHealth);
+      if (mwRes.data) setMwDiag(mwRes.data as MWDiagnostics);
 
       setLastRefreshed(new Date());
     } finally {
@@ -212,6 +228,16 @@ export default function AdminSystemHealth() {
     : (summary.accuracy_players ?? 0) > 100 ? "ok"
     : (summary.accuracy_players ?? 0) > 0 ? "warn"
     : "error";
+
+  const mwLevel: StatusLevel = mwDiag === null ? "loading"
+    : mwDiag.health_status?.startsWith("ERROR") ? "error"
+    : mwDiag.health_status?.startsWith("WARN") ? "warn"
+    : "ok";
+
+  const mwLabel = mwDiag === null ? "Loading"
+    : mwDiag.health_status?.startsWith("ERROR") ? "Error"
+    : mwDiag.health_status?.startsWith("WARN") ? "Warning"
+    : "OK";
 
   const coverageLevel: StatusLevel = !summary ? "loading"
     : summary.reco_rows >= 500 ? "ok"
@@ -403,7 +429,19 @@ export default function AdminSystemHealth() {
           } />
         </HealthCard>
 
-        {/* 8 — Frontend Coverage */}
+        {/* 8 — Market Watch */}
+        <HealthCard icon={TrendingUp} title="Market Watch" status={mwLevel} loading={loading}>
+          <StatRow label="Status" value={<StatusChip level={mwLevel === "loading" ? "loading" : mwLevel} label={mwLabel} />} />
+          <StatRow label="Total players" value={mwDiag?.total_players?.toLocaleString() ?? "—"} />
+          <StatRow label="Buy targets" value={mwDiag?.buy_count ?? "—"} highlight={(mwDiag?.buy_count ?? 0) > 0 ? "good" : "warn"} />
+          <StatRow label="Sell signals" value={mwDiag?.sell_now_count ?? "—"} />
+          <StatRow label="Cash cows" value={mwDiag?.cash_cow_count ?? "—"} highlight={(mwDiag?.cash_cow_count ?? 0) > 0 ? "good" : "warn"} />
+          <StatRow label="Traps (fade)" value={mwDiag?.fade_count ?? "—"} />
+          <StatRow label="Best trades" value={mwDiag?.best_trades ?? "—"} highlight={(mwDiag?.best_trades ?? 0) > 0 ? "good" : "warn"} />
+          <StatRow label="Snapshot age" value={mwDiag?.snapshot_age_hrs != null ? `${Number(mwDiag.snapshot_age_hrs).toFixed(0)}h ago` : "—"} highlight={(mwDiag?.snapshot_age_hrs ?? 999) < 168 ? "good" : "warn"} />
+        </HealthCard>
+
+        {/* 9 — Frontend Coverage */}
         <HealthCard icon={MonitorCheck} title="Frontend Coverage" status={coverageLevel} loading={loading}>
           <StatRow
             label="Player analyses"

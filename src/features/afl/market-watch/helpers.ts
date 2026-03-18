@@ -64,21 +64,25 @@ export function priceChangeColor(v: number | null): string {
 
 export function categoryLabel(cat: MWCategory): string {
   switch (cat) {
-    case "buy":      return "BUY";
-    case "sell":     return "SELL";
-    case "cash_cow": return "CASH COW";
-    case "trap":     return "TRAP";
-    default:         return "BUY";
+    case "buy":           return "BUY";
+    case "sell_now":      return "SELL";
+    case "sell_consider": return "CONSIDER SELL";
+    case "cash_cow":      return "CASH COW";
+    case "fade":          return "TRAP";
+    case "monitor":       return "MONITOR";
+    default:              return "BUY";
   }
 }
 
 export function categoryColor(cat: MWCategory): string {
   switch (cat) {
-    case "buy":      return "text-green-400 bg-green-400/10 border-green-400/25";
-    case "sell":     return "text-red-400 bg-red-400/10 border-red-400/25";
-    case "cash_cow": return "text-[#F5C84C] bg-[#F5C84C]/10 border-[#F5C84C]/25";
-    case "trap":     return "text-orange-400 bg-orange-400/10 border-orange-400/25";
-    default:         return "text-white/40 bg-white/5 border-white/10";
+    case "buy":           return "text-green-400 bg-green-400/10 border-green-400/25";
+    case "sell_now":      return "text-red-400 bg-red-400/10 border-red-400/25";
+    case "sell_consider": return "text-red-300 bg-red-300/10 border-red-300/20";
+    case "cash_cow":      return "text-[#F5C84C] bg-[#F5C84C]/10 border-[#F5C84C]/25";
+    case "fade":          return "text-orange-400 bg-orange-400/10 border-orange-400/25";
+    case "monitor":       return "text-white/50 bg-white/5 border-white/10";
+    default:              return "text-white/40 bg-white/5 border-white/10";
   }
 }
 

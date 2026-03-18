@@ -75,9 +75,9 @@ export default function MarketWatchPage() {
       } else {
         const [buyRes, sellRes, cowRes, trapRes, cardsRes, summaryRes, statusRes] = await Promise.all([
           supabase.from("v_mw_premium").select("*").eq("category", "buy").order("trade_score", { ascending: false }).limit(1),
-          supabase.from("v_mw_premium").select("*").eq("category", "sell").order("trade_score", { ascending: false }).limit(1),
+          supabase.from("v_mw_premium").select("*").in("category", ["sell_now", "sell_consider"]).order("trade_score", { ascending: false }).limit(1),
           supabase.from("v_mw_premium").select("*").eq("category", "cash_cow").order("trade_score", { ascending: false }).limit(1),
-          supabase.from("v_mw_premium").select("*").eq("category", "trap").order("trade_score", { ascending: false }).limit(1),
+          supabase.from("v_mw_premium").select("*").eq("category", "fade").order("trade_score", { ascending: false }).limit(1),
           supabase.from("v_mw_summary_cards").select("*"),
           supabase.from("v_mw_summary").select("*").maybeSingle(),
           supabase.from("v_mw_status").select("*").maybeSingle(),
@@ -179,9 +179,9 @@ export default function MarketWatchPage() {
   }, [filters, sortKey]);
 
   const buyTargets = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "buy")), [players, applyFiltersAndSort]);
-  const sellPlayers = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "sell")), [players, applyFiltersAndSort]);
+  const sellPlayers = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "sell_now" || p.category === "sell_consider")), [players, applyFiltersAndSort]);
   const cashCows    = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "cash_cow")), [players, applyFiltersAndSort]);
-  const traps       = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "trap")), [players, applyFiltersAndSort]);
+  const traps       = useMemo(() => applyFiltersAndSort(players.filter(p => p.category === "fade")), [players, applyFiltersAndSort]);
 
   const isInactive = status != null && !status.is_active;
   const ready = !authLoading && !dataLoading;
@@ -315,14 +315,15 @@ function FreeUserView({ rawPlayers, onUnlock, summary }: FreeViewProps) {
       .sort((a, b) => (b.trade_score ?? 0) - (a.trade_score ?? 0))[0] ?? null;
 
   const topBuy  = byCategory("buy");
-  const topSell = byCategory("sell");
+  const topSell = [...rawPlayers.filter(p => p.category === "sell_now" || p.category === "sell_consider")]
+    .sort((a, b) => (b.trade_score ?? 0) - (a.trade_score ?? 0))[0] ?? null;
   const topCow  = byCategory("cash_cow");
-  const topTrap = byCategory("trap");
+  const topTrap = byCategory("fade");
 
-  const totalBuy  = summary?.buy_count   ?? rawPlayers.filter(p => p.category === "buy").length;
-  const totalSell = summary?.sell_count  ?? rawPlayers.filter(p => p.category === "sell").length;
+  const totalBuy  = summary?.buy_count      ?? rawPlayers.filter(p => p.category === "buy").length;
+  const totalSell = summary?.sell_count     ?? rawPlayers.filter(p => p.category === "sell_now" || p.category === "sell_consider").length;
   const totalCow  = summary?.cash_cow_count ?? rawPlayers.filter(p => p.category === "cash_cow").length;
-  const totalTrap = summary?.trap_count  ?? rawPlayers.filter(p => p.category === "trap").length;
+  const totalTrap = summary?.trap_count     ?? rawPlayers.filter(p => p.category === "fade").length;
 
   const sections = [
     {

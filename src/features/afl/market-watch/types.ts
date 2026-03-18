@@ -1,4 +1,4 @@
-export type MWCategory = "buy" | "sell" | "cash_cow" | "trap";
+export type MWCategory = "buy" | "sell_now" | "sell_consider" | "cash_cow" | "fade" | "monitor";
 
 export interface MWPlayerRow {
   snapshot_id: string;
@@ -90,6 +90,7 @@ export interface MWSummary {
   sell_count: number;
   cash_cow_count: number;
   trap_count: number;
+  monitor_count: number;
   latest_update: string | null;
 }
 
