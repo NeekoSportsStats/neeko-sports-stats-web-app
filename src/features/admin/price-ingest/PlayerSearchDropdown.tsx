@@ -1,6 +1,15 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Search, X } from "lucide-react";
 import type { PlayerOption } from "./types";
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
 
 interface Props {
   players: PlayerOption[];
@@ -10,9 +19,10 @@ interface Props {
 }
 
 export function PlayerSearchDropdown({ players, value, onChange, placeholder = "Search player…" }: Props) {
-  const selected = players.find(p => p.player_id === value) ?? null;
+  const selected = useMemo(() => players.find(p => p.player_id === value) ?? null, [players, value]);
   const [query, setQuery] = useState(selected?.player_name ?? "");
   const [open, setOpen] = useState(false);
+  const debouncedQuery = useDebounce(query, 80);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -23,10 +33,10 @@ export function PlayerSearchDropdown({ players, value, onChange, placeholder = "
   }, [open, selected]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return players.slice(0, 25);
-    return players.filter(p => p.player_name.toLowerCase().includes(q)).slice(0, 40);
-  }, [players, query]);
+    const q = debouncedQuery.trim().toLowerCase();
+    if (!q) return players.slice(0, 30);
+    return players.filter(p => p.player_name.toLowerCase().includes(q)).slice(0, 50);
+  }, [players, debouncedQuery]);
 
   useEffect(() => {
     function onMouseDown(e: MouseEvent) {
@@ -38,22 +48,22 @@ export function PlayerSearchDropdown({ players, value, onChange, placeholder = "
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, []);
 
-  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
     onChange(null, null);
     setOpen(true);
-  }
+  }, [onChange]);
 
   function handleFocus() {
     setOpen(true);
     if (selected) setQuery("");
   }
 
-  function handleSelect(p: PlayerOption) {
+  const handleSelect = useCallback((p: PlayerOption) => {
     onChange(p.player_id, p.player_name);
     setQuery(p.player_name);
     setOpen(false);
-  }
+  }, [onChange]);
 
   function handleClear(e: React.MouseEvent) {
     e.stopPropagation();
@@ -107,9 +117,9 @@ export function PlayerSearchDropdown({ players, value, onChange, placeholder = "
         </div>
       )}
 
-      {open && query.trim() && filtered.length === 0 && (
+      {open && debouncedQuery.trim() && filtered.length === 0 && (
         <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-lg px-3 py-2.5 text-xs text-muted-foreground">
-          No players found
+          No players found for &ldquo;{debouncedQuery.trim()}&rdquo;
         </div>
       )}
     </div>

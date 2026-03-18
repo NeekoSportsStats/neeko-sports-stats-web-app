@@ -14,128 +14,127 @@ export interface MatchResult {
   suggestions: PlayerOption[];
 }
 
-function normalize(s: string): string {
-  return s.toUpperCase().trim().replace(/[^A-Z0-9\s]/g, "");
+function normalizeName(raw: string): string {
+  return raw
+    .toUpperCase()
+    .replace(/-/g, " ")
+    .replace(/[^A-Z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 interface ParsedName {
   initial: string;
+  tokens: string[];
   surname: string;
-  raw: string;
 }
 
 function parseName(sourceName: string): ParsedName | null {
-  const cleaned = sourceName.trim();
-  const parts = cleaned.split(/\s+/);
-  if (parts.length < 2) return null;
+  const norm = normalizeName(sourceName);
+  const tokens = norm.split(" ").filter(Boolean);
+  if (tokens.length < 2) return null;
 
-  const initial = parts[0].replace(/\./g, "").toUpperCase().charAt(0);
-  const surname = parts.slice(1).join(" ").toUpperCase().replace(/[^A-Z\s]/g, "").trim();
+  const initial = tokens[0].charAt(0);
+  const surnameTokens = tokens.slice(1);
+  const surname = surnameTokens.join(" ");
 
   if (!initial || !surname) return null;
-  return { initial, surname, raw: cleaned };
+  return { initial, tokens, surname };
 }
 
-function parsePlayerName(playerName: string): { initial: string; surname: string } | null {
-  const parts = playerName.trim().split(/\s+/);
-  if (parts.length < 2) return null;
+interface ParsedPlayerName {
+  initial: string;
+  tokens: string[];
+  surname: string;
+  fullNorm: string;
+}
 
-  const initial = parts[0].toUpperCase().charAt(0);
-  const surname = parts.slice(1).join(" ").toUpperCase().replace(/[^A-Z\s]/g, "").trim();
+const playerNameCache = new WeakMap<PlayerOption[], Map<number, ParsedPlayerName>>();
 
-  return { initial, surname };
+function getPlayerNameMap(players: PlayerOption[]): Map<number, ParsedPlayerName> {
+  if (playerNameCache.has(players)) return playerNameCache.get(players)!;
+
+  const map = new Map<number, ParsedPlayerName>();
+  for (const p of players) {
+    const norm = normalizeName(p.player_name);
+    const tokens = norm.split(" ").filter(Boolean);
+    if (tokens.length < 2) continue;
+    const initial = tokens[0].charAt(0);
+    const surname = tokens.slice(1).join(" ");
+    map.set(p.player_id, { initial, tokens, surname, fullNorm: norm });
+  }
+  playerNameCache.set(players, map);
+  return map;
 }
 
 export function matchPlayer(sourceName: string, players: PlayerOption[]): MatchResult {
   const parsed = parseName(sourceName);
 
   if (!parsed) {
-    return {
-      status: "pending_player_record",
-      confidence: 0,
-      player_id: null,
-      player_name: null,
-      suggestions: [],
-    };
+    return { status: "pending_player_record", confidence: 0, player_id: null, player_name: null, suggestions: [] };
   }
 
   const { initial, surname } = parsed;
+  const nameMap = getPlayerNameMap(players);
 
-  const exactSurnameInitial: PlayerOption[] = [];
+  const exactBoth: PlayerOption[] = [];
   const exactSurnameOnly: PlayerOption[] = [];
 
   for (const p of players) {
-    const pp = parsePlayerName(p.player_name);
+    const pp = nameMap.get(p.player_id);
     if (!pp) continue;
 
     const surnameMatch = pp.surname === surname;
     const initialMatch = pp.initial === initial;
 
     if (surnameMatch && initialMatch) {
-      exactSurnameInitial.push(p);
+      exactBoth.push(p);
     } else if (surnameMatch) {
       exactSurnameOnly.push(p);
     }
   }
 
-  if (exactSurnameInitial.length === 1) {
+  if (exactBoth.length === 1) {
     return {
       status: "auto_matched",
       confidence: 97,
-      player_id: exactSurnameInitial[0].player_id,
-      player_name: exactSurnameInitial[0].player_name,
+      player_id: exactBoth[0].player_id,
+      player_name: exactBoth[0].player_name,
       suggestions: [],
     };
   }
 
-  if (exactSurnameInitial.length > 1) {
-    return {
-      status: "suggested",
-      confidence: 75,
-      player_id: null,
-      player_name: null,
-      suggestions: exactSurnameInitial.slice(0, 5),
-    };
+  if (exactBoth.length > 1) {
+    return { status: "suggested", confidence: 75, player_id: null, player_name: null, suggestions: exactBoth.slice(0, 6) };
   }
 
   if (exactSurnameOnly.length >= 1) {
-    return {
-      status: "suggested",
-      confidence: 60,
-      player_id: null,
-      player_name: null,
-      suggestions: exactSurnameOnly.slice(0, 5),
-    };
+    return { status: "suggested", confidence: 60, player_id: null, player_name: null, suggestions: exactSurnameOnly.slice(0, 6) };
   }
 
-  const partialSurname = players.filter(p => {
-    const pp = parsePlayerName(p.player_name);
-    return pp && pp.surname.startsWith(surname.slice(0, 4));
-  });
-
-  if (partialSurname.length > 0) {
-    return {
-      status: "manual_required",
-      confidence: 35,
-      player_id: null,
-      player_name: null,
-      suggestions: partialSurname.slice(0, 5),
-    };
+  const surnamePrefix = surname.slice(0, Math.max(4, surname.length - 1));
+  const partial: PlayerOption[] = [];
+  for (const p of players) {
+    const pp = nameMap.get(p.player_id);
+    if (pp && pp.surname.startsWith(surnamePrefix) && pp.initial === initial) partial.push(p);
+  }
+  const partialLoose: PlayerOption[] = [];
+  if (partial.length === 0) {
+    for (const p of players) {
+      const pp = nameMap.get(p.player_id);
+      if (pp && pp.surname.startsWith(surnamePrefix)) partialLoose.push(p);
+    }
   }
 
-  return {
-    status: "pending_player_record",
-    confidence: 0,
-    player_id: null,
-    player_name: null,
-    suggestions: [],
-  };
+  const candidates = partial.length > 0 ? partial : partialLoose;
+  if (candidates.length > 0) {
+    return { status: "manual_required", confidence: 35, player_id: null, player_name: null, suggestions: candidates.slice(0, 6) };
+  }
+
+  return { status: "pending_player_record", confidence: 0, player_id: null, player_name: null, suggestions: [] };
 }
 
-export function applyAutoMatch(
-  rows: MappingRow[],
-  players: PlayerOption[],
-): Array<MappingRow & { match_status: MatchStatus; confidence: number; suggestions: PlayerOption[] }> {
+export function applyAutoMatch(rows: MappingRow[], players: PlayerOption[]): MappingRow[] {
   return rows.map(row => {
     const result = matchPlayer(row.source_name, players);
 

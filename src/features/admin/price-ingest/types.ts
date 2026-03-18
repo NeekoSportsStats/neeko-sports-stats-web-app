@@ -27,6 +27,7 @@ export type MatchStatus =
   | "manually_matched";
 
 export interface MappingRow {
+  id: string;
   source_name: string;
   cleaned_price: number;
   player_id: number | null;

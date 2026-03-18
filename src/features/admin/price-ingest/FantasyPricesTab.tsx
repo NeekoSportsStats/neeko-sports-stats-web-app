@@ -1,6 +1,10 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, FileText, RefreshCw, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, ArrowLeft, Zap, Clock, CircleHelp as HelpCircle, User } from "lucide-react";
+import {
+  Upload, FileText, RefreshCw, CircleCheck as CheckCircle,
+  TriangleAlert as AlertTriangle, ArrowLeft, Zap, Clock,
+  CircleHelp as HelpCircle, User, Search, Eye, EyeOff,
+} from "lucide-react";
 import { parseCSVText, parseCSVFile, fmtPrice, type ParseError } from "./parseUtils";
 import { usePlayerOptions, useCommitPrices, useSavePending } from "./usePriceIngest";
 import { PlayerSearchDropdown } from "./PlayerSearchDropdown";
@@ -9,45 +13,60 @@ import type { ParsedPriceRow, MappingRow, IngestByIdResult, MatchStatus } from "
 
 type Step = "input" | "mapping" | "done";
 
+const GROUP_ORDER: MatchStatus[] = [
+  "pending_player_record",
+  "manual_required",
+  "suggested",
+  "manually_matched",
+  "auto_matched",
+];
+
 function extractLastName(sourceName: string): string {
   const parts = sourceName.trim().split(/\s+/);
   return parts.length >= 2 ? parts[parts.length - 1].toLowerCase() : sourceName.toLowerCase();
 }
 
-function sortByLastName(rows: MappingRow[]): MappingRow[] {
-  return [...rows].sort((a, b) =>
-    extractLastName(a.source_name).localeCompare(extractLastName(b.source_name))
-  );
+function sortAndGroupRows(rows: MappingRow[]): MappingRow[] {
+  return [...rows].sort((a, b) => {
+    const ga = GROUP_ORDER.indexOf(a.match_status);
+    const gb = GROUP_ORDER.indexOf(b.match_status);
+    if (ga !== gb) return ga - gb;
+    return extractLastName(a.source_name).localeCompare(extractLastName(b.source_name));
+  });
+}
+
+function genId(): string {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
 interface StatusBadgeProps { status: MatchStatus; confidence: number }
 function StatusBadge({ status, confidence }: StatusBadgeProps) {
   if (status === "auto_matched")
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 whitespace-nowrap">
         <Zap className="h-2.5 w-2.5" />AUTO {confidence}%
       </span>
     );
   if (status === "manually_matched")
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/25">
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/25 whitespace-nowrap">
         <User className="h-2.5 w-2.5" />MANUAL
       </span>
     );
   if (status === "suggested")
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25">
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25 whitespace-nowrap">
         <HelpCircle className="h-2.5 w-2.5" />SUGGEST
       </span>
     );
   if (status === "manual_required")
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/25">
-        <AlertTriangle className="h-2.5 w-2.5" />MANUAL
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/25 whitespace-nowrap">
+        <AlertTriangle className="h-2.5 w-2.5" />SEARCH
       </span>
     );
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-500/15 text-slate-400 border border-slate-500/25">
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-500/15 text-slate-400 border border-slate-500/25 whitespace-nowrap">
       <Clock className="h-2.5 w-2.5" />PENDING
     </span>
   );
@@ -55,8 +74,10 @@ function StatusBadge({ status, confidence }: StatusBadgeProps) {
 
 function rowBgClass(row: MappingRow): string {
   if (row.player_id !== null) return "hover:bg-emerald-950/10";
-  if (row.match_status === "pending_player_record") return "bg-slate-500/5 hover:bg-slate-500/10";
-  return "bg-amber-950/5 hover:bg-amber-950/10";
+  if (row.match_status === "pending_player_record") return "bg-red-950/5 hover:bg-red-950/10";
+  if (row.match_status === "manual_required") return "bg-orange-950/5 hover:bg-orange-950/10";
+  if (row.match_status === "suggested") return "bg-amber-950/5 hover:bg-amber-950/10";
+  return "hover:bg-muted/10";
 }
 
 export function FantasyPricesTab() {
@@ -76,6 +97,7 @@ export function FantasyPricesTab() {
 
   function buildMappingRows(parsed: ParsedPriceRow[]): MappingRow[] {
     const raw: MappingRow[] = parsed.map(r => ({
+      id: genId(),
       source_name: r.source_name,
       cleaned_price: r.cleaned_price,
       player_id: null,
@@ -86,11 +108,9 @@ export function FantasyPricesTab() {
     }));
 
     if (players.length > 0) {
-      const matched = applyAutoMatch(raw, players);
-      return sortByLastName(matched);
+      return sortAndGroupRows(applyAutoMatch(raw, players));
     }
-
-    return sortByLastName(raw);
+    return sortAndGroupRows(raw);
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -108,10 +128,10 @@ export function FantasyPricesTab() {
     setMappingRows(buildMappingRows(result.rows));
   }
 
-  function handlePlayerSelect(sourceName: string, playerId: number | null, playerName: string | null) {
+  const handlePlayerSelect = useCallback((rowId: string, playerId: number | null, playerName: string | null) => {
     setMappingRows(prev =>
       prev.map(r => {
-        if (r.source_name !== sourceName) return r;
+        if (r.id !== rowId) return r;
         return {
           ...r,
           player_id: playerId,
@@ -120,7 +140,7 @@ export function FantasyPricesTab() {
         };
       })
     );
-  }
+  }, []);
 
   async function handleCommit() {
     const mapped = mappingRows.filter(r => r.player_id !== null);
@@ -155,11 +175,15 @@ export function FantasyPricesTab() {
 
   function handleGoToMapping() {
     if (players.length > 0) {
-      const matched = applyAutoMatch(
-        mappingRows.map(r => ({ ...r, player_id: null, player_name: null, match_status: "manual_required" as const, confidence: 0, suggestions: [] })),
-        players,
-      );
-      setMappingRows(sortByLastName(matched));
+      const rerun = mappingRows.map(r => ({
+        ...r,
+        player_id: null,
+        player_name: null,
+        match_status: "manual_required" as const,
+        confidence: 0,
+        suggestions: [],
+      }));
+      setMappingRows(sortAndGroupRows(applyAutoMatch(rerun, players)));
     }
     setStep("mapping");
   }
@@ -195,7 +219,7 @@ export function FantasyPricesTab() {
   return (
     <div className="space-y-5">
       <div className="rounded-lg border border-amber-500/20 bg-amber-950/10 px-4 py-3 text-sm text-amber-300">
-        <strong>Interactive mapper with auto-match.</strong> Paste your price list — common players auto-match instantly. Ambiguous names require manual selection. Players not yet in the database are held safely.
+        <strong>Interactive mapper with auto-match.</strong> Paste your price list — common players auto-match instantly. Hyphenated names (e.g. L D-Uniacke) are handled. Players not in the database are held safely.
         <br />
         <span className="text-amber-400/70 text-xs mt-0.5 block">
           Format: Column 1 = player name (e.g. <code className="font-mono">N Daicos</code>), Column 2 = price (e.g. <code className="font-mono">$1,182,000</code>). Comma or tab separated.
@@ -229,7 +253,7 @@ export function FantasyPricesTab() {
             <textarea
               value={pasteText}
               onChange={e => handlePasteChange(e.target.value)}
-              placeholder={"N Daicos, $1,182,000\nP Laird, $987,500\nL Neale, $945,000"}
+              placeholder={"N Daicos, $1,182,000\nL D-Uniacke, $785,000\nM Gawn, $1,050,000"}
               rows={14}
               className="w-full border border-border rounded-md px-3 py-2.5 text-sm font-mono bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y"
             />
@@ -250,8 +274,8 @@ export function FantasyPricesTab() {
               <StatTile label="Total" value={counts.total} />
               <StatTile label="Auto-matched" value={counts.auto} color="emerald" />
               <StatTile label="Suggested" value={counts.suggested} color="amber" />
-              <StatTile label="Manual Req." value={counts.manualReq} color="orange" />
-              <StatTile label="Pending" value={counts.pending} color="slate" />
+              <StatTile label="Needs Search" value={counts.manualReq} color="orange" />
+              <StatTile label="Pending" value={counts.pending} color="red" />
               <StatTile label="Ready" value={counts.readyToInsert} color="emerald" />
             </div>
           )}
@@ -268,10 +292,7 @@ export function FantasyPricesTab() {
             </div>
           )}
 
-          <Button
-            onClick={handleGoToMapping}
-            disabled={mappingRows.length === 0}
-          >
+          <Button onClick={handleGoToMapping} disabled={mappingRows.length === 0}>
             <Zap className="h-4 w-4 mr-2" />
             Review &amp; Map Players ({mappingRows.length} rows)
           </Button>
@@ -297,11 +318,12 @@ export function FantasyPricesTab() {
   );
 }
 
-function StatTile({ label, value, color }: { label: string; value: number; color?: "emerald" | "amber" | "orange" | "slate" }) {
+function StatTile({ label, value, color }: { label: string; value: number; color?: "emerald" | "amber" | "orange" | "red" | "slate" }) {
   const colorCls = {
     emerald: "text-emerald-400",
     amber: "text-amber-400",
     orange: "text-orange-400",
+    red: "text-red-400",
     slate: "text-slate-400",
   }[color ?? ""] ?? "text-foreground";
 
@@ -331,7 +353,7 @@ interface MappingStepProps {
   saving: boolean;
   pendingSaved: boolean;
   commitError: string | null;
-  onSelect: (sourceName: string, playerId: number | null, playerName: string | null) => void;
+  onSelect: (rowId: string, playerId: number | null, playerName: string | null) => void;
   onCommit: () => void;
   onSavePending: () => void;
   onBack: () => void;
@@ -341,6 +363,26 @@ function MappingStep({
   rows, players, counts, committing, saving, pendingSaved, commitError,
   onSelect, onCommit, onSavePending, onBack,
 }: MappingStepProps) {
+  const [search, setSearch] = useState("");
+  const [showUnmatchedOnly, setShowUnmatchedOnly] = useState(false);
+
+  const visibleRows = useMemo(() => {
+    let filtered = rows;
+    if (showUnmatchedOnly) {
+      filtered = filtered.filter(r => r.player_id === null);
+    }
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter(r =>
+        r.source_name.toLowerCase().includes(q) ||
+        (r.player_name ?? "").toLowerCase().includes(q)
+      );
+    }
+    return filtered;
+  }, [rows, search, showUnmatchedOnly]);
+
+  let lastGroup: MatchStatus | null = null;
+
   return (
     <>
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
@@ -348,24 +390,24 @@ function MappingStep({
         <StatTile label="Auto-matched" value={counts.auto} color="emerald" />
         <StatTile label="Manual Match" value={counts.manual} color="emerald" />
         <StatTile label="Suggested" value={counts.suggested} color="amber" />
-        <StatTile label="Manual Req." value={counts.manualReq} color="orange" />
-        <StatTile label="Pending Record" value={counts.pending} color="slate" />
+        <StatTile label="Needs Search" value={counts.manualReq} color="orange" />
+        <StatTile label="Pending" value={counts.pending} color="red" />
       </div>
 
       {counts.auto > 0 && (
         <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 px-4 py-2.5 text-sm text-emerald-300 flex items-center gap-2">
           <Zap className="h-4 w-4 shrink-0" />
-          <span>{counts.auto} players auto-matched with high confidence (95%+). Review and override if needed.</span>
+          <span>{counts.auto} players auto-matched (95%+ confidence). Override any by clicking their dropdown.</span>
         </div>
       )}
 
       {counts.pending > 0 && !pendingSaved && (
-        <div className="rounded-lg border border-slate-500/20 bg-slate-500/5 px-4 py-2.5 text-sm text-slate-300 flex items-center justify-between gap-3 flex-wrap">
+        <div className="rounded-lg border border-red-500/20 bg-red-950/10 px-4 py-2.5 text-sm text-red-300 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 shrink-0" />
-            <span>{counts.pending} players not yet in the database. Save them as pending for later resolution.</span>
+            <span>{counts.pending} players not in the database. Save for later resolution once records exist.</span>
           </div>
-          <Button size="sm" variant="outline" onClick={onSavePending} disabled={saving} className="shrink-0 text-xs h-7">
+          <Button size="sm" variant="outline" onClick={onSavePending} disabled={saving} className="shrink-0 text-xs h-7 border-red-500/30 text-red-400 hover:bg-red-950/20">
             {saving ? <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" /> : <Clock className="h-3 w-3 mr-1.5" />}
             Save Pending
           </Button>
@@ -383,6 +425,31 @@ function MappingStep({
         <div className="rounded-lg border border-red-500/25 bg-red-950/15 px-4 py-3 text-sm text-red-400">{commitError}</div>
       )}
 
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search rows by name…"
+            className="w-full pl-7 pr-3 py-1.5 border border-border rounded-md text-xs bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+        <button
+          onClick={() => setShowUnmatchedOnly(v => !v)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
+            showUnmatchedOnly ? "bg-amber-500/20 text-amber-300 border-amber-500/30" : "border-border text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {showUnmatchedOnly ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          {showUnmatchedOnly ? "Showing unmatched" : "Show unmatched only"}
+        </button>
+        <span className="text-xs text-muted-foreground ml-auto">
+          {visibleRows.length} of {rows.length} rows
+        </span>
+      </div>
+
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-sm">
           <thead>
@@ -394,23 +461,30 @@ function MappingStep({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => (
-              <MappingTableRow
-                key={i}
-                row={row}
-                players={players}
-                onSelect={onSelect}
-              />
-            ))}
+            {visibleRows.map(row => {
+              const showDivider = row.match_status !== lastGroup;
+              lastGroup = row.match_status;
+              return (
+                <MappingTableRow
+                  key={row.id}
+                  row={row}
+                  players={players}
+                  onSelect={onSelect}
+                  showGroupDivider={showDivider}
+                />
+              );
+            })}
+            {visibleRows.length === 0 && (
+              <tr>
+                <td colSpan={4} className="py-8 text-center text-xs text-muted-foreground">No rows match your filter</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
-        <Button
-          onClick={onCommit}
-          disabled={counts.readyToInsert === 0 || committing}
-        >
+        <Button onClick={onCommit} disabled={counts.readyToInsert === 0 || committing}>
           {committing
             ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
             : <CheckCircle className="h-4 w-4 mr-2" />}
@@ -428,39 +502,64 @@ function MappingStep({
   );
 }
 
+const GROUP_LABELS: Partial<Record<MatchStatus, string>> = {
+  pending_player_record: "Not in database — pending player record",
+  manual_required: "No match found — search manually",
+  suggested: "Multiple candidates — select the correct player",
+  manually_matched: "Manually matched",
+  auto_matched: "Auto-matched",
+};
+
 function MappingTableRow({
-  row, players, onSelect,
+  row, players, onSelect, showGroupDivider,
 }: {
   row: MappingRow;
   players: ReturnType<typeof usePlayerOptions>;
-  onSelect: (sourceName: string, playerId: number | null, playerName: string | null) => void;
+  onSelect: (rowId: string, playerId: number | null, playerName: string | null) => void;
+  showGroupDivider: boolean;
 }) {
   const isPending = row.match_status === "pending_player_record";
 
+  const dropdownPlayers = useMemo(() => {
+    if (row.suggestions.length > 0 && row.player_id === null) {
+      const suggestionIds = new Set(row.suggestions.map(s => s.player_id));
+      return [...row.suggestions, ...players.filter(p => !suggestionIds.has(p.player_id))];
+    }
+    return players;
+  }, [row.suggestions, row.player_id, players]);
+
   return (
-    <tr className={`border-b border-border/20 last:border-0 transition-colors ${rowBgClass(row)}`}>
-      <td className="py-2 px-3">
-        <StatusBadge status={row.match_status} confidence={row.confidence} />
-      </td>
-      <td className="py-2 px-3 font-mono text-xs text-muted-foreground">{row.source_name}</td>
-      <td className="py-2 px-3 min-w-[220px]">
-        {isPending ? (
-          <span className="text-xs text-slate-500 italic">Not in player database yet</span>
-        ) : (
-          <PlayerSearchDropdown
-            players={row.suggestions.length > 0 && row.player_id === null
-              ? row.suggestions.concat(players.filter(p => !row.suggestions.find(s => s.player_id === p.player_id)))
-              : players
-            }
-            value={row.player_id}
-            onChange={(id, name) => onSelect(row.source_name, id, name)}
-            placeholder={row.player_name ?? "Search player…"}
-          />
-        )}
-      </td>
-      <td className="py-2 px-3 text-right tabular-nums font-mono text-xs">
-        {fmtPrice(row.cleaned_price)}
-      </td>
-    </tr>
+    <>
+      {showGroupDivider && GROUP_LABELS[row.match_status] && (
+        <tr>
+          <td colSpan={4} className="py-1.5 px-3 bg-muted/30 border-b border-t border-border/40">
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+              {GROUP_LABELS[row.match_status]}
+            </span>
+          </td>
+        </tr>
+      )}
+      <tr className={`border-b border-border/20 last:border-0 transition-colors ${rowBgClass(row)}`}>
+        <td className="py-2 px-3">
+          <StatusBadge status={row.match_status} confidence={row.confidence} />
+        </td>
+        <td className="py-2 px-3 font-mono text-xs text-muted-foreground">{row.source_name}</td>
+        <td className="py-2 px-3 min-w-[220px]">
+          {isPending ? (
+            <span className="text-xs text-red-400/70 italic">Not in player database — save as pending above</span>
+          ) : (
+            <PlayerSearchDropdown
+              players={dropdownPlayers}
+              value={row.player_id}
+              onChange={(id, name) => onSelect(row.id, id, name)}
+              placeholder={row.player_name ?? "Search player…"}
+            />
+          )}
+        </td>
+        <td className="py-2 px-3 text-right tabular-nums font-mono text-xs">
+          {fmtPrice(row.cleaned_price)}
+        </td>
+      </tr>
+    </>
   );
 }
