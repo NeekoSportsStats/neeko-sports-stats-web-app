@@ -35,6 +35,34 @@ interface AIResult {
   long: string;
 }
 
+interface PlayerRow {
+  player_id: number;
+  player_name: string;
+  team: string;
+  position: string | null;
+  price: number | null;
+  projection_final: number | null;
+  ceiling: number | null;
+  floor: number | null;
+  risk: number | null;
+  confidence: number | null;
+  consistency: number | null;
+  value_score: number | null;
+  value_tag: string | null;
+  best_value_score: number | null;
+  matchup_rating: string | null;
+  venue_multiplier: number | null;
+  form_score: number | null;
+  neeko_rating: number | null;
+  neeko_rating_scaled: number | null;
+  games_played: number | null;
+  upside_rating: number | null;
+  captain_score: number | null;
+  captain_rating: string | null;
+  input_hash: string | null;
+  needs_regen: boolean;
+}
+
 async function callOpenAI(openaiKey: string, playerData: Record<string, unknown>): Promise<AIResult | null> {
   const userContent = `Analyse this AFL player for fantasy this round:\n${JSON.stringify(playerData, null, 2)}`;
 
@@ -78,9 +106,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabaseUrl      = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const openaiKey        = Deno.env.get("OPENAI_API_KEY");
+    const supabaseUrl    = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const openaiKey      = Deno.env.get("OPENAI_API_KEY");
 
     const authHeader = req.headers.get("Authorization");
     const token = authHeader?.replace("Bearer ", "");
@@ -92,15 +120,22 @@ Deno.serve(async (req: Request) => {
     }
 
     let limitPlayers = DEFAULT_MAX_PLAYERS;
+    let debugMode = false;
     try {
       const body = await req.json().catch(() => ({}));
       if (body?.limit_players && Number(body.limit_players) > 0) {
         limitPlayers = Number(body.limit_players);
       }
+      if (body?.debug_ai_data === true) {
+        debugMode = true;
+      }
     } catch (_) { /* no body — fine */ }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+    // DATA SOURCE: public.v_ai_player_analysis_input
+    // This view reads from afl.player_rankings_cache — the SAME source as public.v_rankings_master.
+    // Both views are backed by the same table, so AI and frontend always use identical numbers.
     const { data: players, error: fetchErr } = await supabase
       .from("v_ai_player_analysis_input")
       .select([
@@ -119,24 +154,50 @@ Deno.serve(async (req: Request) => {
 
     if (!players || players.length === 0) {
       return new Response(
-        JSON.stringify({ ok: true, message: "All player analyses are up to date", processed: 0, skipped_unchanged: true }),
+        JSON.stringify({ ok: true, message: "All player analyses are up to date", processed: 0, skipped_unchanged: true, data_source: "afl.player_rankings_cache (= v_rankings_master)" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    const debugData: Record<number, unknown>[] = [];
     let processed = 0;
     let failed = 0;
     const errors: string[] = [];
 
-    for (let i = 0; i < players.length; i += BATCH_SIZE) {
-      const batch = players.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < (players as PlayerRow[]).length; i += BATCH_SIZE) {
+      const batch = (players as PlayerRow[]).slice(i, i + BATCH_SIZE);
 
       await Promise.all(batch.map(async (player) => {
         try {
+          const promptPayload = {
+            player_name:         player.player_name,
+            team:                player.team,
+            position:            player.position,
+            price:               player.price,
+            projection_final:    player.projection_final,
+            ceiling:             player.ceiling,
+            floor:               player.floor,
+            consistency:         player.consistency,
+            form_score:          player.form_score,
+            value_score:         player.value_score,
+            value_tag:           player.value_tag,
+            matchup_rating:      player.matchup_rating,
+            risk:                player.risk,
+            confidence:          player.confidence,
+            neeko_rating_scaled: player.neeko_rating_scaled,
+            captain_score:       player.captain_score,
+            captain_rating:      player.captain_rating,
+            games_played:        player.games_played,
+          };
+
+          if (debugMode) {
+            debugData.push({ player_id: player.player_id, prompt_payload: promptPayload, data_source: "afl.player_rankings_cache (= v_rankings_master)" });
+          }
+
           let result: AIResult;
 
           if (openaiKey) {
-            const parsed = await callOpenAI(openaiKey, player);
+            const parsed = await callOpenAI(openaiKey, promptPayload);
             if (!parsed) return;
             result = parsed;
           } else {
@@ -147,6 +208,7 @@ Deno.serve(async (req: Request) => {
             };
           }
 
+          // Write to ai.player_ai_analysis (canonical AI store)
           const { error: rpcErr } = await supabase.rpc("upsert_player_ai_analysis", {
             p_player_id:      player.player_id,
             p_recommendation: "HOLD",
@@ -156,8 +218,25 @@ Deno.serve(async (req: Request) => {
             p_model:          "gpt-4o-mini",
             p_input_hash:     player.input_hash ?? null,
           });
-
           if (rpcErr) throw rpcErr;
+
+          // Immediate writeback to afl.player_rankings_cache so frontend sees updated AI
+          // content without waiting for the next full pipeline run.
+          const { error: cacheErr } = await supabase
+            .schema("afl" as any)
+            .from("player_rankings_cache")
+            .update({
+              recommendation_short: result.short,
+              recommendation_why:   `${result.why}\n\n${result.long}`.trim(),
+              ai_summary:           `${result.why}\n\n${result.long}`.trim(),
+              ai_updated_at:        new Date().toISOString(),
+            })
+            .eq("player_id", player.player_id);
+
+          if (cacheErr) {
+            console.warn(`[generate-player-ai] cache writeback failed for player ${player.player_id}:`, cacheErr.message);
+          }
+
           processed++;
         } catch (err) {
           const msg = err instanceof Error ? err.message : JSON.stringify(err);
@@ -168,8 +247,22 @@ Deno.serve(async (req: Request) => {
       }));
     }
 
+    const response: Record<string, unknown> = {
+      ok: true,
+      processed,
+      failed,
+      total_pending: (players as PlayerRow[]).length,
+      errors: errors.slice(0, 5),
+      data_source: "afl.player_rankings_cache (= v_rankings_master)",
+      writeback: "immediate — afl.player_rankings_cache updated after each player",
+    };
+
+    if (debugMode) {
+      response.debug_ai_data = debugData;
+    }
+
     return new Response(
-      JSON.stringify({ ok: true, processed, failed, total_pending: players.length, errors: errors.slice(0, 5) }),
+      JSON.stringify(response),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
