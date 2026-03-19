@@ -219,13 +219,25 @@ export default function MarketWatchPage() {
 
 // ─── Best Trade Hero ───────────────────────────────────────────────────────────
 
+function heroWhyItWorks(trade: BestTrade): string {
+  if (trade.trade_type === "AGGRESSIVE_UPGRADE") {
+    if (trade.projection_gain > 30) return `Turns a declining scorer into an elite weekly performer — ${trade.projection_gain.toFixed(0)} extra pts per round`;
+    if (trade.projection_gain > 15) return `Lifts your scoring floor materially — ${trade.in.player_name} consistently outscores ${trade.out.player_name}`;
+    return `Scoring upgrade at a fair entry price — ${trade.in.player_name} projects ahead this week`;
+  }
+  if (trade.trade_type === "CASH_GENERATION") {
+    const cashStr = fmtPrice(Math.abs(trade.cash_generated));
+    return `Converts a falling asset into ${cashStr} in freed budget — ${trade.out.player_name}'s price is moving against you`;
+  }
+  if (trade.in_type === "buy_before_rise") {
+    return `Buys ${trade.in.player_name} before the price rise lands — every round you wait costs more`;
+  }
+  return `Neutral trade that removes downside risk from ${trade.out.player_name} while preserving scoring floor`;
+}
+
 function BestTradeHero({ trade }: { trade: BestTrade }) {
   const cashPositive = trade.cash_generated >= 0;
   const projPositive = trade.projection_gain >= 0;
-
-  const cashLabel = cashPositive
-    ? `+${fmtPrice(trade.cash_generated)} cash back`
-    : `${fmtPrice(Math.abs(trade.cash_generated))} extra spend`;
 
   const projLabel = projPositive
     ? `+${trade.projection_gain.toFixed(0)} pts/rd`
@@ -243,8 +255,12 @@ function BestTradeHero({ trade }: { trade: BestTrade }) {
       : trade.trade_type === "CASH_GENERATION"
       ? { label: "CASH GENERATION", cls: "text-[#F5C84C] border-[#F5C84C]/30 bg-[#F5C84C]/10" }
       : trade.in_type === "buy_before_rise"
-      ? { label: "PRICE RISE", cls: "text-green-300 border-green-400/30 bg-green-400/10" }
+      ? { label: "EARLY VALUE", cls: "text-green-300 border-green-400/30 bg-green-400/10" }
       : { label: "BALANCED", cls: "text-white/50 border-white/20 bg-white/5" };
+
+  const whyItWorks = heroWhyItWorks(trade);
+  const enables = enablesLine(trade);
+  const sl = scoreLabel(trade.score);
 
   return (
     <div
@@ -252,12 +268,27 @@ function BestTradeHero({ trade }: { trade: BestTrade }) {
       style={{ background: "linear-gradient(160deg, rgba(245,200,76,0.07) 0%, rgba(10,10,10,0) 60%)" }}
     >
       <div className="px-6 pt-6 pb-4 border-b border-white/[0.05]">
-        <div className="flex items-center gap-2 mb-2">
-          <Target className="h-4 w-4 text-[#F5C84C]" />
-          <h2 className="text-base font-extrabold text-white tracking-tight">Best Trade This Round</h2>
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="flex items-center gap-2">
+            <Target className="h-4 w-4 text-[#F5C84C]" />
+            <h2 className="text-base font-extrabold text-white tracking-tight">Best Trade This Round</h2>
+          </div>
+          <span className={`text-[8px] font-extrabold px-2 py-0.5 rounded border uppercase tracking-wider shrink-0 ${sl.cls}`}>
+            {sl.label}
+          </span>
         </div>
-        <p className="text-[13px] font-semibold text-white/70">{summaryLine}</p>
-        <p className="text-[11px] text-white/30 mt-1 leading-snug">{trade.why}</p>
+        <p className="text-[13px] font-semibold text-white/70 mb-1">{summaryLine}</p>
+
+        <div className="mt-3 rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 flex flex-col gap-2.5">
+          <div className="flex items-start gap-2">
+            <span className="text-[9px] font-extrabold uppercase tracking-wider text-[#F5C84C]/60 mt-0.5 shrink-0 w-28">Why it works</span>
+            <p className="text-[11px] text-white/55 leading-snug">{whyItWorks}</p>
+          </div>
+          <div className="border-t border-white/[0.04] pt-2.5 flex items-start gap-2">
+            <span className="text-[9px] font-extrabold uppercase tracking-wider text-sky-400/50 mt-0.5 shrink-0 w-28">What it enables</span>
+            <p className="text-[11px] text-white/45 leading-snug">{enables}</p>
+          </div>
+        </div>
       </div>
 
       <div className="p-6">
@@ -348,7 +379,7 @@ function SummaryStrip({ sellCount, buyCount, upgradeCount, cowCount, trapCount }
 }) {
   const stats = [
     { label: "Sell Now",       value: sellCount,    icon: <ArrowDownRight className="h-3.5 w-3.5" />, cls: "text-red-400",     bg: "bg-red-400/[0.04] border-red-400/15" },
-    { label: "Buy Before Rise", value: buyCount,    icon: <ArrowUpRight className="h-3.5 w-3.5" />,   cls: "text-green-400",   bg: "bg-green-400/[0.04] border-green-400/15" },
+    { label: "Early Value Plays", value: buyCount,   icon: <ArrowUpRight className="h-3.5 w-3.5" />,   cls: "text-green-400",   bg: "bg-green-400/[0.04] border-green-400/15" },
     { label: "Upgrades",       value: upgradeCount, icon: <TrendingUp className="h-3.5 w-3.5" />,     cls: "text-sky-400",     bg: "bg-sky-400/[0.04] border-sky-400/15" },
     { label: "Cash Cows",      value: cowCount,     icon: <DollarSign className="h-3.5 w-3.5" />,     cls: "text-[#F5C84C]",   bg: "bg-[#F5C84C]/[0.04] border-[#F5C84C]/15" },
     { label: "Traps",          value: trapCount,    icon: <ShieldAlert className="h-3.5 w-3.5" />,    cls: "text-orange-400",  bg: "bg-orange-400/[0.04] border-orange-400/15" },
@@ -895,13 +926,13 @@ function ThisWeeksPlan({
           tradeTagCls="text-sky-300 border-sky-400/25 bg-sky-400/8"
         />
         <PlanColumn
-          title="Price Rise Buys"
+          title="Early Value Plays"
           dot="bg-green-400"
           labelColor="text-green-400"
           icon={<ArrowUpRight className="h-3.5 w-3.5" />}
           players={priceRise}
-          emptyMsg="No price rise targets"
-          tradeLabel="Buy Now"
+          emptyMsg="No early value targets this round"
+          tradeLabel="Value Play"
           tradeTagCls="text-green-300 border-green-400/25 bg-green-400/8"
         />
         <PlanColumn
@@ -968,7 +999,7 @@ function FreeUserView({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         {[
           { players: sells.slice(0, 1),        label: "Must Sell",       dot: "bg-red-400",    labelColor: "text-red-400",    total: totalSell,    desc: "Act now — sell before price falls" },
-          { players: buyBeforeRise.slice(0, 1), label: "Buy Before Rise", dot: "bg-green-400",  labelColor: "text-green-400",  total: totalBuy,     desc: "Price going up — buy before it moves" },
+          { players: buyBeforeRise.slice(0, 1), label: "Early Value Plays", dot: "bg-green-400",  labelColor: "text-green-400",  total: totalBuy,     desc: "Cheap players about to spike in price" },
           { players: upgrades.slice(0, 1),      label: "Score Upgrade",   dot: "bg-sky-400",    labelColor: "text-sky-400",    total: totalUpgrade, desc: "Scoring lift — worth the entry price" },
           { players: cashCows.slice(0, 1),      label: "Cash Cow",        dot: "bg-[#F5C84C]",  labelColor: "text-[#F5C84C]",  total: totalCow,     desc: "Budget pick building fast cash" },
         ].map(({ players, label, dot, labelColor, total, desc }) => (
@@ -1098,18 +1129,18 @@ function PremiumView({
         </SectionShell>
       ) : (
         <EmptySection
-          message="No upgrade targets this round"
-          subtext="No premium scorers at compelling value — hold your trades until next round."
+          message="No upgrade targets this round — hold strategy"
+          subtext="No premium scorers at compelling value right now. Wait for pricing to shift before pulling the trigger."
         />
       )}
 
       {buyBeforeRise.length > 0 ? (
         <SectionShell
           id="section-buy"
-          label="Buy Before Rise"
+          label="Early Value Plays"
           labelColor="text-green-400"
           dot="bg-green-400"
-          description="Price trajectory is up — the window to buy at current price is closing"
+          description="Cheap players about to spike in price — buy before the market moves"
           count={buyBeforeRise.length}
           showMore={showMoreBuys}
           onToggle={onToggleBuys}
@@ -1118,8 +1149,8 @@ function PremiumView({
         </SectionShell>
       ) : (
         <EmptySection
-          message="No buy-before-rise targets this round"
-          subtext="No confirmed upward price movers — check Upgrade Targets for scoring buys."
+          message="No early value plays this round — hold strategy"
+          subtext="No confirmed upward price movers identified. Check Upgrade Targets for scoring buys."
         />
       )}
 
@@ -1138,8 +1169,8 @@ function PremiumView({
         </SectionShell>
       ) : (
         <EmptySection
-          message="No cash cow targets this round"
-          subtext="No budget players generating strong price growth — check Buy Before Rise."
+          message="No cash cows this round — hold strategy"
+          subtext="No budget players generating strong price growth. Check Early Value Plays for cheaper entry options."
         />
       )}
 

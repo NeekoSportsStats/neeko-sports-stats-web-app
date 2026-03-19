@@ -1,4 +1,4 @@
-import { Lock, TrendingDown, TrendingUp, Clock, DollarSign, Zap } from "lucide-react";
+import { Lock, TrendingDown, TrendingUp, Clock, DollarSign, Zap, Flame, TriangleAlert as AlertTriangle } from "lucide-react";
 import { DerivedPlayer, DerivedCategory } from "./engine";
 import { fmtPrice, fmtNum, fmtPriceChange, positionBadge } from "./helpers";
 
@@ -12,13 +12,67 @@ interface Props {
 
 function categoryTag(cat: DerivedCategory): { label: string; cls: string } {
   switch (cat) {
-    case "buy_before_rise":  return { label: "BUY NOW",  cls: "text-green-300 bg-green-400/15 border-green-400/35" };
-    case "cash_cow":         return { label: "CASH COW", cls: "text-[#F5C84C] bg-[#F5C84C]/15 border-[#F5C84C]/35" };
-    case "upgrade_target":   return { label: "UPGRADE",  cls: "text-sky-300 bg-sky-400/15 border-sky-400/30" };
-    case "sell_before_drop": return { label: "SELL NOW", cls: "text-red-300 bg-red-400/15 border-red-400/35" };
-    case "fade_trap":        return { label: "AVOID",    cls: "text-orange-300 bg-orange-400/15 border-orange-400/35" };
-    default:                 return { label: "MONITOR",  cls: "text-white/40 bg-white/5 border-white/15" };
+    case "buy_before_rise":  return { label: "EARLY VALUE", cls: "text-green-300 bg-green-400/15 border-green-400/35" };
+    case "cash_cow":         return { label: "CASH COW",    cls: "text-[#F5C84C] bg-[#F5C84C]/15 border-[#F5C84C]/35" };
+    case "upgrade_target":   return { label: "UPGRADE",     cls: "text-sky-300 bg-sky-400/15 border-sky-400/30" };
+    case "sell_before_drop": return { label: "SELL NOW",    cls: "text-red-300 bg-red-400/15 border-red-400/35" };
+    case "fade_trap":        return { label: "AVOID",       cls: "text-orange-300 bg-orange-400/15 border-orange-400/35" };
+    default:                 return { label: "MONITOR",     cls: "text-white/40 bg-white/5 border-white/15" };
   }
+}
+
+function playerTypeTag(row: DerivedPlayer): { label: string; cls: string } | null {
+  const price = Number(row.price ?? 0);
+  const projection = Number(row.projection ?? 0);
+  const expChange = Number(row.expected_price_change ?? 0);
+  const cat = row._derived_category;
+
+  if (cat === "cash_cow" || (cat === "buy_before_rise" && price < 350000)) {
+    return { label: "ROOKIE CASH GEN", cls: "text-[#F5C84C]/70 bg-[#F5C84C]/[0.06] border-[#F5C84C]/20" };
+  }
+  if (cat === "upgrade_target" && projection >= 95 && price >= 500000) {
+    return { label: "MID-PRICER VALUE", cls: "text-sky-300/70 bg-sky-400/[0.06] border-sky-400/20" };
+  }
+  if (expChange > 80000 || (row._delta != null && row._delta > 20)) {
+    return { label: "BREAKOUT WATCH", cls: "text-green-300/70 bg-green-400/[0.06] border-green-400/20" };
+  }
+  return null;
+}
+
+function timeSensitivity(row: DerivedPlayer): { label: string; icon: React.ReactNode; cls: string } | null {
+  const expChange = Number(row.expected_price_change ?? 0);
+  const cat = row._derived_category;
+  const delta = row._delta;
+
+  if (cat === "sell_before_drop" && expChange < -150000) {
+    return {
+      label: "SELL WINDOW CLOSING",
+      icon: <AlertTriangle className="h-2.5 w-2.5" />,
+      cls: "text-red-400 border-red-400/25 bg-red-400/[0.06]",
+    };
+  }
+  if ((cat === "buy_before_rise" || cat === "cash_cow") && expChange > 150000) {
+    return {
+      label: "PRICE MOVING FAST",
+      icon: <Flame className="h-2.5 w-2.5" />,
+      cls: "text-orange-400 border-orange-400/25 bg-orange-400/[0.06]",
+    };
+  }
+  if ((cat === "buy_before_rise" || cat === "cash_cow") && expChange > 60000) {
+    return {
+      label: "1–2 ROUNDS BEFORE PEAK",
+      icon: <Clock className="h-2.5 w-2.5" />,
+      cls: "text-green-400 border-green-400/25 bg-green-400/[0.06]",
+    };
+  }
+  if (cat === "sell_before_drop" && delta != null && delta < -15) {
+    return {
+      label: "SELL WINDOW CLOSING",
+      icon: <AlertTriangle className="h-2.5 w-2.5" />,
+      cls: "text-red-400 border-red-400/25 bg-red-400/[0.06]",
+    };
+  }
+  return null;
 }
 
 function heroMetric(row: DerivedPlayer): {
@@ -58,7 +112,6 @@ function heroMetric(row: DerivedPlayer): {
     };
   }
 
-  // sell_before_drop / fade_trap / monitor
   return {
     label: "Expected Drop",
     value: fmtPriceChange(expChange),
@@ -143,11 +196,26 @@ function categoryUrgencyIcon(cat: DerivedCategory) {
   }
 }
 
-function confidenceLevel(v: number | null): { label: string; cls: string } {
-  if (v == null) return { label: "\u2014", cls: "text-white/20" };
-  if (v >= 75) return { label: "HIGH conf.", cls: "text-green-300/60" };
-  if (v >= 55) return { label: "MED conf.",  cls: "text-[#F5C84C]/60" };
-  return { label: "LOW conf.", cls: "text-orange-300/60" };
+function confidenceLevel(v: number | null): { label: string; icon: React.ReactNode; cls: string; dotCls: string } {
+  if (v == null) return { label: "\u2014", icon: null, cls: "text-white/20", dotCls: "bg-white/15" };
+  if (v >= 75) return {
+    label: "HIGH CONFIDENCE",
+    icon: <Zap className="h-2.5 w-2.5" />,
+    cls: "text-green-300/75",
+    dotCls: "bg-green-400",
+  };
+  if (v >= 55) return {
+    label: "MED CONFIDENCE",
+    icon: <Zap className="h-2.5 w-2.5" />,
+    cls: "text-[#F5C84C]/75",
+    dotCls: "bg-[#F5C84C]",
+  };
+  return {
+    label: "LOW CONFIDENCE",
+    icon: <Zap className="h-2.5 w-2.5" />,
+    cls: "text-orange-300/65",
+    dotCls: "bg-orange-400",
+  };
 }
 
 export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, heroMode = false }: Props) {
@@ -162,6 +230,8 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
   const aiExplanation = row.category_reason ?? null;
   const isSellLike = row._derived_category === "sell_before_drop" || row._derived_category === "fade_trap";
   const urgencyIcon = categoryUrgencyIcon(row._derived_category);
+  const typeTag = playerTypeTag(row);
+  const timeSig = timeSensitivity(row);
 
   // ── Compact (used in Must Sell strip) ─────────────────────────────────────
   if (compact) {
@@ -198,6 +268,13 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
             {delta >= 0 ? `+${delta.toFixed(0)}` : delta.toFixed(0)} vs BE
           </span>
         </div>
+
+        {timeSig && (
+          <div className={`flex items-center gap-1 px-2 py-1 rounded border text-[8px] font-bold uppercase tracking-wide ${timeSig.cls}`}>
+            {timeSig.icon}
+            {timeSig.label}
+          </div>
+        )}
 
         {whyNow && <p className="text-[10px] text-white/30 leading-snug">{whyNow}</p>}
       </div>
@@ -267,7 +344,7 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
 
   // ── Standard card ─────────────────────────────────────────────────────────
   return (
-    <div className={`relative rounded-xl border hover:border-white/12 hover:-translate-y-0.5 transition-all duration-200 p-4 flex flex-col gap-3 ${
+    <div className={`relative rounded-xl border hover:border-white/12 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200 p-4 flex flex-col gap-3 ${
       isSellLike
         ? "border-red-400/12 bg-red-400/[0.02] hover:bg-red-400/[0.035]"
         : "border-white/[0.07] bg-white/[0.025] hover:bg-white/[0.04]"
@@ -282,6 +359,11 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
           {row.position && (
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide ${positionBadge(row.position)}`}>
               {row.position}
+            </span>
+          )}
+          {typeTag && (
+            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide ${typeTag.cls}`}>
+              {typeTag.label}
             </span>
           )}
         </div>
@@ -317,24 +399,23 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
         />
       </div>
 
-      {/* Price + confidence line */}
+      {/* Time sensitivity badge */}
+      {timeSig && (
+        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[9px] font-bold uppercase tracking-wide w-fit ${timeSig.cls}`}>
+          {timeSig.icon}
+          {timeSig.label}
+        </div>
+      )}
+
+      {/* Confidence + price row */}
       <div className="flex items-center justify-between gap-2">
         {row._derived_category !== "upgrade_target" && (
           <span className="text-[10px] text-white/25 font-medium">{fmtPrice(row.price)}</span>
         )}
-        {row._derived_category === "upgrade_target" ? (
-          <div className="flex items-center gap-1.5 ml-auto">
-            {urgencyIcon}
-            <span className={`text-[9px] font-semibold ${conf.cls}`}>{conf.label}</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5">
-            {urgencyIcon}
-            <span className={`text-[10px] font-semibold tabular-nums ${expChange >= 0 ? "text-green-400/60" : "text-red-400/60"}`}>
-              {fmtPriceChange(expChange)}
-            </span>
-          </div>
-        )}
+        <div className={`flex items-center gap-1 ml-auto ${conf.cls}`}>
+          {conf.icon}
+          <span className="text-[8px] font-bold uppercase tracking-wide">{conf.label}</span>
+        </div>
       </div>
 
       {/* Why now */}
