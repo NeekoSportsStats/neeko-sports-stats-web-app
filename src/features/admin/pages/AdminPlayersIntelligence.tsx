@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Users, TrendingUp, TrendingDown, TriangleAlert as AlertTriangle, Gem, Flame, Shield, Crown, ChevronDown, ChevronUp, ChartBar as BarChart3, Database, DollarSign, Swords } from "lucide-react";
 import { FantasyPricesTab } from "../price-ingest/FantasyPricesTab";
 import { NameResolverTab } from "../price-ingest/NameResolverTab";
+import { PriceChangeDebugTab } from "../price-ingest/PriceChangeDebugTab";
 
 type MainTab = "players" | "projections" | "rankings-source" | "fantasy-prices" | "player-metrics";
 
@@ -79,7 +80,7 @@ interface RankingsSourceRow {
   price: number;
 }
 
-type PriceSubTab = "prices" | "name-resolver";
+type PriceSubTab = "prices" | "name-resolver" | "price-debug";
 
 type MetricTabKey =
   | "hot" | "cold" | "overrated" | "undervalued"
@@ -378,6 +379,7 @@ function RankingsSourceTab({ players, loading }: { players: PlayerRow[]; loading
 const PRICE_SUB_TABS: { id: PriceSubTab; label: string }[] = [
   { id: "prices",        label: "Fantasy Prices" },
   { id: "name-resolver", label: "Name Resolver" },
+  { id: "price-debug",   label: "Price Change Debug" },
 ];
 
 function FantasyPricesSection() {
@@ -391,6 +393,7 @@ function FantasyPricesSection() {
       />
       {subTab === "prices"        && <FantasyPricesTab />}
       {subTab === "name-resolver" && <NameResolverTab />}
+      {subTab === "price-debug"   && <PriceChangeDebugTab />}
     </div>
   );
 }

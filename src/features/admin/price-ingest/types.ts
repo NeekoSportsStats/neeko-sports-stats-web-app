@@ -1,6 +1,8 @@
 export interface ParsedPriceRow {
   source_name: string;
   cleaned_price: number;
+  position?: string | null;
+  team?: string | null;
 }
 
 export interface PreviewRow {
@@ -31,6 +33,8 @@ export interface MappingRow {
   id: string;
   source_name: string;
   cleaned_price: number;
+  position?: string | null;
+  team?: string | null;
   player_id: number | null;
   player_name: string | null;
   manual_input_name: string | null;

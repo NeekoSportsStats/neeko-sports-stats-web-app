@@ -212,6 +212,21 @@ async function dispatchCommand(
         const commitResult = commitData as { inserted: number; updated: number; total: number };
         console.log(`[commit_price_ingest] inserted=${commitResult?.inserted} updated=${commitResult?.updated}`);
 
+        // Snapshot prices into price history (one row per player per round)
+        const historyRows = (commitRows as Array<Record<string, unknown>>).map(r => ({
+          player_id: r.player_id,
+          price: r.cleaned_price,
+          position: r.position ?? null,
+        }));
+        try {
+          await admin.schema("afl" as never).rpc("insert_player_price_snapshot" as never, {
+            p_rows: historyRows,
+          } as never);
+          console.log(`[commit_price_ingest] price history snapshot: ok (${historyRows.length} rows)`);
+        } catch (e) {
+          console.warn("[commit_price_ingest] price history snapshot failed (non-fatal):", e instanceof Error ? e.message : String(e));
+        }
+
         const refreshSteps = {
           projection_engine:  { ok: false, error: undefined as string | undefined },
           rebuild_projection: { ok: false, error: undefined as string | undefined },

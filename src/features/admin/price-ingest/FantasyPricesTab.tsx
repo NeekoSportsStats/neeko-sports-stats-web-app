@@ -3,15 +3,17 @@ import { Button } from "@/components/ui/button";
 import {
   Upload, FileText, RefreshCw, CircleCheck as CheckCircle,
   TriangleAlert as AlertTriangle, ArrowLeft, Zap, Clock,
-  CircleHelp as HelpCircle, User, Search, Eye, EyeOff,
+  CircleHelp as HelpCircle, User, Search, Eye, EyeOff, Copy,
+  Sparkles,
 } from "lucide-react";
-import { parseCSVText, parseCSVFile, fmtPrice, type ParseError } from "./parseUtils";
+import { parseCSVText, parseCSVFile, parseRawFantasyText, fmtPrice, type ParseError } from "./parseUtils";
 import { usePlayerOptions, useCommitPrices, useSavePending } from "./usePriceIngest";
 import { PlayerSearchDropdown } from "./PlayerSearchDropdown";
 import { applyAutoMatch } from "./matchEngine";
 import type { ParsedPriceRow, MappingRow, IngestByIdResult, MatchStatus } from "./types";
 
 type Step = "input" | "mapping" | "done";
+type InputMode = "raw" | "paste" | "csv";
 
 const GROUP_ORDER: MatchStatus[] = [
   "pending_player_record",
@@ -92,11 +94,12 @@ export function FantasyPricesTab() {
   const [step, setStep] = useState<Step>("input");
   const [pasteText, setPasteText] = useState("");
   const [parseErrors, setParseErrors] = useState<ParseError[]>([]);
-  const [inputMode, setInputMode] = useState<"paste" | "csv">("paste");
+  const [inputMode, setInputMode] = useState<InputMode>("raw");
   const [mappingRows, setMappingRows] = useState<MappingRow[]>([]);
   const [commitResult, setCommitResult] = useState<IngestByIdResult | null>(null);
   const [commitError, setCommitError] = useState<string | null>(null);
   const [pendingSaved, setPendingSaved] = useState(false);
+  const [copiedCsv, setCopiedCsv] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const players = usePlayerOptions();
@@ -108,6 +111,8 @@ export function FantasyPricesTab() {
       id: genId(),
       source_name: r.source_name,
       cleaned_price: r.cleaned_price,
+      position: r.position ?? null,
+      team: r.team ?? null,
       player_id: null,
       player_name: null,
       manual_input_name: null,
@@ -132,9 +137,18 @@ export function FantasyPricesTab() {
 
   function handlePasteChange(text: string) {
     setPasteText(text);
-    const result = parseCSVText(text);
+    const result = inputMode === "raw" ? parseRawFantasyText(text) : parseCSVText(text);
     setParseErrors(result.errors);
     setMappingRows(buildMappingRows(result.rows));
+  }
+
+  function handleModeChange(mode: InputMode) {
+    setInputMode(mode);
+    if (pasteText) {
+      const result = mode === "raw" ? parseRawFantasyText(pasteText) : parseCSVText(pasteText);
+      setParseErrors(result.errors);
+      setMappingRows(buildMappingRows(result.rows));
+    }
   }
 
   const handlePlayerSelect = useCallback((rowId: string, playerId: number | null, playerName: string | null, isManualInput?: boolean) => {
@@ -210,6 +224,23 @@ export function FantasyPricesTab() {
     setStep("mapping");
   }
 
+  function handleCopyCleanCsv() {
+    const header = "player_name,team,position,price";
+    const lines = mappingRows
+      .filter(r => r.cleaned_price > 0)
+      .map(r => {
+        const name = (r.player_name ?? r.source_name).replace(/,/g, "");
+        const team = (r.team ?? "").replace(/,/g, "");
+        const pos = r.position ?? "";
+        return `${name},${team},${pos},${r.cleaned_price}`;
+      });
+    const csv = [header, ...lines].join("\n");
+    navigator.clipboard.writeText(csv).then(() => {
+      setCopiedCsv(true);
+      setTimeout(() => setCopiedCsv(false), 2000);
+    });
+  }
+
   const counts = useMemo(() => {
     const auto = mappingRows.filter(r => r.match_status === "auto_matched").length;
     const manual = mappingRows.filter(r => r.match_status === "manually_matched").length;
@@ -218,7 +249,9 @@ export function FantasyPricesTab() {
     const pending = mappingRows.filter(r => r.match_status === "pending_player_record").length;
     const manualInput = mappingRows.filter(r => r.match_status === "manual_input").length;
     const readyToInsert = auto + manual;
-    return { auto, manual, suggested, manualReq, pending, manualInput, readyToInsert, total: mappingRows.length };
+    const hasPositions = mappingRows.filter(r => r.position != null).length;
+    const hasTeams = mappingRows.filter(r => r.team != null).length;
+    return { auto, manual, suggested, manualReq, pending, manualInput, readyToInsert, total: mappingRows.length, hasPositions, hasTeams };
   }, [mappingRows]);
 
   if (step === "done" && commitResult) {
@@ -289,43 +322,50 @@ export function FantasyPricesTab() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-lg border border-amber-500/20 bg-amber-950/10 px-4 py-3 text-sm text-amber-300">
-        <strong>Interactive mapper with auto-match.</strong> Paste your price list — common players auto-match instantly. Hyphenated names (e.g. L D-Uniacke) are handled. Players not in the database are held safely.
-        <br />
-        <span className="text-amber-400/70 text-xs mt-0.5 block">
-          Format: Column 1 = player name (e.g. <code className="font-mono">N Daicos</code>), Column 2 = price (e.g. <code className="font-mono">$1,182,000</code>). Comma or tab separated.
-        </span>
-      </div>
-
       {step === "input" && (
         <>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setInputMode("paste")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
-                inputMode === "paste" ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <FileText className="h-3.5 w-3.5" />
-              Paste text
-            </button>
-            <button
-              onClick={() => setInputMode("csv")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
-                inputMode === "csv" ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Upload className="h-3.5 w-3.5" />
+          <div className="flex gap-2 flex-wrap">
+            <ModeButton active={inputMode === "raw"} onClick={() => handleModeChange("raw")} icon={<Sparkles className="h-3.5 w-3.5" />}>
+              Raw site paste
+            </ModeButton>
+            <ModeButton active={inputMode === "paste"} onClick={() => handleModeChange("paste")} icon={<FileText className="h-3.5 w-3.5" />}>
+              CSV paste
+            </ModeButton>
+            <ModeButton active={inputMode === "csv"} onClick={() => handleModeChange("csv")} icon={<Upload className="h-3.5 w-3.5" />}>
               Upload CSV
-            </button>
+            </ModeButton>
           </div>
 
-          {inputMode === "paste" ? (
+          {inputMode === "raw" && (
+            <div className="rounded-lg border border-sky-500/20 bg-sky-950/10 px-4 py-3 text-sm text-sky-300">
+              <strong>Raw paste mode.</strong> Copy the entire player table from AFL Fantasy and paste it below — messy spacing, merged columns, and extra rows are handled automatically. Prices ($NNN,NNN) are used as anchors to detect each player row.
+              <br />
+              <span className="text-sky-400/70 text-xs mt-0.5 block">
+                Extracts: player name, position (DEF/MID/FWD/RUC), team, and price.
+              </span>
+            </div>
+          )}
+
+          {inputMode === "paste" && (
+            <div className="rounded-lg border border-amber-500/20 bg-amber-950/10 px-4 py-3 text-sm text-amber-300">
+              <strong>CSV paste mode.</strong> Expects clean comma or tab-separated rows.
+              <br />
+              <span className="text-amber-400/70 text-xs mt-0.5 block">
+                Format: <code className="font-mono">N Daicos, $1,182,000</code> — one player per line.
+              </span>
+            </div>
+          )}
+
+          {inputMode !== "csv" ? (
             <textarea
               value={pasteText}
               onChange={e => handlePasteChange(e.target.value)}
-              placeholder={"N Daicos, $1,182,000\nL D-Uniacke, $785,000\nM Gawn, $1,050,000"}
-              rows={14}
+              placeholder={
+                inputMode === "raw"
+                  ? "Paste AFL Fantasy player table here — raw copy from site is fine\n\nExample:\n1 Nick Daicos MID Collingwood $1,182,000\n2 Zach Merrett MID Essendon $956,000\n..."
+                  : "N Daicos, $1,182,000\nL D-Uniacke, $785,000\nM Gawn, $1,050,000"
+              }
+              rows={16}
               className="w-full border border-border rounded-md px-3 py-2.5 text-sm font-mono bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y"
             />
           ) : (
@@ -341,32 +381,54 @@ export function FantasyPricesTab() {
           )}
 
           {mappingRows.length > 0 && (
-            <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-6">
-              <StatTile label="Total" value={counts.total} />
-              <StatTile label="Auto-matched" value={counts.auto} color="emerald" />
-              <StatTile label="Suggested" value={counts.suggested} color="amber" />
-              <StatTile label="Needs Search" value={counts.manualReq} color="orange" />
-              <StatTile label="Pending" value={counts.pending} color="red" />
-              <StatTile label="Ready" value={counts.readyToInsert} color="emerald" />
+            <>
+              <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-6">
+                <StatTile label="Total" value={counts.total} />
+                <StatTile label="Auto-matched" value={counts.auto} color="emerald" />
+                <StatTile label="Suggested" value={counts.suggested} color="amber" />
+                <StatTile label="Needs Search" value={counts.manualReq} color="orange" />
+                <StatTile label="Pending" value={counts.pending} color="red" />
+                <StatTile label="Ready" value={counts.readyToInsert} color="emerald" />
+              </div>
+
+              {counts.hasPositions > 0 && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                  Position extracted for {counts.hasPositions} of {counts.total} players
+                  {counts.hasTeams > 0 && ` · Team for ${counts.hasTeams}`}
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <Button onClick={handleGoToMapping}>
+                  <Zap className="h-4 w-4 mr-2" />
+                  Review &amp; Map Players ({mappingRows.length} rows)
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleCopyCleanCsv} className="text-xs h-9">
+                  <Copy className="h-3.5 w-3.5 mr-1.5" />
+                  {copiedCsv ? "Copied!" : "Copy Clean CSV"}
+                </Button>
+              </div>
+            </>
+          )}
+
+          {mappingRows.length === 0 && inputMode !== "csv" && pasteText.trim() && (
+            <div className="rounded-lg border border-red-500/20 bg-red-950/10 px-4 py-3 text-sm text-red-400">
+              No player rows detected. Make sure the pasted content includes prices in the format $NNN,NNN.
             </div>
           )}
 
           {parseErrors.length > 0 && (
             <div className="rounded-lg border border-amber-500/20 bg-amber-950/10 px-3 py-2.5 space-y-1">
               <p className="text-xs font-semibold text-amber-400">Parse warnings ({parseErrors.length})</p>
-              {parseErrors.slice(0, 5).map((e, i) => (
+              {parseErrors.slice(0, 6).map((e, i) => (
                 <p key={i} className="text-xs text-muted-foreground font-mono">
-                  Line {e.line}: {e.reason} — <span className="text-amber-400/70">{e.raw.slice(0, 50)}</span>
+                  Row {e.line}: {e.reason} — <span className="text-amber-400/70">{e.raw.slice(0, 60)}</span>
                 </p>
               ))}
-              {parseErrors.length > 5 && <p className="text-xs text-muted-foreground">…and {parseErrors.length - 5} more</p>}
+              {parseErrors.length > 6 && <p className="text-xs text-muted-foreground">…and {parseErrors.length - 6} more</p>}
             </div>
           )}
-
-          <Button onClick={handleGoToMapping} disabled={mappingRows.length === 0}>
-            <Zap className="h-4 w-4 mr-2" />
-            Review &amp; Map Players ({mappingRows.length} rows)
-          </Button>
         </>
       )}
 
@@ -383,9 +445,32 @@ export function FantasyPricesTab() {
           onCommit={handleCommit}
           onSavePending={handleSavePending}
           onBack={() => setStep("input")}
+          onCopyCleanCsv={handleCopyCleanCsv}
+          copiedCsv={copiedCsv}
         />
       )}
     </div>
+  );
+}
+
+function ModeButton({ active, onClick, icon, children }: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
+        active
+          ? "bg-foreground text-background border-foreground"
+          : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+      }`}
+    >
+      {icon}
+      {children}
+    </button>
   );
 }
 
@@ -415,6 +500,8 @@ interface MappingCounts {
   manualInput: number;
   readyToInsert: number;
   total: number;
+  hasPositions: number;
+  hasTeams: number;
 }
 
 interface MappingStepProps {
@@ -429,14 +516,19 @@ interface MappingStepProps {
   onCommit: () => void;
   onSavePending: () => void;
   onBack: () => void;
+  onCopyCleanCsv: () => void;
+  copiedCsv: boolean;
 }
 
 function MappingStep({
   rows, players, counts, committing, saving, pendingSaved, commitError,
-  onSelect, onCommit, onSavePending, onBack,
+  onSelect, onCommit, onSavePending, onBack, onCopyCleanCsv, copiedCsv,
 }: MappingStepProps) {
   const [search, setSearch] = useState("");
   const [showUnmatchedOnly, setShowUnmatchedOnly] = useState(false);
+
+  const showPositionCol = counts.hasPositions > 0;
+  const showTeamCol = counts.hasTeams > 0;
 
   const visibleRows = useMemo(() => {
     let filtered = rows;
@@ -447,7 +539,8 @@ function MappingStep({
       const q = search.trim().toLowerCase();
       filtered = filtered.filter(r =>
         r.source_name.toLowerCase().includes(q) ||
-        (r.player_name ?? "").toLowerCase().includes(q)
+        (r.player_name ?? "").toLowerCase().includes(q) ||
+        (r.team ?? "").toLowerCase().includes(q)
       );
     }
     return filtered;
@@ -510,13 +603,13 @@ function MappingStep({
       )}
 
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative flex-1 min-w-[180px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search rows by name…"
+            placeholder="Search by name, team…"
             className="w-full pl-7 pr-3 py-1.5 border border-border rounded-md text-xs bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
@@ -527,7 +620,14 @@ function MappingStep({
           }`}
         >
           {showUnmatchedOnly ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-          {showUnmatchedOnly ? "Showing unmatched" : "Show unmatched only"}
+          {showUnmatchedOnly ? "Showing unmatched" : "Unmatched only"}
+        </button>
+        <button
+          onClick={onCopyCleanCsv}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border border-border text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Copy className="h-3.5 w-3.5" />
+          {copiedCsv ? "Copied!" : "Copy CSV"}
         </button>
         <span className="text-xs text-muted-foreground ml-auto">
           {visibleRows.length} of {rows.length} rows
@@ -539,7 +639,13 @@ function MappingStep({
           <thead>
             <tr className="border-b border-border/60 bg-muted/20">
               <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-28">Status</th>
-              <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-28">Input Name</th>
+              <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Input Name</th>
+              {showPositionCol && (
+                <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-16">Pos</th>
+              )}
+              {showTeamCol && (
+                <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-28">Team</th>
+              )}
               <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Matched Player</th>
               <th className="text-right py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-24">Price</th>
             </tr>
@@ -555,12 +661,16 @@ function MappingStep({
                   players={players}
                   onSelect={onSelect}
                   showGroupDivider={showDivider}
+                  showPositionCol={showPositionCol}
+                  showTeamCol={showTeamCol}
                 />
               );
             })}
             {visibleRows.length === 0 && (
               <tr>
-                <td colSpan={4} className="py-8 text-center text-xs text-muted-foreground">No rows match your filter</td>
+                <td colSpan={4 + (showPositionCol ? 1 : 0) + (showTeamCol ? 1 : 0)} className="py-8 text-center text-xs text-muted-foreground">
+                  No rows match your filter
+                </td>
               </tr>
             )}
           </tbody>
@@ -596,14 +706,17 @@ const GROUP_LABELS: Partial<Record<MatchStatus, string>> = {
 };
 
 function MappingTableRow({
-  row, players, onSelect, showGroupDivider,
+  row, players, onSelect, showGroupDivider, showPositionCol, showTeamCol,
 }: {
   row: MappingRow;
   players: ReturnType<typeof usePlayerOptions>;
   onSelect: (rowId: string, playerId: number | null, playerName: string | null, isManualInput?: boolean) => void;
   showGroupDivider: boolean;
+  showPositionCol: boolean;
+  showTeamCol: boolean;
 }) {
   const isHardPending = row.match_status === "pending_player_record";
+  const colSpan = 4 + (showPositionCol ? 1 : 0) + (showTeamCol ? 1 : 0);
 
   const dropdownPlayers = useMemo(() => {
     if (row.suggestions.length > 0 && row.player_id === null) {
@@ -617,7 +730,7 @@ function MappingTableRow({
     <>
       {showGroupDivider && GROUP_LABELS[row.match_status] && (
         <tr>
-          <td colSpan={4} className="py-1.5 px-3 bg-muted/30 border-b border-t border-border/40">
+          <td colSpan={colSpan} className="py-1.5 px-3 bg-muted/30 border-b border-t border-border/40">
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
               {GROUP_LABELS[row.match_status]}
             </span>
@@ -629,24 +742,30 @@ function MappingTableRow({
           <StatusBadge status={row.match_status} confidence={row.confidence} />
         </td>
         <td className="py-2 px-3 font-mono text-xs text-muted-foreground">{row.source_name}</td>
+        {showPositionCol && (
+          <td className="py-2 px-3">
+            {row.position ? (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted/30 text-muted-foreground">
+                {row.position}
+              </span>
+            ) : (
+              <span className="text-[10px] text-muted-foreground/40">—</span>
+            )}
+          </td>
+        )}
+        {showTeamCol && (
+          <td className="py-2 px-3 text-xs text-muted-foreground truncate max-w-[96px]">
+            {row.team ?? "—"}
+          </td>
+        )}
         <td className="py-2 px-3 min-w-[220px]">
-          {isHardPending ? (
-            <PlayerSearchDropdown
-              players={dropdownPlayers}
-              value={row.player_id}
-              manualInputName={row.manual_input_name}
-              onChange={(id, name, isManual) => onSelect(row.id, id, name, isManual)}
-              placeholder="Type name or search…"
-            />
-          ) : (
-            <PlayerSearchDropdown
-              players={dropdownPlayers}
-              value={row.player_id}
-              manualInputName={row.manual_input_name}
-              onChange={(id, name, isManual) => onSelect(row.id, id, name, isManual)}
-              placeholder={row.player_name ?? "Search player…"}
-            />
-          )}
+          <PlayerSearchDropdown
+            players={dropdownPlayers}
+            value={row.player_id}
+            manualInputName={row.manual_input_name}
+            onChange={(id, name, isManual) => onSelect(row.id, id, name, isManual)}
+            placeholder={isHardPending ? "Type name or search…" : (row.player_name ?? "Search player…")}
+          />
         </td>
         <td className="py-2 px-3 text-right tabular-nums font-mono text-xs">
           {fmtPrice(row.cleaned_price)}
