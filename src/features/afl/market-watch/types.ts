@@ -1,4 +1,10 @@
-export type MWCategory = "buy" | "sell_now" | "sell_consider" | "cash_cow" | "fade" | "monitor";
+export type MWCategory =
+  | "buy_before_rise"
+  | "cash_cow"
+  | "upgrade_target"
+  | "sell_before_drop"
+  | "fade_trap"
+  | "monitor";
 
 export type MWCategoryFilter = "all" | "buy" | "sell" | "cash_cow" | "trap";
 
@@ -63,7 +69,8 @@ export interface MWStatus {
 }
 
 export interface MWSummary {
-  buy_count: number;
+  buy_before_rise_count: number;
+  upgrade_target_count: number;
   sell_count: number;
   cash_cow_count: number;
   trap_count: number;

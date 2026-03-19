@@ -27,18 +27,18 @@ export function MarketWatchBanner({ summary, activeSection }: Props) {
 
   const items: NavItem[] = [
     {
-      label: "Buy Before Rise",
-      id: "section-buy",
-      count: summary?.buy_count ?? 0,
-      color: "text-green-400/60 border-green-400/20 hover:border-green-400/50 hover:text-green-400",
-      activeColor: "text-green-400 border-green-400/60 bg-green-400/[0.07]",
+      label: "Upgrade Targets",
+      id: "section-upgrades",
+      count: summary?.upgrade_target_count ?? 0,
+      color: "text-sky-400/60 border-sky-400/20 hover:border-sky-400/50 hover:text-sky-400",
+      activeColor: "text-sky-400 border-sky-400/60 bg-sky-400/[0.07]",
     },
     {
-      label: "Sell Before Drop",
-      id: "section-sell",
-      count: summary?.sell_count ?? 0,
-      color: "text-red-400/60 border-red-400/20 hover:border-red-400/50 hover:text-red-400",
-      activeColor: "text-red-400 border-red-400/60 bg-red-400/[0.07]",
+      label: "Buy Before Rise",
+      id: "section-buy",
+      count: summary?.buy_before_rise_count ?? 0,
+      color: "text-green-400/60 border-green-400/20 hover:border-green-400/50 hover:text-green-400",
+      activeColor: "text-green-400 border-green-400/60 bg-green-400/[0.07]",
     },
     {
       label: "Cash Cows",
@@ -46,6 +46,13 @@ export function MarketWatchBanner({ summary, activeSection }: Props) {
       count: summary?.cash_cow_count ?? 0,
       color: "text-[#F5C84C]/60 border-[#F5C84C]/20 hover:border-[#F5C84C]/50 hover:text-[#F5C84C]",
       activeColor: "text-[#F5C84C] border-[#F5C84C]/60 bg-[#F5C84C]/[0.07]",
+    },
+    {
+      label: "Sell Before Drop",
+      id: "section-sell",
+      count: summary?.sell_count ?? 0,
+      color: "text-red-400/60 border-red-400/20 hover:border-red-400/50 hover:text-red-400",
+      activeColor: "text-red-400 border-red-400/60 bg-red-400/[0.07]",
     },
     {
       label: "Fades & Traps",

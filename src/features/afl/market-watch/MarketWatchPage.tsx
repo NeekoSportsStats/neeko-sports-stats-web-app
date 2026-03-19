@@ -53,7 +53,7 @@ export default function MarketWatchPage() {
         premium
           ? supabase.from("v_mw_premium").select("*").limit(600)
           : supabase.from("v_mw_premium").select("*")
-              .in("category", ["buy", "sell_now", "sell_consider", "cash_cow", "fade", "monitor"])
+              .in("category", ["buy_before_rise", "cash_cow", "upgrade_target", "sell_before_drop", "fade_trap", "monitor"])
               .order("trade_score", { ascending: false })
               .limit(80),
         supabase.from("v_mw_summary").select("*").maybeSingle(),
@@ -392,11 +392,11 @@ function FreeUserView({
   summary: MWSummary | null;
   onUnlock: () => void;
 }) {
-  const totalSell    = summary?.sell_count     ?? sells.length;
-  const totalBuy     = buyBeforeRise.length;
-  const totalUpgrade = upgrades.length;
-  const totalCow     = summary?.cash_cow_count ?? cashCows.length;
-  const totalTrap    = summary?.trap_count     ?? traps.length;
+  const totalSell    = summary?.sell_count            ?? sells.length;
+  const totalBuy     = summary?.buy_before_rise_count ?? buyBeforeRise.length;
+  const totalUpgrade = summary?.upgrade_target_count  ?? upgrades.length;
+  const totalCow     = summary?.cash_cow_count        ?? cashCows.length;
+  const totalTrap    = summary?.trap_count            ?? traps.length;
 
   return (
     <div>
