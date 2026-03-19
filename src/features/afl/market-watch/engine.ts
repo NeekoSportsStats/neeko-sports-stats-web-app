@@ -78,89 +78,84 @@ export function classifyPlayers(raw: MWPlayerRow[]): {
     tagged
       .filter(r => r.category === "cash_cow")
       .sort((a, b) => (b.expected_price_change ?? 0) - (a.expected_price_change ?? 0))
-  ).slice(0, 8);
+  ).slice(0, 12);
 
   const buyBeforeRise = dedupeByPlayerId(
     tagged
       .filter(r => r.category === "buy_before_rise")
       .sort((a, b) => (b.expected_price_change ?? 0) - (a.expected_price_change ?? 0))
-  ).slice(0, 8);
+  ).slice(0, 12);
 
   const upgrades = dedupeByPlayerId(
     tagged
       .filter(r => r.category === "upgrade_target")
       .sort((a, b) => (b.value_score ?? 0) - (a.value_score ?? 0))
-  ).slice(0, 5);
+  ).slice(0, 12);
 
   // Sells: trust DB category — no extra value_score filter
   const sells = dedupeByPlayerId(
     tagged
       .filter(r => r.category === "sell_before_drop")
       .sort((a, b) => (a.expected_price_change ?? 0) - (b.expected_price_change ?? 0))
-  ).slice(0, 8);
+  ).slice(0, 12);
 
   const traps = dedupeByPlayerId(
     tagged
       .filter(r => r.category === "fade_trap")
       .sort((a, b) => (a.expected_price_change ?? 0) - (b.expected_price_change ?? 0))
-  ).slice(0, 6);
+  ).slice(0, 10);
 
   // ── Fallback logic — never return empty categories ──────────────────────────
 
   const allTagged = dedupeByPlayerId(tagged);
 
-  const cashCowsFinal = cashCows.length >= 3 ? cashCows : (() => {
-    // Fallback: cheapest players with positive projection vs breakeven
+  const cashCowsFinal = cashCows.length >= 5 ? cashCows : (() => {
     const fallback = allTagged
       .filter(r => r.category !== "sell_before_drop")
       .filter(r => !cashCows.find(c => c.player_id === r.player_id))
       .sort((a, b) => (a.price ?? 0) - (b.price ?? 0))
-      .slice(0, 8 - cashCows.length);
-    return [...cashCows, ...fallback].slice(0, 8);
+      .slice(0, 12 - cashCows.length);
+    return [...cashCows, ...fallback].slice(0, 12);
   })();
 
-  const buyBeforeRiseFinal = buyBeforeRise.length >= 3 ? buyBeforeRise : (() => {
-    // Fallback: positive delta players not already in cashCows
+  const buyBeforeRiseFinal = buyBeforeRise.length >= 5 ? buyBeforeRise : (() => {
     const cowIds = new Set(cashCowsFinal.map(r => r.player_id));
     const fallback = allTagged
       .filter(r => r.category === "monitor" && delta(r) > 0)
       .filter(r => !cowIds.has(r.player_id))
       .sort((a, b) => delta(b) - delta(a))
-      .slice(0, 8 - buyBeforeRise.length);
-    return [...buyBeforeRise, ...fallback].slice(0, 8);
+      .slice(0, 12 - buyBeforeRise.length);
+    return [...buyBeforeRise, ...fallback].slice(0, 12);
   })();
 
-  const upgradesFinal = upgrades.length >= 4 ? upgrades : (() => {
-    // Fallback: highest projection players
+  const upgradesFinal = upgrades.length >= 5 ? upgrades : (() => {
     const existIds = new Set(upgrades.map(r => r.player_id));
     const fallback = allTagged
       .filter(r => r.category !== "sell_before_drop" && r.category !== "fade_trap")
       .filter(r => !existIds.has(r.player_id))
       .sort((a, b) => (b.projection ?? 0) - (a.projection ?? 0))
-      .slice(0, 5 - upgrades.length);
-    return [...upgrades, ...fallback].slice(0, 5);
+      .slice(0, 12 - upgrades.length);
+    return [...upgrades, ...fallback].slice(0, 12);
   })();
 
-  const sellsFinal = sells.length >= 4 ? sells : (() => {
-    // Fallback: most negative delta players
+  const sellsFinal = sells.length >= 5 ? sells : (() => {
     const existIds = new Set(sells.map(r => r.player_id));
     const fallback = allTagged
       .filter(r => delta(r) < -5)
       .filter(r => !existIds.has(r.player_id))
       .sort((a, b) => delta(a) - delta(b))
-      .slice(0, 8 - sells.length);
-    return [...sells, ...fallback].slice(0, 8);
+      .slice(0, 12 - sells.length);
+    return [...sells, ...fallback].slice(0, 12);
   })();
 
-  const trapsFinal = traps.length >= 3 ? traps : (() => {
-    // Fallback: highest price with low delta
+  const trapsFinal = traps.length >= 4 ? traps : (() => {
     const existIds = new Set(traps.map(r => r.player_id));
     const fallback = allTagged
       .filter(r => (r.price ?? 0) >= 500000 && delta(r) < 0)
       .filter(r => !existIds.has(r.player_id))
       .sort((a, b) => (b.price ?? 0) - (a.price ?? 0))
-      .slice(0, 6 - traps.length);
-    return [...traps, ...fallback].slice(0, 6);
+      .slice(0, 10 - traps.length);
+    return [...traps, ...fallback].slice(0, 10);
   })();
 
   return {

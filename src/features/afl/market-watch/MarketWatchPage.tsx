@@ -11,7 +11,8 @@ import { UpgradeModal } from "./UpgradeModal";
 import { fmtPriceChange, fmtPrice } from "./helpers";
 import { classifyPlayers, buildBestTrades, DerivedPlayer, BestTrade } from "./engine";
 
-const SECTION_LIMIT = 6;
+const SECTION_LIMIT = 8;
+const FREE_SECTION_VISIBLE = 3;
 
 // ─── Trade deduplication key ───────────────────────────────────────────────────
 
@@ -1618,10 +1619,10 @@ function FreeUserView({
   const totalCow     = cashCows.length;
   const totalTrap    = traps.length;
 
-  const hiddenSells    = Math.max(totalSell - 1, 0);
-  const hiddenBuys     = Math.max(totalBuy - 1, 0);
-  const hiddenUpgrades = Math.max(totalUpgrade - 1, 0);
-  const hiddenCows     = Math.max(totalCow - 1, 0);
+  const hiddenSells    = Math.max(totalSell - FREE_SECTION_VISIBLE, 0);
+  const hiddenBuys     = Math.max(totalBuy - FREE_SECTION_VISIBLE, 0);
+  const hiddenUpgrades = Math.max(totalUpgrade - FREE_SECTION_VISIBLE, 0);
+  const hiddenCows     = Math.max(totalCow - FREE_SECTION_VISIBLE, 0);
 
   const hoursLeft = useMemo(() => {
     if (!lastUpdated) return null;
@@ -1676,9 +1677,9 @@ function FreeUserView({
   ];
 
   const lockedPlayers = [
-    ...sells.slice(1, 2),
-    ...upgrades.slice(1, 2),
-    ...buyBeforeRise.slice(1, 2),
+    ...sells.slice(FREE_SECTION_VISIBLE, FREE_SECTION_VISIBLE + 2),
+    ...upgrades.slice(FREE_SECTION_VISIBLE, FREE_SECTION_VISIBLE + 1),
+    ...buyBeforeRise.slice(FREE_SECTION_VISIBLE, FREE_SECTION_VISIBLE + 1),
   ];
 
   return (
@@ -1761,12 +1762,16 @@ function FreeUserView({
             {/* SELL LOGIC FIX: only show NoSellsCard when zero sell signals */}
             {isSell && sells.length === 0 ? (
               <NoSellsCard />
-            ) : players[0] ? (
-              <FreePlayerCard player={players[0]} isSell={isSell} />
-            ) : (
+            ) : players.length === 0 ? (
               <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] px-4 py-4 text-center">
                 <p className="text-[11px] font-semibold text-white/22">No signal this week</p>
                 <p className="text-[10px] text-white/13 mt-0.5">Hold — no action needed</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {players.slice(0, FREE_SECTION_VISIBLE).map(p => (
+                  <FreePlayerCard key={p.player_id} player={p} isSell={isSell} />
+                ))}
               </div>
             )}
           </div>
@@ -1796,6 +1801,42 @@ function FreeUserView({
         onUnlock={onUnlock}
         lastUpdated={lastUpdated}
       />
+    </div>
+  );
+}
+
+// ─── Category Why Block ────────────────────────────────────────────────────────
+
+const CATEGORY_WHY: Record<string, { text: string; tipCls: string }> = {
+  "upgrades": {
+    text: "These players score more than they cost — trade in now before the market catches on and prices rise.",
+    tipCls: "border-sky-400/12 bg-sky-400/[0.025]",
+  },
+  "buyBeforeRise": {
+    text: "Each of these players is beating their breakeven — price rises are imminent. Every round you wait costs more to buy in.",
+    tipCls: "border-green-400/12 bg-green-400/[0.025]",
+  },
+  "cashCows": {
+    text: "Cheap players generating fast cash growth. Bank their value now to fund a future premium upgrade.",
+    tipCls: "border-[#F5C84C]/12 bg-[#F5C84C]/[0.02]",
+  },
+  "traps": {
+    text: "Premium-priced players whose scoring doesn't justify the entry cost. Avoid at current price — wait for a drop.",
+    tipCls: "border-orange-400/12 bg-orange-400/[0.02]",
+  },
+  "sells": {
+    text: "These players are below breakeven — their price is falling. If you own them, now is the window to sell.",
+    tipCls: "border-red-400/12 bg-red-400/[0.02]",
+  },
+};
+
+function CategoryWhyBlock({ id, count }: { id: string; count: number }) {
+  const cfg = CATEGORY_WHY[id];
+  if (!cfg || count === 0) return null;
+  return (
+    <div className={`flex items-start gap-2 rounded-lg border px-3 py-2.5 mb-4 ${cfg.tipCls}`}>
+      <Info className="h-3 w-3 text-white/20 shrink-0 mt-0.5" />
+      <p className="text-[10px] text-white/30 leading-relaxed">{cfg.text}</p>
     </div>
   );
 }
@@ -1867,6 +1908,7 @@ function PremiumView({
           count={upgrades.length}
           defaultOpen
         >
+          <CategoryWhyBlock id="upgrades" count={upgrades.length} />
           <PlayerGrid players={upgrades} isPremium showMore={showMoreUpgrades} />
           {upgrades.length > SECTION_LIMIT && (
             <button onClick={onToggleUpgrades} className="mt-3 w-full text-[10px] text-white/25 hover:text-white/45 transition-colors flex items-center justify-center gap-1">
@@ -1891,6 +1933,7 @@ function PremiumView({
           description="Cheap players about to spike in price — buy before the market moves"
           count={buyBeforeRise.length}
         >
+          <CategoryWhyBlock id="buyBeforeRise" count={buyBeforeRise.length} />
           <PlayerGrid players={buyBeforeRise} isPremium showMore={showMoreBuys} />
           {buyBeforeRise.length > SECTION_LIMIT && (
             <button onClick={onToggleBuys} className="mt-3 w-full text-[10px] text-white/25 hover:text-white/45 transition-colors flex items-center justify-center gap-1">
@@ -1915,6 +1958,7 @@ function PremiumView({
           description="Cheap players beating breakeven — building your war chest for future upgrades"
           count={cashCows.length}
         >
+          <CategoryWhyBlock id="cashCows" count={cashCows.length} />
           <PlayerGrid players={cashCows} isPremium showMore={showMoreCows} />
           {cashCows.length > SECTION_LIMIT && (
             <button onClick={onToggleCows} className="mt-3 w-full text-[10px] text-white/25 hover:text-white/45 transition-colors flex items-center justify-center gap-1">
@@ -1939,6 +1983,7 @@ function PremiumView({
           description="Overpriced at current value — do not trade in at this price"
           count={traps.length}
         >
+          <CategoryWhyBlock id="traps" count={traps.length} />
           <PlayerGrid players={traps} isPremium showMore={showMoreTraps} />
           {traps.length > SECTION_LIMIT && (
             <button onClick={onToggleTraps} className="mt-3 w-full text-[10px] text-white/25 hover:text-white/45 transition-colors flex items-center justify-center gap-1">

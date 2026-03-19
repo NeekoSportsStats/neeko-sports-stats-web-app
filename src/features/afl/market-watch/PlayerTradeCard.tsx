@@ -196,26 +196,60 @@ function categoryUrgencyIcon(cat: DerivedCategory) {
   }
 }
 
-function confidenceLevel(v: number | null): { label: string; icon: React.ReactNode; cls: string; dotCls: string } {
-  if (v == null) return { label: "\u2014", icon: null, cls: "text-white/20", dotCls: "bg-white/15" };
-  if (v >= 75) return {
+function confidenceLevel(v: number | null): { label: string; icon: React.ReactNode; cls: string; dotCls: string; barCls: string; pct: number } {
+  if (v == null) return { label: "\u2014", icon: null, cls: "text-white/20", dotCls: "bg-white/15", barCls: "bg-white/15", pct: 0 };
+  const pct = v <= 1 ? v * 100 : v;
+  if (pct >= 75) return {
     label: "HIGH CONFIDENCE",
     icon: <Zap className="h-2.5 w-2.5" />,
     cls: "text-green-300/75",
     dotCls: "bg-green-400",
+    barCls: "bg-green-400",
+    pct,
   };
-  if (v >= 55) return {
+  if (pct >= 55) return {
     label: "MED CONFIDENCE",
     icon: <Zap className="h-2.5 w-2.5" />,
     cls: "text-[#F5C84C]/75",
     dotCls: "bg-[#F5C84C]",
+    barCls: "bg-[#F5C84C]",
+    pct,
   };
   return {
     label: "LOW CONFIDENCE",
     icon: <Zap className="h-2.5 w-2.5" />,
     cls: "text-orange-300/65",
     dotCls: "bg-orange-400",
+    barCls: "bg-orange-400",
+    pct,
   };
+}
+
+function signalStrengthTag(row: DerivedPlayer): { label: string; cls: string } | null {
+  const cat = row._derived_category;
+  const score = row.trade_score ?? row.value_score ?? 0;
+  const conf = row.projection_confidence ?? 0;
+  const confPct = conf <= 1 ? conf * 100 : conf;
+  const expChange = Number(row.expected_price_change ?? 0);
+
+  if (cat === "sell_before_drop") {
+    if (score >= 300 || expChange < -150000) return { label: "STRONG SELL", cls: "text-red-300 bg-red-400/15 border-red-400/35" };
+    return null;
+  }
+  if (cat === "upgrade_target") {
+    if (score >= 350 && confPct >= 70) return { label: "ELITE VALUE", cls: "text-sky-200 bg-sky-400/15 border-sky-400/35" };
+    return null;
+  }
+  if (cat === "buy_before_rise" || cat === "cash_cow") {
+    if (expChange > 100000 && confPct >= 65) return { label: "HIGH UPSIDE", cls: "text-green-200 bg-green-400/15 border-green-400/35" };
+    if (expChange > 60000) return { label: "STRONG BUY", cls: "text-green-300 bg-green-400/12 border-green-400/25" };
+    return null;
+  }
+  if (cat === "fade_trap") {
+    if (score <= 150) return { label: "AVOID", cls: "text-orange-200 bg-orange-400/15 border-orange-400/35" };
+    return null;
+  }
+  return null;
 }
 
 export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, heroMode = false }: Props) {
@@ -232,6 +266,7 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
   const urgencyIcon = categoryUrgencyIcon(row._derived_category);
   const typeTag = playerTypeTag(row);
   const timeSig = timeSensitivity(row);
+  const sigTag = signalStrengthTag(row);
 
   // ── Compact (used in Must Sell strip) ─────────────────────────────────────
   if (compact) {
@@ -366,6 +401,11 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
               {typeTag.label}
             </span>
           )}
+          {sigTag && (
+            <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded border uppercase tracking-wide ${sigTag.cls}`}>
+              {sigTag.label}
+            </span>
+          )}
         </div>
         {rank != null && <span className="text-[10px] font-mono text-white/15 shrink-0">#{rank}</span>}
       </div>
@@ -407,14 +447,22 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
         </div>
       )}
 
-      {/* Confidence + price row */}
-      <div className="flex items-center justify-between gap-2">
+      {/* Confidence bar + price row */}
+      <div className="flex flex-col gap-1.5">
         {row._derived_category !== "upgrade_target" && (
           <span className="text-[10px] text-white/25 font-medium">{fmtPrice(row.price)}</span>
         )}
-        <div className={`flex items-center gap-1 ml-auto ${conf.cls}`}>
-          {conf.icon}
-          <span className="text-[8px] font-bold uppercase tracking-wide">{conf.label}</span>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+            <div
+              className={`h-full rounded-full opacity-60 transition-all duration-300 ${conf.barCls}`}
+              style={{ width: `${Math.min(conf.pct, 100)}%` }}
+            />
+          </div>
+          <div className={`flex items-center gap-1 shrink-0 ${conf.cls}`}>
+            {conf.icon}
+            <span className="text-[8px] font-bold uppercase tracking-wide">{conf.label}</span>
+          </div>
         </div>
       </div>
 
