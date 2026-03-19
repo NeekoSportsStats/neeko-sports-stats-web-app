@@ -48,7 +48,7 @@ async function dispatchCommand(
         result = await callRpc(admin, "run_neeko_pipeline_orchestrator");
         break;
       case "run_controller":
-        result = await callRpc(admin, "run_afl_pipeline_controller");
+        result = await callRpc(admin, "run_neeko_pipeline");
         break;
       case "run_ingest":
         result = await invokeEdgeFunction("afl-master-dispatcher", payload);
@@ -60,10 +60,10 @@ async function dispatchCommand(
         result = await invokeEdgeFunction("afl-worker-games-team-stats", payload);
         break;
       case "generate_all_ai":
-        result = await invokeEdgeFunction("generate-all-ai", payload);
+        result = await invokeEdgeFunction("generate-player-ai", payload);
         break;
       case "run_ai_worker":
-        result = await invokeEdgeFunction("generate-ai-worker", payload);
+        result = await invokeEdgeFunction("generate-player-ranking-recos", payload);
         break;
       case "generate_player_ai":
         result = await invokeEdgeFunction("generate-player-ai", payload);
@@ -87,7 +87,7 @@ async function dispatchCommand(
         break;
       }
       case "refresh_market_watch":
-        result = await callRpc(admin, "fn_refresh_market_watch");
+        result = await callRpc(admin, "refresh_market_watch");
         break;
       case "refresh_edge_board":
         result = await callRpc(admin, "fn_refresh_edge_board");
@@ -206,12 +206,9 @@ async function dispatchCommand(
         );
         if (commitErr) throw new Error((commitErr as { message: string }).message);
 
-        const commitResult = commitData as { inserted: number; skipped_dup: number; total: number };
-        console.log(`[commit_price_ingest] inserted=${commitResult?.inserted} skipped=${commitResult?.skipped_dup}`);
+        const commitResult = commitData as { inserted: number; updated: number; total: number };
+        console.log(`[commit_price_ingest] inserted=${commitResult?.inserted} updated=${commitResult?.updated}`);
 
-        // ── Post-commit: refresh projections + rankings (best-effort, non-fatal) ──
-        // SQL functions already call refresh_projection_engine + populate_rankings_cache_from_source
-        // internally. The edge function runs additional steps for belt-and-braces coverage.
         const refreshSteps = {
           projection_engine:  { ok: false, error: undefined as string | undefined },
           rankings_cache:     { ok: false, error: undefined as string | undefined },
