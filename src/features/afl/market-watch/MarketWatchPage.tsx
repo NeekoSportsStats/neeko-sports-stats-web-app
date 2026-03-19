@@ -1,9 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import {
-  TrendingUp, RefreshCw, Crown, ChevronDown, ArrowRight, CircleAlert as AlertCircle,
-  Zap, Target, Star, ArrowUpRight, ArrowDownRight, DollarSign, TrendingDown,
-  ShieldAlert, ChartBar as BarChart3, Scale, ArrowUp, ChevronsUpDown, Lock, Clock,
-} from "lucide-react";
+import { TrendingUp, RefreshCw, Crown, ChevronDown, ArrowRight, CircleAlert as AlertCircle, Zap, Target, ArrowUpRight, ArrowDownRight, DollarSign, TrendingDown, ShieldAlert, ChartBar as BarChart3, Scale, ArrowUp, ChevronsUpDown, Lock, Clock, Flame, Timer, CircleCheck as CheckCircle2, Layers } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
@@ -18,6 +14,47 @@ import { classifyPlayers, buildBestTrades, DerivedPlayer, BestTrade } from "./en
 
 const SECTION_LIMIT = 6;
 
+// ─── Trade deduplication key ───────────────────────────────────────────────────
+
+function tradeKey(t: BestTrade): string {
+  return `${t.out.player_id}_${t.in.player_id}`;
+}
+
+// ─── Global used-trades cascade ────────────────────────────────────────────────
+
+interface TradeCascade {
+  yourMove: BestTrade | null;
+  bestTrade: BestTrade | null;
+  bestCash: BestTrade | null;
+  bestUpgrade: BestTrade | null;
+  remaining: BestTrade[];
+}
+
+function buildTradeCascade(allTrades: BestTrade[]): TradeCascade {
+  const used = new Set<string>();
+
+  function pickNext(predicate?: (t: BestTrade) => boolean): BestTrade | null {
+    for (const t of allTrades) {
+      const k = tradeKey(t);
+      if (used.has(k)) continue;
+      if (predicate && !predicate(t)) continue;
+      used.add(k);
+      return t;
+    }
+    return null;
+  }
+
+  const yourMove = pickNext();
+  const bestTrade = pickNext();
+  const bestCash = pickNext(t => t.trade_type === "CASH_GENERATION");
+  const bestUpgrade = pickNext(t => t.trade_type === "AGGRESSIVE_UPGRADE");
+  const remaining = allTrades.filter(t => !used.has(tradeKey(t)));
+
+  return { yourMove, bestTrade, bestCash, bestUpgrade, remaining };
+}
+
+// ─── Sort helper ───────────────────────────────────────────────────────────────
+
 function sortDerived(arr: DerivedPlayer[], key: MWSortKey): DerivedPlayer[] {
   return [...arr].sort((a, b) => {
     if (key === "projection")   return (b.projection ?? 0) - (a.projection ?? 0);
@@ -29,6 +66,8 @@ function sortDerived(arr: DerivedPlayer[], key: MWSortKey): DerivedPlayer[] {
     return (b.value_score ?? b.trade_score ?? 0) - (a.value_score ?? a.trade_score ?? 0);
   });
 }
+
+// ─── Text helpers ──────────────────────────────────────────────────────────────
 
 function weeklyStrategyLine(
   sells: DerivedPlayer[],
@@ -62,6 +101,57 @@ function nextStepLine(trade: BestTrade): string {
   if (trade.in_type === "buy_before_rise") return "Ride the price rise — sell higher after 2–3 rounds of growth";
   return "Removes your main downside risk while keeping scoring floor stable";
 }
+
+function heroWhyItWorks(trade: BestTrade): string {
+  if (trade.trade_type === "AGGRESSIVE_UPGRADE") {
+    if (trade.projection_gain > 30) return `Turns a declining scorer into an elite weekly performer — ${trade.projection_gain.toFixed(0)} extra pts per round`;
+    if (trade.projection_gain > 15) return `Lifts your scoring floor materially — ${trade.in.player_name} consistently outscores ${trade.out.player_name}`;
+    return `Scoring upgrade at a fair entry price — ${trade.in.player_name} projects ahead this week`;
+  }
+  if (trade.trade_type === "CASH_GENERATION") {
+    const cashStr = fmtPrice(Math.abs(trade.cash_generated));
+    return `Converts a falling asset into ${cashStr} in freed budget — ${trade.out.player_name}'s price is moving against you`;
+  }
+  if (trade.in_type === "buy_before_rise") {
+    return `Buys ${trade.in.player_name} before the price rise lands — every round you wait costs more`;
+  }
+  return `Neutral trade that removes downside risk from ${trade.out.player_name} while preserving scoring floor`;
+}
+
+function enablesLine(trade: BestTrade): string {
+  if (trade.cash_generated > 400000) return "Builds major upgrade bank — two moves available next round";
+  if (trade.cash_generated > 200000) return "Unlocks upgrade to premium scorer next round";
+  if (trade.cash_generated > 100000) return "Builds cash buffer — opens mid-tier upgrade window";
+  if (trade.projection_gain > 25)    return "Locks in elite scoring lift — holds long-term value";
+  if (trade.projection_gain > 10)    return "Points upgrade move — team scoring improves immediately";
+  if (trade.trade_type === "CASH_GENERATION")  return "Builds cash for double upgrade in coming rounds";
+  if (trade.in_type === "buy_before_rise")      return "Rides price rise — sell higher after a few rounds";
+  return "Maintains flexibility — stay neutral while others overpay";
+}
+
+function confidenceExplanation(trade: BestTrade): string {
+  const conf = trade.in.projection_confidence ?? 0;
+  if (conf >= 0.7) return `${trade.in.player_name} has scored above breakeven in ${Math.round(conf * 10)}/10 recent games — very reliable.`;
+  if (conf >= 0.5) return `${trade.in.player_name} is consistent but has ceiling variance — expect the average to hold.`;
+  return `Lower confidence — ${trade.in.player_name} has some volatility. Size accordingly.`;
+}
+
+function strategyTypeTag(trade: BestTrade): { label: string; cls: string } {
+  if (trade.trade_type === "CASH_GENERATION") return { label: "CASH BUILD", cls: "text-[#F5C84C]/70 border-[#F5C84C]/20 bg-[#F5C84C]/[0.06]" };
+  if (trade.trade_type === "AGGRESSIVE_UPGRADE") return { label: "AGGRESSIVE", cls: "text-sky-300/70 border-sky-400/20 bg-sky-400/[0.06]" };
+  return { label: "SAFE", cls: "text-green-300/70 border-green-400/20 bg-green-400/[0.06]" };
+}
+
+// ─── Score label helper ────────────────────────────────────────────────────────
+
+function scoreLabel(score: number): { label: string; cls: string } {
+  if (score >= 350) return { label: "ELITE",  cls: "text-[#F5C84C] bg-[#F5C84C]/10 border-[#F5C84C]/25" };
+  if (score >= 250) return { label: "STRONG", cls: "text-sky-300 bg-sky-400/10 border-sky-400/25" };
+  if (score >= 150) return { label: "SOLID",  cls: "text-green-400 bg-green-400/10 border-green-400/25" };
+  return { label: "FAIR", cls: "text-white/40 bg-white/[0.04] border-white/10" };
+}
+
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function MarketWatchPage() {
   const { isPremium, loading: authLoading } = useAuth();
@@ -121,7 +211,12 @@ export default function MarketWatchPage() {
   const sortedBuys     = useMemo(() => sortDerived(buyBeforeRise, sortKey), [buyBeforeRise, sortKey]);
   const sortedUpgrades = useMemo(() => sortDerived(upgrades, sortKey),      [upgrades, sortKey]);
   const sortedCows     = useMemo(() => sortDerived(cashCows, sortKey),      [cashCows, sortKey]);
-  const bestTrades     = useMemo(() => buildBestTrades(sells, upgrades, cashCows, sortedBuys), [sells, upgrades, cashCows, sortedBuys]);
+  const allBestTrades  = useMemo(
+    () => buildBestTrades(sells, upgrades, cashCows, sortedBuys),
+    [sells, upgrades, cashCows, sortedBuys]
+  );
+
+  const cascade = useMemo(() => buildTradeCascade(allBestTrades), [allBestTrades]);
 
   const isInactive = status != null && !status.is_active;
   const ready = !authLoading && !dataLoading;
@@ -178,19 +273,16 @@ export default function MarketWatchPage() {
             cashCows={sortedCows}
             upgrades={sortedUpgrades}
             traps={traps}
-            bestTrades={bestTrades}
+            cascade={cascade}
             summary={summary}
+            lastUpdated={lastUpdated}
             onUnlock={() => setShowUpgrade(true)}
           />
         ) : players.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <TrendingUp className="h-8 w-8 text-white/10" />
-            <p className="text-sm text-white/30">No trade signals this round</p>
-            <p className="text-[11px] text-white/20">Signals update after each round completes</p>
-            <button onClick={handleRefresh} className="text-[11px] text-[#F5C84C] hover:text-[#ffd95a] transition-colors mt-1">
-              Try refreshing
-            </button>
-          </div>
+          <EmptySection
+            message="No trade signals this round — hold strategy"
+            subtext="Signals update after each round completes. Check back once match data is processed."
+          />
         ) : (
           <PremiumView
             sells={sells}
@@ -198,7 +290,7 @@ export default function MarketWatchPage() {
             cashCows={sortedCows}
             upgrades={sortedUpgrades}
             traps={traps}
-            bestTrades={bestTrades}
+            cascade={cascade}
             summary={summary}
             sortKey={sortKey}
             showMoreBuys={showMoreBuys}
@@ -235,7 +327,7 @@ function UrgencyBadge({ lastUpdated }: { lastUpdated: Date | null }) {
       const nextUpdate = new Date(lastUpdated);
       nextUpdate.setHours(nextUpdate.getHours() + 24);
       const diff = (nextUpdate.getTime() - Date.now()) / (1000 * 60 * 60);
-      setHoursLeft(Math.max(0, Math.round(diff)));
+      setHoursLeft(Math.max(0, diff));
     };
     updateHours();
     const id = setInterval(updateHours, 60 * 1000);
@@ -244,89 +336,111 @@ function UrgencyBadge({ lastUpdated }: { lastUpdated: Date | null }) {
 
   if (hoursLeft === null) return null;
 
-  const urgent = hoursLeft <= 6;
+  if (hoursLeft <= 6) {
+    return (
+      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-orange-400/30 bg-orange-400/[0.08] text-[9px] font-bold uppercase tracking-wide text-orange-300/90">
+        <Flame className="h-2.5 w-2.5 shrink-0" />
+        Prices updating soon — act now
+      </div>
+    );
+  }
+
+  if (hoursLeft <= 24) {
+    return (
+      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber-400/20 bg-amber-400/[0.05] text-[9px] font-bold uppercase tracking-wide text-amber-300/60">
+        <Timer className="h-2.5 w-2.5 shrink-0" />
+        Price movement incoming
+      </div>
+    );
+  }
 
   return (
-    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[9px] font-bold uppercase tracking-wide ${
-      urgent
-        ? "border-orange-400/30 bg-orange-400/[0.08] text-orange-300/80"
-        : "border-white/8 bg-white/[0.02] text-white/25"
-    }`}>
+    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/8 bg-white/[0.02] text-[9px] font-bold uppercase tracking-wide text-white/25">
       <Clock className="h-2.5 w-2.5 shrink-0" />
-      {urgent ? `Prices update in ~${hoursLeft}h` : "Prices live"}
+      Prices live
     </div>
   );
 }
 
 // ─── Your Move This Week ───────────────────────────────────────────────────────
 
-function YourMoveThisWeek({ trade, onUnlock, isPremium }: { trade: BestTrade; onUnlock: () => void; isPremium: boolean }) {
+function YourMoveThisWeek({
+  trade,
+  onUnlock,
+  isPremium,
+  lastUpdated,
+}: {
+  trade: BestTrade;
+  onUnlock: () => void;
+  isPremium: boolean;
+  lastUpdated: Date | null;
+}) {
   const cashPositive = trade.cash_generated >= 0;
   const nextStep = nextStepLine(trade);
 
+  const hoursLeft = useMemo(() => {
+    if (!lastUpdated) return null;
+    const nextUpdate = new Date(lastUpdated);
+    nextUpdate.setHours(nextUpdate.getHours() + 24);
+    return Math.max(0, (nextUpdate.getTime() - Date.now()) / (1000 * 60 * 60));
+  }, [lastUpdated]);
+
+  const isUrgent = hoursLeft !== null && hoursLeft <= 6;
+
   return (
     <div
-      className="mb-6 rounded-2xl overflow-hidden border border-white/10 relative"
-      style={{ background: "linear-gradient(135deg, rgba(245,200,76,0.09) 0%, rgba(15,15,15,0) 55%)" }}
+      className="mb-5 rounded-2xl overflow-hidden relative"
+      style={{ background: "linear-gradient(135deg, rgba(245,200,76,0.07) 0%, rgba(13,13,13,1) 60%)", border: "1px solid rgba(255,255,255,0.08)" }}
     >
-      {/* Header bar */}
-      <div className="px-5 pt-5 pb-4 border-b border-white/[0.06]">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#F5C84C] animate-pulse" />
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#F5C84C]/70">Your Move This Week</p>
+      <div className="px-5 pt-5 pb-3.5 border-b border-white/[0.05]">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#F5C84C] animate-pulse" />
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#F5C84C]/70">Your Move This Week</p>
+          </div>
+          {isUrgent && (
+            <div className="flex items-center gap-1 text-[9px] font-bold text-orange-400/70">
+              <Flame className="h-2.5 w-2.5" />
+              Act now
+            </div>
+          )}
         </div>
-        <p className="text-[11px] text-white/30 ml-3.5">One trade that changes everything this round</p>
+        <p className="text-[11px] text-white/25 mt-1 ml-3.5">One trade that changes everything this round</p>
       </div>
 
-      {/* Core trade */}
-      <div className="px-5 py-5">
-        <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center mb-5">
-          {/* Sell */}
+      <div className="px-5 py-4">
+        <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center mb-4">
           <div>
-            <p className="text-[8px] font-extrabold uppercase tracking-widest text-red-400/50 mb-1.5">Sell</p>
-            <p className="text-[20px] sm:text-[22px] font-extrabold text-white leading-none tracking-tight">{trade.out.player_name}</p>
-            <p className="text-[10px] text-white/30 mt-1">{trade.out.team} · {trade.out.position}</p>
-            <p className="text-[11px] font-semibold text-red-400/80 mt-1 tabular-nums">{fmtPriceChange(trade.out.expected_price_change)}</p>
+            <p className="text-[8px] font-extrabold uppercase tracking-widest text-red-400/45 mb-1.5">Sell</p>
+            <p className="text-[19px] sm:text-[21px] font-extrabold text-white leading-none tracking-tight">{trade.out.player_name}</p>
+            <p className="text-[10px] text-white/28 mt-1">{trade.out.team} · {trade.out.position}</p>
+            <p className="text-[11px] font-semibold text-red-400/70 mt-1 tabular-nums">{fmtPriceChange(trade.out.expected_price_change)}</p>
           </div>
 
-          {/* Arrow */}
-          <div className="flex flex-col items-center gap-1.5">
-            <ArrowRight className="h-5 w-5 text-white/12" />
+          <div className="flex flex-col items-center gap-1">
+            <ArrowRight className="h-4 w-4 text-white/10" />
             {cashPositive && (
-              <span className="text-[9px] font-extrabold text-green-400/70 tabular-nums whitespace-nowrap">
+              <span className="text-[9px] font-extrabold text-green-400/65 tabular-nums whitespace-nowrap">
                 +{fmtPrice(trade.cash_generated)}
               </span>
             )}
           </div>
 
-          {/* Buy */}
           <div className="text-right">
-            <p className="text-[8px] font-extrabold uppercase tracking-widest text-sky-400/50 mb-1.5">Buy</p>
-            <p className="text-[20px] sm:text-[22px] font-extrabold text-white leading-none tracking-tight">{trade.in.player_name}</p>
-            <p className="text-[10px] text-white/30 mt-1">{trade.in.team} · {trade.in.position}</p>
-            <p className="text-[11px] font-semibold text-sky-400/70 mt-1">{fmtPrice(trade.in.price)} entry</p>
+            <p className="text-[8px] font-extrabold uppercase tracking-widest text-sky-400/45 mb-1.5">Buy</p>
+            <p className="text-[19px] sm:text-[21px] font-extrabold text-white leading-none tracking-tight">{trade.in.player_name}</p>
+            <p className="text-[10px] text-white/28 mt-1">{trade.in.team} · {trade.in.position}</p>
+            <p className="text-[11px] font-semibold text-sky-400/60 mt-1">{fmtPrice(trade.in.price)} entry</p>
           </div>
         </div>
 
-        {/* Cash result row */}
-        {cashPositive && (
-          <div className="rounded-xl border border-green-400/15 bg-green-400/[0.05] px-4 py-2.5 flex items-center gap-3 mb-4">
-            <DollarSign className="h-3.5 w-3.5 text-green-400/60 shrink-0" />
-            <div>
-              <p className="text-[13px] font-extrabold text-green-400 tabular-nums">BANK +{fmtPrice(trade.cash_generated)}</p>
-              <p className="text-[9px] text-white/25 mt-0.5">freed cash after the trade</p>
-            </div>
-          </div>
-        )}
-
-        {/* Next Step */}
-        <div className="rounded-xl border border-white/[0.05] bg-white/[0.025] px-4 py-3">
-          <p className="text-[8px] font-extrabold uppercase tracking-widest text-[#F5C84C]/40 mb-1.5">Next Step</p>
-          <p className="text-[12px] text-white/60 leading-snug">{nextStep}</p>
+        <div className="rounded-xl bg-white/[0.025] px-4 py-2.5">
+          <p className="text-[8px] font-extrabold uppercase tracking-widest text-[#F5C84C]/35 mb-1">Next Step</p>
+          <p className="text-[12px] text-white/55 leading-snug">{nextStep}</p>
         </div>
 
         {!isPremium && (
-          <div className="mt-4 flex justify-center">
+          <div className="mt-3.5 flex justify-center">
             <button
               onClick={onUnlock}
               className="flex items-center gap-2 bg-[#F5C84C] text-black font-extrabold text-[12px] px-5 py-2.5 rounded-xl hover:brightness-110 transition-all shadow-lg shadow-[#F5C84C]/10"
@@ -343,23 +457,7 @@ function YourMoveThisWeek({ trade, onUnlock, isPremium }: { trade: BestTrade; on
 
 // ─── Best Trade Hero ───────────────────────────────────────────────────────────
 
-function heroWhyItWorks(trade: BestTrade): string {
-  if (trade.trade_type === "AGGRESSIVE_UPGRADE") {
-    if (trade.projection_gain > 30) return `Turns a declining scorer into an elite weekly performer — ${trade.projection_gain.toFixed(0)} extra pts per round`;
-    if (trade.projection_gain > 15) return `Lifts your scoring floor materially — ${trade.in.player_name} consistently outscores ${trade.out.player_name}`;
-    return `Scoring upgrade at a fair entry price — ${trade.in.player_name} projects ahead this week`;
-  }
-  if (trade.trade_type === "CASH_GENERATION") {
-    const cashStr = fmtPrice(Math.abs(trade.cash_generated));
-    return `Converts a falling asset into ${cashStr} in freed budget — ${trade.out.player_name}'s price is moving against you`;
-  }
-  if (trade.in_type === "buy_before_rise") {
-    return `Buys ${trade.in.player_name} before the price rise lands — every round you wait costs more`;
-  }
-  return `Neutral trade that removes downside risk from ${trade.out.player_name} while preserving scoring floor`;
-}
-
-function BestTradeHero({ trade }: { trade: BestTrade }) {
+function BestTradeHero({ trade, isPremium }: { trade: BestTrade; isPremium: boolean }) {
   const cashPositive = trade.cash_generated >= 0;
   const projPositive = trade.projection_gain >= 0;
 
@@ -385,102 +483,117 @@ function BestTradeHero({ trade }: { trade: BestTrade }) {
   const whyItWorks = heroWhyItWorks(trade);
   const enables = enablesLine(trade);
   const sl = scoreLabel(trade.score);
+  const stTag = strategyTypeTag(trade);
+  const confExplain = confidenceExplanation(trade);
 
   return (
     <div
-      className="mb-6 rounded-2xl border border-[#F5C84C]/25 overflow-hidden"
-      style={{ background: "linear-gradient(160deg, rgba(245,200,76,0.07) 0%, rgba(10,10,10,0) 60%)" }}
+      className="mb-6 rounded-2xl border border-[#F5C84C]/20 overflow-hidden"
+      style={{ background: "linear-gradient(160deg, rgba(245,200,76,0.055) 0%, rgba(10,10,10,0) 65%)" }}
     >
-      <div className="px-6 pt-6 pb-4 border-b border-white/[0.05]">
+      <div className="px-6 pt-6 pb-4 border-b border-white/[0.04]">
         <div className="flex items-start justify-between gap-3 mb-2">
           <div className="flex items-center gap-2">
             <Target className="h-4 w-4 text-[#F5C84C]" />
             <h2 className="text-base font-extrabold text-white tracking-tight">Best Trade This Round</h2>
           </div>
-          <span className={`text-[8px] font-extrabold px-2 py-0.5 rounded border uppercase tracking-wider shrink-0 ${sl.cls}`}>
-            {sl.label}
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {isPremium && (
+              <span className={`text-[7px] font-extrabold px-1.5 py-0.5 rounded border uppercase tracking-wider ${stTag.cls}`}>
+                {stTag.label}
+              </span>
+            )}
+            <span className={`text-[8px] font-extrabold px-2 py-0.5 rounded border uppercase tracking-wider ${sl.cls}`}>
+              {sl.label}
+            </span>
+          </div>
         </div>
-        <p className="text-[13px] font-semibold text-white/70 mb-1">{summaryLine}</p>
+        <p className="text-[13px] font-semibold text-white/65 mb-1">{summaryLine}</p>
 
-        <div className="mt-3 rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-3 flex flex-col gap-2.5">
+        <div className="mt-3 rounded-xl border border-white/[0.04] bg-white/[0.015] px-4 py-3 flex flex-col gap-2">
           <div className="flex items-start gap-2">
-            <span className="text-[9px] font-extrabold uppercase tracking-wider text-[#F5C84C]/60 mt-0.5 shrink-0 w-28">Why it works</span>
-            <p className="text-[11px] text-white/55 leading-snug">{whyItWorks}</p>
+            <span className="text-[9px] font-extrabold uppercase tracking-wider text-[#F5C84C]/55 mt-0.5 shrink-0 w-28">Why it works</span>
+            <p className="text-[11px] text-white/50 leading-snug">{whyItWorks}</p>
           </div>
-          <div className="border-t border-white/[0.04] pt-2.5 flex items-start gap-2">
-            <span className="text-[9px] font-extrabold uppercase tracking-wider text-sky-400/50 mt-0.5 shrink-0 w-28">What it enables</span>
-            <p className="text-[11px] text-white/45 leading-snug">{enables}</p>
+          <div className="border-t border-white/[0.03] pt-2 flex items-start gap-2">
+            <span className="text-[9px] font-extrabold uppercase tracking-wider text-sky-400/45 mt-0.5 shrink-0 w-28">What it enables</span>
+            <p className="text-[11px] text-white/40 leading-snug">{enables}</p>
           </div>
+          {isPremium && (
+            <div className="border-t border-white/[0.03] pt-2 flex items-start gap-2">
+              <span className="text-[9px] font-extrabold uppercase tracking-wider text-green-400/40 mt-0.5 shrink-0 w-28">Confidence</span>
+              <p className="text-[11px] text-white/35 leading-snug">{confExplain}</p>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="p-6">
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-4 items-stretch">
-          <div className="rounded-xl border border-red-400/20 bg-red-400/[0.04] p-4 flex flex-col gap-3">
+          <div className="rounded-xl border border-red-400/18 bg-red-400/[0.03] p-4 flex flex-col gap-3">
             <div>
-              <p className="text-[9px] font-extrabold uppercase tracking-widest text-red-400/60 mb-1.5">Trade Out</p>
+              <p className="text-[9px] font-extrabold uppercase tracking-widest text-red-400/55 mb-1.5">Trade Out</p>
               <p className="font-extrabold text-lg text-white leading-tight">{trade.out.player_name}</p>
-              <p className="text-[11px] text-white/35 mt-0.5">{trade.out.team} · {trade.out.position}</p>
+              <p className="text-[11px] text-white/30 mt-0.5">{trade.out.team} · {trade.out.position}</p>
             </div>
             <div className="flex items-end justify-between mt-auto">
               <div>
-                <p className="text-[9px] text-white/25 mb-0.5">Current price</p>
-                <p className="text-sm font-bold text-white/55">{fmtPrice(trade.out.price)}</p>
+                <p className="text-[9px] text-white/22 mb-0.5">Current price</p>
+                <p className="text-sm font-bold text-white/50">{fmtPrice(trade.out.price)}</p>
               </div>
               <div className="text-right">
-                <p className="text-[9px] text-white/25 mb-0.5">Expected drop</p>
+                <p className="text-[9px] text-white/22 mb-0.5">Expected drop</p>
                 <p className="text-base font-extrabold text-red-400">{fmtPriceChange(trade.out.expected_price_change)}</p>
               </div>
             </div>
-            <div className="rounded-lg bg-red-400/[0.06] border border-red-400/15 px-2.5 py-1.5">
-              <p className="text-[10px] text-red-300/60">Proj {trade.out.projection?.toFixed(0)} pts · BE {trade.out.breakeven?.toFixed(0)}</p>
+            <div className="rounded-lg bg-red-400/[0.05] border border-red-400/12 px-2.5 py-1.5">
+              <p className="text-[10px] text-red-300/55">Proj {trade.out.projection?.toFixed(0)} pts · BE {trade.out.breakeven?.toFixed(0)}</p>
             </div>
           </div>
 
           <div className="flex flex-col items-center justify-center gap-3 py-2 px-1">
-            <ArrowRight className="h-5 w-5 text-white/15" />
+            <ArrowRight className="h-5 w-5 text-white/12" />
             <div className="text-center space-y-1.5">
-              <div className={`rounded-lg px-3 py-1.5 ${cashPositive ? "bg-green-400/10 border border-green-400/20" : "bg-white/[0.03] border border-white/8"}`}>
-                <p className={`text-sm font-extrabold tabular-nums ${cashPositive ? "text-green-400" : "text-white/35"}`}>
+              <div className={`rounded-lg px-3 py-1.5 ${cashPositive ? "bg-green-400/[0.08] border border-green-400/18" : "bg-white/[0.02] border border-white/6"}`}>
+                <p className={`text-sm font-extrabold tabular-nums ${cashPositive ? "text-green-400" : "text-white/30"}`}>
                   {cashPositive ? `+${fmtPrice(trade.cash_generated)}` : `-${fmtPrice(Math.abs(trade.cash_generated))}`}
                 </p>
-                <p className="text-[9px] text-white/25 mt-0.5">cash delta</p>
+                <p className="text-[9px] text-white/22 mt-0.5">cash delta</p>
               </div>
-              <div className={`rounded-lg px-3 py-1.5 ${projPositive ? "bg-sky-400/10 border border-sky-400/20" : "bg-white/[0.03] border border-white/8"}`}>
-                <p className={`text-sm font-extrabold tabular-nums ${projPositive ? "text-sky-300" : "text-white/35"}`}>
+              <div className={`rounded-lg px-3 py-1.5 ${projPositive ? "bg-sky-400/[0.08] border border-sky-400/18" : "bg-white/[0.02] border border-white/6"}`}>
+                <p className={`text-sm font-extrabold tabular-nums ${projPositive ? "text-sky-300" : "text-white/30"}`}>
                   {projLabel}
                 </p>
-                <p className="text-[9px] text-white/25 mt-0.5">proj gain</p>
+                <p className="text-[9px] text-white/22 mt-0.5">proj gain</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-xl border border-sky-400/20 bg-sky-400/[0.03] p-4 flex flex-col gap-3">
+          <div className="rounded-xl border border-sky-400/18 bg-sky-400/[0.025] p-4 flex flex-col gap-3">
             <div>
               <div className="flex items-center gap-1.5 mb-1.5">
-                <p className="text-[9px] font-extrabold uppercase tracking-widest text-sky-400/60">Trade In</p>
+                <p className="text-[9px] font-extrabold uppercase tracking-widest text-sky-400/55">Trade In</p>
                 <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide ${inBadge.cls}`}>
                   {inBadge.label}
                 </span>
               </div>
               <p className="font-extrabold text-lg text-white leading-tight">{trade.in.player_name}</p>
-              <p className="text-[11px] text-white/35 mt-0.5">{trade.in.team} · {trade.in.position}</p>
+              <p className="text-[11px] text-white/30 mt-0.5">{trade.in.team} · {trade.in.position}</p>
             </div>
             <div className="flex items-end justify-between mt-auto">
               <div>
-                <p className="text-[9px] text-white/25 mb-0.5">Entry price</p>
-                <p className="text-sm font-bold text-white/55">{fmtPrice(trade.in.price)}</p>
+                <p className="text-[9px] text-white/22 mb-0.5">Entry price</p>
+                <p className="text-sm font-bold text-white/50">{fmtPrice(trade.in.price)}</p>
               </div>
               <div className="text-right">
-                <p className="text-[9px] text-white/25 mb-0.5">Expected rise</p>
-                <p className={`text-base font-extrabold ${(trade.in.expected_price_change ?? 0) >= 0 ? "text-green-400" : "text-white/30"}`}>
+                <p className="text-[9px] text-white/22 mb-0.5">Expected rise</p>
+                <p className={`text-base font-extrabold ${(trade.in.expected_price_change ?? 0) >= 0 ? "text-green-400" : "text-white/28"}`}>
                   {fmtPriceChange(trade.in.expected_price_change)}
                 </p>
               </div>
             </div>
-            <div className="rounded-lg bg-sky-400/[0.06] border border-sky-400/15 px-2.5 py-1.5">
-              <p className="text-[10px] text-sky-300/50">Proj {trade.in.projection?.toFixed(0)} pts · BE {trade.in.breakeven?.toFixed(0)}</p>
+            <div className="rounded-lg bg-sky-400/[0.05] border border-sky-400/12 px-2.5 py-1.5">
+              <p className="text-[10px] text-sky-300/45">Proj {trade.in.projection?.toFixed(0)} pts · BE {trade.in.breakeven?.toFixed(0)}</p>
             </div>
           </div>
         </div>
@@ -499,22 +612,22 @@ function SummaryStrip({ sellCount, buyCount, upgradeCount, cowCount, trapCount }
   trapCount: number;
 }) {
   const stats = [
-    { label: "Sell Now",          value: sellCount,    icon: <ArrowDownRight className="h-3.5 w-3.5" />, cls: "text-red-400",    bg: "bg-red-400/[0.04] border-red-400/15" },
-    { label: "Early Value",       value: buyCount,     icon: <ArrowUpRight className="h-3.5 w-3.5" />,   cls: "text-green-400",  bg: "bg-green-400/[0.04] border-green-400/15" },
-    { label: "Upgrades",          value: upgradeCount, icon: <TrendingUp className="h-3.5 w-3.5" />,     cls: "text-sky-400",    bg: "bg-sky-400/[0.04] border-sky-400/15" },
-    { label: "Cash Cows",         value: cowCount,     icon: <DollarSign className="h-3.5 w-3.5" />,     cls: "text-[#F5C84C]",  bg: "bg-[#F5C84C]/[0.04] border-[#F5C84C]/15" },
-    { label: "Traps",             value: trapCount,    icon: <ShieldAlert className="h-3.5 w-3.5" />,    cls: "text-orange-400", bg: "bg-orange-400/[0.04] border-orange-400/15" },
+    { label: "Sell Now",    value: sellCount,    icon: <ArrowDownRight className="h-3.5 w-3.5" />, cls: "text-red-400",    bg: "bg-red-400/[0.03] border-red-400/12" },
+    { label: "Early Value", value: buyCount,     icon: <ArrowUpRight className="h-3.5 w-3.5" />,   cls: "text-green-400",  bg: "bg-green-400/[0.03] border-green-400/12" },
+    { label: "Upgrades",    value: upgradeCount, icon: <TrendingUp className="h-3.5 w-3.5" />,     cls: "text-sky-400",    bg: "bg-sky-400/[0.03] border-sky-400/12" },
+    { label: "Cash Cows",   value: cowCount,     icon: <DollarSign className="h-3.5 w-3.5" />,     cls: "text-[#F5C84C]",  bg: "bg-[#F5C84C]/[0.03] border-[#F5C84C]/12" },
+    { label: "Traps",       value: trapCount,    icon: <ShieldAlert className="h-3.5 w-3.5" />,    cls: "text-orange-400", bg: "bg-orange-400/[0.03] border-orange-400/12" },
   ];
 
   return (
     <div className="grid grid-cols-5 gap-2 mb-6">
       {stats.map(s => (
         <div key={s.label} className={`rounded-xl border px-2 py-3 text-center ${s.bg}`}>
-          <div className={`flex items-center justify-center gap-1 mb-1.5 ${s.cls}`}>
+          <div className={`flex items-center justify-center mb-1.5 ${s.cls} opacity-60`}>
             {s.icon}
           </div>
           <p className="text-xl font-extrabold text-white tabular-nums leading-none">{s.value}</p>
-          <p className="text-[9px] text-white/25 mt-1.5 leading-tight">{s.label}</p>
+          <p className="text-[9px] text-white/22 mt-1.5 leading-tight">{s.label}</p>
         </div>
       ))}
     </div>
@@ -530,7 +643,7 @@ function MustSellStrip({ sells, isPremium }: { sells: DerivedPlayer[]; isPremium
   return (
     <div className="mb-8">
       <div className="flex items-center gap-2 mb-3">
-        <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+        <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
         <h2 className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-red-400">Act Now — Sell Before Price Falls</h2>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -542,7 +655,7 @@ function MustSellStrip({ sells, isPremium }: { sells: DerivedPlayer[]; isPremium
   );
 }
 
-// ─── Collapsible Section Shell ─────────────────────────────────────────────────
+// ─── Collapsible Section ───────────────────────────────────────────────────────
 
 function CollapsibleSection({
   label, labelColor, dot, description, count, defaultOpen, children, id,
@@ -559,66 +672,25 @@ function CollapsibleSection({
   const [open, setOpen] = useState(defaultOpen ?? false);
 
   return (
-    <div className="mb-6" id={id}>
+    <div className="mb-5" id={id}>
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-start justify-between gap-3 mb-0 group"
+        className="w-full flex items-start justify-between gap-3 group"
       >
         <div>
           <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${dot} shrink-0`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${dot} shrink-0`} />
             <h2 className={`text-sm font-extrabold uppercase tracking-[0.12em] ${labelColor}`}>{label}</h2>
-            <span className="text-[10px] text-white/20 font-mono">{count}</span>
+            <span className="text-[10px] text-white/18 font-mono">{count}</span>
           </div>
-          <p className="text-[11px] text-white/25 mt-0.5 ml-4 text-left">{description}</p>
+          <p className="text-[11px] text-white/22 mt-0.5 ml-3.5 text-left">{description}</p>
         </div>
-        <ChevronDown className={`h-4 w-4 text-white/30 shrink-0 mt-1 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={`h-4 w-4 text-white/25 shrink-0 mt-1 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
 
       <div className={`transition-all duration-300 overflow-hidden ${open ? "max-h-[4000px] opacity-100 mt-4" : "max-h-0 opacity-0"}`}>
         {children}
       </div>
-    </div>
-  );
-}
-
-// ─── Section Shell (legacy, still used for show-more patterns) ─────────────────
-
-function SectionShell({
-  label, labelColor, dot, description, count, showMore, onToggle, children, id,
-}: {
-  label: string;
-  labelColor: string;
-  dot: string;
-  description: string;
-  count: number;
-  showMore: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-  id?: string;
-}) {
-  return (
-    <div className="mb-8" id={id}>
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${dot} shrink-0`} />
-            <h2 className={`text-sm font-extrabold uppercase tracking-[0.12em] ${labelColor}`}>{label}</h2>
-            <span className="text-[10px] text-white/20 font-mono">{count}</span>
-          </div>
-          <p className="text-[11px] text-white/25 mt-0.5 ml-4">{description}</p>
-        </div>
-        {count > SECTION_LIMIT && (
-          <button
-            onClick={onToggle}
-            className="shrink-0 flex items-center gap-1 text-[10px] text-white/30 hover:text-white/55 transition-colors"
-          >
-            <ChevronDown className={`h-3 w-3 transition-transform ${showMore ? "rotate-180" : ""}`} />
-            {showMore ? "Show less" : `+${count - SECTION_LIMIT} more`}
-          </button>
-        )}
-      </div>
-      {children}
     </div>
   );
 }
@@ -633,6 +705,7 @@ function PlayerGrid({ players, isPremium, showMore, limit }: {
 }) {
   const cap = limit ?? SECTION_LIMIT;
   const visible = showMore ? players : players.slice(0, cap);
+  if (visible.length === 0) return null;
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {visible.map((p, i) => (
@@ -642,7 +715,7 @@ function PlayerGrid({ players, isPremium, showMore, limit }: {
   );
 }
 
-// ─── Blur-Locked Player Cards ──────────────────────────────────────────────────
+// ─── Blur-Locked Cards ─────────────────────────────────────────────────────────
 
 function BlurLockedGrid({ players, onUnlock }: { players: DerivedPlayer[]; onUnlock: () => void }) {
   if (players.length === 0) return null;
@@ -650,15 +723,15 @@ function BlurLockedGrid({ players, onUnlock }: { players: DerivedPlayer[]; onUnl
     <div className="relative">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pointer-events-none select-none">
         {players.slice(0, 3).map((p) => (
-          <div key={p.player_id} className="blur-sm opacity-40">
+          <div key={p.player_id} className="blur-sm opacity-35">
             <PlayerTradeCard row={p} isPremium={false} />
           </div>
         ))}
       </div>
-      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-t from-[#0a0a0a]/90 via-[#0a0a0a]/60 to-transparent rounded-xl">
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-t from-[#0a0a0a]/90 via-[#0a0a0a]/55 to-transparent rounded-xl">
         <div className="flex items-center gap-1.5 mb-3">
-          <Lock className="h-3.5 w-3.5 text-white/40" />
-          <p className="text-[12px] font-bold text-white/55">Unlock full trade strategy</p>
+          <Lock className="h-3.5 w-3.5 text-white/35" />
+          <p className="text-[12px] font-bold text-white/50">See every trade before prices move</p>
         </div>
         <button
           onClick={onUnlock}
@@ -670,38 +743,6 @@ function BlurLockedGrid({ players, onUnlock }: { players: DerivedPlayer[]; onUnl
       </div>
     </div>
   );
-}
-
-// ─── Deduplication helper ──────────────────────────────────────────────────────
-
-function deduplicateTrades(trades: BestTrade[]): BestTrade[] {
-  const seen = new Map<string, BestTrade>();
-  const sorted = [...trades].sort((a, b) => b.score - a.score);
-  for (const trade of sorted) {
-    const key = trade.out.player_id;
-    if (!seen.has(key)) seen.set(key, trade);
-  }
-  return Array.from(seen.values());
-}
-
-// ─── Score label helper ────────────────────────────────────────────────────────
-
-function scoreLabel(score: number): { label: string; cls: string } {
-  if (score >= 350) return { label: "ELITE",  cls: "text-[#F5C84C] bg-[#F5C84C]/10 border-[#F5C84C]/25" };
-  if (score >= 250) return { label: "STRONG", cls: "text-sky-300 bg-sky-400/10 border-sky-400/25" };
-  if (score >= 150) return { label: "SOLID",  cls: "text-green-400 bg-green-400/10 border-green-400/25" };
-  return { label: "FAIR", cls: "text-white/40 bg-white/[0.04] border-white/10" };
-}
-
-function enablesLine(trade: BestTrade): string {
-  if (trade.cash_generated > 400000) return "Builds major upgrade bank — two moves available next round";
-  if (trade.cash_generated > 200000) return "Unlocks upgrade to premium scorer next round";
-  if (trade.cash_generated > 100000) return "Builds cash buffer — opens mid-tier upgrade window";
-  if (trade.projection_gain > 25)    return "Locks in elite scoring lift — holds long-term value";
-  if (trade.projection_gain > 10)    return "Points upgrade move — team scoring improves immediately";
-  if (trade.trade_type === "CASH_GENERATION")  return "Builds cash for double upgrade in coming rounds";
-  if (trade.in_type === "buy_before_rise")      return "Rides price rise — sell higher after a few rounds";
-  return "Maintains flexibility — stay neutral while others overpay";
 }
 
 // ─── Trade Type Config ─────────────────────────────────────────────────────────
@@ -729,10 +770,10 @@ const TRADE_TYPE_CONFIGS: TradeTypeConfig[] = [
     icon: <DollarSign className="h-4 w-4" />,
     headerCls: "text-[#F5C84C]",
     accentCls: "text-[#F5C84C]",
-    borderCls: "border-[#F5C84C]/18",
-    bgCls: "bg-[#F5C84C]/[0.02]",
-    headlineBorderCls: "border-[#F5C84C]/22",
-    headlineBgCls: "bg-[#F5C84C]/[0.035]",
+    borderCls: "border-[#F5C84C]/15",
+    bgCls: "bg-[#F5C84C]/[0.015]",
+    headlineBorderCls: "border-[#F5C84C]/18",
+    headlineBgCls: "bg-[#F5C84C]/[0.03]",
   },
   {
     key: "AGGRESSIVE_UPGRADE",
@@ -741,32 +782,44 @@ const TRADE_TYPE_CONFIGS: TradeTypeConfig[] = [
     icon: <ArrowUp className="h-4 w-4" />,
     headerCls: "text-sky-400",
     accentCls: "text-sky-300",
-    borderCls: "border-sky-400/18",
-    bgCls: "bg-sky-400/[0.02]",
-    headlineBorderCls: "border-sky-400/22",
-    headlineBgCls: "bg-sky-400/[0.035]",
+    borderCls: "border-sky-400/15",
+    bgCls: "bg-sky-400/[0.015]",
+    headlineBorderCls: "border-sky-400/18",
+    headlineBgCls: "bg-sky-400/[0.03]",
   },
   {
     key: "BALANCED",
     label: "Best Balanced Trades",
     subtext: "Cash-neutral moves — improve scoring while staying budget-safe",
     icon: <Scale className="h-4 w-4" />,
-    headerCls: "text-white/50",
-    accentCls: "text-white/40",
-    borderCls: "border-white/[0.08]",
-    bgCls: "bg-white/[0.012]",
-    headlineBorderCls: "border-white/12",
-    headlineBgCls: "bg-white/[0.025]",
+    headerCls: "text-white/45",
+    accentCls: "text-white/35",
+    borderCls: "border-white/[0.06]",
+    bgCls: "bg-white/[0.01]",
+    headlineBorderCls: "border-white/8",
+    headlineBgCls: "bg-white/[0.02]",
   },
 ];
 
 // ─── Headline Trade Card ───────────────────────────────────────────────────────
 
-function HeadlineTrade({ trade, config }: { trade: BestTrade; config: TradeTypeConfig }) {
+function HeadlineTrade({
+  trade,
+  config,
+  isPremium,
+  alternatives,
+}: {
+  trade: BestTrade;
+  config: TradeTypeConfig;
+  isPremium: boolean;
+  alternatives?: BestTrade[];
+}) {
   const cashPositive = trade.cash_generated >= 0;
   const projPositive = trade.projection_gain >= 0;
   const sl = scoreLabel(trade.score);
   const enables = enablesLine(trade);
+  const stTag = strategyTypeTag(trade);
+  const confExplain = confidenceExplanation(trade);
 
   const cashStr = cashPositive
     ? `+${fmtPrice(trade.cash_generated)}`
@@ -779,49 +832,81 @@ function HeadlineTrade({ trade, config }: { trade: BestTrade; config: TradeTypeC
     <div className={`rounded-xl border ${config.headlineBorderCls} ${config.headlineBgCls} p-4 mb-2`}>
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
-          <div className="mb-2.5">
+          <div className="flex items-center gap-1.5 mb-2.5">
             <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded border uppercase tracking-wider ${sl.cls}`}>
               {sl.label} TRADE
             </span>
+            {isPremium && (
+              <span className={`text-[7px] font-extrabold px-1.5 py-0.5 rounded border uppercase tracking-wider ${stTag.cls}`}>
+                {stTag.label}
+              </span>
+            )}
           </div>
 
           <div className="flex items-start gap-2 flex-wrap sm:flex-nowrap">
             <div className="min-w-0 flex-1">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-red-400/50 mb-0.5">Sell</p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-red-400/45 mb-0.5">Sell</p>
               <p className="text-[15px] font-extrabold text-white leading-tight truncate">{trade.out.player_name}</p>
-              <p className="text-[10px] text-white/30 mt-0.5">{trade.out.team} · {trade.out.position} · {fmtPrice(trade.out.price)}</p>
+              <p className="text-[10px] text-white/28 mt-0.5">{trade.out.team} · {trade.out.position} · {fmtPrice(trade.out.price)}</p>
             </div>
             <div className="flex items-center justify-center pt-5 shrink-0 px-1">
-              <ArrowRight className="h-4 w-4 text-white/15" />
+              <ArrowRight className="h-4 w-4 text-white/12" />
             </div>
             <div className="min-w-0 flex-1">
               <p className={`text-[9px] font-bold uppercase tracking-wider mb-0.5 ${config.accentCls}`}>Buy</p>
               <p className="text-[15px] font-extrabold text-white leading-tight truncate">{trade.in.player_name}</p>
-              <p className="text-[10px] text-white/30 mt-0.5">{trade.in.team} · {trade.in.position} · {fmtPrice(trade.in.price)}</p>
+              <p className="text-[10px] text-white/28 mt-0.5">{trade.in.team} · {trade.in.position} · {fmtPrice(trade.in.price)}</p>
             </div>
           </div>
         </div>
 
         <div className="flex flex-col gap-1.5 shrink-0">
-          <div className={`rounded-lg px-2.5 py-1.5 text-center min-w-[72px] ${cashPositive ? "bg-green-400/[0.08] border border-green-400/20" : "bg-white/[0.03] border border-white/8"}`}>
-            <p className={`text-[13px] font-extrabold tabular-nums ${cashPositive ? "text-green-400" : "text-white/30"}`}>{cashStr}</p>
-            <p className="text-[8px] text-white/22 mt-0.5">cash delta</p>
+          <div className={`rounded-lg px-2.5 py-1.5 text-center min-w-[72px] ${cashPositive ? "bg-green-400/[0.07] border border-green-400/18" : "bg-white/[0.02] border border-white/6"}`}>
+            <p className={`text-[13px] font-extrabold tabular-nums ${cashPositive ? "text-green-400" : "text-white/28"}`}>{cashStr}</p>
+            <p className="text-[8px] text-white/20 mt-0.5">cash delta</p>
           </div>
-          <div className={`rounded-lg px-2.5 py-1.5 text-center min-w-[72px] ${projPositive ? "bg-sky-400/[0.08] border border-sky-400/20" : "bg-white/[0.03] border border-white/8"}`}>
-            <p className={`text-[13px] font-extrabold tabular-nums ${projPositive ? "text-sky-300" : "text-white/30"}`}>{projStr}</p>
-            <p className="text-[8px] text-white/22 mt-0.5">proj gain</p>
+          <div className={`rounded-lg px-2.5 py-1.5 text-center min-w-[72px] ${projPositive ? "bg-sky-400/[0.07] border border-sky-400/18" : "bg-white/[0.02] border border-white/6"}`}>
+            <p className={`text-[13px] font-extrabold tabular-nums ${projPositive ? "text-sky-300" : "text-white/28"}`}>{projStr}</p>
+            <p className="text-[8px] text-white/20 mt-0.5">proj gain</p>
           </div>
         </div>
       </div>
 
       {trade.why && (
-        <p className="text-[11px] text-white/38 mt-3 leading-snug border-t border-white/[0.04] pt-2.5">{trade.why}</p>
+        <p className="text-[11px] text-white/35 mt-3 leading-snug border-t border-white/[0.03] pt-2.5">{trade.why}</p>
       )}
 
       <div className="mt-2 flex items-start gap-1.5">
-        <Zap className="h-2.5 w-2.5 text-[#F5C84C]/35 shrink-0 mt-0.5" />
-        <p className="text-[10px] text-white/22 leading-snug">{enables}</p>
+        <Zap className="h-2.5 w-2.5 text-[#F5C84C]/30 shrink-0 mt-0.5" />
+        <p className="text-[10px] text-white/20 leading-snug">{enables}</p>
       </div>
+
+      {isPremium && (
+        <div className="mt-2 flex items-start gap-1.5">
+          <CheckCircle2 className="h-2.5 w-2.5 text-green-400/30 shrink-0 mt-0.5" />
+          <p className="text-[10px] text-white/20 leading-snug">{confExplain}</p>
+        </div>
+      )}
+
+      {isPremium && alternatives && alternatives.length > 0 && (
+        <div className="mt-3 border-t border-white/[0.03] pt-3">
+          <p className="text-[8px] font-extrabold uppercase tracking-wider text-white/25 mb-2 flex items-center gap-1">
+            <Layers className="h-2.5 w-2.5" /> Alternative Options
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {alternatives.slice(0, 2).map((alt) => (
+              <div key={tradeKey(alt)} className="flex items-center gap-2 text-[10px] text-white/30 rounded-lg bg-white/[0.02] px-2.5 py-1.5">
+                <span className="truncate">{alt.out.player_name}</span>
+                <ArrowRight className="h-2.5 w-2.5 text-white/15 shrink-0" />
+                <span className="truncate">{alt.in.player_name}</span>
+                <span className={`ml-auto shrink-0 tabular-nums ${alt.cash_generated >= 0 ? "text-green-400/55" : "text-red-400/45"}`}>
+                  {alt.cash_generated >= 0 ? `+${fmtPrice(alt.cash_generated)}` : `-${fmtPrice(Math.abs(alt.cash_generated))}`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -834,28 +919,28 @@ function TradeRow({ trade, rank }: { trade: BestTrade; rank: number }) {
   const sl = scoreLabel(trade.score);
 
   return (
-    <div className="rounded-xl border border-white/[0.05] bg-white/[0.012] hover:bg-white/[0.025] transition-colors px-3.5 py-3">
+    <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.02] transition-colors px-3.5 py-3">
       <div className="flex items-center gap-2.5">
-        <span className="text-[9px] font-bold text-white/18 w-3 shrink-0 tabular-nums text-right">{rank}</span>
+        <span className="text-[9px] font-bold text-white/15 w-3 shrink-0 tabular-nums text-right">{rank}</span>
 
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold text-white/55 truncate">{trade.out.player_name}</p>
-          <p className="text-[9px] text-red-400/40 mt-0.5 truncate">{trade.out.team} · {fmtPrice(trade.out.price)}</p>
+          <p className="text-[11px] font-semibold text-white/50 truncate">{trade.out.player_name}</p>
+          <p className="text-[9px] text-red-400/35 mt-0.5 truncate">{trade.out.team} · {fmtPrice(trade.out.price)}</p>
         </div>
 
         <div className="flex flex-col items-center gap-0.5 shrink-0 px-1">
-          <ArrowRight className="h-2.5 w-2.5 text-white/12" />
-          <span className={`text-[8px] font-semibold tabular-nums ${cashPositive ? "text-green-400/65" : "text-white/18"}`}>
+          <ArrowRight className="h-2.5 w-2.5 text-white/10" />
+          <span className={`text-[8px] font-semibold tabular-nums ${cashPositive ? "text-green-400/60" : "text-white/15"}`}>
             {cashPositive ? `+${fmtPrice(trade.cash_generated)}` : `-${fmtPrice(Math.abs(trade.cash_generated))}`}
           </span>
           {projPositive && (
-            <span className="text-[8px] font-semibold text-sky-300/40 tabular-nums">+{trade.projection_gain.toFixed(0)}pts</span>
+            <span className="text-[8px] font-semibold text-sky-300/35 tabular-nums">+{trade.projection_gain.toFixed(0)}pts</span>
           )}
         </div>
 
         <div className="min-w-0 flex-1 text-right">
           <p className="text-[11px] font-semibold text-white truncate">{trade.in.player_name}</p>
-          <p className="text-[9px] text-white/22 mt-0.5 truncate">{trade.in.team} · {fmtPrice(trade.in.price)}</p>
+          <p className="text-[9px] text-white/20 mt-0.5 truncate">{trade.in.team} · {fmtPrice(trade.in.price)}</p>
         </div>
 
         <div className="shrink-0 pl-2">
@@ -866,7 +951,7 @@ function TradeRow({ trade, rank }: { trade: BestTrade; rank: number }) {
       </div>
 
       {trade.why && (
-        <p className="text-[9px] text-white/18 mt-2 pl-5 leading-snug">{trade.why}</p>
+        <p className="text-[9px] text-white/15 mt-2 pl-5 leading-snug">{trade.why}</p>
       )}
     </div>
   );
@@ -874,30 +959,44 @@ function TradeRow({ trade, rank }: { trade: BestTrade; rank: number }) {
 
 // ─── Trade Type Group ──────────────────────────────────────────────────────────
 
-function TradeTypeGroup({ config, trades }: { config: TradeTypeConfig; trades: BestTrade[] }) {
+function TradeTypeGroup({
+  config,
+  trades,
+  isPremium,
+}: {
+  config: TradeTypeConfig;
+  trades: BestTrade[];
+  isPremium: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
   if (trades.length === 0) return null;
 
   const headline = trades[0];
   const supporting = trades.slice(1, 3);
+  const alternatives = trades.slice(1, 4);
   const extraTrades = trades.slice(3);
   const hasMore = extraTrades.length > 0;
 
   return (
     <div className={`rounded-2xl border ${config.borderCls} ${config.bgCls} p-4 mb-4`}>
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center gap-2 mb-0.5">
         <span className={config.headerCls}>{config.icon}</span>
         <h3 className={`text-[12px] font-extrabold uppercase tracking-[0.1em] ${config.headerCls}`}>{config.label}</h3>
-        <span className="text-[9px] text-white/18 font-mono">{trades.length}</span>
+        <span className="text-[9px] text-white/15 font-mono">{trades.length}</span>
       </div>
-      <p className="text-[10px] text-white/22 mb-4 ml-6">{config.subtext}</p>
+      <p className="text-[10px] text-white/20 mb-4 ml-6">{config.subtext}</p>
 
-      <HeadlineTrade trade={headline} config={config} />
+      <HeadlineTrade
+        trade={headline}
+        config={config}
+        isPremium={isPremium}
+        alternatives={isPremium ? alternatives : undefined}
+      />
 
       {supporting.length > 0 && (
         <div className="flex flex-col gap-1.5 mt-1.5">
           {supporting.map((t, i) => (
-            <TradeRow key={`${t.out.player_id}-${t.in.player_id}`} trade={t} rank={i + 2} />
+            <TradeRow key={tradeKey(t)} trade={t} rank={i + 2} />
           ))}
         </div>
       )}
@@ -907,13 +1006,13 @@ function TradeTypeGroup({ config, trades }: { config: TradeTypeConfig; trades: B
           {expanded && (
             <div className="flex flex-col gap-1.5 mb-2">
               {extraTrades.map((t, i) => (
-                <TradeRow key={`${t.out.player_id}-${t.in.player_id}`} trade={t} rank={i + 4} />
+                <TradeRow key={tradeKey(t)} trade={t} rank={i + 4} />
               ))}
             </div>
           )}
           <button
             onClick={() => setExpanded(e => !e)}
-            className="w-full flex items-center justify-center gap-1.5 text-[10px] text-white/22 hover:text-white/42 transition-colors py-2 rounded-lg border border-white/[0.04] hover:border-white/8 mt-1"
+            className="w-full flex items-center justify-center gap-1.5 text-[10px] text-white/20 hover:text-white/40 transition-colors py-2 rounded-lg border border-white/[0.03] hover:border-white/6 mt-1"
           >
             <ChevronsUpDown className="h-3 w-3" />
             {expanded ? "Show less" : `View ${extraTrades.length} more trade${extraTrades.length !== 1 ? "s" : ""}`}
@@ -928,21 +1027,19 @@ function TradeTypeGroup({ config, trades }: { config: TradeTypeConfig; trades: B
 
 type TradeFilterKey = "ALL" | "CASH_GENERATION" | "AGGRESSIVE_UPGRADE" | "BALANCED";
 
-function TopTradesSection({ trades }: { trades: BestTrade[] }) {
+function TopTradesSection({ trades, isPremium }: { trades: BestTrade[]; isPremium: boolean }) {
   const [activeFilter, setActiveFilter] = useState<TradeFilterKey>("ALL");
   const [sortMode, setSortMode] = useState<"score" | "cash" | "pts">("score");
 
-  const deduped = useMemo(() => deduplicateTrades(trades), [trades]);
-
-  if (deduped.length <= 1) return null;
+  if (trades.length === 0) return null;
 
   const sorted = useMemo(() => {
-    return [...deduped].sort((a, b) => {
+    return [...trades].sort((a, b) => {
       if (sortMode === "cash") return b.cash_generated - a.cash_generated;
       if (sortMode === "pts")  return b.projection_gain - a.projection_gain;
       return b.score - a.score;
     });
-  }, [deduped, sortMode]);
+  }, [trades, sortMode]);
 
   const filtered = activeFilter === "ALL" ? sorted : sorted.filter(t => t.trade_type === activeFilter);
 
@@ -951,10 +1048,10 @@ function TopTradesSection({ trades }: { trades: BestTrade[] }) {
   const balancedTrades = filtered.filter(t => t.trade_type === "BALANCED");
 
   const filterBtns: { key: TradeFilterKey; label: string; activeCls: string }[] = [
-    { key: "ALL",                label: "All",      activeCls: "text-white border-white/20 bg-white/[0.06]" },
-    { key: "CASH_GENERATION",    label: "Cash",     activeCls: "text-[#F5C84C] border-[#F5C84C]/25 bg-[#F5C84C]/[0.06]" },
-    { key: "AGGRESSIVE_UPGRADE", label: "Upgrade",  activeCls: "text-sky-300 border-sky-400/25 bg-sky-400/[0.06]" },
-    { key: "BALANCED",           label: "Balanced", activeCls: "text-white/50 border-white/12 bg-white/[0.03]" },
+    { key: "ALL",                label: "All",      activeCls: "text-white border-white/18 bg-white/[0.05]" },
+    { key: "CASH_GENERATION",    label: "Cash",     activeCls: "text-[#F5C84C] border-[#F5C84C]/22 bg-[#F5C84C]/[0.05]" },
+    { key: "AGGRESSIVE_UPGRADE", label: "Upgrade",  activeCls: "text-sky-300 border-sky-400/22 bg-sky-400/[0.05]" },
+    { key: "BALANCED",           label: "Balanced", activeCls: "text-white/45 border-white/10 bg-white/[0.025]" },
   ];
 
   return (
@@ -964,13 +1061,13 @@ function TopTradesSection({ trades }: { trades: BestTrade[] }) {
           <div className="flex items-center gap-2 mb-1">
             <BarChart3 className="h-4 w-4 text-[#F5C84C]" />
             <h2 className="text-sm font-extrabold uppercase tracking-[0.12em] text-white">Best Trades This Round</h2>
-            <span className="text-[10px] text-white/20 font-mono">{deduped.length}</span>
+            <span className="text-[10px] text-white/18 font-mono">{trades.length}</span>
           </div>
-          <p className="text-[11px] text-white/25 ml-6">Optimised moves based on price change + projected scoring</p>
+          <p className="text-[11px] text-white/22 ml-6">Optimised moves based on price change + projected scoring</p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-0.5 rounded-lg border border-white/[0.06] p-0.5">
+          <div className="flex items-center gap-0.5 rounded-lg border border-white/[0.05] p-0.5">
             {filterBtns.map(btn => (
               <button
                 key={btn.key}
@@ -978,7 +1075,7 @@ function TopTradesSection({ trades }: { trades: BestTrade[] }) {
                 className={`text-[9px] font-bold px-2 py-1 rounded transition-colors ${
                   activeFilter === btn.key
                     ? `border ${btn.activeCls}`
-                    : "text-white/22 hover:text-white/42 border border-transparent"
+                    : "text-white/20 hover:text-white/38 border border-transparent"
                 }`}
               >
                 {btn.label}
@@ -986,15 +1083,15 @@ function TopTradesSection({ trades }: { trades: BestTrade[] }) {
             ))}
           </div>
 
-          <div className="flex items-center gap-0.5 rounded-lg border border-white/[0.06] p-0.5">
+          <div className="flex items-center gap-0.5 rounded-lg border border-white/[0.05] p-0.5">
             {(["score", "cash", "pts"] as const).map(mode => (
               <button
                 key={mode}
                 onClick={() => setSortMode(mode)}
                 className={`text-[9px] font-bold px-2 py-1 rounded transition-colors capitalize ${
                   sortMode === mode
-                    ? "text-white border border-white/15 bg-white/[0.05]"
-                    : "text-white/22 hover:text-white/42 border border-transparent"
+                    ? "text-white border border-white/12 bg-white/[0.04]"
+                    : "text-white/20 hover:text-white/38 border border-transparent"
                 }`}
               >
                 {mode === "score" ? "Score" : mode === "cash" ? "Cash" : "Pts"}
@@ -1005,14 +1102,14 @@ function TopTradesSection({ trades }: { trades: BestTrade[] }) {
       </div>
 
       {cashTrades.length === 0 && upgradeTrades.length === 0 && balancedTrades.length === 0 ? (
-        <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] py-8 text-center">
-          <p className="text-[11px] text-white/25">No strong trades this week — hold strategy</p>
+        <div className="rounded-xl border border-white/[0.03] bg-white/[0.01] py-8 text-center">
+          <p className="text-[11px] text-white/22">No strong trades this week — hold strategy</p>
         </div>
       ) : (
         <>
-          <TradeTypeGroup config={TRADE_TYPE_CONFIGS[0]} trades={cashTrades} />
-          <TradeTypeGroup config={TRADE_TYPE_CONFIGS[1]} trades={upgradeTrades} />
-          <TradeTypeGroup config={TRADE_TYPE_CONFIGS[2]} trades={balancedTrades} />
+          <TradeTypeGroup config={TRADE_TYPE_CONFIGS[0]} trades={cashTrades} isPremium={isPremium} />
+          <TradeTypeGroup config={TRADE_TYPE_CONFIGS[1]} trades={upgradeTrades} isPremium={isPremium} />
+          <TradeTypeGroup config={TRADE_TYPE_CONFIGS[2]} trades={balancedTrades} isPremium={isPremium} />
         </>
       )}
     </div>
@@ -1049,27 +1146,27 @@ function ThisWeeksPlan({
   }) => (
     <div>
       <div className="flex items-center gap-1.5 mb-3">
-        <span className={`${labelColor} opacity-60`}>{icon}</span>
+        <span className={`${labelColor} opacity-55`}>{icon}</span>
         <span className={`text-[11px] font-extrabold uppercase tracking-[0.1em] ${labelColor}`}>{title}</span>
-        <span className="text-[9px] text-white/20 font-mono">{players.length}</span>
+        <span className="text-[9px] text-white/18 font-mono">{players.length}</span>
       </div>
       {players.length === 0 ? (
-        <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] px-4 py-5 text-center">
-          <p className="text-[10px] text-white/20">{emptyMsg}</p>
+        <div className="rounded-xl border border-white/[0.03] bg-white/[0.01] px-4 py-5 text-center">
+          <p className="text-[10px] text-white/18">{emptyMsg}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-1.5">
           {players.map(p => {
             const expChange = Number(p.expected_price_change ?? 0);
             return (
-              <div key={p.player_id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.035] transition-colors px-3.5 py-2.5 cursor-default">
+              <div key={p.player_id} className="rounded-xl border border-white/[0.05] bg-white/[0.015] hover:bg-white/[0.03] transition-colors px-3.5 py-2.5 cursor-default">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-[12px] font-bold text-white leading-tight truncate">{p.player_name}</p>
-                    <p className="text-[9px] text-white/30 mt-0.5">{p.team} · {p.position}</p>
+                    <p className="text-[9px] text-white/28 mt-0.5">{p.team} · {p.position}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-[11px] font-bold text-white/50">{fmtPrice(p.price)}</p>
+                    <p className="text-[11px] font-bold text-white/45">{fmtPrice(p.price)}</p>
                     <p className={`text-[10px] font-semibold mt-0.5 tabular-nums ${expChange >= 0 ? "text-green-400" : "text-red-400"}`}>
                       {fmtPriceChange(expChange)}
                     </p>
@@ -1079,7 +1176,7 @@ function ThisWeeksPlan({
                   <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide ${tradeTagCls}`}>
                     {tradeLabel}
                   </span>
-                  <span className="text-[9px] text-white/18">Proj {p.projection?.toFixed(0)}</span>
+                  <span className="text-[9px] text-white/15">Proj {p.projection?.toFixed(0)}</span>
                 </div>
               </div>
             );
@@ -1095,7 +1192,7 @@ function ThisWeeksPlan({
         <DollarSign className="h-4 w-4 text-[#F5C84C]" />
         <h2 className="text-sm font-extrabold uppercase tracking-[0.12em] text-white">This Week's Plan</h2>
       </div>
-      <p className="text-[12px] text-white/40 mb-5 ml-6 leading-snug">{strategyLine}</p>
+      <p className="text-[12px] text-white/35 mb-5 ml-6 leading-snug">{strategyLine}</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <PlanColumn
@@ -1106,7 +1203,7 @@ function ThisWeeksPlan({
           players={mustSell}
           emptyMsg="No urgent sell signals this round"
           tradeLabel="Sell Now"
-          tradeTagCls="text-red-300 border-red-400/25 bg-red-400/8"
+          tradeTagCls="text-red-300 border-red-400/22 bg-red-400/7"
         />
         <PlanColumn
           title="Score Upgrades"
@@ -1116,7 +1213,7 @@ function ThisWeeksPlan({
           players={upgradeTargets}
           emptyMsg="No upgrades this round — hold strategy"
           tradeLabel="Upgrade"
-          tradeTagCls="text-sky-300 border-sky-400/25 bg-sky-400/8"
+          tradeTagCls="text-sky-300 border-sky-400/22 bg-sky-400/7"
         />
         <PlanColumn
           title="Early Value Plays"
@@ -1126,7 +1223,7 @@ function ThisWeeksPlan({
           players={priceRise}
           emptyMsg="No early value targets this round"
           tradeLabel="Value Play"
-          tradeTagCls="text-green-300 border-green-400/25 bg-green-400/8"
+          tradeTagCls="text-green-300 border-green-400/22 bg-green-400/7"
         />
         <PlanColumn
           title="Cash Generation"
@@ -1136,7 +1233,7 @@ function ThisWeeksPlan({
           players={cashGen}
           emptyMsg="No cash cows this round — hold strategy"
           tradeLabel="Cash Cow"
-          tradeTagCls="text-[#F5C84C] border-[#F5C84C]/25 bg-[#F5C84C]/8"
+          tradeTagCls="text-[#F5C84C] border-[#F5C84C]/22 bg-[#F5C84C]/7"
         />
       </div>
     </div>
@@ -1145,28 +1242,58 @@ function ThisWeeksPlan({
 
 // ─── Premium CTA Block ─────────────────────────────────────────────────────────
 
-function PremiumCTABlock({ hiddenCount, onUnlock }: { hiddenCount: number; onUnlock: () => void }) {
+function PremiumCTABlock({
+  hiddenCount,
+  onUnlock,
+  lastUpdated,
+}: {
+  hiddenCount: number;
+  onUnlock: () => void;
+  lastUpdated: Date | null;
+}) {
+  const hoursLeft = useMemo(() => {
+    if (!lastUpdated) return null;
+    const nextUpdate = new Date(lastUpdated);
+    nextUpdate.setHours(nextUpdate.getHours() + 24);
+    return Math.max(0, (nextUpdate.getTime() - Date.now()) / (1000 * 60 * 60));
+  }, [lastUpdated]);
+
+  const isUrgent = hoursLeft !== null && hoursLeft <= 6;
+
   return (
     <div
-      className="mb-8 rounded-2xl border border-[#F5C84C]/20 p-6 text-center relative overflow-hidden"
-      style={{ background: "linear-gradient(160deg, rgba(245,200,76,0.06) 0%, rgba(10,10,10,0) 70%)" }}
+      className="mb-8 rounded-2xl border border-[#F5C84C]/18 p-6 text-center relative overflow-hidden"
+      style={{ background: "linear-gradient(160deg, rgba(245,200,76,0.055) 0%, rgba(10,10,10,0) 65%)" }}
     >
-      <div className="flex items-center justify-center gap-2 mb-1">
-        <Lock className="h-3.5 w-3.5 text-[#F5C84C]/50" />
-        <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#F5C84C]/60">Premium Only</p>
+      <div className="flex items-center justify-center gap-2 mb-2">
+        <Lock className="h-3.5 w-3.5 text-[#F5C84C]/45" />
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#F5C84C]/55">Premium Only</p>
       </div>
 
-      <h3 className="text-[17px] font-extrabold text-white mb-1.5">Unlock Your Full Trade Plan</h3>
+      <h3 className="text-[17px] font-extrabold text-white mb-1.5">
+        See Every Trade Before Prices Move
+      </h3>
 
-      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mb-4">
-        <span className="text-[11px] text-white/40">+{hiddenCount} trades hidden</span>
-        <span className="text-white/15">·</span>
-        <span className="text-[11px] text-white/40">Full weekly strategy</span>
-        <span className="text-white/15">·</span>
-        <span className="text-[11px] text-white/40">AI-powered explanations</span>
-        <span className="text-white/15">·</span>
-        <span className="text-[11px] text-white/40">Confidence ratings</span>
+      <p className="text-[12px] text-white/35 mb-1">
+        Know the exact moves top players will make
+      </p>
+
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mb-4 mt-3">
+        <span className="text-[11px] text-white/35">+{hiddenCount} trades hidden</span>
+        <span className="text-white/12">·</span>
+        <span className="text-[11px] text-white/35">Full weekly strategy</span>
+        <span className="text-white/12">·</span>
+        <span className="text-[11px] text-white/35">AI-powered explanations</span>
+        <span className="text-white/12">·</span>
+        <span className="text-[11px] text-white/35">Confidence ratings</span>
       </div>
+
+      {isUrgent && (
+        <div className="mb-4 flex items-center justify-center gap-1.5 text-[10px] font-bold text-orange-400/75">
+          <Flame className="h-3 w-3" />
+          Prices updating soon — act now before the window closes
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
         <a
@@ -1178,13 +1305,13 @@ function PremiumCTABlock({ hiddenCount, onUnlock }: { hiddenCount: number; onUnl
         </a>
         <button
           onClick={onUnlock}
-          className="text-[11px] text-white/35 hover:text-white/55 transition-colors px-4 py-3 rounded-xl border border-white/8 hover:border-white/15"
+          className="text-[11px] text-white/30 hover:text-white/50 transition-colors px-4 py-3 rounded-xl border border-white/6 hover:border-white/12"
         >
           View preview
         </button>
       </div>
 
-      <p className="mt-3 text-[10px] text-white/15">From $9.99/mo · Cancel anytime</p>
+      <p className="mt-3 text-[10px] text-white/12">From $9.99/mo · Cancel anytime</p>
     </div>
   );
 }
@@ -1192,15 +1319,16 @@ function PremiumCTABlock({ hiddenCount, onUnlock }: { hiddenCount: number; onUnl
 // ─── Free User View ────────────────────────────────────────────────────────────
 
 function FreeUserView({
-  sells, buyBeforeRise, cashCows, upgrades, traps, bestTrades, summary, onUnlock,
+  sells, buyBeforeRise, cashCows, upgrades, traps, cascade, summary, lastUpdated, onUnlock,
 }: {
   sells: DerivedPlayer[];
   buyBeforeRise: DerivedPlayer[];
   cashCows: DerivedPlayer[];
   upgrades: DerivedPlayer[];
   traps: DerivedPlayer[];
-  bestTrades: BestTrade[];
+  cascade: TradeCascade;
   summary: MWSummary | null;
+  lastUpdated: Date | null;
   onUnlock: () => void;
 }) {
   const totalSell    = summary?.sell_count            ?? sells.length;
@@ -1208,13 +1336,24 @@ function FreeUserView({
   const totalUpgrade = summary?.upgrade_target_count  ?? upgrades.length;
   const totalCow     = summary?.cash_cow_count        ?? cashCows.length;
   const totalTrap    = summary?.trap_count            ?? traps.length;
-  const hiddenCount  = Math.max((totalSell - 1) + (totalBuy - 1) + (totalUpgrade - 1) + (totalCow - 1), 0) || 40;
+  const hiddenCount  = Math.max((totalSell - 1) + (totalBuy - 1) + (totalUpgrade - 1) + (totalCow - 1), 40);
+
+  const freeSections = [
+    { players: sells,        label: "Must Sell",         dot: "bg-red-400",   labelColor: "text-red-400",   total: totalSell,    desc: "Act now — sell before price falls" },
+    { players: buyBeforeRise,label: "Early Value Plays",  dot: "bg-green-400", labelColor: "text-green-400", total: totalBuy,     desc: "Cheap players about to spike in price" },
+    { players: upgrades,     label: "Score Upgrade",     dot: "bg-sky-400",   labelColor: "text-sky-400",   total: totalUpgrade, desc: "Scoring lift — worth the entry price" },
+    { players: cashCows,     label: "Cash Cow",          dot: "bg-[#F5C84C]", labelColor: "text-[#F5C84C]", total: totalCow,     desc: "Budget pick building fast cash" },
+  ];
 
   return (
     <div>
-      {/* Your Move This Week — free users get the top trade */}
-      {bestTrades[0] && (
-        <YourMoveThisWeek trade={bestTrades[0]} onUnlock={onUnlock} isPremium={false} />
+      {cascade.yourMove && (
+        <YourMoveThisWeek
+          trade={cascade.yourMove}
+          onUnlock={onUnlock}
+          isPremium={false}
+          lastUpdated={lastUpdated}
+        />
       )}
 
       <SummaryStrip
@@ -1225,11 +1364,10 @@ function FreeUserView({
         trapCount={totalTrap}
       />
 
-      {/* Best Trade Hero (partially visible) */}
-      {bestTrades[0] && (
+      {cascade.bestTrade && (
         <div className="mb-6 relative">
-          <BestTradeHero trade={bestTrades[0]} />
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-transparent via-transparent to-black/85 pointer-events-none" />
+          <BestTradeHero trade={cascade.bestTrade} isPremium={false} />
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-transparent via-[#0a0a0a]/40 to-[#0a0a0a]/92 pointer-events-none" />
           <div className="absolute bottom-5 left-0 right-0 flex justify-center">
             <button
               onClick={onUnlock}
@@ -1242,38 +1380,32 @@ function FreeUserView({
         </div>
       )}
 
-      {/* One card per section — free preview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        {[
-          { players: sells.slice(0, 1),        label: "Must Sell",         dot: "bg-red-400",   labelColor: "text-red-400",   total: totalSell,    desc: "Act now — sell before price falls" },
-          { players: buyBeforeRise.slice(0, 1), label: "Early Value Plays", dot: "bg-green-400", labelColor: "text-green-400", total: totalBuy,     desc: "Cheap players about to spike in price" },
-          { players: upgrades.slice(0, 1),      label: "Score Upgrade",     dot: "bg-sky-400",   labelColor: "text-sky-400",   total: totalUpgrade, desc: "Scoring lift — worth the entry price" },
-          { players: cashCows.slice(0, 1),      label: "Cash Cow",          dot: "bg-[#F5C84C]", labelColor: "text-[#F5C84C]", total: totalCow,     desc: "Budget pick building fast cash" },
-        ].map(({ players, label, dot, labelColor, total, desc }) => (
+        {freeSections.map(({ players, label, dot, labelColor, total, desc }) => (
           <div key={label} className="flex flex-col gap-2">
             <div className="flex items-center gap-2 pl-0.5">
               <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
               <span className={`text-[11px] font-bold ${labelColor}`}>{label}</span>
-              {total > 1 && <span className="text-[9px] text-white/20">{total} total</span>}
+              {total > 1 && <span className="text-[9px] text-white/18">{total} total</span>}
             </div>
-            <p className="text-[10px] text-white/25 pl-3.5 -mt-1 mb-0.5">{desc}</p>
+            <p className="text-[10px] text-white/22 pl-3.5 -mt-1 mb-0.5">{desc}</p>
             {players[0] ? (
               <PlayerTradeCard row={players[0]} isPremium={false} />
             ) : (
-              <div className="rounded-xl border border-white/[0.05] bg-white/[0.01] p-5 flex items-center justify-center min-h-[100px] text-center">
-                <p className="text-[11px] text-white/20">No {label} signals this round</p>
+              <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] p-5 flex flex-col items-center justify-center min-h-[100px] text-center gap-1">
+                <p className="text-[11px] font-semibold text-white/25">No strong signals this week</p>
+                <p className="text-[10px] text-white/15">Hold strategy — no action needed</p>
               </div>
             )}
           </div>
         ))}
       </div>
 
-      {/* Blurred locked content */}
       {(sells.length > 1 || upgrades.length > 1 || buyBeforeRise.length > 1) && (
         <div className="mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <Lock className="h-3 w-3 text-white/20" />
-            <span className="text-[10px] text-white/25 font-semibold uppercase tracking-wider">More signals hidden</span>
+          <div className="flex items-center gap-1.5 mb-3">
+            <Lock className="h-3 w-3 text-white/18" />
+            <span className="text-[10px] text-white/22 font-semibold uppercase tracking-wider">More signals hidden</span>
           </div>
           <BlurLockedGrid
             players={[...sells.slice(1, 2), ...upgrades.slice(1, 2), ...buyBeforeRise.slice(1, 2)]}
@@ -1282,10 +1414,8 @@ function FreeUserView({
         </div>
       )}
 
-      {/* Premium CTA */}
-      <PremiumCTABlock hiddenCount={hiddenCount} onUnlock={onUnlock} />
+      <PremiumCTABlock hiddenCount={hiddenCount} onUnlock={onUnlock} lastUpdated={lastUpdated} />
 
-      {/* Legacy paywall (signals list) */}
       <MarketWatchPaywall
         sellCount={totalSell}
         buyCount={totalBuy}
@@ -1301,7 +1431,7 @@ function FreeUserView({
 // ─── Premium View ──────────────────────────────────────────────────────────────
 
 function PremiumView({
-  sells, buyBeforeRise, cashCows, upgrades, traps, bestTrades, summary, sortKey,
+  sells, buyBeforeRise, cashCows, upgrades, traps, cascade, summary, sortKey,
   showMoreBuys, showMoreUpgrades, showMoreCows, showMoreTraps,
   onSortChange, onToggleBuys, onToggleUpgrades, onToggleCows, onToggleTraps,
 }: {
@@ -1310,7 +1440,7 @@ function PremiumView({
   cashCows: DerivedPlayer[];
   upgrades: DerivedPlayer[];
   traps: DerivedPlayer[];
-  bestTrades: BestTrade[];
+  cascade: TradeCascade;
   summary: MWSummary | null;
   sortKey: MWSortKey;
   showMoreBuys: boolean;
@@ -1325,12 +1455,10 @@ function PremiumView({
 }) {
   return (
     <>
-      {/* 1. Your Move This Week — top priority hero */}
-      {bestTrades[0] && (
-        <YourMoveThisWeek trade={bestTrades[0]} onUnlock={() => {}} isPremium />
+      {cascade.yourMove && (
+        <YourMoveThisWeek trade={cascade.yourMove} onUnlock={() => {}} isPremium lastUpdated={null} />
       )}
 
-      {/* 2. Summary counts */}
       <SummaryStrip
         sellCount={sells.length}
         buyCount={buyBeforeRise.length}
@@ -1339,10 +1467,8 @@ function PremiumView({
         trapCount={traps.length}
       />
 
-      {/* 3. Best Trade Hero (full detail) */}
-      {bestTrades[0] && <BestTradeHero trade={bestTrades[0]} />}
+      {cascade.bestTrade && <BestTradeHero trade={cascade.bestTrade} isPremium />}
 
-      {/* 4. This Week's Plan */}
       <ThisWeeksPlan
         sells={sells}
         upgrades={upgrades}
@@ -1350,15 +1476,12 @@ function PremiumView({
         cashCows={cashCows}
       />
 
-      {/* 5. Best Trades by type */}
-      <TopTradesSection trades={bestTrades} />
+      <TopTradesSection trades={cascade.remaining} isPremium />
 
-      {/* 6. Must sell strip */}
       <MustSellStrip sells={sells} isPremium />
 
-      {/* 7. All signals (collapsible, default collapsed) */}
-      <div className="flex items-center justify-between gap-3 mb-4 pt-2 border-t border-white/[0.04]">
-        <p className="text-[11px] text-white/25 font-semibold uppercase tracking-wider">Browse All Signals</p>
+      <div className="flex items-center justify-between gap-3 mb-4 pt-2 border-t border-white/[0.03]">
+        <p className="text-[11px] text-white/22 font-semibold uppercase tracking-wider">Browse All Signals</p>
         <MarketWatchSort value={sortKey} onChange={onSortChange} />
       </div>
 
@@ -1374,7 +1497,7 @@ function PremiumView({
         >
           <PlayerGrid players={upgrades} isPremium showMore={showMoreUpgrades} />
           {upgrades.length > SECTION_LIMIT && (
-            <button onClick={onToggleUpgrades} className="mt-3 w-full text-[10px] text-white/30 hover:text-white/50 transition-colors flex items-center justify-center gap-1">
+            <button onClick={onToggleUpgrades} className="mt-3 w-full text-[10px] text-white/25 hover:text-white/45 transition-colors flex items-center justify-center gap-1">
               <ChevronsUpDown className="h-3 w-3" />
               {showMoreUpgrades ? "Show less" : `+${upgrades.length - SECTION_LIMIT} more`}
             </button>
@@ -1383,7 +1506,7 @@ function PremiumView({
       ) : (
         <EmptySection
           message="No upgrade targets this round — hold strategy"
-          subtext="No premium scorers at compelling value right now. Wait for pricing to shift before pulling the trigger."
+          subtext="No premium scorers at compelling value right now. Wait for pricing to shift."
         />
       )}
 
@@ -1398,7 +1521,7 @@ function PremiumView({
         >
           <PlayerGrid players={buyBeforeRise} isPremium showMore={showMoreBuys} />
           {buyBeforeRise.length > SECTION_LIMIT && (
-            <button onClick={onToggleBuys} className="mt-3 w-full text-[10px] text-white/30 hover:text-white/50 transition-colors flex items-center justify-center gap-1">
+            <button onClick={onToggleBuys} className="mt-3 w-full text-[10px] text-white/25 hover:text-white/45 transition-colors flex items-center justify-center gap-1">
               <ChevronsUpDown className="h-3 w-3" />
               {showMoreBuys ? "Show less" : `+${buyBeforeRise.length - SECTION_LIMIT} more`}
             </button>
@@ -1422,7 +1545,7 @@ function PremiumView({
         >
           <PlayerGrid players={cashCows} isPremium showMore={showMoreCows} />
           {cashCows.length > SECTION_LIMIT && (
-            <button onClick={onToggleCows} className="mt-3 w-full text-[10px] text-white/30 hover:text-white/50 transition-colors flex items-center justify-center gap-1">
+            <button onClick={onToggleCows} className="mt-3 w-full text-[10px] text-white/25 hover:text-white/45 transition-colors flex items-center justify-center gap-1">
               <ChevronsUpDown className="h-3 w-3" />
               {showMoreCows ? "Show less" : `+${cashCows.length - SECTION_LIMIT} more`}
             </button>
@@ -1446,7 +1569,7 @@ function PremiumView({
         >
           <PlayerGrid players={traps} isPremium showMore={showMoreTraps} />
           {traps.length > SECTION_LIMIT && (
-            <button onClick={onToggleTraps} className="mt-3 w-full text-[10px] text-white/30 hover:text-white/50 transition-colors flex items-center justify-center gap-1">
+            <button onClick={onToggleTraps} className="mt-3 w-full text-[10px] text-white/25 hover:text-white/45 transition-colors flex items-center justify-center gap-1">
               <ChevronsUpDown className="h-3 w-3" />
               {showMoreTraps ? "Show less" : `+${traps.length - SECTION_LIMIT} more`}
             </button>
@@ -1474,11 +1597,13 @@ function PremiumView({
   );
 }
 
+// ─── Empty Section ─────────────────────────────────────────────────────────────
+
 function EmptySection({ message, subtext }: { message: string; subtext: string }) {
   return (
-    <div className="mb-8 rounded-xl border border-white/[0.04] bg-white/[0.01] px-5 py-6 text-center">
-      <p className="text-[12px] font-semibold text-white/30 mb-1">{message}</p>
-      <p className="text-[10px] text-white/18">{subtext}</p>
+    <div className="mb-6 rounded-xl border border-white/[0.03] bg-white/[0.008] px-5 py-5 text-center">
+      <p className="text-[12px] font-semibold text-white/28 mb-1">{message}</p>
+      <p className="text-[10px] text-white/15">{subtext}</p>
     </div>
   );
 }
@@ -1518,22 +1643,22 @@ function MarketWatchPaywall({
   }
 
   return (
-    <div className="mb-10 rounded-2xl border border-[#F5C84C]/20 bg-gradient-to-b from-[#F5C84C]/[0.05] to-transparent p-7 text-center">
-      <div className="flex items-center justify-center w-11 h-11 rounded-full border border-[#F5C84C]/25 bg-[#F5C84C]/10 mx-auto mb-4">
+    <div className="mb-10 rounded-2xl border border-[#F5C84C]/18 bg-gradient-to-b from-[#F5C84C]/[0.04] to-transparent p-7 text-center">
+      <div className="flex items-center justify-center w-11 h-11 rounded-full border border-[#F5C84C]/22 bg-[#F5C84C]/8 mx-auto mb-4">
         <Crown size={20} className="text-[#F5C84C]" />
       </div>
 
-      <p className="text-[10px] uppercase tracking-widest text-white/20 mb-2">Preview only</p>
-      <h3 className="text-lg font-extrabold text-white mb-1">See your complete trade plan</h3>
-      <p className="text-[12px] text-white/30 mb-5">
+      <p className="text-[10px] uppercase tracking-widest text-white/18 mb-2">Preview only</p>
+      <h3 className="text-lg font-extrabold text-white mb-1">See every trade before prices move</h3>
+      <p className="text-[12px] text-white/28 mb-5">
         {totalExtra}+ trade signals this round — know every move before prices shift
       </p>
 
       <div className="mb-5 space-y-1.5">
         {lines.map(line => (
           <div key={line} className="flex items-center justify-center gap-2">
-            <div className="w-1 h-1 rounded-full bg-[#F5C84C]/35 shrink-0" />
-            <p className="text-[12px] text-white/45">{line}</p>
+            <div className="w-1 h-1 rounded-full bg-[#F5C84C]/30 shrink-0" />
+            <p className="text-[12px] text-white/38">{line}</p>
           </div>
         ))}
       </div>
@@ -1542,13 +1667,13 @@ function MarketWatchPaywall({
         {[
           { icon: <Zap size={9} />, label: "Full round signals" },
           { icon: <Target size={9} />, label: "Breakeven analysis" },
-          { icon: <Star size={9} />, label: "AI-powered insights" },
+          { icon: <Lock size={9} />, label: "AI-powered insights" },
         ].map(({ icon, label }) => (
           <div
             key={label}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#F5C84C]/15 bg-[#F5C84C]/[0.06] text-[10px] font-semibold text-[#F5C84C]/60"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#F5C84C]/12 bg-[#F5C84C]/[0.05] text-[10px] font-semibold text-[#F5C84C]/55"
           >
-            <span className="text-[#F5C84C]/40">{icon}</span>
+            <span className="text-[#F5C84C]/35">{icon}</span>
             {label}
           </div>
         ))}
@@ -1564,13 +1689,13 @@ function MarketWatchPaywall({
         </a>
         <button
           onClick={onUnlock}
-          className="text-[12px] text-white/35 hover:text-white/60 transition-colors px-4 py-3 rounded-xl border border-white/8 hover:border-white/15"
+          className="text-[12px] text-white/28 hover:text-white/55 transition-colors px-4 py-3 rounded-xl border border-white/6 hover:border-white/12"
         >
           View all signals
         </button>
       </div>
 
-      <p className="mt-3 text-[10px] text-white/15">From $9.99/mo or $89/yr</p>
+      <p className="mt-3 text-[10px] text-white/12">From $9.99/mo or $89/yr</p>
     </div>
   );
 }
