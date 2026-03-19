@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { TrendingUp, RefreshCw, Crown, ChevronDown, ArrowRight, CircleAlert as AlertCircle, Zap, Target, Star, ArrowUpRight, ArrowDownRight, DollarSign, TrendingDown, ShieldAlert, ChartBar as BarChart3 } from "lucide-react";
+import { TrendingUp, RefreshCw, Crown, ChevronDown, ArrowRight, CircleAlert as AlertCircle, Zap, Target, Star, ArrowUpRight, ArrowDownRight, DollarSign, TrendingDown, ShieldAlert, ChartBar as BarChart3, Scale, ArrowUp, ChevronsUpDown } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
@@ -448,98 +448,349 @@ function PlayerGrid({ players, isPremium, showMore }: {
   );
 }
 
+// ─── Deduplication helper ──────────────────────────────────────────────────────
+
+function deduplicateTrades(trades: BestTrade[]): BestTrade[] {
+  const seen = new Map<string, BestTrade>();
+  const sorted = [...trades].sort((a, b) => b.score - a.score);
+  for (const trade of sorted) {
+    const key = trade.out.player_id;
+    if (!seen.has(key)) seen.set(key, trade);
+  }
+  return Array.from(seen.values());
+}
+
+// ─── Score label helper ────────────────────────────────────────────────────────
+
+function scoreLabel(score: number): { label: string; cls: string } {
+  if (score >= 350) return { label: "ELITE",  cls: "text-[#F5C84C] bg-[#F5C84C]/10 border-[#F5C84C]/25" };
+  if (score >= 250) return { label: "STRONG", cls: "text-sky-300 bg-sky-400/10 border-sky-400/25" };
+  if (score >= 150) return { label: "SOLID",  cls: "text-green-400 bg-green-400/10 border-green-400/25" };
+  return { label: "FAIR", cls: "text-white/40 bg-white/[0.04] border-white/10" };
+}
+
+function enablesLine(trade: BestTrade): string {
+  if (trade.cash_generated > 400000) return "Builds major upgrade bank — two moves available next round";
+  if (trade.cash_generated > 200000) return "Unlocks upgrade to premium scorer next round";
+  if (trade.cash_generated > 100000) return "Builds cash buffer — opens mid-tier upgrade window";
+  if (trade.projection_gain > 25)    return "Locks in elite scoring lift — holds long-term value";
+  if (trade.projection_gain > 10)    return "Points upgrade move — team scoring improves immediately";
+  if (trade.trade_type === "CASH_GENERATION")  return "Builds cash for double upgrade in coming rounds";
+  if (trade.in_type === "buy_before_rise")      return "Rides price rise — sell higher after a few rounds";
+  return "Maintains flexibility — stay neutral while others overpay";
+}
+
+// ─── Trade Type Config ─────────────────────────────────────────────────────────
+
+type TradeTypeKey = "CASH_GENERATION" | "AGGRESSIVE_UPGRADE" | "BALANCED";
+
+interface TradeTypeConfig {
+  key: TradeTypeKey;
+  label: string;
+  subtext: string;
+  icon: React.ReactNode;
+  headerCls: string;
+  accentCls: string;
+  borderCls: string;
+  bgCls: string;
+  headlineBorderCls: string;
+  headlineBgCls: string;
+}
+
+const TRADE_TYPE_CONFIGS: TradeTypeConfig[] = [
+  {
+    key: "CASH_GENERATION",
+    label: "Best Cash Generation",
+    subtext: "Free up budget — sell overpriced players, land cheap risers",
+    icon: <DollarSign className="h-4 w-4" />,
+    headerCls: "text-[#F5C84C]",
+    accentCls: "text-[#F5C84C]",
+    borderCls: "border-[#F5C84C]/18",
+    bgCls: "bg-[#F5C84C]/[0.02]",
+    headlineBorderCls: "border-[#F5C84C]/22",
+    headlineBgCls: "bg-[#F5C84C]/[0.035]",
+  },
+  {
+    key: "AGGRESSIVE_UPGRADE",
+    label: "Best Upgrade Trades",
+    subtext: "Lift your scoring — trade into premium scorers at fair entry",
+    icon: <ArrowUp className="h-4 w-4" />,
+    headerCls: "text-sky-400",
+    accentCls: "text-sky-300",
+    borderCls: "border-sky-400/18",
+    bgCls: "bg-sky-400/[0.02]",
+    headlineBorderCls: "border-sky-400/22",
+    headlineBgCls: "bg-sky-400/[0.035]",
+  },
+  {
+    key: "BALANCED",
+    label: "Best Balanced Trades",
+    subtext: "Cash-neutral moves — improve scoring while staying budget-safe",
+    icon: <Scale className="h-4 w-4" />,
+    headerCls: "text-white/50",
+    accentCls: "text-white/40",
+    borderCls: "border-white/[0.08]",
+    bgCls: "bg-white/[0.012]",
+    headlineBorderCls: "border-white/12",
+    headlineBgCls: "bg-white/[0.025]",
+  },
+];
+
+// ─── Headline Trade Card ───────────────────────────────────────────────────────
+
+function HeadlineTrade({ trade, config }: { trade: BestTrade; config: TradeTypeConfig }) {
+  const cashPositive = trade.cash_generated >= 0;
+  const projPositive = trade.projection_gain >= 0;
+  const sl = scoreLabel(trade.score);
+  const enables = enablesLine(trade);
+
+  const cashStr = cashPositive
+    ? `+${fmtPrice(trade.cash_generated)}`
+    : `-${fmtPrice(Math.abs(trade.cash_generated))}`;
+  const projStr = projPositive
+    ? `+${trade.projection_gain.toFixed(0)} pts/rd`
+    : `${trade.projection_gain.toFixed(0)} pts/rd`;
+
+  return (
+    <div className={`rounded-xl border ${config.headlineBorderCls} ${config.headlineBgCls} p-4 mb-2`}>
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="mb-2.5">
+            <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded border uppercase tracking-wider ${sl.cls}`}>
+              {sl.label} TRADE
+            </span>
+          </div>
+
+          <div className="flex items-start gap-2 flex-wrap sm:flex-nowrap">
+            <div className="min-w-0 flex-1">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-red-400/50 mb-0.5">Sell</p>
+              <p className="text-[15px] font-extrabold text-white leading-tight truncate">{trade.out.player_name}</p>
+              <p className="text-[10px] text-white/30 mt-0.5">{trade.out.team} · {trade.out.position} · {fmtPrice(trade.out.price)}</p>
+            </div>
+            <div className="flex items-center justify-center pt-5 shrink-0 px-1">
+              <ArrowRight className="h-4 w-4 text-white/15" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className={`text-[9px] font-bold uppercase tracking-wider mb-0.5 ${config.accentCls}`}>Buy</p>
+              <p className="text-[15px] font-extrabold text-white leading-tight truncate">{trade.in.player_name}</p>
+              <p className="text-[10px] text-white/30 mt-0.5">{trade.in.team} · {trade.in.position} · {fmtPrice(trade.in.price)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5 shrink-0">
+          <div className={`rounded-lg px-2.5 py-1.5 text-center min-w-[72px] ${cashPositive ? "bg-green-400/[0.08] border border-green-400/20" : "bg-white/[0.03] border border-white/8"}`}>
+            <p className={`text-[13px] font-extrabold tabular-nums ${cashPositive ? "text-green-400" : "text-white/30"}`}>{cashStr}</p>
+            <p className="text-[8px] text-white/22 mt-0.5">cash delta</p>
+          </div>
+          <div className={`rounded-lg px-2.5 py-1.5 text-center min-w-[72px] ${projPositive ? "bg-sky-400/[0.08] border border-sky-400/20" : "bg-white/[0.03] border border-white/8"}`}>
+            <p className={`text-[13px] font-extrabold tabular-nums ${projPositive ? "text-sky-300" : "text-white/30"}`}>{projStr}</p>
+            <p className="text-[8px] text-white/22 mt-0.5">proj gain</p>
+          </div>
+        </div>
+      </div>
+
+      {trade.why && (
+        <p className="text-[11px] text-white/38 mt-3 leading-snug border-t border-white/[0.04] pt-2.5">{trade.why}</p>
+      )}
+
+      <div className="mt-2 flex items-start gap-1.5">
+        <Zap className="h-2.5 w-2.5 text-[#F5C84C]/35 shrink-0 mt-0.5" />
+        <p className="text-[10px] text-white/22 leading-snug">{enables}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Compact Trade Row ─────────────────────────────────────────────────────────
+
+function TradeRow({ trade, rank }: { trade: BestTrade; rank: number }) {
+  const cashPositive = trade.cash_generated >= 0;
+  const projPositive = trade.projection_gain >= 0;
+  const sl = scoreLabel(trade.score);
+
+  return (
+    <div className="rounded-xl border border-white/[0.05] bg-white/[0.012] hover:bg-white/[0.025] transition-colors px-3.5 py-3">
+      <div className="flex items-center gap-2.5">
+        <span className="text-[9px] font-bold text-white/18 w-3 shrink-0 tabular-nums text-right">{rank}</span>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold text-white/55 truncate">{trade.out.player_name}</p>
+          <p className="text-[9px] text-red-400/40 mt-0.5 truncate">{trade.out.team} · {fmtPrice(trade.out.price)}</p>
+        </div>
+
+        <div className="flex flex-col items-center gap-0.5 shrink-0 px-1">
+          <ArrowRight className="h-2.5 w-2.5 text-white/12" />
+          <span className={`text-[8px] font-semibold tabular-nums ${cashPositive ? "text-green-400/65" : "text-white/18"}`}>
+            {cashPositive ? `+${fmtPrice(trade.cash_generated)}` : `-${fmtPrice(Math.abs(trade.cash_generated))}`}
+          </span>
+          {projPositive && (
+            <span className="text-[8px] font-semibold text-sky-300/40 tabular-nums">+{trade.projection_gain.toFixed(0)}pts</span>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1 text-right">
+          <p className="text-[11px] font-semibold text-white truncate">{trade.in.player_name}</p>
+          <p className="text-[9px] text-white/22 mt-0.5 truncate">{trade.in.team} · {fmtPrice(trade.in.price)}</p>
+        </div>
+
+        <div className="shrink-0 pl-2">
+          <span className={`text-[7px] font-extrabold px-1.5 py-0.5 rounded border uppercase tracking-wide ${sl.cls}`}>
+            {sl.label}
+          </span>
+        </div>
+      </div>
+
+      {trade.why && (
+        <p className="text-[9px] text-white/18 mt-2 pl-5 leading-snug">{trade.why}</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Trade Type Group ──────────────────────────────────────────────────────────
+
+function TradeTypeGroup({ config, trades }: { config: TradeTypeConfig; trades: BestTrade[] }) {
+  const [expanded, setExpanded] = useState(false);
+  if (trades.length === 0) return null;
+
+  const headline = trades[0];
+  const supporting = trades.slice(1, 3);
+  const extraTrades = trades.slice(3);
+  const hasMore = extraTrades.length > 0;
+
+  return (
+    <div className={`rounded-2xl border ${config.borderCls} ${config.bgCls} p-4 mb-4`}>
+      <div className="flex items-center gap-2 mb-1">
+        <span className={config.headerCls}>{config.icon}</span>
+        <h3 className={`text-[12px] font-extrabold uppercase tracking-[0.1em] ${config.headerCls}`}>{config.label}</h3>
+        <span className="text-[9px] text-white/18 font-mono">{trades.length}</span>
+      </div>
+      <p className="text-[10px] text-white/22 mb-4 ml-6">{config.subtext}</p>
+
+      <HeadlineTrade trade={headline} config={config} />
+
+      {supporting.length > 0 && (
+        <div className="flex flex-col gap-1.5 mt-1.5">
+          {supporting.map((t, i) => (
+            <TradeRow key={`${t.out.player_id}-${t.in.player_id}`} trade={t} rank={i + 2} />
+          ))}
+        </div>
+      )}
+
+      {hasMore && (
+        <div className="mt-2">
+          {expanded && (
+            <div className="flex flex-col gap-1.5 mb-2">
+              {extraTrades.map((t, i) => (
+                <TradeRow key={`${t.out.player_id}-${t.in.player_id}`} trade={t} rank={i + 4} />
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => setExpanded(e => !e)}
+            className="w-full flex items-center justify-center gap-1.5 text-[10px] text-white/22 hover:text-white/42 transition-colors py-2 rounded-lg border border-white/[0.04] hover:border-white/8 mt-1"
+          >
+            <ChevronsUpDown className="h-3 w-3" />
+            {expanded ? "Show less" : `View ${extraTrades.length} more trade${extraTrades.length !== 1 ? "s" : ""}`}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Top Trades Section ────────────────────────────────────────────────────────
 
-function TopTradesSection({ trades }: { trades: BestTrade[] }) {
-  if (trades.length <= 1) return null;
+type TradeFilterKey = "ALL" | "CASH_GENERATION" | "AGGRESSIVE_UPGRADE" | "BALANCED";
 
-  const byType = {
-    cash: trades.filter(t => t.trade_type === "CASH_GENERATION"),
-    upgrade: trades.filter(t => t.trade_type === "AGGRESSIVE_UPGRADE"),
-    balanced: trades.filter(t => t.trade_type === "BALANCED"),
-  };
+function TopTradesSection({ trades }: { trades: BestTrade[] }) {
+  const [activeFilter, setActiveFilter] = useState<TradeFilterKey>("ALL");
+  const [sortMode, setSortMode] = useState<"score" | "cash" | "pts">("score");
+
+  const deduped = useMemo(() => deduplicateTrades(trades), [trades]);
+
+  if (deduped.length <= 1) return null;
+
+  const sorted = useMemo(() => {
+    return [...deduped].sort((a, b) => {
+      if (sortMode === "cash") return b.cash_generated - a.cash_generated;
+      if (sortMode === "pts")  return b.projection_gain - a.projection_gain;
+      return b.score - a.score;
+    });
+  }, [deduped, sortMode]);
+
+  const filtered = activeFilter === "ALL" ? sorted : sorted.filter(t => t.trade_type === activeFilter);
+
+  const cashTrades     = filtered.filter(t => t.trade_type === "CASH_GENERATION");
+  const upgradeTrades  = filtered.filter(t => t.trade_type === "AGGRESSIVE_UPGRADE");
+  const balancedTrades = filtered.filter(t => t.trade_type === "BALANCED");
+
+  const filterBtns: { key: TradeFilterKey; label: string; activeCls: string }[] = [
+    { key: "ALL",                label: "All",      activeCls: "text-white border-white/20 bg-white/[0.06]" },
+    { key: "CASH_GENERATION",    label: "Cash",     activeCls: "text-[#F5C84C] border-[#F5C84C]/25 bg-[#F5C84C]/[0.06]" },
+    { key: "AGGRESSIVE_UPGRADE", label: "Upgrade",  activeCls: "text-sky-300 border-sky-400/25 bg-sky-400/[0.06]" },
+    { key: "BALANCED",           label: "Balanced", activeCls: "text-white/50 border-white/12 bg-white/[0.03]" },
+  ];
 
   return (
     <div className="mb-12">
-      <div className="flex items-center gap-2 mb-5">
-        <BarChart3 className="h-4 w-4 text-[#F5C84C]" />
-        <h2 className="text-sm font-extrabold uppercase tracking-[0.12em] text-white">Top Trades This Round</h2>
-        <span className="text-[10px] text-white/20 font-mono">{Math.min(trades.length, 8)}</span>
+      <div className="flex items-start justify-between gap-3 mb-5 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <BarChart3 className="h-4 w-4 text-[#F5C84C]" />
+            <h2 className="text-sm font-extrabold uppercase tracking-[0.12em] text-white">Best Trades This Round</h2>
+            <span className="text-[10px] text-white/20 font-mono">{deduped.length}</span>
+          </div>
+          <p className="text-[11px] text-white/25 ml-6">Optimised moves based on price change + projected scoring</p>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-0.5 rounded-lg border border-white/[0.06] p-0.5">
+            {filterBtns.map(btn => (
+              <button
+                key={btn.key}
+                onClick={() => setActiveFilter(btn.key)}
+                className={`text-[9px] font-bold px-2 py-1 rounded transition-colors ${
+                  activeFilter === btn.key
+                    ? `border ${btn.activeCls}`
+                    : "text-white/22 hover:text-white/42 border border-transparent"
+                }`}
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-0.5 rounded-lg border border-white/[0.06] p-0.5">
+            {(["score", "cash", "pts"] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => setSortMode(mode)}
+                className={`text-[9px] font-bold px-2 py-1 rounded transition-colors capitalize ${
+                  sortMode === mode
+                    ? "text-white border border-white/15 bg-white/[0.05]"
+                    : "text-white/22 hover:text-white/42 border border-transparent"
+                }`}
+              >
+                {mode === "score" ? "Score" : mode === "cash" ? "Cash" : "Pts"}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        {trades.slice(0, 8).map((trade, i) => {
-          const cashPositive = trade.cash_generated >= 0;
-          const projPositive = trade.projection_gain >= 0;
-
-          const badge =
-            trade.trade_type === "AGGRESSIVE_UPGRADE"
-              ? { label: "Upgrade", cls: "text-sky-300 border-sky-400/25 bg-sky-400/8" }
-              : trade.trade_type === "CASH_GENERATION"
-              ? { label: "Cash Gen", cls: "text-[#F5C84C] border-[#F5C84C]/25 bg-[#F5C84C]/8" }
-              : trade.in_type === "buy_before_rise"
-              ? { label: "Price Rise", cls: "text-green-300 border-green-400/25 bg-green-400/8" }
-              : { label: "Balanced", cls: "text-white/50 border-white/15 bg-white/5" };
-
-          const isTopTrade = i === 0;
-          const dividerGroup =
-            i > 0 &&
-            trades[i - 1].trade_type !== trade.trade_type &&
-            byType[trade.trade_type === "CASH_GENERATION" ? "cash" : trade.trade_type === "AGGRESSIVE_UPGRADE" ? "upgrade" : "balanced"][0]?.out.player_id === trade.out.player_id;
-
-          return (
-            <div key={`${trade.out.player_id}-${trade.in.player_id}`}>
-              <div className={`rounded-xl border transition-colors px-4 py-3 ${
-                isTopTrade
-                  ? "border-[#F5C84C]/15 bg-[#F5C84C]/[0.025] hover:bg-[#F5C84C]/[0.04]"
-                  : "border-white/[0.06] bg-white/[0.015] hover:bg-white/[0.03]"
-              }`}>
-                <div className="flex items-center gap-3">
-                  <span className={`text-[10px] font-bold w-4 text-right tabular-nums shrink-0 ${isTopTrade ? "text-[#F5C84C]/60" : "text-white/20"}`}>
-                    {i + 1}
-                  </span>
-
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-bold text-white/65 truncate">{trade.out.player_name}</p>
-                    <p className="text-[9px] text-red-400/50 mt-0.5 truncate">{trade.out.team} · {fmtPrice(trade.out.price)}</p>
-                  </div>
-
-                  <div className="flex flex-col items-center gap-0.5 px-1 shrink-0">
-                    <ArrowRight className="h-3 w-3 text-white/15" />
-                    <span className={`text-[9px] font-semibold tabular-nums ${cashPositive ? "text-green-400/70" : "text-white/25"}`}>
-                      {cashPositive ? `+${fmtPrice(trade.cash_generated)}` : `-${fmtPrice(Math.abs(trade.cash_generated))}`}
-                    </span>
-                    {projPositive && (
-                      <span className="text-[9px] font-semibold text-sky-300/50 tabular-nums">+{trade.projection_gain.toFixed(0)} pts</span>
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1 text-right">
-                    <p className="text-[12px] font-bold text-white truncate">{trade.in.player_name}</p>
-                    <div className="flex items-center gap-1 justify-end mt-0.5">
-                      <p className="text-[9px] text-white/30 truncate">{trade.in.team}</p>
-                      <span className={`text-[8px] font-bold px-1 py-0.5 rounded border uppercase tracking-wide shrink-0 ${badge.cls}`}>
-                        {badge.label}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="text-right shrink-0 pl-1">
-                    <p className={`text-[11px] font-extrabold tabular-nums ${isTopTrade ? "text-[#F5C84C]" : "text-white/40"}`}>
-                      {trade.score.toFixed(0)}
-                    </p>
-                    <p className="text-[8px] text-white/15 mt-0.5">score</p>
-                  </div>
-                </div>
-
-                {trade.why && (
-                  <p className="text-[10px] text-white/22 mt-2 pl-7 leading-snug">{trade.why}</p>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {cashTrades.length === 0 && upgradeTrades.length === 0 && balancedTrades.length === 0 ? (
+        <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] py-8 text-center">
+          <p className="text-[11px] text-white/25">No trades match this filter</p>
+        </div>
+      ) : (
+        <>
+          <TradeTypeGroup config={TRADE_TYPE_CONFIGS[0]} trades={cashTrades} />
+          <TradeTypeGroup config={TRADE_TYPE_CONFIGS[1]} trades={upgradeTrades} />
+          <TradeTypeGroup config={TRADE_TYPE_CONFIGS[2]} trades={balancedTrades} />
+        </>
+      )}
     </div>
   );
 }
