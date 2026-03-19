@@ -309,6 +309,9 @@ export default function MarketWatchPage() {
             <p className="text-[12px] text-white/35 ml-9.5">
               Know who to trade before prices move.
             </p>
+            <p className="text-[10px] text-white/18 ml-9.5 mt-0.5">
+              Signals ranked by value, price movement, and projected scoring
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <UrgencyBadge lastUpdated={lastUpdated} />
@@ -684,11 +687,12 @@ function WhyThisTradeMatters({ trade }: { trade: BestTrade }) {
 
 // ─── Free Player Card (enhanced) ───────────────────────────────────────────────
 
-function FreePlayerCard({ player }: { player: DerivedPlayer }) {
+function FreePlayerCard({ player, isSell }: { player: DerivedPlayer; isSell?: boolean }) {
   const expChange = Number(player.expected_price_change ?? 0);
   const confProps = confidenceLabelProps(player);
   const insight = miniInsightLine(player);
   const sl = scoreLabel(player.trade_score ?? player.value_score ?? 0);
+  const isLowConf = (player.projection_confidence ?? 0) < 0.45;
 
   return (
     <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.035] transition-colors px-4 py-3.5">
@@ -706,9 +710,15 @@ function FreePlayerCard({ player }: { player: DerivedPlayer }) {
       </div>
 
       <div className="flex items-center gap-1.5 flex-wrap">
-        <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded border uppercase tracking-wide ${sl.cls}`}>
-          {sl.label}
-        </span>
+        {isSell && isLowConf ? (
+          <span className="text-[8px] font-extrabold px-1.5 py-0.5 rounded border uppercase tracking-wide text-orange-400/70 border-orange-400/20 bg-orange-400/[0.07]">
+            Low Conf Sell
+          </span>
+        ) : (
+          <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded border uppercase tracking-wide ${sl.cls}`}>
+            {sl.label}
+          </span>
+        )}
         <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide ${confProps.cls}`}>
           {confProps.label} CONF
         </span>
@@ -757,24 +767,24 @@ function ThreeThingsHoldingYouBack({
     {
       icon: <TrendingDown className="h-3.5 w-3.5 text-red-400/60 shrink-0" />,
       text: topSell
-        ? `${topSell.player_name} is losing value — and you may still own them`
-        : "You may be holding players about to lose significant value",
-      sub: "Overpriced players bleed your budget every round you wait",
+        ? `${topSell.player_name} is bleeding value — every round you hold costs you`
+        : "You're holding players losing value every round",
+      sub: "Act before the price drop accelerates",
       accent: "border-red-400/15 bg-red-400/[0.03]",
     },
     {
       icon: <ArrowUpRight className="h-3.5 w-3.5 text-green-400/60 shrink-0" />,
       text: topBuy
-        ? `${topBuy.player_name} is rising — most coaches won't see it until it's too late`
+        ? `${topBuy.player_name} is rising — you're missing the early entry`
         : "You're missing early price rises happening this week",
-      sub: "The best entry points close before lockout",
+      sub: "The window closes before most coaches notice",
       accent: "border-green-400/12 bg-green-400/[0.025]",
     },
     {
       icon: <Target className="h-3.5 w-3.5 text-sky-400/60 shrink-0" />,
       text: topUpgrade
-        ? `${topUpgrade.player_name} is available — but without a plan, you'll overpay`
-        : "Without a structured upgrade path, you'll overpay for the wrong player",
+        ? `${topUpgrade.player_name} is priced right now — without a plan, you'll overpay next round`
+        : "Without a plan, you're overpaying for upgrades",
       sub: "Premium scorers at fair price are a narrow window",
       accent: "border-sky-400/12 bg-sky-400/[0.02]",
     },
@@ -971,7 +981,7 @@ function BlurLockedGrid({
           className="flex items-center gap-2 bg-[#F5C84C] text-black font-extrabold text-[11px] px-4 py-2 rounded-lg hover:brightness-110 transition-all"
         >
           <Crown size={10} />
-          See all trades
+          Unlock full trade plan
         </button>
       </div>
     </div>
@@ -1579,7 +1589,7 @@ function FinalCTABlock({
           </button>
         </div>
 
-        <p className="mt-3 text-[10px] text-white/15">Less than $1 per round · Cancel anytime</p>
+        <p className="mt-3 text-[10px] text-white/15">$10/month · Less than $2.50 per week · Cancel anytime</p>
       </div>
     </div>
   );
@@ -1750,7 +1760,7 @@ function FreeUserView({
             {isSell && sells.length === 0 ? (
               <NoSellsCard />
             ) : players[0] ? (
-              <FreePlayerCard player={players[0]} />
+              <FreePlayerCard player={players[0]} isSell={isSell} />
             ) : (
               <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] px-4 py-4 text-center">
                 <p className="text-[11px] font-semibold text-white/22">No signal this week</p>
