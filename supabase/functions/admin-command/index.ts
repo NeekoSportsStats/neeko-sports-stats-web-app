@@ -63,7 +63,7 @@ async function dispatchCommand(
         result = await invokeEdgeFunction("generate-player-ai", payload);
         break;
       case "run_ai_worker":
-        result = await invokeEdgeFunction("generate-player-ranking-recos", payload);
+        result = await invokeEdgeFunction("generate-player-ai", payload);
         break;
       case "generate_player_ai":
         result = await invokeEdgeFunction("generate-player-ai", payload);
