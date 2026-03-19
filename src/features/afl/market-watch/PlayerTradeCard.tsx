@@ -12,17 +12,18 @@ interface Props {
 
 function categoryTag(cat: MWCategory): { label: string; cls: string } {
   switch (cat) {
-    case "buy":           return { label: "BUY",      cls: "text-green-300 bg-green-400/15 border-green-400/35" };
-    case "sell_now":      return { label: "SELL NOW",  cls: "text-red-300 bg-red-400/15 border-red-400/35" };
-    case "sell_consider": return { label: "CONSIDER",  cls: "text-red-300/80 bg-red-400/10 border-red-400/25" };
-    case "cash_cow":      return { label: "CASH COW",  cls: "text-[#F5C84C] bg-[#F5C84C]/15 border-[#F5C84C]/35" };
-    case "fade":          return { label: "TRAP",      cls: "text-orange-300 bg-orange-400/15 border-orange-400/35" };
-    default:              return { label: "MONITOR",   cls: "text-white/40 bg-white/5 border-white/10" };
+    case "buy":             return { label: "BUY",      cls: "text-green-300 bg-green-400/15 border-green-400/35" };
+    case "upgrade_target":  return { label: "UPGRADE",  cls: "text-green-200 bg-green-400/20 border-green-400/45" };
+    case "sell_now":        return { label: "SELL NOW",  cls: "text-red-300 bg-red-400/15 border-red-400/35" };
+    case "sell_consider":   return { label: "CONSIDER",  cls: "text-red-300/80 bg-red-400/10 border-red-400/25" };
+    case "cash_cow":        return { label: "CASH COW",  cls: "text-[#F5C84C] bg-[#F5C84C]/15 border-[#F5C84C]/35" };
+    case "fade":            return { label: "TRAP",      cls: "text-orange-300 bg-orange-400/15 border-orange-400/35" };
+    default:                return { label: "MONITOR",   cls: "text-white/40 bg-white/5 border-white/10" };
   }
 }
 
 function priceChangeStyle(expChange: number, cat: MWCategory): { text: string; bg: string } {
-  if (cat === "buy" || cat === "cash_cow") {
+  if (cat === "buy" || cat === "cash_cow" || cat === "upgrade_target") {
     return { text: "text-green-400", bg: "bg-green-400/[0.06] border border-green-400/20" };
   }
   if (cat === "sell_now" || cat === "fade") {
@@ -80,6 +81,12 @@ function getWhyNow(row: MWPlayerRow): string | null {
     if (expChange < -30000) return "Price drop is accelerating \u2014 act before next round";
     if (delta < -15) return "Scoring well below breakeven \u2014 price under pressure";
     return "Price falling \u2014 sell window is open now";
+  }
+  if (row.category === "upgrade_target") {
+    const proj = Number(row.projection ?? 0);
+    if (proj >= 110) return "Elite scorer near breakeven \u2014 premium quality at fair price";
+    if (delta > 5) return "High-end scoring above breakeven \u2014 price set to rise";
+    return "Quality upgrade target \u2014 scoring justifies the price";
   }
   if (row.category === "buy") {
     if (expChange > 40000) return "Price rise incoming \u2014 buy before it jumps";

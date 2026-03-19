@@ -1,31 +1,24 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   TrendingUp, RefreshCw, Crown, ChevronDown, ArrowRight,
-  CircleAlert as AlertCircle, Zap, Target, Star, ArrowUpRight, ArrowDownRight,
-  TrendingDown, Siren,
+  CircleAlert as AlertCircle, Zap, Target, Star,
+  ArrowUpRight, ArrowDownRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
-import { MWPlayerRow, MWSummary, MWStatus, MWCategoryFilter, MWSortKey } from "./types";
+import { MWPlayerRow, MWSummary, MWStatus, MWSortKey } from "./types";
 import { PlayerTradeCard } from "./PlayerTradeCard";
 import { MarketWatchBanner } from "./MarketWatchBanner";
-import { HorizontalRail } from "./HorizontalRail";
 import { MarketWatchSkeleton } from "./MarketWatchSkeleton";
 import { MarketWatchSort } from "./MarketWatchSort";
 import { UpgradeModal } from "./UpgradeModal";
 import { fmtPriceChange, fmtPrice } from "./helpers";
+import { classifyPlayers, buildBestTrades, DerivedPlayer, BestTrade } from "./engine";
 
 const SECTION_LIMIT = 6;
 
-const SECTION_IDS = [
-  "section-buy",
-  "section-sell",
-  "section-cash-cows",
-  "section-traps",
-] as const;
-
-function sortPlayers(arr: MWPlayerRow[], key: MWSortKey): MWPlayerRow[] {
+function sortDerived(arr: DerivedPlayer[], key: MWSortKey): DerivedPlayer[] {
   return [...arr].sort((a, b) => {
     if (key === "projection")   return (b.projection ?? 0) - (a.projection ?? 0);
     if (key === "price_change") return (b.expected_price_change ?? 0) - (a.expected_price_change ?? 0);
@@ -39,22 +32,17 @@ function sortPlayers(arr: MWPlayerRow[], key: MWSortKey): MWPlayerRow[] {
 
 export default function MarketWatchPage() {
   const { isPremium, loading: authLoading } = useAuth();
+  const isPremiumRef = useRef(isPremium);
 
   const [players, setPlayers] = useState<MWPlayerRow[]>([]);
   const [summary, setSummary] = useState<MWSummary | null>(null);
   const [status, setStatus] = useState<MWStatus | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
-  const isPremiumRef = useRef(isPremium);
-
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [activeSection, setActiveSection] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState<MWCategoryFilter>("all");
   const [sortKey, setSortKey] = useState<MWSortKey>("value_score");
-
-  const [showMoreBuy, setShowMoreBuy] = useState(false);
-  const [showMoreSell, setShowMoreSell] = useState(false);
-  const [showMoreCashCows, setShowMoreCashCows] = useState(false);
+  const [showMoreUpgrades, setShowMoreUpgrades] = useState(false);
+  const [showMoreCows, setShowMoreCows] = useState(false);
   const [showMoreTraps, setShowMoreTraps] = useState(false);
 
   const fetchData = useCallback(async (premium: boolean) => {
@@ -62,11 +50,11 @@ export default function MarketWatchPage() {
     try {
       const [playersRes, summaryRes, statusRes] = await Promise.all([
         premium
-          ? supabase.from("v_mw_premium").select("*").limit(400)
+          ? supabase.from("v_mw_premium").select("*").limit(600)
           : supabase.from("v_mw_premium").select("*")
-              .in("category", ["buy", "sell_now", "sell_consider", "cash_cow", "fade"])
+              .in("category", ["buy", "sell_now", "sell_consider", "cash_cow", "fade", "monitor"])
               .order("trade_score", { ascending: false })
-              .limit(12),
+              .limit(80),
         supabase.from("v_mw_summary").select("*").maybeSingle(),
         supabase.from("v_mw_status").select("*").maybeSingle(),
       ]);
@@ -91,46 +79,14 @@ export default function MarketWatchPage() {
     fetchData(isPremiumRef.current).then(() => setLastUpdated(new Date()));
   }, [authLoading, fetchData]);
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter(e => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible.length > 0) setActiveSection(visible[0].target.id);
-      },
-      { rootMargin: "-80px 0px -60% 0px", threshold: 0 }
-    );
-    SECTION_IDS.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) observer.observe(el);
-    });
-    return () => observer.disconnect();
-  }, [players]);
-
-  const scrollToSection = useCallback((sectionId: string) => {
-    const el = document.getElementById(sectionId);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
-
-  const buyTargets = useMemo(() =>
-    sortPlayers(players.filter(p => p.category === "buy"), sortKey),
-    [players, sortKey]
-  );
-  const sellPlayers = useMemo(() =>
-    [...players.filter(p => p.category === "sell_now" || p.category === "sell_consider")]
-      .sort((a, b) => (a.expected_price_change ?? 0) - (b.expected_price_change ?? 0)),
+  const { sells, upgrades, cashCows, traps } = useMemo(
+    () => classifyPlayers(players),
     [players]
   );
-  const cashCows = useMemo(() =>
-    sortPlayers(players.filter(p => p.category === "cash_cow"), sortKey),
-    [players, sortKey]
-  );
-  const traps = useMemo(() =>
-    [...players.filter(p => p.category === "fade")]
-      .sort((a, b) => (a.expected_price_change ?? 0) - (b.expected_price_change ?? 0)),
-    [players]
-  );
+
+  const sortedUpgrades = useMemo(() => sortDerived(upgrades, sortKey), [upgrades, sortKey]);
+  const sortedCows = useMemo(() => sortDerived(cashCows, sortKey), [cashCows, sortKey]);
+  const bestTrades = useMemo(() => buildBestTrades(sells, upgrades, cashCows), [sells, upgrades, cashCows]);
 
   const isInactive = status != null && !status.is_active;
   const ready = !authLoading && !dataLoading;
@@ -139,7 +95,7 @@ export default function MarketWatchPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <MarketWatchBanner summary={summary} activeSection={activeSection} />
+      <MarketWatchBanner summary={summary} activeSection={null} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
 
@@ -178,10 +134,11 @@ export default function MarketWatchPage() {
 
         {!isPremium ? (
           <FreeUserView
-            buyTargets={buyTargets}
-            sellPlayers={sellPlayers}
-            cashCows={cashCows}
+            sells={sells}
+            upgrades={sortedUpgrades}
+            cashCows={sortedCows}
             traps={traps}
+            bestTrades={bestTrades}
             summary={summary}
             onUnlock={() => setShowUpgrade(true)}
           />
@@ -196,24 +153,20 @@ export default function MarketWatchPage() {
           </div>
         ) : (
           <PremiumView
-            buyTargets={buyTargets}
-            sellPlayers={sellPlayers}
-            cashCows={cashCows}
+            sells={sells}
+            upgrades={sortedUpgrades}
+            cashCows={sortedCows}
             traps={traps}
-            showMoreBuy={showMoreBuy}
-            showMoreSell={showMoreSell}
-            showMoreCashCows={showMoreCashCows}
-            showMoreTraps={showMoreTraps}
-            categoryFilter={categoryFilter}
-            sortKey={sortKey}
+            bestTrades={bestTrades}
             summary={summary}
-            onFilterChange={setCategoryFilter}
+            sortKey={sortKey}
+            showMoreUpgrades={showMoreUpgrades}
+            showMoreCows={showMoreCows}
+            showMoreTraps={showMoreTraps}
             onSortChange={setSortKey}
-            onToggleBuy={() => setShowMoreBuy(e => !e)}
-            onToggleSell={() => setShowMoreSell(e => !e)}
-            onToggleCashCows={() => setShowMoreCashCows(e => !e)}
+            onToggleUpgrades={() => setShowMoreUpgrades(e => !e)}
+            onToggleCows={() => setShowMoreCows(e => !e)}
             onToggleTraps={() => setShowMoreTraps(e => !e)}
-            onScrollToSection={scrollToSection}
           />
         )}
 
@@ -228,158 +181,69 @@ export default function MarketWatchPage() {
   );
 }
 
-// ─── Weekly Plan Hero ─────────────────────────────────────────────────────────
+// ─── Best Trade Hero ──────────────────────────────────────────────────────────
 
-function WeeklyPlanHero({
-  sellPlayers,
-  buyTargets,
-  cashCows,
-  isPremium,
-}: {
-  sellPlayers: MWPlayerRow[];
-  buyTargets: MWPlayerRow[];
-  cashCows: MWPlayerRow[];
-  isPremium: boolean;
-}) {
-  const mustSells = sellPlayers.slice(0, 3);
-  const topBuys = buyTargets.slice(0, 2);
-  const topCows = cashCows.slice(0, 2);
-
-  const hasSells = mustSells.length > 0;
-  const hasBuysOrCows = topBuys.length > 0 || topCows.length > 0;
-
-  if (!hasSells && !hasBuysOrCows) return null;
+function BestTradeHero({ trade }: { trade: BestTrade }) {
+  const cashLabel = trade.cash_generated >= 0
+    ? `+${fmtPrice(trade.cash_generated)} cash back`
+    : `${fmtPrice(Math.abs(trade.cash_generated))} extra spend`;
+  const projLabel = trade.projection_gain >= 0
+    ? `+${trade.projection_gain.toFixed(0)} pts/rd`
+    : `${trade.projection_gain.toFixed(0)} pts/rd`;
 
   return (
-    <div className="mb-8 rounded-2xl border border-white/[0.07] overflow-hidden"
-      style={{ background: "linear-gradient(160deg, rgba(245,200,76,0.04) 0%, rgba(10,10,10,0) 50%)" }}
+    <div
+      className="mb-8 rounded-2xl border border-[#F5C84C]/20 overflow-hidden"
+      style={{ background: "linear-gradient(160deg, rgba(245,200,76,0.05) 0%, rgba(10,10,10,0) 55%)" }}
     >
       <div className="px-5 pt-5 pb-4 border-b border-white/[0.05]">
         <div className="flex items-center gap-2">
-          <Siren className="h-4 w-4 text-[#F5C84C]" />
-          <h2 className="text-base font-extrabold text-white tracking-tight">This Week's Plan</h2>
-          <span className="text-[10px] text-white/20 ml-1">Neeko's priority moves</span>
+          <Target className="h-4 w-4 text-[#F5C84C]" />
+          <h2 className="text-base font-extrabold text-white tracking-tight">Best Trade This Round</h2>
         </div>
-        <p className="text-[11px] text-white/30 mt-1">Act on these before prices move. Decisions, not data.</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-white/[0.05]">
-        <div className="px-5 py-5">
-          <div className="flex items-center gap-1.5 mb-4">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-red-400">
-              {hasSells ? `Must Sell — ${mustSells.length} urgent` : "No urgent sells"}
-            </p>
-          </div>
-          {hasSells ? (
-            <div className="flex flex-col gap-3">
-              {mustSells.map(p => (
-                <PlayerTradeCard key={p.player_id} row={p} isPremium={isPremium} heroMode />
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-white/[0.05] bg-white/[0.01] px-4 py-5 text-center">
-              <TrendingDown className="h-5 w-5 text-white/10 mx-auto mb-2" />
-              <p className="text-[11px] text-white/30 font-semibold">No urgent sell signals</p>
-              <p className="text-[10px] text-white/18 mt-1">Your roster looks safe — focus on cash generation</p>
-            </div>
-          )}
-        </div>
-
-        <div className="px-5 py-5">
-          <div className="flex items-center gap-1.5 mb-4">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-green-400">
-              {hasBuysOrCows ? "Buy / Cash Plays" : "No elite buys"}
-            </p>
-          </div>
-          {hasBuysOrCows ? (
-            <div className="flex flex-col gap-3">
-              {topBuys.map(p => (
-                <PlayerTradeCard key={p.player_id} row={p} isPremium={isPremium} heroMode />
-              ))}
-              {topCows.map(p => (
-                <PlayerTradeCard key={p.player_id} row={p} isPremium={isPremium} heroMode />
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-white/[0.05] bg-white/[0.01] px-4 py-5 text-center">
-              <TrendingUp className="h-5 w-5 text-white/10 mx-auto mb-2" />
-              <p className="text-[11px] text-white/30 font-semibold">No elite buys this round</p>
-              <p className="text-[10px] text-white/18 mt-1">Focus on selling underperformers and generating cash</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Best Trade Panel ─────────────────────────────────────────────────────────
-
-function BestTradePlan({
-  sellPlayers,
-  buyTargets,
-}: {
-  sellPlayers: MWPlayerRow[];
-  buyTargets: MWPlayerRow[];
-}) {
-  const bestSell = sellPlayers[0];
-  const bestBuy = buyTargets[0];
-
-  if (!bestSell || !bestBuy) return null;
-
-  const cashGained = (Number(bestSell.price ?? 0) - Number(bestBuy.price ?? 0));
-  const netPriceGain = Number(bestBuy.expected_price_change ?? 0) - Number(bestSell.expected_price_change ?? 0);
-
-  return (
-    <div className="mb-8 rounded-2xl border border-white/[0.07] bg-white/[0.015] overflow-hidden">
-      <div className="px-5 pt-4 pb-3 border-b border-white/[0.05] flex items-center gap-2">
-        <Target className="h-3.5 w-3.5 text-[#F5C84C]/60" />
-        <h3 className="text-sm font-bold text-white">Best Trade This Round</h3>
-        <span className="text-[10px] text-white/20 ml-1">Highest value swap</span>
+        <p className="text-[11px] text-white/30 mt-0.5">{trade.why}</p>
       </div>
 
       <div className="p-5">
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-4 items-center">
-          <div className="rounded-xl border border-red-400/20 bg-red-400/[0.04] p-4">
+          <div className="rounded-xl border border-red-400/25 bg-red-400/[0.04] p-4">
             <p className="text-[9px] font-extrabold uppercase tracking-widest text-red-400/70 mb-2">Trade Out</p>
-            <p className="font-extrabold text-base text-white leading-tight">{bestSell.player_name}</p>
-            <p className="text-[11px] text-white/35 mt-0.5 mb-3">{bestSell.team}</p>
+            <p className="font-extrabold text-base text-white leading-tight">{trade.out.player_name}</p>
+            <p className="text-[11px] text-white/35 mt-0.5 mb-3">{trade.out.team} · {trade.out.position}</p>
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-white/70">{fmtPrice(bestSell.price)}</span>
-              <span className="text-sm font-extrabold text-red-400">{fmtPriceChange(bestSell.expected_price_change)}</span>
+              <span className="text-sm font-bold text-white/60">{fmtPrice(trade.out.price)}</span>
+              <span className="text-sm font-extrabold text-red-400">{fmtPriceChange(trade.out.expected_price_change)}</span>
+            </div>
+            <div className="mt-2 text-[9px] text-red-300/50 leading-snug">
+              Proj {trade.out.projection?.toFixed(0)} · BE {trade.out.breakeven?.toFixed(0)}
             </div>
           </div>
 
-          <div className="flex flex-col items-center gap-1 py-2 sm:py-0">
+          <div className="flex flex-col items-center gap-2 py-1">
             <ArrowRight className="h-5 w-5 text-white/20" />
-            {cashGained !== 0 && (
-              <span className={`text-[10px] font-bold ${cashGained > 0 ? "text-green-400" : "text-red-400"}`}>
-                {cashGained > 0 ? `+${fmtPrice(cashGained)}` : fmtPrice(Math.abs(cashGained))}
-              </span>
-            )}
+            <div className="text-center">
+              <p className={`text-[11px] font-bold ${trade.cash_generated >= 0 ? "text-green-400" : "text-white/35"}`}>
+                {cashLabel}
+              </p>
+              <p className={`text-[10px] font-semibold mt-0.5 ${trade.projection_gain >= 0 ? "text-green-300/70" : "text-white/30"}`}>
+                {projLabel}
+              </p>
+            </div>
           </div>
 
-          <div className="rounded-xl border border-green-400/20 bg-green-400/[0.04] p-4">
+          <div className="rounded-xl border border-green-400/25 bg-green-400/[0.04] p-4">
             <p className="text-[9px] font-extrabold uppercase tracking-widest text-green-400/70 mb-2">Trade In</p>
-            <p className="font-extrabold text-base text-white leading-tight">{bestBuy.player_name}</p>
-            <p className="text-[11px] text-white/35 mt-0.5 mb-3">{bestBuy.team}</p>
+            <p className="font-extrabold text-base text-white leading-tight">{trade.in.player_name}</p>
+            <p className="text-[11px] text-white/35 mt-0.5 mb-3">{trade.in.team} · {trade.in.position}</p>
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-white/70">{fmtPrice(bestBuy.price)}</span>
-              <span className="text-sm font-extrabold text-green-400">{fmtPriceChange(bestBuy.expected_price_change)}</span>
+              <span className="text-sm font-bold text-white/60">{fmtPrice(trade.in.price)}</span>
+              <span className="text-sm font-extrabold text-green-400">{fmtPriceChange(trade.in.expected_price_change)}</span>
+            </div>
+            <div className="mt-2 text-[9px] text-green-300/50 leading-snug">
+              Proj {trade.in.projection?.toFixed(0)} · BE {trade.in.breakeven?.toFixed(0)}
             </div>
           </div>
         </div>
-
-        {netPriceGain !== 0 && (
-          <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 flex items-center justify-between gap-2">
-            <p className="text-[11px] text-white/35">Net price swing (combined)</p>
-            <span className={`text-sm font-extrabold tabular-nums ${netPriceGain > 0 ? "text-green-400" : "text-red-400"}`}>
-              {netPriceGain > 0 ? `+${fmtPrice(netPriceGain)}` : fmtPrice(Math.abs(netPriceGain))}
-            </span>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -387,22 +251,22 @@ function BestTradePlan({
 
 // ─── Summary Strip ────────────────────────────────────────────────────────────
 
-function SummaryStrip({ summary, buyCount, sellCount, cowCount, trapCount }: {
+function SummaryStrip({ summary, sellCount, upgradeCount, cowCount, trapCount }: {
   summary: MWSummary | null;
-  buyCount: number;
   sellCount: number;
+  upgradeCount: number;
   cowCount: number;
   trapCount: number;
 }) {
   const stats = [
-    { label: "Rising",    value: summary?.buy_count      ?? buyCount,  icon: <ArrowUpRight className="h-3 w-3" />,   cls: "text-green-400" },
-    { label: "Dropping",  value: summary?.sell_count     ?? sellCount, icon: <ArrowDownRight className="h-3 w-3" />, cls: "text-red-400" },
-    { label: "Cash Cows", value: summary?.cash_cow_count ?? cowCount,  icon: <TrendingUp className="h-3 w-3" />,     cls: "text-[#F5C84C]" },
-    { label: "Traps",     value: summary?.trap_count     ?? trapCount, icon: <AlertCircle className="h-3 w-3" />,    cls: "text-orange-400" },
+    { label: "Sell Now",     value: summary?.sell_count     ?? sellCount,    icon: <ArrowDownRight className="h-3 w-3" />, cls: "text-red-400" },
+    { label: "Upgrades",     value: upgradeCount,                            icon: <TrendingUp className="h-3 w-3" />,    cls: "text-green-400" },
+    { label: "Cash Cows",    value: summary?.cash_cow_count ?? cowCount,     icon: <ArrowUpRight className="h-3 w-3" />,  cls: "text-[#F5C84C]" },
+    { label: "Traps",        value: summary?.trap_count     ?? trapCount,    icon: <AlertCircle className="h-3 w-3" />,   cls: "text-orange-400" },
   ];
 
   return (
-    <div className="grid grid-cols-4 gap-2 mb-6">
+    <div className="grid grid-cols-4 gap-2 mb-8">
       {stats.map(s => (
         <div key={s.label} className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-2 py-2.5 text-center">
           <div className={`flex items-center justify-center gap-1 mb-1 ${s.cls}`}>
@@ -416,107 +280,80 @@ function SummaryStrip({ summary, buyCount, sellCount, cowCount, trapCount }: {
   );
 }
 
-// ─── Top Moves Section ────────────────────────────────────────────────────────
+// ─── Must Sell Strip ──────────────────────────────────────────────────────────
 
-interface HeroColumn {
-  label: string;
-  labelColor: string;
-  borderColor: string;
-  bgGlow: string;
-  players: MWPlayerRow[];
-}
-
-function TopMovesSection({ buyTargets, sellPlayers, cashCows, isPremium }: {
-  buyTargets: MWPlayerRow[];
-  sellPlayers: MWPlayerRow[];
-  cashCows: MWPlayerRow[];
-  isPremium: boolean;
-}) {
-  const topSells = sellPlayers.slice(0, 3);
-  const topBuys = buyTargets.slice(0, 3);
-  const topCows = cashCows.slice(0, 3);
-
-  if (topBuys.length === 0 && topSells.length === 0 && topCows.length === 0) return null;
-
-  const columns: HeroColumn[] = [
-    {
-      label: "Sell Before Drop",
-      labelColor: "text-red-400",
-      borderColor: "border-red-400/20",
-      bgGlow: "rgba(248,113,113,0.05)",
-      players: topSells,
-    },
-    {
-      label: "Buy Before Rise",
-      labelColor: "text-green-400",
-      borderColor: "border-green-400/20",
-      bgGlow: "rgba(74,222,128,0.05)",
-      players: topBuys,
-    },
-    {
-      label: "Cash Cows",
-      labelColor: "text-[#F5C84C]",
-      borderColor: "border-[#F5C84C]/20",
-      bgGlow: "rgba(245,200,76,0.05)",
-      players: topCows,
-    },
-  ].filter(c => c.players.length > 0);
-
-  if (columns.length === 0) return null;
+function MustSellStrip({ sells, isPremium }: { sells: DerivedPlayer[]; isPremium: boolean }) {
+  const top = sells.slice(0, 3);
+  if (top.length === 0) return null;
 
   return (
     <div className="mb-8">
-      <div className="flex items-center gap-2 mb-4">
-        <Zap className="h-3.5 w-3.5 text-[#F5C84C]/60" />
-        <h2 className="text-sm font-bold text-white">Top Moves This Round</h2>
-        <span className="text-[10px] text-white/20 ml-1">Highest-signal players per category</span>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+        <h2 className="text-sm font-extrabold uppercase tracking-[0.12em] text-red-400">Must Sell</h2>
+        <span className="text-[10px] text-white/20">— sell before price drops</span>
       </div>
-
-      <div className={`grid gap-4 ${columns.length === 3 ? "grid-cols-1 md:grid-cols-3" : columns.length === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
-        {columns.map(col => (
-          <div
-            key={col.label}
-            className={`rounded-2xl border ${col.borderColor} overflow-hidden`}
-            style={{ background: `linear-gradient(160deg, ${col.bgGlow} 0%, rgba(10,10,10,0) 60%)` }}
-          >
-            <div className="px-4 pt-4 pb-3 border-b border-white/[0.04]">
-              <p className={`text-[10px] font-extrabold uppercase tracking-[0.15em] ${col.labelColor}`}>{col.label}</p>
-            </div>
-            <div className="px-3 pb-3 pt-2 flex flex-col gap-2.5">
-              {col.players.map(p => (
-                <PlayerTradeCard key={p.player_id} row={p} isPremium={isPremium} compact />
-              ))}
-            </div>
-          </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {top.map(p => (
+          <PlayerTradeCard key={p.player_id} row={p} isPremium={isPremium} compact />
         ))}
       </div>
     </div>
   );
 }
 
-// ─── Category Filter Pills ────────────────────────────────────────────────────
+// ─── Section Shell ────────────────────────────────────────────────────────────
 
-const CATEGORY_FILTERS: { id: MWCategoryFilter; label: string; activeColor: string; inactiveColor: string }[] = [
-  { id: "all",      label: "All",       inactiveColor: "border-white/10 text-white/35 hover:text-white/60", activeColor: "border-white/30 text-white bg-white/8" },
-  { id: "buy",      label: "Buy",       inactiveColor: "border-green-400/15 text-green-400/50 hover:text-green-400", activeColor: "border-green-400/50 text-green-400 bg-green-400/8" },
-  { id: "sell",     label: "Sell",      inactiveColor: "border-red-400/15 text-red-400/50 hover:text-red-400", activeColor: "border-red-400/50 text-red-400 bg-red-400/8" },
-  { id: "cash_cow", label: "Cash Cows", inactiveColor: "border-[#F5C84C]/15 text-[#F5C84C]/50 hover:text-[#F5C84C]", activeColor: "border-[#F5C84C]/50 text-[#F5C84C] bg-[#F5C84C]/8" },
-  { id: "trap",     label: "Fades",     inactiveColor: "border-orange-400/15 text-orange-400/50 hover:text-orange-400", activeColor: "border-orange-400/50 text-orange-400 bg-orange-400/8" },
-];
-
-function CategoryFilterBar({ value, onChange }: { value: MWCategoryFilter; onChange: (v: MWCategoryFilter) => void }) {
+function SectionShell({
+  label, labelColor, dot, description, count, showMore, onToggle, children,
+}: {
+  label: string;
+  labelColor: string;
+  dot: string;
+  description: string;
+  count: number;
+  showMore: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-      {CATEGORY_FILTERS.map(f => (
-        <button
-          key={f.id}
-          onClick={() => onChange(f.id)}
-          className={`shrink-0 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all whitespace-nowrap ${
-            value === f.id ? f.activeColor : f.inactiveColor
-          }`}
-        >
-          {f.label}
-        </button>
+    <div className="mb-10">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${dot} shrink-0`} />
+            <h2 className={`text-sm font-extrabold uppercase tracking-[0.12em] ${labelColor}`}>{label}</h2>
+            <span className="text-[10px] text-white/20 font-mono">{count}</span>
+          </div>
+          <p className="text-[11px] text-white/25 mt-0.5 ml-4">{description}</p>
+        </div>
+        {count > SECTION_LIMIT && (
+          <button
+            onClick={onToggle}
+            className="shrink-0 flex items-center gap-1 text-[10px] text-white/30 hover:text-white/55 transition-colors"
+          >
+            <ChevronDown className={`h-3 w-3 transition-transform ${showMore ? "rotate-180" : ""}`} />
+            {showMore ? "Show less" : `+${count - SECTION_LIMIT} more`}
+          </button>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ─── Player Grid ──────────────────────────────────────────────────────────────
+
+function PlayerGrid({ players, isPremium, showMore }: {
+  players: DerivedPlayer[];
+  isPremium: boolean;
+  showMore: boolean;
+}) {
+  const visible = showMore ? players : players.slice(0, SECTION_LIMIT);
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {visible.map((p, i) => (
+        <PlayerTradeCard key={p.player_id} row={p} rank={i + 1} isPremium={isPremium} />
       ))}
     </div>
   );
@@ -525,76 +362,74 @@ function CategoryFilterBar({ value, onChange }: { value: MWCategoryFilter; onCha
 // ─── Free User View ───────────────────────────────────────────────────────────
 
 function FreeUserView({
-  buyTargets, sellPlayers, cashCows, traps, summary, onUnlock,
+  sells, upgrades, cashCows, traps, bestTrades, summary, onUnlock,
 }: {
-  buyTargets: MWPlayerRow[];
-  sellPlayers: MWPlayerRow[];
-  cashCows: MWPlayerRow[];
-  traps: MWPlayerRow[];
+  sells: DerivedPlayer[];
+  upgrades: DerivedPlayer[];
+  cashCows: DerivedPlayer[];
+  traps: DerivedPlayer[];
+  bestTrades: BestTrade[];
   summary: MWSummary | null;
   onUnlock: () => void;
 }) {
-  const totalBuy  = summary?.buy_count      ?? buyTargets.length;
-  const totalSell = summary?.sell_count     ?? sellPlayers.length;
-  const totalCow  = summary?.cash_cow_count ?? cashCows.length;
-  const totalTrap = summary?.trap_count     ?? traps.length;
+  const totalSell    = summary?.sell_count     ?? sells.length;
+  const totalUpgrade = upgrades.length;
+  const totalCow     = summary?.cash_cow_count ?? cashCows.length;
+  const totalTrap    = summary?.trap_count     ?? traps.length;
 
   return (
     <div>
       <SummaryStrip
         summary={summary}
-        buyCount={buyTargets.length}
-        sellCount={sellPlayers.length}
-        cowCount={cashCows.length}
-        trapCount={traps.length}
+        sellCount={totalSell}
+        upgradeCount={totalUpgrade}
+        cowCount={totalCow}
+        trapCount={totalTrap}
       />
 
-      <div className="mb-5 rounded-2xl border border-white/[0.06] bg-white/[0.015] px-5 py-4">
-        <div className="flex items-center gap-2 mb-1">
-          <Siren className="h-4 w-4 text-[#F5C84C]/60" />
-          <p className="text-sm font-bold text-white">This Week's Plan</p>
+      {bestTrades[0] && (
+        <div className="mb-6 relative">
+          <BestTradeHero trade={bestTrades[0]} />
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-transparent via-transparent to-black/80 pointer-events-none" />
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+            <button
+              onClick={onUnlock}
+              className="flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-xs px-4 py-2 rounded-xl hover:brightness-110 transition-all"
+            >
+              <Crown size={11} />
+              Unlock full trade plan
+            </button>
+          </div>
         </div>
-        <p className="text-[11px] text-white/30">
-          {totalSell > 0 && totalBuy > 0
-            ? `${totalSell} sell signals + ${totalBuy} buy targets identified. Upgrade to see all.`
-            : totalSell > 0
-              ? `${totalSell} sell signals this round. No strong buys — focus on cash generation.`
-              : totalBuy > 0
-                ? `${totalBuy} buy targets this round. No urgent sells detected.`
-                : "No urgent trades this round — monitor for changes after next round."}
-        </p>
-      </div>
+      )}
 
-      <div className="mb-3">
-        <p className="text-[11px] font-semibold text-white/40 uppercase tracking-wider">Top signal per category</p>
-        <p className="text-[10px] text-white/20 mt-0.5">Upgrade to see all {totalBuy + totalSell + totalCow + totalTrap} signals</p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         {[
-          { player: sellPlayers[0], label: "Sell Before Drop", dot: "bg-red-400",    labelColor: "text-red-400",    total: totalSell },
-          { player: buyTargets[0],  label: "Buy Before Rise",  dot: "bg-green-400",  labelColor: "text-green-400",  total: totalBuy  },
-          { player: cashCows[0],    label: "Cash Cows",        dot: "bg-[#F5C84C]",  labelColor: "text-[#F5C84C]",  total: totalCow  },
-          { player: traps[0],       label: "Fades & Traps",    dot: "bg-orange-400", labelColor: "text-orange-400", total: totalTrap },
-        ].map(({ player, label, dot, labelColor, total }) => (
+          { players: sells.slice(0, 1),    label: "Must Sell", dot: "bg-red-400",    labelColor: "text-red-400",    total: totalSell },
+          { players: upgrades.slice(0, 1), label: "Upgrade",   dot: "bg-green-400",  labelColor: "text-green-400",  total: totalUpgrade },
+          { players: cashCows.slice(0, 1), label: "Cash Cows", dot: "bg-[#F5C84C]",  labelColor: "text-[#F5C84C]",  total: totalCow },
+          { players: traps.slice(0, 1),    label: "Traps",     dot: "bg-orange-400", labelColor: "text-orange-400", total: totalTrap },
+        ].map(({ players, label, dot, labelColor, total }) => (
           <div key={label} className="flex flex-col gap-2">
             <div className="flex items-center gap-2 pl-0.5">
               <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
               <span className={`text-[11px] font-bold ${labelColor}`}>{label}</span>
               {total > 1 && <span className="text-[9px] text-white/20">{total} total</span>}
             </div>
-            {player ? (
-              <PlayerTradeCard row={player} isPremium={false} />
+            {players[0] ? (
+              <PlayerTradeCard row={players[0]} isPremium={false} />
             ) : (
-              <EmptyCard label={label} />
+              <div className="rounded-xl border border-white/[0.05] bg-white/[0.01] p-5 flex items-center justify-center min-h-[100px] text-center">
+                <p className="text-[11px] text-white/20">No {label} signals this round</p>
+              </div>
             )}
           </div>
         ))}
       </div>
 
       <MarketWatchPaywall
-        buyCount={totalBuy}
         sellCount={totalSell}
+        upgradeCount={totalUpgrade}
         cowCount={totalCow}
         trapCount={totalTrap}
         onUnlock={onUnlock}
@@ -603,224 +438,125 @@ function FreeUserView({
   );
 }
 
-function EmptyCard({ label }: { label: string }) {
-  return (
-    <div className="rounded-xl border border-white/[0.05] bg-white/[0.01] p-5 flex items-center justify-center min-h-[100px] text-center">
-      <p className="text-[11px] text-white/20">No {label} signals this round</p>
-    </div>
-  );
-}
-
 // ─── Premium View ─────────────────────────────────────────────────────────────
 
-interface PremiumViewProps {
-  buyTargets: MWPlayerRow[];
-  sellPlayers: MWPlayerRow[];
-  cashCows: MWPlayerRow[];
-  traps: MWPlayerRow[];
-  showMoreBuy: boolean;
-  showMoreSell: boolean;
-  showMoreCashCows: boolean;
-  showMoreTraps: boolean;
-  categoryFilter: MWCategoryFilter;
-  sortKey: MWSortKey;
-  summary: MWSummary | null;
-  onFilterChange: (v: MWCategoryFilter) => void;
-  onSortChange: (v: MWSortKey) => void;
-  onToggleBuy: () => void;
-  onToggleSell: () => void;
-  onToggleCashCows: () => void;
-  onToggleTraps: () => void;
-  onScrollToSection: (id: string) => void;
-}
-
 function PremiumView({
-  buyTargets, sellPlayers, cashCows, traps,
-  showMoreBuy, showMoreSell, showMoreCashCows, showMoreTraps,
-  categoryFilter, sortKey, summary, onFilterChange, onSortChange,
-  onToggleBuy, onToggleSell, onToggleCashCows, onToggleTraps,
-}: PremiumViewProps) {
-  const showingAll = categoryFilter === "all";
-  const showBuy  = showingAll || categoryFilter === "buy";
-  const showSell = showingAll || categoryFilter === "sell";
-  const showCow  = showingAll || categoryFilter === "cash_cow";
-  const showTrap = showingAll || categoryFilter === "trap";
-
-  const vis = (arr: MWPlayerRow[], showMore: boolean) =>
-    showMore ? arr : arr.slice(0, SECTION_LIMIT);
-
+  sells, upgrades, cashCows, traps, bestTrades, summary, sortKey,
+  showMoreUpgrades, showMoreCows, showMoreTraps,
+  onSortChange, onToggleUpgrades, onToggleCows, onToggleTraps,
+}: {
+  sells: DerivedPlayer[];
+  upgrades: DerivedPlayer[];
+  cashCows: DerivedPlayer[];
+  traps: DerivedPlayer[];
+  bestTrades: BestTrade[];
+  summary: MWSummary | null;
+  sortKey: MWSortKey;
+  showMoreUpgrades: boolean;
+  showMoreCows: boolean;
+  showMoreTraps: boolean;
+  onSortChange: (v: MWSortKey) => void;
+  onToggleUpgrades: () => void;
+  onToggleCows: () => void;
+  onToggleTraps: () => void;
+}) {
   return (
     <>
-      {showingAll && (
-        <WeeklyPlanHero
-          sellPlayers={sellPlayers}
-          buyTargets={buyTargets}
-          cashCows={cashCows}
-          isPremium
-        />
-      )}
-
-      {showingAll && (
-        <BestTradePlan sellPlayers={sellPlayers} buyTargets={buyTargets} />
-      )}
+      {bestTrades[0] && <BestTradeHero trade={bestTrades[0]} />}
 
       <SummaryStrip
         summary={summary}
-        buyCount={buyTargets.length}
-        sellCount={sellPlayers.length}
+        sellCount={sells.length}
+        upgradeCount={upgrades.length}
         cowCount={cashCows.length}
         trapCount={traps.length}
       />
 
-      {showingAll && (
-        <TopMovesSection
-          buyTargets={buyTargets}
-          sellPlayers={sellPlayers}
-          cashCows={cashCows}
-          isPremium
-        />
-      )}
+      <MustSellStrip sells={sells} isPremium />
 
       <div className="flex items-center justify-between gap-3 mb-6 pt-2 border-t border-white/[0.04]">
-        <CategoryFilterBar value={categoryFilter} onChange={onFilterChange} />
+        <p className="text-[11px] text-white/30 font-semibold">Browse all signals</p>
         <MarketWatchSort value={sortKey} onChange={onSortChange} />
       </div>
 
-      {showBuy && (
-        buyTargets.length > 0 ? (
-          <HorizontalRail
-            id="section-buy"
-            label="Buy Before Rise"
-            labelColor="text-green-400"
-            dot="bg-green-400"
-            description="Projection beats breakeven — price pressure building, trade in before the rise"
-            count={buyTargets.length}
-          >
-            {vis(buyTargets, showMoreBuy).map((p, i) => (
-              <div key={p.player_id} className="w-[272px] flex-shrink-0">
-                <PlayerTradeCard row={p} rank={i + 1} isPremium />
-              </div>
-            ))}
-            {buyTargets.length > SECTION_LIMIT && (
-              <ViewMoreCard count={buyTargets.length - SECTION_LIMIT} expanded={showMoreBuy} onToggle={onToggleBuy} />
-            )}
-          </HorizontalRail>
-        ) : (
-          <EmptySectionBanner
-            id="section-buy"
-            message="No elite buy targets this round"
-            subtext="No elite buys — focus on sell signals or cash generation. Check back after the next round."
-          />
-        )
+      {upgrades.length > 0 ? (
+        <SectionShell
+          label="Upgrade Targets"
+          labelColor="text-green-400"
+          dot="bg-green-400"
+          description="Premium scorers near or above breakeven — buy the upgrade before the price rises"
+          count={upgrades.length}
+          showMore={showMoreUpgrades}
+          onToggle={onToggleUpgrades}
+        >
+          <PlayerGrid players={upgrades} isPremium showMore={showMoreUpgrades} />
+        </SectionShell>
+      ) : (
+        <EmptySection
+          message="No premium upgrade targets this round"
+          subtext="All high-scoring players are overpriced — hold cash and wait for the next round."
+        />
       )}
 
-      {showSell && (
-        sellPlayers.length > 0 ? (
-          <HorizontalRail
-            id="section-sell"
-            label="Sell Before Drop"
-            labelColor="text-red-400"
-            dot="bg-red-400"
-            description="Projection below breakeven — price set to fall, trade out before value drops"
-            count={sellPlayers.length}
-          >
-            {vis(sellPlayers, showMoreSell).map((p, i) => (
-              <div key={p.player_id} className="w-[272px] flex-shrink-0">
-                <PlayerTradeCard row={p} rank={i + 1} isPremium />
-              </div>
-            ))}
-            {sellPlayers.length > SECTION_LIMIT && (
-              <ViewMoreCard count={sellPlayers.length - SECTION_LIMIT} expanded={showMoreSell} onToggle={onToggleSell} />
-            )}
-          </HorizontalRail>
-        ) : (
-          <EmptySectionBanner
-            id="section-sell"
-            message="No urgent sell signals this round"
-            subtext="No significantly overpriced players detected — check cash cows or buy targets."
-          />
-        )
+      {cashCows.length > 0 ? (
+        <SectionShell
+          label="Cash Cows"
+          labelColor="text-[#F5C84C]"
+          dot="bg-[#F5C84C]"
+          description="Budget picks beating breakeven — trade in now for fast price growth"
+          count={cashCows.length}
+          showMore={showMoreCows}
+          onToggle={onToggleCows}
+        >
+          <PlayerGrid players={cashCows} isPremium showMore={showMoreCows} />
+        </SectionShell>
+      ) : (
+        <EmptySection
+          message="No cash cow targets this round"
+          subtext="No budget players generating strong price growth — focus on upgrade targets."
+        />
       )}
 
-      {showCow && (
-        cashCows.length > 0 ? (
-          <HorizontalRail
-            id="section-cash-cows"
-            label="Cash Cows"
-            labelColor="text-[#F5C84C]"
-            dot="bg-[#F5C84C]"
-            description="Budget picks beating breakeven — trade in for fast cash generation before they rise"
-            count={cashCows.length}
-          >
-            {vis(cashCows, showMoreCashCows).map((p, i) => (
-              <div key={p.player_id} className="w-[272px] flex-shrink-0">
-                <PlayerTradeCard row={p} rank={i + 1} isPremium />
-              </div>
-            ))}
-            {cashCows.length > SECTION_LIMIT && (
-              <ViewMoreCard count={cashCows.length - SECTION_LIMIT} expanded={showMoreCashCows} onToggle={onToggleCashCows} />
-            )}
-          </HorizontalRail>
-        ) : (
-          <EmptySectionBanner
-            id="section-cash-cows"
-            message="No cash cow targets this round"
-            subtext="No budget players generating strong price growth — focus on buy or sell signals."
-          />
-        )
+      {traps.length > 0 && (
+        <SectionShell
+          label="Fades & Traps"
+          labelColor="text-orange-400"
+          dot="bg-orange-400"
+          description="Premium price not justified by scoring — avoid or trade out"
+          count={traps.length}
+          showMore={showMoreTraps}
+          onToggle={onToggleTraps}
+        >
+          <PlayerGrid players={traps} isPremium showMore={showMoreTraps} />
+        </SectionShell>
       )}
 
-      {showTrap && (
-        traps.length > 0 ? (
-          <HorizontalRail
-            id="section-traps"
-            label="Fades & Traps"
-            labelColor="text-orange-400"
-            dot="bg-orange-400"
-            description="Premium price not justified by projection — avoid or trade out before the drop"
-            count={traps.length}
-          >
-            {vis(traps, showMoreTraps).map((p, i) => (
-              <div key={p.player_id} className="w-[272px] flex-shrink-0">
-                <PlayerTradeCard row={p} rank={i + 1} isPremium />
-              </div>
+      {sells.length > 3 && (
+        <SectionShell
+          label="All Sell Signals"
+          labelColor="text-red-400"
+          dot="bg-red-400"
+          description="Below breakeven — price under sustained downward pressure"
+          count={sells.length - 3}
+          showMore={false}
+          onToggle={() => {}}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {sells.slice(3, 3 + SECTION_LIMIT).map((p, i) => (
+              <PlayerTradeCard key={p.player_id} row={p} rank={i + 4} isPremium compact />
             ))}
-            {traps.length > SECTION_LIMIT && (
-              <ViewMoreCard count={traps.length - SECTION_LIMIT} expanded={showMoreTraps} onToggle={onToggleTraps} />
-            )}
-          </HorizontalRail>
-        ) : (
-          <EmptySectionBanner
-            id="section-traps"
-            message="No fade alerts this round"
-            subtext="No significantly overpriced high-risk players detected."
-          />
-        )
+          </div>
+        </SectionShell>
       )}
     </>
   );
 }
 
-function EmptySectionBanner({ id, message, subtext }: { id: string; message: string; subtext: string }) {
+function EmptySection({ message, subtext }: { message: string; subtext: string }) {
   return (
-    <section id={id} className="mb-8">
-      <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] px-5 py-5 text-center">
-        <p className="text-[12px] font-semibold text-white/35 mb-1">{message}</p>
-        <p className="text-[10px] text-white/18">{subtext}</p>
-      </div>
-    </section>
-  );
-}
-
-function ViewMoreCard({ count, expanded, onToggle }: { count: number; expanded: boolean; onToggle: () => void }) {
-  if (expanded || count <= 0) return null;
-  return (
-    <div
-      className="w-[120px] flex-shrink-0 rounded-xl border border-white/[0.05] bg-white/[0.01] flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-white/[0.03] transition-colors p-4"
-      onClick={onToggle}
-    >
-      <ChevronDown className="h-4 w-4 text-white/20" />
-      <p className="text-[10px] text-white/30 font-semibold">+{count} more</p>
+    <div className="mb-10 rounded-xl border border-white/[0.04] bg-white/[0.01] px-5 py-6 text-center">
+      <p className="text-[12px] font-semibold text-white/35 mb-1">{message}</p>
+      <p className="text-[10px] text-white/18">{subtext}</p>
     </div>
   );
 }
@@ -828,30 +564,32 @@ function ViewMoreCard({ count, expanded, onToggle }: { count: number; expanded: 
 // ─── Paywall ──────────────────────────────────────────────────────────────────
 
 function MarketWatchPaywall({
-  buyCount, sellCount, cowCount, trapCount, onUnlock,
+  sellCount, upgradeCount, cowCount, trapCount, onUnlock,
 }: {
-  buyCount: number; sellCount: number; cowCount: number; trapCount: number; onUnlock: () => void;
+  sellCount: number;
+  upgradeCount: number;
+  cowCount: number;
+  trapCount: number;
+  onUnlock: () => void;
 }) {
-  const extraBuy  = Math.max(0, buyCount - 1);
-  const extraSell = Math.max(0, sellCount - 1);
-  const extraCow  = Math.max(0, cowCount - 1);
-  const extraTrap = Math.max(0, trapCount - 1);
-  const totalExtra = extraBuy + extraSell + extraCow + extraTrap;
-  const displayExtra = totalExtra > 0 ? totalExtra : 120;
+  const totalExtra = Math.max(
+    (sellCount - 1) + (upgradeCount - 1) + (cowCount - 1) + (trapCount - 1),
+    80
+  );
 
   const lines = [
-    extraSell > 0 && `${extraSell} more trade-out signal${extraSell !== 1 ? "s" : ""} — sell before price drops`,
-    extraBuy  > 0 && `${extraBuy} more trade-in target${extraBuy !== 1 ? "s" : ""} — price set to rise`,
-    extraCow  > 0 && `${extraCow} cash cow${extraCow !== 1 ? "s" : ""} — fastest cash generation this round`,
-    extraTrap > 0 && `${extraTrap} fade alert${extraTrap !== 1 ? "s" : ""} — overpriced players to avoid`,
+    sellCount > 1    && `${sellCount - 1} more sell signal${sellCount - 1 !== 1 ? "s" : ""} — sell before price drops`,
+    upgradeCount > 1 && `${upgradeCount - 1} more upgrade target${upgradeCount - 1 !== 1 ? "s" : ""} — premium scorers near breakeven`,
+    cowCount > 1     && `${cowCount - 1} more cash cow${cowCount - 1 !== 1 ? "s" : ""} — fastest price growth this round`,
+    trapCount > 1    && `${trapCount - 1} fade alert${trapCount - 1 !== 1 ? "s" : ""} — overpriced players to avoid`,
   ].filter(Boolean) as string[];
 
   if (lines.length === 0) {
     lines.push(
-      "Full trade-out signals — overpriced players before value drops",
-      "Full trade-in targets — underpriced players before the rise",
-      "Cash cow targets for fastest price growth",
-      "Fade alerts — premium-priced players to move on",
+      "Full sell signals — overpriced players before value drops",
+      "Upgrade targets — elite scorers at fair prices",
+      "Cash cows — budget picks generating fast price growth",
+      "Fade alerts — premium-priced players to avoid",
     );
   }
 
@@ -864,11 +602,11 @@ function MarketWatchPaywall({
       <p className="text-[10px] uppercase tracking-widest text-white/20 mb-2">Viewing preview only</p>
       <h3 className="text-lg font-extrabold text-white mb-1">Unlock your full trade plan</h3>
       <p className="text-[12px] text-white/30 mb-5">
-        See every AFL Fantasy price signal this round — {displayExtra}+ trade opportunities
+        See every AFL Fantasy price signal this round — {totalExtra}+ trade opportunities
       </p>
 
       <div className="mb-5 space-y-1">
-        {lines.map((line) => (
+        {lines.map(line => (
           <div key={line} className="flex items-center justify-center gap-2">
             <div className="w-1 h-1 rounded-full bg-[#F5C84C]/35 shrink-0" />
             <p className="text-[12px] text-white/45">{line}</p>
