@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { RefreshCw, Shield, Terminal, HeartPulse, Zap, Database, Activity, Users, SquareCheck as CheckSquare, ChartBar as BarChart3 } from "lucide-react";
+import { RefreshCw, Shield, Terminal, HeartPulse, Zap, Database, Activity, Users, SquareCheck as CheckSquare, ChartBar as BarChart3, Target } from "lucide-react";
 import { AdminUIStateProvider, useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
 
 const TABS: { path: string; label: string; icon: React.ElementType }[] = [
@@ -12,6 +12,7 @@ const TABS: { path: string; label: string; icon: React.ElementType }[] = [
   { path: "/admin/players-intelligence", label: "Player Data",         icon: Database },
   { path: "/admin/ai-content",           label: "Marketing",           icon: Zap },
   { path: "/admin/todo",                 label: "To Do",               icon: CheckSquare },
+  { path: "/admin/accuracy",             label: "Accuracy",            icon: Target },
 ];
 
 function TabLoadingFallback() {
@@ -115,6 +116,7 @@ export const AdminPlayersIntelligence = lazy(() => import("@/features/admin/page
 export const AdminAIContent           = lazy(() => import("@/features/admin/pages/AdminAIContent"));
 export const AdminAnalytics           = lazy(() => import("@/features/admin/pages/AdminAnalytics"));
 export const AdminTodo                = lazy(() => import("@/features/admin/pages/AdminTodo"));
+export const AdminAccuracy            = lazy(() => import("@/features/admin/pages/AdminAccuracy"));
 
 export { AdminShellWithProvider as AdminShell };
 export default AdminShellWithProvider;

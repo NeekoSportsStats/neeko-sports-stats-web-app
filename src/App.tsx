@@ -29,6 +29,7 @@ import {
   AdminAIContent,
   AdminAnalytics,
   AdminTodo,
+  AdminAccuracy,
 } from "@/pages/Admin";
 
 const NeekoPlusPurchase = React.lazy(() => import("@/pages/NeekoPlusPurchase"));
@@ -160,6 +161,7 @@ function App() {
         <Route path="ai-content"            element={<S fallback={Generic}><AdminAIContent /></S>} />
         <Route path="analytics"             element={<S fallback={Generic}><AdminAnalytics /></S>} />
         <Route path="todo"                  element={<S fallback={Generic}><AdminTodo /></S>} />
+        <Route path="accuracy"             element={<S fallback={Generic}><AdminAccuracy /></S>} />
         <Route path="data-integrity"        element={<Navigate to="/admin/health" replace />} />
         <Route path="pipelines"             element={<Navigate to="/admin/command-center" replace />} />
         <Route path="system-health"         element={<Navigate to="/admin/health" replace />} />
