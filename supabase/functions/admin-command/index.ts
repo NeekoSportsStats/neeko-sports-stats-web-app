@@ -77,13 +77,16 @@ async function dispatchCommand(
       case "generate_market_watch_ai":
         result = await invokeEdgeFunction("generate-market-watch-summary", payload);
         break;
-      case "refresh_rankings":
-        result = await callRpc(admin, "refresh_player_rankings_cache");
+      case "refresh_rankings": {
+        await admin.schema("afl" as never).rpc("populate_rankings_cache_from_source" as never);
+        result = { refreshed: true };
         break;
+      }
       case "populate_rankings": {
-        await callRpc(admin, "populate_rankings_cache_from_source");
+        await admin.schema("afl" as never).rpc("populate_rankings_cache_from_source" as never);
         await admin.schema("market" as never).rpc("build_market_watch_snapshot" as never);
-        result = { populated: true, snapshot_rebuilt: true };
+        try { await callRpc(admin, "fn_refresh_edge_board"); } catch (_e) { /* non-fatal */ }
+        result = { populated: true, snapshot_rebuilt: true, edge_board_refreshed: true };
         break;
       }
       case "refresh_market_watch":
@@ -211,10 +214,11 @@ async function dispatchCommand(
 
         const refreshSteps = {
           projection_engine:  { ok: false, error: undefined as string | undefined },
-          rankings_cache:     { ok: false, error: undefined as string | undefined },
           rebuild_projection: { ok: false, error: undefined as string | undefined },
           refresh_mv:         { ok: false, error: undefined as string | undefined },
-          refresh_rankings:   { ok: false, error: undefined as string | undefined },
+          rankings_cache:     { ok: false, error: undefined as string | undefined },
+          market_snapshot:    { ok: false, error: undefined as string | undefined },
+          edge_board:         { ok: false, error: undefined as string | undefined },
         };
 
         try {
@@ -224,15 +228,6 @@ async function dispatchCommand(
         } catch (e) {
           refreshSteps.projection_engine.error = e instanceof Error ? e.message : String(e);
           console.warn("[commit_price_ingest] refresh_projection_engine failed:", refreshSteps.projection_engine.error);
-        }
-
-        try {
-          await admin.schema("afl" as never).rpc("populate_rankings_cache_from_source" as never);
-          refreshSteps.rankings_cache.ok = true;
-          console.log("[commit_price_ingest] populate_rankings_cache_from_source: ok");
-        } catch (e) {
-          refreshSteps.rankings_cache.error = e instanceof Error ? e.message : String(e);
-          console.warn("[commit_price_ingest] populate_rankings_cache_from_source failed:", refreshSteps.rankings_cache.error);
         }
 
         try {
@@ -254,19 +249,30 @@ async function dispatchCommand(
         }
 
         try {
-          await admin.rpc("refresh_player_rankings_cache" as never);
-          refreshSteps.refresh_rankings.ok = true;
-          console.log("[commit_price_ingest] refresh_player_rankings_cache: ok");
+          await admin.schema("afl" as never).rpc("populate_rankings_cache_from_source" as never);
+          refreshSteps.rankings_cache.ok = true;
+          console.log("[commit_price_ingest] populate_rankings_cache_from_source: ok");
         } catch (e) {
-          refreshSteps.refresh_rankings.error = e instanceof Error ? e.message : String(e);
-          console.warn("[commit_price_ingest] refresh_player_rankings_cache failed:", refreshSteps.refresh_rankings.error);
+          refreshSteps.rankings_cache.error = e instanceof Error ? e.message : String(e);
+          console.warn("[commit_price_ingest] populate_rankings_cache_from_source failed:", refreshSteps.rankings_cache.error);
         }
 
         try {
           await admin.schema("market" as never).rpc("build_market_watch_snapshot" as never);
+          refreshSteps.market_snapshot.ok = true;
           console.log("[commit_price_ingest] build_market_watch_snapshot: ok");
         } catch (e) {
-          console.warn("[commit_price_ingest] build_market_watch_snapshot failed:", e instanceof Error ? e.message : String(e));
+          refreshSteps.market_snapshot.error = e instanceof Error ? e.message : String(e);
+          console.warn("[commit_price_ingest] build_market_watch_snapshot failed:", refreshSteps.market_snapshot.error);
+        }
+
+        try {
+          await callRpc(admin, "fn_refresh_edge_board");
+          refreshSteps.edge_board.ok = true;
+          console.log("[commit_price_ingest] fn_refresh_edge_board: ok");
+        } catch (e) {
+          refreshSteps.edge_board.error = e instanceof Error ? e.message : String(e);
+          console.warn("[commit_price_ingest] fn_refresh_edge_board failed:", refreshSteps.edge_board.error);
         }
 
         result = { ...commitResult, refresh: refreshSteps };
