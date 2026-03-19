@@ -505,20 +505,7 @@ export function PlayerDetailModal({
     rank,
   );
 
-  const displayConf = (() => {
-    if (rawDisplayConf == null) return null;
-    const proj = row.projection_final ?? 0;
-    const consistency = (row as { consistency_score?: number | null }).consistency_score ?? 0;
-    const consistencyNorm = consistency <= 1 ? consistency * 100 : consistency;
-    const risk = row.risk_rating ?? 100;
-    const isTopTierProjection = proj >= 100;
-    const isEliteOrHighConsistency = consistencyNorm >= 60;
-    const noMajorRisk = risk < 55;
-    if (isTopTierProjection && isEliteOrHighConsistency && noMajorRisk && rawDisplayConf < 72) {
-      return 72;
-    }
-    return rawDisplayConf;
-  })();
+  const displayConf = rawDisplayConf;
 
   const confLabel = getConfidenceLabel(displayConf);
   const confLabelCls = getConfidenceLabelColor(displayConf);
