@@ -12,11 +12,12 @@ interface Props {
 
 function categoryTag(cat: DerivedCategory): { label: string; cls: string } {
   switch (cat) {
-    case "buy_before_rise": return { label: "BUY NOW",  cls: "text-green-300 bg-green-400/15 border-green-400/35" };
-    case "cash_cow":        return { label: "CASH COW", cls: "text-[#F5C84C] bg-[#F5C84C]/15 border-[#F5C84C]/35" };
-    case "upgrade_target":  return { label: "UPGRADE",  cls: "text-sky-300 bg-sky-400/15 border-sky-400/30" };
-    case "sell":            return { label: "SELL NOW", cls: "text-red-300 bg-red-400/15 border-red-400/35" };
-    case "trap":            return { label: "AVOID",    cls: "text-orange-300 bg-orange-400/15 border-orange-400/35" };
+    case "buy_before_rise":  return { label: "BUY NOW",  cls: "text-green-300 bg-green-400/15 border-green-400/35" };
+    case "cash_cow":         return { label: "CASH COW", cls: "text-[#F5C84C] bg-[#F5C84C]/15 border-[#F5C84C]/35" };
+    case "upgrade_target":   return { label: "UPGRADE",  cls: "text-sky-300 bg-sky-400/15 border-sky-400/30" };
+    case "sell_before_drop": return { label: "SELL NOW", cls: "text-red-300 bg-red-400/15 border-red-400/35" };
+    case "fade_trap":        return { label: "AVOID",    cls: "text-orange-300 bg-orange-400/15 border-orange-400/35" };
+    default:                 return { label: "MONITOR",  cls: "text-white/40 bg-white/5 border-white/15" };
   }
 }
 
@@ -55,7 +56,7 @@ function heroMetric(row: DerivedPlayer): {
     };
   }
 
-  // sell / trap — show price drop as warning
+  // sell_before_drop / fade_trap / monitor — show price drop as warning
   return {
     label: "Expected Price Drop",
     value: fmtPriceChange(expChange),
@@ -86,14 +87,16 @@ function getWhyNow(row: DerivedPlayer): string | null {
       if (delta >= 0) return "Scoring above breakeven at a fair entry price";
       return "Scoring upgrade target \u2014 worth the price for the points output";
     }
-    case "sell": {
+    case "sell_before_drop": {
       if (expChange < -200000) return "Heavy price drop ahead \u2014 sell immediately";
       if (delta < -20) return "Well below breakeven \u2014 sell window is open";
       return "Below breakeven \u2014 price under downward pressure";
     }
-    case "trap": {
+    case "fade_trap": {
       return "Premium price not justified by scoring \u2014 don\u2019t trade in at this price";
     }
+    default:
+      return null;
   }
 }
 
@@ -101,7 +104,7 @@ function getIfHeldLine(row: DerivedPlayer): string | null {
   const expChange = Number(row.expected_price_change ?? 0);
   const cat = row._derived_category;
 
-  if (cat === "sell") {
+  if (cat === "sell_before_drop") {
     const twoRound = Math.abs(expChange) * 2;
     if (twoRound > 40000) return `If held: loses ~${fmtPrice(twoRound)} over 2 rounds`;
   }
@@ -118,11 +121,12 @@ function getShortReason(row: DerivedPlayer): string {
     return s.length > 85 ? s.slice(0, 82) + "\u2026" : s;
   }
   switch (row._derived_category) {
-    case "buy_before_rise": return "Beats breakeven \u2014 price expected to rise";
-    case "cash_cow":        return "Budget pick beating breakeven \u2014 fast cash growth";
-    case "upgrade_target":  return "Scoring upgrade target \u2014 worth the price for the points";
-    case "sell":            return "Below breakeven \u2014 price expected to fall";
-    case "trap":            return "Premium price not justified \u2014 avoid buying in";
+    case "buy_before_rise":  return "Beats breakeven \u2014 price expected to rise";
+    case "cash_cow":         return "Budget pick beating breakeven \u2014 fast cash growth";
+    case "upgrade_target":   return "Scoring upgrade target \u2014 worth the price for the points";
+    case "sell_before_drop": return "Below breakeven \u2014 price expected to fall";
+    case "fade_trap":        return "Premium price not justified \u2014 avoid buying in";
+    default:                 return "Monitor — watching for signal changes";
   }
 }
 
@@ -143,7 +147,7 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
   const ifHeld = getIfHeldLine(row);
   const shortReason = getShortReason(row);
   const aiExplanation = row.category_reason ?? null;
-  const isSellLike = row._derived_category === "sell" || row._derived_category === "trap";
+  const isSellLike = row._derived_category === "sell_before_drop" || row._derived_category === "fade_trap";
 
   if (compact) {
     return (

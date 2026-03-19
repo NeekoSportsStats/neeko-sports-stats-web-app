@@ -28,21 +28,35 @@ export interface MWPlayerRow {
   projected_price_r1: number | null;
   projected_price_r2: number | null;
   projected_price_r3: number | null;
+  breakout_score: number | null;
+  breakout_flag: boolean | null;
+  volatility_score: number | null;
+  volatility_level: string | null;
   category: MWCategory;
-  category_reason: string;
-  action: "BUY" | "SELL" | "HOLD" | "AVOID";
+  action: string;
   trade_score: number;
   reasons: Record<string, unknown>;
+  category_reason: string | null;
+  last3_avg: number | null;
+  estimated_price: number | null;
+  value_score: number | null;
+  price_range_top: number | null;
+  price_range_bottom: number | null;
+  value_momentum: number | null;
+  momentum_label: "rising" | "improving" | "stable" | "cooling" | "falling" | null;
+  peak_price: number | null;
+  peak_round: string | null;
+  peak_status: string | null;
+  season: number;
+  round_number: number;
+  snapshot_updated_at: string;
   neeko_rating: number | null;
   consistency_score: number | null;
   projection_confidence: number | null;
   avg_season: number | null;
-  season: number;
-  round_number: number;
-  snapshot_updated_at: string;
-  last3_avg: number | null;
-  value_score: number | null;
-  momentum_label: "rising" | "improving" | "stable" | "cooling" | "falling" | null;
+  ai_recommendation: string | null;
+  recommendation_short: string | null;
+  matchup_label: string | null;
 }
 
 export interface MWSummaryCard {

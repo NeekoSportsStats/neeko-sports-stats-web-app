@@ -6,7 +6,8 @@ export type DerivedCategory =
   | "upgrade_target"
   | "sell_before_drop"
   | "fade_trap"
-  | "monitor";
+  | "monitor"
+  | string;
 
 export interface DerivedPlayer extends MWPlayerRow {
   _derived_category: DerivedCategory;
