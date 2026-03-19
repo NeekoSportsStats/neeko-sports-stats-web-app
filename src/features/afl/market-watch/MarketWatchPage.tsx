@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   TrendingUp, RefreshCw, Crown, ChevronDown, ArrowRight,
   CircleAlert as AlertCircle, Zap, Target, Star,
-  ArrowUpRight, ArrowDownRight,
+  ArrowUpRight, ArrowDownRight, TrendingDown,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/auth";
@@ -41,6 +41,7 @@ export default function MarketWatchPage() {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [sortKey, setSortKey] = useState<MWSortKey>("value_score");
+  const [showMoreBuys, setShowMoreBuys] = useState(false);
   const [showMoreUpgrades, setShowMoreUpgrades] = useState(false);
   const [showMoreCows, setShowMoreCows] = useState(false);
   const [showMoreTraps, setShowMoreTraps] = useState(false);
@@ -79,14 +80,15 @@ export default function MarketWatchPage() {
     fetchData(isPremiumRef.current).then(() => setLastUpdated(new Date()));
   }, [authLoading, fetchData]);
 
-  const { sells, upgrades, cashCows, traps } = useMemo(
+  const { buyBeforeRise, cashCows, upgrades, sells, traps } = useMemo(
     () => classifyPlayers(players),
     [players]
   );
 
-  const sortedUpgrades = useMemo(() => sortDerived(upgrades, sortKey), [upgrades, sortKey]);
-  const sortedCows = useMemo(() => sortDerived(cashCows, sortKey), [cashCows, sortKey]);
-  const bestTrades = useMemo(() => buildBestTrades(sells, upgrades, cashCows), [sells, upgrades, cashCows]);
+  const sortedBuys      = useMemo(() => sortDerived(buyBeforeRise, sortKey), [buyBeforeRise, sortKey]);
+  const sortedUpgrades  = useMemo(() => sortDerived(upgrades, sortKey),      [upgrades, sortKey]);
+  const sortedCows      = useMemo(() => sortDerived(cashCows, sortKey),      [cashCows, sortKey]);
+  const bestTrades      = useMemo(() => buildBestTrades(sells, upgrades, cashCows), [sells, upgrades, cashCows]);
 
   const isInactive = status != null && !status.is_active;
   const ready = !authLoading && !dataLoading;
@@ -135,8 +137,9 @@ export default function MarketWatchPage() {
         {!isPremium ? (
           <FreeUserView
             sells={sells}
-            upgrades={sortedUpgrades}
+            buyBeforeRise={sortedBuys}
             cashCows={sortedCows}
+            upgrades={sortedUpgrades}
             traps={traps}
             bestTrades={bestTrades}
             summary={summary}
@@ -154,16 +157,19 @@ export default function MarketWatchPage() {
         ) : (
           <PremiumView
             sells={sells}
-            upgrades={sortedUpgrades}
+            buyBeforeRise={sortedBuys}
             cashCows={sortedCows}
+            upgrades={sortedUpgrades}
             traps={traps}
             bestTrades={bestTrades}
             summary={summary}
             sortKey={sortKey}
+            showMoreBuys={showMoreBuys}
             showMoreUpgrades={showMoreUpgrades}
             showMoreCows={showMoreCows}
             showMoreTraps={showMoreTraps}
             onSortChange={setSortKey}
+            onToggleBuys={() => setShowMoreBuys(e => !e)}
             onToggleUpgrades={() => setShowMoreUpgrades(e => !e)}
             onToggleCows={() => setShowMoreCows(e => !e)}
             onToggleTraps={() => setShowMoreTraps(e => !e)}
@@ -187,9 +193,14 @@ function BestTradeHero({ trade }: { trade: BestTrade }) {
   const cashLabel = trade.cash_generated >= 0
     ? `+${fmtPrice(trade.cash_generated)} cash back`
     : `${fmtPrice(Math.abs(trade.cash_generated))} extra spend`;
+
   const projLabel = trade.projection_gain >= 0
     ? `+${trade.projection_gain.toFixed(0)} pts/rd`
     : `${trade.projection_gain.toFixed(0)} pts/rd`;
+
+  const inBadge = trade.in_type === "upgrade"
+    ? { label: "SCORING UPGRADE", cls: "text-sky-300 border-sky-400/30 bg-sky-400/10" }
+    : { label: "CASH GENERATION", cls: "text-[#F5C84C] border-[#F5C84C]/30 bg-[#F5C84C]/10" };
 
   return (
     <div
@@ -225,21 +236,28 @@ function BestTradeHero({ trade }: { trade: BestTrade }) {
               <p className={`text-[11px] font-bold ${trade.cash_generated >= 0 ? "text-green-400" : "text-white/35"}`}>
                 {cashLabel}
               </p>
-              <p className={`text-[10px] font-semibold mt-0.5 ${trade.projection_gain >= 0 ? "text-green-300/70" : "text-white/30"}`}>
+              <p className={`text-[10px] font-semibold mt-0.5 ${trade.projection_gain >= 0 ? "text-sky-300/70" : "text-white/30"}`}>
                 {projLabel}
               </p>
             </div>
           </div>
 
-          <div className="rounded-xl border border-green-400/25 bg-green-400/[0.04] p-4">
-            <p className="text-[9px] font-extrabold uppercase tracking-widest text-green-400/70 mb-2">Trade In</p>
+          <div className="rounded-xl border border-sky-400/20 bg-sky-400/[0.03] p-4">
+            <div className="flex items-center gap-1.5 mb-2">
+              <p className="text-[9px] font-extrabold uppercase tracking-widest text-sky-400/70">Trade In</p>
+              <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide ${inBadge.cls}`}>
+                {inBadge.label}
+              </span>
+            </div>
             <p className="font-extrabold text-base text-white leading-tight">{trade.in.player_name}</p>
             <p className="text-[11px] text-white/35 mt-0.5 mb-3">{trade.in.team} · {trade.in.position}</p>
             <div className="flex items-center justify-between">
               <span className="text-sm font-bold text-white/60">{fmtPrice(trade.in.price)}</span>
-              <span className="text-sm font-extrabold text-green-400">{fmtPriceChange(trade.in.expected_price_change)}</span>
+              <span className={`text-sm font-extrabold ${trade.in.expected_price_change >= 0 ? "text-green-400" : "text-white/30"}`}>
+                {fmtPriceChange(trade.in.expected_price_change)}
+              </span>
             </div>
-            <div className="mt-2 text-[9px] text-green-300/50 leading-snug">
+            <div className="mt-2 text-[9px] text-sky-300/40 leading-snug">
               Proj {trade.in.projection?.toFixed(0)} · BE {trade.in.breakeven?.toFixed(0)}
             </div>
           </div>
@@ -251,22 +269,23 @@ function BestTradeHero({ trade }: { trade: BestTrade }) {
 
 // ─── Summary Strip ────────────────────────────────────────────────────────────
 
-function SummaryStrip({ summary, sellCount, upgradeCount, cowCount, trapCount }: {
-  summary: MWSummary | null;
+function SummaryStrip({ sellCount, buyCount, upgradeCount, cowCount, trapCount }: {
   sellCount: number;
+  buyCount: number;
   upgradeCount: number;
   cowCount: number;
   trapCount: number;
 }) {
   const stats = [
-    { label: "Sell Now",     value: summary?.sell_count     ?? sellCount,    icon: <ArrowDownRight className="h-3 w-3" />, cls: "text-red-400" },
-    { label: "Upgrades",     value: upgradeCount,                            icon: <TrendingUp className="h-3 w-3" />,    cls: "text-green-400" },
-    { label: "Cash Cows",    value: summary?.cash_cow_count ?? cowCount,     icon: <ArrowUpRight className="h-3 w-3" />,  cls: "text-[#F5C84C]" },
-    { label: "Traps",        value: summary?.trap_count     ?? trapCount,    icon: <AlertCircle className="h-3 w-3" />,   cls: "text-orange-400" },
+    { label: "Sell Now",      value: sellCount,    icon: <ArrowDownRight className="h-3 w-3" />, cls: "text-red-400" },
+    { label: "Buy Before Rise", value: buyCount,   icon: <ArrowUpRight className="h-3 w-3" />,  cls: "text-green-400" },
+    { label: "Upgrades",      value: upgradeCount, icon: <TrendingUp className="h-3 w-3" />,     cls: "text-sky-400" },
+    { label: "Cash Cows",     value: cowCount,     icon: <TrendingUp className="h-3 w-3" />,     cls: "text-[#F5C84C]" },
+    { label: "Traps",         value: trapCount,    icon: <AlertCircle className="h-3 w-3" />,    cls: "text-orange-400" },
   ];
 
   return (
-    <div className="grid grid-cols-4 gap-2 mb-8">
+    <div className="grid grid-cols-5 gap-2 mb-8">
       {stats.map(s => (
         <div key={s.label} className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-2 py-2.5 text-center">
           <div className={`flex items-center justify-center gap-1 mb-1 ${s.cls}`}>
@@ -362,17 +381,19 @@ function PlayerGrid({ players, isPremium, showMore }: {
 // ─── Free User View ───────────────────────────────────────────────────────────
 
 function FreeUserView({
-  sells, upgrades, cashCows, traps, bestTrades, summary, onUnlock,
+  sells, buyBeforeRise, cashCows, upgrades, traps, bestTrades, summary, onUnlock,
 }: {
   sells: DerivedPlayer[];
-  upgrades: DerivedPlayer[];
+  buyBeforeRise: DerivedPlayer[];
   cashCows: DerivedPlayer[];
+  upgrades: DerivedPlayer[];
   traps: DerivedPlayer[];
   bestTrades: BestTrade[];
   summary: MWSummary | null;
   onUnlock: () => void;
 }) {
   const totalSell    = summary?.sell_count     ?? sells.length;
+  const totalBuy     = buyBeforeRise.length;
   const totalUpgrade = upgrades.length;
   const totalCow     = summary?.cash_cow_count ?? cashCows.length;
   const totalTrap    = summary?.trap_count     ?? traps.length;
@@ -380,8 +401,8 @@ function FreeUserView({
   return (
     <div>
       <SummaryStrip
-        summary={summary}
         sellCount={totalSell}
+        buyCount={totalBuy}
         upgradeCount={totalUpgrade}
         cowCount={totalCow}
         trapCount={totalTrap}
@@ -405,10 +426,10 @@ function FreeUserView({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         {[
-          { players: sells.slice(0, 1),    label: "Must Sell", dot: "bg-red-400",    labelColor: "text-red-400",    total: totalSell },
-          { players: upgrades.slice(0, 1), label: "Upgrade",   dot: "bg-green-400",  labelColor: "text-green-400",  total: totalUpgrade },
-          { players: cashCows.slice(0, 1), label: "Cash Cows", dot: "bg-[#F5C84C]",  labelColor: "text-[#F5C84C]",  total: totalCow },
-          { players: traps.slice(0, 1),    label: "Traps",     dot: "bg-orange-400", labelColor: "text-orange-400", total: totalTrap },
+          { players: sells.slice(0, 1),        label: "Must Sell",      dot: "bg-red-400",    labelColor: "text-red-400",    total: totalSell },
+          { players: buyBeforeRise.slice(0, 1), label: "Buy Before Rise", dot: "bg-green-400", labelColor: "text-green-400",  total: totalBuy },
+          { players: upgrades.slice(0, 1),      label: "Upgrade Target",  dot: "bg-sky-400",   labelColor: "text-sky-400",    total: totalUpgrade },
+          { players: cashCows.slice(0, 1),      label: "Cash Cows",       dot: "bg-[#F5C84C]", labelColor: "text-[#F5C84C]",  total: totalCow },
         ].map(({ players, label, dot, labelColor, total }) => (
           <div key={label} className="flex flex-col gap-2">
             <div className="flex items-center gap-2 pl-0.5">
@@ -429,6 +450,7 @@ function FreeUserView({
 
       <MarketWatchPaywall
         sellCount={totalSell}
+        buyCount={totalBuy}
         upgradeCount={totalUpgrade}
         cowCount={totalCow}
         trapCount={totalTrap}
@@ -441,21 +463,24 @@ function FreeUserView({
 // ─── Premium View ─────────────────────────────────────────────────────────────
 
 function PremiumView({
-  sells, upgrades, cashCows, traps, bestTrades, summary, sortKey,
-  showMoreUpgrades, showMoreCows, showMoreTraps,
-  onSortChange, onToggleUpgrades, onToggleCows, onToggleTraps,
+  sells, buyBeforeRise, cashCows, upgrades, traps, bestTrades, summary, sortKey,
+  showMoreBuys, showMoreUpgrades, showMoreCows, showMoreTraps,
+  onSortChange, onToggleBuys, onToggleUpgrades, onToggleCows, onToggleTraps,
 }: {
   sells: DerivedPlayer[];
-  upgrades: DerivedPlayer[];
+  buyBeforeRise: DerivedPlayer[];
   cashCows: DerivedPlayer[];
+  upgrades: DerivedPlayer[];
   traps: DerivedPlayer[];
   bestTrades: BestTrade[];
   summary: MWSummary | null;
   sortKey: MWSortKey;
+  showMoreBuys: boolean;
   showMoreUpgrades: boolean;
   showMoreCows: boolean;
   showMoreTraps: boolean;
   onSortChange: (v: MWSortKey) => void;
+  onToggleBuys: () => void;
   onToggleUpgrades: () => void;
   onToggleCows: () => void;
   onToggleTraps: () => void;
@@ -465,8 +490,8 @@ function PremiumView({
       {bestTrades[0] && <BestTradeHero trade={bestTrades[0]} />}
 
       <SummaryStrip
-        summary={summary}
         sellCount={sells.length}
+        buyCount={buyBeforeRise.length}
         upgradeCount={upgrades.length}
         cowCount={cashCows.length}
         trapCount={traps.length}
@@ -482,9 +507,9 @@ function PremiumView({
       {upgrades.length > 0 ? (
         <SectionShell
           label="Upgrade Targets"
-          labelColor="text-green-400"
-          dot="bg-green-400"
-          description="Premium scorers near or above breakeven — buy the upgrade before the price rises"
+          labelColor="text-sky-400"
+          dot="bg-sky-400"
+          description="Quality scorers worth bringing into your team — held for points output, not necessarily price rise"
           count={upgrades.length}
           showMore={showMoreUpgrades}
           onToggle={onToggleUpgrades}
@@ -493,8 +518,27 @@ function PremiumView({
         </SectionShell>
       ) : (
         <EmptySection
-          message="No premium upgrade targets this round"
-          subtext="All high-scoring players are overpriced — hold cash and wait for the next round."
+          message="No upgrade targets this round"
+          subtext="No premium scorers with strong value — hold your upgrades until next round."
+        />
+      )}
+
+      {buyBeforeRise.length > 0 ? (
+        <SectionShell
+          label="Buy Before Rise"
+          labelColor="text-green-400"
+          dot="bg-green-400"
+          description="Players with positive price trajectory — buy now before the price jumps"
+          count={buyBeforeRise.length}
+          showMore={showMoreBuys}
+          onToggle={onToggleBuys}
+        >
+          <PlayerGrid players={buyBeforeRise} isPremium showMore={showMoreBuys} />
+        </SectionShell>
+      ) : (
+        <EmptySection
+          message="No buy-before-rise targets this round"
+          subtext="No players with confirmed upward price movement — check Upgrade Targets for scoring buys."
         />
       )}
 
@@ -503,7 +547,7 @@ function PremiumView({
           label="Cash Cows"
           labelColor="text-[#F5C84C]"
           dot="bg-[#F5C84C]"
-          description="Budget picks beating breakeven — trade in now for fast price growth"
+          description="Budget picks beating breakeven — bank cash for future upgrades"
           count={cashCows.length}
           showMore={showMoreCows}
           onToggle={onToggleCows}
@@ -513,7 +557,7 @@ function PremiumView({
       ) : (
         <EmptySection
           message="No cash cow targets this round"
-          subtext="No budget players generating strong price growth — focus on upgrade targets."
+          subtext="No budget players generating strong price growth — check Buy Before Rise."
         />
       )}
 
@@ -522,7 +566,7 @@ function PremiumView({
           label="Fades & Traps"
           labelColor="text-orange-400"
           dot="bg-orange-400"
-          description="Premium price not justified by scoring — avoid or trade out"
+          description="Overpriced or poor value — don't trade in at current price"
           count={traps.length}
           showMore={showMoreTraps}
           onToggle={onToggleTraps}
@@ -564,22 +608,24 @@ function EmptySection({ message, subtext }: { message: string; subtext: string }
 // ─── Paywall ──────────────────────────────────────────────────────────────────
 
 function MarketWatchPaywall({
-  sellCount, upgradeCount, cowCount, trapCount, onUnlock,
+  sellCount, buyCount, upgradeCount, cowCount, trapCount, onUnlock,
 }: {
   sellCount: number;
+  buyCount: number;
   upgradeCount: number;
   cowCount: number;
   trapCount: number;
   onUnlock: () => void;
 }) {
   const totalExtra = Math.max(
-    (sellCount - 1) + (upgradeCount - 1) + (cowCount - 1) + (trapCount - 1),
+    (sellCount - 1) + (buyCount - 1) + (upgradeCount - 1) + (cowCount - 1) + (trapCount - 1),
     80
   );
 
   const lines = [
     sellCount > 1    && `${sellCount - 1} more sell signal${sellCount - 1 !== 1 ? "s" : ""} — sell before price drops`,
-    upgradeCount > 1 && `${upgradeCount - 1} more upgrade target${upgradeCount - 1 !== 1 ? "s" : ""} — premium scorers near breakeven`,
+    buyCount > 1     && `${buyCount - 1} more buy${buyCount - 1 !== 1 ? "s" : ""} before rise — price going up`,
+    upgradeCount > 1 && `${upgradeCount - 1} more upgrade target${upgradeCount - 1 !== 1 ? "s" : ""} — premium scorers`,
     cowCount > 1     && `${cowCount - 1} more cash cow${cowCount - 1 !== 1 ? "s" : ""} — fastest price growth this round`,
     trapCount > 1    && `${trapCount - 1} fade alert${trapCount - 1 !== 1 ? "s" : ""} — overpriced players to avoid`,
   ].filter(Boolean) as string[];
@@ -587,9 +633,9 @@ function MarketWatchPaywall({
   if (lines.length === 0) {
     lines.push(
       "Full sell signals — overpriced players before value drops",
+      "Buy before rise — price moving up now",
       "Upgrade targets — elite scorers at fair prices",
       "Cash cows — budget picks generating fast price growth",
-      "Fade alerts — premium-priced players to avoid",
     );
   }
 

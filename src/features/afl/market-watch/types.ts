@@ -1,4 +1,4 @@
-export type MWCategory = "buy" | "sell_now" | "sell_consider" | "cash_cow" | "fade" | "monitor" | "upgrade_target";
+export type MWCategory = "buy" | "sell_now" | "sell_consider" | "cash_cow" | "fade" | "monitor";
 
 export type MWCategoryFilter = "all" | "buy" | "sell" | "cash_cow" | "trap";
 

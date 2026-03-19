@@ -1,124 +1,149 @@
 import { Lock, TrendingDown, TrendingUp } from "lucide-react";
-import { MWPlayerRow, MWCategory } from "./types";
+import { DerivedPlayer, DerivedCategory } from "./engine";
 import { fmtPrice, fmtNum, fmtPriceChange, positionBadge } from "./helpers";
 
 interface Props {
-  row: MWPlayerRow;
+  row: DerivedPlayer;
   rank?: number;
   isPremium?: boolean;
   compact?: boolean;
   heroMode?: boolean;
 }
 
-function categoryTag(cat: MWCategory): { label: string; cls: string } {
+function categoryTag(cat: DerivedCategory): { label: string; cls: string } {
   switch (cat) {
-    case "buy":             return { label: "BUY",      cls: "text-green-300 bg-green-400/15 border-green-400/35" };
-    case "upgrade_target":  return { label: "UPGRADE",  cls: "text-green-200 bg-green-400/20 border-green-400/45" };
-    case "sell_now":        return { label: "SELL NOW",  cls: "text-red-300 bg-red-400/15 border-red-400/35" };
-    case "sell_consider":   return { label: "CONSIDER",  cls: "text-red-300/80 bg-red-400/10 border-red-400/25" };
-    case "cash_cow":        return { label: "CASH COW",  cls: "text-[#F5C84C] bg-[#F5C84C]/15 border-[#F5C84C]/35" };
-    case "fade":            return { label: "TRAP",      cls: "text-orange-300 bg-orange-400/15 border-orange-400/35" };
-    default:                return { label: "MONITOR",   cls: "text-white/40 bg-white/5 border-white/10" };
+    case "buy_before_rise": return { label: "BUY NOW",  cls: "text-green-300 bg-green-400/15 border-green-400/35" };
+    case "cash_cow":        return { label: "CASH COW", cls: "text-[#F5C84C] bg-[#F5C84C]/15 border-[#F5C84C]/35" };
+    case "upgrade_target":  return { label: "UPGRADE",  cls: "text-sky-300 bg-sky-400/15 border-sky-400/30" };
+    case "sell":            return { label: "SELL NOW", cls: "text-red-300 bg-red-400/15 border-red-400/35" };
+    case "trap":            return { label: "AVOID",    cls: "text-orange-300 bg-orange-400/15 border-orange-400/35" };
   }
 }
 
-function priceChangeStyle(expChange: number, cat: MWCategory): { text: string; bg: string } {
-  if (cat === "buy" || cat === "cash_cow" || cat === "upgrade_target") {
-    return { text: "text-green-400", bg: "bg-green-400/[0.06] border border-green-400/20" };
+/**
+ * The hero metric shown in the large stat box changes per category:
+ * - buy_before_rise / cash_cow  → Expected Price Change (always positive — price rising)
+ * - upgrade_target              → Projection (main reason to buy is scoring output)
+ * - sell                        → Expected Price Change (always negative — price falling)
+ * - trap                        → Expected Price Change (negative — showing the downside)
+ */
+function heroMetric(row: DerivedPlayer): {
+  label: string;
+  value: string;
+  valueCls: string;
+  bgCls: string;
+} {
+  const cat = row._derived_category;
+  const expChange = Number(row.expected_price_change ?? 0);
+  const projection = Number(row.projection ?? 0);
+
+  if (cat === "upgrade_target") {
+    return {
+      label: "Projection (pts/rd)",
+      value: projection.toFixed(1),
+      valueCls: "text-sky-300",
+      bgCls: "bg-sky-400/[0.05] border border-sky-400/20",
+    };
   }
-  if (cat === "sell_now" || cat === "fade") {
-    return { text: "text-red-400", bg: "bg-red-400/[0.06] border border-red-400/20" };
+
+  if (cat === "buy_before_rise" || cat === "cash_cow") {
+    return {
+      label: "Expected Price Rise",
+      value: fmtPriceChange(expChange),
+      valueCls: "text-green-400",
+      bgCls: "bg-green-400/[0.06] border border-green-400/20",
+    };
   }
-  if (expChange > 10000) return { text: "text-green-400", bg: "bg-green-400/[0.06] border border-green-400/20" };
-  if (expChange < -10000) return { text: "text-red-400", bg: "bg-red-400/[0.06] border border-red-400/20" };
-  return { text: "text-white/50", bg: "bg-white/[0.025] border border-white/8" };
+
+  // sell / trap — show price drop as warning
+  return {
+    label: "Expected Price Drop",
+    value: fmtPriceChange(expChange),
+    valueCls: "text-red-400",
+    bgCls: "bg-red-400/[0.06] border border-red-400/20",
+  };
 }
 
-function getShortReason(row: MWPlayerRow): string {
+function getWhyNow(row: DerivedPlayer): string | null {
+  const expChange = Number(row.expected_price_change ?? 0);
+  const delta = row._delta;
+  const projection = Number(row.projection ?? 0);
+
+  switch (row._derived_category) {
+    case "buy_before_rise": {
+      if (expChange > 150000) return "Strong price rise incoming \u2014 buy before it jumps";
+      if (delta > 25) return "Significantly above breakeven \u2014 price rising fast";
+      if (delta > 10) return "Beats breakeven by solid margin \u2014 priced to rise";
+      return "Above breakeven \u2014 price trajectory is upward";
+    }
+    case "cash_cow": {
+      if (expChange > 100000) return "Cheap entry with fast price growth \u2014 maximise cash generation";
+      return "Budget pick beating breakeven \u2014 banking cash for upgrades";
+    }
+    case "upgrade_target": {
+      if (projection >= 120) return "Elite scorer \u2014 a premium you want on your team";
+      if (projection >= 100) return "High-end scorer with strong value \u2014 upgrade your team";
+      if (delta >= 0) return "Scoring above breakeven at a fair entry price";
+      return "Scoring upgrade target \u2014 worth the price for the points output";
+    }
+    case "sell": {
+      if (expChange < -200000) return "Heavy price drop ahead \u2014 sell immediately";
+      if (delta < -20) return "Well below breakeven \u2014 sell window is open";
+      return "Below breakeven \u2014 price under downward pressure";
+    }
+    case "trap": {
+      return "Premium price not justified by scoring \u2014 don\u2019t trade in at this price";
+    }
+  }
+}
+
+function getIfHeldLine(row: DerivedPlayer): string | null {
+  const expChange = Number(row.expected_price_change ?? 0);
+  const cat = row._derived_category;
+
+  if (cat === "sell") {
+    const twoRound = Math.abs(expChange) * 2;
+    if (twoRound > 40000) return `If held: loses ~${fmtPrice(twoRound)} over 2 rounds`;
+  }
+  if (cat === "buy_before_rise" || cat === "cash_cow") {
+    const twoRound = Math.abs(expChange) * 2;
+    if (twoRound > 30000) return `If bought now: gains ~${fmtPrice(twoRound)} over 2 rounds`;
+  }
+  return null;
+}
+
+function getShortReason(row: DerivedPlayer): string {
   if (row.category_reason) {
     const s = String(row.category_reason);
     return s.length > 85 ? s.slice(0, 82) + "\u2026" : s;
   }
-  const edge = Number(row.price_edge_pts ?? 0);
-  if (row.category === "buy") {
-    if (edge >= 40) return "Priced well below projection \u2014 strong value";
-    return "Beats breakeven \u2014 price expected to rise";
+  switch (row._derived_category) {
+    case "buy_before_rise": return "Beats breakeven \u2014 price expected to rise";
+    case "cash_cow":        return "Budget pick beating breakeven \u2014 fast cash growth";
+    case "upgrade_target":  return "Scoring upgrade target \u2014 worth the price for the points";
+    case "sell":            return "Below breakeven \u2014 price expected to fall";
+    case "trap":            return "Premium price not justified \u2014 avoid buying in";
   }
-  if (row.category === "cash_cow") return "Budget pick beating breakeven \u2014 fast cash growth";
-  if (row.category === "sell_now") return "Below breakeven \u2014 price expected to fall";
-  if (row.category === "sell_consider") return "Marginally below breakeven \u2014 monitor closely";
-  if (row.category === "fade") return "Premium price not justified \u2014 avoid";
-  return "No strong signal this round";
-}
-
-function getIfHeldImpact(row: MWPlayerRow): string | null {
-  const expChange = Number(row.expected_price_change ?? 0);
-  const price = Number(row.price ?? 0);
-  if (price <= 0) return null;
-
-  if (row.category === "sell_now" || row.category === "fade") {
-    const twoRoundLoss = Math.abs(expChange) * 2;
-    if (twoRoundLoss > 20000) {
-      return `If held: loses ~${fmtPrice(twoRoundLoss)} over 2 rounds`;
-    }
-    return null;
-  }
-  if (row.category === "buy" || row.category === "cash_cow") {
-    const twoRoundGain = Math.abs(expChange) * 2;
-    if (twoRoundGain > 20000) {
-      return `If bought now: gains ~${fmtPrice(twoRoundGain)} over 2 rounds`;
-    }
-    return null;
-  }
-  return null;
-}
-
-function getWhyNow(row: MWPlayerRow): string | null {
-  const expChange = Number(row.expected_price_change ?? 0);
-  const delta = Number(row.projection ?? 0) - Number(row.breakeven ?? 0);
-
-  if (row.category === "sell_now") {
-    if (expChange < -30000) return "Price drop is accelerating \u2014 act before next round";
-    if (delta < -15) return "Scoring well below breakeven \u2014 price under pressure";
-    return "Price falling \u2014 sell window is open now";
-  }
-  if (row.category === "upgrade_target") {
-    const proj = Number(row.projection ?? 0);
-    if (proj >= 110) return "Elite scorer near breakeven \u2014 premium quality at fair price";
-    if (delta > 5) return "High-end scoring above breakeven \u2014 price set to rise";
-    return "Quality upgrade target \u2014 scoring justifies the price";
-  }
-  if (row.category === "buy") {
-    if (expChange > 40000) return "Price rise incoming \u2014 buy before it jumps";
-    if (delta > 15) return "Significantly above breakeven \u2014 price is rising";
-    return "Priced below projection \u2014 early entry window";
-  }
-  if (row.category === "cash_cow") {
-    return "Cheap entry with above-breakeven scoring \u2014 maximise cash generation";
-  }
-  if (row.category === "fade") {
-    return "Premium price but below-target scoring \u2014 don\u2019t buy at this price";
-  }
-  return null;
 }
 
 function confidenceLevel(v: number | null): { label: string; cls: string } {
   if (v == null) return { label: "\u2014", cls: "text-white/20" };
   if (v >= 75) return { label: "HIGH conf.", cls: "text-green-300/60" };
-  if (v >= 55) return { label: "MED conf.", cls: "text-[#F5C84C]/60" };
+  if (v >= 55) return { label: "MED conf.",  cls: "text-[#F5C84C]/60" };
   return { label: "LOW conf.", cls: "text-orange-300/60" };
 }
 
 export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, heroMode = false }: Props) {
   const expChange = Number(row.expected_price_change ?? 0);
-  const tag = categoryTag(row.category);
-  const style = priceChangeStyle(expChange, row.category);
-  const delta = Number(row.projection ?? 0) - Number(row.breakeven ?? 0);
-  const aiExplanation = row.category_reason ?? null;
+  const tag = categoryTag(row._derived_category);
+  const hero = heroMetric(row);
+  const delta = row._delta;
   const conf = confidenceLevel(row.projection_confidence);
-  const ifHeld = getIfHeldImpact(row);
   const whyNow = getWhyNow(row);
+  const ifHeld = getIfHeldLine(row);
   const shortReason = getShortReason(row);
+  const aiExplanation = row.category_reason ?? null;
+  const isSellLike = row._derived_category === "sell" || row._derived_category === "trap";
 
   if (compact) {
     return (
@@ -133,16 +158,16 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
           </span>
         </div>
 
-        <div className={`rounded-lg px-2.5 py-2 ${style.bg}`}>
-          <p className="text-[8px] text-white/30 uppercase tracking-widest mb-0.5">Expected Change</p>
-          <p className={`text-lg font-extrabold tabular-nums leading-none ${style.text}`}>
-            {fmtPriceChange(expChange)}
+        <div className={`rounded-lg px-2.5 py-2 ${hero.bgCls}`}>
+          <p className="text-[8px] text-white/30 uppercase tracking-widest mb-0.5">{hero.label}</p>
+          <p className={`text-lg font-extrabold tabular-nums leading-none ${hero.valueCls}`}>
+            {hero.value}
           </p>
         </div>
 
         <div className="grid grid-cols-3 gap-1">
           <MiniStat label="Proj" value={fmtNum(row.projection, 1)} cls="text-[#F5C84C]" />
-          <MiniStat label="BE" value={fmtNum(row.breakeven, 1)} cls="text-white/55" />
+          <MiniStat label="BE"   value={fmtNum(row.breakeven, 1)} cls="text-white/55" />
           <MiniStat
             label={delta >= 0 ? `+${delta.toFixed(0)}` : `${delta.toFixed(0)}`}
             value="vs BE"
@@ -178,10 +203,10 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
           </div>
         </div>
 
-        <div className={`rounded-xl px-4 py-3.5 ${style.bg}`}>
-          <p className="text-[8px] text-white/30 uppercase tracking-widest mb-1.5">Expected Price Change</p>
-          <p className={`text-4xl font-extrabold tabular-nums leading-none ${style.text}`}>
-            {fmtPriceChange(expChange)}
+        <div className={`rounded-xl px-4 py-3.5 ${hero.bgCls}`}>
+          <p className="text-[8px] text-white/30 uppercase tracking-widest mb-1.5">{hero.label}</p>
+          <p className={`text-4xl font-extrabold tabular-nums leading-none ${hero.valueCls}`}>
+            {hero.value}
           </p>
           {whyNow && (
             <p className="text-[10px] text-white/40 mt-2 leading-snug">{whyNow}</p>
@@ -190,7 +215,7 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
 
         <div className="grid grid-cols-3 gap-2">
           <StatCell label="Projection" value={fmtNum(row.projection, 1)} cls="text-[#F5C84C]" />
-          <StatCell label="Breakeven" value={fmtNum(row.breakeven, 1)} cls="text-white/60" />
+          <StatCell label="Breakeven"  value={fmtNum(row.breakeven, 1)} cls="text-white/60" />
           <StatCell
             label="vs BE"
             value={delta >= 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1)}
@@ -200,17 +225,15 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
 
         {ifHeld && (
           <div className={`flex items-center gap-2 rounded-lg px-3 py-2 ${
-            row.category === "sell_now" || row.category === "fade"
+            isSellLike
               ? "bg-red-400/[0.05] border border-red-400/15"
               : "bg-green-400/[0.05] border border-green-400/15"
           }`}>
-            {row.category === "sell_now" || row.category === "fade"
+            {isSellLike
               ? <TrendingDown className="h-3 w-3 text-red-400/70 shrink-0" />
               : <TrendingUp className="h-3 w-3 text-green-400/70 shrink-0" />
             }
-            <p className={`text-[10px] font-semibold ${
-              row.category === "sell_now" || row.category === "fade" ? "text-red-300/70" : "text-green-300/70"
-            }`}>{ifHeld}</p>
+            <p className={`text-[10px] font-semibold ${isSellLike ? "text-red-300/70" : "text-green-300/70"}`}>{ifHeld}</p>
           </div>
         )}
       </div>
@@ -238,16 +261,16 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
         <p className="text-[11px] text-white/40 mt-0.5">{row.team}</p>
       </div>
 
-      <div className={`rounded-xl px-4 py-3 ${style.bg}`}>
-        <p className="text-[8px] text-white/30 uppercase tracking-widest mb-1">Expected Price Change</p>
-        <p className={`text-3xl font-extrabold tabular-nums leading-none ${style.text}`}>
-          {fmtPriceChange(expChange)}
+      <div className={`rounded-xl px-4 py-3 ${hero.bgCls}`}>
+        <p className="text-[8px] text-white/30 uppercase tracking-widest mb-1">{hero.label}</p>
+        <p className={`text-3xl font-extrabold tabular-nums leading-none ${hero.valueCls}`}>
+          {hero.value}
         </p>
       </div>
 
       <div className="grid grid-cols-3 gap-1.5">
         <StatCell label="Projection" value={fmtNum(row.projection, 1)} cls="text-[#F5C84C]" />
-        <StatCell label="Breakeven" value={fmtNum(row.breakeven, 1)} cls="text-white/60" />
+        <StatCell label="Breakeven"  value={fmtNum(row.breakeven, 1)} cls="text-white/60" />
         <StatCell
           label="vs BE"
           value={delta >= 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1)}
@@ -257,7 +280,14 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
 
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] text-white/30 font-medium">{fmtPrice(row.price)}</span>
-        <span className={`text-[9px] font-semibold ${conf.cls}`}>{conf.label}</span>
+        {row._derived_category !== "upgrade_target" && (
+          <span className={`text-[10px] font-semibold tabular-nums ${expChange >= 0 ? "text-green-400/60" : "text-red-400/60"}`}>
+            {fmtPriceChange(expChange)}
+          </span>
+        )}
+        {row._derived_category === "upgrade_target" && (
+          <span className={`text-[9px] font-semibold ${conf.cls}`}>{conf.label}</span>
+        )}
       </div>
 
       {whyNow && (
@@ -269,17 +299,15 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
 
       {ifHeld && (
         <div className={`flex items-center gap-2 rounded-lg px-3 py-2 ${
-          row.category === "sell_now" || row.category === "fade"
+          isSellLike
             ? "bg-red-400/[0.04] border border-red-400/12"
             : "bg-green-400/[0.04] border border-green-400/12"
         }`}>
-          {row.category === "sell_now" || row.category === "fade"
+          {isSellLike
             ? <TrendingDown className="h-3 w-3 text-red-400/60 shrink-0" />
             : <TrendingUp className="h-3 w-3 text-green-400/60 shrink-0" />
           }
-          <p className={`text-[10px] ${
-            row.category === "sell_now" || row.category === "fade" ? "text-red-300/60" : "text-green-300/60"
-          }`}>{ifHeld}</p>
+          <p className={`text-[10px] ${isSellLike ? "text-red-300/60" : "text-green-300/60"}`}>{ifHeld}</p>
         </div>
       )}
 
