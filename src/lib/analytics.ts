@@ -32,21 +32,25 @@ export function logEvent(event: string, properties?: Record<string, unknown>) {
 
   const page = typeof window !== "undefined" ? window.location.pathname : undefined;
 
-  supabase.auth.getUser().then(({ data }) => {
-    supabase
-      .from("analytics_events")
-      .insert({
-        event_name: event,
-        page,
-        user_id: data?.user?.id ?? null,
-        properties: properties ?? {},
-      })
-      .then(({ error }) => {
-        if (error) {
-          // Silently discard — analytics table may not exist in all environments
-        }
-      });
-  }).catch(() => {});
+  try {
+    supabase.auth.getUser().then(({ data }) => {
+      try {
+        supabase
+          .from("analytics_events")
+          .insert({
+            event_name: event,
+            page,
+            user_id: data?.user?.id ?? null,
+            properties: properties ?? {},
+          })
+          .then(() => {});
+      } catch {
+        // silently discard — analytics table may not exist in all environments
+      }
+    }).catch(() => {});
+  } catch {
+    // silently discard
+  }
 }
 
 export function identifyUser(user: { id: string; email?: string }) {
