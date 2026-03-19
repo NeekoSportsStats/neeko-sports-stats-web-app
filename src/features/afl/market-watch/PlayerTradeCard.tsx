@@ -1,4 +1,4 @@
-import { Lock, TrendingDown, TrendingUp } from "lucide-react";
+import { Lock, TrendingDown, TrendingUp, Clock, DollarSign, Zap } from "lucide-react";
 import { DerivedPlayer, DerivedCategory } from "./engine";
 import { fmtPrice, fmtNum, fmtPriceChange, positionBadge } from "./helpers";
 
@@ -21,13 +21,6 @@ function categoryTag(cat: DerivedCategory): { label: string; cls: string } {
   }
 }
 
-/**
- * The hero metric shown in the large stat box changes per category:
- * - buy_before_rise / cash_cow  → Expected Price Change (always positive — price rising)
- * - upgrade_target              → Projection (main reason to buy is scoring output)
- * - sell                        → Expected Price Change (always negative — price falling)
- * - trap                        → Expected Price Change (negative — showing the downside)
- */
 function heroMetric(row: DerivedPlayer): {
   label: string;
   value: string;
@@ -40,14 +33,14 @@ function heroMetric(row: DerivedPlayer): {
 
   if (cat === "upgrade_target") {
     return {
-      label: "Projection (pts/rd)",
-      value: projection.toFixed(1),
+      label: "Projection",
+      value: projection.toFixed(0) + " pts",
       valueCls: "text-sky-300",
       bgCls: "bg-sky-400/[0.05] border border-sky-400/20",
     };
   }
 
-  if (cat === "buy_before_rise" || cat === "cash_cow") {
+  if (cat === "buy_before_rise") {
     return {
       label: "Expected Price Rise",
       value: fmtPriceChange(expChange),
@@ -56,9 +49,18 @@ function heroMetric(row: DerivedPlayer): {
     };
   }
 
-  // sell_before_drop / fade_trap / monitor — show price drop as warning
+  if (cat === "cash_cow") {
+    return {
+      label: "Price Growth",
+      value: fmtPriceChange(expChange),
+      valueCls: "text-[#F5C84C]",
+      bgCls: "bg-[#F5C84C]/[0.06] border border-[#F5C84C]/20",
+    };
+  }
+
+  // sell_before_drop / fade_trap / monitor
   return {
-    label: "Expected Price Drop",
+    label: "Expected Drop",
     value: fmtPriceChange(expChange),
     valueCls: "text-red-400",
     bgCls: "bg-red-400/[0.06] border border-red-400/20",
@@ -72,28 +74,28 @@ function getWhyNow(row: DerivedPlayer): string | null {
 
   switch (row._derived_category) {
     case "buy_before_rise": {
-      if (expChange > 150000) return "Strong price rise incoming \u2014 buy before it jumps";
-      if (delta > 25) return "Significantly above breakeven \u2014 price rising fast";
-      if (delta > 10) return "Beats breakeven by solid margin \u2014 priced to rise";
-      return "Above breakeven \u2014 price trajectory is upward";
+      if (expChange > 150000) return "Price jump incoming — every round you wait costs you value";
+      if (delta > 25) return "Well above breakeven — price is moving up fast";
+      if (delta > 10) return "Beats breakeven by a solid margin — priced to rise";
+      return "Above breakeven — price trajectory is heading up";
     }
     case "cash_cow": {
-      if (expChange > 100000) return "Cheap entry with fast price growth \u2014 maximise cash generation";
-      return "Budget pick beating breakeven \u2014 banking cash for upgrades";
+      if (expChange > 100000) return "Cheap entry, fast growth — maximise your cash generation";
+      return "Budget pick beating breakeven — banking cash for your next upgrade";
     }
     case "upgrade_target": {
-      if (projection >= 120) return "Elite scorer \u2014 a premium you want on your team";
-      if (projection >= 100) return "High-end scorer with strong value \u2014 upgrade your team";
+      if (projection >= 120) return "Elite scorer — a premium you want locked in your team";
+      if (projection >= 100) return "High-end scorer with strong value — a genuine upgrade";
       if (delta >= 0) return "Scoring above breakeven at a fair entry price";
-      return "Scoring upgrade target \u2014 worth the price for the points output";
+      return "Worth the price for the scoring output";
     }
     case "sell_before_drop": {
-      if (expChange < -200000) return "Heavy price drop ahead \u2014 sell immediately";
-      if (delta < -20) return "Well below breakeven \u2014 sell window is open";
-      return "Below breakeven \u2014 price under downward pressure";
+      if (expChange < -200000) return "Heavy drop incoming — sell window is closing fast";
+      if (delta < -20) return "Well below breakeven — every round held is value lost";
+      return "Below breakeven — price is under sustained downward pressure";
     }
     case "fade_trap": {
-      return "Premium price not justified by scoring \u2014 don\u2019t trade in at this price";
+      return "Premium price not justified by current scoring — this is a bad entry";
     }
     default:
       return null;
@@ -106,11 +108,11 @@ function getIfHeldLine(row: DerivedPlayer): string | null {
 
   if (cat === "sell_before_drop") {
     const twoRound = Math.abs(expChange) * 2;
-    if (twoRound > 40000) return `If held: loses ~${fmtPrice(twoRound)} over 2 rounds`;
+    if (twoRound > 40000) return `Holding costs ~${fmtPrice(twoRound)} over 2 rounds`;
   }
   if (cat === "buy_before_rise" || cat === "cash_cow") {
     const twoRound = Math.abs(expChange) * 2;
-    if (twoRound > 30000) return `If bought now: gains ~${fmtPrice(twoRound)} over 2 rounds`;
+    if (twoRound > 30000) return `Gains ~${fmtPrice(twoRound)} in value over 2 rounds`;
   }
   return null;
 }
@@ -121,12 +123,23 @@ function getShortReason(row: DerivedPlayer): string {
     return s.length > 85 ? s.slice(0, 82) + "\u2026" : s;
   }
   switch (row._derived_category) {
-    case "buy_before_rise":  return "Beats breakeven \u2014 price expected to rise";
-    case "cash_cow":         return "Budget pick beating breakeven \u2014 fast cash growth";
-    case "upgrade_target":   return "Scoring upgrade target \u2014 worth the price for the points";
-    case "sell_before_drop": return "Below breakeven \u2014 price expected to fall";
-    case "fade_trap":        return "Premium price not justified \u2014 avoid buying in";
-    default:                 return "Monitor — watching for signal changes";
+    case "buy_before_rise":  return "Beats breakeven — price expected to rise this week";
+    case "cash_cow":         return "Budget pick beating breakeven — fast cash generation";
+    case "upgrade_target":   return "Scoring upgrade — worth the entry price for the points";
+    case "sell_before_drop": return "Below breakeven — price expected to fall";
+    case "fade_trap":        return "Overpriced — bad entry point at current value";
+    default:                 return "Monitoring for signal changes";
+  }
+}
+
+function categoryUrgencyIcon(cat: DerivedCategory) {
+  switch (cat) {
+    case "buy_before_rise":  return <Clock className="h-3 w-3 text-green-400/60" />;
+    case "cash_cow":         return <DollarSign className="h-3 w-3 text-[#F5C84C]/60" />;
+    case "upgrade_target":   return <Zap className="h-3 w-3 text-sky-400/60" />;
+    case "sell_before_drop": return <TrendingDown className="h-3 w-3 text-red-400/60" />;
+    case "fade_trap":        return <TrendingDown className="h-3 w-3 text-orange-400/60" />;
+    default:                 return null;
   }
 }
 
@@ -148,14 +161,20 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
   const shortReason = getShortReason(row);
   const aiExplanation = row.category_reason ?? null;
   const isSellLike = row._derived_category === "sell_before_drop" || row._derived_category === "fade_trap";
+  const urgencyIcon = categoryUrgencyIcon(row._derived_category);
 
+  // ── Compact (used in Must Sell strip) ─────────────────────────────────────
   if (compact) {
     return (
-      <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] hover:bg-white/[0.04] hover:border-white/12 transition-all p-3.5 flex flex-col gap-2">
+      <div className={`rounded-xl border hover:border-white/12 transition-all p-3.5 flex flex-col gap-2.5 ${
+        isSellLike
+          ? "border-red-400/15 bg-red-400/[0.025] hover:bg-red-400/[0.04]"
+          : "border-white/[0.07] bg-white/[0.025] hover:bg-white/[0.04]"
+      }`}>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <p className="font-bold text-sm text-white leading-tight truncate">{row.player_name}</p>
-            <p className="text-[10px] text-white/35 mt-0.5">{row.team}</p>
+            <p className="text-[10px] text-white/35 mt-0.5">{row.team} · {row.position}</p>
           </div>
           <span className={`shrink-0 text-[9px] font-extrabold px-1.5 py-0.5 rounded border uppercase tracking-wide ${tag.cls}`}>
             {tag.label}
@@ -164,26 +183,28 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
 
         <div className={`rounded-lg px-2.5 py-2 ${hero.bgCls}`}>
           <p className="text-[8px] text-white/30 uppercase tracking-widest mb-0.5">{hero.label}</p>
-          <p className={`text-lg font-extrabold tabular-nums leading-none ${hero.valueCls}`}>
+          <p className={`text-xl font-extrabold tabular-nums leading-none ${hero.valueCls}`}>
             {hero.value}
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-1">
-          <MiniStat label="Proj" value={fmtNum(row.projection, 1)} cls="text-[#F5C84C]" />
-          <MiniStat label="BE"   value={fmtNum(row.breakeven, 1)} cls="text-white/55" />
-          <MiniStat
-            label={delta >= 0 ? `+${delta.toFixed(0)}` : `${delta.toFixed(0)}`}
-            value="vs BE"
-            cls={delta >= 0 ? "text-green-400" : "text-red-400"}
-          />
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-white/30 font-medium">{fmtPrice(row.price)}</span>
+            <span className="text-white/15">·</span>
+            <span className="text-[10px] text-white/30">Proj {fmtNum(row.projection, 0)}</span>
+          </div>
+          <span className={`text-[10px] font-semibold tabular-nums ${delta >= 0 ? "text-green-400/70" : "text-red-400/70"}`}>
+            {delta >= 0 ? `+${delta.toFixed(0)}` : delta.toFixed(0)} vs BE
+          </span>
         </div>
 
-        <p className="text-[10px] text-white/35 leading-snug">{shortReason}</p>
+        {whyNow && <p className="text-[10px] text-white/30 leading-snug">{whyNow}</p>}
       </div>
     );
   }
 
+  // ── Hero mode ─────────────────────────────────────────────────────────────
   if (heroMode) {
     return (
       <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/15 transition-all p-4 flex flex-col gap-3">
@@ -244,9 +265,16 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
     );
   }
 
+  // ── Standard card ─────────────────────────────────────────────────────────
   return (
-    <div className="relative rounded-xl border border-white/[0.07] bg-white/[0.025] hover:bg-white/[0.04] hover:border-white/12 hover:-translate-y-0.5 transition-all duration-200 p-4 flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-2">
+    <div className={`relative rounded-xl border hover:border-white/12 hover:-translate-y-0.5 transition-all duration-200 p-4 flex flex-col gap-3 ${
+      isSellLike
+        ? "border-red-400/12 bg-red-400/[0.02] hover:bg-red-400/[0.035]"
+        : "border-white/[0.07] bg-white/[0.025] hover:bg-white/[0.04]"
+    }`}>
+
+      {/* Header row — badges + rank */}
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-lg border uppercase tracking-wide ${tag.cls}`}>
             {tag.label}
@@ -260,68 +288,85 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
         {rank != null && <span className="text-[10px] font-mono text-white/15 shrink-0">#{rank}</span>}
       </div>
 
+      {/* Player name + team */}
       <div className="min-w-0">
         <p className="font-bold text-sm text-white leading-tight">{row.player_name}</p>
-        <p className="text-[11px] text-white/40 mt-0.5">{row.team}</p>
+        <p className="text-[11px] text-white/35 mt-0.5">{row.team}</p>
       </div>
 
+      {/* Hero metric — visually dominant */}
       <div className={`rounded-xl px-4 py-3 ${hero.bgCls}`}>
-        <p className="text-[8px] text-white/30 uppercase tracking-widest mb-1">{hero.label}</p>
+        <p className="text-[8px] text-white/25 uppercase tracking-widest mb-1">{hero.label}</p>
         <p className={`text-3xl font-extrabold tabular-nums leading-none ${hero.valueCls}`}>
           {hero.value}
         </p>
       </div>
 
+      {/* Support stats */}
       <div className="grid grid-cols-3 gap-1.5">
-        <StatCell label="Projection" value={fmtNum(row.projection, 1)} cls="text-[#F5C84C]" />
-        <StatCell label="Breakeven"  value={fmtNum(row.breakeven, 1)} cls="text-white/60" />
+        <StatCell
+          label={row._derived_category === "upgrade_target" ? "Price" : "Proj"}
+          value={row._derived_category === "upgrade_target" ? fmtPrice(row.price) : fmtNum(row.projection, 0)}
+          cls={row._derived_category === "upgrade_target" ? "text-white/50" : "text-[#F5C84C]"}
+        />
+        <StatCell label="Breakeven" value={fmtNum(row.breakeven, 0)} cls="text-white/50" />
         <StatCell
           label="vs BE"
-          value={delta >= 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1)}
+          value={delta >= 0 ? `+${delta.toFixed(0)}` : delta.toFixed(0)}
           cls={delta >= 0 ? "text-green-400" : "text-red-400"}
         />
       </div>
 
+      {/* Price + confidence line */}
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] text-white/30 font-medium">{fmtPrice(row.price)}</span>
         {row._derived_category !== "upgrade_target" && (
-          <span className={`text-[10px] font-semibold tabular-nums ${expChange >= 0 ? "text-green-400/60" : "text-red-400/60"}`}>
-            {fmtPriceChange(expChange)}
-          </span>
+          <span className="text-[10px] text-white/25 font-medium">{fmtPrice(row.price)}</span>
         )}
-        {row._derived_category === "upgrade_target" && (
-          <span className={`text-[9px] font-semibold ${conf.cls}`}>{conf.label}</span>
+        {row._derived_category === "upgrade_target" ? (
+          <div className="flex items-center gap-1.5 ml-auto">
+            {urgencyIcon}
+            <span className={`text-[9px] font-semibold ${conf.cls}`}>{conf.label}</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            {urgencyIcon}
+            <span className={`text-[10px] font-semibold tabular-nums ${expChange >= 0 ? "text-green-400/60" : "text-red-400/60"}`}>
+              {fmtPriceChange(expChange)}
+            </span>
+          </div>
         )}
       </div>
 
+      {/* Why now */}
       {whyNow && (
-        <div className="border-t border-white/[0.06] pt-2.5">
-          <p className="text-[9px] text-white/25 uppercase tracking-wider mb-1 font-semibold">Why now</p>
-          <p className="text-[11px] text-white/50 leading-snug">{whyNow}</p>
+        <div className="border-t border-white/[0.05] pt-2.5">
+          <p className="text-[10px] text-white/40 leading-snug">{whyNow}</p>
         </div>
       )}
 
+      {/* If held / if bought */}
       {ifHeld && (
         <div className={`flex items-center gap-2 rounded-lg px-3 py-2 ${
           isSellLike
-            ? "bg-red-400/[0.04] border border-red-400/12"
-            : "bg-green-400/[0.04] border border-green-400/12"
+            ? "bg-red-400/[0.04] border border-red-400/10"
+            : "bg-green-400/[0.04] border border-green-400/10"
         }`}>
           {isSellLike
-            ? <TrendingDown className="h-3 w-3 text-red-400/60 shrink-0" />
-            : <TrendingUp className="h-3 w-3 text-green-400/60 shrink-0" />
+            ? <TrendingDown className="h-3 w-3 text-red-400/55 shrink-0" />
+            : <TrendingUp className="h-3 w-3 text-green-400/55 shrink-0" />
           }
-          <p className={`text-[10px] ${isSellLike ? "text-red-300/60" : "text-green-300/60"}`}>{ifHeld}</p>
+          <p className={`text-[10px] font-medium ${isSellLike ? "text-red-300/55" : "text-green-300/55"}`}>{ifHeld}</p>
         </div>
       )}
 
+      {/* AI explanation (premium only) */}
       {aiExplanation && aiExplanation !== shortReason && (
-        <div className="relative rounded-lg border border-white/[0.06] bg-white/[0.015] px-3 py-2.5">
+        <div className="relative rounded-lg border border-white/[0.05] bg-white/[0.012] px-3 py-2.5">
           {isPremium ? (
-            <p className="text-[10px] text-white/40 leading-relaxed italic">{aiExplanation}</p>
+            <p className="text-[10px] text-white/35 leading-relaxed italic">{aiExplanation}</p>
           ) : (
             <>
-              <p className="text-[10px] text-white/40 leading-relaxed italic blur-[5px] select-none pointer-events-none" aria-hidden>
+              <p className="text-[10px] text-white/35 leading-relaxed italic blur-[5px] select-none pointer-events-none" aria-hidden>
                 {aiExplanation}
               </p>
               <div className="absolute inset-0 flex items-center justify-center gap-1.5 rounded-lg bg-black/30">
@@ -333,11 +378,18 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
         </div>
       )}
 
+      {/* Momentum indicator */}
       {isPremium && (row.momentum_label === "rising" || row.momentum_label === "improving") && (
-        <span className="text-[10px] text-green-300/50">&#8593; {row.momentum_label}</span>
+        <div className="flex items-center gap-1">
+          <TrendingUp className="h-3 w-3 text-green-400/40" />
+          <span className="text-[9px] text-green-300/40 capitalize">{row.momentum_label}</span>
+        </div>
       )}
       {isPremium && (row.momentum_label === "falling" || row.momentum_label === "cooling") && (
-        <span className="text-[10px] text-red-300/50">&#8595; {row.momentum_label}</span>
+        <div className="flex items-center gap-1">
+          <TrendingDown className="h-3 w-3 text-red-400/40" />
+          <span className="text-[9px] text-red-300/40 capitalize">{row.momentum_label}</span>
+        </div>
       )}
     </div>
   );
@@ -345,18 +397,9 @@ export function PlayerTradeCard({ row, rank, isPremium = true, compact = false, 
 
 function StatCell({ label, value, cls }: { label: string; value: string; cls: string }) {
   return (
-    <div className="rounded-lg bg-white/[0.02] px-2 py-1.5 text-center">
-      <p className="text-[8px] text-white/20 uppercase tracking-wider mb-0.5 truncate">{label}</p>
+    <div className="rounded-lg bg-white/[0.025] px-2 py-1.5 text-center">
+      <p className="text-[8px] text-white/18 uppercase tracking-wider mb-0.5 truncate">{label}</p>
       <p className={`text-xs font-semibold tabular-nums ${cls}`}>{value}</p>
-    </div>
-  );
-}
-
-function MiniStat({ label, value, cls }: { label: string; value: string; cls: string }) {
-  return (
-    <div className="rounded bg-white/[0.02] px-1.5 py-1 text-center">
-      <p className={`text-[9px] font-semibold tabular-nums ${cls} leading-none`}>{label}</p>
-      <p className="text-[8px] text-white/20 mt-0.5">{value}</p>
     </div>
   );
 }
