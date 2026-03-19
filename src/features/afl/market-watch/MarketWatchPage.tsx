@@ -199,11 +199,13 @@ function BestTradeHero({ trade }: { trade: BestTrade }) {
     : `${trade.projection_gain.toFixed(0)} pts/rd`;
 
   const inBadge =
-    trade.in_type === "upgrade"
+    trade.trade_type === "AGGRESSIVE_UPGRADE"
       ? { label: "SCORING UPGRADE", cls: "text-sky-300 border-sky-400/30 bg-sky-400/10" }
+      : trade.trade_type === "CASH_GENERATION"
+      ? { label: "CASH GENERATION", cls: "text-[#F5C84C] border-[#F5C84C]/30 bg-[#F5C84C]/10" }
       : trade.in_type === "buy_before_rise"
       ? { label: "PRICE RISE", cls: "text-green-300 border-green-400/30 bg-green-400/10" }
-      : { label: "CASH GENERATION", cls: "text-[#F5C84C] border-[#F5C84C]/30 bg-[#F5C84C]/10" };
+      : { label: "BALANCED", cls: "text-white/50 border-white/20 bg-white/5" };
 
   return (
     <div
@@ -397,11 +399,13 @@ function TopTradesSection({ trades }: { trades: BestTrade[] }) {
       <div className="flex flex-col gap-2">
         {top.map((trade, i) => {
           const inBadge =
-            trade.in_type === "upgrade"
+            trade.trade_type === "AGGRESSIVE_UPGRADE"
               ? { label: "Score Upgrade", cls: "text-sky-300 border-sky-400/25 bg-sky-400/8" }
+              : trade.trade_type === "CASH_GENERATION"
+              ? { label: "Cash Generation", cls: "text-[#F5C84C] border-[#F5C84C]/25 bg-[#F5C84C]/8" }
               : trade.in_type === "buy_before_rise"
               ? { label: "Price Rise", cls: "text-green-300 border-green-400/25 bg-green-400/8" }
-              : { label: "Cash Generation", cls: "text-[#F5C84C] border-[#F5C84C]/25 bg-[#F5C84C]/8" };
+              : { label: "Balanced", cls: "text-white/50 border-white/15 bg-white/5" };
 
           const cashStr = trade.cash_generated >= 0
             ? `+${fmtPrice(trade.cash_generated)}`

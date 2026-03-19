@@ -17,6 +17,7 @@ export interface BestTrade {
   out: DerivedPlayer;
   in: DerivedPlayer;
   in_type: "upgrade" | "cash_cow" | "buy_before_rise";
+  trade_type: "CASH_GENERATION" | "AGGRESSIVE_UPGRADE" | "BALANCED";
   cash_generated: number;
   projection_gain: number;
   score: number;
@@ -103,6 +104,15 @@ function tradeWhy(
   return `Tactical downgrade — bank cash while ${inn.player_name} generates price growth`;
 }
 
+function tradeType(
+  cashGenerated: number,
+  projGain: number,
+): BestTrade["trade_type"] {
+  if (cashGenerated > 200000) return "CASH_GENERATION";
+  if (projGain > 10) return "AGGRESSIVE_UPGRADE";
+  return "BALANCED";
+}
+
 export function buildBestTrades(
   sells: DerivedPlayer[],
   upgrades: DerivedPlayer[],
@@ -111,24 +121,26 @@ export function buildBestTrades(
 ): BestTrade[] {
   if (sells.length === 0) return [];
 
-  const trades: BestTrade[] = [];
+  const allPairs: BestTrade[] = [];
   const buys = buyBeforeRise ?? [];
 
-  for (const out of sells.slice(0, 10)) {
-    for (const inn of upgrades.slice(0, 12)) {
+  for (const out of sells.slice(0, 15)) {
+    for (const inn of upgrades.slice(0, 15)) {
       if (inn.player_id === out.player_id) continue;
       const cashGenerated = price(out) - price(inn);
-      if (cashGenerated < -100000) continue;
+      if (cashGenerated < -150000) continue;
       const projGain = proj(inn) - proj(out);
-      if (projGain <= 5) continue;
+      if (projGain <= 3) continue;
       const score =
-        projGain * 2
-        + cashGenerated / 1000
-        + (inn.value_score ?? 0) * 5;
-      trades.push({
+        projGain * 4
+        + cashGenerated / 2000
+        + (inn.value_score ?? 0) * 2
+        + (out.value_score ?? 0) * -1;
+      allPairs.push({
         out,
         in: inn,
         in_type: "upgrade",
+        trade_type: tradeType(cashGenerated, projGain),
         cash_generated: cashGenerated,
         projection_gain: projGain,
         score,
@@ -136,20 +148,22 @@ export function buildBestTrades(
       });
     }
 
-    for (const inn of buys.slice(0, 10)) {
+    for (const inn of buys.slice(0, 15)) {
       if (inn.player_id === out.player_id) continue;
       const cashGenerated = price(out) - price(inn);
-      if (cashGenerated < -100000) continue;
+      if (cashGenerated < -150000) continue;
       const projGain = proj(inn) - proj(out);
-      if (projGain <= 5) continue;
+      if (projGain <= 3) continue;
       const score =
-        projGain * 2
-        + cashGenerated / 1000
-        + (inn.value_score ?? 0) * 5;
-      trades.push({
+        projGain * 4
+        + cashGenerated / 2000
+        + (inn.value_score ?? 0) * 2
+        + (out.value_score ?? 0) * -1;
+      allPairs.push({
         out,
         in: inn,
         in_type: "buy_before_rise",
+        trade_type: tradeType(cashGenerated, projGain),
         cash_generated: cashGenerated,
         projection_gain: projGain,
         score,
@@ -157,19 +171,21 @@ export function buildBestTrades(
       });
     }
 
-    for (const inn of cashCows.slice(0, 8)) {
+    for (const inn of cashCows.slice(0, 10)) {
       if (inn.player_id === out.player_id) continue;
       const cashGenerated = price(out) - price(inn);
       if (cashGenerated < 50000) continue;
       const projGain = proj(inn) - proj(out);
       const score =
-        projGain * 1.5
-        + cashGenerated / 6000
-        + (inn.value_score ?? 0) * 3;
-      trades.push({
+        projGain * 4
+        + cashGenerated / 2000
+        + (inn.value_score ?? 0) * 2
+        + (out.value_score ?? 0) * -1;
+      allPairs.push({
         out,
         in: inn,
         in_type: "cash_cow",
+        trade_type: tradeType(cashGenerated, projGain),
         cash_generated: cashGenerated,
         projection_gain: projGain,
         score,
@@ -178,5 +194,24 @@ export function buildBestTrades(
     }
   }
 
-  return trades.sort((a, b) => b.score - a.score).slice(0, 10);
+  // Deduplicate: each buy player appears at most once (best trade for that buy target wins)
+  const seenBuy = new Set<number>();
+  const dedupedByBuy = allPairs
+    .sort((a, b) => b.score - a.score)
+    .filter(t => {
+      if (seenBuy.has(t.in.player_id)) return false;
+      seenBuy.add(t.in.player_id);
+      return true;
+    });
+
+  // Each sell player appears at most 3 times to allow variety
+  const sellCount = new Map<number, number>();
+  const result = dedupedByBuy.filter(t => {
+    const n = sellCount.get(t.out.player_id) ?? 0;
+    if (n >= 3) return false;
+    sellCount.set(t.out.player_id, n + 1);
+    return true;
+  });
+
+  return result.slice(0, 10);
 }
