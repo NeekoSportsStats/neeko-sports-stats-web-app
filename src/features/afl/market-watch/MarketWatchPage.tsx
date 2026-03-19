@@ -5,7 +5,6 @@ import { useAuth } from "@/lib/auth";
 import { track } from "@/lib/analytics";
 import { MWPlayerRow, MWSummary, MWStatus, MWSortKey } from "./types";
 import { PlayerTradeCard } from "./PlayerTradeCard";
-import { MarketWatchBanner } from "./MarketWatchBanner";
 import { MarketWatchSkeleton } from "./MarketWatchSkeleton";
 import { MarketWatchSort } from "./MarketWatchSort";
 import { UpgradeModal } from "./UpgradeModal";
@@ -295,8 +294,6 @@ export default function MarketWatchPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <MarketWatchBanner summary={summary} activeSection={null} />
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
 
         {/* Header */}
