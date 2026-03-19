@@ -176,24 +176,26 @@ function whyThisTradeMatters(trade: BestTrade): string[] {
 }
 
 function miniInsightLine(player: DerivedPlayer): string {
-  const conf = player.projection_confidence ?? 0;
+  const raw = player.projection_confidence ?? 0;
+  const conf = raw <= 1 ? raw * 100 : raw;
   const expChange = player.expected_price_change ?? 0;
   const score = player.trade_score ?? player.value_score ?? 0;
 
-  if (conf >= 0.7 && expChange > 15000) return "Breakout risk rising";
-  if (conf >= 0.7) return "Scoring trend improving";
+  if (conf >= 70 && expChange > 15000) return "Breakout risk rising";
+  if (conf >= 70) return "Scoring trend improving";
   if (expChange > 20000) return "Price momentum building";
   if (expChange < -20000) return "Sell window closing fast";
   if (score >= 350) return "Elite signal this round";
   if (score >= 250) return "Strong signal — act this week";
-  if (conf < 0.4) return "Monitor — some volatility";
+  if (conf < 40) return "Monitor — some volatility";
   return "Steady move — low risk";
 }
 
 function confidenceLabelProps(player: DerivedPlayer): { label: string; cls: string } {
-  const conf = player.projection_confidence ?? 0;
-  if (conf >= 0.7) return { label: "HIGH", cls: "text-green-400 border-green-400/22 bg-green-400/[0.08]" };
-  if (conf >= 0.45) return { label: "MED", cls: "text-amber-300 border-amber-400/22 bg-amber-400/[0.07]" };
+  const raw = player.projection_confidence ?? 0;
+  const conf = raw <= 1 ? raw * 100 : raw;
+  if (conf >= 70) return { label: "HIGH", cls: "text-green-400 border-green-400/22 bg-green-400/[0.08]" };
+  if (conf >= 45) return { label: "MED", cls: "text-amber-300 border-amber-400/22 bg-amber-400/[0.07]" };
   return { label: "LOW", cls: "text-red-400/70 border-red-400/18 bg-red-400/[0.06]" };
 }
 
@@ -967,7 +969,7 @@ function BlurLockedGrid({
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-t from-[#0a0a0a]/97 via-[#0a0a0a]/75 to-transparent rounded-xl px-4 text-center">
         <Lock className="h-3.5 w-3.5 text-white/22 mb-2" />
         <p className="text-[14px] font-extrabold text-white/65 mb-2 leading-snug">
-          You're only seeing 10% of available trades
+          Unlock the full trade plan
         </p>
         {chips.length > 0 && (
           <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 mb-4">
@@ -976,12 +978,15 @@ function BlurLockedGrid({
             ))}
           </div>
         )}
+        <p className="text-[10px] text-white/28 mb-3 max-w-[200px] leading-snug">
+          See every upgrade target, sell signal, and price-rise play ranked for this round
+        </p>
         <button
           onClick={onUnlock}
           className="flex items-center gap-2 bg-[#F5C84C] text-black font-extrabold text-[11px] px-4 py-2 rounded-lg hover:brightness-110 transition-all"
         >
           <Crown size={10} />
-          Unlock full trade plan
+          See every trade signal
         </button>
       </div>
     </div>
@@ -1610,11 +1615,11 @@ function FreeUserView({
   lastUpdated: Date | null;
   onUnlock: () => void;
 }) {
-  const totalSell    = summary?.sell_count            ?? sells.length;
-  const totalBuy     = summary?.buy_before_rise_count ?? buyBeforeRise.length;
-  const totalUpgrade = summary?.upgrade_target_count  ?? upgrades.length;
-  const totalCow     = summary?.cash_cow_count        ?? cashCows.length;
-  const totalTrap    = summary?.trap_count            ?? traps.length;
+  const totalSell    = sells.length;
+  const totalBuy     = buyBeforeRise.length;
+  const totalUpgrade = upgrades.length;
+  const totalCow     = cashCows.length;
+  const totalTrap    = traps.length;
 
   const hiddenSells    = Math.max(totalSell - 1, 0);
   const hiddenBuys     = Math.max(totalBuy - 1, 0);

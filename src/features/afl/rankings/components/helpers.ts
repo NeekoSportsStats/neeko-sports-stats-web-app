@@ -178,11 +178,11 @@ export function getConfidenceColor(v: number | null): string {
 
 export function getConfidenceLabel(v: number | null): string {
   if (v == null) return "—";
-  if (v >= 80) return "Elite";
-  if (v >= 70) return "High";
+  if (v >= 80) return "Elite Safety";
+  if (v >= 70) return "Strong";
   if (v >= 60) return "Solid";
-  if (v >= 50) return "Risky";
-  return "High Risk";
+  if (v >= 50) return "Moderate Risk";
+  return "Volatile";
 }
 
 export function getConfidenceLabelColor(v: number | null): string {

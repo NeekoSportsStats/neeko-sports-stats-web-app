@@ -51,32 +51,32 @@ export function classifyPlayers(raw: MWPlayerRow[]): {
 } {
   const tagged = raw.map(tag);
 
-  // SELL: only players with meaningful downward value signal
-  // Sort by worst value_score first, cap at 25 to keep signal credible
+  // SELL: strong downward signal only — must have value_score < -15 and confirmed price drop
+  // Cap at 8 to keep signal credible; sort worst value first
   const sells = tagged
-    .filter(r => r.category === "sell_before_drop" && (r.value_score ?? 0) < -10)
+    .filter(r => r.category === "sell_before_drop" && (r.value_score ?? 0) < -15 && (r.expected_price_change ?? 0) < 0)
     .sort((a, b) => (a.value_score ?? 0) - (b.value_score ?? 0))
-    .slice(0, 25);
+    .slice(0, 8);
 
   const buyBeforeRise = tagged
     .filter(r => r.category === "buy_before_rise")
     .sort((a, b) => (b.expected_price_change ?? 0) - (a.expected_price_change ?? 0))
-    .slice(0, 10);
+    .slice(0, 8);
 
   const cashCows = tagged
     .filter(r => r.category === "cash_cow")
     .sort((a, b) => (b.expected_price_change ?? 0) - (a.expected_price_change ?? 0))
-    .slice(0, 10);
+    .slice(0, 8);
 
   const upgrades = tagged
     .filter(r => r.category === "upgrade_target")
     .sort((a, b) => (b.value_score ?? 0) - (a.value_score ?? 0))
-    .slice(0, 10);
+    .slice(0, 5);
 
   const traps = tagged
     .filter(r => r.category === "fade_trap")
     .sort((a, b) => (a.expected_price_change ?? 0) - (b.expected_price_change ?? 0))
-    .slice(0, 10);
+    .slice(0, 6);
 
   return { buyBeforeRise, cashCows, upgrades, sells, traps };
 }

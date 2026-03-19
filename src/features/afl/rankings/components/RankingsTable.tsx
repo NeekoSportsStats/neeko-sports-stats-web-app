@@ -83,7 +83,7 @@ export function TableHeader({ isPremium, sortKey, sortDir, onSortClick, onRating
         </span>
       </th>
       <SortableTh label="Projection" col="projection_final" width={100} tooltip="Expected fantasy points this round" />
-      <SortableTh label="Confidence" col="projection_confidence" width={100} tooltip="Confidence reflects projection stability, role consistency, and risk. Elite = 80%+, High = 70–79%, Solid = 60–69%, Risky = 50–59%." />
+      <SortableTh label="Confidence" col="projection_confidence" width={100} tooltip="Confidence reflects projection stability, role consistency, and risk. Elite Safety = 80%+, Strong = 70–79%, Solid = 60–69%, Moderate Risk = 50–59%, Volatile = below 50%." />
       <SortableTh label="Form" col="form_score" width={100} tooltip="Weighted recent form — blends last 3, last 5 and season average. 0–100 scale." />
       <Th label="Price" locked={!isPremium} width={110} tooltip="AFL Fantasy salary this round" />
       <SortableTh label="Value" col="value_score" width={120} tooltip="Points per dollar of price — higher means better value for money" />
