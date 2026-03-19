@@ -169,11 +169,67 @@ export function getRiskColor(v: number | null): string {
 
 export function getConfidenceColor(v: number | null): string {
   if (v == null) return "text-white/30";
-  if (v >= 90) return "text-green-400";
-  if (v >= 75) return "text-emerald-400";
+  if (v >= 80) return "text-green-400";
+  if (v >= 70) return "text-emerald-400";
   if (v >= 60) return "text-yellow-400";
-  if (v >= 45) return "text-orange-400";
+  if (v >= 50) return "text-orange-400";
   return "text-red-400";
+}
+
+export function getConfidenceLabel(v: number | null): string {
+  if (v == null) return "—";
+  if (v >= 80) return "Elite";
+  if (v >= 70) return "High";
+  if (v >= 60) return "Solid";
+  if (v >= 50) return "Risky";
+  return "High Risk";
+}
+
+export function getConfidenceLabelColor(v: number | null): string {
+  if (v == null) return "text-white/25 border-white/10 bg-white/5";
+  if (v >= 80) return "text-green-400 border-green-500/30 bg-green-500/10";
+  if (v >= 70) return "text-emerald-400 border-emerald-500/25 bg-emerald-500/8";
+  if (v >= 60) return "text-yellow-400 border-yellow-500/25 bg-yellow-500/8";
+  if (v >= 50) return "text-orange-400 border-orange-500/25 bg-orange-500/8";
+  return "text-red-400 border-red-500/25 bg-red-500/8";
+}
+
+/**
+ * Normalise raw DB confidence (0–100 scale or 0.0–1.0) into a display-ready
+ * score that reflects *relative* certainty, not raw statistical variance.
+ *
+ * Formula:
+ *   base = 50 + (projection_confidence * 0.5) + (consistency_score * 0.3) – (risk_rating * 0.2)
+ *   rank_boost: top10 +8, top20 +5, top30 +3
+ *   clamped: MIN 50 MAX 92
+ *
+ * Input values may be 0–100 or 0.0–1.0 from the DB — we normalise both.
+ */
+export function normaliseConfidence(
+  rawConf: number | null,
+  consistencyScore: number | null,
+  riskRating: number | null,
+  rank: number,
+): number | null {
+  if (rawConf == null) return null;
+
+  // Detect 0–1 scale vs 0–100 scale
+  const conf = rawConf <= 1 ? rawConf * 100 : rawConf;
+  const consistency = consistencyScore != null
+    ? (consistencyScore <= 1 ? consistencyScore * 100 : consistencyScore)
+    : 60;
+  const risk = riskRating != null
+    ? (riskRating <= 1 ? riskRating * 100 : riskRating)
+    : 40;
+
+  let score = 50 + (conf * 0.5) + (consistency * 0.3) - (risk * 0.2);
+
+  // Rank-based boost
+  if (rank <= 10) score += 8;
+  else if (rank <= 20) score += 5;
+  else if (rank <= 30) score += 3;
+
+  return Math.round(Math.max(50, Math.min(score, 92)));
 }
 
 export function getValueScoreColor(v: number | null): string {

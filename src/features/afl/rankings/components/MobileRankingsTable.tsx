@@ -4,9 +4,11 @@ import { RankingRow, RankingsTab, RowTier } from "./types";
 import {
   fmt, fmtPrice, fmtValueScore,
   getNeekoRatingBadge, getValueTagStyle,
-  getValueScoreColor, getConfidenceColor, getFormScoreColor, getDisplayRecommendation,
+  getValueScoreColor, getConfidenceColor, getConfidenceLabel, getConfidenceLabelColor,
+  getFormScoreColor, getDisplayRecommendation,
   resolveRecommendationColor,
   FREE_FULL_ROWS, FREE_PARTIAL_ROWS,
+  normaliseConfidence,
 } from "./helpers";
 
 // ─── Column widths ─────────────────────────────────────────────────────────────
@@ -185,14 +187,27 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
         <div className={`${CELL_BASE} justify-center`} style={{ width: COL.projection, minWidth: COL.projection }}>
           <span className="text-sm font-semibold text-[#F5C84C]/80 tabular-nums">{fmt(row.projection_final, 0)}</span>
         </div>
-        <div className={`${CELL_BASE} justify-center`} style={{ width: COL.confidence, minWidth: COL.confidence }}>
+        <div className={`${CELL_BASE} justify-center flex-col gap-0.5`} style={{ width: COL.confidence, minWidth: COL.confidence }}>
           {(() => {
-            const raw = row.projection_confidence;
-            const display = raw != null ? Math.round(60 + (raw - 60) * 0.7) : null;
+            const display = normaliseConfidence(
+              row.projection_confidence ?? null,
+              (row as any).consistency_score ?? null,
+              row.risk_rating ?? null,
+              idx + 1,
+            );
+            const label = getConfidenceLabel(display);
+            const labelCls = getConfidenceLabelColor(display);
             return (
-              <span className={`text-sm font-semibold tabular-nums ${getConfidenceColor(display)}`}>
-                {display != null ? `${display}%` : "—"}
-              </span>
+              <>
+                <span className={`text-sm font-semibold tabular-nums ${getConfidenceColor(display)}`}>
+                  {display != null ? `${display}%` : "—"}
+                </span>
+                {display != null && (
+                  <span className={`rounded px-1 py-px text-[7px] font-semibold border ${labelCls}`}>
+                    {label}
+                  </span>
+                )}
+              </>
             );
           })()}
         </div>
@@ -255,15 +270,15 @@ export function MobileConversionWall({ onUpgrade }: { onUpgrade: () => void }) {
     <div className="px-4 pt-2 pb-4">
       <div className="flex items-center justify-between gap-3 rounded-xl border border-[#F5C84C]/25 bg-gradient-to-r from-[#F5C84C]/[0.07] to-transparent px-4 py-4">
         <div className="min-w-0">
-          <p className="text-sm font-bold text-white leading-tight">Unlock AI captain picks, value scores and matchup insights.</p>
-          <p className="text-[11px] text-white/40 mt-0.5">$9.99/mo or $89/yr</p>
+          <p className="text-sm font-bold text-white leading-tight">You're seeing the top 8 — 50+ more ranked below</p>
+          <p className="text-[11px] text-white/40 mt-0.5">$10/month · Cancel anytime</p>
         </div>
         <button
           onClick={onUpgrade}
-          className="shrink-0 flex items-center gap-1.5 bg-[#F5C84C] text-black font-bold text-xs px-4 py-2.5 rounded-xl hover:brightness-110 transition-all min-w-[100px] justify-center"
+          className="shrink-0 flex items-center gap-1.5 bg-[#F5C84C] text-black font-bold text-xs px-4 py-2.5 rounded-xl hover:brightness-110 transition-all min-w-[110px] justify-center"
         >
           <Crown size={11} />
-          Upgrade
+          Unlock rankings
         </button>
       </div>
     </div>

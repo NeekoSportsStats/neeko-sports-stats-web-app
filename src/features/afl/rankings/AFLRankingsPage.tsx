@@ -9,7 +9,7 @@ import {
 } from "./components/types";
 import {
   TAB_SORT_KEY, TAB_DESCRIPTIONS, TAB_DEFAULT_SORT,
-  FREE_PARTIAL_ROWS,
+  FREE_FULL_ROWS, FREE_PARTIAL_ROWS,
   getFreeTier, normalisePosition, computeKpiTiles, fmtUpdatedAt,
 } from "./components/helpers";
 import {
@@ -462,7 +462,7 @@ export default function AFLRankingsPage() {
   }, [rows, debouncedSearch, isPremium, premiumFilter, sortKey, sortDir, safeActiveTab]);
 
   const displayRows = useMemo(() => {
-    if (!isPremium) return sortedRows.slice(0, 5);
+    if (!isPremium) return sortedRows.slice(0, FREE_FULL_ROWS);
     return sortedRows.slice(0, visibleCount);
   }, [sortedRows, isPremium, visibleCount]);
 

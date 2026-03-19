@@ -3,9 +3,11 @@ import { RankingRow, SortKey, SortDir, RankingsTab, RowTier } from "./types";
 import {
   fmt, fmtPrice, fmtValueScore,
   getNeekoRatingBadge, getValueTagStyle,
-  getValueScoreColor, getConfidenceColor, getFormScoreColor, getDisplayRecommendation,
+  getValueScoreColor, getConfidenceColor, getConfidenceLabel, getConfidenceLabelColor,
+  getFormScoreColor, getDisplayRecommendation,
   resolveRecommendationColor,
   FREE_PARTIAL_ROWS, FREE_FULL_ROWS,
+  normaliseConfidence,
 } from "./helpers";
 import { InfoTooltip, LockedCell } from "./RankingsModals";
 import { Crown } from "lucide-react";
@@ -81,7 +83,7 @@ export function TableHeader({ isPremium, sortKey, sortDir, onSortClick, onRating
         </span>
       </th>
       <SortableTh label="Projection" col="projection_final" width={100} tooltip="Expected fantasy points this round" />
-      <SortableTh label="Confidence" col="projection_confidence" width={100} tooltip="Forecast reliability — how likely the projection is to land near its expected score." />
+      <SortableTh label="Confidence" col="projection_confidence" width={100} tooltip="Confidence reflects projection stability, role consistency, and risk. Elite = 80%+, High = 70–79%, Solid = 60–69%, Risky = 50–59%." />
       <SortableTh label="Form" col="form_score" width={100} tooltip="Weighted recent form — blends last 3, last 5 and season average. 0–100 scale." />
       <Th label="Price" locked={!isPremium} width={110} tooltip="AFL Fantasy salary this round" />
       <SortableTh label="Value" col="value_score" width={120} tooltip="Points per dollar of price — higher means better value for money" />
@@ -164,12 +166,25 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
       </td>
       <td className="px-4 py-4 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
         {(() => {
-          const raw = row.projection_confidence;
-          const display = raw != null ? Math.round(60 + (raw - 60) * 0.7) : null;
+          const display = normaliseConfidence(
+            row.projection_confidence ?? null,
+            (row as any).consistency_score ?? null,
+            row.risk_rating ?? null,
+            rank,
+          );
+          const label = getConfidenceLabel(display);
+          const labelCls = getConfidenceLabelColor(display);
           return (
-            <span className={`text-sm font-semibold tabular-nums opacity-75 ${getConfidenceColor(display)}`}>
-              {display != null ? `${display}%` : "—"}
-            </span>
+            <div className="flex flex-col items-center gap-1">
+              <span className={`text-sm font-semibold tabular-nums ${getConfidenceColor(display)}`}>
+                {display != null ? `${display}%` : "—"}
+              </span>
+              {display != null && (
+                <span className={`inline-block rounded px-1.5 py-px text-[8px] font-semibold border ${labelCls}`}>
+                  {label}
+                </span>
+              )}
+            </div>
           );
         })()}
       </td>
@@ -246,9 +261,9 @@ export function ConversionWallRow({ onUpgrade, colSpan = TOTAL_COLS }: { onUpgra
             <Crown size={20} className="text-[#F5C84C]" />
           </div>
           <div>
-            <p className="text-lg font-bold text-white mb-1.5">Full rankings are locked for free users</p>
+            <p className="text-lg font-bold text-white mb-1.5">You're seeing the top 8 players — 50+ more ranked below</p>
             <p className="text-sm text-white/45 max-w-sm leading-relaxed">
-              Neeko+ unlocks AI captain calls, breakout value plays, matchup traps and the full 640-player ranked list.
+              Neeko+ unlocks AI captain calls, breakout value plays, matchup traps and the full ranked list.
             </p>
           </div>
           <div className="flex flex-wrap justify-center gap-2 mb-1">
@@ -264,9 +279,9 @@ export function ConversionWallRow({ onUpgrade, colSpan = TOTAL_COLS }: { onUpgra
               className="inline-flex items-center gap-1.5 rounded-xl bg-[#F5C84C] hover:brightness-110 px-7 py-3 text-sm font-bold text-[#070707] transition-all shadow-lg"
             >
               <Crown size={14} />
-              Upgrade to Neeko+
+              Unlock full rankings
             </button>
-            <span className="text-xs text-white/30">$9.99/mo</span>
+            <span className="text-xs text-white/30">$10/month · Cancel anytime</span>
           </div>
         </div>
       </td>
