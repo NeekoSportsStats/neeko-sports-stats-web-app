@@ -42,6 +42,18 @@ function tag(row: MWPlayerRow): DerivedPlayer {
   return { ...row, _derived_category: cat, _delta: delta(row) };
 }
 
+// Deduplicate by player_id — keep highest trade_score entry
+function dedupeByPlayerId(players: DerivedPlayer[]): DerivedPlayer[] {
+  const map = new Map<number, DerivedPlayer>();
+  for (const p of players) {
+    const existing = map.get(p.player_id);
+    if (!existing || (p.trade_score ?? 0) > (existing.trade_score ?? 0)) {
+      map.set(p.player_id, p);
+    }
+  }
+  return Array.from(map.values());
+}
+
 export function classifyPlayers(raw: MWPlayerRow[]): {
   buyBeforeRise: DerivedPlayer[];
   cashCows: DerivedPlayer[];
@@ -49,36 +61,115 @@ export function classifyPlayers(raw: MWPlayerRow[]): {
   sells: DerivedPlayer[];
   traps: DerivedPlayer[];
 } {
-  const tagged = raw.map(tag);
+  // Deduplicate raw input first — SQL should already be clean but safeguard here
+  const seen = new Set<number>();
+  const uniqueRaw = raw.filter(r => {
+    if (seen.has(r.player_id)) return false;
+    seen.add(r.player_id);
+    return true;
+  });
 
-  // SELL: strong downward signal only — must have value_score < -15 and confirmed price drop
-  // Cap at 8 to keep signal credible; sort worst value first
-  const sells = tagged
-    .filter(r => r.category === "sell_before_drop" && (r.value_score ?? 0) < -15 && (r.expected_price_change ?? 0) < 0)
-    .sort((a, b) => (a.value_score ?? 0) - (b.value_score ?? 0))
-    .slice(0, 8);
+  const tagged = uniqueRaw.map(tag);
 
-  const buyBeforeRise = tagged
-    .filter(r => r.category === "buy_before_rise")
-    .sort((a, b) => (b.expected_price_change ?? 0) - (a.expected_price_change ?? 0))
-    .slice(0, 8);
+  // Each category filters by DB-assigned category only — trust the SQL classification
+  // No extra value_score / EPC filters that could over-restrict results
 
-  const cashCows = tagged
-    .filter(r => r.category === "cash_cow")
-    .sort((a, b) => (b.expected_price_change ?? 0) - (a.expected_price_change ?? 0))
-    .slice(0, 8);
+  const cashCows = dedupeByPlayerId(
+    tagged
+      .filter(r => r.category === "cash_cow")
+      .sort((a, b) => (b.expected_price_change ?? 0) - (a.expected_price_change ?? 0))
+  ).slice(0, 8);
 
-  const upgrades = tagged
-    .filter(r => r.category === "upgrade_target")
-    .sort((a, b) => (b.value_score ?? 0) - (a.value_score ?? 0))
-    .slice(0, 5);
+  const buyBeforeRise = dedupeByPlayerId(
+    tagged
+      .filter(r => r.category === "buy_before_rise")
+      .sort((a, b) => (b.expected_price_change ?? 0) - (a.expected_price_change ?? 0))
+  ).slice(0, 8);
 
-  const traps = tagged
-    .filter(r => r.category === "fade_trap")
-    .sort((a, b) => (a.expected_price_change ?? 0) - (b.expected_price_change ?? 0))
-    .slice(0, 6);
+  const upgrades = dedupeByPlayerId(
+    tagged
+      .filter(r => r.category === "upgrade_target")
+      .sort((a, b) => (b.value_score ?? 0) - (a.value_score ?? 0))
+  ).slice(0, 5);
 
-  return { buyBeforeRise, cashCows, upgrades, sells, traps };
+  // Sells: trust DB category — no extra value_score filter
+  const sells = dedupeByPlayerId(
+    tagged
+      .filter(r => r.category === "sell_before_drop")
+      .sort((a, b) => (a.expected_price_change ?? 0) - (b.expected_price_change ?? 0))
+  ).slice(0, 8);
+
+  const traps = dedupeByPlayerId(
+    tagged
+      .filter(r => r.category === "fade_trap")
+      .sort((a, b) => (a.expected_price_change ?? 0) - (b.expected_price_change ?? 0))
+  ).slice(0, 6);
+
+  // ── Fallback logic — never return empty categories ──────────────────────────
+
+  const allTagged = dedupeByPlayerId(tagged);
+
+  const cashCowsFinal = cashCows.length >= 3 ? cashCows : (() => {
+    // Fallback: cheapest players with positive projection vs breakeven
+    const fallback = allTagged
+      .filter(r => r.category !== "sell_before_drop")
+      .filter(r => !cashCows.find(c => c.player_id === r.player_id))
+      .sort((a, b) => (a.price ?? 0) - (b.price ?? 0))
+      .slice(0, 8 - cashCows.length);
+    return [...cashCows, ...fallback].slice(0, 8);
+  })();
+
+  const buyBeforeRiseFinal = buyBeforeRise.length >= 3 ? buyBeforeRise : (() => {
+    // Fallback: positive delta players not already in cashCows
+    const cowIds = new Set(cashCowsFinal.map(r => r.player_id));
+    const fallback = allTagged
+      .filter(r => r.category === "monitor" && delta(r) > 0)
+      .filter(r => !cowIds.has(r.player_id))
+      .sort((a, b) => delta(b) - delta(a))
+      .slice(0, 8 - buyBeforeRise.length);
+    return [...buyBeforeRise, ...fallback].slice(0, 8);
+  })();
+
+  const upgradesFinal = upgrades.length >= 4 ? upgrades : (() => {
+    // Fallback: highest projection players
+    const existIds = new Set(upgrades.map(r => r.player_id));
+    const fallback = allTagged
+      .filter(r => r.category !== "sell_before_drop" && r.category !== "fade_trap")
+      .filter(r => !existIds.has(r.player_id))
+      .sort((a, b) => (b.projection ?? 0) - (a.projection ?? 0))
+      .slice(0, 5 - upgrades.length);
+    return [...upgrades, ...fallback].slice(0, 5);
+  })();
+
+  const sellsFinal = sells.length >= 4 ? sells : (() => {
+    // Fallback: most negative delta players
+    const existIds = new Set(sells.map(r => r.player_id));
+    const fallback = allTagged
+      .filter(r => delta(r) < -5)
+      .filter(r => !existIds.has(r.player_id))
+      .sort((a, b) => delta(a) - delta(b))
+      .slice(0, 8 - sells.length);
+    return [...sells, ...fallback].slice(0, 8);
+  })();
+
+  const trapsFinal = traps.length >= 3 ? traps : (() => {
+    // Fallback: highest price with low delta
+    const existIds = new Set(traps.map(r => r.player_id));
+    const fallback = allTagged
+      .filter(r => (r.price ?? 0) >= 500000 && delta(r) < 0)
+      .filter(r => !existIds.has(r.player_id))
+      .sort((a, b) => (b.price ?? 0) - (a.price ?? 0))
+      .slice(0, 6 - traps.length);
+    return [...traps, ...fallback].slice(0, 6);
+  })();
+
+  return {
+    buyBeforeRise: buyBeforeRiseFinal,
+    cashCows: cashCowsFinal,
+    upgrades: upgradesFinal,
+    sells: sellsFinal,
+    traps: trapsFinal,
+  };
 }
 
 function tradeWhy(
@@ -111,8 +202,8 @@ function tradeType(
   cashGenerated: number,
   projGain: number,
 ): BestTrade["trade_type"] {
-  if (cashGenerated > 200000) return "CASH_GENERATION";
-  if (projGain > 10) return "AGGRESSIVE_UPGRADE";
+  if (cashGenerated > 150000) return "CASH_GENERATION";
+  if (projGain >= 12) return "AGGRESSIVE_UPGRADE";
   return "BALANCED";
 }
 
