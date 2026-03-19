@@ -507,17 +507,6 @@ function YourMoveThisWeek({
           <p className="text-[12px] text-white/55 leading-snug">{nextStep}</p>
         </div>
 
-        {!isPremium && (
-          <div className="mt-3.5 flex justify-center">
-            <button
-              onClick={onUnlock}
-              className="flex items-center gap-2 bg-[#F5C84C] text-black font-extrabold text-[12px] px-5 py-2.5 rounded-xl hover:brightness-110 transition-all shadow-lg shadow-[#F5C84C]/10"
-            >
-              <Crown size={11} />
-              Unlock Full Trade Plan
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -735,7 +724,7 @@ function FreePlayerCard({ player }: { player: DerivedPlayer }) {
   );
 }
 
-// ─── No Sells Empty Card ───────────────────────────────────────────────────────
+// ─── No Sells Empty Card (only shown when sells === 0) ─────────────────────────
 
 function NoSellsCard() {
   return (
@@ -744,6 +733,69 @@ function NoSellsCard() {
       <div>
         <p className="text-[12px] font-bold text-green-400/60 leading-tight">No urgent sells this round</p>
         <p className="text-[10px] text-white/22 mt-0.5">You're in a strong position — no forced trades</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── 3 Things Holding You Back ─────────────────────────────────────────────────
+
+function ThreeThingsHoldingYouBack({
+  sells,
+  buyBeforeRise,
+  upgrades,
+}: {
+  sells: DerivedPlayer[];
+  buyBeforeRise: DerivedPlayer[];
+  upgrades: DerivedPlayer[];
+}) {
+  const topSell = sells[0];
+  const topBuy = buyBeforeRise[0];
+  const topUpgrade = upgrades[0];
+
+  const items = [
+    {
+      icon: <TrendingDown className="h-3.5 w-3.5 text-red-400/60 shrink-0" />,
+      text: topSell
+        ? `${topSell.player_name} is losing value — and you may still own them`
+        : "You may be holding players about to lose significant value",
+      sub: "Overpriced players bleed your budget every round you wait",
+      accent: "border-red-400/15 bg-red-400/[0.03]",
+    },
+    {
+      icon: <ArrowUpRight className="h-3.5 w-3.5 text-green-400/60 shrink-0" />,
+      text: topBuy
+        ? `${topBuy.player_name} is rising — most coaches won't see it until it's too late`
+        : "You're missing early price rises happening this week",
+      sub: "The best entry points close before lockout",
+      accent: "border-green-400/12 bg-green-400/[0.025]",
+    },
+    {
+      icon: <Target className="h-3.5 w-3.5 text-sky-400/60 shrink-0" />,
+      text: topUpgrade
+        ? `${topUpgrade.player_name} is available — but without a plan, you'll overpay`
+        : "Without a structured upgrade path, you'll overpay for the wrong player",
+      sub: "Premium scorers at fair price are a narrow window",
+      accent: "border-sky-400/12 bg-sky-400/[0.02]",
+    },
+  ];
+
+  return (
+    <div className="mb-5 rounded-2xl border border-white/[0.06] bg-white/[0.01] overflow-hidden">
+      <div className="px-4 pt-4 pb-3 border-b border-white/[0.04]">
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-white/30">What you don't see yet</p>
+        <p className="text-[14px] font-extrabold text-white mt-0.5">3 Things Holding You Back</p>
+      </div>
+      <div className="divide-y divide-white/[0.03]">
+        {items.map((item, i) => (
+          <div key={i} className={`flex items-start gap-3 px-4 py-3.5 ${item.accent}`}>
+            <div className="mt-0.5">{item.icon}</div>
+            <div>
+              <p className="text-[12px] font-semibold text-white/65 leading-snug">{item.text}</p>
+              <p className="text-[10px] text-white/25 mt-0.5">{item.sub}</p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -870,50 +922,56 @@ function BlurLockedGrid({
   sellCount,
   buyCount,
   upgradeCount,
+  cowCount,
 }: {
   players: DerivedPlayer[];
   onUnlock: () => void;
   sellCount?: number;
   buyCount?: number;
   upgradeCount?: number;
+  cowCount?: number;
 }) {
   if (players.length === 0) return null;
 
-  const hiddenSells = Math.max((sellCount ?? 1) - 1, 0);
-  const hiddenBuys = Math.max((buyCount ?? 1) - 1, 0);
+  const hiddenSells    = Math.max((sellCount ?? 1) - 1, 0);
+  const hiddenBuys     = Math.max((buyCount ?? 1) - 1, 0);
   const hiddenUpgrades = Math.max((upgradeCount ?? 1) - 1, 0);
+  const hiddenCows     = Math.max((cowCount ?? 1) - 1, 0);
+
+  const chips = [
+    hiddenSells > 0    && { label: `+${hiddenSells} sell signals hidden`,  cls: "text-red-400/60" },
+    hiddenBuys > 0     && { label: `+${hiddenBuys} early value plays`,     cls: "text-green-400/60" },
+    hiddenUpgrades > 0 && { label: `+${hiddenUpgrades} upgrade targets`,   cls: "text-sky-400/60" },
+    hiddenCows > 0     && { label: `+${hiddenCows} cash cows`,             cls: "text-[#F5C84C]/55" },
+  ].filter(Boolean) as { label: string; cls: string }[];
 
   return (
     <div className="relative">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pointer-events-none select-none">
         {players.slice(0, 3).map((p) => (
-          <div key={p.player_id} className="blur-sm opacity-25">
+          <div key={p.player_id} className="blur-sm opacity-20">
             <PlayerTradeCard row={p} isPremium={false} />
           </div>
         ))}
       </div>
-      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-t from-[#0a0a0a]/95 via-[#0a0a0a]/70 to-transparent rounded-xl px-4 text-center">
-        <Lock className="h-4 w-4 text-white/25 mb-2" />
-        <p className="text-[14px] font-extrabold text-white/70 mb-1">
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-t from-[#0a0a0a]/97 via-[#0a0a0a]/75 to-transparent rounded-xl px-4 text-center">
+        <Lock className="h-3.5 w-3.5 text-white/22 mb-2" />
+        <p className="text-[14px] font-extrabold text-white/65 mb-2 leading-snug">
           You're only seeing 10% of available trades
         </p>
-        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 mb-4">
-          {hiddenSells > 0 && (
-            <span className="text-[10px] text-red-400/55">+{hiddenSells} sell signals hidden</span>
-          )}
-          {hiddenBuys > 0 && (
-            <span className="text-[10px] text-green-400/55">+{hiddenBuys} early value plays</span>
-          )}
-          {hiddenUpgrades > 0 && (
-            <span className="text-[10px] text-sky-400/55">+{hiddenUpgrades} upgrade targets</span>
-          )}
-        </div>
+        {chips.length > 0 && (
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 mb-4">
+            {chips.map(c => (
+              <span key={c.label} className={`text-[10px] font-semibold ${c.cls}`}>{c.label}</span>
+            ))}
+          </div>
+        )}
         <button
           onClick={onUnlock}
-          className="flex items-center gap-2 bg-[#F5C84C] text-black font-extrabold text-[12px] px-5 py-2.5 rounded-xl hover:brightness-110 transition-all shadow-lg shadow-[#F5C84C]/15"
+          className="flex items-center gap-2 bg-[#F5C84C] text-black font-extrabold text-[11px] px-4 py-2 rounded-lg hover:brightness-110 transition-all"
         >
-          <Crown size={11} />
-          Unlock My Trade Plan
+          <Crown size={10} />
+          See all trades
         </button>
       </div>
     </div>
@@ -1415,14 +1473,20 @@ function ThisWeeksPlan({
   );
 }
 
-// ─── Premium CTA Block ─────────────────────────────────────────────────────────
+// ─── Final CTA Block (single CTA for free view) ────────────────────────────────
 
-function PremiumCTABlock({
-  hiddenCount,
+function FinalCTABlock({
+  hiddenSells,
+  hiddenBuys,
+  hiddenUpgrades,
+  hiddenCows,
   onUnlock,
   lastUpdated,
 }: {
-  hiddenCount: number;
+  hiddenSells: number;
+  hiddenBuys: number;
+  hiddenUpgrades: number;
+  hiddenCows: number;
   onUnlock: () => void;
   lastUpdated: Date | null;
 }) {
@@ -1435,61 +1499,88 @@ function PremiumCTABlock({
 
   const isUrgent = hoursLeft !== null && hoursLeft <= 6;
 
+  const hiddenLines = [
+    hiddenSells > 0    && `${hiddenSells} sell signal${hiddenSells !== 1 ? "s" : ""} — act before price falls`,
+    hiddenBuys > 0     && `${hiddenBuys} buy-before-rise — entry window closes soon`,
+    hiddenUpgrades > 0 && `${hiddenUpgrades} upgrade target${hiddenUpgrades !== 1 ? "s" : ""} — premium scorers at fair price`,
+    hiddenCows > 0     && `${hiddenCows} cash cow${hiddenCows !== 1 ? "s" : ""} — fastest price growth this round`,
+  ].filter(Boolean) as string[];
+
+  if (hiddenLines.length === 0) {
+    hiddenLines.push(
+      "Full sell signals before value drops",
+      "Buy before rise — window is open now",
+      "Upgrade targets — elite scorers at fair entry",
+    );
+  }
+
   return (
     <div
-      className="mb-8 rounded-2xl border border-[#F5C84C]/18 p-6 text-center relative overflow-hidden"
-      style={{ background: "linear-gradient(160deg, rgba(245,200,76,0.055) 0%, rgba(10,10,10,0) 65%)" }}
+      className="mb-10 rounded-2xl border border-[#F5C84C]/20 overflow-hidden"
+      style={{ background: "linear-gradient(160deg, rgba(245,200,76,0.06) 0%, rgba(10,10,10,0) 70%)" }}
     >
-      <div className="flex items-center justify-center gap-2 mb-2">
-        <Lock className="h-3.5 w-3.5 text-[#F5C84C]/45" />
-        <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#F5C84C]/55">Premium Only</p>
-      </div>
-
-      <h3 className="text-[18px] font-extrabold text-white mb-1.5">
-        See Every Trade Before Prices Move
-      </h3>
-
-      <p className="text-[12px] text-white/40 mb-4">
-        Know the exact moves top players will make before lockout
-      </p>
-
-      <div className="flex flex-col items-center gap-1.5 mb-5 text-left w-full max-w-xs mx-auto">
-        {[
-          "Full weekly trade strategy — every signal ranked",
-          "AI-powered explanations for every move",
-          "Confidence ratings so you size correctly",
-        ].map(b => (
-          <div key={b} className="flex items-center gap-2">
-            <CheckCircle2 className="h-3 w-3 text-[#F5C84C]/45 shrink-0" />
-            <span className="text-[11px] text-white/38">{b}</span>
-          </div>
-        ))}
-      </div>
-
-      {isUrgent && (
-        <div className="mb-4 flex items-center justify-center gap-1.5 text-[10px] font-bold text-orange-400/75">
-          <Flame className="h-3 w-3" />
-          Prices updating soon — act now before the window closes
+      <div className="p-6 sm:p-8 text-center">
+        <div className="flex items-center justify-center w-10 h-10 rounded-full border border-[#F5C84C]/20 bg-[#F5C84C]/[0.08] mx-auto mb-4">
+          <Crown size={18} className="text-[#F5C84C]" />
         </div>
-      )}
 
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-        <a
-          href="/neeko-plus"
-          className="inline-flex items-center gap-2 bg-[#F5C84C] text-black font-extrabold text-[13px] px-6 py-3 rounded-xl hover:brightness-110 transition-all shadow-lg shadow-[#F5C84C]/10"
-        >
-          <Crown size={13} />
-          Unlock My Trade Plan
-        </a>
-        <button
-          onClick={onUnlock}
-          className="text-[11px] text-white/30 hover:text-white/50 transition-colors px-4 py-3 rounded-xl border border-white/6 hover:border-white/12"
-        >
-          Preview how it works
-        </button>
+        <p className="text-[9px] uppercase tracking-widest text-white/18 mb-1.5">Neeko Plus</p>
+        <h3 className="text-[19px] font-extrabold text-white mb-1.5 leading-snug">
+          See Every Trade Before Prices Move
+        </h3>
+        <p className="text-[12px] text-white/35 mb-5">
+          Know exactly what top players will do before lockout
+        </p>
+
+        {/* Feature bullets */}
+        <div className="flex flex-col items-start gap-2 mb-5 w-full max-w-xs mx-auto">
+          {[
+            "Full weekly trade strategy — every signal ranked",
+            "AI-powered explanations for every move",
+            "Confidence ratings so you size correctly",
+          ].map(b => (
+            <div key={b} className="flex items-center gap-2">
+              <CheckCircle2 className="h-3 w-3 text-[#F5C84C]/45 shrink-0" />
+              <span className="text-[11px] text-white/40">{b}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Hidden signal lines */}
+        <div className="mb-5 space-y-1 text-left max-w-xs mx-auto">
+          {hiddenLines.map(line => (
+            <div key={line} className="flex items-center gap-2">
+              <div className="w-1 h-1 rounded-full bg-[#F5C84C]/28 shrink-0" />
+              <p className="text-[11px] text-white/30">{line}</p>
+            </div>
+          ))}
+        </div>
+
+        {isUrgent && (
+          <div className="mb-4 flex items-center justify-center gap-1.5 text-[10px] font-bold text-orange-400/70">
+            <Flame className="h-3 w-3" />
+            Prices updating soon — act now before the window closes
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <a
+            href="/neeko-plus"
+            className="inline-flex items-center gap-2 bg-[#F5C84C] text-black font-extrabold text-[13px] px-7 py-3 rounded-xl hover:brightness-110 transition-all shadow-lg shadow-[#F5C84C]/12"
+          >
+            <Crown size={13} />
+            Unlock My Trade Plan
+          </a>
+          <button
+            onClick={onUnlock}
+            className="text-[11px] text-white/28 hover:text-white/50 transition-colors px-4 py-3 rounded-xl border border-white/6 hover:border-white/12"
+          >
+            Preview how it works
+          </button>
+        </div>
+
+        <p className="mt-3 text-[10px] text-white/15">Less than $1 per round · Cancel anytime</p>
       </div>
-
-      <p className="mt-3 text-[10px] text-white/12">From $9.99/mo · Cancel anytime</p>
     </div>
   );
 }
@@ -1514,14 +1605,11 @@ function FreeUserView({
   const totalUpgrade = summary?.upgrade_target_count  ?? upgrades.length;
   const totalCow     = summary?.cash_cow_count        ?? cashCows.length;
   const totalTrap    = summary?.trap_count            ?? traps.length;
-  const hiddenCount  = Math.max((totalSell - 1) + (totalBuy - 1) + (totalUpgrade - 1) + (totalCow - 1), 40);
 
-  const freeSections = [
-    { players: sells,        label: "Must Sell",         dot: "bg-red-400",   labelColor: "text-red-400",   total: totalSell,    desc: "Act now — sell before price falls" },
-    { players: buyBeforeRise,label: "Early Value Plays",  dot: "bg-green-400", labelColor: "text-green-400", total: totalBuy,     desc: "Cheap players about to spike in price" },
-    { players: upgrades,     label: "Score Upgrade",     dot: "bg-sky-400",   labelColor: "text-sky-400",   total: totalUpgrade, desc: "Scoring lift — worth the entry price" },
-    { players: cashCows,     label: "Cash Cow",          dot: "bg-[#F5C84C]", labelColor: "text-[#F5C84C]", total: totalCow,     desc: "Budget pick building fast cash" },
-  ];
+  const hiddenSells    = Math.max(totalSell - 1, 0);
+  const hiddenBuys     = Math.max(totalBuy - 1, 0);
+  const hiddenUpgrades = Math.max(totalUpgrade - 1, 0);
+  const hiddenCows     = Math.max(totalCow - 1, 0);
 
   const hoursLeft = useMemo(() => {
     if (!lastUpdated) return null;
@@ -1531,28 +1619,75 @@ function FreeUserView({
   }, [lastUpdated]);
 
   const showUrgency = hoursLeft !== null && hoursLeft <= 24;
+  const isHot = hoursLeft !== null && hoursLeft <= 6;
+
+  const freeSections: {
+    players: DerivedPlayer[];
+    label: string;
+    dot: string;
+    labelColor: string;
+    desc: string;
+    isSell: boolean;
+  }[] = [
+    {
+      players: sells,
+      label: "Must Sell",
+      dot: "bg-red-400",
+      labelColor: "text-red-400",
+      desc: "Sell before price falls — act this week",
+      isSell: true,
+    },
+    {
+      players: buyBeforeRise,
+      label: "Early Value Plays",
+      dot: "bg-green-400",
+      labelColor: "text-green-400",
+      desc: "Cheap players about to spike in price",
+      isSell: false,
+    },
+    {
+      players: upgrades,
+      label: "Score Upgrade",
+      dot: "bg-sky-400",
+      labelColor: "text-sky-400",
+      desc: "Scoring lift — worth the entry price",
+      isSell: false,
+    },
+    {
+      players: cashCows,
+      label: "Cash Cow",
+      dot: "bg-[#F5C84C]",
+      labelColor: "text-[#F5C84C]",
+      desc: "Budget pick building fast cash",
+      isSell: false,
+    },
+  ];
+
+  const lockedPlayers = [
+    ...sells.slice(1, 2),
+    ...upgrades.slice(1, 2),
+    ...buyBeforeRise.slice(1, 2),
+  ];
 
   return (
     <div>
-      {/* 1. Your Move hero */}
-      {cascade.yourMove && (
-        <YourMoveThisWeek
-          trade={cascade.yourMove}
-          onUnlock={onUnlock}
-          isPremium={false}
-          lastUpdated={lastUpdated}
-        />
-      )}
+      {/* ── 1. Header trust line ───────────────────────────────────────────── */}
+      <div className="mb-4 flex items-center justify-between gap-2 flex-wrap">
+        <p className="text-[10px] text-white/22 flex items-center gap-1.5">
+          <span className="w-1 h-1 rounded-full bg-white/20 inline-block" />
+          Based on AFL Fantasy pricing + AI projections
+        </p>
+        {lastUpdated && (
+          <p className="text-[10px] text-white/15">
+            Updated {lastUpdated.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}
+          </p>
+        )}
+      </div>
 
-      {/* 2. Why This Trade Matters */}
-      {cascade.yourMove && (
-        <WhyThisTradeMatters trade={cascade.yourMove} />
-      )}
-
-      {/* Micro urgency banner */}
+      {/* ── 2. Urgency banner (if prices updating soon) ─────────────────────── */}
       {showUrgency && (
-        <div className="mb-5 flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-amber-400/18 bg-amber-400/[0.04]">
-          {hoursLeft !== null && hoursLeft <= 6
+        <div className="mb-4 flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-amber-400/18 bg-amber-400/[0.04]">
+          {isHot
             ? <Flame className="h-3.5 w-3.5 text-orange-400/65 shrink-0" />
             : <Timer className="h-3.5 w-3.5 text-amber-400/55 shrink-0" />
           }
@@ -1562,7 +1697,7 @@ function FreeUserView({
         </div>
       )}
 
-      {/* 3. Summary strip */}
+      {/* ── 3. Summary strip ────────────────────────────────────────────────── */}
       <SummaryStrip
         sellCount={totalSell}
         buyCount={totalBuy}
@@ -1571,81 +1706,83 @@ function FreeUserView({
         trapCount={totalTrap}
       />
 
-      {/* 4. Best trade (partially visible, fading out) */}
-      {cascade.bestTrade && (
-        <div className="mb-6 relative">
-          <BestTradeHero trade={cascade.bestTrade} isPremium={false} />
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-transparent via-[#0a0a0a]/35 to-[#0a0a0a]/90 pointer-events-none" />
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center">
-            <button
-              onClick={onUnlock}
-              className="flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-xs px-5 py-2.5 rounded-xl hover:brightness-110 transition-all shadow-lg"
-            >
-              <Crown size={11} />
-              Unlock full trade plan
-            </button>
-          </div>
-        </div>
+      {/* ── 4. Your Move (hero) ─────────────────────────────────────────────── */}
+      {cascade.yourMove && (
+        <YourMoveThisWeek
+          trade={cascade.yourMove}
+          onUnlock={onUnlock}
+          isPremium={false}
+          lastUpdated={lastUpdated}
+        />
       )}
 
-      {/* 5. This Week's Plan — enhanced free cards */}
-      <div className="mb-2">
-        <div className="flex items-center gap-2 mb-1">
-          <DollarSign className="h-4 w-4 text-[#F5C84C]/55" />
-          <h2 className="text-[13px] font-extrabold uppercase tracking-[0.1em] text-white/70">This Week's Plan</h2>
+      {/* ── 5. Why This Trade Matters ───────────────────────────────────────── */}
+      {cascade.yourMove && (
+        <WhyThisTradeMatters trade={cascade.yourMove} />
+      )}
+
+      {/* ── 6. 3 Things Holding You Back ───────────────────────────────────── */}
+      <ThreeThingsHoldingYouBack
+        sells={sells}
+        buyBeforeRise={buyBeforeRise}
+        upgrades={upgrades}
+      />
+
+      {/* ── 7. This Week's Plan ─────────────────────────────────────────────── */}
+      <div className="mb-3">
+        <div className="flex items-center gap-2 mb-0.5">
+          <DollarSign className="h-4 w-4 text-[#F5C84C]/50" />
+          <h2 className="text-[13px] font-extrabold uppercase tracking-[0.1em] text-white/65">This Week's Plan</h2>
         </div>
-        <p className="text-[11px] text-white/25 mb-4 ml-6">Your one visible signal per category — unlock full list with Premium</p>
+        <p className="text-[10px] text-white/22 ml-6">One signal per category — unlock full depth with Premium</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-        {freeSections.map(({ players, label, dot, labelColor, total, desc }) => (
+        {freeSections.map(({ players, label, dot, labelColor, desc, isSell }) => (
           <div key={label} className="flex flex-col gap-2">
             <div className="flex items-center gap-2 pl-0.5">
               <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
               <span className={`text-[11px] font-extrabold uppercase tracking-wider ${labelColor}`}>{label}</span>
-              {total > 1 && (
-                <span className="text-[9px] text-white/18 font-mono">{total} total</span>
-              )}
             </div>
             <p className="text-[10px] text-white/20 pl-3.5 -mt-1 mb-0.5">{desc}</p>
-            {label === "Must Sell" && players.length === 0 ? (
+
+            {/* SELL LOGIC FIX: only show NoSellsCard when zero sell signals */}
+            {isSell && sells.length === 0 ? (
               <NoSellsCard />
             ) : players[0] ? (
               <FreePlayerCard player={players[0]} />
             ) : (
-              <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] p-5 flex flex-col items-center justify-center min-h-[88px] text-center gap-1">
-                <p className="text-[11px] font-semibold text-white/22">No strong signals this week</p>
-                <p className="text-[10px] text-white/13">Hold strategy — no action needed</p>
+              <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] px-4 py-4 text-center">
+                <p className="text-[11px] font-semibold text-white/22">No signal this week</p>
+                <p className="text-[10px] text-white/13 mt-0.5">Hold — no action needed</p>
               </div>
             )}
           </div>
         ))}
       </div>
 
-      {/* 6. Locked tease with counts */}
-      {(sells.length > 1 || upgrades.length > 1 || buyBeforeRise.length > 1) && (
+      {/* ── 8. Locked trades preview ────────────────────────────────────────── */}
+      {lockedPlayers.length > 0 && (
         <div className="mb-6">
           <BlurLockedGrid
-            players={[...sells.slice(1, 2), ...upgrades.slice(1, 2), ...buyBeforeRise.slice(1, 2)]}
+            players={lockedPlayers}
             onUnlock={onUnlock}
             sellCount={totalSell}
             buyCount={totalBuy}
             upgradeCount={totalUpgrade}
+            cowCount={totalCow}
           />
         </div>
       )}
 
-      {/* 7. Main CTA */}
-      <PremiumCTABlock hiddenCount={hiddenCount} onUnlock={onUnlock} lastUpdated={lastUpdated} />
-
-      {/* 8. Paywall footer */}
-      <MarketWatchPaywall
-        sellCount={totalSell}
-        buyCount={totalBuy}
-        upgradeCount={totalUpgrade}
-        cowCount={totalCow}
-        trapCount={totalTrap}
+      {/* ── 9. Single final CTA ─────────────────────────────────────────────── */}
+      <FinalCTABlock
+        hiddenSells={hiddenSells}
+        hiddenBuys={hiddenBuys}
+        hiddenUpgrades={hiddenUpgrades}
+        hiddenCows={hiddenCows}
         onUnlock={onUnlock}
+        lastUpdated={lastUpdated}
       />
     </div>
   );
@@ -1831,94 +1968,3 @@ function EmptySection({ message, subtext }: { message: string; subtext: string }
   );
 }
 
-// ─── Paywall ───────────────────────────────────────────────────────────────────
-
-function MarketWatchPaywall({
-  sellCount, buyCount, upgradeCount, cowCount, trapCount, onUnlock,
-}: {
-  sellCount: number;
-  buyCount: number;
-  upgradeCount: number;
-  cowCount: number;
-  trapCount: number;
-  onUnlock: () => void;
-}) {
-  const totalExtra = Math.max(
-    (sellCount - 1) + (buyCount - 1) + (upgradeCount - 1) + (cowCount - 1) + (trapCount - 1),
-    80
-  );
-
-  const lines = [
-    sellCount > 1    && `${sellCount - 1} more sell signal${sellCount - 1 !== 1 ? "s" : ""} — act before price falls`,
-    buyCount > 1     && `${buyCount - 1} more buy${buyCount - 1 !== 1 ? "s" : ""} before rise — the window is open now`,
-    upgradeCount > 1 && `${upgradeCount - 1} more upgrade target${upgradeCount - 1 !== 1 ? "s" : ""} — premium scorers at fair entry`,
-    cowCount > 1     && `${cowCount - 1} more cash cow${cowCount - 1 !== 1 ? "s" : ""} — fastest price growth this round`,
-    trapCount > 1    && `${trapCount - 1} fade alert${trapCount - 1 !== 1 ? "s" : ""} — overpriced players to avoid`,
-  ].filter(Boolean) as string[];
-
-  if (lines.length === 0) {
-    lines.push(
-      "Full sell signals — overpriced players before value drops",
-      "Buy before rise — price moving up now",
-      "Upgrade targets — elite scorers at fair prices",
-      "Cash cows — budget picks generating fast price growth",
-    );
-  }
-
-  return (
-    <div className="mb-10 rounded-2xl border border-[#F5C84C]/18 bg-gradient-to-b from-[#F5C84C]/[0.04] to-transparent p-7 text-center">
-      <div className="flex items-center justify-center w-11 h-11 rounded-full border border-[#F5C84C]/22 bg-[#F5C84C]/8 mx-auto mb-4">
-        <Crown size={20} className="text-[#F5C84C]" />
-      </div>
-
-      <p className="text-[10px] uppercase tracking-widest text-white/18 mb-2">Preview only</p>
-      <h3 className="text-lg font-extrabold text-white mb-1">See every trade before prices move</h3>
-      <p className="text-[12px] text-white/28 mb-5">
-        {totalExtra}+ trade signals this round — know every move before prices shift
-      </p>
-
-      <div className="mb-5 space-y-1.5">
-        {lines.map(line => (
-          <div key={line} className="flex items-center justify-center gap-2">
-            <div className="w-1 h-1 rounded-full bg-[#F5C84C]/30 shrink-0" />
-            <p className="text-[12px] text-white/38">{line}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap items-center justify-center gap-2 mb-5">
-        {[
-          { icon: <Zap size={9} />, label: "Full round signals" },
-          { icon: <Target size={9} />, label: "Breakeven analysis" },
-          { icon: <Lock size={9} />, label: "AI-powered insights" },
-        ].map(({ icon, label }) => (
-          <div
-            key={label}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#F5C84C]/12 bg-[#F5C84C]/[0.05] text-[10px] font-semibold text-[#F5C84C]/55"
-          >
-            <span className="text-[#F5C84C]/35">{icon}</span>
-            {label}
-          </div>
-        ))}
-      </div>
-
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-        <a
-          href="/neeko-plus"
-          className="inline-flex items-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-6 py-3 rounded-xl hover:brightness-110 transition-all"
-        >
-          <Crown size={13} />
-          Unlock your full trade plan
-        </a>
-        <button
-          onClick={onUnlock}
-          className="text-[12px] text-white/28 hover:text-white/55 transition-colors px-4 py-3 rounded-xl border border-white/6 hover:border-white/12"
-        >
-          View all signals
-        </button>
-      </div>
-
-      <p className="mt-3 text-[10px] text-white/12">From $9.99/mo or $89/yr</p>
-    </div>
-  );
-}
