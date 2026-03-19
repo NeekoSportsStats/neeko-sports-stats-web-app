@@ -64,6 +64,7 @@ export interface ChartDataPoint {
   game_id: number | null;
   actual_score: number | null;
   projected_score: number | null;
+  projection_confidence: number | null;
   is_future: boolean;
 }
 
