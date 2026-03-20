@@ -159,7 +159,19 @@ function ActionCard({
   );
 }
 
+function SyncRow({ label, ok, warnLabel = "Failed" }: { label: string; ok: boolean; warnLabel?: string }) {
+  return (
+    <div className="flex items-center justify-between text-[11px]">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={ok ? "text-emerald-400 font-medium" : "text-amber-400 font-medium"}>
+        {ok ? "Synced" : warnLabel}
+      </span>
+    </div>
+  );
+}
+
 interface ApplyPricesResult {
+  success?: boolean;
   status?: string;
   players_processed?: number;
   match_rate_pct?: number;
@@ -167,6 +179,8 @@ interface ApplyPricesResult {
   rankings_ok?: boolean;
   market_watch_ok?: boolean;
   edge_board_ok?: boolean;
+  ai_triggered?: boolean;
+  pipeline_completed_at?: string;
   duration_ms?: number;
   message?: string;
 }
@@ -192,19 +206,15 @@ function ApplyFantasyPricesCard({
       if (res.success) {
         const data = res.data as ApplyPricesResult | undefined;
         setLastResult(data ?? null);
-        if (data?.status === "aborted") {
-          setResultStatus("aborted");
-          toast({ title: "Apply Fantasy Prices aborted", description: data.message ?? "Insufficient data", variant: "destructive" });
-        } else {
-          setResultStatus("success");
-          toast({
-            title: "Fantasy Prices Applied",
-            description: `${data?.players_processed ?? "—"} players · ${data?.price_changes ?? 0} price changes · ${data?.duration_ms ?? "—"}ms`,
-          });
-          onComplete?.();
-        }
+        setResultStatus("success");
+        toast({
+          title: "Fantasy Prices Applied",
+          description: `${data?.players_processed ?? "—"} players · ${data?.price_changes ?? 0} changes · ${data?.duration_ms ?? "—"}ms`,
+        });
+        onComplete?.();
       } else {
         setResultStatus("error");
+        setLastResult({ message: res.error ?? "Unknown error" });
         toast({ title: "Apply Fantasy Prices failed", description: res.error ?? "Unknown error", variant: "destructive" });
       }
     } catch (err) {
@@ -277,8 +287,8 @@ function ApplyFantasyPricesCard({
         )}
 
         {lastResult && resultStatus === "success" && (
-          <div className="rounded-md border border-emerald-900/40 bg-emerald-950/20 px-3 py-2 space-y-1.5">
-            <p className="text-[11px] font-semibold text-emerald-400">Pipeline complete</p>
+          <div className="rounded-md border border-emerald-900/40 bg-emerald-950/20 px-3 py-2 space-y-2">
+            <p className="text-[11px] font-semibold text-emerald-400">Pipeline complete — all systems synced</p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
               <span>Players processed</span>
               <span className="text-foreground font-medium tabular-nums">{lastResult.players_processed?.toLocaleString() ?? "—"}</span>
@@ -286,31 +296,94 @@ function ApplyFantasyPricesCard({
               <span className="text-foreground font-medium tabular-nums">{lastResult.match_rate_pct != null ? `${lastResult.match_rate_pct}%` : "—"}</span>
               <span>Price changes</span>
               <span className="text-foreground font-medium tabular-nums">{lastResult.price_changes?.toLocaleString() ?? "—"}</span>
-              <span>Rankings cache</span>
-              <span className={lastResult.rankings_ok ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
-                {lastResult.rankings_ok ? "Updated" : "Failed"}
-              </span>
-              <span>Market Watch</span>
-              <span className={lastResult.market_watch_ok ? "text-emerald-400 font-medium" : "text-amber-400 font-medium"}>
-                {lastResult.market_watch_ok ? "Updated" : "Skipped"}
-              </span>
-              <span>Edge Board</span>
-              <span className={lastResult.edge_board_ok ? "text-emerald-400 font-medium" : "text-amber-400 font-medium"}>
-                {lastResult.edge_board_ok ? "Updated" : "Skipped"}
-              </span>
               <span>Duration</span>
               <span className="text-foreground font-medium tabular-nums">{lastResult.duration_ms != null ? `${lastResult.duration_ms}ms` : "—"}</span>
+            </div>
+            <div className="pt-1 border-t border-emerald-900/30 space-y-1">
+              <SyncRow label="Rankings synced" ok={!!lastResult.rankings_ok} />
+              <SyncRow label="Market Watch synced" ok={!!lastResult.market_watch_ok} />
+              <SyncRow label="Edge Board synced" ok={!!lastResult.edge_board_ok} />
+              <SyncRow label="AI invalidated" ok={!!lastResult.ai_triggered} warnLabel="Skipped" />
             </div>
           </div>
         )}
 
-        {lastResult && resultStatus === "aborted" && (
-          <div className="rounded-md border border-amber-900/40 bg-amber-950/15 px-3 py-2">
-            <p className="text-[11px] text-amber-400">{lastResult.message ?? "Aborted — upload prices first via Price Ingest tab"}</p>
+        {lastResult && resultStatus === "error" && (
+          <div className="rounded-md border border-red-900/40 bg-red-950/15 px-3 py-2 space-y-1">
+            <p className="text-[11px] font-semibold text-red-400">Pipeline failed — no data was changed</p>
+            <p className="text-[11px] text-red-300/80">{lastResult.message ?? "Check system logs for details"}</p>
           </div>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function SystemSyncStatus({ status, loading }: { status: CommandCenterStatus | null; loading: boolean }) {
+  const rankingsOk = status ? toLevel(status.rankings_cache_status) === "ok" : null;
+  const marketOk   = status ? toLevel(status.market_watch_health) === "ok" || status.market_watch_health === "ok" : null;
+  const edgeOk     = status ? status.edge_board_rows != null && status.edge_board_rows > 0 : null;
+  const aiOk       = status ? status.ai_missing_players === 0 : null;
+
+  const anyFailed = rankingsOk === false || marketOk === false || edgeOk === false;
+
+  if (loading) {
+    return <div className="h-12 rounded-lg bg-muted animate-pulse" />;
+  }
+
+  return (
+    <div className={`rounded-lg border px-4 py-3 ${anyFailed ? "border-red-900/40 bg-red-950/10" : "border-border bg-muted/20"}`}>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-foreground">System Sync Status</p>
+        {anyFailed && (
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold bg-red-950 text-red-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            Out of Sync
+          </span>
+        )}
+        {!anyFailed && status && (
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold bg-emerald-950 text-emerald-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Synced
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {[
+          { label: "Rankings", ok: rankingsOk, detail: status?.rankings_cache_rows != null ? `${status.rankings_cache_rows.toLocaleString()} players` : null },
+          { label: "Market Watch", ok: marketOk, detail: status?.market_watch_quality ?? null },
+          { label: "Edge Board", ok: edgeOk, detail: status?.edge_board_rows != null ? `${status.edge_board_rows} rows` : null },
+          { label: "AI Recos", ok: aiOk, detail: status?.ai_missing_players != null ? (status.ai_missing_players === 0 ? "All covered" : `${status.ai_missing_players} missing`) : null },
+        ].map(({ label, ok, detail }) => (
+          <div key={label} className={`rounded-md border px-2.5 py-2 ${
+            ok === true ? "border-emerald-900/30 bg-emerald-950/20"
+            : ok === false ? "border-red-900/30 bg-red-950/20"
+            : "border-border bg-muted/10"
+          }`}>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                ok === true ? "bg-emerald-500"
+                : ok === false ? "bg-red-500"
+                : "bg-muted-foreground"
+              }`} />
+              <span className="text-[11px] font-semibold text-foreground">{label}</span>
+            </div>
+            <p className={`text-[10px] ${
+              ok === true ? "text-emerald-400/80"
+              : ok === false ? "text-red-400/80"
+              : "text-muted-foreground"
+            }`}>
+              {ok === null ? "Checking…" : ok ? (detail ?? "Synced") : (detail ?? "Out of sync")}
+            </p>
+          </div>
+        ))}
+      </div>
+      {anyFailed && (
+        <p className="text-[11px] text-red-400 mt-2">
+          One or more systems are out of sync — run Apply Fantasy Prices to resync everything.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -483,6 +556,9 @@ export default function AdminCommandCenter() {
           )}
         </div>
       </div>
+
+      {/* System Sync Status */}
+      <SystemSyncStatus status={status} loading={loading} />
 
       {/* Action Tabs */}
       <Tabs defaultValue="pipeline">
