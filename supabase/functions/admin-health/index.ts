@@ -34,8 +34,17 @@ Deno.serve(async (req: Request) => {
       throw new Error(`get_operator_console_state failed: ${stateErr.message}`);
     }
 
-    // Augment with pipeline steps detail for the Health page pipeline tab
-    const [stepsRes, recentRunsRes, logsRes] = await Promise.allSettled([
+    // Parallel fetch of all health page tabs
+    const [
+      stepsRes,
+      recentRunsRes,
+      logsRes,
+      cronRes,
+      intelligenceRes,
+      signalDistRes,
+      confHistRes,
+      snapshotBreakdownRes,
+    ] = await Promise.allSettled([
       supabase
         .from("v_pipeline_run_detail")
         .select("*")
@@ -51,11 +60,31 @@ Deno.serve(async (req: Request) => {
         .select("id,run_id,step_name,step_label,status,started_at,completed_at,duration_ms,error")
         .order("started_at", { ascending: false })
         .limit(50),
+      supabase.rpc("get_cron_health"),
+      supabase.rpc("get_intelligence_health"),
+      supabase
+        .from("v_health_signal_distribution")
+        .select("*")
+        .order("category")
+        .order("signal_type"),
+      supabase
+        .from("v_health_confidence_histogram")
+        .select("*")
+        .order("bucket"),
+      supabase
+        .from("v_health_snapshot_breakdown")
+        .select("*")
+        .limit(10),
     ]);
 
-    const pipelineRunDetail = stepsRes.status === "fulfilled" ? (stepsRes.value.data ?? []) : [];
-    const recentRuns = recentRunsRes.status === "fulfilled" ? (recentRunsRes.value.data ?? []) : [];
-    const pipelineSteps = logsRes.status === "fulfilled" ? (logsRes.value.data ?? []) : [];
+    const pipelineRunDetail   = stepsRes.status           === "fulfilled" ? (stepsRes.value.data           ?? []) : [];
+    const recentRuns          = recentRunsRes.status      === "fulfilled" ? (recentRunsRes.value.data      ?? []) : [];
+    const pipelineSteps       = logsRes.status            === "fulfilled" ? (logsRes.value.data            ?? []) : [];
+    const cronHealth          = cronRes.status            === "fulfilled" ? (cronRes.value.data            ?? null) : null;
+    const intelligenceHealth  = intelligenceRes.status    === "fulfilled" ? (intelligenceRes.value.data    ?? null) : null;
+    const signalDistribution  = signalDistRes.status      === "fulfilled" ? (signalDistRes.value.data      ?? []) : [];
+    const confidenceHistogram = confHistRes.status        === "fulfilled" ? (confHistRes.value.data        ?? []) : [];
+    const snapshotBreakdown   = snapshotBreakdownRes.status === "fulfilled" ? (snapshotBreakdownRes.value.data ?? []) : [];
 
     // AI coverage detail
     const { data: aiCoverage } = await supabase
@@ -75,12 +104,23 @@ Deno.serve(async (req: Request) => {
       // Canonical state — single source of truth for all counts
       ...state,
 
-      // Extended detail for Health page tabs
+      // Pipeline tabs
       pipeline_run_detail: pipelineRunDetail,
       recent_runs: recentRuns,
       pipeline_steps: pipelineSteps,
+
+      // AI / data
       ai_coverage: aiCoverage,
       snapshots: snapshots ?? [],
+      snapshot_breakdown: snapshotBreakdown,
+
+      // Intelligence layer
+      intelligence: intelligenceHealth,
+      signal_distribution: signalDistribution,
+      confidence_histogram: confidenceHistogram,
+
+      // Cron scheduler
+      cron: cronHealth,
     };
 
     return new Response(JSON.stringify(response), {
