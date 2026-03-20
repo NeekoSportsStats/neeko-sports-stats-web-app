@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp, Lock, Crown } from "lucide-react";
 import { RankingRow, RankingsTab, RowTier } from "./types";
 import {
-  fmt, fmtInt, fmtPrice, fmtValueScore,
+  fmt, fmtInt, fmtPrice, fmtPriceChange, fmtValueScore,
   getNeekoRatingBadge, getRiskBadge, getValueTagStyle,
   getValueScoreColor, getConfidenceColor, getDisplayRecommendation,
   resolveRecommendationColor,
@@ -120,6 +120,11 @@ export function MobilePlayerCard({
               <div className="rounded-lg bg-white/5 px-3 py-2.5">
                 <p className="text-[9px] text-white/35 uppercase tracking-wider mb-0.5">Price</p>
                 <p className="text-sm font-semibold text-white/70">{fmtPrice(row.price)}</p>
+                {fmtPriceChange(row.price_change) && (
+                  <p className={`text-[9px] font-semibold tabular-nums mt-0.5 ${(row.price_change ?? 0) > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    {fmtPriceChange(row.price_change)}
+                  </p>
+                )}
               </div>
             ) : (
               <div className="rounded-lg bg-white/5 px-3 py-2.5 flex items-center justify-center cursor-pointer" onClick={onUpgrade}>

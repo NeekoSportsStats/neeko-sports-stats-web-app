@@ -18,6 +18,9 @@ export interface RankingRow {
   neeko_rating: number | null;
   neeko_rating_scaled: number | null;
   price: number | null;
+  prev_price: number | null;
+  price_change: number | null;
+  price_change_pct: number | null;
   value_score: number | null;
   best_value_score: number | null;
   value_tag: string | null;

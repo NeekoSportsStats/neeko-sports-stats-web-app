@@ -97,6 +97,15 @@ export function fmtPrice(v: number | null | undefined): string {
   return `$${(n / 1_000_000).toFixed(2)}m`;
 }
 
+export function fmtPriceChange(change: number | null | undefined): string {
+  if (change == null) return "";
+  const n = Number(change);
+  if (isNaN(n) || n === 0) return "";
+  const abs = Math.abs(n);
+  const k = abs >= 1000 ? `${(abs / 1000).toFixed(0)}k` : String(abs);
+  return `${n > 0 ? "+" : "-"}$${k}`;
+}
+
 export function fmtValueScore(v: number | null | undefined): string {
   if (v == null) return "—";
   const n = Number(v);

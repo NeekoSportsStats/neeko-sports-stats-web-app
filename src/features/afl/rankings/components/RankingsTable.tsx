@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { RankingRow, SortKey, SortDir, RankingsTab, RowTier } from "./types";
 import {
-  fmt, fmtPrice, fmtValueScore,
+  fmt, fmtPrice, fmtPriceChange, fmtValueScore,
   getNeekoRatingBadge, getValueTagStyle,
   getValueScoreColor, getConfidenceColor, getConfidenceLabel, getConfidenceLabelColor,
   getFormScoreColor, getDisplayRecommendation,
@@ -197,7 +197,19 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
         {locked("price") ? (
           <LockedCell onClick={onUpgrade} />
         ) : (
-          <span className="text-sm font-semibold text-white/70 tabular-nums">{fmtPrice(row.price)}</span>
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-sm font-semibold text-white/70 tabular-nums">{fmtPrice(row.price)}</span>
+            {(() => {
+              const badge = fmtPriceChange(row.price_change);
+              if (!badge) return null;
+              const isUp = (row.price_change ?? 0) > 0;
+              return (
+                <span className={`text-[9px] font-semibold tabular-nums ${isUp ? "text-emerald-400" : "text-red-400"}`}>
+                  {badge}
+                </span>
+              );
+            })()}
+          </div>
         )}
       </td>
       <td className="px-4 py-3 text-center whitespace-nowrap" style={{ width: 120, minWidth: 100 }}>

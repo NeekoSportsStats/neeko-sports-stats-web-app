@@ -27,6 +27,7 @@ interface RankingRow {
   captain_rating: string | null;
   neeko_rating: number | null;
   price: number | null;
+  price_change: number | null;
   value_score: number | null;
   value_tag: string | null;
   ai_summary: string | null;
@@ -120,6 +121,15 @@ function fmtPrice(v: number | null | undefined): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(3)}m`;
   if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}k`;
   return `$${n}`;
+}
+
+function fmtPriceChange(change: number | null | undefined): string {
+  if (change == null) return "";
+  const n = Number(change);
+  if (isNaN(n) || n === 0) return "";
+  const abs = Math.abs(n);
+  const k = abs >= 1000 ? `${(abs / 1000).toFixed(0)}k` : String(abs);
+  return `${n > 0 ? "+" : "-"}${k}`;
 }
 
 function getOneLiner(text: string): string {
@@ -517,7 +527,10 @@ function PlayerAnalysisModal({ row, section, isPremium, onClose, onUpgrade }: Pl
   if (row.projection_final != null) keyFactors.push(`Projection: ${fmtInt(row.projection_final)} pts`);
   if (row.ceiling_estimate != null) keyFactors.push(`Ceiling: ${fmtInt(row.ceiling_estimate)} pts`);
   if (row.floor_estimate != null) keyFactors.push(`Floor: ${fmtInt(row.floor_estimate)} pts`);
-  if (row.price != null) keyFactors.push(`Price: ${fmtPrice(row.price)}`);
+  if (row.price != null) {
+    const badge = fmtPriceChange(row.price_change);
+    keyFactors.push(`Price: ${fmtPrice(row.price)}${badge ? ` (${badge})` : ""}`);
+  }
   if (row.neeko_rating != null) keyFactors.push(`Neeko Rating: ${row.neeko_rating.toFixed(1)}`);
 
   return createPortal(
@@ -760,6 +773,18 @@ function HeroPickCard({ row, section, isPremium, onOpen }: HeroPickCardProps) {
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.04] self-end">
             <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${conf >= 75 ? "bg-green-400" : conf >= 60 ? "bg-yellow-400" : "bg-orange-400"}`} />
             <span className={`text-[10px] font-bold ${getConfidenceColor(conf)}`}>{conf}% conf</span>
+          </div>
+        )}
+        {row.price != null && (
+          <div className="ml-auto text-right shrink-0">
+            <p className="text-[9px] text-white/30 uppercase tracking-widest mb-0.5">Price</p>
+            <p className="text-sm font-semibold text-white/60 tabular-nums">{fmtPrice(row.price)}</p>
+            {(() => {
+              const badge = fmtPriceChange(row.price_change);
+              if (!badge) return null;
+              const isUp = (row.price_change ?? 0) > 0;
+              return <p className={`text-[9px] font-semibold tabular-nums ${isUp ? "text-emerald-400" : "text-red-400"}`}>{badge}</p>;
+            })()}
           </div>
         )}
       </div>
@@ -1042,6 +1067,7 @@ export default function AFLRoundEdgeBoard() {
         captain_rating:        r.captain_rating ?? null,
         neeko_rating:          r.neeko_rating != null ? Number(r.neeko_rating) : null,
         price:                 r.price != null ? Number(r.price) : null,
+        price_change:          r.price_change != null ? Number(r.price_change) : null,
         value_score:           r.value_score != null ? Number(r.value_score) : null,
         value_tag:             r.value_tag ?? null,
         ai_summary:            r.ai_summary ?? null,
