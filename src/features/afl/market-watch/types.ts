@@ -82,6 +82,26 @@ export interface MWStatus {
   data_quality_level: string | null;
 }
 
+export type MovementLabel = "BIG_RISE" | "RISE" | "FLAT" | "DROP" | "BIG_DROP";
+export type MoverSignal = "BUY_BEFORE_RISE" | "RISING" | "TRAP" | "FALLING" | "FLAT";
+
+export interface ProjectedMover {
+  player_id: number;
+  player_name: string;
+  team: string;
+  player_position: string;
+  current_price: number;
+  projected_price: number;
+  projected_price_change: number;
+  projected_price_pct: number;
+  projection: number;
+  recent_avg: number;
+  value_score: number | null;
+  movement_label: MovementLabel;
+  signal: MoverSignal;
+  games_played: number;
+}
+
 export interface MWSummary {
   buy_before_rise_count: number;
   upgrade_target_count: number;

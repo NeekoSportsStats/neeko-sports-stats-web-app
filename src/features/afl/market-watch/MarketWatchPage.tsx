@@ -10,6 +10,7 @@ import { MarketWatchSort } from "./MarketWatchSort";
 import { UpgradeModal } from "./UpgradeModal";
 import { fmtPriceChange, fmtPrice } from "./helpers";
 import { classifyPlayers, buildBestTrades, DerivedPlayer, BestTrade } from "./engine";
+import { ProjectedMoversSection } from "./ProjectedMoversSection";
 
 const SECTION_LIMIT = 8;
 const FREE_SECTION_VISIBLE = 3;
@@ -375,6 +376,13 @@ export default function MarketWatchPage() {
             onToggleTraps={() => setShowMoreTraps(e => !e)}
           />
         )}
+
+        <div className="mt-10 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
+          <ProjectedMoversSection
+            isPremium={isPremium}
+            onShowUpgrade={() => setShowUpgrade(true)}
+          />
+        </div>
 
         <p className="mt-12 text-center text-[10px] text-white/12 leading-relaxed max-w-lg mx-auto">
           Market Watch signals are generated from AI projections and AFL Fantasy pricing data.
