@@ -17,7 +17,8 @@ async function callAdminCommand(command: string, payload: Record<string, unknown
     body: JSON.stringify({ command, payload }),
   });
   const json = await res.json();
-  if (!json.success) throw new Error(json.error ?? "Command failed");
+  console.log("admin-command response:", json);
+  if (!json.ok) throw new Error(json.error ?? "Command failed");
   return json.result;
 }
 

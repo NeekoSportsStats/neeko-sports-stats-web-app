@@ -28,7 +28,7 @@ const COMMAND_MAP: Record<string, { fn: string; args?: Record<string, unknown> }
   run_full_ai_neeko_pipeline:     { fn: "run_neeko_ai_pipeline" },
   rebuild_projections:            { fn: "run_afl_pipeline_controller" },
   refresh_accuracy:               { fn: "run_projection_accuracy_pipeline" },
-  apply_fantasy_prices:           { fn: "afl.apply_fantasy_prices" },
+  apply_fantasy_prices:           { fn: "apply_fantasy_prices" },
   run_ingestion_pipeline:         { fn: "run_afl_ingestion_pipeline" },
   backfill_fantasy_points:        { fn: "run_afl_ingestion_pipeline" },
   clear_failed_ai_queue:          { fn: "clear_failed_ai_queue" },
@@ -54,7 +54,9 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json().catch(() => ({}));
+    console.log("Incoming body:", JSON.stringify(body));
     const command: string = body?.command ?? "";
+    const payload = body?.payload ?? {};
 
     if (!command) {
       return new Response(JSON.stringify({ error: "Missing command" }), {
@@ -68,6 +70,65 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    const startedAt = Date.now();
+
+    // ─── Special commands that carry payload data ─────────────────────────────
+    if (command === "commit_price_ingest") {
+      const rows = payload?.rows ?? [];
+      const { data: cmdResult, error: cmdError } = await supabase
+        .schema("afl" as never)
+        .rpc("process_price_ingest_by_id" as never, { p_rows: rows });
+      const durationMs = Date.now() - startedAt;
+      if (cmdError) {
+        console.error("commit_price_ingest error:", cmdError);
+        return new Response(
+          JSON.stringify({ ok: false, command, error: cmdError.message, duration_ms: durationMs }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({ ok: true, command, result: cmdResult, duration_ms: durationMs }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (command === "save_pending_players") {
+      const rows = payload?.rows ?? [];
+      const { data: cmdResult, error: cmdError } = await supabase
+        .rpc("save_pending_price_rows", { p_rows: rows });
+      const durationMs = Date.now() - startedAt;
+      if (cmdError) {
+        console.error("save_pending_players error:", cmdError);
+        return new Response(
+          JSON.stringify({ ok: false, command, error: cmdError.message, duration_ms: durationMs }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({ ok: true, command, result: cmdResult, duration_ms: durationMs }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (command === "resolve_player_name") {
+      const { normalized_name, player_id } = payload;
+      const { data: cmdResult, error: cmdError } = await supabase
+        .rpc("admin_resolve_player_name", { p_normalized_name: normalized_name, p_player_id: player_id });
+      const durationMs = Date.now() - startedAt;
+      if (cmdError) {
+        console.error("resolve_player_name error:", cmdError);
+        return new Response(
+          JSON.stringify({ ok: false, command, error: cmdError.message, duration_ms: durationMs }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({ ok: true, command, result: cmdResult, duration_ms: durationMs }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    // ─── End special commands ─────────────────────────────────────────────────
+
     const cmdDef = COMMAND_MAP[command];
     if (!cmdDef) {
       return new Response(
@@ -75,8 +136,6 @@ Deno.serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-
-    const startedAt = Date.now();
 
     // Execute the command
     const { data: cmdResult, error: cmdError } = await supabase.rpc(
