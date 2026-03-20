@@ -206,23 +206,36 @@ Deno.serve(async (req: Request) => {
         result = { refreshed: true };
         break;
 
-      // NEW: full downstream refresh after price upload
+      // apply_fantasy_prices: single-button pipeline — runs the canonical 5-step chain
+      // 1. refresh_fantasy_market_matches
+      // 2. sync fantasy_player_market → player_prices
+      // 3. refresh rankings cache
+      // 4. rebuild market watch snapshot
+      // 5. refresh edge board
+      case "apply_fantasy_prices": {
+        const { data: applyResult, error: applyError } = await admin
+          .schema("afl" as never)
+          .rpc("apply_fantasy_prices" as never);
+        if (applyError) throw new Error((applyError as { message: string }).message);
+        result = applyResult ?? { status: "ok" };
+        break;
+      }
+
+      // refresh_fantasy_prices: legacy — kept for backward compat, now calls apply_fantasy_prices
       case "refresh_fantasy_prices": {
-        await admin.schema("afl" as never).rpc("populate_rankings_cache_from_source" as never);
-        await admin.schema("market" as never).rpc("build_market_watch_snapshot" as never);
-        try {
-          await callRpc(admin, "fn_refresh_edge_board");
-        } catch (_e) {
-          // non-fatal — edge board refresh failure should not block price refresh
+        const { data: applyResult, error: applyError } = await admin
+          .schema("afl" as never)
+          .rpc("apply_fantasy_prices" as never);
+        if (applyError) {
+          // fallback to old path if apply_fantasy_prices not yet deployed
+          await admin.schema("afl" as never).rpc("populate_rankings_cache_from_source" as never);
+          await admin.schema("market" as never).rpc("build_market_watch_snapshot" as never);
+          try { await callRpc(admin, "fn_refresh_edge_board"); } catch (_e) { /* non-fatal */ }
+          const { data: priceStats } = await admin.rpc("get_fantasy_price_stats");
+          result = { refreshed: true, rankings_cache: true, market_watch: true, edge_board: true, price_stats: priceStats ?? null };
+        } else {
+          result = applyResult ?? { status: "ok" };
         }
-        const { data: priceStats } = await admin.rpc("get_fantasy_price_stats");
-        result = {
-          refreshed: true,
-          rankings_cache: true,
-          market_watch: true,
-          edge_board: true,
-          price_stats: priceStats ?? null,
-        };
         break;
       }
 

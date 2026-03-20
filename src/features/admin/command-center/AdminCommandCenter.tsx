@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { runCommand } from "@/hooks/useAdminCommand";
-import { RefreshCw, Activity, Database, Bot, TrendingUp, Grid2x2 as Grid, ListOrdered, Play, Zap, Server, ScrollText, Clock, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, SquareCheck as CheckSquare, DollarSign } from "lucide-react";
+import { RefreshCw, Activity, Database, Bot, TrendingUp, Grid2x2 as Grid, ListOrdered, Play, Zap, Server, ScrollText, Clock, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, SquareCheck as CheckSquare, DollarSign, Layers } from "lucide-react";
 import { formatDate } from "../shared/adminUtils";
 import CronJobMonitor, { fetchCronJobs, type CronJob } from "./CronJobMonitor";
 import SystemLogsPanel, { fetchSystemLogs, type SystemLogRow } from "./SystemLogsPanel";
@@ -152,6 +152,161 @@ function ActionCard({
         ) : (
           <div className="flex flex-wrap gap-2">
             {actions.map(a => <ActionButton key={a.key} action={a} onComplete={onComplete} />)}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface ApplyPricesResult {
+  status?: string;
+  players_processed?: number;
+  match_rate_pct?: number;
+  price_changes?: number;
+  rankings_ok?: boolean;
+  market_watch_ok?: boolean;
+  edge_board_ok?: boolean;
+  duration_ms?: number;
+  message?: string;
+}
+
+function ApplyFantasyPricesCard({
+  status, loading, onComplete,
+}: {
+  status: CommandCenterStatus | null;
+  loading: boolean;
+  onComplete?: () => void;
+}) {
+  const { toast } = useToast();
+  const [running, setRunning] = useState(false);
+  const [lastResult, setLastResult] = useState<ApplyPricesResult | null>(null);
+  const [resultStatus, setResultStatus] = useState<"idle" | "success" | "error" | "aborted">("idle");
+
+  async function handle() {
+    setRunning(true);
+    setResultStatus("idle");
+    setLastResult(null);
+    try {
+      const res = await runCommand("apply_fantasy_prices");
+      if (res.success) {
+        const data = res.data as ApplyPricesResult | undefined;
+        setLastResult(data ?? null);
+        if (data?.status === "aborted") {
+          setResultStatus("aborted");
+          toast({ title: "Apply Fantasy Prices aborted", description: data.message ?? "Insufficient data", variant: "destructive" });
+        } else {
+          setResultStatus("success");
+          toast({
+            title: "Fantasy Prices Applied",
+            description: `${data?.players_processed ?? "—"} players · ${data?.price_changes ?? 0} price changes · ${data?.duration_ms ?? "—"}ms`,
+          });
+          onComplete?.();
+        }
+      } else {
+        setResultStatus("error");
+        toast({ title: "Apply Fantasy Prices failed", description: res.error ?? "Unknown error", variant: "destructive" });
+      }
+    } catch (err) {
+      setResultStatus("error");
+      toast({ title: "Apply Fantasy Prices failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+    } finally {
+      setRunning(false);
+      setTimeout(() => { setResultStatus("idle"); setLastResult(null); }, 10_000);
+    }
+  }
+
+  const cardBorder = resultStatus === "success" ? "border-emerald-900/40"
+    : resultStatus === "error" || resultStatus === "aborted" ? "border-red-900/40"
+    : status?.fantasy_price_last_updated ? "border-border" : "border-amber-900/40";
+
+  const chipLevel: HealthStatus = resultStatus === "success" ? "ok"
+    : resultStatus === "error" ? "error"
+    : resultStatus === "aborted" ? "warn"
+    : status?.fantasy_price_last_updated ? "ok" : "warn";
+
+  const chipLabel = resultStatus === "success" ? "Applied"
+    : resultStatus === "error" ? "Failed"
+    : resultStatus === "aborted" ? "Aborted"
+    : status?.fantasy_matched_count != null ? `${status.fantasy_matched_count} matched` : "Prices";
+
+  return (
+    <Card className={`border ${cardBorder} col-span-full`}>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between text-sm font-semibold">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-md bg-muted flex items-center justify-center shrink-0">
+              <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+            </span>
+            Apply Fantasy Prices
+          </div>
+          <StatusChip level={chipLevel} label={chipLabel} />
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Single-button pipeline — matches names, syncs prices, refreshes rankings cache, Market Watch, and Edge Board in one pass.
+        </p>
+        {!lastResult && (
+          <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+            {[
+              status?.fantasy_price_last_updated ? `Last applied: ${formatDate(status.fantasy_price_last_updated)}` : "Never applied",
+              status?.fantasy_unmatched_count ? `${status.fantasy_unmatched_count} unmatched` : null,
+            ].filter(Boolean).join(" · ")}
+          </p>
+        )}
+      </CardHeader>
+      <CardContent className="pt-0 space-y-3">
+        {loading ? (
+          <div className="h-8 rounded bg-muted animate-pulse" />
+        ) : (
+          <Button
+            variant="default"
+            size="sm"
+            disabled={running}
+            onClick={handle}
+            className={`text-xs ${resultStatus === "success" ? "bg-emerald-600 hover:bg-emerald-700" : ""}`}
+          >
+            {running ? (
+              <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
+            ) : resultStatus === "success" ? (
+              <CheckSquare className="h-3 w-3 mr-1.5 text-white" />
+            ) : (
+              <Play className="h-3 w-3 mr-1.5" />
+            )}
+            {running ? "Applying…" : "Apply Fantasy Prices"}
+          </Button>
+        )}
+
+        {lastResult && resultStatus === "success" && (
+          <div className="rounded-md border border-emerald-900/40 bg-emerald-950/20 px-3 py-2 space-y-1.5">
+            <p className="text-[11px] font-semibold text-emerald-400">Pipeline complete</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+              <span>Players processed</span>
+              <span className="text-foreground font-medium tabular-nums">{lastResult.players_processed?.toLocaleString() ?? "—"}</span>
+              <span>Match rate</span>
+              <span className="text-foreground font-medium tabular-nums">{lastResult.match_rate_pct != null ? `${lastResult.match_rate_pct}%` : "—"}</span>
+              <span>Price changes</span>
+              <span className="text-foreground font-medium tabular-nums">{lastResult.price_changes?.toLocaleString() ?? "—"}</span>
+              <span>Rankings cache</span>
+              <span className={lastResult.rankings_ok ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
+                {lastResult.rankings_ok ? "Updated" : "Failed"}
+              </span>
+              <span>Market Watch</span>
+              <span className={lastResult.market_watch_ok ? "text-emerald-400 font-medium" : "text-amber-400 font-medium"}>
+                {lastResult.market_watch_ok ? "Updated" : "Skipped"}
+              </span>
+              <span>Edge Board</span>
+              <span className={lastResult.edge_board_ok ? "text-emerald-400 font-medium" : "text-amber-400 font-medium"}>
+                {lastResult.edge_board_ok ? "Updated" : "Skipped"}
+              </span>
+              <span>Duration</span>
+              <span className="text-foreground font-medium tabular-nums">{lastResult.duration_ms != null ? `${lastResult.duration_ms}ms` : "—"}</span>
+            </div>
+          </div>
+        )}
+
+        {lastResult && resultStatus === "aborted" && (
+          <div className="rounded-md border border-amber-900/40 bg-amber-950/15 px-3 py-2">
+            <p className="text-[11px] text-amber-400">{lastResult.message ?? "Aborted — upload prices first via Price Ingest tab"}</p>
           </div>
         )}
       </CardContent>
@@ -461,22 +616,7 @@ export default function AdminCommandCenter() {
         <TabsContent value="data" className="space-y-4 mt-4">
           <p className="text-xs text-muted-foreground">Refresh data snapshots, prices, projections, and accuracy. All buttons call admin-command → backend RPCs.</p>
           <div className="grid gap-4 sm:grid-cols-2">
-            <ActionCard
-              icon={DollarSign}
-              title="Fantasy Prices"
-              description="Full price refresh — updates rankings cache, Market Watch snapshot, and Edge Board in one pass."
-              status={status?.fantasy_price_last_updated ? "ok" : "warn"}
-              statusLabel={status?.fantasy_matched_count != null ? `${status.fantasy_matched_count} matched` : "Prices"}
-              detail={[
-                status?.fantasy_price_last_updated ? `Last updated: ${formatDate(status.fantasy_price_last_updated)}` : null,
-                status?.fantasy_unmatched_count ? `${status.fantasy_unmatched_count} unmatched` : null,
-              ].filter(Boolean).join(" · ") || undefined}
-              loading={loading}
-              onComplete={handleComplete}
-              actions={[
-                { key: "fantasy-prices", label: "Refresh Fantasy Prices", variant: "default", command: "refresh_fantasy_prices" },
-              ]}
-            />
+            <ApplyFantasyPricesCard status={status} loading={loading} onComplete={handleComplete} />
             <ActionCard
               icon={TrendingUp}
               title="Market Watch"
