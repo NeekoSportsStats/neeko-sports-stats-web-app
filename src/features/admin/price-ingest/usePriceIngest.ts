@@ -59,7 +59,9 @@ export function useCommitPrices() {
           player_status: r.player_status ?? null,
         }));
 
+      console.log(`[commit_price_ingest] season=${season} round=${round} rows=${payload.length}`);
       const result = await callAdminCommand("commit_price_ingest", { rows: payload, season, round });
+      console.log(`[commit_price_ingest] result:`, result);
       return { result: result as IngestByIdResult, error: null };
     } catch (e) {
       return { result: null, error: e instanceof Error ? e.message : "Commit failed" };
