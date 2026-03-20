@@ -9,7 +9,11 @@ export function fmtNum(n: number | null | undefined, dec = 1) {
 
 export function fmtPrice(n: number | null | undefined) {
   if (n == null) return "—";
-  return "$" + (n / 1000).toFixed(0) + "k";
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(3).replace(/\.?0+$/, "")}M`;
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  return `${sign}$${abs}`;
 }
 
 export function pct(n: number | null | undefined) {

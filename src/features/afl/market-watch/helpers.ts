@@ -4,8 +4,11 @@ export function fmtPrice(v: number | null | undefined): string {
   if (v == null) return "—";
   const n = Number(v);
   if (isNaN(n)) return "—";
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}m`;
-  return `$${(n / 1_000).toFixed(0)}k`;
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(3).replace(/\.?0+$/, "")}M`;
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  return `${sign}$${abs}`;
 }
 
 export function fmtNum(v: number | null | undefined, decimals = 0): string {
@@ -50,7 +53,14 @@ export function fmtPriceChange(v: number | null | undefined): string {
   const n = Number(v);
   if (isNaN(n)) return "—";
   const abs = Math.abs(n);
-  const formatted = abs >= 1000 ? `$${(abs / 1000).toFixed(0)}k` : `$${abs.toFixed(0)}`;
+  let formatted: string;
+  if (abs >= 1_000_000) {
+    formatted = `$${(abs / 1_000_000).toFixed(3).replace(/\.?0+$/, "")}M`;
+  } else if (abs >= 1_000) {
+    formatted = `$${(abs / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  } else {
+    formatted = `$${abs.toFixed(0)}`;
+  }
   return n >= 0 ? `+${formatted}` : `-${formatted}`;
 }
 

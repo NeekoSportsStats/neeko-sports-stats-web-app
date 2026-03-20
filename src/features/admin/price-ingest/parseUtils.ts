@@ -495,8 +495,10 @@ export function parseCSVFile(file: File): Promise<ParseResult> {
 }
 
 export function fmtPrice(p: number | null | undefined): string {
-  if (!p) return "—";
-  if (p >= 1_000_000) return `$${(p / 1_000_000).toFixed(3).replace(/\.?0+$/, "")}M`;
-  if (p >= 1_000) return `$${(p / 1_000).toFixed(1)}k`;
-  return `$${p}`;
+  if (p == null) return "—";
+  const abs = Math.abs(p);
+  const sign = p < 0 ? "-" : "";
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(3).replace(/\.?0+$/, "")}M`;
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  return `${sign}$${abs}`;
 }
