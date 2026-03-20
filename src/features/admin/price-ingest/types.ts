@@ -3,6 +3,14 @@ export interface ParsedPriceRow {
   cleaned_price: number;
   position?: string | null;
   team?: string | null;
+  external_id?: number | null;
+  avg_points?: number | null;
+  last_round_score?: number | null;
+  ownership_pct?: number | null;
+  price_change?: number | null;
+  price_change_pct?: number | null;
+  status?: string | null;
+  positions?: string[] | null;
 }
 
 export interface PreviewRow {
@@ -41,6 +49,14 @@ export interface MappingRow {
   match_status: MatchStatus;
   confidence: number;
   suggestions: PlayerOption[];
+  external_id?: number | null;
+  avg_points?: number | null;
+  last_round_score?: number | null;
+  ownership_pct?: number | null;
+  price_change?: number | null;
+  price_change_pct?: number | null;
+  player_status?: string | null;
+  positions?: string[] | null;
 }
 
 export interface RefreshStepResult {

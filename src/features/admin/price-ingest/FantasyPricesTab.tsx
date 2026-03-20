@@ -4,16 +4,16 @@ import {
   Upload, FileText, RefreshCw, CircleCheck as CheckCircle,
   TriangleAlert as AlertTriangle, ArrowLeft, Zap, Clock,
   CircleHelp as HelpCircle, User, Search, Eye, EyeOff, Copy,
-  Sparkles,
+  Sparkles, Braces,
 } from "lucide-react";
-import { parseCSVText, parseCSVFile, parseRawFantasyText, fmtPrice, type ParseError } from "./parseUtils";
+import { parseCSVText, parseCSVFile, parseRawFantasyText, parseJsonPlayersText, isJsonInput, fmtPrice, type ParseError } from "./parseUtils";
 import { usePlayerOptions, useCommitPrices, useSavePending } from "./usePriceIngest";
 import { PlayerSearchDropdown } from "./PlayerSearchDropdown";
 import { applyAutoMatch } from "./matchEngine";
 import type { ParsedPriceRow, MappingRow, IngestByIdResult, MatchStatus } from "./types";
 
 type Step = "input" | "mapping" | "done";
-type InputMode = "raw" | "paste" | "csv";
+type InputMode = "raw" | "json" | "paste" | "csv";
 
 const GROUP_ORDER: MatchStatus[] = [
   "pending_player_record",
@@ -119,6 +119,14 @@ export function FantasyPricesTab() {
       match_status: "manual_required" as const,
       confidence: 0,
       suggestions: [],
+      external_id: r.external_id ?? null,
+      avg_points: r.avg_points ?? null,
+      last_round_score: r.last_round_score ?? null,
+      ownership_pct: r.ownership_pct ?? null,
+      price_change: r.price_change ?? null,
+      price_change_pct: r.price_change_pct ?? null,
+      player_status: r.status ?? null,
+      positions: r.positions ?? null,
     }));
 
     if (players.length > 0) {
@@ -135,9 +143,22 @@ export function FantasyPricesTab() {
     setMappingRows(buildMappingRows(result.rows));
   }
 
+  function parseWithMode(text: string, mode: InputMode) {
+    if (mode === "json") return parseJsonPlayersText(text);
+    if (mode === "raw") return parseRawFantasyText(text);
+    return parseCSVText(text);
+  }
+
+  function detectMode(text: string, currentMode: InputMode): InputMode {
+    if (isJsonInput(text)) return "json";
+    return currentMode === "json" ? "raw" : currentMode;
+  }
+
   function handlePasteChange(text: string) {
     setPasteText(text);
-    const result = inputMode === "raw" ? parseRawFantasyText(text) : parseCSVText(text);
+    const resolvedMode = detectMode(text, inputMode);
+    if (resolvedMode !== inputMode) setInputMode(resolvedMode);
+    const result = parseWithMode(text, resolvedMode);
     setParseErrors(result.errors);
     setMappingRows(buildMappingRows(result.rows));
   }
@@ -145,7 +166,7 @@ export function FantasyPricesTab() {
   function handleModeChange(mode: InputMode) {
     setInputMode(mode);
     if (pasteText) {
-      const result = mode === "raw" ? parseRawFantasyText(pasteText) : parseCSVText(pasteText);
+      const result = parseWithMode(pasteText, mode);
       setParseErrors(result.errors);
       setMappingRows(buildMappingRows(result.rows));
     }
@@ -241,6 +262,8 @@ export function FantasyPricesTab() {
     });
   }
 
+  const isJsonMode = inputMode === "json";
+
   const counts = useMemo(() => {
     const auto = mappingRows.filter(r => r.match_status === "auto_matched").length;
     const manual = mappingRows.filter(r => r.match_status === "manually_matched").length;
@@ -251,7 +274,9 @@ export function FantasyPricesTab() {
     const readyToInsert = auto + manual;
     const hasPositions = mappingRows.filter(r => r.position != null).length;
     const hasTeams = mappingRows.filter(r => r.team != null).length;
-    return { auto, manual, suggested, manualReq, pending, manualInput, readyToInsert, total: mappingRows.length, hasPositions, hasTeams };
+    const hasAvgPoints = mappingRows.filter(r => r.avg_points != null).length;
+    const hasOwnership = mappingRows.filter(r => r.ownership_pct != null).length;
+    return { auto, manual, suggested, manualReq, pending, manualInput, readyToInsert, total: mappingRows.length, hasPositions, hasTeams, hasAvgPoints, hasOwnership };
   }, [mappingRows]);
 
   if (step === "done" && commitResult) {
@@ -328,6 +353,9 @@ export function FantasyPricesTab() {
             <ModeButton active={inputMode === "raw"} onClick={() => handleModeChange("raw")} icon={<Sparkles className="h-3.5 w-3.5" />}>
               Raw site paste
             </ModeButton>
+            <ModeButton active={inputMode === "json"} onClick={() => handleModeChange("json")} icon={<Braces className="h-3.5 w-3.5" />}>
+              JSON (players.json)
+            </ModeButton>
             <ModeButton active={inputMode === "paste"} onClick={() => handleModeChange("paste")} icon={<FileText className="h-3.5 w-3.5" />}>
               CSV paste
             </ModeButton>
@@ -349,6 +377,20 @@ export function FantasyPricesTab() {
             </div>
           )}
 
+          {inputMode === "json" && (
+            <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 px-4 py-3 text-sm text-emerald-300">
+              <strong>JSON mode.</strong> Paste the full <code className="font-mono text-emerald-200">players.json</code> array from AFL Fantasy.
+              <ul className="mt-1.5 space-y-0.5 text-emerald-300/90 text-xs list-disc list-inside">
+                <li>Extracts: name, price, position, avg points, last round score, ownership %, price change</li>
+                <li>Multi-position players (e.g. <code className="font-mono">["MID","FWD"]</code>) are handled — primary position stored</li>
+                <li>External player ID preserved for future sync</li>
+              </ul>
+              <span className="text-emerald-400/70 text-xs mt-1 block">
+                Tip: JSON is also auto-detected — if you paste a JSON array in Raw mode it will switch automatically.
+              </span>
+            </div>
+          )}
+
           {inputMode === "paste" && (
             <div className="rounded-lg border border-amber-500/20 bg-amber-950/10 px-4 py-3 text-sm text-amber-300">
               <strong>CSV paste mode.</strong> Expects clean comma or tab-separated rows.
@@ -364,7 +406,9 @@ export function FantasyPricesTab() {
               value={pasteText}
               onChange={e => handlePasteChange(e.target.value)}
               placeholder={
-                inputMode === "raw"
+                inputMode === "json"
+                  ? '[{\n  "id": 123456,\n  "firstName": "Nick",\n  "lastName": "Daicos",\n  "price": 1182000,\n  "averagePoints": 118.5,\n  "lastRoundScore": 124,\n  "ownership": [{"value": 42.3}],\n  "roundPriceChange": 57000,\n  "position": "MID",\n  "status": "playing"\n}, ...]'
+                  : inputMode === "raw"
                   ? "Paste AFL Fantasy data here — stacked or tabular format both work\n\nStacked example:\nplayingN. Daicos\nMID\n$1.182M\n+$57k\nR1: COL vs ADE\n$1.182M\n\nTabular example:\nNick Daicos  MID  Collingwood  $1,182,000"
                   : "N Daicos, $1,182,000\nL D-Uniacke, $785,000\nM Gawn, $1,050,000"
               }
@@ -385,6 +429,32 @@ export function FantasyPricesTab() {
 
           {mappingRows.length > 0 && (
             <>
+              {isJsonMode && (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-950/15 px-4 py-2.5 flex items-center gap-3 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+                    <Braces className="h-3.5 w-3.5" />
+                    JSON Mode Detected
+                  </span>
+                  <span className="text-xs text-emerald-300/70">{counts.total} players parsed</span>
+                  <span className="text-xs text-emerald-300/70">·</span>
+                  <span className="text-xs text-emerald-300/70">{counts.auto} auto-matched</span>
+                  <span className="text-xs text-emerald-300/70">·</span>
+                  <span className="text-xs text-emerald-300/70">{counts.total - counts.auto - counts.manual} unmatched</span>
+                  {counts.hasAvgPoints > 0 && (
+                    <>
+                      <span className="text-xs text-emerald-300/70">·</span>
+                      <span className="text-xs text-emerald-300/70">Avg pts for {counts.hasAvgPoints}</span>
+                    </>
+                  )}
+                  {counts.hasOwnership > 0 && (
+                    <>
+                      <span className="text-xs text-emerald-300/70">·</span>
+                      <span className="text-xs text-emerald-300/70">Ownership % for {counts.hasOwnership}</span>
+                    </>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-6">
                 <StatTile label="Total" value={counts.total} />
                 <StatTile label="Auto-matched" value={counts.auto} color="emerald" />
@@ -417,7 +487,9 @@ export function FantasyPricesTab() {
 
           {mappingRows.length === 0 && inputMode !== "csv" && pasteText.trim() && (
             <div className="rounded-lg border border-red-500/20 bg-red-950/10 px-4 py-3 text-sm text-red-400">
-              No player rows detected. Stacked format requires position lines (DEF/MID/FWD/RUC) as block separators with prices like <code className="font-mono">$727k</code> or <code className="font-mono">$1.132M</code>. Tabular format requires prices like <code className="font-mono">$1,182,000</code>.
+              {inputMode === "json"
+                ? "No players found. Ensure the input is a valid JSON array with id, firstName, lastName, and price fields."
+                : "No player rows detected. Stacked format requires position lines (DEF/MID/FWD/RUC) as block separators with prices like $727k or $1.132M. Tabular format requires prices like $1,182,000."}
             </div>
           )}
 
@@ -505,6 +577,8 @@ interface MappingCounts {
   total: number;
   hasPositions: number;
   hasTeams: number;
+  hasAvgPoints: number;
+  hasOwnership: number;
 }
 
 interface MappingStepProps {

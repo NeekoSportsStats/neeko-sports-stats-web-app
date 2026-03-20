@@ -383,6 +383,105 @@ export function parseCSVText(text: string): ParseResult {
   return { rows, errors };
 }
 
+// ── AFL Fantasy players.json parser ─────────────────────────────────────────
+//
+// Format: JSON array from AFL Fantasy players.json
+// [{ id, firstName, lastName, price, averagePoints, lastRoundScore,
+//    ownership: [{...}, {value}], roundPriceChange, roundPriceChangePct,
+//    position, status, ... }, ...]
+
+export function isJsonInput(text: string): boolean {
+  const trimmed = text.trimStart();
+  return trimmed.startsWith("[") && trimmed.includes('"id"');
+}
+
+interface AflFantasyPlayer {
+  id?: number;
+  firstName?: string;
+  lastName?: string;
+  price?: number;
+  averagePoints?: number;
+  lastRoundScore?: number;
+  ownership?: Array<{ value?: number }> | number;
+  roundPriceChange?: number;
+  roundPriceChangePct?: number;
+  position?: string | string[];
+  status?: string;
+}
+
+export function parseJsonPlayersText(text: string): ParseResult {
+  const rows: ParsedPriceRow[] = [];
+  const errors: ParseError[] = [];
+
+  let players: AflFantasyPlayer[];
+  try {
+    players = JSON.parse(text);
+  } catch {
+    errors.push({ line: 1, raw: text.slice(0, 80), reason: "Invalid JSON — could not parse" });
+    return { rows, errors };
+  }
+
+  if (!Array.isArray(players)) {
+    errors.push({ line: 1, raw: "", reason: "Expected a JSON array at the root" });
+    return { rows, errors };
+  }
+
+  for (let i = 0; i < players.length; i++) {
+    const p = players[i];
+
+    const firstName = (p.firstName ?? "").trim();
+    const lastName = (p.lastName ?? "").trim();
+    const fullName = [firstName, lastName].filter(Boolean).join(" ");
+
+    if (!fullName || fullName.length < 2) {
+      errors.push({ line: i + 1, raw: JSON.stringify(p).slice(0, 80), reason: "Missing player name" });
+      continue;
+    }
+
+    const price = typeof p.price === "number" ? p.price : null;
+    if (price === null || price < 50_000 || price > 3_000_000) {
+      errors.push({ line: i + 1, raw: fullName, reason: `Invalid price: ${p.price}` });
+      continue;
+    }
+
+    let ownership_pct: number | null = null;
+    if (Array.isArray(p.ownership) && p.ownership.length > 0) {
+      const last = p.ownership[p.ownership.length - 1];
+      ownership_pct = typeof last?.value === "number" ? last.value : null;
+    } else if (typeof p.ownership === "number") {
+      ownership_pct = p.ownership;
+    }
+
+    let position: string | null = null;
+    let positions: string[] | null = null;
+    if (Array.isArray(p.position)) {
+      positions = p.position.map((pos: string) => pos.toUpperCase()).filter((pos: string) => AFL_POSITIONS.includes(pos));
+      position = positions[0] ?? null;
+    } else if (typeof p.position === "string") {
+      const pos = p.position.toUpperCase();
+      position = AFL_POSITIONS.includes(pos) ? pos : null;
+      positions = position ? [position] : null;
+    }
+
+    rows.push({
+      source_name: fullName,
+      cleaned_price: price,
+      position,
+      positions: positions && positions.length > 1 ? positions : null,
+      team: null,
+      external_id: typeof p.id === "number" ? p.id : null,
+      avg_points: typeof p.averagePoints === "number" ? p.averagePoints : null,
+      last_round_score: typeof p.lastRoundScore === "number" ? p.lastRoundScore : null,
+      ownership_pct,
+      price_change: typeof p.roundPriceChange === "number" ? p.roundPriceChange : null,
+      price_change_pct: typeof p.roundPriceChangePct === "number" ? p.roundPriceChangePct : null,
+      status: typeof p.status === "string" ? p.status : null,
+    });
+  }
+
+  return { rows, errors };
+}
+
 export function parseCSVFile(file: File): Promise<ParseResult> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
