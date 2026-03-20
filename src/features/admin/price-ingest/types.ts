@@ -64,10 +64,32 @@ export interface RefreshStepResult {
   error?: string;
 }
 
+export interface PriceRound {
+  season: number;
+  round: number;
+  label: string;
+  is_locked: boolean;
+  created_at: string;
+  player_count: number;
+}
+
+export interface CommitPriceRoundResult {
+  ok: boolean;
+  season: number;
+  round: number;
+  deleted: number;
+  inserted: number;
+  total: number;
+  error?: string;
+}
+
 export interface IngestByIdResult {
   inserted: number;
   skipped_dup: number;
   total: number;
+  season?: number;
+  round?: number;
+  deleted?: number;
   refresh?: {
     projection_engine: RefreshStepResult;
     rankings_cache: RefreshStepResult;

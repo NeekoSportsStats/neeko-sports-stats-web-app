@@ -4,10 +4,11 @@ import {
   Upload, FileText, RefreshCw, CircleCheck as CheckCircle,
   TriangleAlert as AlertTriangle, ArrowLeft, Zap, Clock,
   CircleHelp as HelpCircle, User, Search, Eye, EyeOff, Copy,
-  Sparkles, Braces,
+  Sparkles, Braces, Lock,
 } from "lucide-react";
 import { parseCSVText, parseCSVFile, parseRawFantasyText, parseJsonPlayersText, isJsonInput, fmtPrice, type ParseError } from "./parseUtils";
-import { usePlayerOptions, useCommitPrices, useSavePending } from "./usePriceIngest";
+import { usePlayerOptions, useCommitPrices, useSavePending, usePriceRounds } from "./usePriceIngest";
+import { RoundSelector } from "./RoundSelector";
 import { PlayerSearchDropdown } from "./PlayerSearchDropdown";
 import { applyAutoMatch } from "./matchEngine";
 import type { ParsedPriceRow, MappingRow, IngestByIdResult, MatchStatus } from "./types";
@@ -90,6 +91,8 @@ function rowBgClass(row: MappingRow): string {
   return "hover:bg-muted/10";
 }
 
+const CURRENT_SEASON = 2026;
+
 export function FantasyPricesTab() {
   const [step, setStep] = useState<Step>("input");
   const [pasteText, setPasteText] = useState("");
@@ -100,11 +103,14 @@ export function FantasyPricesTab() {
   const [commitError, setCommitError] = useState<string | null>(null);
   const [pendingSaved, setPendingSaved] = useState(false);
   const [copiedCsv, setCopiedCsv] = useState(false);
+  const [selectedRound, setSelectedRound] = useState(0);
+  const [showOverwriteWarning, setShowOverwriteWarning] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const players = usePlayerOptions();
   const { committing, commitPrices } = useCommitPrices();
   const { saving, savePending } = useSavePending();
+  const { rounds, loading: roundsLoading, fetchRounds, toggleLock } = usePriceRounds(CURRENT_SEASON);
 
   function buildMappingRows(parsed: ParsedPriceRow[]): MappingRow[] {
     const raw: MappingRow[] = parsed.map(r => ({
@@ -196,18 +202,36 @@ export function FantasyPricesTab() {
     );
   }, []);
 
-  async function handleCommit() {
+  const roundMeta = rounds.find(r => r.round === selectedRound && r.season === CURRENT_SEASON);
+  const isRoundLocked = roundMeta?.is_locked ?? false;
+  const existingPlayerCount = roundMeta?.player_count ?? 0;
+
+  async function handleCommitRequest() {
     const mapped = mappingRows.filter(r => r.player_id !== null);
     if (mapped.length === 0) return;
+    if (isRoundLocked) {
+      setCommitError("This round is locked. Unlock it before committing new prices.");
+      return;
+    }
+    if (existingPlayerCount > 0 && !showOverwriteWarning) {
+      setShowOverwriteWarning(true);
+      return;
+    }
+    setShowOverwriteWarning(false);
     setCommitError(null);
-    const { result, error } = await commitPrices(mapped);
+    const { result, error } = await commitPrices(mapped, CURRENT_SEASON, selectedRound);
     if (result) {
       setCommitResult(result);
       setStep("done");
+      await fetchRounds();
       window.dispatchEvent(new CustomEvent("neeko:prices-applied"));
     } else {
       setCommitError(error ?? "Commit failed — check admin logs");
     }
+  }
+
+  function handleCancelOverwrite() {
+    setShowOverwriteWarning(false);
   }
 
   async function handleSavePending() {
@@ -227,6 +251,7 @@ export function FantasyPricesTab() {
     setCommitResult(null);
     setCommitError(null);
     setPendingSaved(false);
+    setShowOverwriteWarning(false);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -299,15 +324,20 @@ export function FantasyPricesTab() {
         ]
       : [];
 
+    const roundLabel = selectedRound === 0 ? "Opening Round" : `Round ${selectedRound}`;
+
     return (
       <div className="space-y-4">
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-6 py-8 text-center">
           <CheckCircle className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
           <h3 className="text-base font-semibold">
-            {allRefreshed ? "Prices updated — projections refreshed" : "Prices imported — refresh partial"}
+            {allRefreshed ? "Prices updated — projections refreshed" : "Prices committed successfully"}
           </h3>
           <p className="text-sm text-muted-foreground mt-1.5">
-            {commitResult.inserted} prices inserted &nbsp;·&nbsp; {commitResult.skipped_dup} already existed
+            {roundLabel} · {commitResult.inserted ?? commitResult.total} prices written
+            {commitResult.deleted != null && commitResult.deleted > 0 && (
+              <> &nbsp;·&nbsp; {commitResult.deleted} previous rows replaced</>
+            )}
           </p>
         </div>
 
@@ -348,6 +378,16 @@ export function FantasyPricesTab() {
 
   return (
     <div className="space-y-5">
+      <RoundSelector
+        selectedRound={selectedRound}
+        season={CURRENT_SEASON}
+        rounds={rounds}
+        loading={roundsLoading}
+        onRoundChange={(r) => { setSelectedRound(r); setShowOverwriteWarning(false); }}
+        onToggleLock={async (round, locked) => { await toggleLock(round, locked); }}
+        onRefresh={fetchRounds}
+      />
+
       {step === "input" && (
         <>
           <div className="flex gap-2 flex-wrap">
@@ -517,8 +557,13 @@ export function FantasyPricesTab() {
           saving={saving}
           pendingSaved={pendingSaved}
           commitError={commitError}
+          isRoundLocked={isRoundLocked}
+          showOverwriteWarning={showOverwriteWarning}
+          existingPlayerCount={existingPlayerCount}
+          selectedRound={selectedRound}
           onSelect={handlePlayerSelect}
-          onCommit={handleCommit}
+          onCommit={handleCommitRequest}
+          onCancelOverwrite={handleCancelOverwrite}
           onSavePending={handleSavePending}
           onBack={() => setStep("input")}
           onCopyCleanCsv={handleCopyCleanCsv}
@@ -590,8 +635,13 @@ interface MappingStepProps {
   saving: boolean;
   pendingSaved: boolean;
   commitError: string | null;
+  isRoundLocked: boolean;
+  showOverwriteWarning: boolean;
+  existingPlayerCount: number;
+  selectedRound: number;
   onSelect: (rowId: string, playerId: number | null, playerName: string | null, isManualInput?: boolean) => void;
   onCommit: () => void;
+  onCancelOverwrite: () => void;
   onSavePending: () => void;
   onBack: () => void;
   onCopyCleanCsv: () => void;
@@ -600,7 +650,8 @@ interface MappingStepProps {
 
 function MappingStep({
   rows, players, counts, committing, saving, pendingSaved, commitError,
-  onSelect, onCommit, onSavePending, onBack, onCopyCleanCsv, copiedCsv,
+  isRoundLocked, showOverwriteWarning, existingPlayerCount, selectedRound,
+  onSelect, onCommit, onCancelOverwrite, onSavePending, onBack, onCopyCleanCsv, copiedCsv,
 }: MappingStepProps) {
   const [search, setSearch] = useState("");
   const [showUnmatchedOnly, setShowUnmatchedOnly] = useState(false);
@@ -673,6 +724,33 @@ function MappingStep({
         <div className="rounded-lg border border-emerald-500/25 bg-emerald-950/10 px-4 py-2.5 text-sm text-emerald-300 flex items-center gap-2">
           <CheckCircle className="h-4 w-4 shrink-0" />
           Pending players saved. They will appear in the Name Resolver once their player records are created.
+        </div>
+      )}
+
+      {isRoundLocked && (
+        <div className="rounded-lg border border-red-500/25 bg-red-950/15 px-4 py-3 text-sm text-red-400 flex items-center gap-2">
+          <Lock className="h-4 w-4 shrink-0" />
+          This round is locked. Unlock it from the round selector above to commit prices.
+        </div>
+      )}
+
+      {showOverwriteWarning && !isRoundLocked && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-950/15 px-4 py-3 space-y-2.5">
+          <p className="text-sm text-amber-300 font-medium">
+            Overwrite {existingPlayerCount} existing prices for {selectedRound === 0 ? "Opening Round" : `Round ${selectedRound}`}?
+          </p>
+          <p className="text-xs text-amber-400/70">
+            All existing prices for this round will be deleted and replaced with the {counts.readyToInsert} mapped rows below.
+          </p>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={onCommit} disabled={committing} className="h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white border-0">
+              {committing ? <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" /> : <CheckCircle className="h-3 w-3 mr-1.5" />}
+              Confirm Overwrite
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onCancelOverwrite} disabled={committing}>
+              Cancel
+            </Button>
+          </div>
         </div>
       )}
 
@@ -755,21 +833,23 @@ function MappingStep({
         </table>
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <Button onClick={onCommit} disabled={counts.readyToInsert === 0 || committing}>
-          {committing
-            ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            : <CheckCircle className="h-4 w-4 mr-2" />}
-          Commit Prices {counts.readyToInsert > 0 ? `(${counts.readyToInsert})` : ""}
-        </Button>
-        <Button variant="outline" onClick={onBack} disabled={committing}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-        {counts.readyToInsert === 0 && (
-          <span className="text-xs text-muted-foreground">Map at least one player to enable commit.</span>
-        )}
-      </div>
+      {!showOverwriteWarning && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button onClick={onCommit} disabled={counts.readyToInsert === 0 || committing || isRoundLocked}>
+            {committing
+              ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              : <CheckCircle className="h-4 w-4 mr-2" />}
+            Commit Prices {counts.readyToInsert > 0 ? `(${counts.readyToInsert})` : ""}
+          </Button>
+          <Button variant="outline" onClick={onBack} disabled={committing}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          {counts.readyToInsert === 0 && (
+            <span className="text-xs text-muted-foreground">Map at least one player to enable commit.</span>
+          )}
+        </div>
+      )}
     </>
   );
 }

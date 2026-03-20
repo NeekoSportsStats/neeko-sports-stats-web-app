@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import type { MappingRow, IngestByIdResult, PlayerOption } from "./types";
+import type { MappingRow, IngestByIdResult, PlayerOption, PriceRound } from "./types";
 
 async function callAdminCommand(command: string, payload: Record<string, unknown>) {
   const { data: { session } } = await supabase.auth.getSession();
@@ -44,14 +44,18 @@ export function usePlayerOptions(): PlayerOption[] {
 export function useCommitPrices() {
   const [committing, setCommitting] = useState(false);
 
-  const commitPrices = useCallback(async (rows: MappingRow[]): Promise<{ result: IngestByIdResult | null; error: string | null }> => {
+  const commitPrices = useCallback(async (
+    rows: MappingRow[],
+    season: number = 2026,
+    round: number = 0,
+  ): Promise<{ result: IngestByIdResult | null; error: string | null }> => {
     setCommitting(true);
     try {
       const payload = rows
         .filter(r => r.player_id !== null)
         .map(r => ({ player_id: r.player_id, cleaned_price: r.cleaned_price }));
 
-      const result = await callAdminCommand("commit_price_ingest", { rows: payload });
+      const result = await callAdminCommand("commit_price_ingest", { rows: payload, season, round });
       return { result: result as IngestByIdResult, error: null };
     } catch (e) {
       return { result: null, error: e instanceof Error ? e.message : "Commit failed" };
@@ -61,6 +65,32 @@ export function useCommitPrices() {
   }, []);
 
   return { committing, commitPrices };
+}
+
+export function usePriceRounds(season: number = 2026) {
+  const [rounds, setRounds] = useState<PriceRound[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchRounds = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase.rpc("get_price_rounds", { p_season: season });
+    if (data) setRounds(data as PriceRound[]);
+    setLoading(false);
+  }, [season]);
+
+  useEffect(() => { fetchRounds(); }, [fetchRounds]);
+
+  const toggleLock = useCallback(async (round: number, locked: boolean): Promise<string | null> => {
+    try {
+      await callAdminCommand("set_price_round_lock", { season, round, locked });
+      await fetchRounds();
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : "Failed to update lock";
+    }
+  }, [season, fetchRounds]);
+
+  return { rounds, loading, fetchRounds, toggleLock };
 }
 
 export function useSavePending() {

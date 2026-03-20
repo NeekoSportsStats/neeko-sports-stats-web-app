@@ -74,13 +74,58 @@ Deno.serve(async (req: Request) => {
 
     // ─── Special commands that carry payload data ─────────────────────────────
     if (command === "commit_price_ingest") {
-      const rows = payload?.rows ?? [];
+      const rows   = payload?.rows   ?? [];
+      const season = payload?.season ?? 2026;
+      const round  = payload?.round  ?? 0;
       const { data: cmdResult, error: cmdError } = await supabase
-        .schema("afl" as never)
-        .rpc("process_price_ingest_by_id" as never, { p_rows: rows });
+        .rpc("commit_price_round", { p_rows: rows, p_season: season, p_round: round });
       const durationMs = Date.now() - startedAt;
       if (cmdError) {
         console.error("commit_price_ingest error:", cmdError);
+        return new Response(
+          JSON.stringify({ ok: false, command, error: cmdError.message, duration_ms: durationMs }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      // The DB function itself returns ok/error for lock checks
+      const result = cmdResult as Record<string, unknown> | null;
+      if (result && result.ok === false) {
+        return new Response(
+          JSON.stringify({ ok: false, command, error: result.error, duration_ms: durationMs }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({ ok: true, command, result: cmdResult, duration_ms: durationMs }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (command === "set_price_round_lock") {
+      const { season, round, locked } = payload;
+      const { data: cmdResult, error: cmdError } = await supabase
+        .rpc("set_price_round_lock", { p_season: season, p_round: round, p_locked: locked });
+      const durationMs = Date.now() - startedAt;
+      if (cmdError) {
+        console.error("set_price_round_lock error:", cmdError);
+        return new Response(
+          JSON.stringify({ ok: false, command, error: cmdError.message, duration_ms: durationMs }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({ ok: true, command, result: cmdResult, duration_ms: durationMs }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (command === "get_price_rounds") {
+      const season = payload?.season ?? 2026;
+      const { data: cmdResult, error: cmdError } = await supabase
+        .rpc("get_price_rounds", { p_season: season });
+      const durationMs = Date.now() - startedAt;
+      if (cmdError) {
+        console.error("get_price_rounds error:", cmdError);
         return new Response(
           JSON.stringify({ ok: false, command, error: cmdError.message, duration_ms: durationMs }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
