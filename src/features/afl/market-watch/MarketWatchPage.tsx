@@ -274,6 +274,15 @@ export default function MarketWatchPage() {
     fetchData(isPremiumRef.current).then(() => setLastUpdated(new Date()));
   }, [authLoading, fetchData]);
 
+  useEffect(() => {
+    function onPricesApplied() {
+      console.log("[MarketWatch] neeko:prices-applied received — refetching");
+      fetchData(isPremiumRef.current).then(() => setLastUpdated(new Date()));
+    }
+    window.addEventListener("neeko:prices-applied", onPricesApplied);
+    return () => window.removeEventListener("neeko:prices-applied", onPricesApplied);
+  }, [fetchData]);
+
   const { buyBeforeRise, cashCows, upgrades, sells, traps } = useMemo(
     () => classifyPlayers(players),
     [players]

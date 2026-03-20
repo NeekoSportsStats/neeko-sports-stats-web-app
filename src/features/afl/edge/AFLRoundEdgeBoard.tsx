@@ -1093,6 +1093,15 @@ export default function AFLRoundEdgeBoard() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  useEffect(() => {
+    function onPricesApplied() {
+      console.log("[EdgeBoard] neeko:prices-applied received — refetching");
+      fetchData();
+    }
+    window.addEventListener("neeko:prices-applied", onPricesApplied);
+    return () => window.removeEventListener("neeko:prices-applied", onPricesApplied);
+  }, [fetchData]);
+
   function handleOpenModal(row: RankingRow, section: Section) {
     if (!isPremium) {
       if (freeOpenCount.current >= 1) {

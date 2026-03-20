@@ -352,6 +352,15 @@ export default function AFLRankingsPage() {
     fetchRankings();
   }, [fetchRankings]);
 
+  useEffect(() => {
+    function onPricesApplied() {
+      console.log("[Rankings] neeko:prices-applied received — refetching");
+      fetchRankings();
+    }
+    window.addEventListener("neeko:prices-applied", onPricesApplied);
+    return () => window.removeEventListener("neeko:prices-applied", onPricesApplied);
+  }, [fetchRankings]);
+
   async function handleRefresh() {
     if (isRefreshing) return;
     setIsRefreshing(true);
