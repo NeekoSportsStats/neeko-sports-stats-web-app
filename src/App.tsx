@@ -22,11 +22,13 @@ import NotFound from "@/pages/NotFound";
 ========================= */
 import {
   AdminShell,
-  AdminControlRoom,
-  AdminPipelinePage,
-  AdminAIPage,
-  AdminDataPage,
-  AdminAnalyticsPage,
+  AdminDashboardPage,
+  AdminHealthPage,
+  AdminUserMetricsPage,
+  AdminCommandPage,
+  AdminPlayerLabPage,
+  AdminMarketingPage,
+  AdminAdminPage,
 } from "@/pages/Admin";
 
 const NeekoPlusPurchase = React.lazy(() => import("@/pages/NeekoPlusPurchase"));
@@ -150,24 +152,29 @@ function App() {
           </RequireAdmin>
         }
       >
-        <Route index element={<Navigate to="/admin/control-room" replace />} />
-        <Route path="control-room"          element={<S fallback={Generic}><AdminControlRoom /></S>} />
-        <Route path="pipeline"              element={<S fallback={Generic}><AdminPipelinePage /></S>} />
-        <Route path="ai"                    element={<S fallback={Generic}><AdminAIPage /></S>} />
-        <Route path="data"                  element={<S fallback={Generic}><AdminDataPage /></S>} />
-        <Route path="analytics"             element={<S fallback={Generic}><AdminAnalyticsPage /></S>} />
+        <Route index element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="dashboard"             element={<S fallback={Generic}><AdminDashboardPage /></S>} />
+        <Route path="health"                element={<S fallback={Generic}><AdminHealthPage /></S>} />
+        <Route path="user-metrics"          element={<S fallback={Generic}><AdminUserMetricsPage /></S>} />
+        <Route path="command-center"        element={<S fallback={Generic}><AdminCommandPage /></S>} />
+        <Route path="player-lab"            element={<S fallback={Generic}><AdminPlayerLabPage /></S>} />
+        <Route path="marketing"             element={<S fallback={Generic}><AdminMarketingPage /></S>} />
+        <Route path="admin"                 element={<S fallback={Generic}><AdminAdminPage /></S>} />
         {/* Legacy redirects */}
-        <Route path="overview"              element={<Navigate to="/admin/control-room" replace />} />
-        <Route path="health"                element={<Navigate to="/admin/control-room" replace />} />
-        <Route path="command-center"        element={<Navigate to="/admin/control-room" replace />} />
-        <Route path="operations"            element={<Navigate to="/admin/control-room" replace />} />
-        <Route path="pipelines"             element={<Navigate to="/admin/pipeline" replace />} />
-        <Route path="system-health"         element={<Navigate to="/admin/control-room" replace />} />
-        <Route path="data-integrity"        element={<Navigate to="/admin/data" replace />} />
-        <Route path="players-intelligence"  element={<Navigate to="/admin/data" replace />} />
-        <Route path="ai-content"            element={<Navigate to="/admin/ai" replace />} />
-        <Route path="todo"                  element={<Navigate to="/admin/control-room" replace />} />
-        <Route path="accuracy"              element={<Navigate to="/admin/pipeline" replace />} />
+        <Route path="control-room"          element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="overview"              element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="pipeline"              element={<Navigate to="/admin/health" replace />} />
+        <Route path="pipelines"             element={<Navigate to="/admin/health" replace />} />
+        <Route path="system-health"         element={<Navigate to="/admin/health" replace />} />
+        <Route path="ai"                    element={<Navigate to="/admin/command-center" replace />} />
+        <Route path="ai-content"            element={<Navigate to="/admin/command-center" replace />} />
+        <Route path="data"                  element={<Navigate to="/admin/command-center" replace />} />
+        <Route path="data-integrity"        element={<Navigate to="/admin/health" replace />} />
+        <Route path="operations"            element={<Navigate to="/admin/command-center" replace />} />
+        <Route path="players-intelligence"  element={<Navigate to="/admin/player-lab" replace />} />
+        <Route path="todo"                  element={<Navigate to="/admin/admin" replace />} />
+        <Route path="accuracy"              element={<Navigate to="/admin/player-lab" replace />} />
+        <Route path="analytics"             element={<Navigate to="/admin/user-metrics" replace />} />
       </Route>
 
       <Route

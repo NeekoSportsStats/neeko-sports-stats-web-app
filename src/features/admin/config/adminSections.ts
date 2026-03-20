@@ -1,18 +1,27 @@
-import { Terminal, GitBranch, Sparkles, Database, ChartBar as BarChart2 } from "lucide-react";
+import {
+  LayoutDashboard,
+  HeartPulse,
+  Users,
+  Terminal,
+  FlaskConical,
+  Megaphone,
+  ShieldCheck,
+} from "lucide-react";
 
 export interface AdminSection {
   path: string;
   label: string;
   icon: React.ElementType;
-  defaultRedirect?: string;
 }
 
 export const ADMIN_SECTIONS: AdminSection[] = [
-  { path: "/admin/control-room", label: "Control Room", icon: Terminal },
-  { path: "/admin/pipeline",     label: "Pipeline",     icon: GitBranch },
-  { path: "/admin/ai",           label: "AI",           icon: Sparkles },
-  { path: "/admin/data",         label: "Data",         icon: Database },
-  { path: "/admin/analytics",    label: "Analytics",    icon: BarChart2 },
+  { path: "/admin/dashboard",       label: "Dashboard",       icon: LayoutDashboard },
+  { path: "/admin/health",          label: "Health",          icon: HeartPulse },
+  { path: "/admin/user-metrics",    label: "User Metrics",    icon: Users },
+  { path: "/admin/command-center",  label: "Command Center",  icon: Terminal },
+  { path: "/admin/player-lab",      label: "Player Lab",      icon: FlaskConical },
+  { path: "/admin/marketing",       label: "Marketing",       icon: Megaphone },
+  { path: "/admin/admin",           label: "Admin",           icon: ShieldCheck },
 ];
 
-export const ADMIN_DEFAULT_PATH = "/admin/control-room";
+export const ADMIN_DEFAULT_PATH = "/admin/dashboard";

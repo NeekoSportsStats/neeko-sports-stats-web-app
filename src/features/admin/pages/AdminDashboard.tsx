@@ -1,516 +1,352 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
-import { runCommand } from "@/hooks/useAdminCommand";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import {
-  RefreshCw, Users, TrendingUp, Activity, DollarSign,
-  ChartBar as BarChart3, ShieldAlert,
-  CircleCheck as CheckCircle, TriangleAlert as AlertTriangle,
-  Circle as XCircle, Bot, Clock, Database, Zap, Play,
-  ArrowRight, ListOrdered, Star,
-} from "lucide-react";
-import { formatDate } from "../shared/adminUtils";
-import type { CommandCenterStatus } from "../shared/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RefreshCw, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Circle as XCircle, Clock, ChevronRight, HeartPulse, Users, Terminal, FlaskConical, Megaphone, ShieldCheck } from "lucide-react";
+import { formatDate } from "@/features/admin/shared/adminUtils";
+import { AdminSectionIntro } from "@/features/admin/shared/AdminExplain";
+import type { CommandCenterStatus } from "@/features/admin/shared/types";
 
-type HealthStatus = "ok" | "warn" | "error" | "loading";
+type Level = "ok" | "warn" | "error" | "loading";
 
-interface MWDiagnostics {
-  total_players: number;
-  positive_price_change: number;
-  negative_price_change: number;
-  snapshot_age_hours: number;
-  status: string;
-  avg_breakeven: number;
-}
-
-interface SubscriptionMetrics {
-  active_subscriptions: number;
-  trial_subscriptions: number;
-  total_profiles: number;
-}
-
-interface SignupMetrics {
-  signups_24h: number;
-  signups_7d: number;
-}
-
-interface RevenueEstimate {
-  mrr_if_all_yearly: number;
-}
-
-interface LiveUsers {
-  live_users: number;
-}
-
-interface ActionItem {
-  label: string;
-  detail: string;
-  urgency: "critical" | "warn" | "info";
-  route?: string;
-  rpcKey?: string;
-}
-
-function toLevel(s: string | undefined | null): HealthStatus {
+function toLevel(s: string | undefined | null): Level {
   if (s === "ok") return "ok";
   if (s === "warn") return "warn";
   if (s === "error") return "error";
   return "loading";
 }
 
-function buildAlerts(status: CommandCenterStatus, mw: MWDiagnostics | null) {
-  const alerts: Array<{ level: "error" | "warn"; message: string; route?: string }> = [];
-  if (status.queue_failed > 10) alerts.push({ level: "error", message: `${status.queue_failed} AI queue jobs failed`, route: "/admin/command-center" });
-  if (status.cron_failed_count > 0) alerts.push({ level: "error", message: `${status.cron_failed_count} cron job(s) failing`, route: "/admin/command-center" });
-  if (status.recent_error_count > 20) alerts.push({ level: "error", message: `${status.recent_error_count} system errors in last 24h`, route: "/admin/health" });
-  if (mw && (mw.positive_price_change / Math.max(mw.total_players, 1)) < 0.05) alerts.push({ level: "error", message: `Market Watch broken — <5% positive price changes (${mw.positive_price_change}/${mw.total_players})`, route: "/admin/health" });
-  if (mw && mw.avg_breakeven > 200) alerts.push({ level: "error", message: `Market Watch breakeven avg ${mw.avg_breakeven.toFixed(0)}pts — model likely broken`, route: "/admin/health" });
-  if (status.ai_missing_players > 50) alerts.push({ level: "warn", message: `${status.ai_missing_players} players missing AI analysis`, route: "/admin/command-center" });
-  if (status.rankings_cache_rows < 100) alerts.push({ level: "warn", message: `Rankings cache low — only ${status.rankings_cache_rows} players`, route: "/admin/health" });
-  if (status.queue_pending > 200) alerts.push({ level: "warn", message: `${status.queue_pending} jobs queued — AI worker may be slow`, route: "/admin/command-center" });
-  if (!status.pipeline_last_run) alerts.push({ level: "warn", message: "AFL pipeline has never run", route: "/admin/command-center" });
-  if (mw && mw.snapshot_age_hours > 48) alerts.push({ level: "warn", message: `Market Watch snapshot is ${mw.snapshot_age_hours.toFixed(0)}h old`, route: "/admin/health" });
+function StatusDot({ level }: { level: Level }) {
+  const cls = level === "ok" ? "bg-emerald-500"
+    : level === "warn" ? "bg-amber-500"
+    : level === "error" ? "bg-red-500 animate-pulse"
+    : "bg-muted-foreground animate-pulse";
+  return <span className={`w-2 h-2 rounded-full shrink-0 ${cls}`} />;
+}
+
+function StatusTile({ label, value, sub, level, onClick }: {
+  label: string; value: string; sub: string; level: Level; onClick?: () => void;
+}) {
+  const border = level === "ok" ? "border-emerald-900/40 bg-emerald-950/10"
+    : level === "warn" ? "border-amber-900/40 bg-amber-950/10"
+    : level === "error" ? "border-red-900/40 bg-red-950/10"
+    : "border-border bg-card";
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-lg border px-3 py-2.5 text-left w-full transition-opacity hover:opacity-80 ${border}`}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+        <StatusDot level={level} />
+      </div>
+      <p className="text-lg font-bold tabular-nums leading-tight truncate">{value}</p>
+      <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{sub}</p>
+    </button>
+  );
+}
+
+interface Alert { level: "warn" | "error"; msg: string; route?: string }
+
+function buildAlerts(s: CommandCenterStatus): Alert[] {
+  const alerts: Alert[] = [];
+  if ((s.queue_failed ?? 0) > 10)
+    alerts.push({ level: "error", msg: `${s.queue_failed} AI jobs failed in queue`, route: "/admin/health" });
+  if (s.pipeline_status === "failed")
+    alerts.push({ level: "error", msg: "AFL pipeline last run failed", route: "/admin/health" });
+  if ((s.cron_failed_count ?? 0) > 0)
+    alerts.push({ level: "warn", msg: `${s.cron_failed_count} cron jobs reporting failure`, route: "/admin/health" });
+  if ((s.fantasy_unmatched_count ?? 0) > 20)
+    alerts.push({ level: "warn", msg: `${s.fantasy_unmatched_count} fantasy prices unmatched`, route: "/admin/command-center" });
+  if (!s.market_watch_last_refresh)
+    alerts.push({ level: "warn", msg: "Market Watch has no snapshot — refresh required", route: "/admin/command-center" });
+  if ((s.ai_missing_players ?? 0) > 100)
+    alerts.push({ level: "warn", msg: `${s.ai_missing_players} players missing AI analysis`, route: "/admin/command-center" });
+  if ((s.rankings_cache_rows ?? 0) < 300)
+    alerts.push({ level: "error", msg: `Rankings cache only has ${s.rankings_cache_rows} rows`, route: "/admin/health" });
   return alerts;
 }
 
-function buildActions(status: CommandCenterStatus, mw: MWDiagnostics | null): ActionItem[] {
-  const actions: ActionItem[] = [];
-  if (mw && (mw.positive_price_change / Math.max(mw.total_players, 1)) < 0.1) {
-    actions.push({ label: "Rerun Market Watch snapshot", detail: "Price model showing abnormal distribution — refresh required", urgency: "critical", rpcKey: "refresh_market_watch" });
-  }
-  if (status.queue_failed > 0) {
-    actions.push({ label: "Clear failed AI queue jobs", detail: `${status.queue_failed} failed jobs blocking the queue`, urgency: "critical", route: "/admin/command-center" });
-  }
-  if (status.ai_missing_players > 20) {
-    actions.push({ label: "Run AI worker batch", detail: `${status.ai_missing_players} players missing AI summaries`, urgency: "warn", rpcKey: "run_ai_worker" });
-  }
-  if (status.rankings_cache_rows < 500) {
-    actions.push({ label: "Refresh rankings cache", detail: "Cache is low — players may be missing from rankings page", urgency: "warn", rpcKey: "refresh_rankings" });
-  }
-  if (status.queue_pending > 100) {
-    actions.push({ label: "Monitor AI queue drain", detail: `${status.queue_pending} jobs still pending`, urgency: "info", route: "/admin/command-center" });
-  }
-  if (!status.pipeline_last_run || new Date(status.pipeline_last_run) < new Date(Date.now() - 7 * 86400000)) {
-    actions.push({ label: "Run AFL pipeline", detail: "No recent pipeline run detected — data may be stale", urgency: "warn", rpcKey: "run_neeko_pipeline_orchestrator" });
-  }
-  if (actions.length === 0) {
-    actions.push({ label: "All systems healthy", detail: "No immediate actions required — platform looks good", urgency: "info" });
-  }
-  return actions;
+interface RunRow {
+  id: string;
+  label: string | null;
+  pipeline_key: string | null;
+  status: string;
+  started_at: string | null;
+  duration_seconds: number | null;
+  error_summary: string | null;
 }
 
-function HealthDot({ status }: { status: HealthStatus }) {
-  const cls = status === "ok" ? "bg-emerald-500"
-    : status === "warn" ? "bg-amber-500 animate-pulse"
-    : status === "error" ? "bg-red-500 animate-pulse"
-    : "bg-muted-foreground animate-pulse";
-  return <span className={`inline-block w-2 h-2 rounded-full ${cls}`} />;
+function statusBadge(s: string | null | undefined) {
+  if (!s) return <span className="text-muted-foreground text-xs">—</span>;
+  const up = s.toLowerCase();
+  const cls = up === "completed" || up === "ok"
+    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
+    : up === "running" || up === "processing"
+    ? "bg-sky-500/15 text-sky-400 border-sky-500/25 animate-pulse"
+    : up === "failed" || up === "error"
+    ? "bg-red-500/15 text-red-400 border-red-500/25"
+    : "bg-muted/50 text-muted-foreground border-border";
+  return <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold border ${cls}`}>{s}</span>;
 }
 
-function SystemCard({
-  icon: Icon, label, status, primary, secondary, sub, route, loading,
-}: {
-  icon: React.ElementType; label: string; status: HealthStatus;
-  primary: React.ReactNode; secondary?: React.ReactNode; sub?: string;
-  route?: string; loading: boolean;
-}) {
-  const navigate = useNavigate();
-  const border = status === "ok" ? "border-emerald-500/15"
-    : status === "warn" ? "border-amber-500/20"
-    : status === "error" ? "border-red-500/25"
-    : "border-border";
-  return (
-    <Card
-      className={`border ${border} transition-colors ${route ? "cursor-pointer hover:bg-muted/20" : ""}`}
-      onClick={route ? () => navigate(route) : undefined}
-    >
-      <CardContent className="pt-4 pb-3 px-4">
-        {loading ? (
-          <div className="space-y-2">
-            <div className="h-3 w-20 rounded bg-muted animate-pulse" />
-            <div className="h-6 w-24 rounded bg-muted animate-pulse" />
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <Icon className="h-3 w-3 text-muted-foreground" />
-                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{label}</span>
-              </div>
-              <HealthDot status={status} />
-            </div>
-            <div className="text-lg font-bold tabular-nums leading-tight">{primary}</div>
-            {secondary && <div className="text-xs text-muted-foreground mt-0.5">{secondary}</div>}
-            {sub && <p className="text-[10px] text-muted-foreground mt-1 opacity-70">{sub}</p>}
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
+function fmtTs(ts: string | null | undefined) {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleString("en-AU", { dateStyle: "short", timeStyle: "short" });
 }
 
-function KpiCard({ icon: Icon, label, value, sub, accent }: {
-  icon: React.ElementType; label: string; value: React.ReactNode;
-  sub?: string; accent?: "green" | "blue" | "amber";
-}) {
-  const cls = accent === "green" ? "text-emerald-400"
-    : accent === "blue" ? "text-sky-400"
-    : accent === "amber" ? "text-amber-400"
-    : "text-foreground";
-  return (
-    <Card>
-      <CardContent className="pt-5 pb-4">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1 min-w-0">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">{label}</p>
-            <p className={`text-2xl font-bold tabular-nums leading-tight ${cls}`}>{value}</p>
-            {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
-          </div>
-          <div className="shrink-0 p-2 rounded-lg bg-muted ml-3">
-            <Icon className="h-4 w-4 text-muted-foreground" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+function fmtDuration(s: number | null | undefined) {
+  if (!s) return "—";
+  if (s < 60) return `${s.toFixed(0)}s`;
+  return `${(s / 60).toFixed(1)}m`;
 }
+
+const NAV_TILES = [
+  { path: "/admin/health",         label: "Health",          sub: "Pipeline, AI & data integrity",  icon: HeartPulse },
+  { path: "/admin/user-metrics",   label: "User Metrics",    sub: "Usage, signups, conversions",     icon: Users },
+  { path: "/admin/command-center", label: "Command Center",  sub: "All operator actions",            icon: Terminal },
+  { path: "/admin/player-lab",     label: "Player Lab",      sub: "Player data explorer",            icon: FlaskConical },
+  { path: "/admin/marketing",      label: "Marketing",       sub: "Content & media tools",           icon: Megaphone },
+  { path: "/admin/admin",          label: "Admin",           sub: "Tasks, logs & flags",             icon: ShieldCheck },
+];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { toast } = useToast();
-
-  const [sysLoading, setSysLoading] = useState(true);
-  const [bizLoading, setBizLoading] = useState(true);
-  const [sysStatus, setSysStatus] = useState<CommandCenterStatus | null>(null);
-  const [mwDiag, setMwDiag] = useState<MWDiagnostics | null>(null);
-  const [subMetrics, setSubMetrics] = useState<SubscriptionMetrics | null>(null);
-  const [signupMetrics, setSignupMetrics] = useState<SignupMetrics | null>(null);
-  const [revenueEstimate, setRevenueEstimate] = useState<RevenueEstimate | null>(null);
-  const [liveUsers, setLiveUsers] = useState<LiveUsers | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<CommandCenterStatus | null>(null);
+  const [runs, setRuns] = useState<RunRow[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const [actionRunning, setActionRunning] = useState<string | null>(null);
-  const hasLoaded = useRef(false);
-
-  const fetchSystem = useCallback(async () => {
-    setSysLoading(true);
-    try {
-      const [statusRes, mwRes] = await Promise.allSettled([
-        supabase.from("v_command_center_status").select("*").maybeSingle(),
-        supabase.from("v_mw_diagnostics").select("*").maybeSingle(),
-      ]);
-      if (statusRes.status === "fulfilled" && statusRes.value.data) setSysStatus(statusRes.value.data as CommandCenterStatus);
-      if (mwRes.status === "fulfilled" && mwRes.value.data) setMwDiag(mwRes.value.data as MWDiagnostics);
-    } finally {
-      setSysLoading(false);
-    }
-  }, []);
-
-  const fetchBusiness = useCallback(async () => {
-    setBizLoading(true);
-    try {
-      const [subRes, signupRes, revenueRes, liveRes] = await Promise.allSettled([
-        supabase.from("v_admin_subscription_metrics").select("*").maybeSingle(),
-        supabase.schema("admin" as never).from("v_signups_7d").select("*").maybeSingle(),
-        supabase.schema("admin" as never).from("v_revenue_estimate").select("*").maybeSingle(),
-        supabase.schema("admin" as never).from("v_live_users").select("*").maybeSingle(),
-      ]);
-      if (subRes.status === "fulfilled" && subRes.value.data) setSubMetrics(subRes.value.data as SubscriptionMetrics);
-      if (signupRes.status === "fulfilled" && signupRes.value.data) setSignupMetrics(signupRes.value.data as SignupMetrics);
-      if (revenueRes.status === "fulfilled" && revenueRes.value.data) setRevenueEstimate(revenueRes.value.data as RevenueEstimate);
-      if (liveRes.status === "fulfilled" && liveRes.value.data) setLiveUsers(liveRes.value.data as LiveUsers);
-    } finally {
-      setBizLoading(false);
-    }
-  }, []);
 
   const fetchAll = useCallback(async () => {
-    await Promise.all([fetchSystem(), fetchBusiness()]);
-    setLastRefreshed(new Date());
-  }, [fetchSystem, fetchBusiness]);
-
-  useEffect(() => {
-    if (!hasLoaded.current) {
-      hasLoaded.current = true;
-      fetchAll();
-    }
-  }, [fetchAll]);
-
-  async function runAction(key: string, label: string, command: string) {
-    setActionRunning(key);
+    setLoading(true);
     try {
-      const res = await runCommand(command);
-      if (!res.success) throw new Error(res.error ?? "Unknown error");
-      toast({ title: `${label} complete` });
-      await fetchSystem();
-    } catch (err) {
-      toast({ title: `${label} failed`, description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
+      const [statusRes, runsRes] = await Promise.allSettled([
+        supabase.from("v_command_center_status").select("*").maybeSingle(),
+        supabase.from("v_pipeline_run_detail").select("*").order("started_at", { ascending: false }).limit(8),
+      ]);
+      if (statusRes.status === "fulfilled" && statusRes.value.data)
+        setStatus(statusRes.value.data as CommandCenterStatus);
+      if (runsRes.status === "fulfilled" && runsRes.value.data)
+        setRuns(runsRes.value.data as RunRow[]);
+      setLastRefreshed(new Date());
     } finally {
-      setActionRunning(null);
+      setLoading(false);
     }
-  }
+  }, []);
 
-  const overallHealth: HealthStatus = !sysStatus ? "loading"
-    : [sysStatus.rankings_cache_status, sysStatus.pipeline_health, sysStatus.ai_health,
-       sysStatus.market_watch_health, sysStatus.cron_health, sysStatus.logs_health]
-        .includes("error") ? "error"
-    : [sysStatus.rankings_cache_status, sysStatus.pipeline_health, sysStatus.ai_health,
-       sysStatus.market_watch_health, sysStatus.cron_health, sysStatus.logs_health]
-        .includes("warn") ? "warn"
-    : "ok";
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const alerts = sysStatus ? buildAlerts(sysStatus, mwDiag) : [];
-  const actions = sysStatus ? buildActions(sysStatus, mwDiag) : [];
-  const mrr = revenueEstimate?.mrr_if_all_yearly ?? 0;
+  const alerts = status ? buildAlerts(status) : [];
 
-  const positivePct = mwDiag && mwDiag.total_players > 0
-    ? Math.round((mwDiag.positive_price_change / mwDiag.total_players) * 100)
-    : null;
+  const tiles = [
+    {
+      label: "Rankings Cache",
+      value: status?.rankings_cache_rows != null ? `${status.rankings_cache_rows.toLocaleString()}` : "—",
+      sub: status?.rankings_cache_refreshed_at ? formatDate(status.rankings_cache_refreshed_at) : "Never refreshed",
+      level: status ? toLevel(status.rankings_cache_status) : "loading" as Level,
+      route: "/admin/health",
+    },
+    {
+      label: "Pipeline",
+      value: status?.pipeline_status ?? "—",
+      sub: status?.pipeline_last_run ? formatDate(status.pipeline_last_run) : "No recent run",
+      level: status?.pipeline_status === "completed" ? "ok" as Level
+        : status?.pipeline_status === "failed" ? "error" as Level
+        : status?.pipeline_status === "running" ? "warn" as Level
+        : "loading" as Level,
+      route: "/admin/health",
+    },
+    {
+      label: "AI Coverage",
+      value: status ? `${status.ai_analysis_rows.toLocaleString()}` : "—",
+      sub: status ? `${status.ai_missing_players} missing` : "",
+      level: (status?.ai_missing_players ?? 999) > 100 ? "warn" as Level : "ok" as Level,
+      route: "/admin/command-center",
+    },
+    {
+      label: "Market Watch",
+      value: status?.market_watch_quality ?? "—",
+      sub: status?.market_watch_last_refresh ? formatDate(status.market_watch_last_refresh) : "Never",
+      level: toLevel(status?.market_watch_health),
+      route: "/admin/command-center",
+    },
+    {
+      label: "AI Queue",
+      value: status != null ? `${status.queue_pending} pending` : "—",
+      sub: status != null ? `${status.queue_failed} failed` : "",
+      level: (status?.queue_failed ?? 0) > 10 ? "error" as Level
+        : (status?.queue_pending ?? 0) > 200 ? "warn" as Level
+        : "ok" as Level,
+      route: "/admin/command-center",
+    },
+    {
+      label: "Edge Board",
+      value: status?.edge_board_rows != null ? `${status.edge_board_rows} rows` : "—",
+      sub: status?.edge_board_last_refreshed ? formatDate(status.edge_board_last_refreshed) : "Never",
+      level: (status?.edge_board_rows ?? 0) < 5 ? "warn" as Level : "ok" as Level,
+      route: "/admin/health",
+    },
+  ];
+
+  const overallHealth: Level = status
+    ? tiles.filter(t => t.level === "error").length > 0 ? "error"
+      : tiles.filter(t => t.level === "warn").length > 1 ? "warn"
+      : "ok"
+    : "loading";
 
   return (
-    <div className="space-y-6">
-
-      {/* Page header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-lg font-bold tracking-tight">Overview</h2>
-            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-              overallHealth === "ok"    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/25"
-              : overallHealth === "warn"  ? "bg-amber-500/15 text-amber-400 border border-amber-500/25"
-              : overallHealth === "error" ? "bg-red-500/15 text-red-400 border border-red-500/25"
-              : "bg-muted/50 text-muted-foreground border border-border"
-            }`}>
-              <HealthDot status={overallHealth} />
-              {overallHealth === "ok" ? "All Systems OK"
-                : overallHealth === "warn" ? "Warnings"
-                : overallHealth === "error" ? "Issues Detected"
-                : "Checking…"}
-            </span>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold tracking-tight">Dashboard</h1>
+            <StatusDot level={overallHealth} />
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {lastRefreshed
-              ? `Updated ${lastRefreshed.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
-              : "Platform status at a glance"}
+            Operator summary — system health at a glance
+            {lastRefreshed && ` · ${lastRefreshed.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" })}`}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchAll} disabled={sysLoading || bizLoading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${sysLoading || bizLoading ? "animate-spin" : ""}`} />
+        <Button variant="outline" size="sm" onClick={fetchAll} disabled={loading}>
+          <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
       </div>
 
-      {/* Critical alerts */}
-      {!sysLoading && alerts.length > 0 && (
-        <div className="space-y-1.5">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Critical Alerts</p>
-          {alerts.map((alert, i) => (
-            <div
-              key={i}
-              className={`flex items-center gap-3 rounded-lg px-3.5 py-2.5 border cursor-pointer transition-opacity hover:opacity-80 ${
-                alert.level === "error"
-                  ? "bg-red-950/20 border-red-900/40 text-red-400"
-                  : "bg-amber-950/15 border-amber-900/30 text-amber-400"
-              }`}
-              onClick={() => alert.route && navigate(alert.route)}
-            >
-              {alert.level === "error"
-                ? <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
-                : <AlertTriangle className="h-3.5 w-3.5 shrink-0" />}
-              <span className="flex-1 text-sm font-medium">{alert.message}</span>
-              {alert.route && <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-50" />}
-            </div>
+      <AdminSectionIntro
+        description="Your 24-hour operator view. Shows system health at a glance, active alerts, and recent pipeline runs. Click any tile to navigate to the relevant section."
+        detail="Tiles turn amber when something needs attention and red when something is broken. Alerts appear below when action is required. Check Health for stage-by-stage pipeline details, or Command Center to trigger manual actions."
+      />
+
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-16 rounded-lg border border-border bg-card animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {tiles.map(t => (
+            <StatusTile key={t.label} {...t} onClick={() => navigate(t.route)} />
           ))}
         </div>
       )}
 
-      {/* System Snapshot */}
-      <div>
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">System Snapshot</p>
-        <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
-          <SystemCard
-            icon={ListOrdered}
-            label="Rankings"
-            status={toLevel(sysStatus?.rankings_cache_status)}
-            primary={sysStatus ? sysStatus.rankings_cache_rows.toLocaleString() : "—"}
-            secondary="players cached"
-            sub={sysStatus?.rankings_cache_refreshed_at ? formatDate(sysStatus.rankings_cache_refreshed_at) : undefined}
-            route="/admin/health"
-            loading={sysLoading}
-          />
-          <SystemCard
-            icon={Activity}
-            label="Pipeline"
-            status={toLevel(sysStatus?.pipeline_health)}
-            primary={sysStatus?.pipeline_status ?? "—"}
-            secondary={sysStatus?.pipeline_last_run ? formatDate(sysStatus.pipeline_last_run) : "Never run"}
-            route="/admin/command-center"
-            loading={sysLoading}
-          />
-          <SystemCard
-            icon={Bot}
-            label="AI Content"
-            status={toLevel(sysStatus?.ai_health)}
-            primary={sysStatus ? `${sysStatus.ai_missing_players} missing` : "—"}
-            secondary={sysStatus ? `${sysStatus.ai_analysis_rows.toLocaleString()} with AI` : undefined}
-            route="/admin/ai-content"
-            loading={sysLoading}
-          />
-          <SystemCard
-            icon={Database}
-            label="AI Queue"
-            status={toLevel(sysStatus?.queue_health)}
-            primary={sysStatus ? `${sysStatus.queue_pending} pending` : "—"}
-            secondary={sysStatus?.queue_failed ? `${sysStatus.queue_failed} failed` : "no failures"}
-            route="/admin/command-center"
-            loading={sysLoading}
-          />
-          <SystemCard
-            icon={TrendingUp}
-            label="Market Watch"
-            status={toLevel(sysStatus?.market_watch_health)}
-            primary={positivePct !== null ? `${positivePct}% positive` : (sysStatus?.market_watch_health ?? "—")}
-            secondary={mwDiag ? `${mwDiag.total_players} players` : undefined}
-            sub={sysStatus?.market_watch_last_refresh ? formatDate(sysStatus.market_watch_last_refresh) : undefined}
-            route="/admin/health"
-            loading={sysLoading}
-          />
-          <SystemCard
-            icon={Clock}
-            label="Cron Jobs"
-            status={toLevel(sysStatus?.cron_health)}
-            primary={sysStatus ? `${sysStatus.cron_active_count} active` : "—"}
-            secondary={sysStatus?.cron_failed_count ? `${sysStatus.cron_failed_count} failed` : "all healthy"}
-            route="/admin/command-center"
-            loading={sysLoading}
-          />
+      {!loading && alerts.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Alerts</p>
+          {alerts.map((a, i) => (
+            <button
+              key={i}
+              onClick={() => a.route && navigate(a.route)}
+              className={`w-full flex items-center gap-3 rounded-lg border px-4 py-2.5 text-left hover:opacity-80 transition-opacity ${
+                a.level === "error"
+                  ? "border-red-500/30 bg-red-950/10"
+                  : "border-amber-500/30 bg-amber-950/10"
+              }`}
+            >
+              {a.level === "error"
+                ? <XCircle className="h-4 w-4 text-red-400 shrink-0" />
+                : <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />}
+              <span className={`text-sm flex-1 ${a.level === "error" ? "text-red-300" : "text-amber-300"}`}>{a.msg}</span>
+              {a.route && <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+            </button>
+          ))}
         </div>
-      </div>
+      )}
 
-      {/* Today's Actions + Business side by side */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      {!loading && alerts.length === 0 && status && (
+        <div className="flex items-center gap-3 rounded-lg border border-emerald-500/20 bg-emerald-950/10 px-4 py-3">
+          <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
+          <span className="text-sm text-emerald-300">All systems operational — no active alerts</span>
+        </div>
+      )}
 
-        {/* Today's Actions */}
+      <div className="grid gap-5 lg:grid-cols-2">
+
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-              <Zap className="h-4 w-4 text-muted-foreground" />
-              Today's Actions
+            <CardTitle className="flex items-center justify-between text-sm font-semibold">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                Recent Pipeline Runs
+              </div>
+              <button
+                onClick={() => navigate("/admin/health")}
+                className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors"
+              >
+                View all <ChevronRight className="h-3 w-3" />
+              </button>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {sysLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map(i => <div key={i} className="h-12 rounded bg-muted animate-pulse" />)}
+          <CardContent>
+            {loading ? (
+              <div className="space-y-2">{[1,2,3,4].map(i => <div key={i} className="h-8 rounded bg-muted animate-pulse" />)}</div>
+            ) : runs.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No pipeline runs found</p>
+            ) : (
+              <div className="space-y-0">
+                {runs.map((r, i) => (
+                  <div key={r.id ?? i} className="flex items-center justify-between py-2 border-b border-border/20 last:border-0">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium truncate">{r.label ?? r.pipeline_key ?? "—"}</p>
+                      <p className="text-[11px] text-muted-foreground">{fmtTs(r.started_at)} · {fmtDuration(r.duration_seconds)}</p>
+                    </div>
+                    <div className="ml-3 shrink-0 flex flex-col items-end gap-1">
+                      {statusBadge(r.status)}
+                      {r.error_summary && (
+                        <span className="text-[10px] text-red-400 max-w-[140px] truncate">{r.error_summary}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ) : actions.map((action, i) => (
-              <div
-                key={i}
-                className={`flex items-start gap-3 rounded-lg p-3 border transition-colors ${
-                  action.urgency === "critical" ? "border-red-900/40 bg-red-950/15"
-                  : action.urgency === "warn" ? "border-amber-900/30 bg-amber-950/10"
-                  : "border-border bg-muted/20"
-                } ${action.route || action.rpcKey ? "cursor-pointer hover:opacity-80" : ""}`}
-                onClick={() => {
-                  if (action.route) navigate(action.route);
-                  else if (action.rpcKey) runAction(action.rpcKey, action.label, action.rpcKey);
-                }}
-              >
-                <div className="shrink-0 mt-0.5">
-                  {action.urgency === "critical" ? <XCircle className="h-4 w-4 text-red-400" />
-                    : action.urgency === "warn" ? <AlertTriangle className="h-4 w-4 text-amber-400" />
-                    : <CheckCircle className="h-4 w-4 text-emerald-400" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${
-                    action.urgency === "critical" ? "text-red-300"
-                    : action.urgency === "warn" ? "text-amber-300"
-                    : "text-foreground"
-                  }`}>{action.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{action.detail}</p>
-                </div>
-                {(action.route || action.rpcKey) && (
-                  actionRunning === action.rpcKey
-                    ? <RefreshCw className="h-3.5 w-3.5 text-muted-foreground animate-spin shrink-0" />
-                    : action.rpcKey
-                      ? <Play className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      : <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                )}
-              </div>
-            ))}
+            )}
           </CardContent>
         </Card>
 
-        {/* Business snapshot */}
-        <div className="space-y-4">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Business</p>
-          <div className="grid gap-3 grid-cols-2">
-            <KpiCard
-              icon={Activity}
-              label="Live Now"
-              value={bizLoading ? "—" : (liveUsers?.live_users?.toLocaleString() ?? "0")}
-              sub="active sessions (5 min)"
-              accent="blue"
-            />
-            <KpiCard
-              icon={Users}
-              label="New Signups (7d)"
-              value={bizLoading ? "—" : (signupMetrics?.signups_7d?.toLocaleString() ?? "0")}
-              sub={signupMetrics ? `${signupMetrics.signups_24h} today` : undefined}
-              accent="green"
-            />
-            <KpiCard
-              icon={Star}
-              label="Subscribers"
-              value={bizLoading ? "—" : (subMetrics?.active_subscriptions?.toLocaleString() ?? "0")}
-              sub={subMetrics ? `${subMetrics.trial_subscriptions} on trial` : undefined}
-              accent="amber"
-            />
-            <KpiCard
-              icon={DollarSign}
-              label="Est. MRR"
-              value={bizLoading ? "—" : `$${mrr.toLocaleString("en-AU", { minimumFractionDigits: 0 })}`}
-              sub={subMetrics ? `${subMetrics.total_profiles?.toLocaleString()} total users` : undefined}
-              accent="green"
-            />
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Navigate</p>
+          <div className="grid grid-cols-2 gap-3">
+            {NAV_TILES.map(({ path, label, sub, icon: Icon }) => (
+              <button
+                key={path}
+                onClick={() => navigate(path)}
+                className="rounded-lg border border-border bg-card hover:bg-muted/40 transition-colors p-3 text-left"
+              >
+                <Icon className="h-4 w-4 text-muted-foreground mb-2" />
+                <p className="text-xs font-semibold">{label}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
+              </button>
+            ))}
           </div>
         </div>
 
       </div>
 
-      {/* Quick links */}
-      <div>
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">Quick Links</p>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: "Player Intelligence", detail: "Hot/cold/overrated players", icon: Users, route: "/admin/players-intelligence" },
-            { label: "Health", detail: "Data freshness, errors and diagnostics", icon: ShieldAlert, route: "/admin/health" },
-            { label: "Command Center", detail: "Run pipelines and workers", icon: Database, route: "/admin/command-center" },
-            { label: "Operations", detail: "Manual triggers and price upload", icon: BarChart3, route: "/admin/operations" },
-          ].map(({ label, detail, icon: Icon, route }) => (
-            <Card
-              key={route}
-              className="cursor-pointer hover:bg-muted/30 transition-colors border-border/60"
-              onClick={() => navigate(route)}
-            >
-              <CardContent className="pt-4 pb-4 px-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="shrink-0 p-2 rounded-lg bg-muted">
-                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">{label}</p>
-                    <p className="text-xs text-muted-foreground truncate">{detail}</p>
-                  </div>
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-auto" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+      {status && !loading && (
+        <div className="rounded-lg border border-border bg-card px-4 py-3">
+          <p className="text-xs font-semibold mb-2">System Snapshot</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1.5">
+            {[
+              { label: "Cron jobs active", value: `${status.cron_active_count ?? 0}`, ok: (status.cron_active_count ?? 0) > 0 },
+              { label: "Cron failures", value: `${status.cron_failed_count ?? 0}`, ok: (status.cron_failed_count ?? 0) === 0 },
+              { label: "Fantasy matched", value: `${status.fantasy_matched_count?.toLocaleString() ?? "—"}`, ok: (status.fantasy_matched_count ?? 0) > 0 },
+              { label: "Recent errors", value: `${status.recent_error_count ?? 0}`, ok: (status.recent_error_count ?? 0) < 5 },
+              { label: "Reco rows", value: `${status.reco_rows?.toLocaleString() ?? "—"}`, ok: (status.reco_rows ?? 0) > 0 },
+              { label: "Queue complete", value: `${status.queue_complete?.toLocaleString() ?? "—"}`, ok: true },
+              { label: "Queue processing", value: `${status.queue_processing?.toLocaleString() ?? "—"}`, ok: true },
+              { label: "AI last updated", value: status.ai_last_updated ? formatDate(status.ai_last_updated) : "—", ok: !!status.ai_last_updated },
+            ].map(({ label, value, ok }) => (
+              <div key={label} className="flex items-center justify-between text-[11px]">
+                <span className="text-muted-foreground">{label}</span>
+                <span className={ok ? "font-medium" : "text-amber-400 font-medium"}>{value}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-
+      )}
     </div>
   );
 }

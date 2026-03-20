@@ -99,11 +99,13 @@ function AdminShellWithProvider() {
   );
 }
 
-export const AdminControlRoom        = lazy(() => import("@/features/admin/pages/AdminControlRoom"));
-export const AdminPipelinePage       = lazy(() => import("@/features/admin/pages/AdminPipelines"));
-export const AdminAIPage             = lazy(() => import("@/features/admin/pages/AdminAIHub"));
-export const AdminDataPage           = lazy(() => import("@/features/admin/pages/AdminDataHub"));
-export const AdminAnalyticsPage      = lazy(() => import("@/features/admin/pages/AdminAnalytics"));
+export const AdminDashboardPage    = lazy(() => import("@/features/admin/pages/AdminDashboard"));
+export const AdminHealthPage       = lazy(() => import("@/features/admin/pages/AdminHealth"));
+export const AdminUserMetricsPage  = lazy(() => import("@/features/admin/pages/AdminAnalytics"));
+export const AdminCommandPage      = lazy(() => import("@/features/admin/pages/AdminNewCommandCenter"));
+export const AdminPlayerLabPage    = lazy(() => import("@/features/admin/pages/AdminPlayerLab"));
+export const AdminMarketingPage    = lazy(() => import("@/features/admin/pages/AdminMarketing"));
+export const AdminAdminPage        = lazy(() => import("@/features/admin/pages/AdminAdminHub"));
 
 export { AdminShellWithProvider as AdminShell };
 export default AdminShellWithProvider;
