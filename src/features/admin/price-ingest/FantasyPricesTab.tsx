@@ -338,10 +338,13 @@ export function FantasyPricesTab() {
 
           {inputMode === "raw" && (
             <div className="rounded-lg border border-sky-500/20 bg-sky-950/10 px-4 py-3 text-sm text-sky-300">
-              <strong>Raw paste mode.</strong> Copy the entire player table from AFL Fantasy and paste it below — messy spacing, merged columns, and extra rows are handled automatically. Prices ($NNN,NNN) are used as anchors to detect each player row.
-              <br />
-              <span className="text-sky-400/70 text-xs mt-0.5 block">
-                Extracts: player name, position (DEF/MID/FWD/RUC), team, and price.
+              <strong>Raw paste mode.</strong> Supports both AFL Fantasy paste formats automatically:
+              <ul className="mt-1.5 space-y-0.5 text-sky-300/90 text-xs list-disc list-inside">
+                <li><strong>Stacked format</strong> (AFL Fantasy website copy) — one field per line, prices like <code className="font-mono">$727k</code> / <code className="font-mono">$1.132M</code>, position line as block separator</li>
+                <li><strong>Tabular format</strong> — all fields on one row, prices like <code className="font-mono">$1,182,000</code></li>
+              </ul>
+              <span className="text-sky-400/70 text-xs mt-1 block">
+                Tip: Select All on the AFL Fantasy trade page and paste here. Extracts name, position (DEF/MID/FWD/RUC), and price.
               </span>
             </div>
           )}
@@ -362,7 +365,7 @@ export function FantasyPricesTab() {
               onChange={e => handlePasteChange(e.target.value)}
               placeholder={
                 inputMode === "raw"
-                  ? "Paste AFL Fantasy player table here — raw copy from site is fine\n\nExample:\n1 Nick Daicos MID Collingwood $1,182,000\n2 Zach Merrett MID Essendon $956,000\n..."
+                  ? "Paste AFL Fantasy data here — stacked or tabular format both work\n\nStacked example:\nplayingN. Daicos\nMID\n$1.182M\n+$57k\nR1: COL vs ADE\n$1.182M\n\nTabular example:\nNick Daicos  MID  Collingwood  $1,182,000"
                   : "N Daicos, $1,182,000\nL D-Uniacke, $785,000\nM Gawn, $1,050,000"
               }
               rows={16}
@@ -414,7 +417,7 @@ export function FantasyPricesTab() {
 
           {mappingRows.length === 0 && inputMode !== "csv" && pasteText.trim() && (
             <div className="rounded-lg border border-red-500/20 bg-red-950/10 px-4 py-3 text-sm text-red-400">
-              No player rows detected. Make sure the pasted content includes prices in the format $NNN,NNN.
+              No player rows detected. Stacked format requires position lines (DEF/MID/FWD/RUC) as block separators with prices like <code className="font-mono">$727k</code> or <code className="font-mono">$1.132M</code>. Tabular format requires prices like <code className="font-mono">$1,182,000</code>.
             </div>
           )}
 

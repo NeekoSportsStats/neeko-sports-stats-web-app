@@ -18,6 +18,27 @@ function cleanPrice(raw: string): number | null {
   return n;
 }
 
+// ── Short price parser: $727k or $1.132M ─────────────────────────────────────
+function parseShortPrice(raw: string): number | null {
+  const s = raw.trim();
+  // $1.132M  or  $1M
+  const mMatch = s.match(/^\$(\d+(?:\.\d+)?)M$/i);
+  if (mMatch) {
+    const val = Math.round(parseFloat(mMatch[1]) * 1_000_000);
+    if (val >= 50_000 && val <= 3_000_000) return val;
+    return null;
+  }
+  // $727k  or  $727.5k
+  const kMatch = s.match(/^\$(\d+(?:\.\d+)?)k$/i);
+  if (kMatch) {
+    const val = Math.round(parseFloat(kMatch[1]) * 1_000);
+    if (val >= 50_000 && val <= 3_000_000) return val;
+    return null;
+  }
+  // Fallback: full dollar amount $727,000
+  return cleanPrice(s);
+}
+
 // ── AFL team name lookup ─────────────────────────────────────────────────────
 
 const AFL_TEAMS: Record<string, string> = {
@@ -46,7 +67,6 @@ const AFL_POSITIONS = ["DEF", "MID", "FWD", "RUC"];
 function extractTeam(tokens: string[]): { team: string | null; remaining: string[] } {
   const upper = tokens.map(t => t.toUpperCase());
 
-  // Try two-word team matches first (NORTH MELBOURNE, PORT ADELAIDE, etc.)
   for (let i = 0; i < upper.length - 1; i++) {
     const two = `${upper[i]} ${upper[i + 1]}`;
     if (AFL_TEAMS[two]) {
@@ -56,7 +76,6 @@ function extractTeam(tokens: string[]): { team: string | null; remaining: string
       };
     }
   }
-  // Single-word team
   for (let i = 0; i < upper.length; i++) {
     if (AFL_TEAMS[upper[i]]) {
       return {
@@ -71,7 +90,6 @@ function extractTeam(tokens: string[]): { team: string | null; remaining: string
 function extractPosition(tokens: string[]): { position: string | null; remaining: string[] } {
   const upper = tokens.map(t => t.toUpperCase());
 
-  // Multi-token positions like "DEF/MID", "MID/FWD"
   for (let i = 0; i < upper.length; i++) {
     if (/^(DEF|MID|FWD|RUC)(\/?(DEF|MID|FWD|RUC))*$/.test(upper[i])) {
       const position = upper[i].split("/").map(p => p.trim()).find(p => AFL_POSITIONS.includes(p)) ?? upper[i];
@@ -84,16 +102,135 @@ function extractPosition(tokens: string[]): { position: string | null; remaining
   return { position: null, remaining: tokens };
 }
 
-// ── Raw AFL Fantasy paste parser ─────────────────────────────────────────────
+// ── Detect which format the pasted text uses ─────────────────────────────────
+//
+// AFL Fantasy website stacked-block format:
+//   playingD. Stephens          ← name line (may have "playing" / "bye" prefix)
+//   MID                         ← position line  ← block separator
+//   $727k                       ← current price
+//   +$57k                       ← price change   (starts with + or -)
+//   R1: ADE vs BRI              ← fixture line   (skip)
+//   $727k                       ← duplicate price (skip)
+//
+// AFL Fantasy tabular format (old):
+//   Nick Daicos  MID  Collingwood  $1,182,000
+
+const SHORT_PRICE_RE = /^\$\d+(?:\.\d+)?[kKmM]$/;
+const FULL_PRICE_RE = /\$[1-9]\d{0,2}(?:,\d{3}){1,2}/;
+const POSITION_LINE_RE = /^(DEF|MID|FWD|RUC)(\/?(DEF|MID|FWD|RUC))*$/i;
+const CHANGE_LINE_RE = /^[+-]\$\d+(?:\.\d+)?[kKmM]$/;
+const FIXTURE_LINE_RE = /R\d+\s*:/i;
+
+function isStackedBlockFormat(lines: string[]): boolean {
+  let shortPriceCount = 0;
+  let positionLineCount = 0;
+  for (const l of lines) {
+    if (SHORT_PRICE_RE.test(l)) shortPriceCount++;
+    if (POSITION_LINE_RE.test(l)) positionLineCount++;
+  }
+  return shortPriceCount >= 3 || positionLineCount >= 3;
+}
+
+// ── Stacked-block parser ──────────────────────────────────────────────────────
+//
+// Strategy:
+//   1. Split all lines.
+//   2. Walk through lines; when we hit a POSITION line, the PREVIOUS non-junk
+//      line is the player name. Collect the next ~6 lines to find the price.
+//   3. Extract name (clean "playing"/"bye" prefix), position, first price.
+
+function parseStackedBlocks(lines: string[]): ParseResult {
+  const rows: ParsedPriceRow[] = [];
+  const errors: ParseError[] = [];
+
+  // Indices of position lines — each marks the start of a player block
+  const blockStarts: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (POSITION_LINE_RE.test(lines[i])) {
+      blockStarts.push(i);
+    }
+  }
+
+  for (let bi = 0; bi < blockStarts.length; bi++) {
+    const posIdx = blockStarts[bi];
+    const nextPosIdx = blockStarts[bi + 1] ?? lines.length;
+
+    // ── Name: scan backwards from posIdx for first non-junk line ──
+    let rawName: string | null = null;
+    for (let ni = posIdx - 1; ni >= 0; ni--) {
+      const l = lines[ni];
+      // Skip change/price/fixture/position/blank lines
+      if (!l) continue;
+      if (POSITION_LINE_RE.test(l)) break;
+      if (SHORT_PRICE_RE.test(l)) break;
+      if (FULL_PRICE_RE.test(l)) break;
+      if (CHANGE_LINE_RE.test(l)) break;
+      if (FIXTURE_LINE_RE.test(l)) break;
+      rawName = l;
+      break;
+    }
+
+    if (!rawName) {
+      errors.push({ line: posIdx + 1, raw: lines[posIdx], reason: "Could not find player name before position line" });
+      continue;
+    }
+
+    // Clean name: strip leading "playing" / "bye" / "inj" prefixes (case-insensitive)
+    const cleanedName = rawName
+      .replace(/^(playing|bye|inj|injured|out|dtd)\s*/i, "")
+      .trim();
+
+    if (!cleanedName || cleanedName.length < 2 || !/[A-Za-z]/.test(cleanedName)) {
+      errors.push({ line: posIdx + 1, raw: rawName, reason: `Name looks invalid: "${rawName}"` });
+      continue;
+    }
+
+    // ── Position ──
+    const position = lines[posIdx].toUpperCase().split("/")[0].trim();
+
+    // ── Price: first valid price line after the position, within this block ──
+    let price: number | null = null;
+    for (let pi = posIdx + 1; pi < nextPosIdx; pi++) {
+      const l = lines[pi];
+      if (CHANGE_LINE_RE.test(l)) continue;   // skip +$57k change lines
+      if (FIXTURE_LINE_RE.test(l)) continue;  // skip fixture lines
+
+      // Try short price ($727k / $1.132M)
+      if (SHORT_PRICE_RE.test(l)) {
+        price = parseShortPrice(l);
+        if (price !== null) break;
+      }
+      // Try full price ($727,000)
+      const fullMatch = l.match(FULL_PRICE_RE);
+      if (fullMatch) {
+        price = cleanPrice(fullMatch[0]);
+        if (price !== null) break;
+      }
+    }
+
+    if (price === null) {
+      errors.push({ line: posIdx + 1, raw: cleanedName, reason: "Could not find a valid price in player block" });
+      continue;
+    }
+
+    rows.push({
+      source_name: cleanedName,
+      cleaned_price: price,
+      position,
+      team: null,
+    });
+  }
+
+  return { rows, errors };
+}
+
+// ── Raw AFL Fantasy paste parser (tabular, price-anchored) ───────────────────
 //
 // The AFL Fantasy site table looks like (when pasted raw):
-//
 //   Nick Daicos  MID  Collingwood  $1,182,000
 //   Zach Merrett  MID  Essendon  $956,000
-//   ...
 //
-// But it can also come in garbled/merged forms. We anchor on the price ($NNN,NNN)
-// and work backwards to extract name, position, team.
+// Anchors on $NNN,NNN price pattern.
 
 export function parseRawFantasyText(text: string): ParseResult {
   const rows: ParsedPriceRow[] = [];
@@ -101,19 +238,23 @@ export function parseRawFantasyText(text: string): ParseResult {
 
   if (!text.trim()) return { rows, errors };
 
-  // Normalise the text: collapse multiple spaces/tabs to single space,
-  // normalise newlines, strip zero-width chars
+  // Normalise: collapse horizontal whitespace, normalise newlines
   const normalised = text
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
-    .replace(/[^\S\n]+/g, " ")         // collapse horizontal whitespace
-    .replace(/\u00a0/g, " ")           // non-breaking spaces
-    .replace(/[\u200b\u200c\u200d\ufeff]/g, "") // zero-width chars
+    .replace(/[^\S\n]+/g, " ")
+    .replace(/\u00a0/g, " ")
+    .replace(/[\u200b\u200c\u200d\ufeff]/g, "")
     .trim();
 
-  // Strategy: split by price pattern as anchor
-  // Each price ($nnn,nnn) terminates a player record
-  // Regex: matches $NNN,NNN or $N,NNN,NNN (1 or 2 groups of 3 digits after first)
+  const lines = normalised.split("\n").map(l => l.trim()).filter(Boolean);
+
+  // Detect stacked-block vs tabular format
+  if (isStackedBlockFormat(lines)) {
+    return parseStackedBlocks(lines);
+  }
+
+  // ── Tabular format: anchor on $NNN,NNN ──────────────────────────────────────
   const PRICE_RE = /\$[1-9]\d{0,2}(?:,\d{3}){1,2}/g;
 
   const priceMatches: Array<{ match: string; index: number }> = [];
@@ -124,11 +265,9 @@ export function parseRawFantasyText(text: string): ParseResult {
   }
 
   if (priceMatches.length === 0) {
-    // No prices found — fall back to line-by-line CSV parse
     return parseCSVText(text);
   }
 
-  // Build segments: text from previous price end to current price (inclusive)
   const segments: string[] = [];
   let cursor = 0;
   for (const pm of priceMatches) {
@@ -137,16 +276,10 @@ export function parseRawFantasyText(text: string): ParseResult {
     if (seg) segments.push(seg);
     cursor = segEnd;
   }
-  // Handle trailing text (non-price rows at end)
-  const trailing = normalised.slice(cursor).trim();
-  if (trailing) {
-    // trailing may have partial info — skip it
-  }
 
   for (let si = 0; si < segments.length; si++) {
     const seg = segments[si];
 
-    // Extract price from this segment (always the last price in it)
     const segPriceMatch = seg.match(/\$[1-9]\d{0,2}(?:,\d{3}){1,2}$/);
     if (!segPriceMatch) {
       errors.push({ line: si + 1, raw: seg.slice(0, 60), reason: "No price found in segment" });
@@ -159,46 +292,34 @@ export function parseRawFantasyText(text: string): ParseResult {
       continue;
     }
 
-    // Text before price
     const beforePrice = seg.slice(0, seg.lastIndexOf(segPriceMatch[0])).trim();
     if (!beforePrice) {
       errors.push({ line: si + 1, raw: seg.slice(0, 60), reason: "No player info before price" });
       continue;
     }
 
-    // Tokenise beforePrice — split by whitespace and newlines
     let tokens = beforePrice.split(/[\s\n]+/).filter(Boolean);
 
-    // Remove leading rank/number tokens like "1", "23", "123."
     while (tokens.length > 0 && /^\d+\.?$/.test(tokens[0])) {
       tokens = tokens.slice(1);
     }
 
-    // Remove known junk tokens (e.g. avg score columns, % owned)
     tokens = tokens.filter(t => !/^\d+(\.\d+)?%?$/.test(t) || /^\d{4,}$/.test(t));
 
-    // Extract position
     const posResult = extractPosition(tokens);
     const position = posResult.position;
     tokens = posResult.remaining;
 
-    // Extract team
     const teamResult = extractTeam(tokens);
     const team = teamResult.team;
     tokens = teamResult.remaining;
 
-    // Remaining tokens = player name
-    // Validate: must have at least 2 tokens for a valid name
-    const name = tokens.join(" ").trim();
-
-    // Filter out obvious non-name leftovers (single chars, pure numbers)
-    const cleanedName = name.replace(/\s+/g, " ").trim();
+    const cleanedName = tokens.join(" ").trim().replace(/\s+/g, " ");
     if (!cleanedName || cleanedName.length < 2) {
       errors.push({ line: si + 1, raw: seg.slice(0, 60), reason: "Could not extract player name" });
       continue;
     }
 
-    // Final sanity: name should have at least one letter
     if (!/[A-Za-z]/.test(cleanedName)) {
       errors.push({ line: si + 1, raw: seg.slice(0, 60), reason: `Name looks invalid: "${cleanedName}"` });
       continue;
@@ -224,7 +345,6 @@ export function parseCSVText(text: string): ParseResult {
     const raw = lines[i].trim();
     if (!raw) continue;
 
-    // Try comma-separated first (CSV)
     let name: string | null = null;
     let priceStr: string | null = null;
 
@@ -233,7 +353,6 @@ export function parseCSVText(text: string): ParseResult {
       name = commaParts[0].trim().replace(/^"|"$/g, "");
       priceStr = commaParts.slice(1).join(",").trim().replace(/^"|"$/g, "");
     } else {
-      // Tab-separated fallback
       const tabParts = raw.split("\t");
       if (tabParts.length >= 2) {
         name = tabParts[0].trim();
