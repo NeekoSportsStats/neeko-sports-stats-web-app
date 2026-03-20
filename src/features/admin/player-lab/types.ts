@@ -177,6 +177,8 @@ export interface SignalMasterRow {
   price: number;
   projection: number;
   neeko_rating: number;
+  status: string | null;
+  is_available: boolean | null;
   signal_tags: string[];
   signal_count: number;
   signal_strength_score: number;

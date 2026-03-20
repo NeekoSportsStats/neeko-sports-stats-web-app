@@ -7,6 +7,7 @@ import {
 import type { PlayerRow, PlayerSignals, PlayerEdge, PlayerRoundHistory } from "../types";
 import { SIGNAL_CATEGORY_MAP } from "../constants";
 import { fmtNum, fmtPrice, ConfidenceBadge, RecoBadge } from "./SharedUI";
+import { StatusBadge } from "@/components/admin/StatusBadge";
 
 function EdgeBar({ label, value, color, positive = true }: { label: string; value: number | null | undefined; color: string; positive?: boolean }) {
   const v = value ?? 0;
@@ -81,11 +82,13 @@ export function PlayerDetailPanel({
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-sm">{player.player_name}</span>
+            <StatusBadge status={player.status} />
             <span className="text-muted-foreground">{player.team}</span>
             <span className="text-[10px] bg-muted/40 px-1.5 py-0.5 rounded font-mono">{player.position}</span>
             <ConfidenceBadge label={player.confidence_label} />
             <RecoBadge color={player.recommendation_color} short={player.recommendation_short} />
           </div>
+          {console.log("Player Lab status sample:", player.player_name, "→", player.status, "| is_available:", player.is_available) as undefined}
           <div className="text-muted-foreground mt-1">{fmtPrice(player.price)} · Rating {fmtNum(player.neeko_rating, 0)} · {player.games_played ?? "—"} games</div>
         </div>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded">

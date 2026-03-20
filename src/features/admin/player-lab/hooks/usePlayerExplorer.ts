@@ -27,7 +27,9 @@ export function usePlayerExplorer() {
         supabase.from("v_player_edge_scores").select("player_id,value_edge,matchup_edge,role_edge,form_edge,risk_penalty,edge_total").limit(1000),
       ]);
       if (explorerRes.status === "fulfilled") {
-        setRows((explorerRes.value.data as PlayerRow[]) ?? []);
+        const explorerData = (explorerRes.value.data as PlayerRow[]) ?? [];
+        console.log("Player Lab status sample:", explorerData.slice(0, 5).map(p => ({ name: p.player_name, status: p.status, is_available: p.is_available })));
+        setRows(explorerData);
       }
       if (signalsRes.status === "fulfilled") {
         const sMap = new Map<number, PlayerSignals>();

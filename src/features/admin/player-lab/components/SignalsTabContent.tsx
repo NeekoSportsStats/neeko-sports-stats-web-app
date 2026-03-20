@@ -7,6 +7,7 @@ import {
   ResponsiveContainer, Cell,
 } from "recharts";
 import { fmtNum, fmtPrice, RecoBadge, DataWarningBanner } from "./SharedUI";
+import { StatusBadge } from "@/components/admin/StatusBadge";
 import { SIGNAL_GROUPS, SIGNAL_CATEGORY_MAP, SIGNAL_PILLS_BY_GROUP } from "../constants";
 import { useSignals } from "../hooks/useSignals";
 import type { SignalCategory } from "../hooks/useSignals";
@@ -232,7 +233,12 @@ export function SignalsTabContent() {
                     ) : filteredMaster.map((r, i) => (
                       <tr key={`${r.player_id}-${i}`} className="border-b border-border/40 hover:bg-muted/20">
                         <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
-                        <td className="px-3 py-2 font-medium whitespace-nowrap">{r.player_name}</td>
+                        <td className="px-3 py-2 font-medium whitespace-nowrap">
+                          <span className="flex items-center">
+                            {r.player_name}
+                            <StatusBadge status={r.status} />
+                          </span>
+                        </td>
                         <td className="px-3 py-2 text-muted-foreground font-mono">{r.position}</td>
                         <td className="px-3 py-2 text-muted-foreground">{r.team}</td>
                         <td className="px-3 py-2 tabular-nums font-semibold">{fmtNum(r.neeko_rating, 0)}</td>
@@ -321,7 +327,12 @@ export function SignalsTabContent() {
                   ) : labRows.map((r, i) => (
                     <tr key={`${r.player_id ?? r.player_name}-${i}`} className="border-b border-border/40 hover:bg-muted/20">
                       <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
-                      <td className="px-3 py-2 font-medium whitespace-nowrap">{r.player_name}</td>
+                      <td className="px-3 py-2 font-medium whitespace-nowrap">
+                        <span className="flex items-center">
+                          {r.player_name}
+                          {'status' in r && <StatusBadge status={(r as any).status} />}
+                        </span>
+                      </td>
                       <td className="px-3 py-2 text-muted-foreground font-mono">{r.position}</td>
                       <td className="px-3 py-2 text-muted-foreground">{r.team}</td>
                       <td className="px-3 py-2 tabular-nums font-semibold">{fmtNum(r.neeko_rating)}</td>

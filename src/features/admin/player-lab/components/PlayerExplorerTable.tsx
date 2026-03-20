@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { AdminSectionIntro, AdminInfoTooltip } from "@/features/admin/shared/AdminExplain";
 import { PlayerDetailPanel } from "./PlayerDetailPanel";
 import { fmtNum, fmtPrice, pct, ConfidenceBadge, RecoBadge, SortIcon, DataWarningBanner } from "./SharedUI";
+import { StatusBadge } from "@/components/admin/StatusBadge";
 import { SIGNAL_PILLS_BY_GROUP, SIGNAL_GROUPS } from "../constants";
 import { usePlayerExplorer } from "../hooks/usePlayerExplorer";
 
@@ -216,16 +217,17 @@ export function PlayerExplorerTable() {
                     <td className="px-2 py-2 text-muted-foreground">
                       <ChevronRight className={`h-3 w-3 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
                     </td>
-                    <td className="px-2 py-2 font-medium whitespace-nowrap">{r.player_name}</td>
+                    <td className="px-2 py-2 font-medium whitespace-nowrap">
+                      <span className="flex items-center">
+                        {r.player_name}
+                        <StatusBadge status={r.status} />
+                      </span>
+                    </td>
                     <td className="px-2 py-2 text-muted-foreground font-mono">{r.position}</td>
                     <td className="px-2 py-2 text-muted-foreground">{r.team}</td>
                     <td className="px-2 py-2">
                       {r.status ? (
-                        <span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
-                          r.status === "OUT" ? "bg-red-500/15 text-red-400 border-red-500/25"
-                          : r.status === "TEST" ? "bg-amber-500/15 text-amber-400 border-amber-500/25"
-                          : "bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
-                        }`}>{r.status}</span>
+                        <StatusBadge status={r.status} />
                       ) : (
                         <span className="text-muted-foreground/40 text-[10px]">—</span>
                       )}
