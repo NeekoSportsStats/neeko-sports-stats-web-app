@@ -634,7 +634,7 @@ export default function AdminMediaLibrary() {
   const { state, setMediaLibrary, setContentEngine, setDraft } = useAdminUIState();
   const ml = state.mediaLibrary;
 
-  const allMedia = (ml.images as MediaItem[]).concat(ml.videos as MediaItem[]);
+  const allMedia = ((ml.images as MediaItem[]) ?? []).concat((ml.videos as MediaItem[]) ?? []);
 
   const setAllMedia = (items: MediaItem[]) => {
     const imgs = items.filter((i) => i.media_type === "image");

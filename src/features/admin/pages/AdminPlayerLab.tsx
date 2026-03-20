@@ -2,14 +2,13 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { RefreshCw, Users, TrendingUp, DollarSign, Target, ChevronUp, ChevronDown, ChevronsUpDown, Search, Flame, Gem, Crown, Shield, TriangleAlert as AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { AdminSectionIntro, AdminInfoTooltip } from "@/features/admin/shared/AdminExplain";
 import { FantasyPricesTab } from "@/features/admin/price-ingest/FantasyPricesTab";
 import { NameResolverTab } from "@/features/admin/price-ingest/NameResolverTab";
 import { PriceChangeDebugTab } from "@/features/admin/price-ingest/PriceChangeDebugTab";
 import { FantasyPlayerMatchingTab } from "@/features/admin/price-ingest/FantasyPlayerMatchingTab";
 import {
-  LineChart, Line, BarChart, Bar,
+  BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer, Cell,
 } from "recharts";
@@ -45,42 +44,79 @@ interface PlayerRow {
   recommendation_short: string;
   market_watch_category: string;
   best_value_score: number;
+  confidence_label: string;
+  opportunity_score: number;
+  risk_score: number;
+  signal_count: number;
+  signal_tags: string[];
 }
 
 interface AccuracyKpi {
-  total_predictions: number | null;
-  players_evaluated: number | null;
+  players_analysed: number | null;
+  avg_error: number | null;
+  median_error: number | null;
+  within_10: number | null;
+  within_15: number | null;
+  within_20: number | null;
   latest_round: number | null;
-  latest_round_mae: number | null;
-  season_mae: number | null;
-  season_rmse: number | null;
-  within_10_pct: number | null;
-  within_20_pct: number | null;
-  avg_signed_error: number | null;
-  over_projection_pct: number | null;
-  best_position: string | null;
-  worst_position: string | null;
-  best_position_mae: number | null;
-  worst_position_mae: number | null;
+  source: string | null;
 }
 
 interface RoundRow {
   round_number: number;
   round_label: string;
-  mae: number;
-  rmse: number;
+  mean_error: number;
+  median_error: number;
   within_10_pct: number;
   within_20_pct: number;
   predictions_count: number;
 }
 
 interface PositionRow {
-  position: string;
-  predictions_count: number;
-  mae: number;
+  position_group: string;
+  mean_absolute_error: number;
+  median_absolute_error: number;
   rmse: number;
   within_10_pct: number;
   within_20_pct: number;
+  predictions_count: number;
+  players_count: number;
+}
+
+// ─── Signal view types ────────────────────────────────────────────────────────
+
+interface LabPlayerRow {
+  player_id: number;
+  player_name: string;
+  team: string;
+  position: string;
+  projection: number;
+  ceiling: number;
+  floor: number;
+  price: number;
+  value_score: number;
+  neeko_rating: number;
+  form_score: number;
+  consistency: number;
+  upside_pct: number;
+  captain_score: number;
+  captain_rating: string;
+  matchup_label: string;
+  recommendation_short: string;
+  recommendation_color: string;
+  confidence_label: string;
+  buy_score: number;
+  opportunity_score: number;
+  risk_score: number;
+  total_score: number;
+  signal_count: number;
+  signal_tags: string[];
+  composite_label: string;
+  breakout_probability?: number;
+  breakout_index?: number;
+  ceiling_hit_rate?: number;
+  recent_trend?: string;
+  sell_score?: number;
 }
 
 // ─── Sub-tab config ───────────────────────────────────────────────────────────
@@ -145,11 +181,17 @@ function PlayerExplorerTab() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
+      .schema("afl" as never)
       .from("player_rankings_cache")
-      .select("player_id,player_name,team,position,projection_final,ceiling,floor,price,neeko_rating,value_score,value_tag,consistency,form_score,captain_score,captain_rating,upside_rating,upside_pct,risk_rating,matchup_rating,matchup_multiplier,ai_recommendation,recommendation_color,recommendation_short,market_watch_category,best_value_score")
+      .select("player_id,player_name,team,position,projection_final,ceiling,floor,price,neeko_rating,value_score,value_tag,consistency,form_score,captain_score,captain_rating,upside_rating,upside_pct,risk_rating,matchup_rating,matchup_multiplier,ai_recommendation,recommendation_color,recommendation_short,market_watch_category,best_value_score,confidence_label,opportunity_score,risk_score,signal_count,signal_tags")
       .order("neeko_rating", { ascending: false })
-      .limit(700);
+      .limit(1000);
+    console.log("Player Lab explorer:", data?.length, "rows | error:", error);
+    if (!data?.length) {
+      const { data: state } = await supabase.rpc("get_operator_console_state");
+      console.log("Player Lab — operator state:", state);
+    }
     setRows((data as PlayerRow[]) ?? []);
     setLoading(false);
   }, []);
@@ -179,27 +221,30 @@ function PlayerExplorerTab() {
   }
 
   const cols: { key: string; label: string; explain?: string }[] = [
-    { key: "player_name", label: "Player" },
-    { key: "position",    label: "Pos" },
-    { key: "team",        label: "Team" },
-    { key: "projection_final", label: "Proj", explain: "Final blended projection including matchup and role multipliers" },
-    { key: "ceiling",     label: "Ceil", explain: "85th percentile outcome from recent 10 games" },
-    { key: "floor",       label: "Floor", explain: "15th percentile outcome from recent 10 games" },
-    { key: "neeko_rating", label: "Rating", explain: "Neeko composite rating (0-100) blending projection, form, value, consistency" },
-    { key: "value_score", label: "Value", explain: "Value score: projected points per $100k of price. Higher = better value" },
-    { key: "consistency", label: "Cons%", explain: "Consistency: fraction of recent games above their own average" },
-    { key: "captain_score", label: "Cap", explain: "Captain score: upside-weighted rating for captaincy decisions" },
-    { key: "upside_pct",  label: "Upside%", explain: "Probability of exceeding projection by >10%" },
-    { key: "matchup_multiplier", label: "Matchup", explain: "Opponent difficulty multiplier (1.0 = neutral, >1 = easier)" },
-    { key: "price",       label: "Price" },
+    { key: "player_name",        label: "Player" },
+    { key: "position",           label: "Pos" },
+    { key: "team",               label: "Team" },
+    { key: "projection_final",   label: "Proj",     explain: "Final blended projection including matchup and role multipliers" },
+    { key: "ceiling",            label: "Ceil",     explain: "85th percentile outcome from recent 10 games" },
+    { key: "floor",              label: "Floor",    explain: "15th percentile outcome from recent 10 games" },
+    { key: "neeko_rating",       label: "Rating",   explain: "Neeko composite rating (0-100) blending projection, form, value, consistency" },
+    { key: "value_score",        label: "Value",    explain: "Value score: projected points per $100k of price. Higher = better value" },
+    { key: "consistency",        label: "Cons%",    explain: "Consistency: fraction of recent games above their own average" },
+    { key: "captain_score",      label: "Cap",      explain: "Captain score: upside-weighted rating for captaincy decisions" },
+    { key: "upside_pct",         label: "Upside%",  explain: "Probability of exceeding projection by >10%" },
+    { key: "matchup_multiplier", label: "Matchup",  explain: "Opponent difficulty multiplier (1.0 = neutral, >1 = easier)" },
+    { key: "opportunity_score",  label: "Opp",      explain: "Opportunity score from signal engine — breakout + matchup + value composite" },
+    { key: "risk_score",         label: "Risk",     explain: "Risk score from signal engine — volatility + consistency penalty" },
+    { key: "signal_count",       label: "Signals",  explain: "Number of active signals firing for this player" },
+    { key: "price",              label: "Price" },
     { key: "recommendation_short", label: "Reco" },
   ];
 
   return (
     <div>
       <AdminSectionIntro
-        description="Full player data from player_rankings_cache — the production table that drives all rankings and recommendations."
-        detail="Filters update in-browser on the 700-row local dataset. Sort any column by clicking its header. The Reco column shows the AI short recommendation from the latest generation cycle."
+        description="Full player data from afl.player_rankings_cache — the production table driving all rankings and recommendations."
+        detail="Filters update in-browser on the 1000-row local dataset. Sort any column by clicking its header. Includes opportunity, risk, and signal scores from the signal engine."
       />
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -269,6 +314,9 @@ function PlayerExplorerTab() {
                 <td className="px-2 py-2 tabular-nums">{fmtNum(r.captain_score)}</td>
                 <td className="px-2 py-2 tabular-nums">{fmtNum(r.upside_pct, 0)}%</td>
                 <td className="px-2 py-2 tabular-nums">{fmtNum(r.matchup_multiplier, 2)}x</td>
+                <td className="px-2 py-2 tabular-nums text-sky-400">{fmtNum(r.opportunity_score, 0)}</td>
+                <td className="px-2 py-2 tabular-nums text-amber-400">{fmtNum(r.risk_score, 0)}</td>
+                <td className="px-2 py-2 tabular-nums">{r.signal_count ?? "—"}</td>
                 <td className="px-2 py-2 tabular-nums">{fmtPrice(r.price)}</td>
                 <td className="px-2 py-2">
                   <RecoBadge color={r.recommendation_color} short={r.recommendation_short} />
@@ -294,19 +342,28 @@ function AccuracyTab() {
     setLoading(true);
     const [kpiRes, roundRes, posRes] = await Promise.allSettled([
       supabase.from("v_projection_accuracy_homepage").select("*").maybeSingle(),
-      supabase.from("v_projection_accuracy_round").select("round_number,round_label,mae,rmse,within_10_pct,within_20_pct,predictions_count").order("round_number", { ascending: false }).limit(12),
-      supabase.from("v_projection_accuracy_by_position").select("position,predictions_count,mae,rmse,within_10_pct,within_20_pct").order("mae", { ascending: true }),
+      supabase.from("v_projection_accuracy_by_round").select("round_number,round_label,mean_error,median_error,within_10_pct,within_20_pct,predictions_count").order("round_number", { ascending: false }).limit(12),
+      supabase.from("v_projection_accuracy_by_position").select("position_group,mean_absolute_error,median_absolute_error,rmse,within_10_pct,within_20_pct,predictions_count,players_count").order("mean_absolute_error", { ascending: true }),
     ]);
-    if (kpiRes.status === "fulfilled") setKpi(kpiRes.value.data as AccuracyKpi | null);
-    if (roundRes.status === "fulfilled") setRounds((roundRes.value.data ?? []) as RoundRow[]);
-    if (posRes.status === "fulfilled") setPositions((posRes.value.data ?? []) as PositionRow[]);
+    if (kpiRes.status === "fulfilled") {
+      console.log("Accuracy KPI:", kpiRes.value.data, "error:", kpiRes.value.error);
+      setKpi(kpiRes.value.data as AccuracyKpi | null);
+    }
+    if (roundRes.status === "fulfilled") {
+      console.log("Accuracy rounds:", roundRes.value.data?.length, "rows | error:", roundRes.value.error);
+      setRounds((roundRes.value.data ?? []) as RoundRow[]);
+    }
+    if (posRes.status === "fulfilled") {
+      console.log("Accuracy positions:", posRes.value.data?.length, "rows | error:", posRes.value.error);
+      setPositions((posRes.value.data ?? []) as PositionRow[]);
+    }
     setLoading(false);
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const chartData = useMemo(() =>
-    [...rounds].reverse().map(r => ({ name: r.round_label ?? `R${r.round_number}`, mae: r.mae, rmse: r.rmse, w10: +(r.within_10_pct * 100).toFixed(1) })),
+    [...rounds].reverse().map(r => ({ name: r.round_label ?? `R${r.round_number}`, mae: r.mean_error, w10: +(r.within_10_pct * 100).toFixed(1) })),
     [rounds]
   );
 
@@ -317,58 +374,46 @@ function AccuracyTab() {
     <div className="space-y-6">
       <AdminSectionIntro
         description="How accurate are the Neeko projection models? MAE = Mean Absolute Error (lower is better). Within 10%/20% = fraction of predictions within that band."
-        detail="Data from v_projection_accuracy_homepage, v_projection_accuracy_round, and v_projection_accuracy_by_position views. These are refreshed weekly after each round by the pipeline."
+        detail="Data from v_projection_accuracy_homepage, v_projection_accuracy_by_round, and v_projection_accuracy_by_position views. These are refreshed daily by the pipeline."
       />
 
       {loading ? (
         <div className="flex items-center justify-center py-20"><RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" /></div>
       ) : (
         <>
-          {/* KPI Row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-            {[
-              { label: "Season MAE", value: fmtNum(kpi?.season_mae), color: maeColor(kpi?.season_mae ?? null), explain: "Average absolute error across all predictions this season" },
-              { label: "Latest Round MAE", value: fmtNum(kpi?.latest_round_mae), color: maeColor(kpi?.latest_round_mae ?? null), explain: "MAE for the most recently completed round" },
-              { label: "Season RMSE", value: fmtNum(kpi?.season_rmse), color: "", explain: "Root mean squared error — penalises larger errors more heavily" },
-              { label: "Within 10%", value: pct(kpi?.within_10_pct ?? null), color: "text-emerald-400", explain: "Fraction of predictions within 10% of actual score" },
-              { label: "Within 20%", value: pct(kpi?.within_20_pct ?? null), color: "text-emerald-400", explain: "Fraction of predictions within 20% of actual score" },
-              { label: "Avg Bias", value: fmtNum(kpi?.avg_signed_error), color: "", explain: "Signed error: positive = over-projecting, negative = under-projecting" },
-              { label: "Players Evaluated", value: kpi?.players_evaluated ?? "—", color: "", explain: "Number of unique players with at least one accuracy measurement" },
-            ].map(({ label, value, color, explain }) => (
-              <div key={label} className="rounded-lg border border-border bg-card p-3">
-                <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-1">
-                  {label}
-                  <AdminInfoTooltip text={explain} />
+          {kpi ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {[
+                { label: "Avg Error (MAE)",    value: fmtNum(kpi.avg_error),          color: maeColor(kpi.avg_error ?? null),    explain: "Mean absolute error across all predictions" },
+                { label: "Median Error",       value: fmtNum(kpi.median_error),        color: maeColor(kpi.median_error ?? null), explain: "Median absolute error — less sensitive to outliers" },
+                { label: "Within 10pts",       value: pct(kpi.within_10 != null ? kpi.within_10 / 100 : null),   color: "text-emerald-400", explain: "Fraction of predictions within 10 points of actual" },
+                { label: "Within 15pts",       value: pct(kpi.within_15 != null ? kpi.within_15 / 100 : null),   color: "text-emerald-400", explain: "Fraction of predictions within 15 points of actual" },
+                { label: "Within 20pts",       value: pct(kpi.within_20 != null ? kpi.within_20 / 100 : null),   color: "text-emerald-400", explain: "Fraction of predictions within 20 points of actual" },
+                { label: "Players Analysed",   value: kpi.players_analysed ?? "—",    color: "",                                 explain: "Number of unique players with at least one accuracy measurement" },
+              ].map(({ label, value, color, explain }) => (
+                <div key={label} className="rounded-lg border border-border bg-card p-3">
+                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-1">
+                    {label}
+                    <AdminInfoTooltip text={explain} />
+                  </div>
+                  <div className={`text-xl font-bold tabular-nums ${color}`}>{value}</div>
                 </div>
-                <div className={`text-xl font-bold tabular-nums ${color}`}>{value}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Best / Worst position */}
-          {(kpi?.best_position || kpi?.worst_position) && (
-            <div className="flex flex-wrap gap-3">
-              {kpi?.best_position && (
-                <div className="flex items-center gap-2 text-xs rounded-md border border-emerald-500/25 bg-emerald-500/10 px-3 py-2">
-                  <span className="text-emerald-400 font-medium">Best: {kpi.best_position}</span>
-                  <span className="text-muted-foreground">MAE {fmtNum(kpi.best_position_mae)}</span>
-                </div>
-              )}
-              {kpi?.worst_position && (
-                <div className="flex items-center gap-2 text-xs rounded-md border border-red-500/25 bg-red-500/10 px-3 py-2">
-                  <span className="text-red-400 font-medium">Needs work: {kpi.worst_position}</span>
-                  <span className="text-muted-foreground">MAE {fmtNum(kpi.worst_position_mae)}</span>
-                </div>
-              )}
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+              No accuracy summary data found. Run the accuracy pipeline to generate projections.
+              <Button size="sm" variant="outline" onClick={fetchData} className="ml-3">
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Retry
+              </Button>
             </div>
           )}
 
-          {/* Round MAE chart */}
           {chartData.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <h3 className="text-sm font-medium">MAE by Round</h3>
-                <AdminInfoTooltip text="Lower MAE is better. The green reference line at 18 marks a good target." />
+                <AdminInfoTooltip text="Lower MAE is better. Green bars are under 18 (good), amber under 25 (ok), red above 25 (needs work)." />
               </div>
               <div className="h-48 rounded-lg border border-border bg-card p-3">
                 <ResponsiveContainer width="100%" height="100%">
@@ -388,7 +433,6 @@ function AccuracyTab() {
             </div>
           )}
 
-          {/* Position breakdown */}
           {positions.length > 0 && (
             <div>
               <h3 className="text-sm font-medium mb-3">By Position</h3>
@@ -396,17 +440,18 @@ function AccuracyTab() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
-                      {["Position", "Predictions", "MAE", "RMSE", "Within 10%", "Within 20%"].map(h => (
+                      {["Position", "Players", "Predictions", "MAE", "RMSE", "Within 10pts", "Within 20pts"].map(h => (
                         <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {positions.map(p => (
-                      <tr key={p.position} className="border-b border-border/40 hover:bg-muted/20">
-                        <td className="px-3 py-2 font-medium">{p.position}</td>
+                      <tr key={p.position_group} className="border-b border-border/40 hover:bg-muted/20">
+                        <td className="px-3 py-2 font-medium">{p.position_group}</td>
+                        <td className="px-3 py-2 tabular-nums">{p.players_count}</td>
                         <td className="px-3 py-2 tabular-nums">{p.predictions_count}</td>
-                        <td className={`px-3 py-2 tabular-nums font-semibold ${maeColor(p.mae)}`}>{fmtNum(p.mae)}</td>
+                        <td className={`px-3 py-2 tabular-nums font-semibold ${maeColor(p.mean_absolute_error)}`}>{fmtNum(p.mean_absolute_error)}</td>
                         <td className="px-3 py-2 tabular-nums">{fmtNum(p.rmse)}</td>
                         <td className="px-3 py-2 tabular-nums text-emerald-400">{pct(p.within_10_pct)}</td>
                         <td className="px-3 py-2 tabular-nums text-emerald-400">{pct(p.within_20_pct)}</td>
@@ -418,7 +463,6 @@ function AccuracyTab() {
             </div>
           )}
 
-          {/* Round table */}
           {rounds.length > 0 && (
             <div>
               <h3 className="text-sm font-medium mb-3">Recent Rounds</h3>
@@ -426,7 +470,7 @@ function AccuracyTab() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
-                      {["Round", "Predictions", "MAE", "RMSE", "Within 10%", "Within 20%"].map(h => (
+                      {["Round", "Predictions", "Mean Error", "Median Error", "Within 10pts", "Within 20pts"].map(h => (
                         <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground">{h}</th>
                       ))}
                     </tr>
@@ -436,8 +480,8 @@ function AccuracyTab() {
                       <tr key={r.round_number} className="border-b border-border/40 hover:bg-muted/20">
                         <td className="px-3 py-2 font-medium">{r.round_label ?? `Round ${r.round_number}`}</td>
                         <td className="px-3 py-2 tabular-nums">{r.predictions_count}</td>
-                        <td className={`px-3 py-2 tabular-nums font-semibold ${maeColor(r.mae)}`}>{fmtNum(r.mae)}</td>
-                        <td className="px-3 py-2 tabular-nums">{fmtNum(r.rmse)}</td>
+                        <td className={`px-3 py-2 tabular-nums font-semibold ${maeColor(r.mean_error)}`}>{fmtNum(r.mean_error)}</td>
+                        <td className="px-3 py-2 tabular-nums">{fmtNum(r.median_error)}</td>
                         <td className="px-3 py-2 tabular-nums text-emerald-400">{pct(r.within_10_pct)}</td>
                         <td className="px-3 py-2 tabular-nums text-emerald-400">{pct(r.within_20_pct)}</td>
                       </tr>
@@ -446,6 +490,10 @@ function AccuracyTab() {
                 </table>
               </div>
             </div>
+          )}
+
+          {!kpi && rounds.length === 0 && positions.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-8">No accuracy data available yet.</p>
           )}
 
           <div className="flex justify-end">
@@ -501,78 +549,82 @@ function PricingTab() {
   );
 }
 
-// ─── Signals Tab ─────────────────────────────────────────────────────────────
+// ─── Signals Tab — rewired to v_player_lab_* backend views ───────────────────
 
-interface SignalRow {
-  player_name: string;
-  team: string;
-  position: string;
-  neeko_rating: number;
-  projection_final: number;
-  value_score: number;
-  price: number;
-  market_watch_category: string;
-  recommendation_short: string;
-  recommendation_color: string;
-  captain_score: number;
-  upside_pct: number;
-  consistency: number;
-}
+type SignalCategory = "best_buys" | "breakout" | "high_upside" | "risky_traps" | "safe_picks" | "all";
 
-type SignalCategory = "hot" | "value" | "captain" | "risky" | "all";
-
-const SIGNAL_CATS: { id: SignalCategory; label: string; icon: React.ElementType; desc: string }[] = [
-  { id: "hot",     label: "Hot Picks",      icon: Flame,          desc: "Players with high form_score and above-average Neeko rating" },
-  { id: "value",   label: "Best Value",     icon: Gem,            desc: "Highest value_score — points per dollar of price" },
-  { id: "captain", label: "Captain Picks",  icon: Crown,          desc: "Highest captain_score for doubling options" },
-  { id: "risky",   label: "Risk Watch",     icon: AlertTriangle,  desc: "High upside but inconsistent — trade with caution" },
-  { id: "all",     label: "All Signals",    icon: Shield,         desc: "All players sorted by Neeko rating" },
+const SIGNAL_CATS: { id: SignalCategory; label: string; icon: React.ElementType; desc: string; view: string }[] = [
+  { id: "best_buys",   label: "Best Buys",    icon: Gem,           desc: "Top value picks — high buy score and projected upside vs price", view: "v_player_lab_best_buys" },
+  { id: "breakout",    label: "Breakout",     icon: Flame,         desc: "Players with high breakout probability and recent upward trend",   view: "v_player_lab_breakout" },
+  { id: "high_upside", label: "High Upside",  icon: Crown,         desc: "High captain_score and high upside — double or captain options",  view: "v_player_lab_high_upside" },
+  { id: "risky_traps", label: "Risky Traps",  icon: AlertTriangle, desc: "Players priced high but signal engine flags as overvalued traps", view: "v_player_lab_risky_traps" },
+  { id: "safe_picks",  label: "Safe Picks",   icon: Shield,        desc: "Consistent, low-risk players with high floor scores",             view: "v_player_lab_safe_picks" },
+  { id: "all",         label: "All Signals",  icon: TrendingUp,    desc: "All player signals sorted by total_score from the signal engine", view: "" },
 ];
 
 function SignalsTab() {
-  const [rows, setRows] = useState<SignalRow[]>([]);
+  const [rows, setRows] = useState<LabPlayerRow[]>([]);
+  const [allRows, setAllRows] = useState<LabPlayerRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState<SignalCategory>("hot");
+  const [category, setCategory] = useState<SignalCategory>("best_buys");
 
-  const fetchData = useCallback(async () => {
+  const fetchCategory = useCallback(async (cat: SignalCategory) => {
     setLoading(true);
-    const { data } = await supabase
-      .from("player_rankings_cache")
-      .select("player_name,team,position,neeko_rating,projection_final,value_score,price,market_watch_category,recommendation_short,recommendation_color,captain_score,upside_pct,consistency,form_score,risk_rating")
-      .order("neeko_rating", { ascending: false })
-      .limit(600);
-    setRows((data as SignalRow[]) ?? []);
+    const viewMap: Record<SignalCategory, string> = {
+      best_buys:   "v_player_lab_best_buys",
+      breakout:    "v_player_lab_breakout",
+      high_upside: "v_player_lab_high_upside",
+      risky_traps: "v_player_lab_risky_traps",
+      safe_picks:  "v_player_lab_safe_picks",
+      all:         "v_player_lab_best_buys",
+    };
+
+    if (cat === "all") {
+      if (allRows.length === 0) {
+        const { data, error } = await supabase
+          .from("v_player_lab_best_buys")
+          .select("*")
+          .order("total_score", { ascending: false })
+          .limit(100);
+        console.log("Signals all (fallback best_buys):", data?.length, "rows | error:", error);
+        setRows((data as LabPlayerRow[]) ?? []);
+        setAllRows((data as LabPlayerRow[]) ?? []);
+      } else {
+        setRows(allRows);
+      }
+    } else {
+      const viewName = viewMap[cat];
+      const { data, error } = await supabase
+        .from(viewName)
+        .select("*")
+        .order("total_score", { ascending: false })
+        .limit(50);
+      console.log(`Signals [${cat}] from ${viewName}:`, data?.length, "rows | error:", error);
+      setRows((data as LabPlayerRow[]) ?? []);
+    }
     setLoading(false);
-  }, []);
+  }, [allRows]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchCategory(category); }, [category, fetchCategory]);
 
-  const filtered = useMemo(() => {
-    if (category === "hot")
-      return [...rows].sort((a, b) => (b as unknown as Record<string, number>).form_score - (a as unknown as Record<string, number>).form_score).slice(0, 25);
-    if (category === "value")
-      return [...rows].filter(r => r.price > 0).sort((a, b) => b.value_score - a.value_score).slice(0, 25);
-    if (category === "captain")
-      return [...rows].sort((a, b) => b.captain_score - a.captain_score).slice(0, 25);
-    if (category === "risky")
-      return [...rows].filter(r => r.upside_pct > 30 && r.consistency < 0.55).sort((a, b) => b.upside_pct - a.upside_pct).slice(0, 25);
-    return rows.slice(0, 50);
-  }, [rows, category]);
+  function handleCategory(cat: SignalCategory) {
+    setCategory(cat);
+  }
 
   const activeCat = SIGNAL_CATS.find(c => c.id === category)!;
 
   return (
     <div>
       <AdminSectionIntro
-        description="Curated signal lists to quickly identify targets, value plays, captain options, and risk players."
-        detail="All data from player_rankings_cache. Hot = sorted by form_score. Value = sorted by value_score (pts/$). Captain = sorted by captain_score. Risky = high upside_pct but low consistency."
+        description="Curated signal lists powered by the Neeko signal engine — each category is a dedicated backend view with pre-computed scores."
+        detail="Best Buys = v_player_lab_best_buys | Breakout = v_player_lab_breakout | High Upside = v_player_lab_high_upside | Risky Traps = v_player_lab_risky_traps | Safe Picks = v_player_lab_safe_picks"
       />
 
       <div className="flex flex-wrap gap-2 mb-4">
         {SIGNAL_CATS.map(({ id, label, icon: Icon, desc }) => (
           <button
             key={id}
-            onClick={() => setCategory(id)}
+            onClick={() => handleCategory(id)}
             title={desc}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
               category === id
@@ -584,7 +636,7 @@ function SignalsTab() {
             {label}
           </button>
         ))}
-        <Button size="sm" variant="outline" onClick={fetchData} className="ml-auto">
+        <Button size="sm" variant="outline" onClick={() => fetchCategory(category)} className="ml-auto">
           <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
@@ -593,7 +645,7 @@ function SignalsTab() {
       {activeCat && (
         <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5">
           <activeCat.icon className="h-3.5 w-3.5" />
-          {activeCat.desc} — showing top {filtered.length} players
+          {activeCat.desc} — {loading ? "loading…" : `${rows.length} players`}
         </p>
       )}
 
@@ -613,28 +665,50 @@ function SignalsTab() {
                 <span className="flex items-center gap-1">Value <AdminInfoTooltip text="Points per $100k" /></span>
               </th>
               <th className="px-3 py-2 text-left font-medium text-muted-foreground">Price</th>
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Cons%</th>
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Cap</th>
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Upside%</th>
+              <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                <span className="flex items-center gap-1">Buy <AdminInfoTooltip text="Buy score from signal engine" /></span>
+              </th>
+              <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                <span className="flex items-center gap-1">Opp <AdminInfoTooltip text="Opportunity score — breakout + matchup + value" /></span>
+              </th>
+              <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                <span className="flex items-center gap-1">Risk <AdminInfoTooltip text="Risk score from signal engine" /></span>
+              </th>
+              <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                <span className="flex items-center gap-1">Total <AdminInfoTooltip text="Composite total score — higher = stronger signal" /></span>
+              </th>
+              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Tags</th>
               <th className="px-3 py-2 text-left font-medium text-muted-foreground">Reco</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={12} className="text-center py-10 text-muted-foreground">Loading…</td></tr>
-            ) : filtered.map((r, i) => (
-              <tr key={`${r.player_name}-${i}`} className="border-b border-border/40 hover:bg-muted/20">
+              <tr><td colSpan={14} className="text-center py-10 text-muted-foreground">Loading…</td></tr>
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={14} className="text-center py-10 text-muted-foreground">No signal data found for this category</td></tr>
+            ) : rows.map((r, i) => (
+              <tr key={`${r.player_id ?? r.player_name}-${i}`} className="border-b border-border/40 hover:bg-muted/20">
                 <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
                 <td className="px-3 py-2 font-medium">{r.player_name}</td>
                 <td className="px-3 py-2 text-muted-foreground">{r.position}</td>
                 <td className="px-3 py-2 text-muted-foreground">{r.team}</td>
                 <td className="px-3 py-2 tabular-nums font-semibold">{fmtNum(r.neeko_rating)}</td>
-                <td className="px-3 py-2 tabular-nums">{fmtNum(r.projection_final)}</td>
+                <td className="px-3 py-2 tabular-nums">{fmtNum(r.projection)}</td>
                 <td className="px-3 py-2 tabular-nums">{fmtNum(r.value_score, 2)}</td>
                 <td className="px-3 py-2 tabular-nums">{fmtPrice(r.price)}</td>
-                <td className="px-3 py-2 tabular-nums">{pct(r.consistency)}</td>
-                <td className="px-3 py-2 tabular-nums">{fmtNum(r.captain_score)}</td>
-                <td className="px-3 py-2 tabular-nums">{fmtNum(r.upside_pct, 0)}%</td>
+                <td className="px-3 py-2 tabular-nums text-emerald-400">{fmtNum(r.buy_score, 0)}</td>
+                <td className="px-3 py-2 tabular-nums text-sky-400">{fmtNum(r.opportunity_score, 0)}</td>
+                <td className="px-3 py-2 tabular-nums text-amber-400">{fmtNum(r.risk_score, 0)}</td>
+                <td className="px-3 py-2 tabular-nums font-semibold">{fmtNum(r.total_score, 0)}</td>
+                <td className="px-3 py-2 max-w-[140px]">
+                  {Array.isArray(r.signal_tags) && r.signal_tags.length > 0 ? (
+                    <div className="flex flex-wrap gap-0.5">
+                      {r.signal_tags.slice(0, 3).map((tag, ti) => (
+                        <span key={ti} className="text-[9px] bg-muted/60 text-muted-foreground rounded px-1 py-0.5 whitespace-nowrap">{tag}</span>
+                      ))}
+                    </div>
+                  ) : <span className="text-muted-foreground">—</span>}
+                </td>
                 <td className="px-3 py-2">
                   <RecoBadge color={r.recommendation_color} short={r.recommendation_short} />
                 </td>

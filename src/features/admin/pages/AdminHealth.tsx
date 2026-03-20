@@ -249,6 +249,16 @@ function PipelineFlowDiagram({ nodes, running, onAction }: {
 
 type Tab = "pipeline" | "data" | "ai" | "logs";
 
+interface CronJobRow {
+  jobid: number;
+  jobname: string;
+  schedule: string;
+  active: boolean;
+  last_run: string | null;
+  last_status: string | null;
+  next_run: string | null;
+}
+
 interface PipelineRunRow {
   id: string;
   pipeline_key: string;
@@ -297,24 +307,27 @@ export default function AdminHealth() {
   const [aiWorker, setAiWorker] = useState<AIWorkerHealth | null>(null);
   const [startSitCache, setStartSitCache] = useState<StartSitCacheHealth | null>(null);
   const [cmdStatus, setCmdStatus] = useState<CommandCenterStatus | null>(null);
+  const [cronJobs, setCronJobs] = useState<CronJobRow[]>([]);
   const [pipelineLoading, setPipelineLoading] = useState(true);
   const hasLoaded = useRef(false);
 
   const fetchPipelineData = useCallback(async () => {
     setPipelineLoading(true);
     try {
-      const [runsRes, healthRes, aiRes, ssRes, cmdRes] = await Promise.allSettled([
+      const [runsRes, healthRes, aiRes, ssRes, cmdRes, cronRes] = await Promise.allSettled([
         supabase.from("v_pipeline_run_detail").select("*").order("started_at", { ascending: false }).limit(20),
         supabase.from("v_pipeline_health").select("*").maybeSingle(),
         supabase.from("v_ai_worker_health").select("*").maybeSingle(),
         supabase.from("v_start_sit_cache_health").select("*").maybeSingle(),
         supabase.from("v_command_center_status").select("*").maybeSingle(),
+        supabase.rpc("get_cron_job_status"),
       ]);
       if (runsRes.status === "fulfilled" && runsRes.value.data) setPipelineRuns(runsRes.value.data as PipelineRunRow[]);
       if (healthRes.status === "fulfilled" && healthRes.value.data) setPipelineHealth(healthRes.value.data as PipelineHealth);
       if (aiRes.status === "fulfilled" && aiRes.value.data) setAiWorker(aiRes.value.data as AIWorkerHealth);
       if (ssRes.status === "fulfilled" && ssRes.value.data) setStartSitCache(ssRes.value.data as StartSitCacheHealth);
       if (cmdRes.status === "fulfilled" && cmdRes.value.data) setCmdStatus(cmdRes.value.data as CommandCenterStatus);
+      if (cronRes.status === "fulfilled" && cronRes.value.data) setCronJobs(cronRes.value.data as CronJobRow[]);
     } finally {
       setPipelineLoading(false);
     }
@@ -653,6 +666,63 @@ export default function AdminHealth() {
                               ? <span className="text-red-400 truncate block">{r.error_summary}</span>
                               : <span className="text-emerald-400 opacity-50">—</span>}
                           </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                Cron Jobs
+                {!pipelineLoading && (
+                  <span className="ml-auto text-[11px] text-muted-foreground font-normal">
+                    {cronJobs.filter(j => j.active).length} active / {cronJobs.length} total
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {pipelineLoading ? (
+                <div className="space-y-2">{[1,2,3,4,5].map(i => <div key={i} className="h-8 rounded bg-muted animate-pulse" />)}</div>
+              ) : cronJobs.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">No cron jobs found — ensure get_cron_job_status RPC exists.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border/40">
+                        <th className="text-left py-2 pr-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Job</th>
+                        <th className="text-left py-2 pr-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Schedule</th>
+                        <th className="text-left py-2 pr-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Active</th>
+                        <th className="text-left py-2 pr-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wide hidden md:table-cell">Last Run</th>
+                        <th className="text-left py-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wide hidden md:table-cell">Next Run</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cronJobs.map((job) => (
+                        <tr key={job.jobid} className="border-b border-border/20 last:border-0 hover:bg-muted/20 transition-colors">
+                          <td className="py-1.5 pr-3 font-mono text-[11px] text-foreground">{job.jobname}</td>
+                          <td className="py-1.5 pr-3 font-mono text-[11px] text-muted-foreground hidden sm:table-cell">{job.schedule}</td>
+                          <td className="py-1.5 pr-3">
+                            {job.active
+                              ? <StatusChip level="ok" label="Active" />
+                              : <StatusChip level="warn" label="Paused" />}
+                          </td>
+                          <td className="py-1.5 pr-3 text-muted-foreground hidden md:table-cell">
+                            {job.last_run ? fmtTs(job.last_run) : "—"}
+                            {job.last_status && (
+                              <span className={`ml-2 text-[10px] font-semibold ${job.last_status === "succeeded" ? "text-emerald-400" : job.last_status === "failed" ? "text-red-400" : "text-muted-foreground"}`}>
+                                {job.last_status}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-1.5 text-muted-foreground hidden md:table-cell">{job.next_run ? fmtTs(job.next_run) : "—"}</td>
                         </tr>
                       ))}
                     </tbody>
