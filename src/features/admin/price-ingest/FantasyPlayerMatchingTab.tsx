@@ -12,16 +12,25 @@ import type { PlayerOption } from "./types";
 interface MatchedRow {
   id: string;
   external_name: string;
-  normalized_source_name: string;
-  example_price: number | null;
+  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  position: string | null;
+  team: string | null;
+  price: number | null;
+  avg_score: number | null;
+  games_played: number | null;
+  season: number;
+  round_number: number | null;
+  ingested_at: string | null;
   player_id: number | null;
   canonical_name: string | null;
   position_group: string | null;
   match_confidence: number;
   match_method: "manual_override" | "exact" | "fuzzy_surname" | "unmatched";
+  match_reviewed: boolean;
   is_matched: boolean;
   needs_review: boolean;
-  created_at: string;
 }
 
 interface MatchingStats {
@@ -53,7 +62,7 @@ function useMatchedRows() {
       const { data, error: err } = await supabase
         .from("v_fantasy_player_matched" as never)
         .select("*")
-        .order("created_at", { ascending: false })
+        .order("ingested_at", { ascending: false })
         .limit(300) as unknown as { data: MatchedRow[] | null; error: { message: string } | null };
 
       if (err) throw new Error(err.message);
@@ -250,7 +259,7 @@ export function FantasyPlayerMatchingTab() {
     setRowField(row.id, "resolving", true);
     setRowField(row.id, "error", null);
 
-    const result = await resolvePlayerName(row.normalized_source_name, state.selectedPlayerId);
+    const result = await resolvePlayerName(row.external_name, state.selectedPlayerId);
 
     if (result.success) {
       setRowField(row.id, "resolved", true);
@@ -372,9 +381,9 @@ export function FantasyPlayerMatchingTab() {
       ) : filteredRows.length > 0 && (
         <div className="rounded-lg border border-border overflow-hidden">
           {/* Column headers */}
-          <div className="grid grid-cols-[1.5fr_80px_1fr_1fr_80px_auto] gap-0 border-b border-border/60 bg-muted/20 px-3 py-2">
+          <div className="grid grid-cols-[1.5fr_100px_1fr_1fr_80px_auto] gap-0 border-b border-border/60 bg-muted/20 px-3 py-2">
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Source Name</span>
-            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Price</span>
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Price / Pos</span>
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Auto Match</span>
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Override Player</span>
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Confidence</span>
@@ -388,18 +397,25 @@ export function FantasyPlayerMatchingTab() {
             return (
               <div
                 key={row.id}
-                className="grid grid-cols-[1.5fr_80px_1fr_1fr_80px_auto] gap-0 items-center border-b border-border/20 last:border-0 px-3 py-2.5 hover:bg-muted/10 transition-colors"
+                className="grid grid-cols-[1.5fr_100px_1fr_1fr_80px_auto] gap-0 items-center border-b border-border/20 last:border-0 px-3 py-2.5 hover:bg-muted/10 transition-colors"
               >
                 {/* Source name */}
                 <div>
                   <p className="text-xs font-mono font-semibold">{row.external_name}</p>
-                  <p className="text-[10px] text-muted-foreground">{row.normalized_source_name}</p>
+                  {row.team && (
+                    <p className="text-[10px] text-muted-foreground">{row.team}</p>
+                  )}
                 </div>
 
-                {/* Price */}
-                <span className="text-xs tabular-nums font-mono text-muted-foreground">
-                  {fmtPrice(row.example_price)}
-                </span>
+                {/* Price + Position */}
+                <div>
+                  <p className="text-xs tabular-nums font-mono text-muted-foreground">
+                    {fmtPrice(row.price)}
+                  </p>
+                  {row.position && (
+                    <p className="text-[10px] text-muted-foreground">{row.position}</p>
+                  )}
+                </div>
 
                 {/* Auto-matched canonical name */}
                 <div>
