@@ -7,6 +7,7 @@ import { RefreshCw, Users, TrendingUp, TrendingDown, TriangleAlert as AlertTrian
 import { FantasyPricesTab } from "../price-ingest/FantasyPricesTab";
 import { NameResolverTab } from "../price-ingest/NameResolverTab";
 import { PriceChangeDebugTab } from "../price-ingest/PriceChangeDebugTab";
+import { FantasyPlayerMatchingTab } from "../price-ingest/FantasyPlayerMatchingTab";
 
 type MainTab = "players" | "projections" | "rankings-source" | "fantasy-prices" | "player-metrics";
 
@@ -80,7 +81,7 @@ interface RankingsSourceRow {
   price: number;
 }
 
-type PriceSubTab = "prices" | "name-resolver" | "price-debug";
+type PriceSubTab = "prices" | "name-resolver" | "player-matching" | "price-debug";
 
 type MetricTabKey =
   | "hot" | "cold" | "overrated" | "undervalued"
@@ -377,9 +378,10 @@ function RankingsSourceTab({ players, loading }: { players: PlayerRow[]; loading
 }
 
 const PRICE_SUB_TABS: { id: PriceSubTab; label: string }[] = [
-  { id: "prices",        label: "Fantasy Prices" },
-  { id: "name-resolver", label: "Name Resolver" },
-  { id: "price-debug",   label: "Price Change Debug" },
+  { id: "prices",           label: "Fantasy Prices" },
+  { id: "player-matching",  label: "Player Matching" },
+  { id: "name-resolver",    label: "Name Resolver" },
+  { id: "price-debug",      label: "Price Change Debug" },
 ];
 
 function FantasyPricesSection() {
@@ -391,9 +393,10 @@ function FantasyPricesSection() {
         activeId={subTab}
         onChange={id => setSubTab(id as PriceSubTab)}
       />
-      {subTab === "prices"        && <FantasyPricesTab />}
-      {subTab === "name-resolver" && <NameResolverTab />}
-      {subTab === "price-debug"   && <PriceChangeDebugTab />}
+      {subTab === "prices"          && <FantasyPricesTab />}
+      {subTab === "player-matching" && <FantasyPlayerMatchingTab />}
+      {subTab === "name-resolver"   && <NameResolverTab />}
+      {subTab === "price-debug"     && <PriceChangeDebugTab />}
     </div>
   );
 }
