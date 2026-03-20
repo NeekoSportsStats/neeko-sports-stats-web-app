@@ -7,437 +7,302 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-
-type CommandResult = { success: true; result: unknown } | { success: false; error: string };
-
-async function invokeEdgeFunction(name: string, payload: unknown = {}): Promise<unknown> {
-  const url = `${SUPABASE_URL}/functions/v1/${name}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${SERVICE_ROLE_KEY}`,
-      "apikey": ANON_KEY,
-    },
-    body: JSON.stringify(payload),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`Edge function ${name} returned ${res.status}: ${text}`);
-  try { return JSON.parse(text); } catch { return { raw: text }; }
-}
-
-async function callRpc(admin: ReturnType<typeof createClient>, fn: string, params: Record<string, unknown> = {}): Promise<unknown> {
-  const { data, error } = await (admin as typeof admin).rpc(fn as never, params as never);
-  if (error) throw new Error(error.message);
-  return data;
-}
-
-async function dispatchCommand(
-  admin: ReturnType<typeof createClient>,
-  command: string,
-  payload: Record<string, unknown>,
-): Promise<CommandResult> {
-  try {
-    let result: unknown;
-
-    switch (command) {
-      case "run_full_pipeline":
-        result = await callRpc(admin, "run_neeko_pipeline_orchestrator");
-        break;
-      case "run_controller":
-        result = await callRpc(admin, "run_neeko_pipeline");
-        break;
-      case "run_ingest":
-        result = await invokeEdgeFunction("afl-master-dispatcher", payload);
-        break;
-      case "ingest_player_stats":
-        result = await invokeEdgeFunction("afl-worker-games-player-stats", payload);
-        break;
-      case "ingest_team_stats":
-        result = await invokeEdgeFunction("afl-worker-games-team-stats", payload);
-        break;
-      case "generate_all_ai":
-        result = await invokeEdgeFunction("generate-player-ai", payload);
-        break;
-      case "run_ai_worker":
-        result = await invokeEdgeFunction("generate-player-ai", payload);
-        break;
-      case "generate_player_ai":
-        result = await invokeEdgeFunction("generate-player-ai", payload);
-        break;
-      case "generate_ranking_ai":
-        result = await invokeEdgeFunction("generate-ranking-ai", payload);
-        break;
-      case "enqueue_reco_jobs":
-        result = await callRpc(admin, "enqueue_ranking_reco_jobs");
-        break;
-      case "generate_market_watch_ai":
-        result = await invokeEdgeFunction("generate-market-watch-summary", payload);
-        break;
-      case "refresh_rankings": {
-        await admin.schema("afl" as never).rpc("populate_rankings_cache_from_source" as never);
-        result = { refreshed: true };
-        break;
-      }
-      case "populate_rankings": {
-        await admin.schema("afl" as never).rpc("populate_rankings_cache_from_source" as never);
-        await admin.schema("market" as never).rpc("build_market_watch_snapshot" as never);
-        try { await callRpc(admin, "fn_refresh_edge_board"); } catch (_e) { /* non-fatal */ }
-        result = { populated: true, snapshot_rebuilt: true, edge_board_refreshed: true };
-        break;
-      }
-      case "refresh_market_watch":
-        result = await callRpc(admin, "refresh_market_watch");
-        break;
-      case "refresh_edge_board":
-        result = await callRpc(admin, "fn_refresh_edge_board");
-        break;
-      case "refresh_projections":
-        result = await callRpc(admin, "refresh_projection_accuracy");
-        break;
-      case "rebuild_start_sit":
-        result = await invokeEdgeFunction("generate-start-sit", payload);
-        break;
-      case "run_pipeline_alerts":
-        result = await invokeEdgeFunction("pipeline-alerts", payload);
-        break;
-      case "health_check":
-        result = { status: "ok", timestamp: new Date().toISOString() };
-        break;
-
-      case "preview_price_ingest": {
-        const previewRows = payload.rows as unknown[];
-        if (!Array.isArray(previewRows)) {
-          return { success: false, error: "rows must be an array" };
-        }
-        if (previewRows.length === 0) {
-          return { success: false, error: "rows must be a non-empty array" };
-        }
-        for (const row of previewRows) {
-          const r = row as Record<string, unknown>;
-          if (!r.source_name || typeof r.source_name !== "string") {
-            return { success: false, error: "each row must have a source_name string" };
-          }
-          if (typeof r.cleaned_price !== "number") {
-            return { success: false, error: `row "${r.source_name}" has invalid cleaned_price (must be number)` };
-          }
-        }
-
-        console.log(`[preview_price_ingest] incoming rows: ${previewRows.length}`);
-
-        const { data: previewData, error: previewErr } = await admin.rpc(
-          "preview_price_ingest_public" as never,
-          { p_rows: previewRows } as never,
-        );
-        if (previewErr) throw new Error((previewErr as { message: string }).message);
-
-        const rows = previewData as Array<{
-          status: string;
-          source_name: string;
-          normalized_name: string;
-          cleaned_price: number;
-          player_id: number | null;
-          player_name: string | null;
-          existing_price: number | null;
-        }>;
-
-        const matched = rows.filter(r => r.status === "matched");
-        const unmatched = rows.filter(r => r.status === "unmatched");
-        const duplicate = rows.filter(r => r.status === "duplicate");
-
-        console.log(`[preview_price_ingest] matched=${matched.length} unmatched=${unmatched.length} duplicate=${duplicate.length}`);
-
-        result = rows;
-        break;
-      }
-
-      case "process_price_ingest": {
-        const ingestRows = payload.rows as unknown[];
-        if (!Array.isArray(ingestRows)) {
-          return { success: false, error: "rows must be an array" };
-        }
-        if (ingestRows.length === 0) {
-          return { success: false, error: "rows must be a non-empty array" };
-        }
-        for (const row of ingestRows) {
-          const r = row as Record<string, unknown>;
-          if (!r.source_name || typeof r.source_name !== "string") {
-            return { success: false, error: "each row must have a source_name string" };
-          }
-          if (typeof r.cleaned_price !== "number") {
-            return { success: false, error: `row "${r.source_name}" has invalid cleaned_price (must be number)` };
-          }
-        }
-
-        console.log(`[process_price_ingest] incoming rows: ${ingestRows.length}`);
-
-        const { data: ingestData, error: ingestErr } = await admin.rpc(
-          "process_price_ingest_public" as never,
-          { p_rows: ingestRows } as never,
-        );
-        if (ingestErr) throw new Error((ingestErr as { message: string }).message);
-        result = ingestData;
-        break;
-      }
-
-      case "commit_price_ingest": {
-        const commitRows = payload.rows as unknown[];
-        if (!Array.isArray(commitRows)) {
-          return { success: false, error: "rows must be an array" };
-        }
-        if (commitRows.length === 0) {
-          return { success: false, error: "rows must be a non-empty array" };
-        }
-        for (const row of commitRows) {
-          const r = row as Record<string, unknown>;
-          if (typeof r.player_id !== "number") {
-            return { success: false, error: "each row must have a numeric player_id" };
-          }
-          if (typeof r.cleaned_price !== "number") {
-            return { success: false, error: `row player_id=${r.player_id} has invalid cleaned_price (must be number)` };
-          }
-        }
-
-        console.log(`[commit_price_ingest] incoming rows: ${commitRows.length}`);
-
-        const { data: commitData, error: commitErr } = await admin.rpc(
-          "process_price_ingest_by_id_public" as never,
-          { p_rows: commitRows } as never,
-        );
-        if (commitErr) throw new Error((commitErr as { message: string }).message);
-
-        const commitResult = commitData as { inserted: number; updated: number; total: number };
-        console.log(`[commit_price_ingest] inserted=${commitResult?.inserted} updated=${commitResult?.updated}`);
-
-        // Snapshot prices into price history (one row per player per round)
-        const historyRows = (commitRows as Array<Record<string, unknown>>).map(r => ({
-          player_id: r.player_id,
-          price: r.cleaned_price,
-          position: r.position ?? null,
-        }));
-        try {
-          await admin.schema("afl" as never).rpc("insert_player_price_snapshot" as never, {
-            p_rows: historyRows,
-          } as never);
-          console.log(`[commit_price_ingest] price history snapshot: ok (${historyRows.length} rows)`);
-        } catch (e) {
-          console.warn("[commit_price_ingest] price history snapshot failed (non-fatal):", e instanceof Error ? e.message : String(e));
-        }
-
-        const refreshSteps = {
-          projection_engine:  { ok: false, error: undefined as string | undefined },
-          rebuild_projection: { ok: false, error: undefined as string | undefined },
-          refresh_mv:         { ok: false, error: undefined as string | undefined },
-          rankings_cache:     { ok: false, error: undefined as string | undefined },
-          market_snapshot:    { ok: false, error: undefined as string | undefined },
-          edge_board:         { ok: false, error: undefined as string | undefined },
-        };
-
-        try {
-          await admin.schema("afl" as never).rpc("refresh_projection_engine" as never);
-          refreshSteps.projection_engine.ok = true;
-          console.log("[commit_price_ingest] refresh_projection_engine: ok");
-        } catch (e) {
-          refreshSteps.projection_engine.error = e instanceof Error ? e.message : String(e);
-          console.warn("[commit_price_ingest] refresh_projection_engine failed:", refreshSteps.projection_engine.error);
-        }
-
-        try {
-          await admin.schema("afl" as never).rpc("rebuild_player_projection" as never);
-          refreshSteps.rebuild_projection.ok = true;
-          console.log("[commit_price_ingest] rebuild_player_projection: ok");
-        } catch (e) {
-          refreshSteps.rebuild_projection.error = e instanceof Error ? e.message : String(e);
-          console.warn("[commit_price_ingest] rebuild_player_projection failed:", refreshSteps.rebuild_projection.error);
-        }
-
-        try {
-          await admin.schema("afl" as never).rpc("refresh_mv_player_projection" as never);
-          refreshSteps.refresh_mv.ok = true;
-          console.log("[commit_price_ingest] refresh_mv_player_projection: ok");
-        } catch (e) {
-          refreshSteps.refresh_mv.error = e instanceof Error ? e.message : String(e);
-          console.warn("[commit_price_ingest] refresh_mv_player_projection failed:", refreshSteps.refresh_mv.error);
-        }
-
-        try {
-          await admin.schema("afl" as never).rpc("populate_rankings_cache_from_source" as never);
-          refreshSteps.rankings_cache.ok = true;
-          console.log("[commit_price_ingest] populate_rankings_cache_from_source: ok");
-        } catch (e) {
-          refreshSteps.rankings_cache.error = e instanceof Error ? e.message : String(e);
-          console.warn("[commit_price_ingest] populate_rankings_cache_from_source failed:", refreshSteps.rankings_cache.error);
-        }
-
-        try {
-          await admin.schema("market" as never).rpc("build_market_watch_snapshot" as never);
-          refreshSteps.market_snapshot.ok = true;
-          console.log("[commit_price_ingest] build_market_watch_snapshot: ok");
-        } catch (e) {
-          refreshSteps.market_snapshot.error = e instanceof Error ? e.message : String(e);
-          console.warn("[commit_price_ingest] build_market_watch_snapshot failed:", refreshSteps.market_snapshot.error);
-        }
-
-        try {
-          await callRpc(admin, "fn_refresh_edge_board");
-          refreshSteps.edge_board.ok = true;
-          console.log("[commit_price_ingest] fn_refresh_edge_board: ok");
-        } catch (e) {
-          refreshSteps.edge_board.error = e instanceof Error ? e.message : String(e);
-          console.warn("[commit_price_ingest] fn_refresh_edge_board failed:", refreshSteps.edge_board.error);
-        }
-
-        result = { ...commitResult, refresh: refreshSteps };
-        break;
-      }
-
-      case "save_pending_players": {
-        const pendingRows = payload.rows as unknown[];
-        if (!Array.isArray(pendingRows) || pendingRows.length === 0) {
-          return { success: false, error: "rows must be a non-empty array" };
-        }
-        for (const row of pendingRows) {
-          const r = row as Record<string, unknown>;
-          if (typeof r.source_name !== "string" || !r.source_name.trim()) {
-            return { success: false, error: "each row must have a source_name string" };
-          }
-          if (typeof r.cleaned_price !== "number") {
-            return { success: false, error: `row "${r.source_name}" has invalid cleaned_price (must be number)` };
-          }
-        }
-
-        console.log(`[save_pending_players] saving ${pendingRows.length} rows`);
-
-        const { data: pendingData, error: pendingErr } = await admin.rpc(
-          "save_pending_price_rows" as never,
-          { p_rows: pendingRows } as never,
-        );
-        if (pendingErr) throw new Error((pendingErr as { message: string }).message);
-
-        const pendingResult = pendingData as { saved: number; total: number };
-        console.log(`[save_pending_players] saved=${pendingResult?.saved}`);
-
-        result = pendingData;
-        break;
-      }
-
-      case "resolve_player_name": {
-        const normName = payload.normalized_name as string;
-        const resolvePlayerId = payload.player_id as number;
-        if (!normName || !resolvePlayerId) {
-          return { success: false, error: "normalized_name and player_id are required" };
-        }
-        const { data: resolveData, error: resolveErr } = await admin
-          .schema("afl" as never)
-          .rpc("resolve_player_name" as never, {
-            p_normalized_name: normName,
-            p_player_id: resolvePlayerId,
-          } as never);
-        if (resolveErr) throw new Error((resolveErr as { message: string }).message);
-        result = resolveData;
-        break;
-      }
-
-      default:
-        return { success: false, error: `Unknown command: ${command}` };
-    }
-
-    return { success: true, result };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
-  try {
-    if (req.method !== "POST") {
-      return new Response(JSON.stringify({ success: false, error: "Only POST allowed" }), {
-        status: 405,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ success: false, error: "Missing Authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ success: false, error: "Not authenticated" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const { data: profile } = await userClient.from("profiles").select("is_admin").eq("id", user.id).maybeSingle();
-    if (!profile?.is_admin) {
-      return new Response(JSON.stringify({ success: false, error: "Not authorised — admin only" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const body = await req.json() as { command: string; payload?: Record<string, unknown> };
-    const { command, payload = {} } = body;
-
-    if (!command) {
-      return new Response(JSON.stringify({ success: false, error: "Missing command" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-    const startMs = Date.now();
-
-    const { data: logRow, error: logError } = await admin.schema("admin" as never).from("command_logs" as never).insert({
-      command,
-      status: "running",
-      payload: payload ?? null,
-      triggered_by: user.id,
-    } as never).select("id").maybeSingle();
-
-    const logId = (logRow as { id: string } | null)?.id ?? null;
-    void logError;
-
-    const result = await dispatchCommand(admin, command, payload);
-    const durationMs = Date.now() - startMs;
-
-    if (logId) {
-      await admin.schema("admin" as never).from("command_logs" as never).update({
-        status: result.success ? "success" : "error",
-        result: result.success ? (result.result as Record<string, unknown> ?? null) : null,
-        error: !result.success ? result.error : null,
-        duration_ms: durationMs,
-        updated_at: new Date().toISOString(),
-      } as never).eq("id" as never, logId as never);
-    }
-
-    const statusCode = result.success ? 200 : 500;
-    return new Response(JSON.stringify({ ...result, duration_ms: durationMs, log_id: logId }), {
-      status: statusCode,
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: "Missing authorization" }), {
+      status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+    global: { headers: { Authorization: authHeader } },
+  });
+
+  const { data: { user }, error: userError } = await userClient.auth.getUser();
+  if (userError || !user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { data: isAdmin } = await userClient.rpc("is_admin_user");
+  if (!isAdmin) {
+    return new Response(JSON.stringify({ error: "Admin access required" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const admin = createClient(supabaseUrl, serviceKey);
+
+  let body: { command?: string; payload?: Record<string, unknown> } = {};
+  try {
+    body = await req.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const command = body.command;
+  if (!command) {
+    return new Response(JSON.stringify({ error: "Missing command" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const startMs = Date.now();
+
+  const logStart = async () => {
+    await admin
+      .schema("admin" as never)
+      .from("command_logs" as never)
+      .insert({ command, status: "running" });
+  };
+
+  const logEnd = async (status: "success" | "error", error?: string) => {
+    await admin
+      .schema("admin" as never)
+      .from("command_logs" as never)
+      .insert({ command, status, duration_ms: Date.now() - startMs, error: error ?? null });
+  };
+
+  // deno-lint-ignore no-explicit-any
+  async function callRpc(client: any, fn: string, args?: Record<string, unknown>) {
+    const { data, error } = args
+      ? await client.rpc(fn, args)
+      : await client.rpc(fn);
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  try {
+    await logStart();
+    // deno-lint-ignore no-explicit-any
+    let result: any = null;
+
+    switch (command) {
+
+      // ── PIPELINE ──────────────────────────────────────────────────────────
+      case "run_full_pipeline":
+        result = await callRpc(admin, "run_neeko_pipeline_orchestrator");
+        break;
+
+      case "run_controller":
+        result = await callRpc(admin, "run_neeko_pipeline");
+        break;
+
+      case "refresh_rankings":
+        result = await callRpc(admin, "refresh_player_rankings_cache");
+        break;
+
+      case "populate_rankings":
+        result = await admin.schema("afl" as never).rpc("populate_rankings_cache_from_source" as never);
+        result = result.data;
+        break;
+
+      case "ingest_player_stats": {
+        const res = await fetch(`${supabaseUrl}/functions/v1/afl-worker-games-player-stats`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: "{}",
+        });
+        result = { triggered: true, status: res.status };
+        break;
+      }
+
+      case "ingest_team_stats": {
+        const res = await fetch(`${supabaseUrl}/functions/v1/afl-worker-games-team-stats`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: "{}",
+        });
+        result = { triggered: true, status: res.status };
+        break;
+      }
+
+      case "refresh_edge_board":
+        result = await callRpc(admin, "fn_refresh_edge_board");
+        break;
+
+      // ── AI ────────────────────────────────────────────────────────────────
+      case "run_ai_worker": {
+        const res = await fetch(`${supabaseUrl}/functions/v1/generate-ai-worker`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: "{}",
+        });
+        result = { triggered: true, status: res.status };
+        break;
+      }
+
+      case "generate_all_ai": {
+        const res = await fetch(`${supabaseUrl}/functions/v1/generate-all-ai`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: "{}",
+        });
+        result = { triggered: true, status: res.status };
+        break;
+      }
+
+      case "enqueue_reco_jobs": {
+        const res = await fetch(`${supabaseUrl}/functions/v1/generate-player-ranking-recos`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: "{}",
+        });
+        result = { triggered: true, status: res.status };
+        break;
+      }
+
+      case "generate_ranking_ai": {
+        const res = await fetch(`${supabaseUrl}/functions/v1/generate-ranking-ai`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: "{}",
+        });
+        result = { triggered: true, status: res.status };
+        break;
+      }
+
+      case "generate_player_ai": {
+        const res = await fetch(`${supabaseUrl}/functions/v1/generate-player-ai`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: "{}",
+        });
+        result = { triggered: true, status: res.status };
+        break;
+      }
+
+      case "generate_market_watch_ai": {
+        const res = await fetch(`${supabaseUrl}/functions/v1/generate-market-watch-summary`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: "{}",
+        });
+        result = { triggered: true, status: res.status };
+        break;
+      }
+
+      // ── DATA ──────────────────────────────────────────────────────────────
+
+      // FIXED: was calling non-existent "refresh_market_watch" RPC
+      case "refresh_market_watch":
+        result = await admin.schema("market" as never).rpc("build_market_watch_snapshot" as never);
+        result = { refreshed: true };
+        break;
+
+      // NEW: full downstream refresh after price upload
+      case "refresh_fantasy_prices": {
+        await admin.schema("afl" as never).rpc("populate_rankings_cache_from_source" as never);
+        await admin.schema("market" as never).rpc("build_market_watch_snapshot" as never);
+        try {
+          await callRpc(admin, "fn_refresh_edge_board");
+        } catch (_e) {
+          // non-fatal — edge board refresh failure should not block price refresh
+        }
+        const { data: priceStats } = await admin.rpc("get_fantasy_price_stats");
+        result = {
+          refreshed: true,
+          rankings_cache: true,
+          market_watch: true,
+          edge_board: true,
+          price_stats: priceStats ?? null,
+        };
+        break;
+      }
+
+      case "refresh_projections":
+        result = await callRpc(admin, "run_projection_accuracy_pipeline");
+        break;
+
+      case "rebuild_start_sit": {
+        const res = await fetch(`${supabaseUrl}/functions/v1/generate-start-sit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: "{}",
+        });
+        result = { triggered: true, status: res.status };
+        break;
+      }
+
+      case "run_ingest": {
+        const res = await fetch(`${supabaseUrl}/functions/v1/afl-master-dispatcher`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: "{}",
+        });
+        result = { triggered: true, status: res.status };
+        break;
+      }
+
+      // ── PRICE INGEST ──────────────────────────────────────────────────────
+      case "commit_price_ingest": {
+        const payload = body.payload as { prices?: { player_name: string; price: number }[] } | undefined;
+        if (!payload?.prices?.length) {
+          throw new Error("No prices provided in payload");
+        }
+        const { error: insertError } = await admin
+          .schema("afl" as never)
+          .from("player_prices_import" as never)
+          .insert(payload.prices);
+        if (insertError) throw new Error(insertError.message);
+        await admin.schema("afl" as never).rpc("populate_rankings_cache_from_source" as never);
+        await callRpc(admin, "rebuild_player_projection");
+        await callRpc(admin, "refresh_mv_player_projection");
+        await admin.schema("afl" as never).rpc("populate_rankings_cache_from_source" as never);
+        await admin.schema("market" as never).rpc("build_market_watch_snapshot" as never);
+        await callRpc(admin, "fn_refresh_edge_board");
+        const { data: priceStats } = await admin.rpc("get_fantasy_price_stats");
+        result = { committed: true, rows: payload.prices.length, price_stats: priceStats ?? null };
+        break;
+      }
+
+      // ── SYSTEM ────────────────────────────────────────────────────────────
+      case "run_pipeline_alerts": {
+        const res = await fetch(`${supabaseUrl}/functions/v1/pipeline-alerts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: "{}",
+        });
+        result = { triggered: true, status: res.status };
+        break;
+      }
+
+      default:
+        await logEnd("error", `Unknown command: ${command}`);
+        return new Response(JSON.stringify({ success: false, error: `Unknown command: ${command}` }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+    }
+
+    await logEnd("success");
+    return new Response(
+      JSON.stringify({ success: true, command, duration_ms: Date.now() - startMs, data: result }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
 
   } catch (err) {
-    return new Response(JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    const message = err instanceof Error ? err.message : String(err);
+    await logEnd("error", message);
+    return new Response(
+      JSON.stringify({ success: false, command, error: message, duration_ms: Date.now() - startMs }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 });
