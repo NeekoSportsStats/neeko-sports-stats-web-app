@@ -7,6 +7,7 @@ interface PlayerOption {
   player_name: string;
   team: string | null;
   position: string | null;
+  player_pos?: string | null;
   projection_final: number | null;
   neeko_rating: number | null;
 }
@@ -47,16 +48,21 @@ export function StartSitSelector({ label, value, excludeId, onChange }: StartSit
     }
     const timer = setTimeout(async () => {
       setLoading(true);
-      const { data } = await supabase
-        .from("v_rankings_master")
-        .select("player_id, player_name, team, position, projection_final, neeko_rating")
-        .ilike("player_name", `%${query}%`)
-        .not("player_id", "is", null)
-        .order("neeko_rating", { ascending: false })
-        .limit(10);
+      const { data } = await supabase.rpc("search_available_players", {
+        p_query: query,
+        p_limit: 12,
+      });
       setLoading(false);
       setActiveIndex(-1);
-      setResults((data ?? []).filter((p) => p.player_id !== excludeId) as PlayerOption[]);
+      const mapped = ((data ?? []) as any[]).map((p) => ({
+        player_id: p.player_id,
+        player_name: p.player_name,
+        team: p.team ?? null,
+        position: p.player_pos ?? null,
+        projection_final: p.projection_final != null ? Number(p.projection_final) : null,
+        neeko_rating: p.neeko_rating != null ? Number(p.neeko_rating) : null,
+      }));
+      setResults(mapped.filter((p) => p.player_id !== excludeId));
     }, 200);
     return () => clearTimeout(timer);
   }, [query, excludeId]);

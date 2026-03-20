@@ -136,8 +136,17 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
       </td>
       <td className="px-4 py-3 whitespace-nowrap" style={{ width: 240, minWidth: 200 }}>
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-semibold text-white">{row.player_name}</span>
+            {row.status === "OUT" && (
+              <span className="rounded-sm bg-red-500/15 px-1 py-0.5 text-[9px] font-semibold text-red-400 uppercase tracking-wide border border-red-500/20">INJURED</span>
+            )}
+            {row.status === "TEST" && (
+              <span className="rounded-sm bg-orange-500/15 px-1 py-0.5 text-[9px] font-semibold text-orange-400 uppercase tracking-wide border border-orange-500/20">TEST</span>
+            )}
+            {row.status === "OMITTED" && (
+              <span className="rounded-sm bg-white/10 px-1 py-0.5 text-[9px] font-semibold text-white/40 uppercase tracking-wide border border-white/15">NOT PLAYING</span>
+            )}
             {!isPremium && rowUnlocked && (
               <span className="rounded-sm bg-[#F5C84C]/15 px-1 py-0.5 text-[9px] font-semibold text-[#F5C84C] uppercase tracking-wide">Free</span>
             )}

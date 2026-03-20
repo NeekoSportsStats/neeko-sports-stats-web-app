@@ -48,6 +48,10 @@ export interface RankingRow {
   upside_pct: number | null;
   /** AI summary text */
   ai_summary: string | null;
+  /** Player availability status: AVAILABLE | OUT | TEST | OMITTED | null */
+  status: string | null;
+  /** Derived boolean — false when status = 'OUT' */
+  is_available: boolean | null;
 }
 
 export interface ScoreHistoryPoint {

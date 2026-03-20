@@ -173,7 +173,7 @@ const PREMIUM_COLUMNS =
   "projection_confidence,risk_rating,matchup_rating,matchup_label,matchup_multiplier," +
   "upside_rating,upside_pct,captain_score,captain_rating,ai_recommendation,recommendation_strength,recommendation_color," +
   "recommendation_short,recommendation_why,ai_summary,consistency_tier,total_count,cached_at,games_played,ai_updated_at," +
-  "start_sit_decision,edge_score,edge_tier,market_watch_category";
+  "start_sit_decision,edge_score,edge_tier,market_watch_category,status,is_available";
 
 const FREE_COLUMNS =
   "player_id,player_name,team,team_name,position,position_group," +
@@ -182,7 +182,7 @@ const FREE_COLUMNS =
   "projection_confidence,risk_rating,matchup_rating,matchup_label,matchup_multiplier," +
   "ai_recommendation,recommendation_strength,recommendation_color,recommendation_short,recommendation_why,ai_summary," +
   "consistency_tier,access_tier,total_count,cached_at,games_played,row_rank," +
-  "start_sit_decision,edge_score,edge_tier,market_watch_category";
+  "start_sit_decision,edge_score,edge_tier,market_watch_category,status,is_available";
 
 const AI_COLUMNS =
   "player_id,recommendation_short,recommendation_why,ai_summary,ai_updated_at";
@@ -280,6 +280,8 @@ export default function AFLRankingsPage() {
       edge_tier:            r.edge_tier ?? null,
       market_watch_category: r.market_watch_category ?? null,
       upside_pct:           r.upside_pct != null ? Number(r.upside_pct) : null,
+      status:               r.status ?? null,
+      is_available:         r.is_available != null ? Boolean(r.is_available) : null,
     };
   }
 
