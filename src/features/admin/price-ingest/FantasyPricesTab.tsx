@@ -204,6 +204,7 @@ export function FantasyPricesTab() {
     if (result) {
       setCommitResult(result);
       setStep("done");
+      window.dispatchEvent(new CustomEvent("neeko:prices-applied"));
     } else {
       setCommitError(error ?? "Commit failed — check admin logs");
     }

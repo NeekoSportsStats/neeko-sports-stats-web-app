@@ -27,30 +27,8 @@ export function track(event: string, properties?: Record<string, unknown>) {
   logEvent(event, properties);
 }
 
-export function logEvent(event: string, properties?: Record<string, unknown>) {
-  if (typeof window === "undefined") return;
-
-  const page = typeof window !== "undefined" ? window.location.pathname : undefined;
-
-  try {
-    supabase.auth.getUser().then(({ data }) => {
-      try {
-        supabase
-          .from("analytics_events")
-          .insert({
-            event_name: event,
-            page,
-            user_id: data?.user?.id ?? null,
-            properties: properties ?? {},
-          })
-          .then(() => {});
-      } catch {
-        // silently discard — analytics table may not exist in all environments
-      }
-    }).catch(() => {});
-  } catch {
-    // silently discard
-  }
+export function logEvent(_event: string, _properties?: Record<string, unknown>) {
+  // analytics_events table not provisioned — no-op
 }
 
 export function identifyUser(user: { id: string; email?: string }) {

@@ -118,28 +118,52 @@ export function useSystemHealth() {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
+      if (!session) {
+        setState(prev => ({ ...prev, loading: false, error: "Not authenticated" }));
+        return;
+      }
 
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-health`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-      });
+      let json: Record<string, unknown> = {};
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+        });
+        json = await res.json().catch(() => ({}));
+      } catch (fetchErr) {
+        console.error("admin-health fetch failed:", fetchErr);
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: "Health endpoint unreachable — showing partial data",
+        }));
+        return;
+      }
 
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error ?? "Failed to fetch health data");
-
-      setState({
-        data: json.data as SystemHealthData,
-        loading: false,
-        error: null,
-        lastRefreshed: new Date(),
-      });
+      if (json.success && json.data) {
+        setState({
+          data: json.data as SystemHealthData,
+          loading: false,
+          error: null,
+          lastRefreshed: new Date(),
+        });
+      } else {
+        console.warn("admin-health returned non-success:", json.error ?? json);
+        setState(prev => ({
+          ...prev,
+          data: (json.data as SystemHealthData) ?? prev.data,
+          loading: false,
+          error: (json.error as string) ?? "Health data partially unavailable",
+          lastRefreshed: new Date(),
+        }));
+      }
     } catch (err) {
+      console.error("useSystemHealth unexpected error:", err);
       setState(prev => ({
         ...prev,
         loading: false,

@@ -24,31 +24,36 @@ interface PlayerRow {
   team: string;
   position: string;
   projection_final: number;
+  projection: number;
   ceiling: number;
   floor: number;
   price: number;
   neeko_rating: number;
+  neeko_rating_scaled: number;
   value_score: number;
   value_tag: string;
   consistency: number;
   form_score: number;
   captain_score: number;
   captain_rating: string;
-  upside_rating: string;
+  upside_rating: number;
   upside_pct: number;
-  risk_rating: string;
+  risk_rating: number;
   matchup_rating: string;
   matchup_multiplier: number;
+  matchup_label: string;
   ai_recommendation: string;
   recommendation_color: string;
   recommendation_short: string;
   market_watch_category: string;
   best_value_score: number;
   confidence_label: string;
-  opportunity_score: number;
-  risk_score: number;
-  signal_count: number;
-  signal_tags: string[];
+  edge_score: number;
+  edge_tier: string;
+  start_sit_decision: string;
+  recommendation_strength: string;
+  games_played: number;
+  consistency_tier: string;
 }
 
 interface AccuracyKpi {
@@ -181,22 +186,29 @@ function PlayerExplorerTab() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .schema("afl" as never)
-      .from("player_rankings_cache")
-      .select("player_id,player_name,team,position,projection_final,ceiling,floor,price,neeko_rating,value_score,value_tag,consistency,form_score,captain_score,captain_rating,upside_rating,upside_pct,risk_rating,matchup_rating,matchup_multiplier,ai_recommendation,recommendation_color,recommendation_short,market_watch_category,best_value_score,confidence_label,opportunity_score,risk_score,signal_count,signal_tags")
-      .order("neeko_rating", { ascending: false })
-      .limit(1000);
-    console.log("Player Lab explorer:", data?.length, "rows | error:", error);
-    if (!data?.length) {
-      const { data: state } = await supabase.rpc("get_operator_console_state");
-      console.log("Player Lab — operator state:", state);
+    try {
+      const { data, error } = await supabase
+        .from("v_player_lab_explorer")
+        .select("*")
+        .order("neeko_rating", { ascending: false })
+        .limit(1000);
+      console.log("Player Lab explorer:", data?.length, "rows | error:", error);
+      setRows((data as PlayerRow[]) ?? []);
+    } catch (err) {
+      console.error("Player Lab explorer fetch failed:", err);
+      setRows([]);
+    } finally {
+      setLoading(false);
     }
-    setRows((data as PlayerRow[]) ?? []);
-    setLoading(false);
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    const handler = () => fetchData();
+    window.addEventListener("neeko:prices-applied", handler);
+    return () => window.removeEventListener("neeko:prices-applied", handler);
+  }, [fetchData]);
 
   const positions = useMemo(() => ["ALL", ...Array.from(new Set(rows.map(r => r.position).filter(Boolean))).sort()], [rows]);
   const teams = useMemo(() => ["ALL", ...Array.from(new Set(rows.map(r => r.team).filter(Boolean))).sort()], [rows]);
@@ -233,9 +245,8 @@ function PlayerExplorerTab() {
     { key: "captain_score",      label: "Cap",      explain: "Captain score: upside-weighted rating for captaincy decisions" },
     { key: "upside_pct",         label: "Upside%",  explain: "Probability of exceeding projection by >10%" },
     { key: "matchup_multiplier", label: "Matchup",  explain: "Opponent difficulty multiplier (1.0 = neutral, >1 = easier)" },
-    { key: "opportunity_score",  label: "Opp",      explain: "Opportunity score from signal engine — breakout + matchup + value composite" },
-    { key: "risk_score",         label: "Risk",     explain: "Risk score from signal engine — volatility + consistency penalty" },
-    { key: "signal_count",       label: "Signals",  explain: "Number of active signals firing for this player" },
+    { key: "edge_score",         label: "Edge",     explain: "Edge score — composite of value, matchup, and upside signals" },
+    { key: "best_value_score",   label: "Val Score", explain: "Best value score blending projected return per price tier" },
     { key: "price",              label: "Price" },
     { key: "recommendation_short", label: "Reco" },
   ];
@@ -314,9 +325,8 @@ function PlayerExplorerTab() {
                 <td className="px-2 py-2 tabular-nums">{fmtNum(r.captain_score)}</td>
                 <td className="px-2 py-2 tabular-nums">{fmtNum(r.upside_pct, 0)}%</td>
                 <td className="px-2 py-2 tabular-nums">{fmtNum(r.matchup_multiplier, 2)}x</td>
-                <td className="px-2 py-2 tabular-nums text-sky-400">{fmtNum(r.opportunity_score, 0)}</td>
-                <td className="px-2 py-2 tabular-nums text-amber-400">{fmtNum(r.risk_score, 0)}</td>
-                <td className="px-2 py-2 tabular-nums">{r.signal_count ?? "—"}</td>
+                <td className="px-2 py-2 tabular-nums text-sky-400">{fmtNum(r.edge_score, 0)}</td>
+                <td className="px-2 py-2 tabular-nums text-amber-400">{fmtNum(r.best_value_score, 1)}</td>
                 <td className="px-2 py-2 tabular-nums">{fmtPrice(r.price)}</td>
                 <td className="px-2 py-2">
                   <RecoBadge color={r.recommendation_color} short={r.recommendation_short} />
