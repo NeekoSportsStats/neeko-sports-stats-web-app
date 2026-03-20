@@ -110,6 +110,17 @@ Deno.serve(async (req: Request) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
+      // Fire post-commit refresh chain in background so frontend sees latest prices immediately
+      EdgeRuntime.waitUntil((async () => {
+        try {
+          await supabase.rpc("refresh_player_rankings_cache");
+          await supabase.rpc("refresh_market_watch");
+          await supabase.rpc("populate_mv_edge_board");
+          console.log("[commit_price_ingest] post-commit refresh chain complete");
+        } catch (e) {
+          console.error("[commit_price_ingest] post-commit refresh chain error:", e);
+        }
+      })());
       return new Response(
         JSON.stringify({ ok: true, command, result: cmdResult, duration_ms: durationMs }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
