@@ -53,7 +53,11 @@ export function useCommitPrices() {
     try {
       const payload = rows
         .filter(r => r.player_id !== null)
-        .map(r => ({ player_id: r.player_id, cleaned_price: r.cleaned_price }));
+        .map(r => ({
+          player_id: r.player_id,
+          cleaned_price: r.cleaned_price,
+          player_status: r.player_status ?? null,
+        }));
 
       const result = await callAdminCommand("commit_price_ingest", { rows: payload, season, round });
       return { result: result as IngestByIdResult, error: null };

@@ -53,6 +53,7 @@ function PriceFullTable() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [hideOut, setHideOut] = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -66,6 +67,7 @@ function PriceFullTable() {
 
   const filtered = useMemo(() => {
     let res = rows;
+    if (hideOut) res = res.filter(r => r.status !== "OUT");
     if (search) res = res.filter(r => r.player_name?.toLowerCase().includes(search.toLowerCase()) || r.team?.toLowerCase().includes(search.toLowerCase()));
     if (priceFilter === "risers")          res = res.filter(r => (r.price_change ?? 0) > 0);
     if (priceFilter === "fallers")         res = res.filter(r => (r.price_change ?? 0) < 0);
@@ -120,8 +122,9 @@ function PriceFullTable() {
     { key: "player_name",      label: "Player" },
     { key: "team",             label: "Team" },
     { key: "position",         label: "Pos" },
+    { key: "status",           label: "Status" },
     { key: "current_price",    label: "Price" },
-    { key: "last_price",       label: "Last Price" },
+    { key: "prev_price",       label: "Last Price" },
     { key: "price_change",     label: "Δ Price" },
     { key: "price_change_pct", label: "Δ %" },
     { key: "value_score",      label: "Value" },
@@ -160,6 +163,16 @@ function PriceFullTable() {
             className="pl-8 pr-3 py-1.5 text-xs bg-background border border-border rounded-md focus:outline-none w-40"
           />
         </div>
+        <button
+          onClick={() => setHideOut(v => !v)}
+          className={`px-2.5 py-1 text-[11px] rounded-full border font-medium transition-colors ${
+            hideOut
+              ? "border-red-500/40 bg-red-500/10 text-red-400"
+              : "border-border/50 text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {hideOut ? "Hiding OUT" : "Show OUT"}
+        </button>
         <Button size="sm" variant="outline" onClick={fetchData}>
           <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh
         </Button>
@@ -203,6 +216,17 @@ function PriceFullTable() {
                     </td>
                     <td className="px-2 py-2 text-muted-foreground">{r.team}</td>
                     <td className="px-2 py-2 text-muted-foreground font-mono">{r.position}</td>
+                    <td className="px-2 py-2">
+                      {r.status ? (
+                        <span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                          r.status === "OUT" ? "bg-red-500/15 text-red-400 border-red-500/25"
+                          : r.status === "TEST" ? "bg-amber-500/15 text-amber-400 border-amber-500/25"
+                          : "bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
+                        }`}>{r.status}</span>
+                      ) : (
+                        <span className="text-muted-foreground/40 text-[10px]">—</span>
+                      )}
+                    </td>
                     <td className="px-2 py-2 tabular-nums font-semibold">
                       {isEditing ? (
                         <input
@@ -214,7 +238,7 @@ function PriceFullTable() {
                         />
                       ) : fmtPrice(r.current_price)}
                     </td>
-                    <td className="px-2 py-2 tabular-nums text-muted-foreground">{fmtPrice(r.last_price)}</td>
+                    <td className="px-2 py-2 tabular-nums text-muted-foreground">{fmtPrice(r.prev_price)}</td>
                     <td className={`px-2 py-2 tabular-nums font-semibold ${delta > 0 ? "text-emerald-400" : delta < 0 ? "text-red-400" : "text-muted-foreground"}`}>
                       {delta !== 0 ? (delta > 0 ? "+" : "") + fmtPrice(delta) : "—"}
                     </td>

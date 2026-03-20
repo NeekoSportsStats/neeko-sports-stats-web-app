@@ -13,6 +13,7 @@ export function usePlayerExplorer() {
   const [recoFilter, setRecoFilter] = useState("ALL");
   const [quickFilter, setQuickFilter] = useState<"all" | "high_edge" | "high_confidence" | "high_risk" | "signals_3plus">("all");
   const [activeSignalFilters, setActiveSignalFilters] = useState<string[]>([]);
+  const [hideOut, setHideOut] = useState(true);
   const [sortCol, setSortCol] = useState<string>("neeko_rating");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -59,6 +60,7 @@ export function usePlayerExplorer() {
 
   const filtered = useMemo(() => {
     let res = rows;
+    if (hideOut) res = res.filter(r => r.status !== "OUT");
     if (search) res = res.filter(r => r.player_name?.toLowerCase().includes(search.toLowerCase()) || r.team?.toLowerCase().includes(search.toLowerCase()));
     if (posFilter !== "ALL") res = res.filter(r => r.position === posFilter);
     if (teamFilter !== "ALL") res = res.filter(r => r.team === teamFilter);
@@ -83,7 +85,7 @@ export function usePlayerExplorer() {
       const bv = (b as Record<string, unknown>)[sortCol] as number ?? 0;
       return sortDir === "asc" ? av - bv : bv - av;
     });
-  }, [rows, search, posFilter, teamFilter, recoFilter, quickFilter, activeSignalFilters, sortCol, sortDir, signalsMap]);
+  }, [rows, search, posFilter, teamFilter, recoFilter, quickFilter, activeSignalFilters, sortCol, sortDir, signalsMap, hideOut]);
 
   function handleSort(col: string) {
     if (col === sortCol) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -112,6 +114,7 @@ export function usePlayerExplorer() {
     recoFilter, setRecoFilter,
     quickFilter, setQuickFilter,
     activeSignalFilters, toggleSignalFilter, clearSignalFilters,
+    hideOut, setHideOut,
     sortCol, sortDir, handleSort,
     expandedId, toggleExpand,
     positions, teams, recos,

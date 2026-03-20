@@ -648,6 +648,33 @@ interface MappingStepProps {
   copiedCsv: boolean;
 }
 
+function PlayerStatusBadge({ status }: { status: string | null | undefined }) {
+  if (!status) return null;
+  if (status === "OUT")
+    return (
+      <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/25 whitespace-nowrap">
+        OUT
+      </span>
+    );
+  if (status === "TEST")
+    return (
+      <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/25 whitespace-nowrap">
+        TEST
+      </span>
+    );
+  if (status === "AVAILABLE")
+    return (
+      <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 whitespace-nowrap">
+        AVAIL
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-500/15 text-slate-400 border border-slate-500/25 whitespace-nowrap">
+      {status}
+    </span>
+  );
+}
+
 function MappingStep({
   rows, players, counts, committing, saving, pendingSaved, commitError,
   isRoundLocked, showOverwriteWarning, existingPlayerCount, selectedRound,
@@ -658,6 +685,7 @@ function MappingStep({
 
   const showPositionCol = counts.hasPositions > 0;
   const showTeamCol = counts.hasTeams > 0;
+  const showStatusCol = rows.some(r => r.player_status != null);
 
   const visibleRows = useMemo(() => {
     let filtered = rows;
@@ -794,7 +822,10 @@ function MappingStep({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border/60 bg-muted/20">
-              <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-28">Status</th>
+              <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-28">Match</th>
+              {showStatusCol && (
+                <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-16">Avail</th>
+              )}
               <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Input Name</th>
               {showPositionCol && (
                 <th className="text-left py-2 px-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide w-16">Pos</th>
@@ -819,12 +850,13 @@ function MappingStep({
                   showGroupDivider={showDivider}
                   showPositionCol={showPositionCol}
                   showTeamCol={showTeamCol}
+                  showStatusCol={showStatusCol}
                 />
               );
             })}
             {visibleRows.length === 0 && (
               <tr>
-                <td colSpan={4 + (showPositionCol ? 1 : 0) + (showTeamCol ? 1 : 0)} className="py-8 text-center text-xs text-muted-foreground">
+                <td colSpan={4 + (showPositionCol ? 1 : 0) + (showTeamCol ? 1 : 0) + (showStatusCol ? 1 : 0)} className="py-8 text-center text-xs text-muted-foreground">
                   No rows match your filter
                 </td>
               </tr>
@@ -864,7 +896,7 @@ const GROUP_LABELS: Partial<Record<MatchStatus, string>> = {
 };
 
 function MappingTableRow({
-  row, players, onSelect, showGroupDivider, showPositionCol, showTeamCol,
+  row, players, onSelect, showGroupDivider, showPositionCol, showTeamCol, showStatusCol,
 }: {
   row: MappingRow;
   players: ReturnType<typeof usePlayerOptions>;
@@ -872,9 +904,10 @@ function MappingTableRow({
   showGroupDivider: boolean;
   showPositionCol: boolean;
   showTeamCol: boolean;
+  showStatusCol: boolean;
 }) {
   const isHardPending = row.match_status === "pending_player_record";
-  const colSpan = 4 + (showPositionCol ? 1 : 0) + (showTeamCol ? 1 : 0);
+  const colSpan = 4 + (showPositionCol ? 1 : 0) + (showTeamCol ? 1 : 0) + (showStatusCol ? 1 : 0);
 
   const dropdownPlayers = useMemo(() => {
     if (row.suggestions.length > 0 && row.player_id === null) {
@@ -899,6 +932,11 @@ function MappingTableRow({
         <td className="py-2 px-3">
           <StatusBadge status={row.match_status} confidence={row.confidence} />
         </td>
+        {showStatusCol && (
+          <td className="py-2 px-3">
+            <PlayerStatusBadge status={row.player_status} />
+          </td>
+        )}
         <td className="py-2 px-3 font-mono text-xs text-muted-foreground">{row.source_name}</td>
         {showPositionCol && (
           <td className="py-2 px-3">

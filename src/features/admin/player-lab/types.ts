@@ -6,6 +6,8 @@ export interface PlayerRow {
   player_name: string;
   team: string;
   position: string;
+  status: string | null;
+  is_available: boolean | null;
   projection_final: number;
   projection: number;
   ceiling: number;
@@ -121,8 +123,10 @@ export interface PriceRow {
   player_name: string;
   team: string;
   position: string;
+  status: string | null;
+  is_available: boolean | null;
   current_price: number;
-  last_price: number | null;
+  prev_price: number | null;
   price_change: number;
   price_change_pct: number;
   value_score: number;

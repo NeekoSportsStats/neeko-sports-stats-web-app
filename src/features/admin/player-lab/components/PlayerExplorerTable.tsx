@@ -33,6 +33,7 @@ export function PlayerExplorerTable() {
     recoFilter, setRecoFilter,
     quickFilter, setQuickFilter,
     activeSignalFilters, toggleSignalFilter, clearSignalFilters,
+    hideOut, setHideOut,
     sortCol, sortDir, handleSort,
     expandedId, toggleExpand,
     positions, teams, recos,
@@ -59,6 +60,7 @@ export function PlayerExplorerTable() {
     { key: "player_name",        label: "Player" },
     { key: "position",           label: "Pos" },
     { key: "team",               label: "Team" },
+    { key: "status",             label: "Status" },
     { key: "projection_final",   label: "Proj",     explain: "Final blended projection including matchup and role multipliers" },
     { key: "ceiling",            label: "Ceil",     explain: "85th percentile outcome from recent 10 games" },
     { key: "floor",              label: "Floor",    explain: "15th percentile outcome from recent 10 games" },
@@ -164,6 +166,16 @@ export function PlayerExplorerTable() {
         <select value={recoFilter} onChange={e => setRecoFilter(e.target.value)} className="text-xs bg-background border border-border rounded-md px-2 py-1.5 focus:outline-none">
           {recos.map(r => <option key={r}>{r}</option>)}
         </select>
+        <button
+          onClick={() => setHideOut(v => !v)}
+          className={`px-2.5 py-1 text-[11px] rounded-full border font-medium transition-colors ${
+            hideOut
+              ? "border-red-500/40 bg-red-500/10 text-red-400"
+              : "border-border/50 text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {hideOut ? "Hiding OUT" : "Show OUT"}
+        </button>
         <Button size="sm" variant="outline" onClick={fetchData} className="ml-auto">
           <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh
         </Button>
@@ -207,6 +219,17 @@ export function PlayerExplorerTable() {
                     <td className="px-2 py-2 font-medium whitespace-nowrap">{r.player_name}</td>
                     <td className="px-2 py-2 text-muted-foreground font-mono">{r.position}</td>
                     <td className="px-2 py-2 text-muted-foreground">{r.team}</td>
+                    <td className="px-2 py-2">
+                      {r.status ? (
+                        <span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                          r.status === "OUT" ? "bg-red-500/15 text-red-400 border-red-500/25"
+                          : r.status === "TEST" ? "bg-amber-500/15 text-amber-400 border-amber-500/25"
+                          : "bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
+                        }`}>{r.status}</span>
+                      ) : (
+                        <span className="text-muted-foreground/40 text-[10px]">—</span>
+                      )}
+                    </td>
                     <td className="px-2 py-2 tabular-nums font-semibold">{fmtNum(r.projection_final, 0)}</td>
                     <td className="px-2 py-2 tabular-nums text-emerald-400">{fmtNum(r.ceiling, 0)}</td>
                     <td className="px-2 py-2 tabular-nums text-red-400">{fmtNum(r.floor, 0)}</td>
