@@ -91,16 +91,16 @@ function toLevel(s: string | undefined | null): HealthStatus {
 
 function buildAlerts(status: CommandCenterStatus, mw: MWDiagnostics | null) {
   const alerts: Array<{ level: "error" | "warn"; message: string; route?: string }> = [];
-  if (status.queue_failed > 10) alerts.push({ level: "error", message: `${status.queue_failed} AI queue jobs failed`, route: "/admin/pipelines" });
+  if (status.queue_failed > 10) alerts.push({ level: "error", message: `${status.queue_failed} AI queue jobs failed`, route: "/admin/command-center" });
   if (status.cron_failed_count > 0) alerts.push({ level: "error", message: `${status.cron_failed_count} cron job(s) failing`, route: "/admin/command-center" });
-  if (status.recent_error_count > 20) alerts.push({ level: "error", message: `${status.recent_error_count} system errors in last 24h`, route: "/admin/system-health" });
-  if (mw && (mw.positive_price_change / Math.max(mw.total_players, 1)) < 0.05) alerts.push({ level: "error", message: `Market Watch broken — <5% positive price changes (${mw.positive_price_change}/${mw.total_players})`, route: "/admin/data-integrity" });
-  if (mw && mw.avg_breakeven > 200) alerts.push({ level: "error", message: `Market Watch breakeven avg ${mw.avg_breakeven.toFixed(0)}pts — model likely broken`, route: "/admin/data-integrity" });
-  if (status.ai_missing_players > 50) alerts.push({ level: "warn", message: `${status.ai_missing_players} players missing AI analysis`, route: "/admin/pipelines" });
-  if (status.rankings_cache_rows < 100) alerts.push({ level: "warn", message: `Rankings cache low — only ${status.rankings_cache_rows} players`, route: "/admin/system-health" });
-  if (status.queue_pending > 200) alerts.push({ level: "warn", message: `${status.queue_pending} jobs queued — AI worker may be slow`, route: "/admin/pipelines" });
-  if (!status.pipeline_last_run) alerts.push({ level: "warn", message: "AFL pipeline has never run", route: "/admin/pipelines" });
-  if (mw && mw.snapshot_age_hours > 48) alerts.push({ level: "warn", message: `Market Watch snapshot is ${mw.snapshot_age_hours.toFixed(0)}h old`, route: "/admin/data-integrity" });
+  if (status.recent_error_count > 20) alerts.push({ level: "error", message: `${status.recent_error_count} system errors in last 24h`, route: "/admin/health" });
+  if (mw && (mw.positive_price_change / Math.max(mw.total_players, 1)) < 0.05) alerts.push({ level: "error", message: `Market Watch broken — <5% positive price changes (${mw.positive_price_change}/${mw.total_players})`, route: "/admin/health" });
+  if (mw && mw.avg_breakeven > 200) alerts.push({ level: "error", message: `Market Watch breakeven avg ${mw.avg_breakeven.toFixed(0)}pts — model likely broken`, route: "/admin/health" });
+  if (status.ai_missing_players > 50) alerts.push({ level: "warn", message: `${status.ai_missing_players} players missing AI analysis`, route: "/admin/command-center" });
+  if (status.rankings_cache_rows < 100) alerts.push({ level: "warn", message: `Rankings cache low — only ${status.rankings_cache_rows} players`, route: "/admin/health" });
+  if (status.queue_pending > 200) alerts.push({ level: "warn", message: `${status.queue_pending} jobs queued — AI worker may be slow`, route: "/admin/command-center" });
+  if (!status.pipeline_last_run) alerts.push({ level: "warn", message: "AFL pipeline has never run", route: "/admin/command-center" });
+  if (mw && mw.snapshot_age_hours > 48) alerts.push({ level: "warn", message: `Market Watch snapshot is ${mw.snapshot_age_hours.toFixed(0)}h old`, route: "/admin/health" });
   return alerts;
 }
 
@@ -110,7 +110,7 @@ function buildActions(status: CommandCenterStatus, mw: MWDiagnostics | null): Ac
     actions.push({ label: "Rerun Market Watch snapshot", detail: "Price model showing abnormal distribution — refresh required", urgency: "critical", rpcKey: "fn_refresh_market_watch" });
   }
   if (status.queue_failed > 0) {
-    actions.push({ label: "Clear failed AI queue jobs", detail: `${status.queue_failed} failed jobs blocking the queue`, urgency: "critical", route: "/admin/pipelines" });
+    actions.push({ label: "Clear failed AI queue jobs", detail: `${status.queue_failed} failed jobs blocking the queue`, urgency: "critical", route: "/admin/command-center" });
   }
   if (status.ai_missing_players > 20) {
     actions.push({ label: "Run AI worker batch", detail: `${status.ai_missing_players} players missing AI summaries`, urgency: "warn", rpcKey: "run_ai_worker_batch" });
@@ -119,7 +119,7 @@ function buildActions(status: CommandCenterStatus, mw: MWDiagnostics | null): Ac
     actions.push({ label: "Refresh rankings cache", detail: "Cache is low — players may be missing from rankings page", urgency: "warn", rpcKey: "refresh_player_rankings_cache" });
   }
   if (status.queue_pending > 100) {
-    actions.push({ label: "Monitor AI queue drain", detail: `${status.queue_pending} jobs still pending`, urgency: "info", route: "/admin/pipelines" });
+    actions.push({ label: "Monitor AI queue drain", detail: `${status.queue_pending} jobs still pending`, urgency: "info", route: "/admin/command-center" });
   }
   if (!status.pipeline_last_run || new Date(status.pipeline_last_run) < new Date(Date.now() - 7 * 86400000)) {
     actions.push({ label: "Run AFL pipeline", detail: "No recent pipeline run detected — data may be stale", urgency: "warn", rpcKey: "run_neeko_pipeline_orchestrator" });
@@ -365,7 +365,7 @@ export default function AdminDashboard() {
             primary={sysStatus ? sysStatus.rankings_cache_rows.toLocaleString() : "—"}
             secondary="players cached"
             sub={sysStatus?.rankings_cache_refreshed_at ? formatDate(sysStatus.rankings_cache_refreshed_at) : undefined}
-            route="/admin/system-health"
+            route="/admin/health"
             loading={sysLoading}
           />
           <SystemCard
@@ -374,7 +374,7 @@ export default function AdminDashboard() {
             status={toLevel(sysStatus?.pipeline_health)}
             primary={sysStatus?.pipeline_status ?? "—"}
             secondary={sysStatus?.pipeline_last_run ? formatDate(sysStatus.pipeline_last_run) : "Never run"}
-            route="/admin/pipelines"
+            route="/admin/command-center"
             loading={sysLoading}
           />
           <SystemCard
@@ -392,7 +392,7 @@ export default function AdminDashboard() {
             status={toLevel(sysStatus?.queue_health)}
             primary={sysStatus ? `${sysStatus.queue_pending} pending` : "—"}
             secondary={sysStatus?.queue_failed ? `${sysStatus.queue_failed} failed` : "no failures"}
-            route="/admin/pipelines"
+            route="/admin/command-center"
             loading={sysLoading}
           />
           <SystemCard
@@ -402,7 +402,7 @@ export default function AdminDashboard() {
             primary={positivePct !== null ? `${positivePct}% positive` : (sysStatus?.market_watch_health ?? "—")}
             secondary={mwDiag ? `${mwDiag.total_players} players` : undefined}
             sub={sysStatus?.market_watch_last_refresh ? formatDate(sysStatus.market_watch_last_refresh) : undefined}
-            route="/admin/data-integrity"
+            route="/admin/health"
             loading={sysLoading}
           />
           <SystemCard
@@ -514,9 +514,9 @@ export default function AdminDashboard() {
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {[
             { label: "Player Intelligence", detail: "Hot/cold/overrated players", icon: Users, route: "/admin/players-intelligence" },
-            { label: "Data Integrity", detail: "Validate all data sources", icon: ShieldAlert, route: "/admin/data-integrity" },
-            { label: "Pipelines", detail: "Monitor and rerun pipelines", icon: Database, route: "/admin/pipelines" },
-            { label: "System Health", detail: "Technical health dashboard", icon: BarChart3, route: "/admin/system-health" },
+            { label: "Health", detail: "Data freshness, errors and diagnostics", icon: ShieldAlert, route: "/admin/health" },
+            { label: "Command Center", detail: "Run pipelines and workers", icon: Database, route: "/admin/command-center" },
+            { label: "Operations", detail: "Manual triggers and price upload", icon: BarChart3, route: "/admin/operations" },
           ].map(({ label, detail, icon: Icon, route }) => (
             <Card
               key={route}

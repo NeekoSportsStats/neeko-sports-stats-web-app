@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Zap, Bot, Activity, History, RefreshCw,
+  Zap, Bot, RefreshCw,
   DollarSign, Upload, CircleCheck as CheckCircle,
   CircleAlert as AlertCircle, ChartBar as BarChart2,
   Grid2x2 as Grid, ListOrdered, Play, DatabaseZap,
@@ -14,7 +13,6 @@ import { AdminPipelineProgress, type PipelineRun } from "@/components/admin/Admi
 
 export default function AdminOperations() {
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [running, setRunning] = useState<string | null>(null);
   const [activeRun, setActiveRun] = useState<PipelineRun | null>(null);
 
@@ -393,28 +391,6 @@ export default function AdminOperations() {
               icon={Bot}
               onClick={handleRunRankingAI}
             />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Navigation shortcuts */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Activity className="h-4 w-4 text-muted-foreground" />
-            Admin Navigation
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Button onClick={() => navigate("/admin/queue")} variant="outline" className="w-full justify-start">
-              <Activity className="h-4 w-4 mr-2" />
-              AI Queue Dashboard
-            </Button>
-            <Button onClick={() => navigate("/admin/pipeline-history")} variant="outline" className="w-full justify-start">
-              <History className="h-4 w-4 mr-2" />
-              Pipeline History
-            </Button>
           </div>
         </CardContent>
       </Card>

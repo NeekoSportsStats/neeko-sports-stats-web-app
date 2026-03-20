@@ -1,13 +1,14 @@
 import { lazy, Suspense } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { RefreshCw, Shield, Terminal, HeartPulse, Zap, Database, Activity, Users, SquareCheck as CheckSquare, ChartBar as BarChart3, Target } from "lucide-react";
+import { RefreshCw, Shield, Terminal, HeartPulse, Zap, Database, Activity, Users, SquareCheck as CheckSquare, ChartBar as BarChart3, Target, Settings } from "lucide-react";
 import { AdminUIStateProvider, useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
 
 const TABS: { path: string; label: string; icon: React.ElementType }[] = [
   { path: "/admin/overview",             label: "Overview",            icon: Activity },
   { path: "/admin/health",               label: "Health",              icon: HeartPulse },
   { path: "/admin/command-center",       label: "Command Center",      icon: Terminal },
+  { path: "/admin/operations",           label: "Operations",          icon: Settings },
   { path: "/admin/analytics",            label: "User Metrics",        icon: Users },
   { path: "/admin/players-intelligence", label: "Player Data",         icon: Database },
   { path: "/admin/ai-content",           label: "Marketing",           icon: Zap },
@@ -112,6 +113,7 @@ function AdminShellWithProvider() {
 export const AdminOverview            = lazy(() => import("@/features/admin/pages/AdminDashboard"));
 export const AdminHealth              = lazy(() => import("@/features/admin/pages/AdminHealth"));
 export const AdminCommandCenter       = lazy(() => import("@/features/admin/command-center/AdminCommandCenter"));
+export const AdminOperationsPage      = lazy(() => import("@/features/admin/pages/AdminOperations"));
 export const AdminPlayersIntelligence = lazy(() => import("@/features/admin/pages/AdminPlayersIntelligence"));
 export const AdminAIContent           = lazy(() => import("@/features/admin/pages/AdminAIContent"));
 export const AdminAnalytics           = lazy(() => import("@/features/admin/pages/AdminAnalytics"));
