@@ -19,21 +19,36 @@ const PIPELINE_COMMANDS = new Set([
 
 // Map command names to DB function calls
 const COMMAND_MAP: Record<string, { fn: string; args?: Record<string, unknown> }> = {
+  // Pipeline
   run_full_pipeline:              { fn: "run_afl_pipeline_controller" },
+  run_afl_processing:             { fn: "run_neeko_pipeline" },
   run_processing_only:            { fn: "run_neeko_pipeline" },
+  // Rankings
   refresh_rankings:               { fn: "refresh_player_rankings_cache" },
+  // Market Watch / Edge Board
   refresh_market_watch:           { fn: "refresh_market_watch" },
   refresh_edge_board:             { fn: "refresh_ranking_board" },
+  // AI
   run_ai_worker:                  { fn: "run_neeko_ai_pipeline" },
   run_full_ai_neeko_pipeline:     { fn: "run_neeko_ai_pipeline" },
+  run_neeko_ai_pipeline:          { fn: "run_neeko_ai_pipeline" },
+  enqueue_all_ai:                 { fn: "fn_enqueue_ranking_reco_jobs" },
+  // Projections / Accuracy
+  refresh_projections:            { fn: "run_afl_pipeline_controller" },
   rebuild_projections:            { fn: "run_afl_pipeline_controller" },
   refresh_accuracy:               { fn: "run_projection_accuracy_pipeline" },
+  // Fantasy Prices
   apply_fantasy_prices:           { fn: "apply_fantasy_prices" },
+  // Ingestion
+  run_ingestion:                  { fn: "run_afl_ingestion_pipeline" },
   run_ingestion_pipeline:         { fn: "run_afl_ingestion_pipeline" },
-  backfill_fantasy_points:        { fn: "run_afl_ingestion_pipeline" },
+  backfill_fantasy_points:        { fn: "fn_backfill_raw_fantasy_points" },
+  // Danger Zone
+  clear_failed_ai_jobs:           { fn: "clear_failed_ai_queue" },
   clear_failed_ai_queue:          { fn: "clear_failed_ai_queue" },
   reset_stale_ai:                 { fn: "reset_stale_ai_analyses" },
   clear_start_sit_cache:          { fn: "clear_start_sit_cache" },
+  refresh_all_views:              { fn: "refresh_rankings_and_market_watch" },
   force_refresh_all_views:        { fn: "refresh_rankings_and_market_watch" },
   rebuild_market_watch:           { fn: "fn_apply_market_watch_categories" },
   rebuild_confidence:             { fn: "fn_rebuild_confidence_scores" },

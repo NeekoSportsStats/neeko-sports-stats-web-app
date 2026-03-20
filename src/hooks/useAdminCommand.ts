@@ -16,6 +16,8 @@ export async function runCommand(command: string, payload?: Record<string, unkno
 
   const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-command`;
 
+  console.log("Running command:", command);
+
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -26,8 +28,22 @@ export async function runCommand(command: string, payload?: Record<string, unkno
     body: JSON.stringify({ command, payload }),
   });
 
-  const data = await res.json() as CommandResponse;
-  return data;
+  const raw = await res.json() as Record<string, unknown>;
+
+  const success = raw.ok === true || raw.success === true;
+  if (success) {
+    console.log("Command success:", command, `(${raw.duration_ms ?? "?"}ms)`);
+  } else {
+    console.error("Command failed:", command, raw.error ?? raw);
+  }
+
+  return {
+    success,
+    result: raw.result,
+    error: typeof raw.error === "string" ? raw.error : undefined,
+    duration_ms: typeof raw.duration_ms === "number" ? raw.duration_ms : undefined,
+    log_id: typeof raw.log_id === "string" ? raw.log_id : undefined,
+  };
 }
 
 export function useAdminCommand() {
