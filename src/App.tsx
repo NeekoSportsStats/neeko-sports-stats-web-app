@@ -22,16 +22,11 @@ import NotFound from "@/pages/NotFound";
 ========================= */
 import {
   AdminShell,
-  AdminOverview,
-  AdminHealth,
-  AdminCommandCenter,
-  AdminPipelinesPage,
-  AdminOperationsPage,
-  AdminPlayersIntelligence,
-  AdminAIContent,
-  AdminAnalytics,
-  AdminTodo,
-  AdminAccuracy,
+  AdminControlRoom,
+  AdminPipelinePage,
+  AdminAIPage,
+  AdminDataPage,
+  AdminAnalyticsPage,
 } from "@/pages/Admin";
 
 const NeekoPlusPurchase = React.lazy(() => import("@/pages/NeekoPlusPurchase"));
@@ -155,20 +150,24 @@ function App() {
           </RequireAdmin>
         }
       >
-        <Route index element={<Navigate to="/admin/overview" replace />} />
-        <Route path="overview"              element={<S fallback={Generic}><AdminOverview /></S>} />
-        <Route path="health"                element={<S fallback={Generic}><AdminHealth /></S>} />
-        <Route path="command-center"        element={<S fallback={Generic}><AdminCommandCenter /></S>} />
-        <Route path="pipelines"             element={<S fallback={Generic}><AdminPipelinesPage /></S>} />
-        <Route path="operations"            element={<S fallback={Generic}><AdminOperationsPage /></S>} />
-        <Route path="players-intelligence"  element={<S fallback={Generic}><AdminPlayersIntelligence /></S>} />
-        <Route path="ai-content"            element={<S fallback={Generic}><AdminAIContent /></S>} />
-        <Route path="analytics"             element={<S fallback={Generic}><AdminAnalytics /></S>} />
-        <Route path="todo"                  element={<S fallback={Generic}><AdminTodo /></S>} />
-        <Route path="accuracy"             element={<S fallback={Generic}><AdminAccuracy /></S>} />
-        <Route path="data-integrity"        element={<Navigate to="/admin/health" replace />} />
-        <Route path="pipelines"             element={<Navigate to="/admin/command-center" replace />} />
-        <Route path="system-health"         element={<Navigate to="/admin/health" replace />} />
+        <Route index element={<Navigate to="/admin/control-room" replace />} />
+        <Route path="control-room"          element={<S fallback={Generic}><AdminControlRoom /></S>} />
+        <Route path="pipeline"              element={<S fallback={Generic}><AdminPipelinePage /></S>} />
+        <Route path="ai"                    element={<S fallback={Generic}><AdminAIPage /></S>} />
+        <Route path="data"                  element={<S fallback={Generic}><AdminDataPage /></S>} />
+        <Route path="analytics"             element={<S fallback={Generic}><AdminAnalyticsPage /></S>} />
+        {/* Legacy redirects */}
+        <Route path="overview"              element={<Navigate to="/admin/control-room" replace />} />
+        <Route path="health"                element={<Navigate to="/admin/control-room" replace />} />
+        <Route path="command-center"        element={<Navigate to="/admin/control-room" replace />} />
+        <Route path="operations"            element={<Navigate to="/admin/control-room" replace />} />
+        <Route path="pipelines"             element={<Navigate to="/admin/pipeline" replace />} />
+        <Route path="system-health"         element={<Navigate to="/admin/control-room" replace />} />
+        <Route path="data-integrity"        element={<Navigate to="/admin/data" replace />} />
+        <Route path="players-intelligence"  element={<Navigate to="/admin/data" replace />} />
+        <Route path="ai-content"            element={<Navigate to="/admin/ai" replace />} />
+        <Route path="todo"                  element={<Navigate to="/admin/control-room" replace />} />
+        <Route path="accuracy"              element={<Navigate to="/admin/pipeline" replace />} />
       </Route>
 
       <Route

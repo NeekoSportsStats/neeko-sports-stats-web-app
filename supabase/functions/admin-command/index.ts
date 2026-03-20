@@ -285,6 +285,34 @@ Deno.serve(async (req: Request) => {
         break;
       }
 
+      // ── AI RESET ──────────────────────────────────────────────────────────
+      case "clear_ai_short": {
+        const { data: clearResult, error: clearErr } = await admin
+          .schema("admin" as never)
+          .rpc("clear_ai_text" as never, { p_scope: "short" } as never);
+        if (clearErr) throw new Error((clearErr as { message: string }).message);
+        result = clearResult;
+        break;
+      }
+
+      case "clear_ai_extended": {
+        const { data: clearResult, error: clearErr } = await admin
+          .schema("admin" as never)
+          .rpc("clear_ai_text" as never, { p_scope: "extended" } as never);
+        if (clearErr) throw new Error((clearErr as { message: string }).message);
+        result = clearResult;
+        break;
+      }
+
+      case "clear_ai_all": {
+        const { data: clearResult, error: clearErr } = await admin
+          .schema("admin" as never)
+          .rpc("clear_ai_text" as never, { p_scope: "all" } as never);
+        if (clearErr) throw new Error((clearErr as { message: string }).message);
+        result = clearResult;
+        break;
+      }
+
       // ── SYSTEM ────────────────────────────────────────────────────────────
       case "run_pipeline_alerts": {
         const res = await fetch(`${supabaseUrl}/functions/v1/pipeline-alerts`, {

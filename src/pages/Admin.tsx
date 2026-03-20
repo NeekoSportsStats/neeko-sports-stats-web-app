@@ -1,21 +1,9 @@
 import { lazy, Suspense } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { RefreshCw, Shield, Terminal, HeartPulse, Zap, Database, Activity, Users, SquareCheck as CheckSquare, ChartBar as BarChart3, Target, Settings, GitBranch } from "lucide-react";
+import { RefreshCw, Shield } from "lucide-react";
 import { AdminUIStateProvider, useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
-
-const TABS: { path: string; label: string; icon: React.ElementType }[] = [
-  { path: "/admin/overview",             label: "Overview",            icon: Activity },
-  { path: "/admin/health",               label: "Health",              icon: HeartPulse },
-  { path: "/admin/command-center",       label: "Command Center",      icon: Terminal },
-  { path: "/admin/pipelines",            label: "Pipelines",           icon: GitBranch },
-  { path: "/admin/operations",           label: "Operations",          icon: Settings },
-  { path: "/admin/analytics",            label: "User Metrics",        icon: Users },
-  { path: "/admin/players-intelligence", label: "Player Data",         icon: Database },
-  { path: "/admin/ai-content",           label: "Marketing",           icon: Zap },
-  { path: "/admin/todo",                 label: "To Do",               icon: CheckSquare },
-  { path: "/admin/accuracy",             label: "Accuracy",            icon: Target },
-];
+import { ADMIN_SECTIONS, ADMIN_DEFAULT_PATH } from "@/features/admin/config/adminSections";
 
 function TabLoadingFallback() {
   return (
@@ -57,7 +45,7 @@ function AdminShell() {
         <div className="container mx-auto max-w-7xl px-4">
           <div className="flex items-center gap-4 h-14">
             <button
-              onClick={() => navigate("/admin/overview")}
+              onClick={() => navigate(ADMIN_DEFAULT_PATH)}
               className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity"
             >
               <Shield className="h-4 w-4 text-foreground" />
@@ -70,7 +58,7 @@ function AdminShell() {
               className="flex items-center gap-0 overflow-x-auto flex-1"
               style={{ scrollbarWidth: "none" }}
             >
-              {TABS.map(({ path, label, icon: Icon }) => (
+              {ADMIN_SECTIONS.map(({ path, label, icon: Icon }) => (
                 <NavLink
                   key={path}
                   to={path}
@@ -111,16 +99,13 @@ function AdminShellWithProvider() {
   );
 }
 
-export const AdminOverview            = lazy(() => import("@/features/admin/pages/AdminDashboard"));
-export const AdminHealth              = lazy(() => import("@/features/admin/pages/AdminHealth"));
-export const AdminCommandCenter       = lazy(() => import("@/features/admin/command-center/AdminCommandCenter"));
-export const AdminPipelinesPage       = lazy(() => import("@/features/admin/pages/AdminPipelines"));
-export const AdminOperationsPage      = lazy(() => import("@/features/admin/pages/AdminOperations"));
-export const AdminPlayersIntelligence = lazy(() => import("@/features/admin/pages/AdminPlayersIntelligence"));
-export const AdminAIContent           = lazy(() => import("@/features/admin/pages/AdminAIContent"));
-export const AdminAnalytics           = lazy(() => import("@/features/admin/pages/AdminAnalytics"));
-export const AdminTodo                = lazy(() => import("@/features/admin/pages/AdminTodo"));
-export const AdminAccuracy            = lazy(() => import("@/features/admin/pages/AdminAccuracy"));
+export const AdminControlRoom        = lazy(() => import("@/features/admin/pages/AdminControlRoom"));
+export const AdminPipelinePage       = lazy(() => import("@/features/admin/pages/AdminPipelines"));
+export const AdminAIPage             = lazy(() => import("@/features/admin/pages/AdminAIHub"));
+export const AdminDataPage           = lazy(() => import("@/features/admin/pages/AdminDataHub"));
+export const AdminAnalyticsPage      = lazy(() => import("@/features/admin/pages/AdminAnalytics"));
 
 export { AdminShellWithProvider as AdminShell };
 export default AdminShellWithProvider;
+
+export { Navigate };
