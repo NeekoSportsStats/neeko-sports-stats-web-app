@@ -439,7 +439,7 @@ Deno.serve(async (req: Request) => {
     for (let i = 0; i < (players as PlayerRow[]).length; i += BATCH_SIZE) {
       const batch = (players as PlayerRow[]).slice(i, i + BATCH_SIZE);
 
-      await Promise.all(batch.map(async (player) => {
+      for (const player of batch) {
         try {
           const recommendation = player.ai_recommendation ?? "HOLD";
 
@@ -480,7 +480,7 @@ Deno.serve(async (req: Request) => {
             if (!res) {
               errors.push(`${player.player_name}: null response from OpenAI`);
               failed++;
-              return;
+              continue;
             }
             result = res;
             validation = val ?? { valid: true, issues: [] };
@@ -539,7 +539,7 @@ Deno.serve(async (req: Request) => {
           errors.push(`${player.player_name}: ${msg}`);
           failed++;
         }
-      }));
+      }
     }
 
     const durationMs = Date.now() - startTime;
