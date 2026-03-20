@@ -15,64 +15,82 @@ Deno.serve(async (req: Request) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Missing Authorization header" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Missing authorization" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const userClient = createClient(
+    const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Single canonical call — all state from one function
+    const { data: state, error: stateErr } = await supabase
+      .rpc("get_operator_console_state");
+
+    if (stateErr) {
+      throw new Error(`get_operator_console_state failed: ${stateErr.message}`);
     }
 
-    const { data: profile } = await userClient
-      .from("profiles")
-      .select("is_admin")
-      .eq("id", user.id)
+    // Augment with pipeline steps detail for the Health page pipeline tab
+    const [stepsRes, recentRunsRes, logsRes] = await Promise.allSettled([
+      supabase
+        .from("v_pipeline_run_detail")
+        .select("*")
+        .order("started_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("pipeline_runs")
+        .select("id,pipeline_key,label,status,started_at,finished_at,duration_ms")
+        .order("started_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("pipeline_steps")
+        .select("id,run_id,step_name,step_label,status,started_at,completed_at,duration_ms,error")
+        .order("started_at", { ascending: false })
+        .limit(50),
+    ]);
+
+    const pipelineRunDetail = stepsRes.status === "fulfilled" ? (stepsRes.value.data ?? []) : [];
+    const recentRuns = recentRunsRes.status === "fulfilled" ? (recentRunsRes.value.data ?? []) : [];
+    const pipelineSteps = logsRes.status === "fulfilled" ? (logsRes.value.data ?? []) : [];
+
+    // AI coverage detail
+    const { data: aiCoverage } = await supabase
+      .from("v_ai_coverage_summary")
+      .select("*")
       .maybeSingle();
 
-    if (!profile?.is_admin) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Admin access required" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Snapshots list
+    const { data: snapshots } = await supabase
+      .schema("admin" as never)
+      .from("snapshots")
+      .select("snapshot_id,created_at,validation_status,is_live,rankings_count,ai_coverage_pct,market_watch_ok,confidence_ok,invalidated_reason")
+      .order("created_at", { ascending: false })
+      .limit(10);
 
-    const admin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const response = {
+      // Canonical state — single source of truth for all counts
+      ...state,
 
-    const { data, error } = await admin.rpc("get_system_health", {}, {
-      schema: "admin" as never,
-    } as never);
+      // Extended detail for Health page tabs
+      pipeline_run_detail: pipelineRunDetail,
+      recent_runs: recentRuns,
+      pipeline_steps: pipelineSteps,
+      ai_coverage: aiCoverage,
+      snapshots: snapshots ?? [],
+    };
 
-    if (error) {
-      return new Response(
-        JSON.stringify({ success: false, error: error.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({ success: true, data }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     return new Response(
-      JSON.stringify({ success: false, error: err instanceof Error ? err.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: message, generated_at: new Date().toISOString() }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
