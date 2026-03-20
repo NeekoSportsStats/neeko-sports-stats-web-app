@@ -25,6 +25,7 @@ import {
   AdminOverview,
   AdminHealth,
   AdminCommandCenter,
+  AdminPipelinesPage,
   AdminOperationsPage,
   AdminPlayersIntelligence,
   AdminAIContent,
@@ -158,6 +159,7 @@ function App() {
         <Route path="overview"              element={<S fallback={Generic}><AdminOverview /></S>} />
         <Route path="health"                element={<S fallback={Generic}><AdminHealth /></S>} />
         <Route path="command-center"        element={<S fallback={Generic}><AdminCommandCenter /></S>} />
+        <Route path="pipelines"             element={<S fallback={Generic}><AdminPipelinesPage /></S>} />
         <Route path="operations"            element={<S fallback={Generic}><AdminOperationsPage /></S>} />
         <Route path="players-intelligence"  element={<S fallback={Generic}><AdminPlayersIntelligence /></S>} />
         <Route path="ai-content"            element={<S fallback={Generic}><AdminAIContent /></S>} />

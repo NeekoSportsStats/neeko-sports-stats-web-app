@@ -5,43 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { runCommand } from "@/hooks/useAdminCommand";
-import { RefreshCw, Activity, Database, Bot, TrendingUp, Grid2x2 as Grid, ListOrdered, Play, Zap, Server, ScrollText, Clock, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, SquareCheck as CheckSquare } from "lucide-react";
+import { RefreshCw, Activity, Database, Bot, TrendingUp, Grid2x2 as Grid, ListOrdered, Play, Zap, Server, ScrollText, Clock, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Circle as XCircle, SquareCheck as CheckSquare, DollarSign } from "lucide-react";
 import { formatDate } from "../shared/adminUtils";
 import CronJobMonitor, { fetchCronJobs, type CronJob } from "./CronJobMonitor";
 import SystemLogsPanel, { fetchSystemLogs, type SystemLogRow } from "./SystemLogsPanel";
+import type { CommandCenterStatus } from "../shared/types";
 
 type HealthStatus = "ok" | "warn" | "error" | "loading";
-
-interface CommandCenterStatus {
-  rankings_cache_rows: number;
-  rankings_cache_refreshed_at: string | null;
-  rankings_cache_status: string;
-  pipeline_status: string | null;
-  pipeline_last_run: string | null;
-  pipeline_finished_at: string | null;
-  pipeline_health: string;
-  ai_analysis_rows: number;
-  ai_missing_players: number;
-  ai_last_updated: string | null;
-  reco_rows: number;
-  reco_last_updated: string | null;
-  ai_health: string;
-  queue_pending: number;
-  queue_processing: number;
-  queue_complete: number;
-  queue_failed: number;
-  queue_health: string;
-  market_watch_last_refresh: string | null;
-  market_watch_quality: string | null;
-  market_watch_health: string;
-  cron_active_count: number;
-  cron_inactive_count: number;
-  cron_failed_count: number;
-  cron_health: string;
-  recent_error_count: number;
-  system_logs_last_event_at: string | null;
-  logs_health: string;
-}
 
 interface CommandLogRow {
   id: string;
@@ -351,7 +321,9 @@ export default function AdminCommandCenter() {
             <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
               {status.rankings_cache_rows.toLocaleString()} players cached &middot; {status.reco_rows.toLocaleString()} AI recos &middot; {status.cron_active_count} cron active
               {status.cron_failed_count > 0 && ` · ${status.cron_failed_count} cron failed`}
-              {status.ai_missing_players > 0 && ` · ${status.ai_missing_players} players missing AI`}
+              {status.ai_missing_players > 0 && ` · ${status.ai_missing_players} missing AI`}
+              {status.edge_board_rows != null && ` · ${status.edge_board_rows} edge board rows`}
+              {status.fantasy_unmatched_count != null && status.fantasy_unmatched_count > 0 && ` · ${status.fantasy_unmatched_count} unmatched prices`}
             </p>
           )}
         </div>
@@ -489,6 +461,22 @@ export default function AdminCommandCenter() {
         <TabsContent value="data" className="space-y-4 mt-4">
           <p className="text-xs text-muted-foreground">Refresh data snapshots, prices, projections, and accuracy. All buttons call admin-command → backend RPCs.</p>
           <div className="grid gap-4 sm:grid-cols-2">
+            <ActionCard
+              icon={DollarSign}
+              title="Fantasy Prices"
+              description="Full price refresh — updates rankings cache, Market Watch snapshot, and Edge Board in one pass."
+              status={status?.fantasy_price_last_updated ? "ok" : "warn"}
+              statusLabel={status?.fantasy_matched_count != null ? `${status.fantasy_matched_count} matched` : "Prices"}
+              detail={[
+                status?.fantasy_price_last_updated ? `Last updated: ${formatDate(status.fantasy_price_last_updated)}` : null,
+                status?.fantasy_unmatched_count ? `${status.fantasy_unmatched_count} unmatched` : null,
+              ].filter(Boolean).join(" · ") || undefined}
+              loading={loading}
+              onComplete={handleComplete}
+              actions={[
+                { key: "fantasy-prices", label: "Refresh Fantasy Prices", variant: "default", command: "refresh_fantasy_prices" },
+              ]}
+            />
             <ActionCard
               icon={TrendingUp}
               title="Market Watch"

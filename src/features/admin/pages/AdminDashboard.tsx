@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
+import { runCommand } from "@/hooks/useAdminCommand";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -12,39 +13,9 @@ import {
   ArrowRight, ListOrdered, Star,
 } from "lucide-react";
 import { formatDate } from "../shared/adminUtils";
+import type { CommandCenterStatus } from "../shared/types";
 
 type HealthStatus = "ok" | "warn" | "error" | "loading";
-
-interface CommandCenterStatus {
-  rankings_cache_rows: number;
-  rankings_cache_refreshed_at: string | null;
-  rankings_cache_status: string;
-  pipeline_status: string | null;
-  pipeline_last_run: string | null;
-  pipeline_finished_at: string | null;
-  pipeline_health: string;
-  ai_analysis_rows: number;
-  ai_missing_players: number;
-  ai_last_updated: string | null;
-  reco_rows: number;
-  reco_last_updated: string | null;
-  ai_health: string;
-  queue_pending: number;
-  queue_processing: number;
-  queue_complete: number;
-  queue_failed: number;
-  queue_health: string;
-  market_watch_last_refresh: string | null;
-  market_watch_quality: string | null;
-  market_watch_health: string;
-  cron_active_count: number;
-  cron_inactive_count: number;
-  cron_failed_count: number;
-  cron_health: string;
-  recent_error_count: number;
-  system_logs_last_event_at: string | null;
-  logs_health: string;
-}
 
 interface MWDiagnostics {
   total_players: number;
@@ -107,16 +78,16 @@ function buildAlerts(status: CommandCenterStatus, mw: MWDiagnostics | null) {
 function buildActions(status: CommandCenterStatus, mw: MWDiagnostics | null): ActionItem[] {
   const actions: ActionItem[] = [];
   if (mw && (mw.positive_price_change / Math.max(mw.total_players, 1)) < 0.1) {
-    actions.push({ label: "Rerun Market Watch snapshot", detail: "Price model showing abnormal distribution — refresh required", urgency: "critical", rpcKey: "fn_refresh_market_watch" });
+    actions.push({ label: "Rerun Market Watch snapshot", detail: "Price model showing abnormal distribution — refresh required", urgency: "critical", rpcKey: "refresh_market_watch" });
   }
   if (status.queue_failed > 0) {
     actions.push({ label: "Clear failed AI queue jobs", detail: `${status.queue_failed} failed jobs blocking the queue`, urgency: "critical", route: "/admin/command-center" });
   }
   if (status.ai_missing_players > 20) {
-    actions.push({ label: "Run AI worker batch", detail: `${status.ai_missing_players} players missing AI summaries`, urgency: "warn", rpcKey: "run_ai_worker_batch" });
+    actions.push({ label: "Run AI worker batch", detail: `${status.ai_missing_players} players missing AI summaries`, urgency: "warn", rpcKey: "run_ai_worker" });
   }
   if (status.rankings_cache_rows < 500) {
-    actions.push({ label: "Refresh rankings cache", detail: "Cache is low — players may be missing from rankings page", urgency: "warn", rpcKey: "refresh_player_rankings_cache" });
+    actions.push({ label: "Refresh rankings cache", detail: "Cache is low — players may be missing from rankings page", urgency: "warn", rpcKey: "refresh_rankings" });
   }
   if (status.queue_pending > 100) {
     actions.push({ label: "Monitor AI queue drain", detail: `${status.queue_pending} jobs still pending`, urgency: "info", route: "/admin/command-center" });
@@ -266,11 +237,11 @@ export default function AdminDashboard() {
     }
   }, [fetchAll]);
 
-  async function runAction(key: string, label: string, rpc: string) {
+  async function runAction(key: string, label: string, command: string) {
     setActionRunning(key);
     try {
-      const { error } = await supabase.rpc(rpc as never);
-      if (error) throw error;
+      const res = await runCommand(command);
+      if (!res.success) throw new Error(res.error ?? "Unknown error");
       toast({ title: `${label} complete` });
       await fetchSystem();
     } catch (err) {

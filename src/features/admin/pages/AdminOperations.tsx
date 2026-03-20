@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { runCommand } from "@/hooks/useAdminCommand";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -61,13 +62,9 @@ export default function AdminOperations() {
     setRunning("refresh_prices");
     toast({ title: "Refreshing prices and rankings…" });
     try {
-      const { error } = await supabase.schema("afl" as never).rpc("populate_rankings_cache_from_source");
-      if (error) throw error;
-      await Promise.all([
-        supabase.rpc("fn_refresh_market_watch"),
-        supabase.rpc("fn_refresh_edge_board"),
-      ]);
-      toast({ title: "Prices and rankings refreshed", description: "Frontend will reflect updated prices immediately." });
+      const res = await runCommand("refresh_fantasy_prices");
+      if (!res.success) throw new Error(res.error ?? "Unknown error");
+      toast({ title: "Prices and rankings refreshed", description: "Rankings cache, Market Watch and Edge Board updated." });
     } catch (err) {
       toast({ title: "Refresh failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
     } finally {
@@ -77,28 +74,26 @@ export default function AdminOperations() {
 
   const handleRunController = async () => {
     setRunning("controller");
-    toast({ title: "Triggering AFL pipeline controller…" });
-    const runId = await createPipelineRun("afl_controller", "AFL Pipeline Controller", 10);
+    toast({ title: "Triggering AFL pipeline orchestrator…" });
+    const runId = await createPipelineRun("afl_controller", "AFL Pipeline Orchestrator", 10);
     if (runId) await fetchActiveRun(runId);
-    supabase
-      .rpc("run_afl_pipeline_controller")
-      .then(async ({ error }) => {
-        const success = !error;
-        if (runId) await finishPipelineRun(runId, success);
-        toast({
-          title: success ? "Pipeline controller complete" : "Pipeline controller failed",
-          description: error ? error.message : undefined,
-          variant: success ? "default" : "destructive",
-        });
-        setRunning(null);
+    runCommand("run_full_pipeline").then(async (res) => {
+      const success = res.success;
+      if (runId) await finishPipelineRun(runId, success);
+      toast({
+        title: success ? "Pipeline complete" : "Pipeline failed",
+        description: !success ? (res.error ?? "Unknown error") : undefined,
+        variant: success ? "default" : "destructive",
       });
+      setRunning(null);
+    });
   };
 
   const handleRefreshRankingsCache = async () => {
     setRunning("rankings_cache");
     try {
-      const { error } = await supabase.schema("afl" as never).rpc("refresh_player_rankings_cache");
-      if (error) throw error;
+      const res = await runCommand("refresh_rankings");
+      if (!res.success) throw new Error(res.error ?? "Unknown error");
       toast({ title: "Rankings cache refreshed" });
     } catch (err) {
       toast({ title: "Rankings cache refresh failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
@@ -110,8 +105,8 @@ export default function AdminOperations() {
   const handleRefreshEdgeBoard = async () => {
     setRunning("edge_board");
     try {
-      const { error } = await supabase.rpc("fn_refresh_edge_board");
-      if (error) throw error;
+      const res = await runCommand("refresh_edge_board");
+      if (!res.success) throw new Error(res.error ?? "Unknown error");
       toast({ title: "Edge Board refreshed" });
     } catch (err) {
       toast({ title: "Edge Board refresh failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
@@ -123,8 +118,8 @@ export default function AdminOperations() {
   const handleRefreshMarketWatch = async () => {
     setRunning("market_watch");
     try {
-      const { error } = await supabase.rpc("fn_refresh_market_watch");
-      if (error) throw error;
+      const res = await runCommand("refresh_market_watch");
+      if (!res.success) throw new Error(res.error ?? "Unknown error");
       toast({ title: "Market Watch refreshed" });
     } catch (err) {
       toast({ title: "Market Watch refresh failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
@@ -136,8 +131,8 @@ export default function AdminOperations() {
   const handleRefreshProjectionAccuracy = async () => {
     setRunning("proj_accuracy");
     try {
-      const { error } = await supabase.rpc("refresh_projection_accuracy");
-      if (error) throw error;
+      const res = await runCommand("refresh_projections");
+      if (!res.success) throw new Error(res.error ?? "Unknown error");
       toast({ title: "Projection accuracy refreshed" });
     } catch (err) {
       toast({ title: "Projection accuracy failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
@@ -149,8 +144,8 @@ export default function AdminOperations() {
   const handleEnqueueRecoJobs = async () => {
     setRunning("enqueue_recos");
     try {
-      const { error } = await supabase.rpc("enqueue_ranking_reco_jobs");
-      if (error) throw error;
+      const res = await runCommand("enqueue_reco_jobs");
+      if (!res.success) throw new Error(res.error ?? "Unknown error");
       toast({ title: "Ranking reco jobs enqueued" });
     } catch (err) {
       toast({ title: "Enqueue failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
@@ -162,11 +157,11 @@ export default function AdminOperations() {
   const handleRunRecoWorker = async () => {
     setRunning("reco_worker");
     try {
-      const { error } = await supabase.functions.invoke("generate-player-ranking-recos", { body: {} });
-      if (error) throw error;
-      toast({ title: "Reco worker triggered (one batch)" });
+      const res = await runCommand("run_ai_worker");
+      if (!res.success) throw new Error(res.error ?? "Unknown error");
+      toast({ title: "AI worker triggered (one batch)" });
     } catch (err) {
-      toast({ title: "Reco worker failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
+      toast({ title: "AI worker failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });
     } finally {
       setRunning(null);
     }
@@ -175,8 +170,8 @@ export default function AdminOperations() {
   const handleRunRankingAI = async () => {
     setRunning("ranking_ai");
     try {
-      const { error } = await supabase.functions.invoke("generate-ranking-ai", { body: {} });
-      if (error) throw error;
+      const res = await runCommand("generate_ranking_ai");
+      if (!res.success) throw new Error(res.error ?? "Unknown error");
       toast({ title: "Ranking AI worker triggered" });
     } catch (err) {
       toast({ title: "Ranking AI failed", description: err instanceof Error ? err.message : "Unknown", variant: "destructive" });

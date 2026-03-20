@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { runCommand } from "@/hooks/useAdminCommand";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, Circle as XCircle, Clock, Database, Activity, Bot, TrendingUp, Zap, ChevronRight } from "lucide-react";
 import { useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
-import { supabase as supabaseClient } from "@/lib/supabaseClient";
+import type { CommandCenterStatus } from "../shared/types";
 
 interface PipelineRunRow {
   id: string;
@@ -43,19 +44,6 @@ interface StartSitCacheHealth {
   rounds_cached: number | null;
 }
 
-interface CommandStatus {
-  rankings_cache_rows: number;
-  rankings_cache_refreshed_at: string | null;
-  rankings_cache_status: string;
-  ai_analysis_rows: number;
-  ai_missing_players: number;
-  queue_pending: number;
-  queue_processing: number;
-  queue_complete: number;
-  queue_failed: number;
-  market_watch_last_refresh: string | null;
-  market_watch_quality: string | null;
-}
 
 type Status = "ok" | "warn" | "error" | "loading" | "running";
 
@@ -230,7 +218,7 @@ export default function AdminPipelines() {
   const [pipelineHealth, setPipelineHealth] = useState<PipelineHealth | null>(null);
   const [aiWorker, setAiWorker] = useState<AIWorkerHealth | null>(null);
   const [startSitCache, setStartSitCache] = useState<StartSitCacheHealth | null>(null);
-  const [cmdStatus, setCmdStatus] = useState<CommandStatus | null>(null);
+  const [cmdStatus, setCmdStatus] = useState<CommandCenterStatus | null>(null);
   const [running, setRunning] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const hasLoaded = useRef(false);
@@ -249,7 +237,7 @@ export default function AdminPipelines() {
       if (healthRes.status === "fulfilled" && healthRes.value.data) setPipelineHealth(healthRes.value.data as PipelineHealth);
       if (aiRes.status === "fulfilled" && aiRes.value.data) setAiWorker(aiRes.value.data as AIWorkerHealth);
       if (ssRes.status === "fulfilled" && ssRes.value.data) setStartSitCache(ssRes.value.data as StartSitCacheHealth);
-      if (cmdRes.status === "fulfilled" && cmdRes.value.data) setCmdStatus(cmdRes.value.data as CommandStatus);
+      if (cmdRes.status === "fulfilled" && cmdRes.value.data) setCmdStatus(cmdRes.value.data as CommandCenterStatus);
     } finally {
       setLoading(false);
       setLastRefreshed(new Date());
@@ -263,11 +251,11 @@ export default function AdminPipelines() {
     }
   }, [fetchAll]);
 
-  async function runRpc(label: string, jobType: string, rpcName: string) {
+  async function runAdminCommand(label: string, jobType: string, command: string) {
     setRunning(jobType);
     dispatch({ type: "START_JOB", payload: { jobType, label, pct: 10 } });
     try {
-      await supabaseClient.rpc(rpcName as never);
+      await runCommand(command);
       dispatch({ type: "UPDATE_JOB", payload: { pct: 100 } });
       setTimeout(() => dispatch({ type: "END_JOB" }), 1500);
       await fetchAll();
@@ -341,9 +329,9 @@ export default function AdminPipelines() {
   ];
 
   function handleFlowAction(key: string) {
-    if (key === "pipeline") runRpc("Running AFL Pipeline…", "pipeline", "run_neeko_pipeline_orchestrator");
-    if (key === "rankings") runRpc("Refreshing Rankings Cache…", "rankings", "refresh_player_rankings_cache");
-    if (key === "mw") runRpc("Refreshing Market Watch…", "mw", "refresh_market_watch");
+    if (key === "pipeline") runAdminCommand("Running AFL Pipeline…", "pipeline", "run_full_pipeline");
+    if (key === "rankings") runAdminCommand("Refreshing Rankings Cache…", "rankings", "refresh_rankings");
+    if (key === "mw") runAdminCommand("Refreshing Market Watch…", "mw", "refresh_market_watch");
   }
 
   const currentRun = runs.find(r => r.status === "running");
@@ -426,7 +414,7 @@ export default function AdminPipelines() {
           ]}
           action={{
             label: running === "pipeline" ? "Running…" : "Run AFL Pipeline",
-            onClick: () => runRpc("Running AFL Pipeline…", "pipeline", "run_neeko_pipeline_orchestrator"),
+            onClick: () => runAdminCommand("Running AFL Pipeline…", "pipeline", "run_full_pipeline"),
             disabled: running !== null,
           }}
         />
@@ -445,7 +433,7 @@ export default function AdminPipelines() {
           ]}
           action={{
             label: running === "rankings" ? "Running…" : "Refresh Rankings Cache",
-            onClick: () => runRpc("Refreshing Rankings Cache…", "rankings", "refresh_player_rankings_cache"),
+            onClick: () => runAdminCommand("Refreshing Rankings Cache…", "rankings", "refresh_rankings"),
             disabled: running !== null,
           }}
         />
@@ -470,7 +458,7 @@ export default function AdminPipelines() {
           ]}
           action={{
             label: running === "ai" ? "Running…" : "Run AI Worker (1 batch)",
-            onClick: () => runRpc("Running AI Worker…", "ai", "run_ai_worker_batch"),
+            onClick: () => runAdminCommand("Running AI Worker…", "ai", "run_ai_worker"),
             disabled: running !== null,
           }}
         />
@@ -488,7 +476,7 @@ export default function AdminPipelines() {
           ]}
           action={{
             label: running === "mw" ? "Running…" : "Refresh Market Watch",
-            onClick: () => runRpc("Refreshing Market Watch…", "mw", "refresh_market_watch"),
+            onClick: () => runAdminCommand("Refreshing Market Watch…", "mw", "refresh_market_watch"),
             disabled: running !== null,
           }}
         />
