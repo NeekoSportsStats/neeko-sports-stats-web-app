@@ -243,19 +243,45 @@ export default function MarketWatchPage() {
   const fetchData = useCallback(async (premium: boolean) => {
     setDataLoading(true);
     try {
-      const [playersRes, summaryRes, statusRes] = await Promise.all([
-        premium
-          ? supabase.from("v_mw_premium").select("*").limit(600)
-          : supabase.from("v_mw_premium").select("*")
-              .in("category", ["buy_before_rise", "cash_cow", "upgrade_target", "sell_before_drop", "fade_trap", "monitor"])
-              .order("trade_score", { ascending: false })
-              .limit(80),
-        supabase.from("v_mw_summary").select("*").maybeSingle(),
-        supabase.from("v_mw_status").select("*").maybeSingle(),
-      ]);
-      setPlayers((playersRes.data ?? []) as MWPlayerRow[]);
-      if (summaryRes.data) setSummary(summaryRes.data as MWSummary);
-      if (statusRes.data) setStatus(statusRes.data as MWStatus);
+      if (premium) {
+        const [playersRes, summaryRes, statusRes] = await Promise.all([
+          supabase.from("v_mw_premium").select("*").limit(600),
+          supabase.from("v_mw_summary").select("*").maybeSingle(),
+          supabase.from("v_mw_status").select("*").maybeSingle(),
+        ]);
+        setPlayers((playersRes.data ?? []) as MWPlayerRow[]);
+        if (summaryRes.data) setSummary(summaryRes.data as MWSummary);
+        if (statusRes.data) setStatus(statusRes.data as MWStatus);
+      } else {
+        // Fetch each category separately so no category is starved by a global limit.
+        // Premium users see all data; free users see up to 20 per category (shown 3, rest locked).
+        const FREE_CAT_LIMIT = 20;
+        const categories: Array<{ cat: string; order: string; asc: boolean }> = [
+          { cat: "sell_before_drop", order: "expected_price_change", asc: true },
+          { cat: "buy_before_rise",  order: "expected_price_change", asc: false },
+          { cat: "upgrade_target",   order: "value_score",           asc: false },
+          { cat: "cash_cow",         order: "expected_price_change", asc: false },
+          { cat: "fade_trap",        order: "trade_score",           asc: false },
+        ];
+        const [catResults, summaryRes, statusRes] = await Promise.all([
+          Promise.all(
+            categories.map(({ cat, order, asc }) =>
+              supabase
+                .from("v_mw_premium")
+                .select("*")
+                .eq("category", cat)
+                .order(order, { ascending: asc })
+                .limit(FREE_CAT_LIMIT)
+            )
+          ),
+          supabase.from("v_mw_summary").select("*").maybeSingle(),
+          supabase.from("v_mw_status").select("*").maybeSingle(),
+        ]);
+        const combined = catResults.flatMap(r => (r.data ?? []) as MWPlayerRow[]);
+        setPlayers(combined);
+        if (summaryRes.data) setSummary(summaryRes.data as MWSummary);
+        if (statusRes.data) setStatus(statusRes.data as MWStatus);
+      }
     } finally {
       setDataLoading(false);
     }
@@ -1691,12 +1717,22 @@ function FreeUserView({
       desc: "Budget pick building fast cash",
       isSell: false,
     },
+    {
+      players: traps,
+      label: "Traps",
+      dot: "bg-orange-400",
+      labelColor: "text-orange-400",
+      desc: "Premium players not worth the price",
+      isSell: false,
+    },
   ];
 
   const lockedPlayers = [
     ...sells.slice(FREE_SECTION_VISIBLE, FREE_SECTION_VISIBLE + 2),
     ...upgrades.slice(FREE_SECTION_VISIBLE, FREE_SECTION_VISIBLE + 1),
     ...buyBeforeRise.slice(FREE_SECTION_VISIBLE, FREE_SECTION_VISIBLE + 1),
+    ...cashCows.slice(FREE_SECTION_VISIBLE, FREE_SECTION_VISIBLE + 1),
+    ...traps.slice(FREE_SECTION_VISIBLE, FREE_SECTION_VISIBLE + 1),
   ];
 
   return (
@@ -1764,7 +1800,7 @@ function FreeUserView({
           <DollarSign className="h-4 w-4 text-[#F5C84C]/50" />
           <h2 className="text-[13px] font-extrabold uppercase tracking-[0.1em] text-white/65">This Week's Plan</h2>
         </div>
-        <p className="text-[10px] text-white/22 ml-6">One signal per category — unlock full depth with Premium</p>
+        <p className="text-[10px] text-white/22 ml-6">Top signals across 5 categories — unlock full depth with Premium</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
@@ -1776,13 +1812,12 @@ function FreeUserView({
             </div>
             <p className="text-[10px] text-white/20 pl-3.5 -mt-1 mb-0.5">{desc}</p>
 
-            {/* SELL LOGIC FIX: only show NoSellsCard when zero sell signals */}
             {isSell && sells.length === 0 ? (
               <NoSellsCard />
             ) : players.length === 0 ? (
               <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] px-4 py-4 text-center">
-                <p className="text-[11px] font-semibold text-white/22">No signal this week</p>
-                <p className="text-[10px] text-white/13 mt-0.5">Hold — no action needed</p>
+                <p className="text-[11px] font-semibold text-white/22">No signal this week — hold</p>
+                <p className="text-[10px] text-white/13 mt-0.5">No action needed in this category</p>
               </div>
             ) : (
               <div className="flex flex-col gap-2">
