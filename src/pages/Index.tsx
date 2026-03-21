@@ -246,6 +246,18 @@ function teamAbbr(team: string) {
 
 // ─── Model Accuracy ───────────────────────────────────────────────────────────
 
+function formatRelativeTime(isoString: string | null): string | null {
+  if (!isoString) return null;
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins  = Math.floor(diff / 60_000);
+  const hours = Math.floor(diff / 3_600_000);
+  const days  = Math.floor(diff / 86_400_000);
+  if (mins < 2)   return "just now";
+  if (mins < 60)  return `${mins} minutes ago`;
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
 interface AccuracyRow {
   players_analysed: number | null;
   avg_error: number | null;
@@ -254,6 +266,8 @@ interface AccuracyRow {
   within_15: number | null;
   within_20: number | null;
   latest_round: number | null;
+  total_predictions: number | null;
+  last_updated_at: string | null;
   source: string | null;
 }
 
@@ -529,8 +543,16 @@ function ModelAccuracySection() {
 
         <div className="flex items-center justify-center gap-2 text-xs text-neutral-500 mt-3">
           <Database size={11} className="shrink-0" />
-          <span>Model evaluated on 9,866 historical AFL player projections</span>
+          {hasData && row?.total_predictions != null
+            ? <span>Model evaluated on {row.total_predictions.toLocaleString()} AFL player projections · 2026 season</span>
+            : <span>Accuracy data building as rounds complete</span>
+          }
         </div>
+        {hasData && row?.last_updated_at && (
+          <p className="text-center text-[10px] text-white/18 mt-1">
+            Data updated {formatRelativeTime(row.last_updated_at)}
+          </p>
+        )}
 
         <div className="flex items-center justify-between mt-6 p-4 border border-[#F5C84C]/20 rounded-lg gap-4">
           <p className="text-sm text-white/40 leading-relaxed">
@@ -1092,7 +1114,12 @@ function OutcomeProofSection() {
                     </div>
                   );
                 })
-              : null
+              : (
+                <div className="col-span-3 rounded-2xl border border-white/[0.07] bg-[#0e0e0e] p-8 text-center">
+                  <p className="text-sm font-semibold text-white/30">Accuracy data building...</p>
+                  <p className="text-xs text-white/18 mt-1">Examples will appear once round results are processed.</p>
+                </div>
+              )
           }
         </div>
 
