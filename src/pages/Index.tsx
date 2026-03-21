@@ -782,7 +782,7 @@ function EdgeBoardPreview() {
         .from("v_edge_board_safe")
         .select("player_name, team, position, neeko_rating, projection_final, ceiling_estimate, projection_confidence, risk_rating, upside_rating")
         .order("neeko_rating", { ascending: false })
-        .limit(25);
+        .limit(50);
 
       type RankedEdgeRow = EdgeRow & { _rank: number };
       const rows: RankedEdgeRow[] = ((data ?? []) as EdgeRow[]).map((r, i) => ({ ...r, _rank: i + 1 }));
