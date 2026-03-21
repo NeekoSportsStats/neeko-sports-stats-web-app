@@ -3,7 +3,7 @@ import { Search, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 interface PlayerOption {
-  player_id: string;
+  player_id: string | number;
   player_name: string;
   team: string | null;
   position: string | null;
@@ -15,8 +15,47 @@ interface PlayerOption {
 interface StartSitSelectorProps {
   label: string;
   value: PlayerOption | null;
-  excludeId?: string | null;
+  excludeId?: string | number | null;
   onChange: (player: PlayerOption | null) => void;
+}
+
+async function fetchPlayers(
+  query: string,
+  excludeId: string | number | null | undefined,
+): Promise<PlayerOption[]> {
+  const trimmed = query.trim();
+
+  const { data, error } = await supabase.rpc("search_available_players", {
+    p_query: trimmed,
+    p_limit: 20,
+  });
+
+  if (error) {
+    console.error("[StartSitSelector] search error:", error.message);
+    return [];
+  }
+
+  const rows = (data ?? []) as Array<{
+    player_id: number;
+    player_name: string;
+    team: string | null;
+    player_pos: string | null;
+    projection_final: string | number | null;
+    neeko_rating: string | number | null;
+  }>;
+
+  console.log("[StartSitSelector]", { query: trimmed || "(top players)", rows: rows.length });
+
+  return rows
+    .map((p) => ({
+      player_id: p.player_id,
+      player_name: p.player_name,
+      team: p.team ?? null,
+      position: p.player_pos ?? null,
+      projection_final: p.projection_final != null ? Number(p.projection_final) : null,
+      neeko_rating: p.neeko_rating != null ? Number(p.neeko_rating) : null,
+    }))
+    .filter((p) => String(p.player_id) !== String(excludeId ?? ""));
 }
 
 export function StartSitSelector({ label, value, excludeId, onChange }: StartSitSelectorProps) {
@@ -25,9 +64,11 @@ export function StartSitSelector({ label, value, excludeId, onChange }: StartSit
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -40,40 +81,45 @@ export function StartSitSelector({ label, value, excludeId, onChange }: StartSit
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  useEffect(() => {
-    if (query.length < 2) {
-      setResults([]);
-      setActiveIndex(-1);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      const { data } = await supabase.rpc("search_available_players", {
-        p_query: query,
-        p_limit: 12,
-      });
-      setLoading(false);
-      setActiveIndex(-1);
-      const mapped = ((data ?? []) as any[]).map((p) => ({
-        player_id: p.player_id,
-        player_name: p.player_name,
-        team: p.team ?? null,
-        position: p.player_pos ?? null,
-        projection_final: p.projection_final != null ? Number(p.projection_final) : null,
-        neeko_rating: p.neeko_rating != null ? Number(p.neeko_rating) : null,
-      }));
-      setResults(mapped.filter((p) => p.player_id !== excludeId));
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [query, excludeId]);
+  const runSearch = useCallback(
+    (q: string) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(async () => {
+        setLoading(true);
+        setActiveIndex(-1);
+        const players = await fetchPlayers(q, excludeId);
+        setResults(players);
+        setLoading(false);
+      }, 300);
+    },
+    [excludeId],
+  );
 
-  const select = useCallback((player: PlayerOption) => {
-    onChange(player);
-    setQuery("");
-    setResults([]);
-    setOpen(false);
-    setActiveIndex(-1);
-  }, [onChange]);
+  useEffect(() => {
+    if (!open) return;
+    runSearch(query);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query, open, runSearch]);
+
+  const handleFocus = useCallback(() => {
+    setOpen(true);
+    if (results.length === 0 && !loading) {
+      runSearch(query);
+    }
+  }, [results.length, loading, query, runSearch]);
+
+  const select = useCallback(
+    (player: PlayerOption) => {
+      onChange(player);
+      setQuery("");
+      setResults([]);
+      setOpen(false);
+      setActiveIndex(-1);
+    },
+    [onChange],
+  );
 
   function clear() {
     onChange(null);
@@ -106,8 +152,6 @@ export function StartSitSelector({ label, value, excludeId, onChange }: StartSit
     }
   }, [activeIndex]);
 
-  const showDropdown = open && query.length >= 2;
-
   return (
     <div ref={containerRef} className="relative w-full">
       <p className="text-[11px] font-semibold uppercase tracking-widest text-white/35 mb-2">{label}</p>
@@ -127,27 +171,39 @@ export function StartSitSelector({ label, value, excludeId, onChange }: StartSit
             </p>
           </div>
           <div className="shrink-0 flex items-center gap-1.5">
-            <span className="text-[10px] text-white/20 group-hover:text-white/40 transition-colors hidden sm:inline">Change</span>
+            <span className="text-[10px] text-white/20 group-hover:text-white/40 transition-colors hidden sm:inline">
+              Change
+            </span>
             <X size={13} className="text-white/30 group-hover:text-white/60 transition-colors" />
           </div>
         </button>
       ) : (
         <div className="relative">
-          <Search size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+          <Search
+            size={13}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none"
+          />
           <input
             ref={inputRef}
             type="text"
             value={query}
             placeholder="Search player..."
-            onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-            onFocus={() => setOpen(true)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setOpen(true);
+            }}
+            onFocus={handleFocus}
             onKeyDown={handleKeyDown}
             className="w-full rounded-xl border border-white/10 bg-white/[0.04] pl-9 pr-9 py-3.5 text-sm text-white placeholder:text-white/25 outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all"
             autoComplete="off"
           />
           {query.length > 0 && (
             <button
-              onClick={() => { setQuery(""); setResults([]); inputRef.current?.focus(); }}
+              onClick={() => {
+                setQuery("");
+                runSearch("");
+                inputRef.current?.focus();
+              }}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50 transition-colors"
             >
               <X size={12} />
@@ -156,7 +212,7 @@ export function StartSitSelector({ label, value, excludeId, onChange }: StartSit
         </div>
       )}
 
-      {showDropdown && (
+      {open && (
         <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-white/[0.08] bg-[#111] shadow-2xl overflow-hidden">
           {loading ? (
             <div className="flex items-center gap-2.5 px-4 py-3.5">
@@ -170,12 +226,22 @@ export function StartSitSelector({ label, value, excludeId, onChange }: StartSit
             </div>
           ) : (
             <div ref={listRef} className="max-h-60 overflow-y-auto overscroll-contain">
+              {query.trim() === "" && (
+                <p className="px-4 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-widest text-white/20">
+                  Top Players
+                </p>
+              )}
               {results.map((p, i) => (
                 <button
                   key={p.player_id}
-                  onMouseDown={(e) => { e.preventDefault(); select(p); }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    select(p);
+                  }}
                   onMouseEnter={() => setActiveIndex(i)}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors border-b border-white/[0.04] last:border-0 ${activeIndex === i ? "bg-white/[0.08]" : "hover:bg-white/[0.05]"}`}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors border-b border-white/[0.04] last:border-0 ${
+                    activeIndex === i ? "bg-white/[0.08]" : "hover:bg-white/[0.05]"
+                  }`}
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-white truncate">{p.player_name}</p>
