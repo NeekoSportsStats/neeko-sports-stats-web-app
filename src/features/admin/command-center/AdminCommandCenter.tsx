@@ -63,11 +63,11 @@ function ActionButton({ action, onComplete }: { action: ActionDef; onComplete?: 
     setLastStatus("idle");
     try {
       const res = await runCommand(action.command, action.payload);
-      if (res.success) {
+      if (res.ok) {
         setLastStatus("success");
         toast({
           title: `${action.label} started`,
-          description: res.duration_ms ? `Completed in ${res.duration_ms}ms` : "Running in background",
+          description: res.message ?? (res.duration_ms ? `Completed in ${res.duration_ms}ms` : "Running in background"),
         });
         onComplete?.();
       } else {
@@ -203,8 +203,8 @@ function ApplyFantasyPricesCard({
     setLastResult(null);
     try {
       const res = await runCommand("apply_fantasy_prices");
-      if (res.success) {
-        const data = res.data as ApplyPricesResult | undefined;
+      if (res.ok) {
+        const data = res.result as ApplyPricesResult | undefined;
         setLastResult(data ?? null);
         setResultStatus("success");
         toast({
@@ -478,7 +478,19 @@ export default function AdminCommandCenter() {
     fetchAll();
     fetchCommandLogs();
     const interval = setInterval(fetchAll, 60_000);
-    return () => clearInterval(interval);
+
+    const onRefresh = () => {
+      setTimeout(() => {
+        fetchAll();
+        fetchCommandLogs();
+      }, 1500);
+    };
+    window.addEventListener("neeko:refresh", onRefresh);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("neeko:refresh", onRefresh);
+    };
   }, [fetchAll, fetchCommandLogs]);
 
   const overallHealth: HealthStatus = !status ? "loading"
@@ -631,58 +643,58 @@ export default function AdminCommandCenter() {
 
         {/* AI TAB */}
         <TabsContent value="ai" className="space-y-4 mt-4">
-          <p className="text-xs text-muted-foreground">Control AI generation for player analyses, rankings, and summaries. All buttons call admin-command → generate-* edge functions.</p>
+          <p className="text-xs text-muted-foreground">Control AI generation for player analyses, rankings, and summaries. All buttons call admin-command → backend RPCs.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <ActionCard
               icon={Bot}
-              title="AI Worker"
-              description="Drains the AI generation queue — processes player analysis and ranking reco jobs."
+              title="AI Pipeline"
+              description="Runs the full Neeko AI pipeline — enqueues and processes all player analysis jobs."
               status={toLevel(status?.ai_health)}
               statusLabel={status?.queue_pending != null ? `${status.queue_pending} pending` : "Unknown"}
               detail={`${status?.queue_failed ?? 0} failed · ${status?.queue_complete?.toLocaleString() ?? "—"} complete`}
               loading={loading}
               onComplete={handleComplete}
               actions={[
-                { key: "worker", label: "Run AI Worker Batch", variant: "default", command: "run_ai_worker" },
-                { key: "generate-all", label: "Generate All AI", command: "generate_all_ai" },
+                { key: "worker", label: "Run AI Pipeline", variant: "default", command: "run_ai_pipeline" },
+                { key: "wave", label: "Fire AI Worker Wave", command: "run_ai_wave" },
               ]}
             />
             <ActionCard
               icon={Zap}
-              title="Ranking Recommendations"
-              description="Enqueues ranking recommendation AI jobs for all players."
+              title="Enqueue AI Jobs"
+              description="Enqueues ranking recommendation and analysis jobs for all players needing updates."
               status={toLevel(status?.queue_health)}
               statusLabel={`${status?.reco_rows?.toLocaleString() ?? "—"} recos`}
               detail={status?.reco_last_updated ? `Last updated: ${formatDate(status.reco_last_updated)}` : undefined}
               loading={loading}
               onComplete={handleComplete}
               actions={[
-                { key: "enqueue-recos", label: "Enqueue Reco Jobs", variant: "default", command: "enqueue_reco_jobs" },
-                { key: "generate-ranking", label: "Run Ranking AI", command: "generate_ranking_ai" },
+                { key: "enqueue-recos", label: "Enqueue All Jobs", variant: "default", command: "enqueue_all_ai" },
               ]}
             />
             <ActionCard
               icon={Bot}
-              title="Player Analysis"
-              description="Generates individual AI analysis for all players missing summaries."
+              title="Truncate AI Text"
+              description="Clears summaries and explanations but keeps all player records intact. Ready for fresh regeneration."
               status={toLevel(status?.ai_health)}
               statusLabel={`${status?.ai_missing_players ?? "—"} missing`}
               loading={loading}
               onComplete={handleComplete}
               actions={[
-                { key: "player-ai", label: "Generate Player AI", variant: "default", command: "generate_player_ai" },
+                { key: "truncate-ai", label: "Truncate AI (Keep Structure)", variant: "outline", command: "truncate_ai_text" },
+                { key: "clear-failed", label: "Clear Failed Jobs", command: "clear_failed_ai_jobs" },
               ]}
             />
             <ActionCard
               icon={TrendingUp}
-              title="Market Watch AI"
-              description="Generates AI summary for the Market Watch page."
-              status={toLevel(status?.market_watch_health)}
-              statusLabel="Summary"
+              title="Regenerate All AI"
+              description="Deletes all existing AI rows then triggers the full AI pipeline and worker wave. Use after major data changes."
+              status={toLevel(status?.ai_health)}
+              statusLabel="Nuclear option"
               loading={loading}
               onComplete={handleComplete}
               actions={[
-                { key: "mw-ai", label: "Generate Market Watch Summary", command: "generate_market_watch_ai" },
+                { key: "regen-all", label: "Regenerate All AI", variant: "default", command: "regenerate_all_ai" },
               ]}
             />
           </div>
@@ -715,7 +727,7 @@ export default function AdminCommandCenter() {
               loading={loading}
               onComplete={handleComplete}
               actions={[
-                { key: "accuracy", label: "Refresh Accuracy", variant: "default", command: "refresh_projections" },
+                { key: "accuracy", label: "Refresh Accuracy", variant: "default", command: "refresh_accuracy" },
               ]}
             />
             <ActionCard
