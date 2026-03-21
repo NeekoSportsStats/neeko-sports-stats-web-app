@@ -130,6 +130,26 @@ Deno.serve(async (req: Request) => {
       return ok({ command, message: "AI summaries cleared — records preserved, ready for regeneration", duration_ms: durationMs });
     }
 
+    // ── Special: truncate + regenerate AI (safe one-click reset) ─────────────
+    if (command === "truncate_and_regenerate_ai") {
+      const { data: result, error } = await supabase.rpc("truncate_and_regenerate_ai");
+      const durationMs = Date.now() - startedAt;
+
+      console.log({ event: "admin-command", command, timestamp, success: !error, duration_ms: durationMs });
+
+      if (error) {
+        console.error("truncate_and_regenerate_ai error:", error);
+        return fail(error.message, { command, duration_ms: durationMs });
+      }
+
+      return ok({
+        command,
+        message: "AI summaries cleared and regeneration started",
+        result,
+        duration_ms: durationMs,
+      });
+    }
+
     // ── Special: regenerate all AI (delete + re-pipeline) ────────────────────
     if (command === "regenerate_all_ai") {
       const { error: deleteError } = await supabase.schema("ai" as never)

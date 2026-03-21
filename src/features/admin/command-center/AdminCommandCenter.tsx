@@ -687,6 +687,18 @@ export default function AdminCommandCenter() {
             />
             <ActionCard
               icon={TrendingUp}
+              title="Truncate + Rebuild AI"
+              description="Clears all AI summaries and regenerates them immediately. Safe — keeps player records, fires 200-player wave, refreshes rankings cache."
+              status={toLevel(status?.ai_health)}
+              statusLabel="One-click reset"
+              loading={loading}
+              onComplete={handleComplete}
+              actions={[
+                { key: "truncate-regen", label: "Truncate + Rebuild AI", variant: "default", command: "truncate_and_regenerate_ai" },
+              ]}
+            />
+            <ActionCard
+              icon={TrendingUp}
               title="Regenerate All AI"
               description="Deletes all existing AI rows then triggers the full AI pipeline and worker wave. Use after major data changes."
               status={toLevel(status?.ai_health)}
