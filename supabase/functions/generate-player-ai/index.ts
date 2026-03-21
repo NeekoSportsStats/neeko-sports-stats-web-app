@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const BATCH_SIZE = 5;
 const DEFAULT_MAX_PLAYERS = 20;
-const PROMPT_VERSION = "generate-player-ai-v5";
+const PROMPT_VERSION = "generate-player-ai-v6";
 const MAX_RETRY_ATTEMPTS = 2;
 
 // ── BANNED PHRASES ─────────────────────────────────────────────────────────
@@ -82,31 +82,31 @@ Tone: clear and firm. Do NOT frame this positively.`,
 
 function buildSystemPrompt(recommendation: string): string {
   const tone = RECOMMENDATION_TONE[recommendation.toUpperCase()] ?? `RECOMMENDATION = ${recommendation}`;
-  return `You are Neeko, an elite AFL fantasy analyst. You write sharp, data-grounded player summaries for fantasy coaches.
+  return `You are Neeko, an elite AFL fantasy analyst. You write sharp, opinionated, data-grounded player summaries for fantasy coaches.
 
 ${tone}
 
-YOUR ONLY JOB: Explain WHY the ${recommendation.toUpperCase()} recommendation is correct using ONLY the data provided. Every sentence must support the recommendation.
+YOUR ONLY JOB: Explain WHY the ${recommendation.toUpperCase()} recommendation is correct using ONLY the data provided. Every sentence must support the recommendation. Be direct and decisive — no hedging.
 
 ━━ STRICT OUTPUT RULES ━━
 
-SHORT (1 sentence, max 100 chars):
+SHORT (1 sentence, max 110 chars):
 - Lead with the player name and the single strongest signal for the ${recommendation} call
-- Must reference a specific number (projection, value_score, ceiling, floor, price, or form_score)
+- Must reference a specific number (projection, value_score, ceiling, floor, price, confidence, or form_score)
 - Must be unique to this player's actual numbers — not a template
 - ${recommendation.toUpperCase() === "SELL" ? "MUST express a clear negative signal — declining form, overpriced, soft ceiling, risky. Never neutral." : ""}
 
-WHY (1–2 sentences, max 130 chars total):
+WHY (1–2 sentences, max 140 chars total):
 - The single most important quantitative reason for the ${recommendation} rating
-- Concise, decision-focused, player-specific
+- Concise, decision-focused, player-specific. If signals are provided, reference the most relevant one.
 
 LONG (exactly 5 sentences):
-1. Projection context: projection_final vs ceiling vs floor — what range does this player live in?
-2. Form and consistency: form_score, consistency — is this trending up, stable, or declining?
-3. Value and price: value_score, value_tag, price — is this player good value, fair, or overpriced?
-4. Risk and upside: risk, upside_pct, confidence — what's the ceiling scenario vs downside risk?
-5. Matchup context: matchup_label, matchup_rating, venue_multiplier — does the opponent or venue help or hurt?
-Each sentence MUST reference actual numbers from the data. Analyst voice. No filler.
+1. Projection context: projection_final vs ceiling vs floor — what range does this player live in? Is it tight or wide?
+2. Form and trend: form_score, trend_direction, consistency — is this player trending UP, FLAT, or DOWN?
+3. Value and price: value_score, value_tag, price, price_change — is this player good value, fair, or overpriced?
+4. Risk and confidence: risk, confidence, confidence_label — what is the confidence tier and what drives the risk?
+5. Signals and matchup: use signal_tags (if provided) and matchup_label — name specific signals that support the call.
+Each sentence MUST reference actual numbers or named signals from the data. Analyst voice. No filler.
 
 ━━ BANNED PHRASES (NEVER use) ━━
 "this round", "fantasy coaches should", "coaches should", "based on current projections",
@@ -115,18 +115,19 @@ Each sentence MUST reference actual numbers from the data. Analyst voice. No fil
 ${recommendation.toUpperCase() === "SELL" ? '\nFOR SELL — also banned: "great form", "solid buy", "strong option", "must-start", "strong performer", "reliable output", "promising projection"' : ""}
 
 ━━ VARIATION RULES ━━
-- Each player MUST have a distinct opening line — never reuse sentence structure from other players
+- Each player MUST have a distinct opening line — never reuse sentence structure
 - Sentence order in LONG can vary — lead with the most interesting signal for this specific player
 - Avoid starting multiple sentences with "His", "He", or the player name
+- When signals are provided, name them directly (e.g. "the breakout_candidate signal" or "flagged as underpriced_elite")
 
 ━━ RESPONSE FORMAT — return ONLY valid JSON ━━
 {
-  "short": "<one sentence ≤100 chars — player name + strongest ${recommendation} signal + specific number>",
-  "why": "<1–2 sentences ≤130 chars — primary quantitative reason for ${recommendation}>",
-  "long": "<exactly 5 sentences — projection/form/value/risk/matchup — all with real numbers>"
+  "short": "<one sentence ≤110 chars — player name + strongest ${recommendation} signal + specific number>",
+  "why": "<1–2 sentences ≤140 chars — primary quantitative reason for ${recommendation}, referencing signals if present>",
+  "long": "<exactly 5 sentences — projection/trend/value/confidence/signals — all with real numbers or named signals>"
 }
 
-BEFORE RESPONDING: re-read your output. Does every sentence support ${recommendation.toUpperCase()}? Does "short" contain a number? Is "long" exactly 5 sentences? Have you avoided all banned phrases?`;
+BEFORE RESPONDING: re-read your output. Does every sentence support ${recommendation.toUpperCase()}? Does "short" contain a number? Is "long" exactly 5 sentences? Have you avoided all banned phrases? Are you being decisive and opinionated?`;
 }
 
 // ── TYPES ───────────────────────────────────────────────────────────────────
@@ -148,6 +149,7 @@ interface PlayerRow {
   floor: number | null;
   risk: number | null;
   confidence: number | null;
+  confidence_label: string | null;
   consistency: number | null;
   value_score: number | null;
   value_tag: string | null;
@@ -165,6 +167,11 @@ interface PlayerRow {
   captain_rating: string | null;
   ai_recommendation: string | null;
   recommendation_strength: string | null;
+  price_change: number | null;
+  price_change_pct: number | null;
+  signal_count: number | null;
+  top_signals: string[] | null;
+  trend_direction: string | null;
   input_hash: string | null;
   needs_regen: boolean;
 }
@@ -397,13 +404,15 @@ Deno.serve(async (req: Request) => {
       .select([
         "player_id", "player_name", "team", "position",
         "price", "projection_final", "ceiling", "floor",
-        "risk", "confidence", "consistency",
+        "risk", "confidence", "confidence_label", "consistency",
         "value_score", "value_tag", "best_value_score",
         "matchup_rating", "matchup_label", "venue_multiplier",
         "form_score", "neeko_rating", "neeko_rating_scaled",
         "games_played", "upside_rating", "upside_pct",
         "captain_score", "captain_rating",
         "ai_recommendation", "recommendation_strength",
+        "price_change", "price_change_pct",
+        "signal_count", "top_signals", "trend_direction",
         "input_hash", "needs_regen",
       ].join(","))
       .limit(limitPlayers);
@@ -448,22 +457,28 @@ Deno.serve(async (req: Request) => {
             team:                    player.team,
             position:                player.position,
             price:                   player.price,
+            price_change:            player.price_change,
             projection_final:        player.projection_final,
             ceiling:                 player.ceiling,
             floor:                   player.floor,
             consistency:             player.consistency,
             form_score:              player.form_score,
+            trend_direction:         player.trend_direction,
             value_score:             player.value_score,
             value_tag:               player.value_tag,
             matchup_label:           player.matchup_label,
             matchup_rating:          player.matchup_rating,
+            venue_multiplier:        player.venue_multiplier,
             risk:                    player.risk,
             confidence:              player.confidence,
+            confidence_label:        player.confidence_label,
             neeko_rating_scaled:     player.neeko_rating_scaled,
             upside_pct:              player.upside_pct,
             captain_score:           player.captain_score,
             captain_rating:          player.captain_rating,
             games_played:            player.games_played,
+            signal_count:            player.signal_count,
+            signal_tags:             (player.top_signals ?? []).slice(0, 3),
             model_recommendation:    recommendation,
             recommendation_strength: player.recommendation_strength,
           };
