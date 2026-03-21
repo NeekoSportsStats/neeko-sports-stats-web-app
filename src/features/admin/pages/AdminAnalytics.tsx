@@ -75,7 +75,29 @@ export default function AdminAnalytics() {
   const [revenueEstimate, setRevenueEstimate] = useState<RevenueEstimate | null>(null);
   const [growthLoading, setGrowthLoading] = useState(false);
 
+  const [liveFunnel, setLiveFunnel] = useState<{
+    page_views: number;
+    cta_clicks: number;
+    subscriptions: number;
+    unique_sessions: number;
+    unique_subscribers: number;
+  } | null>(null);
+  const [liveFunnelLoading, setLiveFunnelLoading] = useState(false);
+
   const hasLoaded = useRef(false);
+
+  const fetchLiveFunnel = useCallback(async () => {
+    setLiveFunnelLoading(true);
+    try {
+      const { data, error } = await supabase.rpc("get_analytics_funnel_7d" as never);
+      if (!error && data) {
+        const row = Array.isArray(data) ? data[0] : data;
+        setLiveFunnel(row ?? null);
+      }
+    } finally {
+      setLiveFunnelLoading(false);
+    }
+  }, []);
 
   const fetchAnalytics = useCallback(async () => {
     setAnalyticsLoading(true);
@@ -166,20 +188,21 @@ export default function AdminAnalytics() {
   const loadTab = useCallback((tab: AnalyticsTab) => {
     if (loadedTabs.current.has(tab)) return;
     loadedTabs.current.add(tab);
-    if (tab === "usage") { fetchAnalytics(); fetchV2Metrics(); }
+    if (tab === "usage") { fetchAnalytics(); fetchV2Metrics(); fetchLiveFunnel(); }
     if (tab === "product") fetchProductMetrics();
     if (tab === "growth") fetchGrowthMetrics();
-  }, [fetchAnalytics, fetchProductMetrics, fetchV2Metrics, fetchGrowthMetrics]);
+  }, [fetchAnalytics, fetchProductMetrics, fetchV2Metrics, fetchGrowthMetrics, fetchLiveFunnel]);
 
   const fetchAll = useCallback(() => {
     loadedTabs.current.clear();
     fetchAnalytics();
     fetchV2Metrics();
+    fetchLiveFunnel();
     if (activeTab === "product") fetchProductMetrics();
     if (activeTab === "growth") fetchGrowthMetrics();
     loadedTabs.current.add(activeTab);
     if (activeTab === "usage") { loadedTabs.current.add("usage"); }
-  }, [activeTab, fetchAnalytics, fetchProductMetrics, fetchV2Metrics, fetchGrowthMetrics]);
+  }, [activeTab, fetchAnalytics, fetchProductMetrics, fetchV2Metrics, fetchGrowthMetrics, fetchLiveFunnel]);
 
   useEffect(() => {
     if (!hasLoaded.current) {
@@ -253,6 +276,36 @@ export default function AdminAnalytics() {
           <StatRow label="Upgrade clicks" value={analytics7d?.upgrade_clicks?.toLocaleString() ?? "0"} highlight={(analytics7d?.upgrade_clicks ?? 0) > 0 ? "good" : "neutral"} />
           <StatRow label="Subscriptions started" value={analytics7d?.subscriptions?.toLocaleString() ?? "0"} highlight={(analytics7d?.subscriptions ?? 0) > 0 ? "good" : "neutral"} />
           <StatRow label="Unique logged-in users" value={analytics7d?.unique_users_7d?.toLocaleString() ?? "0"} />
+        </SectionCard>
+      </div>
+
+      {/* Live Funnel (7d) — from analytics.events */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <SectionCard icon={ArrowUpRight} title="Live Funnel — 7 Days" loading={liveFunnelLoading}>
+          <StatRow label="Page views" value={liveFunnel?.page_views?.toLocaleString() ?? "—"} />
+          <StatRow label="CTA clicks" value={liveFunnel?.cta_clicks?.toLocaleString() ?? "—"} highlight={(liveFunnel?.cta_clicks ?? 0) > 0 ? "good" : "neutral"} />
+          <StatRow label="Subscriptions" value={liveFunnel?.subscriptions?.toLocaleString() ?? "—"} highlight={(liveFunnel?.subscriptions ?? 0) > 0 ? "good" : "neutral"} />
+          {liveFunnel && liveFunnel.cta_clicks > 0 && (
+            <div className="mt-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-center">
+              <span className="text-xl font-bold text-emerald-400 tabular-nums">
+                {((liveFunnel.subscriptions / liveFunnel.cta_clicks) * 100).toFixed(1)}%
+              </span>
+              <p className="text-xs text-muted-foreground mt-0.5">click → sub conversion</p>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard icon={Users} title="Live Sessions — 7 Days" loading={liveFunnelLoading}>
+          <StatRow label="Unique sessions" value={liveFunnel?.unique_sessions?.toLocaleString() ?? "—"} />
+          <StatRow label="Unique subscribers" value={liveFunnel?.unique_subscribers?.toLocaleString() ?? "—"} highlight={(liveFunnel?.unique_subscribers ?? 0) > 0 ? "good" : "neutral"} />
+          {liveFunnel && liveFunnel.unique_sessions > 0 && (
+            <div className="mt-3 rounded-lg bg-blue-500/10 border border-blue-500/20 px-3 py-2 text-center">
+              <span className="text-xl font-bold text-blue-400 tabular-nums">
+                {((liveFunnel.unique_subscribers / liveFunnel.unique_sessions) * 100).toFixed(1)}%
+              </span>
+              <p className="text-xs text-muted-foreground mt-0.5">sessions → subscriber rate</p>
+            </div>
+          )}
         </SectionCard>
       </div>
 

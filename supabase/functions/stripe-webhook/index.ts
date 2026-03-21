@@ -75,7 +75,19 @@ async function handleEvent(event: Stripe.Event) {
         }
         break;
       }
-      case 'customer.subscription.created':
+      case 'customer.subscription.created': {
+        const sub = event.data.object as Stripe.Subscription;
+        if (sub.customer) {
+          await syncCustomerFromStripe(sub.customer as string);
+          await trackAnalyticsEvent('subscription_created', null, {
+            customer_id: sub.customer as string,
+            plan: sub.items?.data?.[0]?.price?.id ?? null,
+            status: sub.status,
+            interval: sub.items?.data?.[0]?.price?.recurring?.interval ?? null,
+          });
+        }
+        break;
+      }
       case 'customer.subscription.updated': {
         const sub = event.data.object as Stripe.Subscription;
         if (sub.customer) {
@@ -243,6 +255,30 @@ async function deactivateProfile(userId: string, customerId: string) {
     console.error(`Failed to deactivate profile for user ${userId}:`, error);
   } else {
     console.log(`Profile deactivated for user: ${userId}`);
+  }
+}
+
+async function trackAnalyticsEvent(
+  eventName: string,
+  userId: string | null,
+  metadata: Record<string, unknown> = {}
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .schema('analytics' as never)
+      .from('events' as never)
+      .insert({
+        event_name: eventName,
+        user_id: userId ?? null,
+        session_id: null,
+        page: null,
+        metadata,
+      } as never);
+    if (error) {
+      console.warn(`[analytics] trackAnalyticsEvent(${eventName}) failed:`, error.message);
+    }
+  } catch (err: any) {
+    console.warn(`[analytics] trackAnalyticsEvent(${eventName}) threw:`, err?.message);
   }
 }
 
