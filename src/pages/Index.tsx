@@ -50,6 +50,7 @@ interface EdgeRow {
   projection_confidence: number | null;
   risk_rating: number | null;
   upside_rating: number | null;
+  signal_type: "captain" | "breakout" | "trap";
 }
 
 // ─── Static data ──────────────────────────────────────────────────────────────
@@ -755,7 +756,6 @@ interface EdgeSignal {
   accentColor: string;
   icon: typeof Star;
   row: EdgeRow;
-  rank: number;
 }
 
 function edgeConfLabel(conf: number | null): { label: string; color: string } {
@@ -772,6 +772,14 @@ function riskLabelEdge(risk: number | null): { label: string; color: string } {
   return               { label: "Low",  color: "text-green-400" };
 }
 
+const SIGNAL_META: Record<"captain" | "breakout" | "trap", { label: string; desc: string; accentColor: string; icon: typeof Star }> = {
+  captain: { label: "Captain Lock",     desc: "Top captain pick — highest model score with strong confidence.",        accentColor: "#F5C84C", icon: Crown },
+  breakout: { label: "Must Have Value", desc: "Best value play — strong upside relative to price and projection.",     accentColor: "#34d399", icon: TrendingUp },
+  trap:     { label: "Do Not Start",    desc: "High-ranked player carrying elevated risk — fade with caution.",        accentColor: "#f87171", icon: AlertTriangle },
+};
+
+const SIGNAL_ORDER: Array<"captain" | "breakout" | "trap"> = ["captain", "breakout", "trap"];
+
 function EdgeBoardPreview() {
   const [signals, setSignals] = useState<EdgeSignal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -780,12 +788,9 @@ function EdgeBoardPreview() {
     (async () => {
       const { data } = await supabase
         .from("v_edge_board_safe")
-        .select("player_name, team, position, neeko_rating, projection_final, ceiling_estimate, projection_confidence, risk_rating, upside_rating")
-        .order("neeko_rating", { ascending: false })
-        .limit(50);
+        .select("player_name, team, position, neeko_rating, projection_final, ceiling_estimate, projection_confidence, risk_rating, upside_rating, signal_type");
 
-      type RankedEdgeRow = EdgeRow & { _rank: number };
-      const rows: RankedEdgeRow[] = ((data ?? []) as EdgeRow[]).map((r, i) => ({ ...r, _rank: i + 1 }));
+      const rows = (data ?? []) as EdgeRow[];
 
       if (rows.length === 0) {
         setSignals([]);
@@ -793,29 +798,12 @@ function EdgeBoardPreview() {
         return;
       }
 
-      const top10 = rows.slice(0, 10);
-      const top25 = rows;
-
-      const captain = [...top10].sort((a, b) => (b.ceiling_estimate ?? 0) - (a.ceiling_estimate ?? 0))[0];
-
-      const breakout = [...top25].sort((a, b) =>
-        ((b.ceiling_estimate ?? 0) - (b.projection_final ?? 0)) -
-        ((a.ceiling_estimate ?? 0) - (a.projection_final ?? 0))
-      )[0];
-
-      const trap = [...top25].sort((a, b) => (a.projection_confidence ?? 100) - (b.projection_confidence ?? 100))[0];
-
-      const built: EdgeSignal[] = [];
-
-      if (captain) {
-        built.push({ type: "captain", label: "Captain Lock", desc: "Top projection with high ceiling and confidence.", accentColor: "#F5C84C", icon: Crown, row: captain, rank: captain._rank });
-      }
-      if (breakout) {
-        built.push({ type: "breakout", label: "Must Have Value", desc: "High upside relative to projection — strong value play.", accentColor: "#34d399", icon: TrendingUp, row: breakout, rank: breakout._rank });
-      }
-      if (trap) {
-        built.push({ type: "trap", label: "Do Not Start", desc: "High-ranked player with low confidence — fade this week.", accentColor: "#f87171", icon: AlertTriangle, row: trap, rank: trap._rank });
-      }
+      const built: EdgeSignal[] = SIGNAL_ORDER.flatMap((type) => {
+        const row = rows.find((r) => r.signal_type === type);
+        if (!row) return [];
+        const meta = SIGNAL_META[type];
+        return [{ type, label: meta.label, desc: meta.desc, accentColor: meta.accentColor, icon: meta.icon, row }];
+      });
 
       setSignals(built);
       setLoading(false);
@@ -836,7 +824,7 @@ function EdgeBoardPreview() {
           {loading
             ? [0, 1, 2].map((i) => <EdgeCardSkeleton key={i} />)
             : signals.map((signal) => {
-                const { label, desc, accentColor, icon: Icon, row, rank, type } = signal;
+                const { label, desc, accentColor, icon: Icon, row, type } = signal;
                 const conf = edgeConfLabel(row.projection_confidence);
                 const risk = riskLabelEdge(row.risk_rating);
                 const upside = row.ceiling_estimate != null && row.projection_final != null
@@ -883,7 +871,9 @@ function EdgeBoardPreview() {
                       ) : (
                         <EdgeStatRow label="Confidence" value={conf.label} valueColor={conf.color} />
                       )}
-                      <EdgeStatRow label="Neeko Rank" value={`#${rank}`} valueColor="text-white/40" />
+                      {row.neeko_rating != null && (
+                        <EdgeStatRow label="Neeko Rating" value={`${Math.round(row.neeko_rating)}`} valueColor="text-white/40" />
+                      )}
                     </div>
                   </div>
                 );
