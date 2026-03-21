@@ -155,8 +155,19 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
                 </span>
               )}
             </div>
-            <div className="text-[9px] text-white/30 truncate mt-px max-w-[100px]">
-              {row.team}{row.position ? ` · ${row.position}` : ""}
+            <div className="flex items-center gap-1 flex-wrap mt-px">
+              <span className="text-[9px] text-white/30 truncate max-w-[100px]">
+                {row.team}{row.position ? ` · ${row.position}` : ""}
+              </span>
+              {row.status === "OUT" && (
+                <span className="shrink-0 rounded-sm bg-red-500/15 px-1 py-px text-[7px] font-semibold text-red-400 uppercase tracking-wide border border-red-500/20">INJ</span>
+              )}
+              {row.status === "TEST" && (
+                <span className="shrink-0 rounded-sm bg-orange-500/15 px-1 py-px text-[7px] font-semibold text-orange-400 uppercase tracking-wide border border-orange-500/20">TEST</span>
+              )}
+              {row.status === "OMITTED" && (
+                <span className="shrink-0 rounded-sm bg-white/10 px-1 py-px text-[7px] font-semibold text-white/40 uppercase tracking-wide border border-white/15">OUT</span>
+              )}
             </div>
           </div>
         </div>
