@@ -52,6 +52,12 @@ export interface RankingRow {
   status: string | null;
   /** Derived boolean — false when status = 'OUT' */
   is_available: boolean | null;
+  /** Bye round number for this player's team (e.g. 13, 14, 15) */
+  bye_round: number | null;
+  /** True when the player's team has a bye next round */
+  is_bye: boolean | null;
+  /** True when the player's team has a bye in two rounds */
+  bye_next_round: boolean | null;
 }
 
 export interface ScoreHistoryPoint {

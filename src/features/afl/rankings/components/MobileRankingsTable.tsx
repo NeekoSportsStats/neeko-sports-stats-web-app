@@ -159,6 +159,12 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
               <span className="text-[9px] text-white/30 truncate max-w-[100px]">
                 {row.team}{row.position ? ` · ${row.position}` : ""}
               </span>
+              {row.is_bye && (
+                <span className="shrink-0 rounded-sm bg-sky-500/15 px-1 py-px text-[7px] font-semibold text-sky-400 uppercase tracking-wide border border-sky-500/20">BYE</span>
+              )}
+              {!row.is_bye && row.bye_next_round && (
+                <span className="shrink-0 rounded-sm bg-sky-500/10 px-1 py-px text-[7px] font-semibold text-sky-500/50 uppercase tracking-wide border border-sky-500/15">BYE R{row.bye_round}</span>
+              )}
               {row.status === "OUT" && (
                 <span className="shrink-0 rounded-sm bg-red-500/15 px-1 py-px text-[7px] font-semibold text-red-400 uppercase tracking-wide border border-red-500/20">INJ</span>
               )}
@@ -196,7 +202,10 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
         </div>
 
         <div className={`${CELL_BASE} justify-center`} style={{ width: COL.projection, minWidth: COL.projection }}>
-          <span className="text-sm font-semibold text-[#F5C84C]/80 tabular-nums">{fmt(row.projection_final, 0)}</span>
+          {row.is_bye
+            ? <span className="text-sm font-semibold text-white/20 tabular-nums">—</span>
+            : <span className="text-sm font-semibold text-[#F5C84C]/80 tabular-nums">{fmt(row.projection_final, 0)}</span>
+          }
         </div>
         <div className={`${CELL_BASE} justify-center flex-col gap-0.5`} style={{ width: COL.confidence, minWidth: COL.confidence }}>
           {(() => {

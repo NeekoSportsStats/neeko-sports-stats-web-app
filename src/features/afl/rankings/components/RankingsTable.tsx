@@ -138,6 +138,12 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-semibold text-white">{row.player_name}</span>
+            {row.is_bye && (
+              <span className="rounded-sm bg-sky-500/15 px-1 py-0.5 text-[9px] font-semibold text-sky-400 uppercase tracking-wide border border-sky-500/20">BYE</span>
+            )}
+            {!row.is_bye && row.bye_next_round && (
+              <span className="rounded-sm bg-sky-500/10 px-1 py-0.5 text-[9px] font-semibold text-sky-500/60 uppercase tracking-wide border border-sky-500/15">BYE R{row.bye_round}</span>
+            )}
             {row.status === "OUT" && (
               <span className="rounded-sm bg-red-500/15 px-1 py-0.5 text-[9px] font-semibold text-red-400 uppercase tracking-wide border border-red-500/20">INJURED</span>
             )}
@@ -171,7 +177,10 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
         </div>
       </td>
       <td className="px-4 py-4 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
-        <span className="text-sm font-semibold text-[#F5C84C]/75 tabular-nums">{fmt(row.projection_final)}</span>
+        {row.is_bye
+          ? <span className="text-sm font-semibold text-white/20 tabular-nums">—</span>
+          : <span className="text-sm font-semibold text-[#F5C84C]/75 tabular-nums">{fmt(row.projection_final)}</span>
+        }
       </td>
       <td className="px-4 py-4 text-center whitespace-nowrap" style={{ width: 100, minWidth: 90 }}>
         {(() => {

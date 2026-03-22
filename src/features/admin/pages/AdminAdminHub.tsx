@@ -1,17 +1,19 @@
 import { lazy, Suspense, useState } from "react";
-import { RefreshCw, ListTodo, ClipboardList, Flag, BookOpen, ScrollText } from "lucide-react";
+import { RefreshCw, ListTodo, ClipboardList, BookOpen, ScrollText, CalendarOff } from "lucide-react";
 import { AdminSectionIntro } from "@/features/admin/shared/AdminExplain";
 
 const AdminTodoPage      = lazy(() => import("@/features/admin/pages/AdminTodo"));
 const AdminTasksPage     = lazy(() => import("@/features/admin/pages/AdminFounderTasks"));
 const DataPipelinePage   = lazy(() => import("@/features/admin/DataPipelineStatusPage"));
+const AdminByeManager    = lazy(() => import("@/features/admin/pages/AdminByeManager"));
 
-type Tab = "tasks" | "todo" | "pipeline-history" | "logs";
+type Tab = "tasks" | "todo" | "pipeline-history" | "logs" | "byes";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "tasks",            label: "Founder Tasks",     icon: ClipboardList },
   { id: "todo",             label: "To Do",             icon: ListTodo },
   { id: "pipeline-history", label: "Pipeline History",  icon: ScrollText },
+  { id: "byes",             label: "Bye Manager",       icon: CalendarOff },
   { id: "logs",             label: "Internal Notes",    icon: BookOpen },
 ];
 
@@ -84,6 +86,7 @@ export default function AdminAdminHub() {
         {tab === "tasks"            && <AdminTasksPage />}
         {tab === "todo"             && <AdminTodoPage />}
         {tab === "pipeline-history" && <DataPipelinePage />}
+        {tab === "byes"             && <AdminByeManager />}
         {tab === "logs"             && <InternalNotesTab />}
       </Suspense>
     </div>
