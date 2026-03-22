@@ -272,7 +272,7 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
           {locked("why") ? (
             <LockedPlaceholder onUpgrade={onUpgrade} />
           ) : (
-            <span className="text-[11px] text-white/50 leading-tight line-clamp-2 py-2">
+            <span className="text-[11px] text-white/50 leading-tight line-clamp-2 py-2 max-w-[140px]">
               {row.why ?? "—"}
             </span>
           )}

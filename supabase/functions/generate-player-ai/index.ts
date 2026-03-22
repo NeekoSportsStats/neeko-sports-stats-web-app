@@ -21,7 +21,7 @@ function getCorsHeaders(req: Request): Record<string, string> {
 
 const BATCH_SIZE = 5;
 const DEFAULT_MAX_PLAYERS = 20;
-const PROMPT_VERSION = "generate-player-ai-v12";
+const PROMPT_VERSION = "generate-player-ai-v13";
 const MAX_RETRY_ATTEMPTS = 2;
 
 // ── BANNED PHRASES ─────────────────────────────────────────────────────────
@@ -460,9 +460,9 @@ async function callOpenAIWithPrompt(
         `Use only these numbers — do not invent any:\n${JSON.stringify(playerData, null, 2)}`,
       ].join("\n\n")
     : [
-        `Write a ${recommendation.toUpperCase()} explanation for this AFL fantasy player.`,
+        `Write a data-driven player profile for this AFL fantasy player.`,
         `Return exactly 2 fields: "why" (1 sentence with a number) and "long" (exactly 5 sentences).`,
-        `Every sentence must justify the ${recommendation.toUpperCase()} recommendation using only these numbers — do not invent any:\n${JSON.stringify(playerData, null, 2)}`,
+        `Describe the player's scoring profile, value, and risk using only these numbers — do not invent any. Do NOT output the words buy, sell, hold, start, or sit:\n${JSON.stringify(playerData, null, 2)}`,
       ].join("\n\n");
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -519,7 +519,7 @@ async function callOpenAIWithPrompt(
       { role: "assistant", content: content },
       {
         role: "user",
-        content: `Your response has these issues that MUST be fixed:\n${validation.issues.map((i, n) => `${n + 1}. ${i}`).join("\n")}\n\nRewrite and return corrected JSON. Pay special attention to the ${isBye ? "BYE" : recommendation.toUpperCase()} tone requirements.`,
+        content: `Your response has these issues that MUST be fixed:\n${validation.issues.map((i, n) => `${n + 1}. ${i}`).join("\n")}\n\nRewrite and return corrected JSON. Remember: do NOT output buy, sell, hold, start, or sit — describe the player profile in data terms only.`,
       },
     ];
 
