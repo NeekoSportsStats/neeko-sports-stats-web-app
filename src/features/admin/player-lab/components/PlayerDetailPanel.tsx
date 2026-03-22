@@ -231,15 +231,16 @@ export function PlayerDetailPanel({
         </div>
       )}
 
-      {player.recommendation_short && (
+      {/* AI Summary */}
+      {player.ai_summary && (
         <div className="space-y-1.5">
-          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Why</div>
-          <p className="text-muted-foreground leading-relaxed">{player.recommendation_short}</p>
+          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">AI Summary</div>
+          <p className="text-muted-foreground leading-relaxed">{player.ai_summary}</p>
         </div>
       )}
       {player.recommendation_why && (
         <div className="space-y-1.5">
-          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Full Analysis</div>
+          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Recommendation Rationale</div>
           <p className="text-muted-foreground leading-relaxed">{player.recommendation_why}</p>
         </div>
       )}

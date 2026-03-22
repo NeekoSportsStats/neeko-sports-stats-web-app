@@ -19,7 +19,7 @@ interface RankingRow {
   projection_confidence: number | null;
   upside_rating: number | null;
   captain_score: number | null;
-  why: string | null;
+  ai_summary: string | null;
   price: number | null;
   value_tag: string | null;
 }
@@ -455,8 +455,8 @@ function VerdictBlock({
 
   const aiText = (() => {
     if (!isPremium) return null;
-    const a = playerA.why;
-    const b = playerB.why;
+    const a = playerA.ai_summary;
+    const b = playerB.ai_summary;
     if (!a && !b) return null;
     const parts: string[] = [];
     if (a) parts.push(`${playerA.player_name}: ${a.slice(0, 160)}${a.length > 160 ? "…" : ""}`);

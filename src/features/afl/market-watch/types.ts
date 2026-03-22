@@ -85,8 +85,6 @@ export interface MWStatus {
 export type MovementLabel = "BIG_RISE" | "RISE" | "FLAT" | "DROP" | "BIG_DROP";
 export type MoverSignal = "BUY_BEFORE_RISE" | "RISING" | "TRAP" | "FALLING" | "FLAT";
 
-export type { DerivedPlayer as MarketRow } from "./engine";
-
 export interface ProjectedMover {
   player_id: number;
   player_name: string;
