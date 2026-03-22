@@ -65,7 +65,7 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const { data, error } = await supabase.rpc("commit_price_ingest", {
+      const { data, error } = await supabase.rpc("commit_price_round", {
         p_season: season,
         p_round: round,
         p_rows: rows,
