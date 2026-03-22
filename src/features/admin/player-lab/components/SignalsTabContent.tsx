@@ -352,7 +352,7 @@ export function SignalsTabContent() {
                           </div>
                         ) : <span className="text-muted-foreground">—</span>}
                       </td>
-                      <td className="px-3 py-2"><RecoBadge color={r.recommendation_color} short={r.summary_short} /></td>
+                      <td className="px-3 py-2"><RecoBadge color={r.recommendation_color} short={r.recommendation_short} /></td>
                     </tr>
                   ))}
                 </tbody>

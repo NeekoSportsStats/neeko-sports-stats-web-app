@@ -130,8 +130,8 @@ function PriceFullTable() {
     { key: "value_score",      label: "Value" },
     { key: "projection_final", label: "Proj" },
     { key: "neeko_rating",     label: "Rating" },
-    { key: "summary_short", label: "Reco" },
-    { key: "edit",          label: "Edit" },
+    { key: "recommendation_short", label: "Reco" },
+    { key: "edit",             label: "Edit" },
   ];
 
   return (
@@ -248,7 +248,7 @@ function PriceFullTable() {
                     <td className="px-2 py-2 tabular-nums text-amber-400">{fmtNum(r.value_score, 2)}</td>
                     <td className="px-2 py-2 tabular-nums">{fmtNum(r.projection_final, 0)}</td>
                     <td className="px-2 py-2 tabular-nums">{fmtNum(r.neeko_rating, 0)}</td>
-                    <td className="px-2 py-2"><RecoBadge color={r.recommendation_color} short={r.summary_short} /></td>
+                    <td className="px-2 py-2"><RecoBadge color={r.recommendation_color} short={r.recommendation_short} /></td>
                     <td className="px-2 py-2">
                       {isEditing ? (
                         <div className="flex gap-1">

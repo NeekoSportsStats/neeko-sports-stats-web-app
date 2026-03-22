@@ -44,7 +44,7 @@ interface PlayerRow {
   ai_recommendation: string;
   recommendation_strength: string;
   recommendation_color: string;
-  summary_short: string;
+  recommendation_short: string;
   market_watch_category: string;
   best_value_score: number;
 }
@@ -73,7 +73,7 @@ interface RankingsSourceRow {
   value_score: number;
   captain_score: number;
   ai_recommendation: string;
-  summary_short: string;
+  recommendation_short: string;
   recommendation_strength: string;
   recommendation_color: string;
   market_watch_category: string;
@@ -238,7 +238,7 @@ function PlayersTab({ players, loading, onRefresh }: {
                   <td className="py-1.5 pr-3 text-right tabular-nums">{fmtNum(p.neeko_rating, 0)}</td>
                   <td className="py-1.5 pr-3 text-right text-muted-foreground text-xs">{fmtPrice(p.price)}</td>
                   <td className="py-1.5 pr-3"><RatingBadge label={p.value_tag} /></td>
-                  <td className="py-1.5"><RatingBadge label={p.summary_short || p.ai_recommendation} /></td>
+                  <td className="py-1.5"><RatingBadge label={p.recommendation_short || p.ai_recommendation} /></td>
                 </tr>
               ))}
             </tbody>
@@ -365,7 +365,7 @@ function RankingsSourceTab({ players, loading }: { players: PlayerRow[]; loading
                 <td className="py-1.5 pr-3 text-right tabular-nums">{fmtNum(p.captain_score, 0)}</td>
                 <td className="py-1.5 pr-3 text-right tabular-nums">{fmtNum(p.best_value_score, 1)}</td>
                 <td className="py-1.5 pr-3"><RatingBadge label={p.ai_recommendation} /></td>
-                <td className="py-1.5 pr-3 text-xs text-muted-foreground max-w-[200px] truncate">{p.summary_short || "—"}</td>
+                <td className="py-1.5 pr-3 text-xs text-muted-foreground max-w-[200px] truncate">{p.recommendation_short || "—"}</td>
                 <td className="py-1.5 text-xs">{p.market_watch_category || "—"}</td>
               </tr>
             ))}
@@ -533,7 +533,7 @@ export default function AdminPlayersIntelligence() {
     try {
       const { data } = await supabase
         .from("v_rankings_master")
-        .select("player_id,player_name,team,position,projection_final,projection,ceiling,floor,price,neeko_rating,value_score,value_tag,consistency,form_score,captain_score,captain_rating,upside_rating,upside_pct,risk_rating,matchup_rating,matchup_multiplier,ai_recommendation,recommendation_strength,recommendation_color,summary_short,market_watch_category,best_value_score")
+        .select("player_id,player_name,team,position,projection_final,projection,ceiling,floor,price,neeko_rating,value_score,value_tag,consistency,form_score,captain_score,captain_rating,upside_rating,upside_pct,risk_rating,matchup_rating,matchup_multiplier,ai_recommendation,recommendation_strength,recommendation_color,recommendation_short,market_watch_category,best_value_score")
         .limit(800);
       if (data) setPlayers(data as PlayerRow[]);
     } finally {

@@ -352,7 +352,7 @@ export function sharpenAIText(
   if (out.startsWith("{") || out.startsWith("[")) {
     try {
       const parsed = JSON.parse(out) as Record<string, string>;
-      out = parsed.long ?? parsed.why ?? out;
+      out = parsed.analysis ?? parsed.recommendation_long ?? parsed.recommendation_short ?? out;
     } catch {
       // not valid JSON — leave as-is
     }

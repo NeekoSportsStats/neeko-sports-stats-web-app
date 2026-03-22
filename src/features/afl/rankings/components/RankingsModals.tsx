@@ -843,14 +843,19 @@ export function PlayerDetailModal({
             </div>
           )}
 
-          {/* 2. WHY sentence */}
-          {unlocked && row.why && (
+          {/* 2. AI Recommendation card — label + WHY sentence */}
+          {unlocked && row.ai_recommendation && (
             <div
               className="rounded-lg border px-4 py-4"
-              style={{ background: `${recColor}12`, borderColor: `${recColor}30` }}
+              style={{ background: `${recColor}18`, borderColor: `${recColor}40` }}
             >
-              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5">Why</p>
-              <p className="text-sm text-white/80 leading-relaxed">{row.why}</p>
+              <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5">AI Recommendation</p>
+              <p className="text-base font-bold mb-2" style={{ color: recColor }}>
+                {row.ai_recommendation}
+              </p>
+              {row.why && (
+                <p className="text-sm text-white/70 leading-relaxed">{row.why}</p>
+              )}
             </div>
           )}
 
@@ -969,7 +974,7 @@ export function PlayerDetailModal({
           {/* 7. AI Analysis — short preview for free, full for premium */}
           {canSeeAI ? (() => {
             const aiCtx = { riskRating: row.risk_rating ?? null, confidence: row.projection_confidence ?? null };
-            const rawExtended = row.long ?? null;
+            const rawExtended = row.long ?? aiAnalysis?.analysis ?? null;
             const extendedText = sharpenAIText(rawExtended, aiCtx);
             const hasText = !loadingAI && extendedText && extendedText !== "Model analysis is currently generating.";
             const isStale = isAITextStale(rawExtended, {
