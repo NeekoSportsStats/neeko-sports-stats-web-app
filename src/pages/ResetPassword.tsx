@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
-import { Eye, EyeOff, ArrowLeft, CheckCircle, Trophy, Loader2 } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, CircleCheck as CheckCircle, Trophy, Loader as Loader2 } from "lucide-react";
 
 const ResetPassword = () => {
   const [password, setPassword] = useState("");
@@ -37,16 +37,11 @@ const ResetPassword = () => {
 
   useEffect(() => {
     const checkRecovery = async () => {
-      console.log("RESET → checking Supabase session for recovery");
-
       const { data } = await supabase.auth.getSession();
       const session = data.session;
 
       if (session?.user && session.user?.email) {
-        console.log("RESET → has recovery session user:", session.user.email);
         setTokenValid(true);
-      } else {
-        console.log("RESET → NO recovery session user");
       }
 
       setChecking(false);
@@ -72,7 +67,6 @@ const ResetPassword = () => {
     if (!tokenValid) return;
 
     if (isUpdatingRef.current) {
-      console.log("RESET → already updating, ignoring duplicate submit");
       return;
     }
 
@@ -98,13 +92,9 @@ const ResetPassword = () => {
     setLoading(true);
 
     try {
-      console.log("RESET → calling updateUser");
       const { data, error } = await supabase.auth.updateUser({ password });
-      console.log("RESET → updateUser result:", { data, error });
 
       if (error) throw error;
-
-      console.log("RESET → password update successful, showing success screen");
 
       setLoading(false);
       setSuccess(true);

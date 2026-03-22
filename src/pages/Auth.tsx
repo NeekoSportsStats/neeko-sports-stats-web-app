@@ -46,8 +46,11 @@ const Auth = () => {
 
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const redirect = searchParams.get("redirect") || "/";
   const { user } = useAuth();
+
+  const SAFE_REDIRECTS = new Set(["/", "/account", "/dashboard", "checkout", "account"]);
+  const rawRedirect = searchParams.get("redirect") || "/";
+  const redirect = SAFE_REDIRECTS.has(rawRedirect) ? rawRedirect : "/";
 
   // ⭐ FIXED REDIRECT BEHAVIOUR ⭐
   useEffect(() => {

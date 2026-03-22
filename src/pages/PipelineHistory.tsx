@@ -202,8 +202,6 @@ export default function PipelineHistory() {
     if (loading) return;
     if (!user) { navigate("/auth"); return; }
 
-    console.log("Admin check", user?.email);
-
     if (user.email === ADMIN_EMAIL) {
       setIsAdmin(true);
       setCheckingAdmin(false);

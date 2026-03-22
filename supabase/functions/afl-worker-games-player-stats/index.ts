@@ -18,6 +18,14 @@ Deno.serve(async (req: Request) => {
     const apiBase     = Deno.env.get("AFL_API_BASE_URL")!;
     const apiKey      = Deno.env.get("AFL_API_KEY")!;
 
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || authHeader !== `Bearer ${serviceKey}`) {
+      return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const db = createClient(supabaseUrl, serviceKey);
 
     const body        = req.method === "POST" ? await req.json().catch(() => ({})) : {};

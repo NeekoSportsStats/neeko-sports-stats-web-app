@@ -1,5 +1,5 @@
 // src/pages/ForgotPassword.tsx
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -17,10 +17,6 @@ export default function ForgotPassword() {
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    console.log("FORGOT → PAGE LOADED");
-    console.log("URL:", window.location.href);
-  }, []);
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,17 +33,13 @@ export default function ForgotPassword() {
 
     const redirectUrl = `${origin}/reset-password`;
 
-    console.log("FORGOT → Sending reset email with redirect:", redirectUrl);
-
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: redirectUrl,
     });
 
     if (error) {
-      console.log("FORGOT → ERROR:", error);
       setFormError(error.message || "Something went wrong.");
     } else {
-      console.log("FORGOT → Reset email sent ✔");
       setFormSuccess("Password reset email sent. Check your inbox.");
     }
 
