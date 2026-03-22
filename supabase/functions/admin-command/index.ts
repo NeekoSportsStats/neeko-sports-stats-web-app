@@ -57,6 +57,27 @@ Deno.serve(async (req: Request) => {
       const { data, error } = await supabase.rpc("run_neeko_pipeline");
       if (error) throw error;
       result = data;
+    } else if (command === "commit_price_ingest") {
+      const { season, round, rows } = payload;
+      if (!season || !round || !rows) {
+        return new Response(JSON.stringify({ error: "Missing required fields" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data, error } = await supabase.rpc("commit_price_ingest", {
+        p_season: season,
+        p_round: round,
+        p_rows: rows,
+      });
+      if (error) {
+        console.error("commit_price_ingest error:", error);
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      result = data;
     } else {
       return new Response(
         JSON.stringify({ error: `Unknown command: ${command}` }),
