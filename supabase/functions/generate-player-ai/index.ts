@@ -672,15 +672,14 @@ Deno.serve(async (req: Request) => {
           const now = new Date().toISOString();
 
           const { error: rpcErr } = await supabase.rpc("upsert_player_ai_analysis", {
-            p_player_id:            player.player_id,
-            p_recommendation:       recommendation,
-            p_recommendation_short: result.why,
-            p_recommendation_why:   result.long,
-            p_color:                null,
-            p_ai_summary:           result.long,
-            p_prompt_version:       PROMPT_VERSION,
-            p_input_hash:           player.input_hash ?? null,
-            p_stored_projection:    player.projection_final ?? null,
+            p_player_id:         player.player_id,
+            p_recommendation:    recommendation,
+            p_summary_short:     result.why,
+            p_summary_long:      result.long,
+            p_color:             null,
+            p_prompt_version:    PROMPT_VERSION,
+            p_input_hash:        player.input_hash ?? null,
+            p_stored_projection: player.projection_final ?? null,
           });
           if (rpcErr) throw rpcErr;
 
@@ -688,6 +687,8 @@ Deno.serve(async (req: Request) => {
             .schema("afl" as any)
             .from("player_rankings_cache")
             .update({
+              summary_short:        result.why,
+              summary_long:         result.long,
               recommendation_short: result.why,
               recommendation_why:   result.long,
               ai_summary:           result.long,
