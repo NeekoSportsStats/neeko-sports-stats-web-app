@@ -1,11 +1,23 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+const ALLOWED_ORIGINS = new Set([
+  "https://www.neekostats.com.au",
+  "https://neekostats.com.au",
+  "http://localhost:5173",
+  "http://localhost:3000",
+]);
+
+function getCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") ?? "";
+  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : "https://www.neekostats.com.au";
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+    "Vary": "Origin",
+  };
+}
 
 const CACHE_TTL_MS = 6 * 24 * 60 * 60 * 1000;
 const MODEL_VERSION = "v3";
@@ -47,6 +59,23 @@ interface StructuredAIOutput {
   sit_conditions: string[];
   play_style: "safe" | "upside" | "balanced";
   decision_context: "close" | "lean" | "clear" | "strong";
+}
+
+// In-memory rate limiter: max 3 requests per 10s per caller identity
+const RATE_WINDOW_MS = 10_000;
+const RATE_MAX_CALLS = 3;
+const callerCallLog = new Map<string, number[]>();
+
+function isRateLimited(callerId: string): { limited: boolean; retryIn: number } {
+  const now = Date.now();
+  const calls = (callerCallLog.get(callerId) ?? []).filter(t => now - t < RATE_WINDOW_MS);
+  if (calls.length >= RATE_MAX_CALLS) {
+    const oldest = calls[0];
+    return { limited: true, retryIn: Math.ceil((RATE_WINDOW_MS - (now - oldest)) / 1000) };
+  }
+  calls.push(now);
+  callerCallLog.set(callerId, calls);
+  return { limited: false, retryIn: 0 };
 }
 
 function compositeScore(p: PlayerData): number {
@@ -573,6 +602,7 @@ function toFrontendPlayer(p: PlayerData) {
 }
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
@@ -642,6 +672,16 @@ Deno.serve(async (req: Request) => {
         }
       } catch {
       }
+    }
+
+    // Rate limit: 3 requests per 10s per user (or IP for anon callers)
+    const callerId = userId ?? (req.headers.get("x-forwarded-for") ?? "anon");
+    const rateCheck = isRateLimited(callerId);
+    if (rateCheck.limited) {
+      return new Response(
+        JSON.stringify({ error: `Rate limit exceeded — please retry in ${rateCheck.retryIn} seconds` }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const body: StartSitRequest = await req.json();

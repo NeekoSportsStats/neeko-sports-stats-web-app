@@ -1,11 +1,23 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+const ALLOWED_ORIGINS = new Set([
+  "https://www.neekostats.com.au",
+  "https://neekostats.com.au",
+  "http://localhost:5173",
+  "http://localhost:3000",
+]);
+
+function getCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") ?? "";
+  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : "https://www.neekostats.com.au";
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+    "Vary": "Origin",
+  };
+}
 
 const PIPELINE_COMMANDS = new Set([
   "run_full_pipeline",
@@ -14,6 +26,22 @@ const PIPELINE_COMMANDS = new Set([
   "refresh_market_watch",
   "run_neeko_pipeline",
 ]);
+
+// In-memory cooldown: pipeline commands throttled to once per 30s, others 10s
+const PIPELINE_COOLDOWN_MS = 30_000;
+const DEFAULT_COOLDOWN_MS  = 10_000;
+const lastCommandAt = new Map<string, number>();
+
+function checkCooldown(command: string): { blocked: boolean; retryIn: number } {
+  const cooldown = PIPELINE_COMMANDS.has(command) ? PIPELINE_COOLDOWN_MS : DEFAULT_COOLDOWN_MS;
+  const last = lastCommandAt.get(command) ?? 0;
+  const elapsed = Date.now() - last;
+  if (elapsed < cooldown) {
+    return { blocked: true, retryIn: Math.ceil((cooldown - elapsed) / 1000) };
+  }
+  lastCommandAt.set(command, Date.now());
+  return { blocked: false, retryIn: 0 };
+}
 
 const COMMAND_MAP: Record<string, { fn: string; args?: Record<string, unknown> }> = {
   // ── Pipeline ──────────────────────────────────────────────────────────────
@@ -79,13 +107,15 @@ function fail(message: string, data: Record<string, unknown> = {}, status = 500)
 }
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    if (!authHeader || authHeader !== `Bearer ${serviceKey}`) {
       return fail("Unauthorized", {}, 401);
     }
 
@@ -94,15 +124,24 @@ Deno.serve(async (req: Request) => {
     const payload = body?.payload ?? {};
     const timestamp = new Date().toISOString();
 
-    console.log({ event: "admin-command", command, timestamp, payload_keys: Object.keys(payload) });
-
     if (!command) {
       return fail("Missing command", {}, 400);
     }
 
+    const cooldown = checkCooldown(command);
+    if (cooldown.blocked) {
+      return fail(
+        `Rate limit exceeded — please retry in ${cooldown.retryIn} seconds`,
+        { command, retry_after_seconds: cooldown.retryIn },
+        429,
+      );
+    }
+
+    console.log({ event: "admin-command", command, timestamp, payload_keys: Object.keys(payload) });
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      serviceKey,
     );
 
     const startedAt = Date.now();
@@ -114,7 +153,6 @@ Deno.serve(async (req: Request) => {
         .update({
           summary_short: null,
           summary_long: null,
-          confidence: null,
           generated_at: null,
           input_hash: null,
         } as never)
