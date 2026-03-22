@@ -720,37 +720,17 @@ Deno.serve(async (req: Request) => {
           const now = new Date().toISOString();
 
           const { error: rpcErr } = await supabase.rpc("upsert_player_ai_analysis", {
-            p_player_id:            player.player_id,
-            p_recommendation:       recommendation,
-            p_recommendation_short: result.why,
-            p_recommendation_why:   result.long,
-            p_color:                null,
-            p_ai_summary:           result.long,
-            p_prompt_version:       PROMPT_VERSION,
-            p_input_hash:           player.input_hash ?? null,
-            p_stored_projection:    player.projection_final ?? null,
+            p_player_id:         player.player_id,
+            p_summary_short:     result.why,
+            p_summary_long:      result.long,
+            p_recommendation:    recommendation,
+            p_color:             null,
+            p_prompt_version:    PROMPT_VERSION,
+            p_input_hash:        player.input_hash ?? null,
+            p_stored_projection: player.projection_final ?? null,
           });
           if (rpcErr) throw rpcErr;
-
-          const { error: cacheErr } = await supabase
-            .schema("afl" as any)
-            .from("player_rankings_cache")
-            .update({
-              recommendation_short: result.why,
-              recommendation_why:   result.long,
-              ai_summary:           result.long,
-              ai_updated_at:        now,
-              ai_prompt_version:    PROMPT_VERSION,
-              ai_validation_passed: validation.valid,
-              ai_generated_at:      now,
-            })
-            .eq("player_id", player.player_id);
-
-          if (cacheErr) {
-            console.warn(`[generate-player-ai] cache writeback failed ${player.player_name}:`, cacheErr.message);
-          } else {
-            saved++;
-          }
+          saved++;
         } catch (err) {
           const msg = err instanceof Error ? err.message : JSON.stringify(err);
           console.error(`[generate-player-ai] ${player.player_name} failed:`, msg);
