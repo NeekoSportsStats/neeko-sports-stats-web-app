@@ -48,14 +48,12 @@ export function logEvent(event: string, properties?: Record<string, unknown>) {
   const page = window.location.pathname;
 
   supabase
-    .schema("analytics" as never)
-    .from("events" as never)
-    .insert({
-      event_name: event,
-      session_id,
-      page,
-      metadata: properties ?? {},
-    } as never)
+    .rpc("log_analytics_event", {
+      p_event_name: event,
+      p_session_id: session_id,
+      p_page: page,
+      p_metadata: properties ?? {},
+    })
     .then(({ error }: { error: { message: string } | null }) => {
       if (error) {
         console.warn("[analytics] logEvent failed:", error.message);
