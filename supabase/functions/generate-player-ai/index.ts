@@ -666,6 +666,8 @@ Deno.serve(async (req: Request) => {
             p_color:                null,
             p_ai_summary:           result.long,
             p_prompt_version:       PROMPT_VERSION,
+            p_input_hash:           player.input_hash ?? null,
+            p_stored_projection:    player.projection_final ?? null,
           });
           if (rpcErr) throw rpcErr;
 
