@@ -55,6 +55,11 @@ const BANNED_ALWAYS = [
   "could",
   "might",
   "may",
+  "bye",
+  "rest week",
+  "unavailable",
+  "not playing",
+  "missing this week",
 ];
 const BANNED_OPENINGS = [
   "primed for a solid", "primed for a strong", "primed for a great",
@@ -98,55 +103,6 @@ Use phrases like: "shows", "confirms the risk", "drives the sit call".
 Tone: clear and firm. Do NOT frame this positively.`,
 };
 
-// ── BYE PROMPT BUILDER ──────────────────────────────────────────────────────
-
-function buildByeSystemPrompt(): string {
-  return `You are Neeko — an elite AFL fantasy analyst. This player's team has a BYE this round. The player is UNAVAILABLE and cannot be selected.
-
-Your ONLY job:
-→ Explain clearly that the player is unavailable due to their team's bye round
-→ Preserve medium-term fantasy value context so coaches know what to expect when they return
-→ Do NOT frame this player as a start, captain, or selection option for this round
-
-━━ OUTPUT STRUCTURE ━━
-
-WHY — EXACTLY 1 sentence, max 140 characters:
-- State clearly that the player is unavailable due to bye
-- Include the player's name and a relevant number (e.g. season average, projection, or price)
-- Do NOT recommend starting or captaining this player
-
-LONG — EXACTLY 5 sentences:
-Sentence 1 → Confirm the bye — player is unavailable for selection this round due to team bye.
-Sentence 2 → Season performance context: average, projection, or recent form numbers.
-Sentence 3 → Value and price context for when they return — is this player worth holding?
-Sentence 4 → Risk or role considerations for next available round.
-Sentence 5 → Medium-term outlook — what should coaches expect when the player returns?
-
-Rules for LONG:
-- Every sentence must reference actual numbers from the data provided
-- Do NOT suggest starting, captaining, or selecting the player this round
-- Do NOT use "this round" as a phrase — banned
-- Do NOT use hedging language: "could", "might", "may", "potentially"
-- Be direct and informative about bye + return value
-
-━━ BANNED PHRASES — NEVER USE ━━
-"this round", "fantasy coaches should", "coaches should", "based on current projections",
-"primed for", "worth noting", "overall,", "in conclusion", "in summary",
-"could", "might", "may", "potentially", "indicates", "suggests"
-
-━━ RESPONSE FORMAT — return ONLY valid JSON ━━
-{
-  "why": "<EXACTLY 1 sentence ≤140 chars — confirms BYE unavailability with a specific number>",
-  "long": "<EXACTLY 5 sentences — bye context + medium-term return value>"
-}
-
-FINAL CHECK before responding:
-1. Does "why" contain a specific number? (required)
-2. Is "long" exactly 5 sentences? (count carefully)
-3. Does the response make clear this player is unavailable due to bye?
-4. Have you avoided ALL banned phrases?`;
-}
-
 // ── PROMPT BUILDER ──────────────────────────────────────────────────────────
 
 function buildSystemPrompt(recommendation: string): string {
@@ -164,6 +120,8 @@ function buildSystemPrompt(recommendation: string): string {
     : `SIT alignment: Lead with the reason to sit — low projection, poor matchup, injury risk, or role concern. Clear and firm.`;
 
   return `You are Neeko — an elite AFL fantasy analyst. You do NOT generate recommendations. The model recommendation is already decided.
+
+Ignore bye rounds entirely. Always assume the player is available and analyse based on projected performance and next matchup.
 
 Your ONLY job:
 → Explain WHY the ${rec} recommendation is correct
@@ -293,9 +251,6 @@ interface PlayerRow {
   trend_direction: string | null;
   input_hash: string | null;
   needs_regen: boolean;
-  bye_round: number | null;
-  is_bye: boolean | null;
-  bye_next_round: boolean | null;
 }
 
 interface ValidationResult {
@@ -376,20 +331,13 @@ async function callOpenAIWithPrompt(
   systemPrompt: string,
   recommendation: string,
   playerData: Record<string, unknown>,
-  isBye: boolean = false,
   attempt: number = 0,
 ): Promise<{ result: AIResult | null; validation: ValidationResult | null; attempts: number }> {
-  const userContent = isBye
-    ? [
-        `Write a BYE explanation for this AFL fantasy player. Their team is on bye — they are UNAVAILABLE this round.`,
-        `Return exactly 2 fields: "why" (1 sentence with a number confirming bye unavailability) and "long" (exactly 5 sentences covering bye + return value context).`,
-        `Use only these numbers — do not invent any:\n${JSON.stringify(playerData, null, 2)}`,
-      ].join("\n\n")
-    : [
-        `Write a ${recommendation.toUpperCase()} explanation for this AFL fantasy player.`,
-        `Return exactly 2 fields: "why" (1 sentence with a number) and "long" (exactly 5 sentences).`,
-        `Every sentence must justify the ${recommendation.toUpperCase()} recommendation using only these numbers — do not invent any:\n${JSON.stringify(playerData, null, 2)}`,
-      ].join("\n\n");
+  const userContent = [
+    `Write a ${recommendation.toUpperCase()} explanation for this AFL fantasy player.`,
+    `Return exactly 2 fields: "why" (1 sentence with a number) and "long" (exactly 5 sentences).`,
+    `Every sentence must justify the ${recommendation.toUpperCase()} recommendation using only these numbers — do not invent any:\n${JSON.stringify(playerData, null, 2)}`,
+  ].join("\n\n");
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -439,13 +387,14 @@ async function callOpenAIWithPrompt(
   const validation = validateOutput(parsed, recommendation);
 
   if (!validation.valid && attempt < MAX_RETRY_ATTEMPTS) {
+    const issueList = validation.issues.map((issue, n) => `${n + 1}. ${issue}`).join("\n");
     const retryMessages = [
       { role: "system", content: systemPrompt },
       { role: "user", content: userContent },
       { role: "assistant", content: content },
       {
         role: "user",
-        content: `Your response has these issues that MUST be fixed:\n${validation.issues.map((i, n) => `${n + 1}. ${i}`).join("\n")}\n\nRewrite and return corrected JSON. Pay special attention to the ${isBye ? "BYE" : recommendation.toUpperCase()} tone requirements.`,
+        content: `Your response has these issues that MUST be fixed:\n${issueList}\n\nRewrite and return corrected JSON. Pay special attention to the ${recommendation.toUpperCase()} tone requirements.`,
       },
     ];
 
@@ -557,7 +506,6 @@ Deno.serve(async (req: Request) => {
         "price_change", "price_change_pct",
         "signal_count", "top_signals", "trend_direction",
         "input_hash", "needs_regen",
-        "bye_round", "is_bye", "bye_next_round",
       ].join(","))
       .limit(limitPlayers);
 
@@ -598,7 +546,6 @@ Deno.serve(async (req: Request) => {
       for (const player of batch) {
         try {
           const recommendation = player.ai_recommendation ?? "HOLD";
-          const isByePlayer = player.is_bye === true;
 
           const promptPayload = {
             player_name:             player.player_name,
@@ -629,19 +576,18 @@ Deno.serve(async (req: Request) => {
             signal_tags:             (player.top_signals ?? []).slice(0, 3),
             model_recommendation:    recommendation,
             recommendation_strength: player.recommendation_strength,
-            ...(isByePlayer ? { bye_round: player.bye_round, team_on_bye: true } : {}),
           };
 
           if (debugMode) {
-            debugData.push({ player_id: player.player_id, recommendation, is_bye: isByePlayer, prompt_payload: promptPayload });
+            debugData.push({ player_id: player.player_id, recommendation, prompt_payload: promptPayload });
           }
 
           let result: AIResult;
           let validation: ValidationResult = { valid: true, issues: [] };
 
           if (openaiKey) {
-            const systemPrompt = isByePlayer ? buildByeSystemPrompt() : buildSystemPrompt(recommendation);
-            const { result: res, validation: val, attempts } = await callOpenAIWithPrompt(openaiKey, systemPrompt, recommendation, promptPayload, isByePlayer);
+            const systemPrompt = buildSystemPrompt(recommendation);
+            const { result: res, validation: val, attempts } = await callOpenAIWithPrompt(openaiKey, systemPrompt, recommendation, promptPayload);
             if (!res) {
               errors.push(`${player.player_name}: null response from OpenAI`);
               failed++;
@@ -657,15 +603,10 @@ Deno.serve(async (req: Request) => {
             }
             processed++;
           } else {
-            result = isByePlayer
-              ? {
-                  why: `${player.player_name} is unavailable — team bye round ${player.bye_round}, season avg projection ${player.projection_final}.`,
-                  long: `${player.player_name}'s team is on bye and the player cannot be selected. Season projection sits at ${player.projection_final} between ceiling ${player.ceiling} and floor ${player.floor}. Priced at ${player.price} with value score ${player.value_score} — worth holding for return. Risk is ${player.risk} with confidence ${player.confidence} (${player.confidence_label}). Form score of ${player.form_score} signals what to expect when they return from bye.`,
-                }
-              : {
-                  why: `Proj ${player.projection_final}, value ${player.value_score ?? "N/A"}, risk ${player.risk ?? "N/A"}, form ${player.form_score ?? "N/A"}.`,
-                  long: `Projection of ${player.projection_final} sits between ceiling ${player.ceiling} and floor ${player.floor}. Form score is ${player.form_score} with value tag ${player.value_tag}. Priced at ${player.price} with value score ${player.value_score}. Risk is ${player.risk} with confidence ${player.confidence} (${player.confidence_label}). Matchup is ${player.matchup_label ?? "neutral"} — recommendation is ${recommendation}.`,
-                };
+            result = {
+              why: `Proj ${player.projection_final}, value ${player.value_score ?? "N/A"}, risk ${player.risk ?? "N/A"}, form ${player.form_score ?? "N/A"}.`,
+              long: `Projection of ${player.projection_final} sits between ceiling ${player.ceiling} and floor ${player.floor}. Form score is ${player.form_score} with value tag ${player.value_tag}. Priced at ${player.price} with value score ${player.value_score}. Risk is ${player.risk} with confidence ${player.confidence} (${player.confidence_label}). Matchup is ${player.matchup_label ?? "neutral"} — recommendation is ${recommendation}.`,
+            };
             processed++;
           }
 
