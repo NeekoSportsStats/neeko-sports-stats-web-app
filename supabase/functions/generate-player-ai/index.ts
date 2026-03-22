@@ -195,7 +195,7 @@ function validateOutput(result: AIResult, recommendation: string): ValidationRes
   if (!result.long || result.long.length < 100) issues.push("long field too short");
 
   const sentenceCount = (result.long?.match(/[.!?]+\s*/g) ?? []).length;
-  if (sentenceCount < 4 || sentenceCount > 7) {
+  if (sentenceCount < 4 || sentenceCount > 8) {
     issues.push(`long field has ${sentenceCount} sentences — expected ~5`);
   }
 
@@ -284,6 +284,13 @@ async function callOpenAI(
 
   const json = await res.json();
   const content = json.choices?.[0]?.message?.content?.trim();
+  console.log("[generate-player-ai] AI RESPONSE:", JSON.stringify({
+    status: res.status,
+    model: json.model,
+    usage: json.usage,
+    content_preview: content?.substring(0, 400),
+    finish_reason: json.choices?.[0]?.finish_reason,
+  }));
   if (!content) return { result: null, validation: null, attempts: attempt + 1 };
 
   let parsed: AIResult;
@@ -365,21 +372,23 @@ Deno.serve(async (req: Request) => {
     // Primary auth: service role JWT
     let isAuthorized = token === serviceRoleKey;
 
-    // Secondary auth: cron_auth_token stored in internal.cron_secrets
-    // This allows the DB pipeline to call us without the service role JWT
-    if (!isAuthorized && token.startsWith("neeko-cron-")) {
+    // Secondary auth: any known secret stored in internal.cron_secrets
+    // Covers both neeko-cron-* tokens AND sb_secret_* keys used by the DB pipeline
+    if (!isAuthorized && token.length > 10) {
       try {
         const adminClient = createClient(supabaseUrl, serviceRoleKey);
-        const { data: secretRow } = await adminClient
+        const { data: secrets } = await adminClient
           .schema("internal" as any)
           .from("cron_secrets")
           .select("value")
-          .eq("key", "cron_auth_token")
-          .maybeSingle();
-        if (secretRow?.value && token === secretRow.value) {
+          .in("key", ["cron_auth_token", "supabase_secret_key"]);
+        if (secrets?.some((row: { value: string }) => row.value === token)) {
           isAuthorized = true;
         }
-      } catch { /* auth fails closed */ }
+        console.log("[generate-player-ai] auth check — token_prefix:", token.substring(0, 12), "matched:", isAuthorized, "secrets_found:", secrets?.length ?? 0);
+      } catch (e) {
+        console.error("[generate-player-ai] auth DB lookup failed:", e instanceof Error ? e.message : String(e));
+      }
     }
 
     if (!isAuthorized) {
@@ -519,13 +528,15 @@ Deno.serve(async (req: Request) => {
           const now = new Date().toISOString();
 
           const { error: rpcErr } = await supabase.rpc("upsert_player_ai_analysis", {
-            p_player_id:      player.player_id,
-            p_recommendation: recommendation,
-            p_confidence:     65,
-            p_summary_short:  result.short,
-            p_summary_long:   summaryLong,
-            p_model:          "gpt-4o-mini",
-            p_input_hash:     player.input_hash ?? null,
+            p_player_id:         player.player_id,
+            p_recommendation:    recommendation,
+            p_confidence:        65,
+            p_summary_short:     result.short,
+            p_summary_long:      summaryLong,
+            p_model:             "gpt-4o-mini",
+            p_input_hash:        player.input_hash ?? null,
+            p_ai_input_snapshot: null,
+            p_prompt_version:    PROMPT_VERSION,
           });
           if (rpcErr) throw rpcErr;
 
