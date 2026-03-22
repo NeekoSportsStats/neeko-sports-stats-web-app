@@ -556,7 +556,7 @@ Deno.serve(async (req: Request) => {
           const { error: rpcErr } = await supabase.rpc("upsert_player_ai_analysis", {
             p_player_id:         player.player_id,
             p_recommendation:    recommendation,
-            p_confidence:        65,
+            p_confidence:        player.confidence ?? null,
             p_summary_short:     result.why,
             p_summary_long:      result.long,
             p_model:             "gpt-4o-mini",
