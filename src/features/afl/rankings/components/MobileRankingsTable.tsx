@@ -22,7 +22,7 @@ const COL = {
   price: 84,
   value: 90,
   aiRec: 100,
-  why: 260,
+  why: 180,
 } as const;
 
 // Only rank + player are sticky now
@@ -272,7 +272,7 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
           {locked("why") ? (
             <LockedPlaceholder onUpgrade={onUpgrade} />
           ) : (
-            <span className="text-xs text-white/50 leading-snug line-clamp-2 py-2">
+            <span className="text-[11px] text-white/50 leading-tight line-clamp-2 py-2">
               {row.why ?? "—"}
             </span>
           )}

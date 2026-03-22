@@ -21,7 +21,7 @@ function getCorsHeaders(req: Request): Record<string, string> {
 
 const BATCH_SIZE = 5;
 const DEFAULT_MAX_PLAYERS = 20;
-const PROMPT_VERSION = "generate-player-ai-v11";
+const PROMPT_VERSION = "generate-player-ai-v12";
 const MAX_RETRY_ATTEMPTS = 2;
 
 // ── BANNED PHRASES ─────────────────────────────────────────────────────────
@@ -90,40 +90,49 @@ const BANNED_OPENINGS = [
   "is a solid pick", "is a strong pick",
 ];
 
-// ── RECOMMENDATION TONE GUIDES ─────────────────────────────────────────────
+// ── ANGLE POOL — rotated per player to prevent structural repetition ────────
 
-const RECOMMENDATION_TONE: Record<string, string> = {
-  BUY: `RECOMMENDATION = BUY
-The decision is made: this player is underpriced and the upside is not priced in.
-Lead with: the clear value gap, price inefficiency, rising form, or favourable matchup.
-Use phrases like: "clear value gap", "mispriced relative to output", "upside is not priced in", "shows", "confirms", "drives", "reinforces".
-Tone: assertive and opportunity-focused. Reference actual dollar figures and point projections.
-NEVER use sell/decline/avoid language.`,
+const REASONING_ANGLES = [
+  "Lead with the price and value relationship — is this player priced correctly for their output?",
+  "Lead with projection and ceiling — what does the scoring range tell us about upside?",
+  "Lead with recent form trajectory — is output trending, flat, or declining?",
+  "Lead with the matchup — how does the opponent affect the scoring range?",
+  "Lead with the floor — how protected is the downside, and what does that mean?",
+  "Lead with role and consistency — how stable and predictable is this player's role?",
+  "Lead with the value gap — is the market pricing this player correctly?",
+  "Lead with risk and variance — what is the volatility profile telling us?",
+];
 
-  HOLD: `RECOMMENDATION = HOLD
-The decision is made: this player is a stable scoring profile — hold firm.
-Lead with: the defined scoring range, stable projection, or consistent output that confirms the hold.
-Use phrases like: "stable scoring profile", "range is well defined", "reliable baseline output", "shows", "confirms", "reinforces".
-Tone: calm and analytical. Reference specific point projections and the ceiling/floor spread. No hedging.`,
+function pickAngles(playerId: number): string {
+  const i = playerId % REASONING_ANGLES.length;
+  const j = (playerId * 3 + 1) % REASONING_ANGLES.length;
+  const primary = REASONING_ANGLES[i];
+  const secondary = REASONING_ANGLES[j !== i ? j : (j + 1) % REASONING_ANGLES.length];
+  return `Primary angle: ${primary}\nSecondary angle: ${secondary}`;
+}
 
-  SELL: `RECOMMENDATION = SELL
-The decision is made: risk outweighs value. SELL signal is firm.
-Lead with: the primary sell reason — price exceeds output, form declining, soft ceiling, or structural risk.
-Use phrases like: "risk outweighs value", "price exceeds output", "regression signals present", "declining", "overpriced", "soft ceiling", "value deficit".
-Tone: direct and firm. NEVER use positive language. NEVER say "reliable", "solid", "strong", "viable", "dependable", "promising".
-The "why" MUST express a clear negative signal. Never neutral.`,
+// ── CONTEXT TONE GUIDES ─────────────────────────────────────────────────────
 
-  START: `RECOMMENDATION = START
-The decision is made: this player is a clear start candidate.
-Lead with: elite projection, matchup advantage, or ceiling potential that confirms the start.
-Use phrases like: "shows", "confirms", "ceiling is live", "matchup reinforces the case".
-Tone: decisive and specific. Reference exact point projections and ceiling numbers.`,
+const CONTEXT_TONE: Record<string, string> = {
+  BUY: `CONTEXT SIGNAL: This player shows a clear pricing inefficiency — the upside is not priced in.
+Explain: the value gap, price vs output relationship, rising form, or favourable matchup that makes this player worth targeting.
+Avoid saying "buy", "BUY", or any recommendation directive — explain the opportunity in data terms only.`,
 
-  SIT: `RECOMMENDATION = SIT
-The decision is made: this player should be benched.
-Lead with: the specific reason — low projection, poor matchup, injury risk, or role concern.
-Use phrases like: "shows", "confirms the risk", "drives the sit call".
-Tone: clear and firm. Do NOT frame this positively.`,
+  HOLD: `CONTEXT SIGNAL: This player has a stable, well-defined scoring profile.
+Explain: the projection range, ceiling-floor spread, consistency, or risk factors that define why this is a hold-worthy profile.
+Avoid saying "hold", "HOLD", or any recommendation directive — describe the profile characteristics only.`,
+
+  SELL: `CONTEXT SIGNAL: This player carries elevated risk relative to price.
+Explain: the price vs output mismatch, declining form, soft ceiling, or structural concern that makes this player a risk to hold.
+Avoid saying "sell", "SELL", or any recommendation directive — describe the risk in data terms only.`,
+
+  START: `CONTEXT SIGNAL: This player has an elite projection profile for this fixture.
+Explain: the ceiling potential, matchup advantage, or projection confidence that makes this a high-priority start.
+Avoid saying "start", "START", or any recommendation directive — describe the upside profile only.`,
+
+  SIT: `CONTEXT SIGNAL: This player carries projection risk for this fixture.
+Explain: the low projection, poor matchup, injury concern, or role risk that creates uncertainty in their output.
+Avoid saying "sit", "SIT", or any recommendation directive — describe the risk profile only.`,
 };
 
 // ── BYE PROMPT BUILDER ──────────────────────────────────────────────────────
@@ -136,31 +145,36 @@ Your ONLY job:
 → Preserve medium-term fantasy value context so coaches know what to expect when they return
 → Do NOT frame this player as a start, captain, or selection option for this round
 
+━━ CRITICAL: DO NOT OUTPUT RECOMMENDATION WORDS ━━
+NEVER write: "buy", "BUY", "sell", "SELL", "hold", "HOLD", "start", "START", "sit", "SIT", "lock", "must have", "must start"
+These are MODEL decisions — not yours to make or repeat. Describe the player profile in data terms only.
+
 ━━ OUTPUT STRUCTURE ━━
 
 WHY — EXACTLY 1 sentence, max 140 characters:
 - State clearly that the player is unavailable due to bye
 - Include the player's name and a relevant number (e.g. season average, projection, or price)
-- Do NOT recommend starting or captaining this player
+- VARY the sentence opening: sometimes start with the name, sometimes with the number, sometimes with "Team bye"
 
 LONG — EXACTLY 5 sentences:
-Sentence 1 → Confirm the bye — player is unavailable for selection this round due to team bye.
+Sentence 1 → Confirm the bye — player is unavailable due to team bye, with a specific number.
 Sentence 2 → Season performance context: average, projection, or recent form numbers.
-Sentence 3 → Value and price context for when they return — is this player worth holding?
+Sentence 3 → Value and price context for when they return — describe the price/output relationship.
 Sentence 4 → Risk or role considerations for next available round.
-Sentence 5 → Medium-term outlook — what should coaches expect when the player returns?
+Sentence 5 → Medium-term outlook — what the scoring range signals for their return.
 
 Rules for LONG:
 - Every sentence must reference actual numbers from the data provided
-- Do NOT suggest starting, captaining, or selecting the player this round
+- VARY sentence openings — do NOT start multiple sentences with "He", "His", or the player name
 - Do NOT use "this round" as a phrase — banned
 - Do NOT use hedging language: "could", "might", "may", "potentially"
-- Be direct and informative about bye + return value
+- Do NOT output recommendation words: buy, sell, hold, start, sit, lock
 
 ━━ BANNED PHRASES — NEVER USE ━━
 "this round", "fantasy coaches should", "coaches should", "based on current projections",
 "primed for", "worth noting", "overall,", "in conclusion", "in summary",
-"could", "might", "may", "potentially", "indicates", "suggests"
+"could", "might", "may", "potentially", "indicates", "suggests",
+"buy", "sell", "hold", "start", "sit", "lock", "must have", "must start"
 
 ━━ RESPONSE FORMAT — return ONLY valid JSON ━━
 {
@@ -172,130 +186,126 @@ FINAL CHECK before responding:
 1. Does "why" contain a specific number? (required)
 2. Is "long" exactly 5 sentences? (count carefully)
 3. Does the response make clear this player is unavailable due to bye?
-4. Have you avoided ALL banned phrases?`;
+4. Have you avoided ALL banned phrases including buy/sell/hold/start/sit?
+5. Do sentences have varied openings (no repeated "He", "His", or player name starts)?`;
 }
 
 // ── PROMPT BUILDER ──────────────────────────────────────────────────────────
 
-function buildSystemPrompt(recommendation: string): string {
+function buildSystemPrompt(recommendation: string, playerId: number): string {
   const rec = recommendation.toUpperCase();
-  const tone = RECOMMENDATION_TONE[rec] ?? `RECOMMENDATION = ${recommendation}`;
+  const contextTone = CONTEXT_TONE[rec] ?? `CONTEXT SIGNAL: Analyse this player's profile based on the data provided.`;
+  const angles = pickAngles(playerId);
 
-  const recommendationAlignment = rec === "BUY"
-    ? `BUY alignment: Lead with upside, value, or opportunity. Use words like: underpriced, rising, upside, inefficiency, breakout, value gap, priced below output.`
-    : rec === "SELL"
-    ? `SELL alignment: Lead with risk, regression, or overpricing. Use words like: declining, overpriced, ceiling too low, soft ceiling, limited upside, value deficit, sell signal, dipping.`
-    : rec === "HOLD"
-    ? `HOLD alignment: Lead with stability, range, or consistency. Use words like: consistent range, reliable baseline, known ceiling, stable projection, floor support, locked in.`
-    : rec === "START"
-    ? `START alignment: Lead with elite projection, ceiling potential, or matchup advantage. Decisive and specific.`
-    : `SIT alignment: Lead with the reason to sit — low projection, poor matchup, injury risk, or role concern. Clear and firm.`;
+  return `You are Neeko — an elite AFL fantasy analyst. You write data-driven player profiles. You do NOT make or repeat recommendations.
 
-  return `You are Neeko — an elite AFL fantasy analyst. You do NOT generate recommendations. The model recommendation is already decided.
+━━ CRITICAL: YOU DO NOT OUTPUT RECOMMENDATION WORDS ━━
+NEVER write the words: "buy", "BUY", "sell", "SELL", "hold", "HOLD", "start", "START", "sit", "SIT", "lock", "must have", "must start"
+These are system decisions — not yours to make, echo, or imply. Describe the player's data profile in analytical terms only.
+If "recommendation" appears in the input data — IGNORE it. Do not repeat it, reference it, or let it influence your word choice.
 
-Your ONLY job:
-→ Explain WHY the ${rec} recommendation is correct
-→ Using precise numbers, signals, and context
-→ As if the decision has already been made and you are justifying it confidently
+━━ YOUR ROLE ━━
+→ Write a concise, data-driven player profile
+→ Use precise numbers, signals, and context
+→ Sound like a sharp human analyst — not a template system
 
-${tone}
+${contextTone}
 
-${recommendationAlignment}
+━━ REASONING ANGLES FOR THIS PLAYER ━━
+Every player analysis must feel unique. Use a different reasoning angle per player.
+${angles}
+Organise your LONG analysis around these angles — lead with the primary, reinforce with the secondary.
 
-━━ CONVICTION RULES (CRITICAL) ━━
-You are not neutral. A decision has already been made. You are justifying it.
-- Every response must clearly reinforce the ${rec} recommendation
-- Sound decisive, not observational — you are confirming a call, not exploring one
-- Avoid passive or hedging phrasing at all costs
+━━ VARIATION RULES (CRITICAL) ━━
+- Do NOT reuse the same sentence structures across players
+- Do NOT repeat opening phrases (e.g. "has a stable scoring profile", "boasts a projection of")
+- VARY the sentence openings in LONG: use player name, a number, a verb, or a contextual phrase — not "He" or "His" every time
+- Each player analysis must read as uniquely written, not generated from a template
+- Write like a human analyst who has looked at THIS player's specific numbers
 
 REPLACE weak verbs with strong ones:
 - "indicates" → "shows"
 - "suggests" → "confirms"
-- "could" → banned entirely
-- "may" → banned entirely
-- "potentially" → banned entirely
-- "might" → banned entirely
-
-━━ TONE RULES (non-negotiable) ━━
-- Write like a sharp analyst, not a chatbot
-- Be direct and decisive — never hedge
-- Never use generic phrases that could apply to any player
-- Every sentence must be specific to THIS player's numbers
-- If signal_tags are provided, you MUST use at least ONE — integrate it naturally, do not list them
+- "could" → banned
+- "may" → banned
+- "potentially" → banned
+- "might" → banned
 
 ━━ SIGNAL USAGE ━━
-When signal_tags are provided (e.g. ["underpriced_elite", "breakout_candidate", "form_rising"]):
+When signal_tags are provided:
 - Pick the 1–2 most relevant signals
-- Translate them into natural language: "underpriced_elite" → "priced well below his output level", "breakout_candidate" → "showing signs of a scoring breakout", "form_rising" → "form has been building week on week"
-- Weave the translated signal naturally into a sentence — do NOT quote the raw tag name
-- Never just list them. Never ignore them.
+- Translate to natural language: "underpriced_elite" → "priced well below output level", "breakout_candidate" → "showing signs of a scoring breakout", "form_rising" → "form building week on week"
+- Weave naturally — do NOT quote the raw tag name, do NOT list them
 
 ━━ OUTPUT STRUCTURE ━━
 
 WHY — EXACTLY 1 sentence, max 140 characters:
-- The single strongest reason the ${rec} call is correct
-- Must contain at least one specific number from the data (price, points projection, ceiling, floor, or percentage)
-- Must be player-specific — never a template sentence that could apply to any player
-- Start with the player name OR a direct data point — vary the opening structure across players
-- VARY your sentence structure: sometimes lead with the player name, sometimes lead with a number, sometimes lead with the key signal
-${rec === "SELL" ? "- Must express a clear negative signal — declining, overpriced, risky, soft ceiling. Never neutral." : ""}
-${rec === "BUY" ? '- Use language like: "clear value gap", "mispriced relative to output", or "upside is not priced in"' : ""}
-${rec === "HOLD" ? '- Use language like: "stable scoring profile", "range is well defined", or "reliable baseline output"' : ""}
-${rec === "SELL" ? '- Use language like: "risk outweighs value", "price exceeds output", or "regression signals present"' : ""}
+- The single most analytically compelling observation about this player
+- Must contain at least one specific number (price, projection, ceiling, floor, or percentage)
+- Must be player-specific — never a sentence that could apply to any other player
+- VARY the opening: sometimes start with the player name, sometimes a number, sometimes the key signal
+- Do NOT start with "With a", "Having a", or "As a" — vary beyond these patterns
+${rec === "SELL" ? "- Describe the risk or pricing concern using data — declining output, soft ceiling, price exceeding output" : ""}
+${rec === "BUY" ? "- Describe the value gap or pricing inefficiency using data — mispriced vs output, underpriced ceiling" : ""}
+${rec === "HOLD" ? "- Describe the scoring range and profile stability using data — defined range, consistent floor, projection spread" : ""}
+${rec === "START" ? "- Describe the projection and ceiling potential using data — elite output expected, matchup-boosted range" : ""}
+${rec === "SIT" ? "- Describe the projection risk or matchup concern using data — soft ceiling, limited range, structural risk" : ""}
 
 LONG — EXACTLY 5 sentences (count carefully):
-Sentence 1 → Scoring range context: what is the projected points outcome, how wide or tight is the ceiling-to-floor spread?
-Sentence 2 → Recent form and trajectory: is output trending up, flat, or declining — backed by a specific number?
-Sentence 3 → Price and value: is the current price justified by the scoring output — include actual dollar figure?
-Sentence 4 → Risk and reliability: what is driving confidence or uncertainty in this projection?
-Sentence 5 → Matchup and signals: what does the opponent matchup or key signal tell us — reinforce the ${rec} call.
+Lead with the PRIMARY angle above, reinforce with the SECONDARY angle.
+- Sentence 1 → Primary angle: the most compelling data point for this player's profile
+- Sentence 2 → Secondary angle: the supporting evidence or context
+- Sentence 3 → Price and value relationship — is the current price justified by scoring output? Include dollar figure.
+- Sentence 4 → Risk and reliability — what drives confidence or uncertainty in this projection?
+- Sentence 5 → Matchup or signal context — what does the opponent or a key signal confirm about the profile?
 
 Rules for LONG:
-- Every sentence must reference actual numbers from the data provided (points, dollars, percentages)
-- Sentence order can vary — lead with the most compelling angle for this specific player
+- Every sentence must reference actual numbers from the data (points, dollars, percentages)
 - Do NOT start multiple sentences with "His", "He", or the player name
-- Do NOT duplicate the "why" sentence
-- Every sentence must reinforce the ${rec} call — not just describe
-- NEVER mention internal metric names: projection_final, form_score, consistency_score, value_score, risk_rating, neeko_rating, upside_pct, captain_score
+- Do NOT duplicate the WHY sentence
+- Do NOT use recommendation words: buy, sell, hold, start, sit, lock
+- NEVER mention internal metric names
 
-━━ DATA FIELD NAMES — NEVER QUOTE THESE IN YOUR RESPONSE ━━
-The data is provided as JSON with labelled fields. Do NOT copy field names into your output.
-- Use "projected points" not "projected_points" or "projection_final"
-- Use "recent form" or "form trend" not "form_score", "form score", "recent form score", "recent form index", "recent form trend", or "form index"
-- Use "value" or "pricing gap" not "value_score" or "value gap index"
-- Use "risk" or "variance" not "risk_index" or "risk_rating"
-- Use "ceiling" and "floor" (these are fine as-is)
-- Use "consistency" not "consistency_pct" or "consistency_score"
-- Use "captaincy potential" not "captaincy_index" or "captain_score"
-- NEVER copy any underscore_field_name or multi-word index label into your response
+━━ DATA FIELD NAMES — NEVER QUOTE IN RESPONSE ━━
+- "projected points" not "projection_final"
+- "recent form" or "form trend" not "form_score" or "form index"
+- "value" or "pricing gap" not "value_score" or "value gap index"
+- "risk" or "variance" not "risk_index" or "risk_rating"
+- "ceiling" and "floor" are fine
+- "consistency" not "consistency_pct"
+- "captaincy potential" not "captaincy_index" or "captain_score"
+- NEVER copy any underscore_field_name into response
 
 ━━ BANNED PHRASES — NEVER USE ━━
+"buy", "sell", "hold", "start", "sit", "lock", "must have", "must start",
+"BUY call", "SELL signal", "HOLD decision",
 "this round", "fantasy coaches should", "coaches should", "based on current projections",
 "primed for", "is primed", "worth noting", "overall,", "in conclusion", "in summary",
 "it is worth", "reliable option", "solid choice", "viable option", "dependable option",
 "solid option", "good choice",
 "could", "might", "may", "arguably", "potentially", "indicates", "suggests",
 "projection_final", "form_score", "consistency_score", "value_score", "risk_rating",
-"neeko_rating", "upside_pct", "captain_score", "BUY call", "SELL signal",
+"neeko_rating", "upside_pct", "captain_score",
 "ultra_consistent", "form_hot", "elite_ceiling_signal", "value_spike",
 "form index", "risk index", "value gap index", "captaincy index", "recent form index",
-"active signal", "venue factor", "overall rating"
-${rec === "SELL" ? '\nSELL-specific bans: "great form", "solid buy", "strong option", "must-start", "strong performer", "reliable output", "promising projection", "reliable", "solid", "strong", "viable", "dependable", "promising"' : ""}
+"active signal", "venue factor", "overall rating",
+"stable scoring profile", "has a stable", "boasts a projection", "boasts a stable"
+${rec === "SELL" ? '\nSELL-context bans: "great form", "solid buy", "strong option", "must-start", "strong performer", "reliable output", "promising projection", "reliable", "solid", "strong", "viable", "dependable", "promising"' : ""}
 
 ━━ RESPONSE FORMAT — return ONLY valid JSON ━━
 {
-  "why": "<EXACTLY 1 sentence ≤140 chars — strongest ${rec} signal with a specific number>",
-  "long": "<EXACTLY 5 sentences — all referencing real numbers from the data, no internal metric names>"
+  "why": "<EXACTLY 1 sentence ≤140 chars — strongest analytical observation with a specific number, no recommendation words>",
+  "long": "<EXACTLY 5 sentences — all referencing real numbers, no recommendation words, varied openings>"
 }
 
 FINAL CHECK before responding:
 1. Does "why" contain a specific number? (required)
-2. Is "long" exactly 5 sentences? (count the full stops/punctuation)
-3. Does every sentence reinforce the ${rec} call decisively?
+2. Is "long" exactly 5 sentences? (count carefully)
+3. Have you avoided ALL recommendation words: buy, sell, hold, start, sit, lock?
 4. Have you used at least one signal from signal_tags (translated to natural language)?
-5. Have you avoided ALL banned phrases including internal metric names like "form_score", "value_score"?
-6. Does "why" use a varied sentence opening — not the same pattern as every other player?
-7. Does the output sound like a decision has been made — not a possibility being explored?`;
+5. Have you avoided ALL banned phrases including internal metric names?
+6. Are sentence openings in LONG varied — not all starting with "He", "His", or player name?
+7. Does this analysis feel unique to this specific player — not a template?`;
 }
 
 // ── TYPES ───────────────────────────────────────────────────────────────────
@@ -353,6 +363,9 @@ interface ValidationResult {
 
 // ── OUTPUT VALIDATOR ────────────────────────────────────────────────────────
 
+// Recommendation words must NEVER appear in AI output — these are model decisions only
+const BANNED_REC_WORDS = ["buy", "sell", "hold", "start", "sit", "lock", "must have", "must start"];
+
 function validateOutput(result: AIResult, recommendation: string): ValidationResult {
   const issues: string[] = [];
   const rec = recommendation.toUpperCase();
@@ -380,6 +393,14 @@ function validateOutput(result: AIResult, recommendation: string): ValidationRes
     : false;
   if (whyDupesLong) issues.push("long field is duplicating the why field");
 
+  // ── HARD BLOCK: recommendation words must never appear in output ──
+  for (const word of BANNED_REC_WORDS) {
+    const pattern = new RegExp(`\\b${word}\\b`, "i");
+    if (pattern.test(allText)) {
+      issues.push(`recommendation word not allowed in output: "${word}" — describe the profile in data terms only`);
+    }
+  }
+
   // Banned phrases
   for (const phrase of BANNED_ALWAYS) {
     if (allText.includes(phrase.toLowerCase())) {
@@ -402,12 +423,13 @@ function validateOutput(result: AIResult, recommendation: string): ValidationRes
       }
     }
     const hasSellSignal = [
-      "sell", "declin", "overpriced", "risky", "dip", "limited upside",
+      "declin", "overpriced", "risky", "dip", "limited upside",
       "soft ceil", "low ceiling", "ceiling too low", "value deficit",
       "below", "underperform", "struggling", "low upside", "not worth",
       "poor form", "dipping", "risk", "underwhelm", "gamble",
+      "price exceeds", "risk outweighs",
     ].some(w => allText.includes(w));
-    if (!hasSellSignal) issues.push("SELL output missing any sell-signal language");
+    if (!hasSellSignal) issues.push("SELL-context output missing risk or pricing concern language");
   }
 
   if (rec === "BUY") {
@@ -688,7 +710,7 @@ Deno.serve(async (req: Request) => {
           let validation: ValidationResult = { valid: true, issues: [] };
 
           if (openaiKey) {
-            const systemPrompt = isByePlayer ? buildByeSystemPrompt() : buildSystemPrompt(recommendation);
+            const systemPrompt = isByePlayer ? buildByeSystemPrompt() : buildSystemPrompt(recommendation, player.player_id);
             const { result: res, validation: val, attempts } = await callOpenAIWithPrompt(openaiKey, systemPrompt, recommendation, promptPayload, isByePlayer);
             if (!res) {
               errors.push(`${player.player_name}: null response from OpenAI`);

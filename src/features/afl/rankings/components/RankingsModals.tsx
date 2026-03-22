@@ -758,10 +758,23 @@ export function PlayerDetailModal({
   const riskBadge = getRiskBadge(Number(row.risk_rating) ?? null);
 
   const modalRef = useRef<HTMLDivElement>(null);
+  const touchStartY = useRef<number | null>(null);
+
   const handleOverlayClick = useCallback((e: React.MouseEvent) => {
     if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
       onClose();
     }
+  }, [onClose]);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartY.current === null) return;
+    const delta = e.changedTouches[0].clientY - touchStartY.current;
+    touchStartY.current = null;
+    if (delta > 80) onClose();
   }, [onClose]);
 
   const rawDisplayConf = normaliseConfidence(
@@ -807,6 +820,8 @@ export function PlayerDetailModal({
         ref={modalRef}
         className="relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl border border-white/10 bg-[#0e0e0e] shadow-2xl overflow-hidden"
         style={{ maxHeight: "calc(100dvh - env(safe-area-inset-top) - 1rem)", overscrollBehavior: "contain" }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
         {/* Drag handle on mobile */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden sticky top-0 z-10 bg-[#0e0e0e]">
@@ -821,9 +836,10 @@ export function PlayerDetailModal({
           </div>
           <button
             onClick={onClose}
-            className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-white/8 text-white/40 hover:text-white/80 hover:bg-white/12 transition-colors mt-0.5"
+            className="shrink-0 w-11 h-11 -mr-1.5 flex items-center justify-center rounded-full text-white/40 hover:text-white/80 hover:bg-white/10 active:bg-white/15 transition-colors"
+            aria-label="Close"
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
 
