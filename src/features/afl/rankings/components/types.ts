@@ -25,8 +25,6 @@ export interface RankingRow {
   best_value_score: number | null;
   value_tag: string | null;
   value_tier: string | null;
-  ai_recommendation: string | null;
-  recommendation_strength: string | null;
   ai_updated_at: string | null;
   recommendation_color: string | null;
   consistency_tier: string | null;
@@ -46,8 +44,6 @@ export interface RankingRow {
   market_watch_category: string | null;
   /** Upside percentage from breakout model */
   upside_pct: number | null;
-  /** AI summary text */
-  ai_summary: string | null;
   /** Player availability status: AVAILABLE | OUT | TEST | OMITTED | null */
   status: string | null;
   /** Derived boolean — false when status = 'OUT' */

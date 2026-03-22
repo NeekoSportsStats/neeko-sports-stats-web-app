@@ -118,9 +118,9 @@ export function MarketPlayerCard({ row, locked, onUnlock, tab, rank }: Props) {
           </div>
         ) : null}
 
-        {row.recommendation_why && (
+        {row.recommendation_short && (
           <p className="mt-2.5 text-[11px] text-white/35 leading-snug line-clamp-2">
-            {row.recommendation_why}
+            {row.recommendation_short}
           </p>
         )}
       </div>

@@ -21,7 +21,7 @@ function getCorsHeaders(req: Request): Record<string, string> {
 
 const BATCH_SIZE = 5;
 const DEFAULT_MAX_PLAYERS = 20;
-const PROMPT_VERSION = "generate-player-ai-v10";
+const PROMPT_VERSION = "generate-player-ai-v11";
 const MAX_RETRY_ATTEMPTS = 2;
 
 // ── BANNED PHRASES ─────────────────────────────────────────────────────────
@@ -55,6 +55,34 @@ const BANNED_ALWAYS = [
   "could",
   "might",
   "may",
+  "projection_final",
+  "form_score",
+  "consistency_score",
+  "value_score",
+  "risk_rating",
+  "neeko_rating",
+  "upside_pct",
+  "captain_score",
+  "buy call",
+  "sell signal",
+  "ultra_consistent",
+  "form_hot",
+  "elite_ceiling_signal",
+  "value_spike",
+  "underpriced_elite",
+  "breakout_candidate",
+  "form_rising",
+  "recent form index",
+  "form index",
+  "value gap index",
+  "risk index",
+  "captaincy index",
+  "value score",
+  "form score",
+  "upside ceiling",
+  "overall rating",
+  "active signal",
+  "venue factor",
 ];
 const BANNED_OPENINGS = [
   "primed for a solid", "primed for a strong", "primed for a great",
@@ -69,18 +97,18 @@ const RECOMMENDATION_TONE: Record<string, string> = {
 The decision is made: this player is underpriced and the upside is not priced in.
 Lead with: the clear value gap, price inefficiency, rising form, or favourable matchup.
 Use phrases like: "clear value gap", "mispriced relative to output", "upside is not priced in", "shows", "confirms", "drives", "reinforces".
-Tone: assertive and opportunity-focused. Reference the specific value_score or price gap.
+Tone: assertive and opportunity-focused. Reference actual dollar figures and point projections.
 NEVER use sell/decline/avoid language.`,
 
   HOLD: `RECOMMENDATION = HOLD
 The decision is made: this player is a stable scoring profile — hold firm.
-Lead with: the defined range, stable projection, or consistent output that confirms the hold.
+Lead with: the defined scoring range, stable projection, or consistent output that confirms the hold.
 Use phrases like: "stable scoring profile", "range is well defined", "reliable baseline output", "shows", "confirms", "reinforces".
-Tone: calm and analytical. Acknowledge the ceiling and floor range specifically. No hedging.`,
+Tone: calm and analytical. Reference specific point projections and the ceiling/floor spread. No hedging.`,
 
   SELL: `RECOMMENDATION = SELL
 The decision is made: risk outweighs value. SELL signal is firm.
-Lead with: the primary sell reason — price exceeds output, regression signals present, declining form, soft ceiling, or structural risk.
+Lead with: the primary sell reason — price exceeds output, form declining, soft ceiling, or structural risk.
 Use phrases like: "risk outweighs value", "price exceeds output", "regression signals present", "declining", "overpriced", "soft ceiling", "value deficit".
 Tone: direct and firm. NEVER use positive language. NEVER say "reliable", "solid", "strong", "viable", "dependable", "promising".
 The "why" MUST express a clear negative signal. Never neutral.`,
@@ -89,7 +117,7 @@ The "why" MUST express a clear negative signal. Never neutral.`,
 The decision is made: this player is a clear start candidate.
 Lead with: elite projection, matchup advantage, or ceiling potential that confirms the start.
 Use phrases like: "shows", "confirms", "ceiling is live", "matchup reinforces the case".
-Tone: decisive and specific. Reference projection and ceiling numbers.`,
+Tone: decisive and specific. Reference exact point projections and ceiling numbers.`,
 
   SIT: `RECOMMENDATION = SIT
 The decision is made: this player should be benched.
@@ -198,56 +226,76 @@ REPLACE weak verbs with strong ones:
 ━━ SIGNAL USAGE ━━
 When signal_tags are provided (e.g. ["underpriced_elite", "breakout_candidate", "form_rising"]):
 - Pick the 1–2 most relevant signals
-- Weave them into the analysis naturally: "flagged as underpriced_elite" or "the breakout_candidate signal aligns with..."
+- Translate them into natural language: "underpriced_elite" → "priced well below his output level", "breakout_candidate" → "showing signs of a scoring breakout", "form_rising" → "form has been building week on week"
+- Weave the translated signal naturally into a sentence — do NOT quote the raw tag name
 - Never just list them. Never ignore them.
 
 ━━ OUTPUT STRUCTURE ━━
 
 WHY — EXACTLY 1 sentence, max 140 characters:
 - The single strongest reason the ${rec} call is correct
-- Must contain at least one specific number from the data
-- Must be player-specific — never a template sentence
-- Start with the player name OR a direct data point
+- Must contain at least one specific number from the data (price, points projection, ceiling, floor, or percentage)
+- Must be player-specific — never a template sentence that could apply to any player
+- Start with the player name OR a direct data point — vary the opening structure across players
+- VARY your sentence structure: sometimes lead with the player name, sometimes lead with a number, sometimes lead with the key signal
 ${rec === "SELL" ? "- Must express a clear negative signal — declining, overpriced, risky, soft ceiling. Never neutral." : ""}
 ${rec === "BUY" ? '- Use language like: "clear value gap", "mispriced relative to output", or "upside is not priced in"' : ""}
 ${rec === "HOLD" ? '- Use language like: "stable scoring profile", "range is well defined", or "reliable baseline output"' : ""}
 ${rec === "SELL" ? '- Use language like: "risk outweighs value", "price exceeds output", or "regression signals present"' : ""}
 
 LONG — EXACTLY 5 sentences (count carefully):
-Sentence 1 → Projection context: projection_final vs ceiling vs floor — is the range tight or wide?
-Sentence 2 → Form and trend: form_score, trend_direction, consistency — trending UP, FLAT, or DOWN?
-Sentence 3 → Value and price: value_score, value_tag, price — is this player good value, fair, or overpriced?
-Sentence 4 → Risk and confidence: risk score, confidence, confidence_label — what drives the uncertainty?
-Sentence 5 → Signals and matchup: name specific signal(s) from signal_tags and matchup_label — reinforce the call.
+Sentence 1 → Scoring range context: what is the projected points outcome, how wide or tight is the ceiling-to-floor spread?
+Sentence 2 → Recent form and trajectory: is output trending up, flat, or declining — backed by a specific number?
+Sentence 3 → Price and value: is the current price justified by the scoring output — include actual dollar figure?
+Sentence 4 → Risk and reliability: what is driving confidence or uncertainty in this projection?
+Sentence 5 → Matchup and signals: what does the opponent matchup or key signal tell us — reinforce the ${rec} call.
 
 Rules for LONG:
-- Every sentence must reference actual numbers or named signals from the data provided
+- Every sentence must reference actual numbers from the data provided (points, dollars, percentages)
 - Sentence order can vary — lead with the most compelling angle for this specific player
 - Do NOT start multiple sentences with "His", "He", or the player name
 - Do NOT duplicate the "why" sentence
 - Every sentence must reinforce the ${rec} call — not just describe
+- NEVER mention internal metric names: projection_final, form_score, consistency_score, value_score, risk_rating, neeko_rating, upside_pct, captain_score
+
+━━ DATA FIELD NAMES — NEVER QUOTE THESE IN YOUR RESPONSE ━━
+The data is provided as JSON with labelled fields. Do NOT copy field names into your output.
+- Use "projected points" not "projected_points" or "projection_final"
+- Use "recent form" or "form trend" not "form_score", "form score", "recent form score", "recent form index", "recent form trend", or "form index"
+- Use "value" or "pricing gap" not "value_score" or "value gap index"
+- Use "risk" or "variance" not "risk_index" or "risk_rating"
+- Use "ceiling" and "floor" (these are fine as-is)
+- Use "consistency" not "consistency_pct" or "consistency_score"
+- Use "captaincy potential" not "captaincy_index" or "captain_score"
+- NEVER copy any underscore_field_name or multi-word index label into your response
 
 ━━ BANNED PHRASES — NEVER USE ━━
 "this round", "fantasy coaches should", "coaches should", "based on current projections",
 "primed for", "is primed", "worth noting", "overall,", "in conclusion", "in summary",
 "it is worth", "reliable option", "solid choice", "viable option", "dependable option",
 "solid option", "good choice",
-"could", "might", "may", "arguably", "potentially", "indicates", "suggests"
+"could", "might", "may", "arguably", "potentially", "indicates", "suggests",
+"projection_final", "form_score", "consistency_score", "value_score", "risk_rating",
+"neeko_rating", "upside_pct", "captain_score", "BUY call", "SELL signal",
+"ultra_consistent", "form_hot", "elite_ceiling_signal", "value_spike",
+"form index", "risk index", "value gap index", "captaincy index", "recent form index",
+"active signal", "venue factor", "overall rating"
 ${rec === "SELL" ? '\nSELL-specific bans: "great form", "solid buy", "strong option", "must-start", "strong performer", "reliable output", "promising projection", "reliable", "solid", "strong", "viable", "dependable", "promising"' : ""}
 
 ━━ RESPONSE FORMAT — return ONLY valid JSON ━━
 {
   "why": "<EXACTLY 1 sentence ≤140 chars — strongest ${rec} signal with a specific number>",
-  "long": "<EXACTLY 5 sentences — all referencing real numbers or named signals from the data>"
+  "long": "<EXACTLY 5 sentences — all referencing real numbers from the data, no internal metric names>"
 }
 
 FINAL CHECK before responding:
 1. Does "why" contain a specific number? (required)
 2. Is "long" exactly 5 sentences? (count the full stops/punctuation)
 3. Does every sentence reinforce the ${rec} call decisively?
-4. Have you used at least one signal from signal_tags (if provided)?
-5. Have you avoided ALL banned phrases including "could", "might", "may", "indicates", "suggests", "solid option", "good choice"?
-6. Does the output sound like a decision has been made — not a possibility being explored?`;
+4. Have you used at least one signal from signal_tags (translated to natural language)?
+5. Have you avoided ALL banned phrases including internal metric names like "form_score", "value_score"?
+6. Does "why" use a varied sentence opening — not the same pattern as every other player?
+7. Does the output sound like a decision has been made — not a possibility being explored?`;
 }
 
 // ── TYPES ───────────────────────────────────────────────────────────────────
@@ -311,15 +359,19 @@ function validateOutput(result: AIResult, recommendation: string): ValidationRes
   const allText = `${result.why} ${result.long}`.toLowerCase();
 
   // WHY: exactly 1 sentence, has a number, not too long
+  // Strip decimal dots (e.g. 23.84) before counting sentence terminators
+  const whyStripped = (result.why ?? "").replace(/\d\.\d/g, "NUM");
+  const longStripped = (result.long ?? "").replace(/\d\.\d/g, "NUM");
+
   if (!result.why || result.why.length < 15) issues.push("why field too short or empty");
   if (result.why?.length > 160) issues.push("why field too long (>160 chars)");
   if (!/\d/.test(result.why ?? "")) issues.push("why field must contain a specific number");
-  const whySentences = (result.why?.match(/[.!?]+/g) ?? []).length;
+  const whySentences = (whyStripped.match(/[.!?]+/g) ?? []).length;
   if (whySentences !== 1) issues.push(`why field must be exactly 1 sentence — got ${whySentences}`);
 
   // LONG: exactly 5 sentences, substantial
   if (!result.long || result.long.length < 100) issues.push("long field too short");
-  const longSentences = (result.long?.match(/[.!?]+/g) ?? []).length;
+  const longSentences = (longStripped.match(/[.!?]+/g) ?? []).length;
   if (longSentences !== 5) issues.push(`long field must be exactly 5 sentences — got ${longSentences}`);
 
   // No duplication between why and long
@@ -336,7 +388,7 @@ function validateOutput(result: AIResult, recommendation: string): ValidationRes
   }
 
   // Conviction checks — weak/hedging language
-  const weakPhrases = ["indicates", "suggests", "could", "might", "may ", "potentially", "solid option", "good choice"];
+  const weakPhrases = ["indicates", "suggests", "could", "might", "may ", "potentially", "solid option", "good choice", "form score", "recent form score", "recent form trend", "a score of"];
   for (const phrase of weakPhrases) {
     if (allText.includes(phrase.toLowerCase())) {
       issues.push(`weak/hedging phrase not allowed: "${phrase}"`);
@@ -503,22 +555,18 @@ Deno.serve(async (req: Request) => {
     // Primary auth: service role JWT
     let isAuthorized = token === serviceRoleKey;
 
-    // Secondary auth: any known secret stored in internal.cron_secrets
-    // Covers both neeko-cron-* tokens AND sb_secret_* keys used by the DB pipeline
+    // Secondary auth: compare against cron_auth_token via SECURITY DEFINER RPC
     if (!isAuthorized && token.length > 10) {
       try {
         const adminClient = createClient(supabaseUrl, serviceRoleKey);
-        const { data: secrets } = await adminClient
-          .schema("internal" as any)
-          .from("cron_secrets")
-          .select("value")
-          .in("key", ["cron_auth_token", "supabase_secret_key"]);
-        if (secrets?.some((row: { value: string }) => row.value === token)) {
+        const { data: cronToken, error: rpcErr } = await adminClient
+          .rpc("get_cron_auth_token");
+        if (!rpcErr && cronToken && token === cronToken) {
           isAuthorized = true;
         }
-        console.log("[generate-player-ai] auth check — token_prefix:", token.substring(0, 12), "matched:", isAuthorized, "secrets_found:", secrets?.length ?? 0);
+        console.log("[generate-player-ai] auth check — token_prefix:", token.substring(0, 12), "matched:", isAuthorized, "rpc_error:", rpcErr?.message ?? "none");
       } catch (e) {
-        console.error("[generate-player-ai] auth DB lookup failed:", e instanceof Error ? e.message : String(e));
+        console.error("[generate-player-ai] auth RPC failed:", e instanceof Error ? e.message : String(e));
       }
     }
 
@@ -601,34 +649,34 @@ Deno.serve(async (req: Request) => {
           const isByePlayer = player.is_bye === true;
 
           const promptPayload = {
-            player_name:             player.player_name,
-            team:                    player.team,
-            position:                player.position,
-            price:                   player.price,
-            price_change:            player.price_change,
-            projection_final:        player.projection_final,
-            ceiling:                 player.ceiling,
-            floor:                   player.floor,
-            consistency:             player.consistency,
-            form_score:              player.form_score,
-            trend_direction:         player.trend_direction,
-            value_score:             player.value_score,
-            value_tag:               player.value_tag,
-            matchup_label:           player.matchup_label,
-            matchup_rating:          player.matchup_rating,
-            venue_multiplier:        player.venue_multiplier,
-            risk:                    player.risk,
-            confidence:              player.confidence,
-            confidence_label:        player.confidence_label,
-            neeko_rating_scaled:     player.neeko_rating_scaled,
-            upside_pct:              player.upside_pct,
-            captain_score:           player.captain_score,
-            captain_rating:          player.captain_rating,
-            games_played:            player.games_played,
-            signal_count:            player.signal_count,
-            signal_tags:             (player.top_signals ?? []).slice(0, 3),
-            model_recommendation:    recommendation,
-            recommendation_strength: player.recommendation_strength,
+            player_name:              player.player_name,
+            team:                     player.team,
+            position:                 player.position,
+            price_dollars:            player.price,
+            price_change_dollars:     player.price_change,
+            projected_points:         player.projection_final,
+            ceiling_points:           player.ceiling,
+            floor_points:             player.floor,
+            consistency_pct:          player.consistency,
+            recent_form_trend:        player.form_score,
+            trend_direction:          player.trend_direction,
+            value_gap_index:          player.value_score,
+            value_tier:               player.value_tag,
+            matchup:                  player.matchup_label,
+            matchup_strength:         player.matchup_rating,
+            venue_factor:             player.venue_multiplier,
+            risk_index:               player.risk,
+            projection_confidence:    player.confidence,
+            confidence_tier:          player.confidence_label,
+            overall_rating:           player.neeko_rating_scaled,
+            upside_ceiling_pct:       player.upside_pct,
+            captaincy_index:          player.captain_score,
+            captaincy_tier:           player.captain_rating,
+            games_played:             player.games_played,
+            active_signal_count:      player.signal_count,
+            signal_tags:              (player.top_signals ?? []).slice(0, 3),
+            recommendation:           recommendation,
+            recommendation_strength:  player.recommendation_strength,
             ...(isByePlayer ? { bye_round: player.bye_round, team_on_bye: true } : {}),
           };
 
