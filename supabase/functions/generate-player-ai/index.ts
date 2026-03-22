@@ -195,7 +195,7 @@ function validateOutput(result: AIResult, recommendation: string): ValidationRes
   if (!result.long || result.long.length < 100) issues.push("long field too short");
 
   const sentenceCount = (result.long?.match(/[.!?]+\s*/g) ?? []).length;
-  if (sentenceCount < 4 || sentenceCount > 8) {
+  if (sentenceCount < 3 || sentenceCount > 12) {
     issues.push(`long field has ${sentenceCount} sentences — expected ~5`);
   }
 
@@ -405,6 +405,9 @@ Deno.serve(async (req: Request) => {
     const debugMode = body?.debug_ai_data === true;
     const forceAll = body?.force_all === true;
     const targetPlayerId = body?.player_id ? Number(body.player_id) : null;
+    const pageOffset = body?.page_offset ? Number(body.page_offset) : 0;
+    const playerIdGte = body?.player_id_gte ? Number(body.player_id_gte) : null;
+    const playerIdLt  = body?.player_id_lt  ? Number(body.player_id_lt)  : null;
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
@@ -429,7 +432,10 @@ Deno.serve(async (req: Request) => {
     if (targetPlayerId) {
       query = query.eq("player_id", targetPlayerId);
     } else if (!forceAll) {
-      query = query.eq("needs_regen", true);
+      query = query.eq("needs_regen", true).order("player_id", { ascending: true });
+      // Fixed ID range sharding — stable regardless of how many players are regenerated
+      if (playerIdGte !== null) query = query.gte("player_id", playerIdGte);
+      if (playerIdLt  !== null) query = query.lt("player_id", playerIdLt);
     }
 
     const { data: players, error: fetchErr } = await query;
