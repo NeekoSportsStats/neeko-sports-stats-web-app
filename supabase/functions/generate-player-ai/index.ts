@@ -21,7 +21,7 @@ function getCorsHeaders(req: Request): Record<string, string> {
 
 const BATCH_SIZE = 5;
 const DEFAULT_MAX_PLAYERS = 20;
-const PROMPT_VERSION = "generate-player-ai-v13";
+const PROMPT_VERSION = "generate-player-ai-v14";
 const MAX_RETRY_ATTEMPTS = 2;
 
 // ── BANNED PHRASES ─────────────────────────────────────────────────────────
@@ -114,25 +114,25 @@ function pickAngles(playerId: number): string {
 // ── CONTEXT TONE GUIDES ─────────────────────────────────────────────────────
 
 const CONTEXT_TONE: Record<string, string> = {
-  BUY: `CONTEXT SIGNAL: This player shows a clear pricing inefficiency — the upside is not priced in.
-Explain: the value gap, price vs output relationship, rising form, or favourable matchup that makes this player worth targeting.
-Avoid saying "buy", "BUY", or any recommendation directive — explain the opportunity in data terms only.`,
+  BUY: `CONTEXT SIGNAL: This player shows a clear pricing inefficiency — the upside is not reflected in the price.
+Explain: the value gap, price vs output relationship, rising form, or favourable matchup using data terms only.
+Describe what the numbers show — do NOT use recommendation words.`,
 
-  HOLD: `CONTEXT SIGNAL: This player has a stable, well-defined scoring profile.
-Explain: the projection range, ceiling-floor spread, consistency, or risk factors that define why this is a hold-worthy profile.
-Avoid saying "hold", "HOLD", or any recommendation directive — describe the profile characteristics only.`,
+  HOLD: `CONTEXT SIGNAL: This player has a well-defined, consistent scoring profile.
+Explain: the projection range, ceiling-floor spread, consistency percentage, or risk factors using data terms only.
+Describe the profile characteristics — do NOT use recommendation words.`,
 
-  SELL: `CONTEXT SIGNAL: This player carries elevated risk relative to price.
-Explain: the price vs output mismatch, declining form, soft ceiling, or structural concern that makes this player a risk to hold.
-Avoid saying "sell", "SELL", or any recommendation directive — describe the risk in data terms only.`,
+  SELL: `CONTEXT SIGNAL: This player carries elevated risk relative to their current price.
+Explain: the price vs output mismatch, declining form, soft ceiling, or structural concern using data terms only.
+Describe the risk profile — do NOT use recommendation words.`,
 
   START: `CONTEXT SIGNAL: This player has an elite projection profile for this fixture.
-Explain: the ceiling potential, matchup advantage, or projection confidence that makes this a high-priority start.
-Avoid saying "start", "START", or any recommendation directive — describe the upside profile only.`,
+Explain: the ceiling potential, matchup advantage, or projection confidence using data terms only.
+Describe the upside profile — do NOT use recommendation words.`,
 
   SIT: `CONTEXT SIGNAL: This player carries projection risk for this fixture.
-Explain: the low projection, poor matchup, injury concern, or role risk that creates uncertainty in their output.
-Avoid saying "sit", "SIT", or any recommendation directive — describe the risk profile only.`,
+Explain: the limited projection, poor matchup, or role risk that creates uncertainty using data terms only.
+Describe the risk profile — do NOT use recommendation words.`,
 };
 
 // ── BYE PROMPT BUILDER ──────────────────────────────────────────────────────
@@ -245,11 +245,7 @@ WHY — EXACTLY 1 sentence, max 140 characters:
 - Must be player-specific — never a sentence that could apply to any other player
 - VARY the opening: sometimes start with the player name, sometimes a number, sometimes the key signal
 - Do NOT start with "With a", "Having a", or "As a" — vary beyond these patterns
-${rec === "SELL" ? "- Describe the risk or pricing concern using data — declining output, soft ceiling, price exceeding output" : ""}
-${rec === "BUY" ? "- Describe the value gap or pricing inefficiency using data — mispriced vs output, underpriced ceiling" : ""}
-${rec === "HOLD" ? "- Describe the scoring range and profile stability using data — defined range, consistent floor, projection spread" : ""}
-${rec === "START" ? "- Describe the projection and ceiling potential using data — elite output expected, matchup-boosted range" : ""}
-${rec === "SIT" ? "- Describe the projection risk or matchup concern using data — soft ceiling, limited range, structural risk" : ""}
+- Describe what the data shows in plain analytical terms — no recommendation words
 
 LONG — EXACTLY 5 sentences (count carefully):
 Lead with the PRIMARY angle above, reinforce with the SECONDARY angle.
@@ -290,7 +286,6 @@ Rules for LONG:
 "form index", "risk index", "value gap index", "captaincy index", "recent form index",
 "active signal", "venue factor", "overall rating",
 "stable scoring profile", "has a stable", "boasts a projection", "boasts a stable"
-${rec === "SELL" ? '\nSELL-context bans: "great form", "solid buy", "strong option", "must-start", "strong performer", "reliable output", "promising projection", "reliable", "solid", "strong", "viable", "dependable", "promising"' : ""}
 
 ━━ RESPONSE FORMAT — return ONLY valid JSON ━━
 {
@@ -671,34 +666,32 @@ Deno.serve(async (req: Request) => {
           const isByePlayer = player.is_bye === true;
 
           const promptPayload = {
-            player_name:              player.player_name,
-            team:                     player.team,
-            position:                 player.position,
-            price_dollars:            player.price,
-            price_change_dollars:     player.price_change,
-            projected_points:         player.projection_final,
-            ceiling_points:           player.ceiling,
-            floor_points:             player.floor,
-            consistency_pct:          player.consistency,
-            recent_form_trend:        player.form_score,
-            trend_direction:          player.trend_direction,
-            value_gap_index:          player.value_score,
-            value_tier:               player.value_tag,
-            matchup:                  player.matchup_label,
-            matchup_strength:         player.matchup_rating,
-            venue_factor:             player.venue_multiplier,
-            risk_index:               player.risk,
-            projection_confidence:    player.confidence,
-            confidence_tier:          player.confidence_label,
-            overall_rating:           player.neeko_rating_scaled,
-            upside_ceiling_pct:       player.upside_pct,
-            captaincy_index:          player.captain_score,
-            captaincy_tier:           player.captain_rating,
-            games_played:             player.games_played,
-            active_signal_count:      player.signal_count,
-            signal_tags:              (player.top_signals ?? []).slice(0, 3),
-            recommendation:           recommendation,
-            recommendation_strength:  player.recommendation_strength,
+            player_name:           player.player_name,
+            team:                  player.team,
+            position:              player.position,
+            price:                 player.price,
+            price_change:          player.price_change,
+            projection:            player.projection_final,
+            ceiling:               player.ceiling,
+            floor:                 player.floor,
+            consistency:           player.consistency,
+            recent_form:           player.form_score,
+            trend:                 player.trend_direction,
+            value:                 player.value_score,
+            value_tier:            player.value_tag,
+            matchup:               player.matchup_label,
+            matchup_rating:        player.matchup_rating,
+            venue_multiplier:      player.venue_multiplier,
+            risk:                  player.risk,
+            confidence:            player.confidence,
+            confidence_tier:       player.confidence_label,
+            rating:                player.neeko_rating_scaled,
+            upside_pct:            player.upside_pct,
+            captaincy_score:       player.captain_score,
+            captaincy_tier:        player.captain_rating,
+            games_played:          player.games_played,
+            signal_count:          player.signal_count,
+            signal_tags:           (player.top_signals ?? []).slice(0, 3),
             ...(isByePlayer ? { bye_round: player.bye_round, team_on_bye: true } : {}),
           };
 
@@ -729,12 +722,12 @@ Deno.serve(async (req: Request) => {
           } else {
             result = isByePlayer
               ? {
-                  why: `${player.player_name} is unavailable — team bye round ${player.bye_round}, season avg projection ${player.projection_final}.`,
-                  long: `${player.player_name}'s team is on bye and the player cannot be selected. Season projection sits at ${player.projection_final} between ceiling ${player.ceiling} and floor ${player.floor}. Priced at ${player.price} with value score ${player.value_score} — worth holding for return. Risk is ${player.risk} with confidence ${player.confidence} (${player.confidence_label}). Form score of ${player.form_score} signals what to expect when they return from bye.`,
+                  why: `${player.player_name} is unavailable due to their team's bye in round ${player.bye_round}, projected at ${player.projection_final} points.`,
+                  long: `${player.player_name}'s team is on bye and the player cannot be selected this round. Season projection sits at ${player.projection_final} points between a ceiling of ${player.ceiling} and floor of ${player.floor}. Priced at $${player.price?.toLocaleString()}, the current valuation reflects a ${player.value_tag ?? "neutral"} value profile. Risk sits at ${player.risk} with ${player.confidence_label ?? "moderate"} confidence in the projection. Recent form of ${player.form_score} points sets the baseline expectation for their return.`,
                 }
               : {
-                  why: `Proj ${player.projection_final}, value ${player.value_score ?? "N/A"}, risk ${player.risk ?? "N/A"}, form ${player.form_score ?? "N/A"}.`,
-                  long: `Projection of ${player.projection_final} sits between ceiling ${player.ceiling} and floor ${player.floor}. Form score is ${player.form_score} with value tag ${player.value_tag}. Priced at ${player.price} with value score ${player.value_score}. Risk is ${player.risk} with confidence ${player.confidence} (${player.confidence_label}). Matchup is ${player.matchup_label ?? "neutral"} — recommendation is ${recommendation}.`,
+                  why: `${player.player_name} projects at ${player.projection_final} points with a ceiling of ${player.ceiling} and floor of ${player.floor}.`,
+                  long: `The projection of ${player.projection_final} points sits between a ceiling of ${player.ceiling} and a floor of ${player.floor}. Recent form tracks at ${player.form_score} with a ${player.trend_direction ?? "flat"} trend. Priced at $${player.price?.toLocaleString()}, the value profile is classified as ${player.value_tag ?? "neutral"}. Risk sits at ${player.risk} with ${player.confidence_label ?? "moderate"} projection confidence. The ${player.matchup_label ?? "neutral"} matchup rating confirms the output range.`,
                 };
             processed++;
           }
