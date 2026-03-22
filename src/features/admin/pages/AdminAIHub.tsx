@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { runCommand } from "@/hooks/useAdminCommand";
 import { Button } from "@/components/ui/button";
@@ -7,10 +7,137 @@ import { useToast } from "@/hooks/use-toast";
 import {
   RefreshCw, Bot, Zap, TrendingUp, Play, TriangleAlert as AlertTriangle,
   CircleCheck as CheckCircle, Circle as XCircle, SquareCheck as CheckSquare,
-  Trash2, ShieldAlert,
+  Trash2, ShieldAlert, Activity,
 } from "lucide-react";
 import { formatDate } from "@/features/admin/shared/adminUtils";
 import type { CommandCenterStatus } from "@/features/admin/shared/types";
+
+interface RegenProgress {
+  completed: number;
+  remaining: number;
+  total: number;
+  pct_complete: number;
+  priority_remaining: number;
+  last_generated_at: string | null;
+}
+
+function RegenProgressPanel({ onComplete }: { onComplete: () => void }) {
+  const [progress, setProgress] = useState<RegenProgress | null>(null);
+  const [polling, setPolling] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  async function fetchProgress() {
+    const { data } = await supabase.rpc("get_ai_regen_progress");
+    if (data) setProgress(data as RegenProgress);
+  }
+
+  function startPolling() {
+    setPolling(true);
+    fetchProgress();
+    intervalRef.current = setInterval(() => {
+      fetchProgress();
+    }, 8000);
+  }
+
+  function stopPolling() {
+    setPolling(false);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    onComplete();
+  }
+
+  useEffect(() => {
+    fetchProgress();
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  if (!progress) {
+    return <div className="h-16 rounded-lg border border-border bg-card animate-pulse" />;
+  }
+
+  const pct = progress.pct_complete;
+  const barColor = pct >= 90 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-blue-500";
+  const isComplete = progress.remaining === 0;
+
+  return (
+    <div className={`rounded-lg border p-4 space-y-3 ${
+      isComplete ? "border-emerald-900/40 bg-emerald-950/10" : "border-border bg-card"
+    }`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Activity className="h-4 w-4 text-muted-foreground shrink-0" />
+          <p className="text-sm font-semibold">Regen Progress</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isComplete ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold bg-emerald-950 text-emerald-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Complete
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold bg-amber-950 text-amber-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              {progress.remaining} remaining
+            </span>
+          )}
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={fetchProgress}>
+            <RefreshCw className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>{progress.completed} / {progress.total} players</span>
+          <span className="font-semibold tabular-nums text-foreground">{pct}%</span>
+        </div>
+        <div className="h-2 rounded-full bg-muted overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 text-center">
+        {[
+          { label: "Completed", value: progress.completed, color: "text-emerald-400" },
+          { label: "Remaining", value: progress.remaining, color: progress.remaining > 0 ? "text-amber-400" : "text-emerald-400" },
+          { label: "Priority Left", value: progress.priority_remaining, color: progress.priority_remaining > 0 ? "text-orange-400" : "text-emerald-400" },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="rounded-md bg-muted/40 px-2 py-2">
+            <p className={`text-sm font-bold tabular-nums ${color}`}>{value}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{label}</p>
+          </div>
+        ))}
+      </div>
+
+      {progress.last_generated_at && (
+        <p className="text-[11px] text-muted-foreground">
+          Last generated: {new Date(progress.last_generated_at).toLocaleString("en-AU", { dateStyle: "short", timeStyle: "short" })}
+        </p>
+      )}
+
+      <div className="flex gap-2 pt-1">
+        {!polling ? (
+          <Button variant="outline" size="sm" className="text-xs" onClick={startPolling}>
+            <Activity className="h-3 w-3 mr-1.5" />
+            Auto-refresh (8s)
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" className="text-xs border-amber-500/40 text-amber-400" onClick={stopPolling}>
+            <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
+            Stop polling
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 type HealthStatus = "ok" | "warn" | "error" | "loading";
 
@@ -328,6 +455,9 @@ export default function AdminAIHub() {
           ))}
         </div>
       )}
+
+      {/* Regen Progress */}
+      <RegenProgressPanel onComplete={fetchAll} />
 
       <div className="grid gap-5 lg:grid-cols-2">
 
