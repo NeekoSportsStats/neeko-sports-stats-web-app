@@ -30,7 +30,7 @@ interface RankingRow {
   price_change: number | null;
   value_score: number | null;
   value_tag: string | null;
-  ai_summary: string | null;
+  why: string | null;
   recommendation_color: string | null;
   refreshed_at: string | null;
   edge_score: number | null;
@@ -251,7 +251,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
 function buildShareText(row: RankingRow, section: Section): string {
   const conf = row.projection_confidence;
   const confStr = conf != null ? ` (${conf}% confidence)` : "";
-  const oneLiner = row.ai_summary ? getOneLiner(row.ai_summary) : null;
+  const oneLiner = row.why ? getOneLiner(row.why) : null;
   const reasonStr = oneLiner ? `\n"${oneLiner}"` : "";
   switch (section) {
     case "captain": return `🔥 AFL Fantasy Captain Pick (Neeko)\n${row.player_name} (${row.team}) — ${fmtInt(row.projection_final)} pts${confStr}${reasonStr}\n\nneekosports.com.au #AFLFantasy`;
@@ -614,10 +614,10 @@ function PlayerAnalysisModal({ row, section, isPremium, onClose, onUpgrade }: Pl
 
           {/* AI Analysis */}
           {isPremium ? (
-            row.ai_summary ? (
+            row.why ? (
               <div>
-                <p className={`text-[9px] font-bold uppercase tracking-widest mb-2 ${cfg.accentText} opacity-70`}>AI Analysis</p>
-                <p className="text-[13px] text-white/75 leading-relaxed">{row.ai_summary}</p>
+                <p className={`text-[9px] font-bold uppercase tracking-widest mb-2 ${cfg.accentText} opacity-70`}>Why</p>
+                <p className="text-[13px] text-white/75 leading-relaxed">{row.why}</p>
               </div>
             ) : (
               <p className="text-sm text-white/30 italic">No analysis available yet.</p>
@@ -725,7 +725,7 @@ function HeroPickCard({ row, section, isPremium, onOpen }: HeroPickCardProps) {
   const cfg = getSectionLabel(section);
   const metric = getPrimaryMetric(row, section);
   const conf = row.projection_confidence;
-  const oneLiner = row.ai_summary ? truncateWords(getOneLiner(row.ai_summary), 9) : null;
+  const oneLiner = row.why ? truncateWords(getOneLiner(row.why), 9) : null;
   const isCaptain = section === "captain";
 
   return (
@@ -1070,7 +1070,7 @@ export default function AFLRoundEdgeBoard() {
         price_change:          r.price_change != null ? Number(r.price_change) : null,
         value_score:           r.value_score != null ? Number(r.value_score) : null,
         value_tag:             r.value_tag ?? null,
-        ai_summary:            r.ai_summary ?? null,
+        why:                   r.why ?? null,
         recommendation_color:  r.recommendation_color ?? null,
         refreshed_at:          r.refreshed_at ?? null,
         edge_score:            r.edge_score != null ? Number(r.edge_score) : null,

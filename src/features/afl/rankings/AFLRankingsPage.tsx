@@ -171,8 +171,8 @@ const PREMIUM_COLUMNS =
   "projection_final,ceiling,floor," +
   "consistency,form_score,neeko_rating,neeko_rating_scaled,price,prev_price,price_change,price_change_pct,value_score,best_value_score,value_tag,value_tier," +
   "projection_confidence,risk_rating,matchup_rating,matchup_label,matchup_multiplier," +
-  "upside_rating,upside_pct,captain_score,captain_rating,ai_recommendation,recommendation_strength,recommendation_color," +
-  "recommendation_short,recommendation_why,ai_summary,consistency_tier,total_count,cached_at,games_played,ai_updated_at," +
+  "upside_rating,upside_pct,captain_score,captain_rating,recommendation_color," +
+  "summary_short,summary_long,consistency_tier,total_count,cached_at,games_played,ai_updated_at," +
   "start_sit_decision,edge_score,edge_tier,market_watch_category,status,is_available";
 
 const FREE_COLUMNS =
@@ -180,12 +180,12 @@ const FREE_COLUMNS =
   "projection_final,ceiling,floor," +
   "consistency,form_score,neeko_rating,neeko_rating_scaled,price,prev_price,price_change,price_change_pct,value_score,best_value_score,value_tag,value_tier," +
   "projection_confidence,risk_rating,matchup_rating,matchup_label,matchup_multiplier," +
-  "ai_recommendation,recommendation_strength,recommendation_color,recommendation_short,recommendation_why,ai_summary," +
+  "recommendation_color,summary_short,summary_long," +
   "consistency_tier,access_tier,total_count,cached_at,games_played,row_rank," +
   "start_sit_decision,edge_score,edge_tier,market_watch_category,status,is_available";
 
 const AI_COLUMNS =
-  "player_id,recommendation_short,recommendation_why,ai_summary,ai_updated_at";
+  "player_id,summary_short,summary_long,ai_updated_at";
 
 export default function AFLRankingsPage() {
   const { isPremium } = useAuth();
@@ -259,21 +259,16 @@ export default function AFLRankingsPage() {
       best_value_score:       r.best_value_score != null ? Number(r.best_value_score) : null,
       value_tag:              r.value_tag ?? null,
       value_tier:             r.value_tier ?? null,
-      ai_recommendation:      r.ai_recommendation ?? null,
-      recommendation_strength: r.recommendation_strength ?? null,
+      ai_recommendation:      null,
+      recommendation_strength: null,
       recommendation_color:   r.recommendation_color ?? null,
       consistency_tier:       r.consistency_tier ?? null,
       total_count:            r.total_count != null ? Number(r.total_count) : null,
       games_played:           r.games_played != null ? Number(r.games_played) : null,
       ai_updated_at:          r.ai_updated_at ?? null,
-      why: r.why
-        ?? r.recommendation_short
-        ?? null,
-      long: r.long
-        ?? r.recommendation_why
-        ?? r.ai_summary
-        ?? null,
-      ai_summary:           r.ai_summary ?? null,
+      why:  r.summary_short ?? null,
+      long: r.summary_long ?? null,
+      ai_summary:           null,
       start_sit_decision:   r.start_sit_decision ?? null,
       edge_score:           r.edge_score != null ? Number(r.edge_score) : null,
       edge_tier:            r.edge_tier ?? null,
@@ -290,12 +285,12 @@ export default function AFLRankingsPage() {
     if (view === "free") {
       const { data } = await supabase
         .from("v_rankings_free")
-        .select("player_id,recommendation_short")
+        .select("player_id,summary_short")
         .eq("player_id", row.player_id)
         .maybeSingle();
       if (!data) return {};
       return {
-        why: (data as any).recommendation_short ?? row.why,
+        why: (data as any).summary_short ?? row.why,
       };
     }
     const { data } = await supabase
@@ -305,8 +300,8 @@ export default function AFLRankingsPage() {
       .maybeSingle();
     if (!data) return {};
     return {
-      why:           (data as any).recommendation_short ?? row.why,
-      long:          (data as any).recommendation_why ?? row.long,
+      why:           (data as any).summary_short ?? row.why,
+      long:          (data as any).summary_long ?? row.long,
       ai_updated_at: (data as any).ai_updated_at ?? row.ai_updated_at,
     };
   }
