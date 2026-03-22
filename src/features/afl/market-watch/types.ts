@@ -55,7 +55,7 @@ export interface MWPlayerRow {
   projection_confidence: number | null;
   avg_season: number | null;
   ai_recommendation: string | null;
-  summary_short: string | null;
+  recommendation_short: string | null;
   matchup_label: string | null;
 }
 

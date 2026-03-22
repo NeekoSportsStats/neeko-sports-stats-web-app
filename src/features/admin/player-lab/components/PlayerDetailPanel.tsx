@@ -86,7 +86,7 @@ export function PlayerDetailPanel({
             <span className="text-muted-foreground">{player.team}</span>
             <span className="text-[10px] bg-muted/40 px-1.5 py-0.5 rounded font-mono">{player.position}</span>
             <ConfidenceBadge label={player.confidence_label} />
-            <RecoBadge color={player.recommendation_color} short={player.summary_short} />
+            <RecoBadge color={player.recommendation_color} short={player.recommendation_short} />
           </div>
           {console.log("Player Lab status sample:", player.player_name, "→", player.status, "| is_available:", player.is_available) as undefined}
           <div className="text-muted-foreground mt-1">{fmtPrice(player.price)} · Rating {fmtNum(player.neeko_rating, 0)} · {player.games_played ?? "—"} games</div>
@@ -231,16 +231,16 @@ export function PlayerDetailPanel({
         </div>
       )}
 
-      {player.summary_short && (
+      {player.recommendation_short && (
         <div className="space-y-1.5">
           <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Why</div>
-          <p className="text-muted-foreground leading-relaxed">{player.summary_short}</p>
+          <p className="text-muted-foreground leading-relaxed">{player.recommendation_short}</p>
         </div>
       )}
-      {player.summary_long && (
+      {player.recommendation_why && (
         <div className="space-y-1.5">
           <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Full Analysis</div>
-          <p className="text-muted-foreground leading-relaxed">{player.summary_long}</p>
+          <p className="text-muted-foreground leading-relaxed">{player.recommendation_why}</p>
         </div>
       )}
     </div>
