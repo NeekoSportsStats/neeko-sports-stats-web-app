@@ -204,63 +204,20 @@ export function getConfidenceLabelColor(v: number | null): string {
 }
 
 /**
- * Normalise raw DB confidence into a calibrated display-ready score with real spread.
- *
- * Uses a base-plus-adjustments model:
- *   1. Base from raw projection_confidence percentile (40–84 range from DB → mapped to 66–84)
- *   2. Consistency modifier: bounded ±5 (not dominant)
- *   3. Risk modifier: bounded -1 to -8 (risk=50 default = -4 penalty)
- *   4. Minor rank modifier: ±1-2 to break ties, not inflate
- *
- * Target distribution:
- *   Elite safe players: 84–91
- *   Strong premium plays: 78–85
- *   Solid top-30: 72–80
- *   Moderate risk: 64–71
- *   Volatile: 52–63
- *
- * Input values may be 0–100 or 0.0–1.0 from the DB.
+ * Pass-through display confidence from the model pipeline.
+ * projection_confidence in the DB already has real variance (35–95) driven
+ * by the projection engine. Display it directly — no remapping, no clamping.
+ * Normalises 0–1 fractional values to 0–100 for legacy DB rows only.
  */
 export function normaliseConfidence(
   rawConf: number | null,
-  consistencyScore: number | null,
-  riskRating: number | null,
-  rank: number,
+  _consistencyScore: number | null,
+  _riskRating: number | null,
+  _rank: number,
 ): number | null {
   if (rawConf == null) return null;
-
-  const conf = rawConf <= 1 ? rawConf * 100 : rawConf;
-  const consistency = consistencyScore != null
-    ? (consistencyScore <= 1 ? consistencyScore * 100 : consistencyScore)
-    : 55;
-  const risk = riskRating != null
-    ? (riskRating <= 1 ? riskRating * 100 : riskRating)
-    : 50;
-
-  // 1. Base score: map raw confidence (DB range ~35-65) linearly to display range 54-84
-  //    DB raw conf of 35 → 54, 50 → 66, 65 → 80, 80+ → 88
-  const base = 44 + (conf * 0.68);
-
-  // 2. Consistency modifier — bounded [-3, +5], not dominant
-  //    consistency ~70-90 for top players — gives +2 to +4, not the full +24 of old formula
-  const consistencyMod = Math.max(-3, Math.min(5, (consistency - 60) * 0.18));
-
-  // 3. Risk modifier — penalise high risk meaningfully
-  //    risk=10 (secure role) → -0.4, risk=50 (default/unknown) → -4, risk=70+ → -6+
-  const riskMod = Math.max(-8, Math.min(-0.5, -(risk * 0.11)));
-
-  // 4. Minor rank tiebreaker — only ±2 max, prevents bunching without inflating
-  let rankMod = 0;
-  if (rank <= 5)        rankMod = 1.8;
-  else if (rank <= 10)  rankMod = 1.2;
-  else if (rank <= 20)  rankMod = 0.6;
-  else if (rank <= 30)  rankMod = 0.2;
-  else if (rank >= 200) rankMod = -1.5;
-  else if (rank >= 100) rankMod = -0.8;
-
-  const raw = base + consistencyMod + riskMod + rankMod;
-
-  return Math.round(Math.max(52, Math.min(raw, 91)));
+  const conf = rawConf <= 1 ? Math.round(rawConf * 100) : Math.round(rawConf);
+  return Math.max(0, Math.min(100, conf));
 }
 
 export function getValueScoreColor(v: number | null): string {

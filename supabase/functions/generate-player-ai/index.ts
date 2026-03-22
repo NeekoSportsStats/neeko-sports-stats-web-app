@@ -590,15 +590,13 @@ Deno.serve(async (req: Request) => {
           const now = new Date().toISOString();
 
           const { error: rpcErr } = await supabase.rpc("upsert_player_ai_analysis", {
-            p_player_id:         player.player_id,
-            p_recommendation:    recommendation,
-            p_confidence:        player.confidence ?? null,
-            p_summary_short:     result.why,
-            p_summary_long:      result.long,
-            p_model:             "gpt-4o-mini",
-            p_input_hash:        player.input_hash ?? null,
-            p_ai_input_snapshot: null,
-            p_prompt_version:    PROMPT_VERSION,
+            p_player_id:            player.player_id,
+            p_recommendation:       recommendation,
+            p_recommendation_short: result.why,
+            p_recommendation_why:   result.long,
+            p_color:                null,
+            p_ai_summary:           result.long,
+            p_prompt_version:       PROMPT_VERSION,
           });
           if (rpcErr) throw rpcErr;
 
