@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const BATCH_SIZE = 5;
 const DEFAULT_MAX_PLAYERS = 20;
-const PROMPT_VERSION = "generate-player-ai-v8";
+const PROMPT_VERSION = "generate-player-ai-v9";
 const MAX_RETRY_ATTEMPTS = 2;
 
 // ── BANNED PHRASES ─────────────────────────────────────────────────────────
@@ -38,6 +38,11 @@ const BANNED_ALWAYS = [
   "overall,",
   "in conclusion",
   "in summary",
+  "solid option",
+  "good choice",
+  "could",
+  "might",
+  "may",
 ];
 const BANNED_OPENINGS = [
   "primed for a solid", "primed for a strong", "primed for a great",
@@ -49,32 +54,35 @@ const BANNED_OPENINGS = [
 
 const RECOMMENDATION_TONE: Record<string, string> = {
   BUY: `RECOMMENDATION = BUY
-The player is underpriced or has upside the market hasn't priced in.
-Lead with: price inefficiency, rising form, value score, or favourable matchup.
-Tone: assertive, opportunity-focused. Reference the specific value_score or price gap.
+The decision is made: this player is underpriced and the upside is not priced in.
+Lead with: the clear value gap, price inefficiency, rising form, or favourable matchup.
+Use phrases like: "clear value gap", "mispriced relative to output", "upside is not priced in", "shows", "confirms", "drives", "reinforces".
+Tone: assertive and opportunity-focused. Reference the specific value_score or price gap.
 NEVER use sell/decline/avoid language.`,
 
   HOLD: `RECOMMENDATION = HOLD
-The player is a reliable baseline — keep but don't trade.
-Lead with: projection stability, known ceiling/floor range, or consistent form.
-Tone: calm and analytical. No over-enthusiasm. No dismissiveness.
-Acknowledge the ceiling and floor range specifically.`,
+The decision is made: this player is a stable scoring profile — hold firm.
+Lead with: the defined range, stable projection, or consistent output that confirms the hold.
+Use phrases like: "stable scoring profile", "range is well defined", "reliable baseline output", "shows", "confirms", "reinforces".
+Tone: calm and analytical. Acknowledge the ceiling and floor range specifically. No hedging.`,
 
   SELL: `RECOMMENDATION = SELL
-The player is overpriced, declining, or has structural risk. SELL signal is firm.
-Lead with: the primary sell reason (overpriced vs output, declining form, soft ceiling, risky matchup, or limited role).
-Tone: direct and cautious. Use words like: declining, overpriced, ceiling too low, risky, dipping, limited upside, soft ceiling, sell signal, value deficit.
-NEVER use positive language. NEVER say "reliable", "solid", "strong", "viable", "dependable", "promising".
-The "why" MUST express a clear negative signal — declining form, overpriced, soft ceiling, risky. Never neutral.`,
+The decision is made: risk outweighs value. SELL signal is firm.
+Lead with: the primary sell reason — price exceeds output, regression signals present, declining form, soft ceiling, or structural risk.
+Use phrases like: "risk outweighs value", "price exceeds output", "regression signals present", "declining", "overpriced", "soft ceiling", "value deficit".
+Tone: direct and firm. NEVER use positive language. NEVER say "reliable", "solid", "strong", "viable", "dependable", "promising".
+The "why" MUST express a clear negative signal. Never neutral.`,
 
   START: `RECOMMENDATION = START
-The player is a clear start/captain candidate.
-Lead with: elite projection, matchup advantage, or ceiling potential.
+The decision is made: this player is a clear start candidate.
+Lead with: elite projection, matchup advantage, or ceiling potential that confirms the start.
+Use phrases like: "shows", "confirms", "ceiling is live", "matchup reinforces the case".
 Tone: decisive and specific. Reference projection and ceiling numbers.`,
 
   SIT: `RECOMMENDATION = SIT
-The player should be benched this round.
-Lead with: the specific reason to sit (low projection, poor matchup, injury risk, role concern, or declining form).
+The decision is made: this player should be benched.
+Lead with: the specific reason — low projection, poor matchup, injury risk, or role concern.
+Use phrases like: "shows", "confirms the risk", "drives the sit call".
 Tone: clear and firm. Do NOT frame this positively.`,
 };
 
@@ -99,15 +107,29 @@ function buildSystemPrompt(recommendation: string): string {
 Your ONLY job:
 → Explain WHY the ${rec} recommendation is correct
 → Using precise numbers, signals, and context
-→ In a confident, analyst tone
+→ As if the decision has already been made and you are justifying it confidently
 
 ${tone}
 
 ${recommendationAlignment}
 
+━━ CONVICTION RULES (CRITICAL) ━━
+You are not neutral. A decision has already been made. You are justifying it.
+- Every response must clearly reinforce the ${rec} recommendation
+- Sound decisive, not observational — you are confirming a call, not exploring one
+- Avoid passive or hedging phrasing at all costs
+
+REPLACE weak verbs with strong ones:
+- "indicates" → "shows"
+- "suggests" → "confirms"
+- "could" → banned entirely
+- "may" → banned entirely
+- "potentially" → banned entirely
+- "might" → banned entirely
+
 ━━ TONE RULES (non-negotiable) ━━
 - Write like a sharp analyst, not a chatbot
-- Be direct and decisive — never hedge with "could", "might", "may", "potentially", "arguably"
+- Be direct and decisive — never hedge
 - Never use generic phrases that could apply to any player
 - Every sentence must be specific to THIS player's numbers
 - If signal_tags are provided, you MUST use at least ONE — integrate it naturally, do not list them
@@ -126,6 +148,9 @@ WHY — EXACTLY 1 sentence, max 140 characters:
 - Must be player-specific — never a template sentence
 - Start with the player name OR a direct data point
 ${rec === "SELL" ? "- Must express a clear negative signal — declining, overpriced, risky, soft ceiling. Never neutral." : ""}
+${rec === "BUY" ? '- Use language like: "clear value gap", "mispriced relative to output", or "upside is not priced in"' : ""}
+${rec === "HOLD" ? '- Use language like: "stable scoring profile", "range is well defined", or "reliable baseline output"' : ""}
+${rec === "SELL" ? '- Use language like: "risk outweighs value", "price exceeds output", or "regression signals present"' : ""}
 
 LONG — EXACTLY 5 sentences (count carefully):
 Sentence 1 → Projection context: projection_final vs ceiling vs floor — is the range tight or wide?
@@ -139,12 +164,14 @@ Rules for LONG:
 - Sentence order can vary — lead with the most compelling angle for this specific player
 - Do NOT start multiple sentences with "His", "He", or the player name
 - Do NOT duplicate the "why" sentence
+- Every sentence must reinforce the ${rec} call — not just describe
 
 ━━ BANNED PHRASES — NEVER USE ━━
 "this round", "fantasy coaches should", "coaches should", "based on current projections",
 "primed for", "is primed", "worth noting", "overall,", "in conclusion", "in summary",
 "it is worth", "reliable option", "solid choice", "viable option", "dependable option",
-"could", "might", "may offer", "arguably", "potentially"
+"solid option", "good choice",
+"could", "might", "may", "arguably", "potentially", "indicates", "suggests"
 ${rec === "SELL" ? '\nSELL-specific bans: "great form", "solid buy", "strong option", "must-start", "strong performer", "reliable output", "promising projection", "reliable", "solid", "strong", "viable", "dependable", "promising"' : ""}
 
 ━━ RESPONSE FORMAT — return ONLY valid JSON ━━
@@ -156,9 +183,10 @@ ${rec === "SELL" ? '\nSELL-specific bans: "great form", "solid buy", "strong opt
 FINAL CHECK before responding:
 1. Does "why" contain a specific number? (required)
 2. Is "long" exactly 5 sentences? (count the full stops/punctuation)
-3. Does every sentence support the ${rec} call?
+3. Does every sentence reinforce the ${rec} call decisively?
 4. Have you used at least one signal from signal_tags (if provided)?
-5. Have you avoided all banned phrases?`;
+5. Have you avoided ALL banned phrases including "could", "might", "may", "indicates", "suggests", "solid option", "good choice"?
+6. Does the output sound like a decision has been made — not a possibility being explored?`;
 }
 
 // ── TYPES ───────────────────────────────────────────────────────────────────
@@ -240,6 +268,14 @@ function validateOutput(result: AIResult, recommendation: string): ValidationRes
   for (const phrase of BANNED_ALWAYS) {
     if (allText.includes(phrase.toLowerCase())) {
       issues.push(`banned phrase: "${phrase}"`);
+    }
+  }
+
+  // Conviction checks — weak/hedging language
+  const weakPhrases = ["indicates", "suggests", "could", "might", "may ", "potentially", "solid option", "good choice"];
+  for (const phrase of weakPhrases) {
+    if (allText.includes(phrase.toLowerCase())) {
+      issues.push(`weak/hedging phrase not allowed: "${phrase}"`);
     }
   }
 
