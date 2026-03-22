@@ -264,7 +264,7 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
             <LockedPlaceholder onUpgrade={onUpgrade} />
           ) : (
             <span className="text-xs text-white/50 leading-snug line-clamp-2 py-2">
-              {row.short ?? "Hold based on current projections"}
+              {row.why ?? "—"}
             </span>
           )}
         </div>

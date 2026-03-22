@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const BATCH_SIZE = 5;
 const DEFAULT_MAX_PLAYERS = 20;
-const PROMPT_VERSION = "generate-player-ai-v6";
+const PROMPT_VERSION = "generate-player-ai-v7";
 const MAX_RETRY_ATTEMPTS = 2;
 
 // ── BANNED PHRASES ─────────────────────────────────────────────────────────
@@ -65,7 +65,7 @@ The player is overpriced, declining, or has structural risk. SELL signal is firm
 Lead with: the primary sell reason (overpriced vs output, declining form, soft ceiling, risky matchup, or limited role).
 Tone: direct and cautious. Use words like: declining, overpriced, ceiling too low, risky, dipping, limited upside, soft ceiling, sell signal, value deficit.
 NEVER use positive language. NEVER say "reliable", "solid", "strong", "viable", "dependable", "promising".
-The "short" MUST start with or include a negative signal — not a neutral descriptor.`,
+The "why" MUST express a clear negative signal — declining form, overpriced, soft ceiling, risky. Never neutral.`,
 
   START: `RECOMMENDATION = START
 The player is a clear start/captain candidate.
@@ -90,17 +90,14 @@ YOUR ONLY JOB: Explain WHY the ${recommendation.toUpperCase()} recommendation is
 
 ━━ STRICT OUTPUT RULES ━━
 
-SHORT (1 sentence, max 110 chars):
-- Lead with the player name and the single strongest signal for the ${recommendation} call
-- Must reference a specific number (projection, value_score, ceiling, floor, price, confidence, or form_score)
-- Must be unique to this player's actual numbers — not a template
-- ${recommendation.toUpperCase() === "SELL" ? "MUST express a clear negative signal — declining form, overpriced, soft ceiling, risky. Never neutral." : ""}
+WHY (EXACTLY 1 sentence, max 140 chars):
+- The single strongest quantitative reason for the ${recommendation} call
+- Must contain at least one specific number (projection, value_score, ceiling, floor, price, confidence, form_score, or upside_pct)
+- Must be player-specific — never a generic template
+- Must start with the player name or a direct data point
+${recommendation.toUpperCase() === "SELL" ? "- MUST express a clear negative signal — declining form, overpriced, soft ceiling, risky. Never neutral." : ""}
 
-WHY (1–2 sentences, max 140 chars total):
-- The single most important quantitative reason for the ${recommendation} rating
-- Concise, decision-focused, player-specific. If signals are provided, reference the most relevant one.
-
-LONG (exactly 5 sentences):
+LONG (EXACTLY 5 sentences — no more, no less):
 1. Projection context: projection_final vs ceiling vs floor — what range does this player live in? Is it tight or wide?
 2. Form and trend: form_score, trend_direction, consistency — is this player trending UP, FLAT, or DOWN?
 3. Value and price: value_score, value_tag, price, price_change — is this player good value, fair, or overpriced?
@@ -115,25 +112,23 @@ Each sentence MUST reference actual numbers or named signals from the data. Anal
 ${recommendation.toUpperCase() === "SELL" ? '\nFOR SELL — also banned: "great form", "solid buy", "strong option", "must-start", "strong performer", "reliable output", "promising projection"' : ""}
 
 ━━ VARIATION RULES ━━
-- Each player MUST have a distinct opening line — never reuse sentence structure
+- Each player MUST have a distinct opening — never reuse sentence structure across players
 - Sentence order in LONG can vary — lead with the most interesting signal for this specific player
 - Avoid starting multiple sentences with "His", "He", or the player name
 - When signals are provided, name them directly (e.g. "the breakout_candidate signal" or "flagged as underpriced_elite")
 
 ━━ RESPONSE FORMAT — return ONLY valid JSON ━━
 {
-  "short": "<one sentence ≤110 chars — player name + strongest ${recommendation} signal + specific number>",
-  "why": "<1–2 sentences ≤140 chars — primary quantitative reason for ${recommendation}, referencing signals if present>",
-  "long": "<exactly 5 sentences — projection/trend/value/confidence/signals — all with real numbers or named signals>"
+  "why": "<EXACTLY 1 sentence ≤140 chars — strongest ${recommendation} signal with a specific number>",
+  "long": "<EXACTLY 5 sentences — projection/trend/value/confidence/signals — all with real numbers or named signals>"
 }
 
-BEFORE RESPONDING: re-read your output. Does every sentence support ${recommendation.toUpperCase()}? Does "short" contain a number? Is "long" exactly 5 sentences? Have you avoided all banned phrases? Are you being decisive and opinionated?`;
+BEFORE RESPONDING: Does "why" contain a number? Is "long" exactly 5 sentences (count them)? Does every sentence support ${recommendation.toUpperCase()}? Have you avoided all banned phrases?`;
 }
 
 // ── TYPES ───────────────────────────────────────────────────────────────────
 
 interface AIResult {
-  short: string;
   why: string;
   long: string;
 }
@@ -186,27 +181,30 @@ interface ValidationResult {
 function validateOutput(result: AIResult, recommendation: string): ValidationResult {
   const issues: string[] = [];
   const rec = recommendation.toUpperCase();
-  const allText = `${result.short} ${result.why} ${result.long}`.toLowerCase();
-  const shortLower = result.short?.toLowerCase() ?? "";
+  const allText = `${result.why} ${result.long}`.toLowerCase();
 
-  if (!result.short || result.short.length < 20) issues.push("short field too short or empty");
-  if (result.short?.length > 130) issues.push("short field too long (>130 chars)");
+  // WHY: exactly 1 sentence, has a number, not too long
   if (!result.why || result.why.length < 15) issues.push("why field too short or empty");
+  if (result.why?.length > 160) issues.push("why field too long (>160 chars)");
+  if (!/\d/.test(result.why ?? "")) issues.push("why field must contain a specific number");
+  const whySentences = (result.why?.match(/[.!?]+/g) ?? []).length;
+  if (whySentences !== 1) issues.push(`why field must be exactly 1 sentence — got ${whySentences}`);
+
+  // LONG: exactly 5 sentences, substantial
   if (!result.long || result.long.length < 100) issues.push("long field too short");
+  const longSentences = (result.long?.match(/[.!?]+/g) ?? []).length;
+  if (longSentences !== 5) issues.push(`long field must be exactly 5 sentences — got ${longSentences}`);
 
-  const sentenceCount = (result.long?.match(/[.!?]+\s*/g) ?? []).length;
-  if (sentenceCount < 3 || sentenceCount > 12) {
-    issues.push(`long field has ${sentenceCount} sentences — expected ~5`);
-  }
+  // No duplication between why and long
+  const whyDupesLong = result.why && result.long
+    ? result.long.toLowerCase().startsWith(result.why.toLowerCase().substring(0, 30))
+    : false;
+  if (whyDupesLong) issues.push("long field is duplicating the why field");
 
+  // Banned phrases
   for (const phrase of BANNED_ALWAYS) {
     if (allText.includes(phrase.toLowerCase())) {
       issues.push(`banned phrase: "${phrase}"`);
-    }
-  }
-  for (const phrase of BANNED_OPENINGS) {
-    if (shortLower.includes(phrase.toLowerCase())) {
-      issues.push(`banned opening in short: "${phrase}"`);
     }
   }
 
@@ -233,15 +231,6 @@ function validateOutput(result: AIResult, recommendation: string): ValidationRes
     }
   }
 
-  if (!/\d/.test(result.short)) {
-    issues.push("short field must contain a specific number");
-  }
-
-  const whyDupesLong = result.why && result.long
-    ? result.long.toLowerCase().startsWith(result.why.toLowerCase().substring(0, 30))
-    : false;
-  if (whyDupesLong) issues.push("long field is duplicating the why field");
-
   return { valid: issues.length === 0, issues };
 }
 
@@ -255,8 +244,8 @@ async function callOpenAI(
 ): Promise<{ result: AIResult | null; validation: ValidationResult | null; attempts: number }> {
   const userContent = [
     `Write a ${recommendation.toUpperCase()} explanation for this AFL fantasy player.`,
-    `Every field must specifically justify the ${recommendation.toUpperCase()} recommendation.`,
-    `Use only these numbers — do not invent any:\n${JSON.stringify(playerData, null, 2)}`,
+    `Return exactly 2 fields: "why" (1 sentence with a number) and "long" (exactly 5 sentences).`,
+    `Every sentence must justify the ${recommendation.toUpperCase()} recommendation using only these numbers — do not invent any:\n${JSON.stringify(playerData, null, 2)}`,
   ].join("\n\n");
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -297,7 +286,6 @@ async function callOpenAI(
   try {
     const raw = JSON.parse(content);
     parsed = {
-      short: raw.short ?? raw.summary_short ?? "",
       why: raw.why ?? "",
       long: raw.long ?? raw.summary_long ?? "",
     };
@@ -340,7 +328,6 @@ async function callOpenAI(
         try {
           const retryRaw = JSON.parse(retryContent);
           const retryParsed: AIResult = {
-            short: retryRaw.short ?? retryRaw.summary_short ?? "",
             why: retryRaw.why ?? "",
             long: retryRaw.long ?? retryRaw.summary_long ?? "",
           };
@@ -523,22 +510,20 @@ Deno.serve(async (req: Request) => {
             processed++;
           } else {
             result = {
-              short: `${player.player_name} — ${recommendation} | proj ${player.projection_final} | value ${player.value_score}`,
-              why: `Value score ${player.value_score ?? "N/A"}, risk ${player.risk ?? "N/A"}, form ${player.form_score ?? "N/A"}`,
-              long: `Recommendation: ${recommendation}. Projection: ${player.projection_final} pts, ceiling: ${player.ceiling}, floor: ${player.floor}. Form score: ${player.form_score}. Value tag: ${player.value_tag}. Matchup: ${player.matchup_label ?? "neutral"}.`,
+              why: `Proj ${player.projection_final}, value ${player.value_score ?? "N/A"}, risk ${player.risk ?? "N/A"}, form ${player.form_score ?? "N/A"}.`,
+              long: `Projection of ${player.projection_final} sits between ceiling ${player.ceiling} and floor ${player.floor}. Form score is ${player.form_score} with value tag ${player.value_tag}. Priced at ${player.price} with value score ${player.value_score}. Risk is ${player.risk} with confidence ${player.confidence} (${player.confidence_label}). Matchup is ${player.matchup_label ?? "neutral"} — recommendation is ${recommendation}.`,
             };
             processed++;
           }
 
-          const summaryLong = `${result.why}\n\n${result.long}`.trim();
           const now = new Date().toISOString();
 
           const { error: rpcErr } = await supabase.rpc("upsert_player_ai_analysis", {
             p_player_id:         player.player_id,
             p_recommendation:    recommendation,
             p_confidence:        65,
-            p_summary_short:     result.short,
-            p_summary_long:      summaryLong,
+            p_summary_short:     result.why,
+            p_summary_long:      result.long,
             p_model:             "gpt-4o-mini",
             p_input_hash:        player.input_hash ?? null,
             p_ai_input_snapshot: null,
@@ -550,9 +535,9 @@ Deno.serve(async (req: Request) => {
             .schema("afl" as any)
             .from("player_rankings_cache")
             .update({
-              recommendation_short: result.short,
-              recommendation_why:   summaryLong,
-              ai_summary:           summaryLong,
+              recommendation_short: result.why,
+              recommendation_why:   result.long,
+              ai_summary:           result.long,
               ai_updated_at:        now,
               ai_prompt_version:    PROMPT_VERSION,
               ai_validation_passed: validation.valid,

@@ -32,9 +32,9 @@ export interface RankingRow {
   consistency_tier: string | null;
   total_count: number | null;
   games_played: number | null;
-  /** WHY column — short 1-sentence summary (maps to recommendation_short) */
-  short: string | null;
-  /** Modal extended analysis — full AI paragraph (maps to recommendation_why / ai_summary) */
+  /** WHY — single sentence with strongest signal (maps to recommendation_short / primary_reason) */
+  why: string | null;
+  /** LONG — exactly 5-sentence breakdown (maps to recommendation_why / ai_summary) */
   long: string | null;
   /** Single-source decision: START / SIT / CONSIDER */
   start_sit_decision: string | null;

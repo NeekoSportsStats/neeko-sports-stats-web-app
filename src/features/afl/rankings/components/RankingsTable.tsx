@@ -118,7 +118,7 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
     if (isPremium) return false;
     if (idx < FREE_FULL_ROWS) return false;
     if (idx < FREE_PARTIAL_ROWS) {
-      return ["price", "value_score", "value_tag", "ai_recommendation", "recommendation_why", "ai_summary"].includes(colKey);
+      return ["price", "value_score", "value_tag", "ai_recommendation", "why", "long"].includes(colKey);
     }
     return true;
   };
@@ -253,13 +253,13 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
         ) : <span className="text-white/20 text-xs">—</span>}
       </td>
       <td className="px-4 py-3 text-left align-top" style={{ minWidth: 180, maxWidth: 280, width: 280 }}>
-        {locked("recommendation_why") ? (
+        {locked("why") ? (
           <LockedCell onClick={onUpgrade} />
         ) : (() => {
-          const whyText = row.short ?? "Hold based on current projections";
-          return (
-            <span className="text-xs text-white/60 leading-snug block line-clamp-2 max-w-[260px]">{whyText}</span>
-          );
+          const whyText = row.why ?? null;
+          return whyText
+            ? <span className="text-xs text-white/60 leading-snug block line-clamp-2 max-w-[260px]">{whyText}</span>
+            : <span className="text-white/20 text-xs">—</span>;
         })()}
       </td>
     </tr>

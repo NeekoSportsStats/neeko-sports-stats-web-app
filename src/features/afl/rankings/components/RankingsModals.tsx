@@ -843,7 +843,7 @@ export function PlayerDetailModal({
             </div>
           )}
 
-          {/* 2. AI Recommendation (green card) — uses recommendation_short only */}
+          {/* 2. AI Recommendation card — label + WHY sentence */}
           {unlocked && row.ai_recommendation && (
             <div
               className="rounded-lg border px-4 py-4"
@@ -853,8 +853,8 @@ export function PlayerDetailModal({
               <p className="text-base font-bold mb-2" style={{ color: recColor }}>
                 {row.ai_recommendation}
               </p>
-              {row.short && (
-                <p className="text-sm text-white/70 leading-relaxed">{row.short}</p>
+              {row.why && (
+                <p className="text-sm text-white/70 leading-relaxed">{row.why}</p>
               )}
             </div>
           )}

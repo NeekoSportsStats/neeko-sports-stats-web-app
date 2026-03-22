@@ -266,9 +266,8 @@ export default function AFLRankingsPage() {
       total_count:            r.total_count != null ? Number(r.total_count) : null,
       games_played:           r.games_played != null ? Number(r.games_played) : null,
       ai_updated_at:          r.ai_updated_at ?? null,
-      short: r.short
+      why: r.why
         ?? r.recommendation_short
-        ?? r.ai_summary_short
         ?? null,
       long: r.long
         ?? r.recommendation_why
@@ -296,7 +295,7 @@ export default function AFLRankingsPage() {
         .maybeSingle();
       if (!data) return {};
       return {
-        short: (data as any).recommendation_short ?? row.short,
+        why: (data as any).recommendation_short ?? row.why,
       };
     }
     const { data } = await supabase
@@ -306,8 +305,8 @@ export default function AFLRankingsPage() {
       .maybeSingle();
     if (!data) return {};
     return {
-      short:        (data as any).recommendation_short ?? row.short,
-      long:         (data as any).recommendation_why ?? row.long,
+      why:           (data as any).recommendation_short ?? row.why,
+      long:          (data as any).recommendation_why ?? row.long,
       ai_updated_at: (data as any).ai_updated_at ?? row.ai_updated_at,
     };
   }
@@ -408,7 +407,7 @@ export default function AFLRankingsPage() {
     setSelected({ row, rank, tier, isUnlocked });
     const isFreeTop5 = !isPremium && tier === "full";
     if (isUnlocked || isFreeTop5) {
-      const needsAI = !row.short && !row.long;
+      const needsAI = !row.why && !row.long;
       if (needsAI) {
         const aiData = await fetchAIForRow(row, isFreeTop5 && !isPremium ? "free" : undefined);
         if (Object.keys(aiData).length > 0) {
