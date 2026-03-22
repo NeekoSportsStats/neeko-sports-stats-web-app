@@ -29,8 +29,8 @@ export interface PlayerRow {
   matchup_label: string;
   ai_recommendation: string;
   recommendation_color: string;
-  recommendation_short: string;
-  recommendation_why: string;
+  summary_short: string;
+  summary_long: string;
   market_watch_category: string;
   best_value_score: number;
   confidence_label: string;
@@ -40,7 +40,6 @@ export interface PlayerRow {
   recommendation_strength: string;
   games_played: number;
   consistency_tier: string;
-  ai_summary: string;
 }
 
 export interface PlayerSignals {
@@ -137,7 +136,7 @@ export interface PriceRow {
   form_score: number;
   consistency: number;
   matchup_label: string;
-  recommendation_short: string;
+  summary_short: string;
   recommendation_color: string;
   confidence_label: string;
   market_watch_category: string;
@@ -157,7 +156,7 @@ export interface LabPlayerRow {
   form_score: number;
   consistency: number;
   matchup_label: string;
-  recommendation_short: string;
+  summary_short: string;
   recommendation_color: string;
   confidence_label: string;
   buy_score: number;

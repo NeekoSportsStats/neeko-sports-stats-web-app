@@ -16,7 +16,7 @@ interface LeaderboardPlayer {
   price: number | null;
   value_score: number | null;
   ai_recommendation: string | null;
-  recommendation_short: string | null;
+  summary_short: string | null;
 }
 
 const RECO_COLORS: Record<string, string> = {
@@ -47,7 +47,7 @@ export default function AdminLeaderboardLab() {
       const { data, error } = await supabase
         .from("v_rankings_content_engine")
         .select(
-          "player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, consistency_score, form_rating, neeko_rating, price, value_score, ai_recommendation, recommendation_short"
+          "player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, consistency_score, form_rating, neeko_rating, price, value_score, ai_recommendation, summary_short"
         )
         .order("projection_final", { ascending: false })
         .limit(300);
@@ -75,7 +75,7 @@ export default function AdminLeaderboardLab() {
   const avgProj = players.length
     ? (players.reduce((s, p) => s + (p.projection_final ?? 0), 0) / players.length).toFixed(1)
     : "—";
-  const mustStarts = players.filter((p) => (p.recommendation_short ?? "").includes("MUST")).length;
+  const mustStarts = players.filter((p) => (p.summary_short ?? "").includes("MUST")).length;
 
   return (
     <div className="space-y-6">
@@ -175,7 +175,7 @@ export default function AdminLeaderboardLab() {
                 </tr>
               ) : (
                 filtered.map((p, i) => {
-                  const reco = p.recommendation_short ?? p.ai_recommendation ?? "";
+                  const reco = p.summary_short ?? p.ai_recommendation ?? "";
                   const recoKey = Object.keys(RECO_COLORS).find((k) => reco.toUpperCase().includes(k)) ?? "";
                   return (
                     <tr key={p.player_id ?? i} className="border-b border-border/50 hover:bg-muted/20 transition-colors">

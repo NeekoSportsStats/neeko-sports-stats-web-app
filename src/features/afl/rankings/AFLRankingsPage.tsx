@@ -268,7 +268,6 @@ export default function AFLRankingsPage() {
       ai_updated_at:          r.ai_updated_at ?? null,
       why:  r.summary_short ?? null,
       long: r.summary_long ?? null,
-      ai_summary:           null,
       start_sit_decision:   r.start_sit_decision ?? null,
       edge_score:           r.edge_score != null ? Number(r.edge_score) : null,
       edge_tier:            r.edge_tier ?? null,

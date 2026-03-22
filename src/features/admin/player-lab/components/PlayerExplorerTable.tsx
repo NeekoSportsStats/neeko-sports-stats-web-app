@@ -75,7 +75,7 @@ export function PlayerExplorerTable() {
     { key: "edge_score",         label: "Edge",     explain: "Edge score — composite of value, matchup, and upside signals" },
     { key: "signal_count",       label: "Signals",  explain: "Number of active signals from the signal engine" },
     { key: "price",              label: "Price" },
-    { key: "recommendation_short", label: "Reco" },
+    { key: "summary_short", label: "Reco" },
   ];
 
   return (
@@ -249,7 +249,7 @@ export function PlayerExplorerTable() {
                       ) : "—"}
                     </td>
                     <td className="px-2 py-2 tabular-nums text-muted-foreground">{fmtPrice(r.price)}</td>
-                    <td className="px-2 py-2"><RecoBadge color={r.recommendation_color} short={r.recommendation_short} /></td>
+                    <td className="px-2 py-2"><RecoBadge color={r.recommendation_color} short={r.summary_short} /></td>
                   </tr>,
                   isExpanded && (
                     <tr key={`expand-${r.player_id}`} className="bg-muted/10">
