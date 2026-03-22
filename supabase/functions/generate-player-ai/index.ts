@@ -21,7 +21,7 @@ function getCorsHeaders(req: Request): Record<string, string> {
 
 const BATCH_SIZE = 5;
 const DEFAULT_MAX_PLAYERS = 20;
-const PROMPT_VERSION = "generate-player-ai-v15";
+const PROMPT_VERSION = "generate-player-ai-v16";
 const MAX_RETRY_ATTEMPTS = 2;
 
 // ── BANNED PHRASES ─────────────────────────────────────────────────────────
@@ -112,28 +112,74 @@ function pickAngles(playerId: number): string {
 }
 
 // ── CONTEXT TONE GUIDES ─────────────────────────────────────────────────────
+// These tones must align with the model's decision WITHOUT stating the decision.
+// BUY → bullish (underpriced, upside unrealised), HOLD → neutral (balanced),
+// SELL → bearish (overpriced, output concern). Never use the banned words.
 
 const CONTEXT_TONE: Record<string, string> = {
-  BUY: `CONTEXT SIGNAL: This player shows a clear pricing inefficiency — the upside is not reflected in the price.
-Explain: the value gap, price vs output relationship, rising form, or favourable matchup using data terms only.
-Describe what the numbers show — do NOT use recommendation words.`,
+  BUY: `SIGNAL CONTEXT: The pricing model has identified a clear gap — output is running ahead of price.
+Your job: write with BULLISH conviction. The numbers show an undervalued asset.
+Lean into: the gap between price and output, the value_gap_signal field, rising form, or underpriced ceiling.
+Tone examples (DO NOT COPY — use as style guide only):
+  WHY: "Underpriced relative to projection, with a strong value gap supporting upside at current cost."
+  WHY: "Priced well below projected output — the gap between cost and ceiling makes the risk-reward attractive."
+  LONG: "The pricing gap is material — at current cost the output ceiling is not reflected in the market valuation."
+DO NOT use recommendation words. Describe the data profile with bullish clarity.`,
 
-  HOLD: `CONTEXT SIGNAL: This player has a well-defined, consistent scoring profile.
-Explain: the projection range, ceiling-floor spread, consistency percentage, or risk factors using data terms only.
-Describe the profile characteristics — do NOT use recommendation words.`,
+  HOLD: `SIGNAL CONTEXT: The pricing model sees a balanced price-to-output profile — no clear edge in either direction.
+Your job: write with NEUTRAL objectivity. The numbers show fair pricing relative to output.
+Lean into: the projection range, ceiling-floor spread, consistency percentage, or balanced risk profile.
+Tone examples (DO NOT COPY — use as style guide only):
+  WHY: "Balanced price-to-output profile with no clear value edge at current pricing."
+  WHY: "Projection and price are well-aligned — the scoring range reflects the cost fairly."
+  LONG: "The ceiling-floor spread is moderate, consistent with a well-priced asset at this output tier."
+DO NOT use recommendation words. Describe the data profile with neutral precision.`,
 
-  SELL: `CONTEXT SIGNAL: This player carries elevated risk relative to their current price.
-Explain: the price vs output mismatch, declining form, soft ceiling, or structural concern using data terms only.
-Describe the risk profile — do NOT use recommendation words.`,
+  SELL: `SIGNAL CONTEXT: The pricing model has identified elevated cost relative to expected output.
+Your job: write with BEARISH precision. The numbers show an overpriced asset.
+Lean into: the price vs output mismatch, the value_gap_signal field, soft ceiling, declining form, or risk premium.
+Tone examples (DO NOT COPY — use as style guide only):
+  WHY: "Priced above expected output, with limited upside relative to cost at current market valuation."
+  WHY: "The output ceiling doesn't justify the price — the gap between cost and projected return is unfavourable."
+  LONG: "At current pricing, the output doesn't support the cost — the ceiling is too low relative to the price tag."
+DO NOT use recommendation words. Describe the data profile with bearish precision.`,
 
-  START: `CONTEXT SIGNAL: This player has an elite projection profile for this fixture.
-Explain: the ceiling potential, matchup advantage, or projection confidence using data terms only.
-Describe the upside profile — do NOT use recommendation words.`,
+  START: `SIGNAL CONTEXT: This player has an elite projection profile for this fixture.
+Your job: write with assertive confidence about the output ceiling and matchup upside.
+Lean into: the ceiling potential, matchup advantage, or projection confidence using data terms only.
+DO NOT use recommendation words. Describe the upside profile.`,
 
-  SIT: `CONTEXT SIGNAL: This player carries projection risk for this fixture.
-Explain: the limited projection, poor matchup, or role risk that creates uncertainty using data terms only.
-Describe the risk profile — do NOT use recommendation words.`,
+  SIT: `SIGNAL CONTEXT: This player carries projection risk for this fixture.
+Your job: write with measured caution about the limited ceiling or unfavourable matchup.
+Lean into: the limited projection, poor matchup, or role risk that creates uncertainty.
+DO NOT use recommendation words. Describe the risk profile.`,
 };
+
+// ── VALUE GAP SIGNAL BUILDER ─────────────────────────────────────────────────
+// Translates the raw value_score into a human-readable pricing signal that the
+// AI can reference without needing to understand the threshold logic.
+// BUY threshold: >= 4.5 | SELL threshold: <= -3.0
+
+function buildValueGapSignal(valueScore: number | null, recommendation: string, price: number | null, projection: number | null): string {
+  const rec = recommendation.toUpperCase();
+  const vs = valueScore ?? 0;
+  const priceStr = price ? `$${(price / 1_000_000).toFixed(2)}m` : "unknown price";
+  const projStr = projection ? `${Math.round(projection)} projected points` : "unknown projection";
+
+  if (rec === "BUY") {
+    if (vs >= 15) return `Strongly underpriced — output of ${projStr} significantly exceeds what ${priceStr} typically buys in this market. Clear pricing inefficiency.`;
+    if (vs >= 8)  return `Underpriced relative to output — ${projStr} at ${priceStr} represents a favourable price-to-output gap.`;
+    return `Modest pricing advantage — ${projStr} at ${priceStr} sits slightly ahead of fair market value for this output tier.`;
+  }
+
+  if (rec === "SELL") {
+    if (vs <= -10) return `Significantly overpriced — ${projStr} falls well short of what ${priceStr} demands. The price-to-output gap is unfavourable.`;
+    if (vs <= -5)  return `Overpriced relative to output — ${projStr} at ${priceStr} doesn't justify the cost at current market rates.`;
+    return `Mildly overpriced — ${projStr} at ${priceStr} is slightly above fair market value for this output level.`;
+  }
+
+  return `Fairly priced — ${projStr} at ${priceStr} is broadly aligned with market expectations for this output tier.`;
+}
 
 // ── BYE PROMPT BUILDER ──────────────────────────────────────────────────────
 
@@ -709,8 +755,8 @@ Deno.serve(async (req: Request) => {
             consistency:           player.consistency,
             recent_form:           player.form_score,
             trend:                 player.trend_direction,
-            value:                 player.value_score,
             value_tier:            player.value_tag,
+            value_gap_signal:      buildValueGapSignal(player.value_score, recommendation, player.price, player.projection_final),
             matchup:               player.matchup_label,
             matchup_rating:        player.matchup_rating,
             venue_multiplier:      player.venue_multiplier,
