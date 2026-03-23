@@ -12,7 +12,7 @@ export default function useMarketingPlayers() {
       const { data } = await supabase
         .from("v_rankings_free")
         .select(
-          "player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, consistency_score, form_rating, matchup_rating, upside_rating, risk_rating, projection_confidence, captain_score, neeko_rating, price, value_score, value_tag, value_tier, consistency_tier, price_tier, ai_recommendation"
+          "player_id, player_name, team, team_name, position, projection_final, ceiling, floor, consistency, form_score, matchup_rating, risk_rating, projection_confidence, neeko_rating, neeko_rating_scaled, price, prev_price, price_change, price_change_pct, value_score, best_value_score, value_tag, value_tier, consistency_tier, ai_recommendation, recommendation_strength, recommendation_color, recommendation_short, recommendation_why, summary_short, summary_long, games_played, status, manual_status, is_available, bye_round, is_bye"
         )
         .order("neeko_rating", { ascending: false })
         .limit(300);
