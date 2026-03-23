@@ -293,6 +293,7 @@ export default function AdminAccuracy() {
   const [tierType, setTierType] = useState<string>("confidence");
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
 
   const [kpi, setKpi] = useState<KpiSummary | null>(null);
   const [rounds, setRounds] = useState<RoundRow[]>([]);
@@ -342,6 +343,14 @@ export default function AdminAccuracy() {
       if (playersRes.data) setPlayers(playersRes.data as PlayerRow[]);
       if (distRes.data)    setErrorDist(distRes.data as ErrorBand[]);
       if (gamesRes.data)   setGames(gamesRes.data as GameRow[]);
+
+      const { data: homepageData } = await supabase
+        .from("v_projection_accuracy_homepage")
+        .select("last_updated_at")
+        .maybeSingle();
+      if (homepageData?.last_updated_at) {
+        setLastUpdatedAt(homepageData.last_updated_at as string);
+      }
     } catch (e) {
       console.error("Accuracy load error", e);
     } finally {
@@ -373,6 +382,11 @@ export default function AdminAccuracy() {
           </div>
           <p className="text-[12px] text-white/35 ml-7.5">
             Internal model diagnostics — 2026 season · {fmtInt(kpi?.total_predictions)} evaluations
+            {lastUpdatedAt && (
+              <span className="ml-2 text-white/20">
+                · updated {new Date(lastUpdatedAt).toLocaleDateString("en-AU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
           </p>
         </div>
         <button
