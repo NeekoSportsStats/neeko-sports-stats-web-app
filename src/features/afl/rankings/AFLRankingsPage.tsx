@@ -173,7 +173,8 @@ const PREMIUM_COLUMNS =
   "projection_confidence,risk_rating,matchup_rating,matchup_label,matchup_multiplier," +
   "upside_rating,upside_pct,captain_score,captain_rating,ai_recommendation,recommendation_strength,recommendation_color," +
   "summary_short,summary_long,recommendation_short,recommendation_why,ai_summary,consistency_tier,total_count,cached_at,games_played,ai_updated_at," +
-  "start_sit_decision,edge_score,edge_tier,market_watch_category,status,is_available";
+  "start_sit_decision,edge_score,edge_tier,market_watch_category,status,is_available," +
+  "bye_round,is_bye,bye_next_round";
 
 const FREE_COLUMNS =
   "player_id,player_name,team,team_name,position,position_group," +
@@ -182,7 +183,8 @@ const FREE_COLUMNS =
   "projection_confidence,risk_rating,matchup_rating,matchup_label,matchup_multiplier," +
   "ai_recommendation,recommendation_strength,recommendation_color,summary_short,summary_long,recommendation_short,recommendation_why,ai_summary," +
   "consistency_tier,access_tier,total_count,cached_at,games_played,row_rank," +
-  "start_sit_decision,edge_score,edge_tier,market_watch_category,status,is_available";
+  "start_sit_decision,edge_score,edge_tier,market_watch_category,status,is_available," +
+  "bye_round,is_bye,bye_next_round";
 
 const AI_COLUMNS =
   "player_id,summary_short,summary_long,recommendation_short,recommendation_why,ai_summary,ai_updated_at";
@@ -283,6 +285,9 @@ export default function AFLRankingsPage() {
       upside_pct:           r.upside_pct != null ? Number(r.upside_pct) : null,
       status:               r.status ?? null,
       is_available:         r.is_available != null ? Boolean(r.is_available) : null,
+      bye_round:            r.bye_round != null ? Number(r.bye_round) : null,
+      is_bye:               r.is_bye != null ? Boolean(r.is_bye) : null,
+      bye_next_round:       r.bye_next_round != null ? Boolean(r.bye_next_round) : null,
     };
   }
 
