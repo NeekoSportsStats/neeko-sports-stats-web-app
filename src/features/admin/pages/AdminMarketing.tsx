@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from "react";
-import { RefreshCw, Sparkles, Calendar, Image as ImageIcon, ChartBar as BarChart2, FileText, Wand as Wand2, BookOpen, Clapperboard, TrendingUp } from "lucide-react";
+import { RefreshCw, Sparkles, Calendar, Image as ImageIcon, ChartBar as BarChart2, FileText, Wand as Wand2, BookOpen, Clapperboard, TrendingUp, Compass } from "lucide-react";
 import { AdminSectionIntro } from "@/features/admin/shared/AdminExplain";
 
 const ContentEngine     = lazy(() => import("@/features/admin/marketing/ContentEngine"));
@@ -12,7 +12,8 @@ const WeeklyPlanner     = lazy(() => import("@/features/admin/marketing/WeeklyPl
 const AIMediaLibrary    = lazy(() => import("@/features/admin/marketing/AIVideoLibrary"));
 const MarketingStats    = lazy(() => import("@/features/admin/marketing/MarketingStatsHub"));
 const VideoGenerator    = lazy(() => import("@/features/admin/marketing/VideoGenerator"));
-const GrowthInsights    = lazy(() => import("@/features/admin/marketing/GrowthInsights"));
+const GrowthInsights       = lazy(() => import("@/features/admin/marketing/GrowthInsights"));
+const ContentRecommender   = lazy(() => import("@/features/admin/marketing/ContentRecommender"));
 
 type Tab =
   | "scripts"
@@ -20,6 +21,7 @@ type Tab =
   | "editor"
   | "library"
   | "insights"
+  | "recommender"
   | "images"
   | "graphics"
   | "planner"
@@ -32,8 +34,9 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; group: "scripts" 
   { id: "ai-studio", label: "AI Studio",        icon: Wand2,       group: "scripts"  },
   { id: "editor",    label: "Editor",           icon: Sparkles,    group: "scripts"  },
   { id: "library",   label: "Library",          icon: BookOpen,    group: "scripts"  },
-  { id: "insights",  label: "Growth Insights",  icon: TrendingUp,  group: "scripts"  },
-  { id: "video",     label: "Video Generator",  icon: Clapperboard, group: "scripts" },
+  { id: "insights",    label: "Growth Insights",  icon: TrendingUp,  group: "scripts"  },
+  { id: "recommender", label: "Recommender",      icon: Compass,     group: "scripts"  },
+  { id: "video",       label: "Video Generator",  icon: Clapperboard, group: "scripts" },
   { id: "images",    label: "Image Engine",     icon: ImageIcon,   group: "visuals"  },
   { id: "graphics",  label: "Graphic Engine",   icon: ImageIcon,   group: "visuals"  },
   { id: "planner",   label: "Weekly Planner",   icon: Calendar,    group: "visuals"  },
@@ -118,8 +121,9 @@ export default function AdminMarketing() {
         {tab === "ai-studio" && <AIStudio />}
         {tab === "editor"    && <Editor />}
         {tab === "library"   && <Library />}
-        {tab === "insights"  && <GrowthInsights />}
-        {tab === "images"    && <ImageEngine />}
+        {tab === "insights"     && <GrowthInsights />}
+        {tab === "recommender"  && <ContentRecommender />}
+        {tab === "images"       && <ImageEngine />}
         {tab === "graphics"  && <GraphicEngine />}
         {tab === "planner"   && <WeeklyPlanner />}
         {tab === "media"     && <AIMediaLibrary />}
