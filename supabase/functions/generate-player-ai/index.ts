@@ -21,7 +21,7 @@ function getCorsHeaders(req: Request): Record<string, string> {
 
 const BATCH_SIZE = 5;
 const DEFAULT_MAX_PLAYERS = 20;
-const PROMPT_VERSION = "generate-player-ai-v12";
+const PROMPT_VERSION = "generate-player-ai-v13";
 const MAX_RETRY_ATTEMPTS = 2;
 
 // ── BANNED PHRASES ─────────────────────────────────────────────────────────
@@ -144,9 +144,37 @@ Do NOT frame this positively.`,
 
 // ── PROMPT BUILDER ──────────────────────────────────────────────────────────
 
-function buildSystemPrompt(recommendation: string): string {
+function buildConvictionLayer(confidence: number | null): string {
+  const c = confidence ?? 50;
+  if (c >= 90) {
+    return `CONVICTION TIER: ELITE (${c})
+Use language that signals the highest level of certainty. This player is among the most reliable projections on the slate.
+Phrase bank (use ONE naturally, do NOT quote the number): "elite play", "top-tier option", "one of the strongest plays on the slate", "as reliable as it gets this week", "high-conviction selection".`;
+  }
+  if (c >= 75) {
+    return `CONVICTION TIER: STRONG (${c})
+Use language that signals a well-supported, high-quality projection.
+Phrase bank (use ONE naturally, do NOT quote the number): "strong play", "well-supported pick", "shapes as a strong selection", "projection is well-backed", "well-positioned to deliver".`;
+  }
+  if (c >= 60) {
+    return `CONVICTION TIER: SOLID (${c})
+Use language that signals reasonable confidence with some uncertainty acknowledged.
+Phrase bank (use ONE naturally, do NOT quote the number): "reasonable play", "has upside but not without risk", "projection holds up", "a workable option given the numbers", "floor provides some security".`;
+  }
+  if (c >= 50) {
+    return `CONVICTION TIER: LOW (${c})
+Use language that signals meaningful uncertainty — this player carries risk.
+Phrase bank (use ONE naturally, do NOT quote the number): "volatile output", "inconsistent profile", "comes with real risk", "projection range is wide", "hard to pin down".`;
+  }
+  return `CONVICTION TIER: VERY LOW (${c})
+Use language that signals significant uncertainty — the projection is unreliable.
+Phrase bank (use ONE naturally, do NOT quote the number): "risky selection", "hard to trust right now", "significant downside exists", "projection lacks reliability", "variance is too high to lean on".`;
+}
+
+function buildSystemPrompt(recommendation: string, confidence?: number | null): string {
   const rec = recommendation.toUpperCase();
   const tone = RECOMMENDATION_TONE[rec] ?? `RECOMMENDATION = ${recommendation}`;
+  const convictionLayer = buildConvictionLayer(confidence ?? null);
 
   const recommendationAlignment = rec === "BUY"
     ? `PERSONALITY: Aggressive confidence — this is an opportunity. The reader should feel compelled to act.\nVary your opener: "He's", "Right now,", "At this price,", "There's clear upside", "The value gap here".\nRisk: acknowledge briefly, redirect to upside. Do NOT dwell on it.`
@@ -168,6 +196,22 @@ Your ONLY job:
 ${tone}
 
 ${recommendationAlignment}
+
+━━ CONVICTION LANGUAGE LAYER ━━
+${convictionLayer}
+
+Rules for conviction language:
+- Use ONE conviction phrase naturally per response — do NOT repeat it
+- Blend it into a sentence as if it were your own assessment, not a label
+  ✗ "This is a strong play because confidence is high"
+  ✓ "The projection range shapes as a strong play given his current role and output"
+- WHY field: one subtle conviction phrase woven in (if it fits naturally)
+- LONG field: one conviction phrase integrated into the narrative
+- Align conviction with recommendation tone:
+  BUY + high conviction → amplify the opportunity feel
+  BUY + low conviction → tone down urgency, note the risk briefly
+  SELL + low conviction → reinforce the risk/uncertainty angle
+  HOLD + any conviction → keep it measured, no amplification
 
 ━━ TONE (non-negotiable) ━━
 - Write like a sharp, paid analyst — not a chatbot, not a template
@@ -622,7 +666,7 @@ Deno.serve(async (req: Request) => {
           let validation: ValidationResult = { valid: true, issues: [] };
 
           if (openaiKey) {
-            const systemPrompt = buildSystemPrompt(recommendation);
+            const systemPrompt = buildSystemPrompt(recommendation, player.confidence);
             const { result: res, validation: val, attempts } = await callOpenAIWithPrompt(openaiKey, systemPrompt, recommendation, promptPayload);
             if (!res) {
               errors.push(`${player.player_name}: null response from OpenAI`);
