@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, ChevronDown, Copy, Download, Trash2, RefreshCw, Check, Calendar, Sparkles, CreditCard as Edit2, Zap, List, LayoutGrid, Filter, SquareCheck as CheckSquare, Square as SquareIcon, ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
+import { Plus, ChevronDown, Copy, Download, Trash2, RefreshCw, Check, Calendar, Sparkles, CreditCard as Edit2, Zap, List, LayoutGrid, Filter, SquareCheck as CheckSquare, Square as SquareIcon, ChevronLeft, ChevronRight, Image as ImageIcon, FileText } from "lucide-react";
+import SimpleWeeklyPlanner from "./SimpleWeeklyPlanner";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
@@ -447,8 +448,10 @@ function getTodayDayName(): DayOfWeek | null {
 
 type ViewMode = "week" | "list";
 type StatusFilter = "all" | PlannerPostStatus;
+type PlannerTab = "ads" | "scripts";
 
 export default function WeeklyPlanner() {
+  const [plannerTab, setPlannerTab] = useState<PlannerTab>("scripts");
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -622,6 +625,30 @@ export default function WeeklyPlanner() {
 
   return (
     <div className="space-y-5">
+
+      {/* Planner mode tabs */}
+      <div className="flex items-center gap-1 p-0.5 rounded-lg border border-border bg-muted/20 w-fit">
+        <button
+          onClick={() => setPlannerTab("scripts")}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all"
+          style={plannerTab === "scripts" ? { background: ACCENT, color: "#000" } : { color: "hsl(var(--muted-foreground))" }}
+        >
+          <FileText className="h-3.5 w-3.5" /> Script Planner
+        </button>
+        <button
+          onClick={() => setPlannerTab("ads")}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all"
+          style={plannerTab === "ads" ? { background: ACCENT, color: "#000" } : { color: "hsl(var(--muted-foreground))" }}
+        >
+          <Sparkles className="h-3.5 w-3.5" /> Ad Planner
+        </button>
+      </div>
+
+      {/* Script planner */}
+      {plannerTab === "scripts" && <SimpleWeeklyPlanner />}
+
+      {/* Ad planner (existing) */}
+      {plannerTab === "ads" && <>
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -942,6 +969,8 @@ export default function WeeklyPlanner() {
           )}
         </div>
       )}
+
+      </>}
     </div>
   );
 }

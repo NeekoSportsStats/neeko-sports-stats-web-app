@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Play, Square, Copy, Check, BookmarkPlus, ChevronDown, Mic, RefreshCw, Zap, Scissors, AlignLeft, Wand as Wand2, ExternalLink, FileText, TriangleAlert as AlertTriangle } from "lucide-react";
+import { Play, Square, Copy, Check, BookmarkPlus, ChevronDown, Mic, RefreshCw, Zap, Scissors, AlignLeft, Wand as Wand2, ExternalLink, FileText, TriangleAlert as AlertTriangle, CircleStop as StopCircle, Radio, Sparkles, Download } from "lucide-react";
 import { loadLibrary, addToLibrary } from "./lib/library";
 import { generateCaptions, formatCaptionsForExport } from "./lib/captions";
 import type { LibraryItem } from "./lib/library";
@@ -228,6 +228,21 @@ export default function VoiceStudio() {
   const [sentToVideo, setSentToVideo]               = useState(false);
   const [captionMode, setCaptionMode]               = useState<"short" | "full">("short");
   const [captionsCopied, setCaptionsCopied]         = useState(false);
+
+  // Recording
+  const [isRecording, setIsRecording]               = useState(false);
+  const [audioBlob, setAudioBlob]                   = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl]                     = useState<string | null>(null);
+  const [micError, setMicError]                     = useState<string | null>(null);
+  const [recordingSaved, setRecordingSaved]         = useState(false);
+  const mediaRecorderRef                            = useRef<MediaRecorder | null>(null);
+  const recordingChunksRef                          = useRef<Blob[]>([]);
+
+  // AI Voice
+  const [aiVoiceUrl, setAiVoiceUrl]                 = useState<string | null>(null);
+  const [aiLoading, setAiLoading]                   = useState(false);
+  const [aiVoiceSaved, setAiVoiceSaved]             = useState(false);
+
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const voicesAvailable = voices.length > 0;
@@ -348,6 +363,90 @@ export default function VoiceStudio() {
 
   function handleSendToEditor() {
     handleSendToVideoGenerator();
+  }
+
+  async function startRecording() {
+    setMicError(null);
+    setAudioBlob(null);
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl(null);
+    }
+    setRecordingSaved(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingChunksRef.current = [];
+      const mr = new MediaRecorder(stream);
+      mediaRecorderRef.current = mr;
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) recordingChunksRef.current.push(e.data);
+      };
+      mr.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(recordingChunksRef.current, { type: "audio/webm" });
+        const url  = URL.createObjectURL(blob);
+        setAudioBlob(blob);
+        setAudioUrl(url);
+      };
+      mr.start();
+      setIsRecording(true);
+    } catch {
+      setMicError("Microphone access required for recording. Please allow mic permissions and try again.");
+    }
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+  }
+
+  function saveRecording() {
+    if (!audioUrl) return;
+    addToLibrary({
+      type:     "audio" as LibraryItem["type"],
+      title:    `${title || "Voice Recording"} - recording`,
+      content:  audioUrl,
+      player:   null,
+      tags:     ["voice", "recording"],
+      status:   "idea",
+      platform: null,
+    });
+    setRecordingSaved(true);
+    setTimeout(() => setRecordingSaved(false), 3000);
+  }
+
+  async function generateAIVoice() {
+    if (!activeScript.trim() && !originalScript.trim()) return;
+    setAiLoading(true);
+    setAiVoiceSaved(false);
+    try {
+      const res = await fetch("/api/generate-voice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: activeScript || originalScript }),
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = await res.json();
+      setAiVoiceUrl(data.audioUrl ?? null);
+    } catch {
+      setAiVoiceUrl(null);
+    }
+    setAiLoading(false);
+  }
+
+  function saveAIVoice() {
+    if (!aiVoiceUrl) return;
+    addToLibrary({
+      type:     "audio" as LibraryItem["type"],
+      title:    `${title || "AI Voice"} - ai`,
+      content:  aiVoiceUrl,
+      player:   null,
+      tags:     ["voice", "ai"],
+      status:   "idea",
+      platform: null,
+    });
+    setAiVoiceSaved(true);
+    setTimeout(() => setAiVoiceSaved(false), 3000);
   }
 
   const fullCopyText = [
@@ -682,6 +781,130 @@ export default function VoiceStudio() {
           </div>
         );
       })()}
+
+      {/* Voice Recorder */}
+      <div className="border rounded-lg p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Voice Recorder</p>
+          {isRecording && (
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-[10px] font-medium text-red-500">Recording</span>
+            </div>
+          )}
+        </div>
+
+        {micError ? (
+          <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700 dark:text-amber-400">{micError}</p>
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={startRecording}
+            disabled={isRecording}
+            className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <Radio className="h-3.5 w-3.5" /> Start Recording
+          </button>
+          <button
+            onClick={stopRecording}
+            disabled={!isRecording}
+            className="flex items-center gap-1.5 text-xs font-medium px-4 py-2 rounded-md border border-border hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <StopCircle className="h-3.5 w-3.5" /> Stop
+          </button>
+          {audioUrl && !isRecording && (
+            <button
+              onClick={saveRecording}
+              disabled={recordingSaved}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-border hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {recordingSaved
+                ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Saved to Library</>
+                : <><Download className="h-3.5 w-3.5" /> Save Recording</>
+              }
+            </button>
+          )}
+        </div>
+
+        {audioUrl && !isRecording && (
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Playback</p>
+            <audio
+              controls
+              src={audioUrl}
+              className="w-full h-9 rounded-md"
+            />
+          </div>
+        )}
+
+        {!audioUrl && !isRecording && !micError && (
+          <p className="text-xs text-muted-foreground">
+            Record your voice reading the active script. Click Start Recording, read your script, then Stop.
+          </p>
+        )}
+      </div>
+
+      {/* AI Voice Generator */}
+      <div className="border rounded-lg p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">AI Voice Generator</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">API-ready — connect your preferred TTS provider</p>
+          </div>
+          {aiLoading && (
+            <div className="flex items-center gap-1.5">
+              <RefreshCw className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
+              <span className="text-[10px] text-muted-foreground">Generating...</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={generateAIVoice}
+            disabled={aiLoading || (!activeScript.trim() && !originalScript.trim())}
+            className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-md bg-foreground text-background hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            {aiLoading ? "Generating voice..." : "Generate AI Voice"}
+          </button>
+          {aiVoiceUrl && (
+            <button
+              onClick={saveAIVoice}
+              disabled={aiVoiceSaved}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-border hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {aiVoiceSaved
+                ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Saved to Library</>
+                : <><Download className="h-3.5 w-3.5" /> Save AI Voice</>
+              }
+            </button>
+          )}
+        </div>
+
+        {aiVoiceUrl ? (
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">AI Voice Playback</p>
+            <audio
+              controls
+              src={aiVoiceUrl}
+              className="w-full h-9 rounded-md"
+            />
+          </div>
+        ) : (
+          !aiLoading && (
+            <div className="px-3 py-2.5 rounded-md bg-muted/30 border border-dashed border-border">
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                Connect a TTS API (ElevenLabs, OpenAI TTS, etc.) via <code className="font-mono bg-muted px-1 rounded">/api/generate-voice</code> to enable AI voice generation. The active script will be sent automatically.
+              </p>
+            </div>
+          )
+        )}
+      </div>
 
       {/* Save & Export */}
       <div className="border rounded-lg p-4 space-y-3">
