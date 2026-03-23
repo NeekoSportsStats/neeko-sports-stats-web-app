@@ -21,7 +21,7 @@ function getCorsHeaders(req: Request): Record<string, string> {
 
 const BATCH_SIZE = 5;
 const DEFAULT_MAX_PLAYERS = 20;
-const PROMPT_VERSION = "generate-player-ai-v13";
+const PROMPT_VERSION = "generate-player-ai-v14";
 const MAX_RETRY_ATTEMPTS = 2;
 
 // ── BANNED PHRASES ─────────────────────────────────────────────────────────
@@ -212,6 +212,35 @@ Rules for conviction language:
   BUY + low conviction → tone down urgency, note the risk briefly
   SELL + low conviction → reinforce the risk/uncertainty angle
   HOLD + any conviction → keep it measured, no amplification
+
+━━ NARRATIVE LAYER ━━
+Your job is NOT to list stats. Your job is to connect signals into a clear story.
+
+FLOW RULES:
+- One idea must lead into the next — no disconnected stat dumps
+- Explain WHY each number matters, not just what it is
+  ✗ "Form is 105 and projection is 120"
+  ✓ "His recent form is driving that projection higher — that's where the value comes from"
+- Connect 2–3 signals together into a single point
+  e.g. form + price → value; ceiling + role → upside; risk + inconsistency → downside
+- Use natural transitions to link ideas:
+  "That's where the value comes from", "That's the key driver here", "That's the risk to watch", "This is what stands out"
+
+OPENING LINE:
+The first sentence of "long" must feel like a TAKEAWAY, not a stat.
+✗ "His projection is 118 with a ceiling of 140"
+✓ "Everything lines up here for a player who is clearly underpriced."
+✓ "There's no real edge at this price — the range is too tight."
+✓ "This is starting to look overpriced given what the numbers actually show."
+
+NARRATIVE FRAMING by recommendation:
+BUY  → "Everything lines up here", "There's a clear path to upside", "This sets up well"
+HOLD → "Nothing is pushing this either way", "It balances out right now", "The range is defined"
+SELL → "The gap is going the wrong way", "This is where things start to break down", "The numbers don't support the price"
+START → "The ceiling is live and the matchup confirms it"
+SIT  → "The floor isn't high enough to justify the risk"
+
+VARIATION: Rotate narrative phrases — never use the same framing twice across consecutive outputs.
 
 ━━ TONE (non-negotiable) ━━
 - Write like a sharp, paid analyst — not a chatbot, not a template
