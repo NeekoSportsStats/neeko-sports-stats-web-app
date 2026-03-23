@@ -50,6 +50,8 @@ export interface RankingRow {
   ai_summary: string | null;
   /** Player availability status: AVAILABLE | OUT | TEST | OMITTED | null */
   status: string | null;
+  /** Admin-controlled manual override: OUT | INJURED | TEST | null */
+  manual_status: string | null;
   /** Derived boolean — false when status = 'OUT' */
   is_available: boolean | null;
   /** Bye round number for this player's team (e.g. 13, 14, 15) */

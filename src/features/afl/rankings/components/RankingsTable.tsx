@@ -138,20 +138,18 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-semibold text-white">{row.player_name}</span>
-            {row.is_bye && (
-              <span className="rounded-sm bg-sky-500/15 px-1 py-0.5 text-[9px] font-semibold text-sky-400 uppercase tracking-wide border border-sky-500/20">BYE</span>
+            {row.manual_status === "OUT" ? (
+              <span className="rounded-sm bg-red-500/15 px-1 py-0.5 text-[9px] font-semibold text-red-400 uppercase tracking-wide border border-red-500/20">OUT</span>
+            ) : row.manual_status === "INJURED" ? (
+              <span className="rounded-sm bg-orange-500/15 px-1 py-0.5 text-[9px] font-semibold text-orange-400 uppercase tracking-wide border border-orange-500/20">INJ</span>
+            ) : row.is_bye ? (
+              <span className="rounded-sm bg-white/10 px-1 py-0.5 text-[9px] font-semibold text-white/40 uppercase tracking-wide border border-white/15">BYE</span>
+            ) : null}
+            {!row.manual_status && !row.is_bye && row.bye_next_round && (
+              <span className="rounded-sm bg-white/8 px-1 py-0.5 text-[9px] font-semibold text-white/30 uppercase tracking-wide border border-white/10">BYE R{row.bye_round}</span>
             )}
-            {!row.is_bye && row.bye_next_round && (
-              <span className="rounded-sm bg-sky-500/10 px-1 py-0.5 text-[9px] font-semibold text-sky-500/60 uppercase tracking-wide border border-sky-500/15">BYE R{row.bye_round}</span>
-            )}
-            {(row.status === "OUT" || row.status === "INJURED") && (
-              <span className="rounded-sm bg-red-500/15 px-1 py-0.5 text-[9px] font-semibold text-red-400 uppercase tracking-wide border border-red-500/20">INJURED</span>
-            )}
-            {row.status === "TEST" && (
+            {row.manual_status === "TEST" && (
               <span className="rounded-sm bg-orange-500/15 px-1 py-0.5 text-[9px] font-semibold text-orange-400 uppercase tracking-wide border border-orange-500/20">TEST</span>
-            )}
-            {row.status === "OMITTED" && (
-              <span className="rounded-sm bg-white/10 px-1 py-0.5 text-[9px] font-semibold text-white/40 uppercase tracking-wide border border-white/15">NOT PLAYING</span>
             )}
             {!isPremium && rowUnlocked && (
               <span className="rounded-sm bg-[#F5C84C]/15 px-1 py-0.5 text-[9px] font-semibold text-[#F5C84C] uppercase tracking-wide">Free</span>

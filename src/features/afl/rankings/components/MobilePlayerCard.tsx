@@ -73,14 +73,15 @@ export function MobilePlayerCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-sm font-semibold text-white truncate">{row.player_name}</span>
-            {row.status === "OUT" && (
-              <span className="rounded-sm bg-red-500/15 px-1 py-0.5 text-[9px] font-semibold text-red-400 uppercase tracking-wide border border-red-500/20 shrink-0">INJURED</span>
-            )}
-            {row.status === "TEST" && (
+            {row.manual_status === "OUT" ? (
+              <span className="rounded-sm bg-red-500/15 px-1 py-0.5 text-[9px] font-semibold text-red-400 uppercase tracking-wide border border-red-500/20 shrink-0">OUT</span>
+            ) : row.manual_status === "INJURED" ? (
+              <span className="rounded-sm bg-orange-500/15 px-1 py-0.5 text-[9px] font-semibold text-orange-400 uppercase tracking-wide border border-orange-500/20 shrink-0">INJ</span>
+            ) : row.is_bye ? (
+              <span className="rounded-sm bg-white/10 px-1 py-0.5 text-[9px] font-semibold text-white/40 uppercase tracking-wide border border-white/15 shrink-0">BYE</span>
+            ) : null}
+            {row.manual_status === "TEST" && (
               <span className="rounded-sm bg-orange-500/15 px-1 py-0.5 text-[9px] font-semibold text-orange-400 uppercase tracking-wide border border-orange-500/20 shrink-0">TEST</span>
-            )}
-            {row.status === "OMITTED" && (
-              <span className="rounded-sm bg-white/10 px-1 py-0.5 text-[9px] font-semibold text-white/40 uppercase tracking-wide border border-white/15 shrink-0">NOT PLAYING</span>
             )}
             {!isPremium && isUnlocked && (
               <span className="rounded-sm bg-[#F5C84C]/15 px-1 py-0.5 text-[9px] font-semibold text-[#F5C84C] uppercase tracking-wide shrink-0">Free</span>
