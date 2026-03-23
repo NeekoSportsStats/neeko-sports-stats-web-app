@@ -144,7 +144,7 @@ export function TableRow({ row, idx, isPremium, tier, activeTab, isHighlighted, 
             {!row.is_bye && row.bye_next_round && (
               <span className="rounded-sm bg-sky-500/10 px-1 py-0.5 text-[9px] font-semibold text-sky-500/60 uppercase tracking-wide border border-sky-500/15">BYE R{row.bye_round}</span>
             )}
-            {row.status === "OUT" && (
+            {(row.status === "OUT" || row.status === "INJURED") && (
               <span className="rounded-sm bg-red-500/15 px-1 py-0.5 text-[9px] font-semibold text-red-400 uppercase tracking-wide border border-red-500/20">INJURED</span>
             )}
             {row.status === "TEST" && (

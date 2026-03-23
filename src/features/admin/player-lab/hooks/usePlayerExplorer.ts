@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { PlayerRow, PlayerSignals, PlayerEdge, SortDir } from "../types";
 
+const ADMIN_COMMAND_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-command`;
+
 export function usePlayerExplorer() {
   const [rows, setRows] = useState<PlayerRow[]>([]);
   const [signalsMap, setSignalsMap] = useState<Map<number, PlayerSignals>>(new Map());
@@ -108,6 +110,29 @@ export function usePlayerExplorer() {
     setActiveSignalFilters([]);
   }
 
+  async function updatePlayerStatus(playerId: number, status: string | null): Promise<void> {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token ?? import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const res = await fetch(ADMIN_COMMAND_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        Apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ command: "update_player_status", payload: { player_id: playerId, status } }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error ?? "Failed to update player status");
+    }
+    setRows(prev => prev.map(r =>
+      r.player_id === playerId
+        ? { ...r, manual_status: status, status: status ?? r.status }
+        : r
+    ));
+  }
+
   return {
     rows, signalsMap, edgeMap, loading, filtered,
     search, setSearch,
@@ -121,5 +146,6 @@ export function usePlayerExplorer() {
     expandedId, toggleExpand,
     positions, teams, recos,
     fetchData,
+    updatePlayerStatus,
   };
 }

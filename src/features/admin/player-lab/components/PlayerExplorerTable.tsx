@@ -39,6 +39,7 @@ export function PlayerExplorerTable() {
     expandedId, toggleExpand,
     positions, teams, recos,
     fetchData,
+    updatePlayerStatus,
   } = usePlayerExplorer();
 
   const warnings: string[] = [];
@@ -259,6 +260,7 @@ export function PlayerExplorerTable() {
                           signals={sigs ?? null}
                           edge={edgeMap.get(r.player_id) ?? null}
                           onClose={() => toggleExpand(r.player_id)}
+                          onUpdateStatus={updatePlayerStatus}
                         />
                       </td>
                     </tr>

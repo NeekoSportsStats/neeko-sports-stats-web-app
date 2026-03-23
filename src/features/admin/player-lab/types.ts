@@ -7,6 +7,7 @@ export interface PlayerRow {
   team: string;
   position: string;
   status: string | null;
+  manual_status: string | null;
   is_available: boolean | null;
   projection_final: number;
   projection: number;

@@ -9,6 +9,64 @@ import { SIGNAL_CATEGORY_MAP } from "../constants";
 import { fmtNum, fmtPrice, ConfidenceBadge, RecoBadge } from "./SharedUI";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 
+const STATUS_OPTIONS = [
+  { value: "",         label: "Available" },
+  { value: "OUT",      label: "OUT" },
+  { value: "INJURED",  label: "INJURED" },
+  { value: "TEST",     label: "TEST" },
+];
+
+function ManualStatusDropdown({
+  playerId,
+  currentStatus,
+  onUpdate,
+}: {
+  playerId: number;
+  currentStatus: string | null;
+  onUpdate: (playerId: number, status: string | null) => Promise<void>;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const val = e.target.value || null;
+    setSaving(true);
+    setError(null);
+    try {
+      await onUpdate(playerId, val);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const current = currentStatus ?? "";
+  const colorMap: Record<string, string> = {
+    "":       "border-border/50 text-muted-foreground",
+    OUT:      "border-red-500/50 text-red-400 bg-red-500/10",
+    INJURED:  "border-red-500/50 text-red-400 bg-red-500/10",
+    TEST:     "border-orange-500/50 text-orange-400 bg-orange-500/10",
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <select
+        value={current}
+        onChange={handleChange}
+        disabled={saving}
+        className={`text-[10px] rounded border px-1.5 py-0.5 bg-background font-medium focus:outline-none transition-colors ${colorMap[current] ?? "border-border/50 text-muted-foreground"} ${saving ? "opacity-50" : ""}`}
+      >
+        {STATUS_OPTIONS.map(o => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      {saving && <span className="text-[9px] text-muted-foreground">Saving…</span>}
+      {error && <span className="text-[9px] text-red-400">{error}</span>}
+    </div>
+  );
+}
+
 function EdgeBar({ label, value, color, positive = true }: { label: string; value: number | null | undefined; color: string; positive?: boolean }) {
   const v = value ?? 0;
   const width = Math.min(100, Math.abs(v));
@@ -26,12 +84,13 @@ function EdgeBar({ label, value, color, positive = true }: { label: string; valu
 }
 
 export function PlayerDetailPanel({
-  player, signals, edge, onClose,
+  player, signals, edge, onClose, onUpdateStatus,
 }: {
   player: PlayerRow;
   signals: PlayerSignals | null;
   edge: PlayerEdge | null;
   onClose: () => void;
+  onUpdateStatus?: (playerId: number, status: string | null) => Promise<void>;
 }) {
   const [history, setHistory] = useState<PlayerRoundHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -83,6 +142,13 @@ export function PlayerDetailPanel({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-sm">{player.player_name}</span>
             <StatusBadge status={player.status} />
+            {onUpdateStatus && (
+              <ManualStatusDropdown
+                playerId={player.player_id}
+                currentStatus={player.manual_status ?? null}
+                onUpdate={onUpdateStatus}
+              />
+            )}
             <span className="text-muted-foreground">{player.team}</span>
             <span className="text-[10px] bg-muted/40 px-1.5 py-0.5 rounded font-mono">{player.position}</span>
             <ConfidenceBadge label={player.confidence_label} />
