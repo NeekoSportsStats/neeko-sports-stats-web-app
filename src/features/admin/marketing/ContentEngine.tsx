@@ -21,10 +21,9 @@ interface RankingPlayer {
   team: string;
   position: string | null;
   projection_final: number | null;
-  ceiling_estimate: number | null;
-  floor_estimate: number | null;
-  form_rating: number | null;
-  upside_rating: number | null;
+  ceiling: number | null;
+  floor: number | null;
+  form_score: number | null;
   risk_rating: number | null;
   value_score: number | null;
   price: number | null;
@@ -59,10 +58,9 @@ function buildScript(player: RankingPlayer, angle: Angle): string {
   const name = player.player_name;
   const team = player.team;
   const proj = fmt(player.projection_final, " pts");
-  const ceil = fmt(player.ceiling_estimate, " pts");
-  const floor = fmt(player.floor_estimate, " pts");
-  const form = fmtDec(player.form_rating, 0);
-  const upside = fmtDec(player.upside_rating, 1, " / 10");
+  const ceil = fmt(player.ceiling, " pts");
+  const floor = fmt(player.floor, " pts");
+  const form = fmtDec(player.form_score, 0);
   const risk = fmtDec(player.risk_rating, 0);
   const value = fmtDec(player.value_score, 1);
   const price = fmtPrice(player.price);
@@ -92,7 +90,6 @@ Here's why you should consider trading him out:
 → Risk Rating: ${risk}
 → Projection: ${proj}
 → Floor: ${floor}
-→ Upside: ${upside}
 
 ${ai ? `Neeko Intel: "${ai}"` : ""}
 
@@ -166,9 +163,9 @@ This is the edge. Use it. #AFLFantasy #ValuePick #NeekoSports`,
 function buildHooks(player: RankingPlayer, angle: Angle): string[] {
   const name = player.player_name;
   const proj = fmt(player.projection_final, " pts");
-  const ceil = fmt(player.ceiling_estimate, " pts");
+  const ceil = fmt(player.ceiling, " pts");
   const price = fmtPrice(player.price);
-  const form = fmtDec(player.form_rating, 0);
+  const form = fmtDec(player.form_score, 0);
 
   const hookSets: Record<Angle, string[]> = {
     buy: [
@@ -225,7 +222,7 @@ export default function ContentEngine() {
       const { data } = await supabase
         .from("v_rankings_free")
         .select(
-          "player_id, player_name, team, position, projection_final, ceiling_estimate, floor_estimate, form_rating, upside_rating, risk_rating, value_score, price, neeko_rating, summary_short, summary_long, ai_recommendation, recommendation_color"
+          "player_id, player_name, team, position, projection_final, ceiling, floor, form_score, risk_rating, value_score, price, neeko_rating, summary_short, summary_long, ai_recommendation, recommendation_color"
         )
         .order("neeko_rating", { ascending: false })
         .limit(300);
@@ -364,7 +361,7 @@ export default function ContentEngine() {
           </div>
           <div>
             <span className="text-muted-foreground">Ceiling</span>
-            <p className="font-semibold">{fmt(selectedPlayer.ceiling_estimate, " pts")}</p>
+            <p className="font-semibold">{fmt(selectedPlayer.ceiling, " pts")}</p>
           </div>
           <div>
             <span className="text-muted-foreground">Price</span>
