@@ -459,22 +459,60 @@ function ModelAccuracySection() {
     },
   ];
 
+  const SIGNAL_CARDS = [
+    {
+      icon: Database,
+      stat: hasData && row?.players_analysed != null ? `${row.players_analysed.toLocaleString()} players` : "687 players",
+      desc: "Analysed every round — across all 18 AFL clubs",
+    },
+    {
+      icon: Cpu,
+      stat: "Daily updates",
+      desc: "Projection model refreshed continuously as new data arrives",
+    },
+    {
+      icon: BarChart2,
+      stat: "Price vs output",
+      desc: "Value scores driven by expected score relative to current price — not gut feel",
+    },
+    {
+      icon: Sparkles,
+      stat: "Real match data",
+      desc: "AI explanations built from live stats — not pre-written templates",
+    },
+  ];
+
   return (
-    <section className="py-10 md:py-12 bg-[#070707] border-t border-white/[0.05]">
+    <section className="py-10 md:py-14 bg-[#070707] border-t border-white/[0.05]">
       <div className="max-w-5xl mx-auto px-4">
-        <div className="text-center mb-6">
+
+        <div className="text-center mb-8">
           <span className="text-xs uppercase tracking-wide text-[#F5C84C]">
-            Model Validation
+            Real Performance Data
           </span>
-          <div className="mt-2"><SectionHeading>How Accurate Are Neeko Projections?</SectionHeading></div>
+          <div className="mt-2"><SectionHeading>Built on Real Performance Data</SectionHeading></div>
           <p className="text-sm text-white/50 mt-3 max-w-xl mx-auto leading-relaxed">
-            Most projections land within 10–15 points of actual AFL Fantasy scores, giving coaches a reliable weekly baseline for lineup decisions.
+            Every recommendation is backed by live projections, pricing inefficiencies, and player performance signals — updated continuously.
           </p>
           {proofLine && (
-            <p className="text-[12px] text-white/30 mt-1 max-w-xl mx-auto leading-relaxed">
+            <p className="text-[12px] text-white/30 mt-1.5 max-w-xl mx-auto leading-relaxed">
               {proofLine} · 2026 season
             </p>
           )}
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-7">
+          {SIGNAL_CARDS.map(({ icon: Icon, stat, desc }) => (
+            <div key={stat} className="rounded-xl border border-white/[0.07] bg-[#0e0e0e] p-4 flex flex-col gap-2.5">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#F5C84C]/10 border border-[#F5C84C]/15 shrink-0">
+                <Icon size={13} className="text-[#F5C84C]" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white leading-tight">{stat}</p>
+                <p className="text-[11px] text-white/35 mt-1 leading-snug">{desc}</p>
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -555,18 +593,26 @@ function ModelAccuracySection() {
           </p>
         )}
 
-        <div className="flex items-center justify-between mt-6 p-4 border border-[#F5C84C]/20 rounded-lg gap-4">
-          <p className="text-sm text-white/40 leading-relaxed">
-            More accurate projections mean better captain choices, smarter trades and stronger fantasy results.
-          </p>
-          <Link
-            to="/neeko-plus"
-            className="shrink-0 inline-flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-5 py-2.5 rounded-xl hover:brightness-110 transition-all whitespace-nowrap"
-          >
-            <Crown size={13} />
-            Gain an Edge
-          </Link>
+        <div className="mt-6 p-5 border border-white/[0.08] rounded-xl bg-[#0d0d0d]">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-white/70 leading-relaxed">
+                This isn't opinion — it's measurable edge.
+              </p>
+              <p className="text-xs text-white/35 mt-1 leading-relaxed">
+                See every player ranked by projection, value, and confidence — updated before each round.
+              </p>
+            </div>
+            <Link
+              to="/afl/rankings"
+              className="shrink-0 inline-flex items-center justify-center gap-2 bg-[#F5C84C] text-black font-bold text-sm px-5 py-2.5 rounded-xl hover:brightness-110 transition-all whitespace-nowrap"
+            >
+              See the Rankings
+              <ArrowRight size={13} />
+            </Link>
+          </div>
         </div>
+
       </div>
     </section>
   );
