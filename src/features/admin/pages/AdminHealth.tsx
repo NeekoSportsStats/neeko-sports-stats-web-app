@@ -462,6 +462,136 @@ interface StartSitCacheHealth {
   rounds_cached: number | null;
 }
 
+interface PlayerIdentityIssue {
+  player_id: number;
+  name_variants: number;
+  team_variants: number;
+  rows: number;
+  variant_names: string[];
+  variant_teams: string[];
+  has_override: boolean;
+  severity: "critical" | "warning";
+}
+
+function PlayerIdentityIssuesCard({ issues, loading }: { issues: PlayerIdentityIssue[]; loading: boolean }) {
+  const criticalCount = issues.filter(i => i.severity === "critical").length;
+  const warningCount  = issues.filter(i => i.severity === "warning").length;
+  const unresolvedCount = issues.filter(i => !i.has_override).length;
+
+  const cardStatus: StatusLevel = loading ? "loading"
+    : criticalCount > 0 ? "error"
+    : warningCount > 0 ? "warn"
+    : "ok";
+
+  return (
+    <Card className={`border ${
+      cardStatus === "ok" ? "border-emerald-900/60"
+      : cardStatus === "warn" ? "border-amber-900/60"
+      : cardStatus === "error" ? "border-red-900/60"
+      : "border-border"
+    }`}>
+      <CardHeader className="pb-3 pt-4 px-5">
+        <CardTitle className="flex items-center justify-between text-sm font-semibold">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-md bg-muted flex items-center justify-center shrink-0">
+              <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
+            </span>
+            Player Identity Anomaly Detector
+          </div>
+          <div className="flex items-center gap-2">
+            {!loading && issues.length > 0 && (
+              <StatusChip
+                level={cardStatus}
+                label={`${issues.length} issue${issues.length !== 1 ? "s" : ""} detected`}
+              />
+            )}
+            {!loading && issues.length === 0 && <StatusChip level="ok" label="Clean" />}
+            {loading && <RefreshCw className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-5 pb-5">
+        {loading ? (
+          <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-8 rounded bg-muted animate-pulse" />)}</div>
+        ) : issues.length === 0 ? (
+          <div className="flex items-center gap-2 py-3 text-sm text-emerald-400">
+            <CheckCircle className="h-4 w-4 shrink-0" />
+            No player identity anomalies found — all player_ids have consistent names and teams
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-3">
+              {criticalCount > 0 && (
+                <div className="flex items-center gap-2 rounded-md border border-red-500/30 bg-red-950/20 px-3 py-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                  <span className="text-xs text-red-400 font-semibold">{criticalCount} critical — name + team conflict</span>
+                </div>
+              )}
+              {warningCount > 0 && (
+                <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-950/20 px-3 py-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                  <span className="text-xs text-amber-400 font-semibold">{warningCount} warning — team mismatch</span>
+                </div>
+              )}
+              {unresolvedCount > 0 && (
+                <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-1.5">
+                  <span className="text-xs text-muted-foreground font-medium">{unresolvedCount} without override</span>
+                </div>
+              )}
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border/40">
+                    <th className="text-left py-2 pr-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wide w-20">Player ID</th>
+                    <th className="text-left py-2 pr-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Names Seen</th>
+                    <th className="text-left py-2 pr-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Teams Seen</th>
+                    <th className="text-right py-2 pr-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wide w-12">Rows</th>
+                    <th className="text-center py-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wide w-20">Override</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {issues.map(issue => (
+                    <tr key={issue.player_id} className="border-b border-border/20 last:border-0 hover:bg-muted/10 transition-colors">
+                      <td className="py-2 pr-3 font-mono font-semibold text-foreground">{issue.player_id}</td>
+                      <td className="py-2 pr-3">
+                        <div className="flex flex-wrap gap-1">
+                          {issue.variant_names.map(n => (
+                            <span key={n} className="inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium bg-muted text-foreground">{n}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-2 pr-3 hidden sm:table-cell">
+                        <div className="flex flex-wrap gap-1">
+                          {issue.variant_teams.map(t => (
+                            <span key={t} className="inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium bg-amber-950/40 text-amber-400">{t}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-2 pr-3 text-right text-muted-foreground tabular-nums">{issue.rows}</td>
+                      <td className="py-2 text-center">
+                        {issue.has_override
+                          ? <StatusChip level="ok" label="Fixed" />
+                          : <StatusChip level="warn" label="None" />}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="text-[11px] text-muted-foreground">
+              These player_ids have inconsistent names or teams across historical game records.
+              Use <span className="font-mono text-foreground">afl.player_identity_overrides</span> to permanently fix any mislabelling.
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AdminHealth() {
   const { data, loading, error, lastRefreshed, refresh } = useSystemHealth();
   const { dispatch } = useAdminUIState();
@@ -475,7 +605,19 @@ export default function AdminHealth() {
   const [startSitCache, setStartSitCache] = useState<StartSitCacheHealth | null>(null);
   const [cmdStatus, setCmdStatus] = useState<CommandCenterStatus | null>(null);
   const [cronJobs, setCronJobs] = useState<CronJobRow[]>([]);
+  const [identityIssues, setIdentityIssues] = useState<PlayerIdentityIssue[]>([]);
+  const [identityLoading, setIdentityLoading] = useState(true);
   const [pipelineLoading, setPipelineLoading] = useState(true);
+
+  const fetchIdentityIssues = useCallback(async () => {
+    setIdentityLoading(true);
+    try {
+      const { data } = await supabase.schema("admin").from("v_player_identity_issues").select("*").limit(50);
+      if (data) setIdentityIssues(data as PlayerIdentityIssue[]);
+    } finally {
+      setIdentityLoading(false);
+    }
+  }, []);
 
   const fetchPipelineData = useCallback(async () => {
     setPipelineLoading(true);
@@ -501,11 +643,13 @@ export default function AdminHealth() {
 
   useEffect(() => {
     fetchPipelineData();
-  }, [fetchPipelineData]);
+    fetchIdentityIssues();
+  }, [fetchPipelineData, fetchIdentityIssues]);
 
   function handleRefreshAll() {
     refresh();
     fetchPipelineData();
+    fetchIdentityIssues();
   }
 
   async function runAdminCommand(label: string, jobType: string, command: string) {
@@ -988,6 +1132,8 @@ export default function AdminHealth() {
               <StatRow label="Projection accuracy" value={(counts?.projection_accuracy ?? 0).toLocaleString()} />
             </HealthCard>
           </div>
+
+          <PlayerIdentityIssuesCard issues={identityIssues} loading={identityLoading} />
 
           <Card>
             <CardHeader className="pb-3">
