@@ -239,10 +239,6 @@ Deno.serve(async (req) => {
       stack: e?.stack,
     });
 
-    return err(e?.message ?? 'Internal server error', 500, {
-      type: e?.type ?? null,
-      code: e?.code ?? null,
-      param: e?.param ?? null,
-    });
+    return err('Unable to start checkout session', 500);
   }
 });

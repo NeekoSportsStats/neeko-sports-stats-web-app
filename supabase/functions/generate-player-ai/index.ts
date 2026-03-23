@@ -465,7 +465,7 @@ Deno.serve(async (req: Request) => {
         if (secrets?.some((row: { value: string }) => row.value === token)) {
           isAuthorized = true;
         }
-        console.log("[generate-player-ai] auth check — token_prefix:", token.substring(0, 12), "matched:", isAuthorized, "secrets_found:", secrets?.length ?? 0);
+        console.log("[generate-player-ai] auth check — matched:", isAuthorized, "secrets_found:", secrets?.length ?? 0);
       } catch (e) {
         console.error("[generate-player-ai] auth DB lookup failed:", e instanceof Error ? e.message : String(e));
       }

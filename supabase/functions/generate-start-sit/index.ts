@@ -697,7 +697,7 @@ Deno.serve(async (req: Request) => {
       round_number = await detectCurrentRound(serviceClient);
     }
 
-    console.log("generate-start-sit:", JSON.stringify({ playerAId, playerBId, round_number, season, isPremium, userId: userId ?? "anon" }));
+    console.log("generate-start-sit:", JSON.stringify({ playerAId, playerBId, round_number, season, isPremium }));
 
     if (!playerAId || !playerBId) {
       return new Response(

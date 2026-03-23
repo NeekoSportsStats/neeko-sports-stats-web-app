@@ -2,11 +2,22 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import OpenAI from "npm:openai@4";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+const ALLOWED_ORIGINS = new Set([
+  "https://www.neekostats.com.au",
+  "https://neekostats.com.au",
+  "http://localhost:5173",
+  "http://localhost:3000",
+]);
+
+function getCorsHeaders(origin: string): Record<string, string> {
+  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : "https://www.neekostats.com.au";
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+    "Vary": "Origin",
+  };
+}
 
 const STORAGE_BUCKET = "content-assets";
 const CATEGORIES = ["stadium", "crowd", "field", "abstract", "players"] as const;
@@ -189,6 +200,7 @@ function sseEvent(data: object): string {
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req.headers.get("origin") ?? "");
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }

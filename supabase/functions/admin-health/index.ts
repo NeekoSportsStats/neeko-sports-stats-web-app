@@ -26,19 +26,42 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader || authHeader !== `Bearer ${serviceKey}`) {
+    const token = authHeader?.replace("Bearer ", "") ?? "";
+
+    if (!token) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
+    let isAuthorized = token === serviceKey;
+
+    if (!isAuthorized) {
+      const userClient = createClient(supabaseUrl, serviceKey);
+      const { data: { user }, error: authErr } = await userClient.auth.getUser(token);
+      if (!authErr && user) {
+        const { data: profile } = await userClient
+          .from("profiles")
+          .select("is_admin")
+          .eq("id", user.id)
+          .maybeSingle();
+        isAuthorized = profile?.is_admin === true;
+      }
+    }
+
+    if (!isAuthorized) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, serviceKey);
 
     // Single canonical call — all state from one function
     const { data: state, error: stateErr } = await supabase
