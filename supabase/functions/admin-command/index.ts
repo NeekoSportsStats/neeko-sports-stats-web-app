@@ -65,29 +65,12 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const validStatuses = ["OUT", "INJURED", "TEST", null];
-      if (!validStatuses.includes(status)) {
-        return new Response(JSON.stringify({ error: `Invalid status: ${status}. Use OUT, INJURED, TEST, or null.` }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const { error: updateError } = await supabase
-        .schema("afl" as never)
-        .from("players")
-        .update({ manual_status: status ?? null })
-        .eq("player_id", player_id);
+      const { data, error: updateError } = await supabase.rpc("admin_update_player_status", {
+        p_player_id: player_id,
+        p_status: status ?? null,
+      });
       if (updateError) throw updateError;
-
-      // Also update the rankings cache status immediately (no full pipeline needed)
-      const effectiveStatus = status ?? null;
-      await supabase
-        .schema("afl" as never)
-        .from("player_rankings_cache")
-        .update({ status: effectiveStatus })
-        .eq("player_id", player_id);
-
-      result = { player_id, manual_status: effectiveStatus };
+      result = data;
     } else if (command === "commit_price_ingest") {
       const { season, round, rows } = payload;
       if (!season || !round || !rows) {
