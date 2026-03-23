@@ -1,35 +1,40 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import useMarketingPlayers from "./useMarketingPlayers";
 import { cleanAiText, truncateSmart } from "@/utils/cleanAiText";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, RefreshCw, ChevronDown, Search, Clapperboard, Zap } from "lucide-react";
+import {
+  Copy, Check, RefreshCw, ChevronDown, Search,
+  Clapperboard, Zap, Volume2, VolumeX, Play, Square,
+} from "lucide-react";
 import type { MarketingPlayer } from "./types";
 
-type Angle = "buy" | "sell" | "breakout" | "trap";
+type Angle  = "buy" | "sell" | "breakout" | "trap";
 type Format = "tiktok" | "story" | "landscape";
 type Length = 15 | 30 | 45;
+type SceneType = "hook" | "player" | "stats" | "analysis" | "deep" | "cta";
 
 interface Scene {
-  index: number;
-  title: string;
+  index:        number;
+  title:        string;
+  type:         SceneType;
   onScreenText: string;
-  visual: string;
-  duration: number;
+  visual:       string;
+  duration:     number;
 }
 
 interface GeneratedContent {
-  hooks: string[];
-  script: string;
-  scenes: Scene[];
+  hooks:    string[];
+  script:   string;
+  scenes:   Scene[];
   captions: string;
 }
 
-const ANGLE_CONFIG: Record<Angle, { label: string; emoji: string; hooks: string[] }> = {
+const ANGLE_CONFIG: Record<Angle, { label: string; symbol: string; hookTemplates: string[] }> = {
   buy: {
     label: "Buy",
-    emoji: "📈",
-    hooks: [
+    symbol: "+",
+    hookTemplates: [
       "This is the value play no one is talking about",
       "{PLAYER} is underpriced right now",
       "You're sleeping on {PLAYER} this week",
@@ -37,8 +42,8 @@ const ANGLE_CONFIG: Record<Angle, { label: string; emoji: string; hooks: string[
   },
   sell: {
     label: "Sell",
-    emoji: "📉",
-    hooks: [
+    symbol: "-",
+    hookTemplates: [
       "This player is starting to look overpriced",
       "{PLAYER} is a trap at this price",
       "This is where the risk starts to show",
@@ -46,8 +51,8 @@ const ANGLE_CONFIG: Record<Angle, { label: string; emoji: string; hooks: string[
   },
   breakout: {
     label: "Breakout",
-    emoji: "💥",
-    hooks: [
+    symbol: "^",
+    hookTemplates: [
       "{PLAYER} is trending toward a breakout",
       "This could be the week {PLAYER} jumps",
       "The upside is building for {PLAYER}",
@@ -55,8 +60,8 @@ const ANGLE_CONFIG: Record<Angle, { label: string; emoji: string; hooks: string[
   },
   trap: {
     label: "Trap",
-    emoji: "🪤",
-    hooks: [
+    symbol: "!",
+    hookTemplates: [
       "This looks good on the surface, but it isn't",
       "{PLAYER} is the trap people are missing",
       "There's less here than the hype suggests",
@@ -64,14 +69,21 @@ const ANGLE_CONFIG: Record<Angle, { label: string; emoji: string; hooks: string[
   },
 };
 
+const ANGLE_SCENE_STYLES: Record<Angle, { bg: string; accent: string; text: string }> = {
+  buy:      { bg: "from-emerald-950 to-slate-950", accent: "text-emerald-400", text: "text-emerald-200" },
+  sell:     { bg: "from-red-950 to-slate-950",     accent: "text-red-400",     text: "text-red-200"     },
+  breakout: { bg: "from-sky-950 to-slate-950",     accent: "text-sky-400",     text: "text-sky-200"     },
+  trap:     { bg: "from-amber-950 to-slate-950",   accent: "text-amber-400",   text: "text-amber-200"   },
+};
+
 const FORMAT_CONFIG: Record<Format, { label: string; desc: string }> = {
-  tiktok:    { label: "TikTok / Reel", desc: "9:16 vertical" },
-  story:     { label: "Story",         desc: "9:16 static" },
-  landscape: { label: "Landscape",     desc: "16:9 horizontal" },
+  tiktok:    { label: "TikTok / Reel", desc: "9:16 vertical"   },
+  story:     { label: "Story",         desc: "9:16 static"      },
+  landscape: { label: "Landscape",     desc: "16:9 horizontal"  },
 };
 
 function buildHooks(angle: Angle, player: MarketingPlayer): string[] {
-  return ANGLE_CONFIG[angle].hooks.map((h) =>
+  return ANGLE_CONFIG[angle].hookTemplates.map((h) =>
     h.replace("{PLAYER}", player.player_name)
   );
 }
@@ -79,10 +91,9 @@ function buildHooks(angle: Angle, player: MarketingPlayer): string[] {
 function buildScript(
   angle: Angle,
   player: MarketingPlayer,
-  hooks: string[],
+  hook: string,
   length: Length
 ): string {
-  const hook = hooks[0];
   const why = truncateSmart(
     cleanAiText(player.recommendation_why ?? player.summary_short ?? ""),
     180
@@ -91,7 +102,7 @@ function buildScript(
     cleanAiText(player.summary_long ?? player.summary_short ?? ""),
     length === 15 ? 80 : length === 30 ? 160 : 240
   );
-  const proj = player.projection_final != null ? Math.round(player.projection_final) : null;
+  const proj  = player.projection_final != null ? Math.round(player.projection_final) : null;
   const price = player.price != null ? `$${(player.price / 1000).toFixed(0)}k` : null;
 
   const statLine =
@@ -121,12 +132,12 @@ function buildScript(
 function buildScenes(
   angle: Angle,
   player: MarketingPlayer,
-  hooks: string[],
+  hook: string,
   length: Length
 ): Scene[] {
-  const proj = player.projection_final != null ? Math.round(player.projection_final) : null;
-  const value = player.value_score != null ? Number(player.value_score).toFixed(1) : null;
-  const price = player.price != null ? `$${(player.price / 1000).toFixed(0)}k` : null;
+  const proj         = player.projection_final != null ? Math.round(player.projection_final) : null;
+  const value        = player.value_score != null ? Number(player.value_score).toFixed(1) : null;
+  const price        = player.price != null ? `$${(player.price / 1000).toFixed(0)}k` : null;
   const analysisLine = truncateSmart(
     cleanAiText(player.recommendation_why ?? player.summary_short ?? ""),
     90
@@ -134,44 +145,39 @@ function buildScenes(
 
   const perScene = Math.floor(length / 5);
 
+  const statsText = [
+    proj  != null ? `Projection: ${proj}pt` : null,
+    value != null ? `Value: ${value}` : null,
+    price != null ? `Price: ${price}` : null,
+  ].filter(Boolean).join("  |  ");
+
   const scenes: Scene[] = [
     {
-      index: 1,
-      title: "Hook",
-      onScreenText: hooks[0],
+      index: 1, title: "Hook", type: "hook",
+      onScreenText: hook,
       visual: "Bold text centred on dark gradient background",
       duration: perScene,
     },
     {
-      index: 2,
-      title: "Player Card",
+      index: 2, title: "Player Card", type: "player",
       onScreenText: `${player.player_name} • ${player.team ?? ""}${player.position ? ` • ${player.position}` : ""}`,
       visual: "Player card — generate in Image Engine tab",
       duration: perScene,
     },
     {
-      index: 3,
-      title: "Numbers",
-      onScreenText: [
-        proj != null ? `Projection: ${proj}pt` : null,
-        value != null ? `Value: ${value}` : null,
-        price != null ? `Price: ${price}` : null,
-      ]
-        .filter(Boolean)
-        .join("  |  "),
+      index: 3, title: "Numbers", type: "stats",
+      onScreenText: statsText || "Stats loading...",
       visual: "Stats overlay card on branded background",
       duration: perScene,
     },
     {
-      index: 4,
-      title: "Analysis",
+      index: 4, title: "Analysis", type: "analysis",
       onScreenText: analysisLine || "Key insight from Neeko AI",
       visual: "Branded panel with player name watermark",
       duration: perScene,
     },
     {
-      index: 5,
-      title: "CTA",
+      index: 5, title: "CTA", type: "cta",
       onScreenText: "See full rankings at neekostats.com.au",
       visual: "Neeko logo + URL on solid background",
       duration: perScene,
@@ -179,30 +185,26 @@ function buildScenes(
   ];
 
   if (length === 45) {
-    const extra = truncateSmart(
-      cleanAiText(player.summary_long ?? ""),
-      80
-    );
+    const extra = truncateSmart(cleanAiText(player.summary_long ?? ""), 80);
     scenes.splice(4, 0, {
-      index: 4,
-      title: "Deep Dive",
+      index: 5, title: "Deep Dive", type: "deep",
       onScreenText: extra || `${ANGLE_CONFIG[angle].label} signal confirmed by multiple data points`,
       visual: "Text-heavy card with supporting stat callouts",
       duration: perScene,
     });
-    scenes[5] = { ...scenes[5], index: 5 };
-    scenes[6] = { ...scenes[6], index: 6 };
+    scenes[5] = { ...scenes[5], index: 6 };
+    scenes[6] = { ...scenes[6], index: 7 };
   }
 
-  return scenes;
+  return scenes.map((s, i) => ({ ...s, index: i + 1 }));
 }
 
 function buildCaptions(script: string): string {
   return script
     .split("\n\n")
-    .map((line) => line.trim())
+    .map((l) => l.trim())
     .filter(Boolean)
-    .map((line, i) => (i === 0 ? line.toUpperCase() : line))
+    .map((l, i) => (i === 0 ? l.toUpperCase() : l))
     .join("\n");
 }
 
@@ -216,12 +218,11 @@ function useCopy() {
   return { copy, copied };
 }
 
-function CopyButton({ text, label, copyKey, copy, copied }: {
-  text: string;
-  label: string;
-  copyKey: string;
-  copy: (t: string, k: string) => void;
-  copied: string | null;
+function CopyBtn({
+  text, label, copyKey, copy, copied,
+}: {
+  text: string; label: string; copyKey: string;
+  copy: (t: string, k: string) => void; copied: string | null;
 }) {
   const done = copied === copyKey;
   return (
@@ -235,7 +236,7 @@ function CopyButton({ text, label, copyKey, copy, copied }: {
   );
 }
 
-const posStyle = (pos: string | null) => {
+const posStyle = (pos: string | null | undefined) => {
   const map: Record<string, string> = {
     MID: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
     DEF: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
@@ -245,18 +246,108 @@ const posStyle = (pos: string | null) => {
   return map[pos ?? ""] ?? "bg-muted text-muted-foreground";
 };
 
+function SceneCard({ scene, angle, isLandscape }: {
+  scene: Scene; angle: Angle; isLandscape: boolean;
+}) {
+  const style = ANGLE_SCENE_STYLES[angle];
+
+  const cardClass = isLandscape
+    ? "w-[260px] h-[150px]"
+    : "w-[120px] h-[213px]";
+
+  const content = () => {
+    switch (scene.type) {
+      case "hook":
+        return (
+          <div className="flex-1 flex items-center justify-center px-3">
+            <p className={`text-center font-bold leading-tight ${isLandscape ? "text-sm" : "text-xs"} ${style.accent}`}>
+              {scene.onScreenText}
+            </p>
+          </div>
+        );
+
+      case "player":
+        return (
+          <div className="flex-1 flex flex-col items-center justify-center gap-2 px-3">
+            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-lg font-bold text-white/60">
+              {scene.onScreenText.charAt(0)}
+            </div>
+            <p className={`text-center font-semibold text-white leading-tight ${isLandscape ? "text-xs" : "text-[10px]"}`}>
+              {scene.onScreenText}
+            </p>
+            <p className="text-[9px] text-white/40 italic">Use Image Engine card here</p>
+          </div>
+        );
+
+      case "stats":
+        return (
+          <div className="flex-1 flex flex-col items-center justify-center gap-1.5 px-2">
+            {scene.onScreenText.split("  |  ").map((stat, i) => {
+              const [label, val] = stat.split(": ");
+              return (
+                <div key={i} className="flex gap-1.5 items-baseline">
+                  <span className="text-[9px] text-white/50 uppercase tracking-wide">{label}</span>
+                  <span className={`font-bold ${isLandscape ? "text-base" : "text-sm"} ${style.accent}`}>{val}</span>
+                </div>
+              );
+            })}
+          </div>
+        );
+
+      case "analysis":
+      case "deep":
+        return (
+          <div className="flex-1 flex items-center justify-center px-3">
+            <p className={`text-center text-white/80 leading-tight ${isLandscape ? "text-xs" : "text-[9px]"}`}>
+              {scene.onScreenText}
+            </p>
+          </div>
+        );
+
+      case "cta":
+        return (
+          <div className="flex-1 flex flex-col items-center justify-center gap-1 px-2">
+            <div className={`font-black uppercase tracking-wider ${isLandscape ? "text-sm" : "text-xs"} ${style.accent}`}>
+              NEEKO
+            </div>
+            <p className={`text-center text-white/70 ${isLandscape ? "text-[10px]" : "text-[8px]"}`}>
+              {scene.onScreenText}
+            </p>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className={`${cardClass} rounded-xl bg-gradient-to-b ${style.bg} flex flex-col shrink-0 overflow-hidden border border-white/10`}>
+      <div className="px-2 pt-2 pb-1 flex items-center justify-between">
+        <span className="text-[8px] font-bold uppercase tracking-widest text-white/40">
+          Scene {scene.index}
+        </span>
+        <span className="text-[8px] text-white/30">{scene.duration}s</span>
+      </div>
+      {content()}
+      <div className="px-2 pb-2 pt-1">
+        <span className="text-[8px] text-white/30 font-medium">{scene.title}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function VideoGenerator() {
   const { players, loading } = useMarketingPlayers();
-  const { copy, copied } = useCopy();
+  const { copy, copied }     = useCopy();
+  const utteranceRef         = useRef<SpeechSynthesisUtterance | null>(null);
 
-  const [search, setSearch] = useState("");
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [search,         setSearch]         = useState("");
+  const [showDropdown,   setShowDropdown]   = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<MarketingPlayer | null>(null);
-  const [angle, setAngle] = useState<Angle>("buy");
-  const [format, setFormat] = useState<Format>("tiktok");
-  const [length, setLength] = useState<Length>(30);
-  const [generated, setGenerated] = useState<GeneratedContent | null>(null);
-  const [selectedHook, setSelectedHook] = useState(0);
+  const [angle,          setAngle]          = useState<Angle>("buy");
+  const [format,         setFormat]         = useState<Format>("tiktok");
+  const [length,         setLength]         = useState<Length>(30);
+  const [generated,      setGenerated]      = useState<GeneratedContent | null>(null);
+  const [selectedHook,   setSelectedHook]   = useState(0);
+  const [voicePlaying,   setVoicePlaying]   = useState(false);
 
   const filtered = players.filter((p) =>
     p.player_name.toLowerCase().includes(search.toLowerCase())
@@ -264,13 +355,47 @@ export default function VideoGenerator() {
 
   const generate = () => {
     if (!selectedPlayer) return;
-    const hooks = buildHooks(angle, selectedPlayer);
-    const script = buildScript(angle, selectedPlayer, hooks, length);
-    const scenes = buildScenes(angle, selectedPlayer, hooks, length);
+    const hooks    = buildHooks(angle, selectedPlayer);
+    const script   = buildScript(angle, selectedPlayer, hooks[0], length);
+    const scenes   = buildScenes(angle, selectedPlayer, hooks[0], length);
     const captions = buildCaptions(script);
     setGenerated({ hooks, script, scenes, captions });
     setSelectedHook(0);
+    stopVoice();
   };
+
+  const applyHook = (idx: number) => {
+    if (!generated || !selectedPlayer) return;
+    setSelectedHook(idx);
+    const hook     = generated.hooks[idx];
+    const script   = buildScript(angle, selectedPlayer, hook, length);
+    const scenes   = buildScenes(angle, selectedPlayer, hook, length);
+    const captions = buildCaptions(script);
+    setGenerated({ ...generated, script, scenes, captions });
+    stopVoice();
+  };
+
+  const stopVoice = () => {
+    speechSynthesis.cancel();
+    setVoicePlaying(false);
+  };
+
+  const toggleVoice = () => {
+    if (voicePlaying) {
+      stopVoice();
+      return;
+    }
+    if (!generated) return;
+    const utterance = new SpeechSynthesisUtterance(generated.script.replace(/\n\n/g, ". "));
+    utterance.rate   = 0.95;
+    utterance.pitch  = 1;
+    utterance.onend  = () => setVoicePlaying(false);
+    utteranceRef.current = utterance;
+    speechSynthesis.speak(utterance);
+    setVoicePlaying(true);
+  };
+
+  const isLandscape = format === "landscape";
 
   const fullStoryboard = generated
     ? [
@@ -288,8 +413,7 @@ export default function VideoGenerator() {
         ``,
         `--- SCENES ---`,
         ...generated.scenes.map(
-          (s) =>
-            `Scene ${s.index}: ${s.title} (${s.duration}s)\nText: ${s.onScreenText}\nVisual: ${s.visual}`
+          (s) => `Scene ${s.index}: ${s.title} (${s.duration}s)\nText: ${s.onScreenText}\nVisual: ${s.visual}`
         ),
         ``,
         `--- CAPTIONS ---`,
@@ -344,6 +468,7 @@ export default function VideoGenerator() {
                           setShowDropdown(false);
                           setSearch("");
                           setGenerated(null);
+                          stopVoice();
                         }}
                       >
                         <span className="font-medium truncate flex-1">{p.player_name}</span>
@@ -362,17 +487,17 @@ export default function VideoGenerator() {
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Angle</label>
             <div className="grid grid-cols-2 gap-1">
-              {(Object.entries(ANGLE_CONFIG) as [Angle, typeof ANGLE_CONFIG[Angle]][]).map(([id, cfg]) => (
+              {(Object.entries(ANGLE_CONFIG) as [Angle, (typeof ANGLE_CONFIG)[Angle]][]).map(([id, cfg]) => (
                 <button
                   key={id}
-                  onClick={() => { setAngle(id); setGenerated(null); }}
+                  onClick={() => { setAngle(id); setGenerated(null); stopVoice(); }}
                   className={`text-xs font-medium py-1.5 px-2 rounded border transition-colors ${
                     angle === id
                       ? "bg-foreground text-background border-foreground"
                       : "border-border text-muted-foreground hover:text-foreground bg-background"
                   }`}
                 >
-                  {cfg.emoji} {cfg.label}
+                  {cfg.label}
                 </button>
               ))}
             </div>
@@ -381,7 +506,7 @@ export default function VideoGenerator() {
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Format</label>
             <div className="flex flex-col gap-1">
-              {(Object.entries(FORMAT_CONFIG) as [Format, typeof FORMAT_CONFIG[Format]][]).map(([id, cfg]) => (
+              {(Object.entries(FORMAT_CONFIG) as [Format, (typeof FORMAT_CONFIG)[Format]][]).map(([id, cfg]) => (
                 <button
                   key={id}
                   onClick={() => setFormat(id)}
@@ -404,7 +529,7 @@ export default function VideoGenerator() {
               {([15, 30, 45] as Length[]).map((l) => (
                 <button
                   key={l}
-                  onClick={() => { setLength(l); setGenerated(null); }}
+                  onClick={() => { setLength(l); setGenerated(null); stopVoice(); }}
                   className={`flex-1 text-xs font-medium py-1.5 rounded border transition-colors ${
                     length === l
                       ? "bg-foreground text-background border-foreground"
@@ -418,11 +543,7 @@ export default function VideoGenerator() {
           </div>
         </div>
 
-        <Button
-          onClick={generate}
-          disabled={!selectedPlayer}
-          className="h-9 px-6 gap-2 self-end"
-        >
+        <Button onClick={generate} disabled={!selectedPlayer} className="h-9 px-6 gap-2 self-end">
           <Zap className="h-4 w-4" />
           Generate
         </Button>
@@ -443,7 +564,7 @@ export default function VideoGenerator() {
             Ready to generate for {selectedPlayer.player_name}
           </p>
           <p className="text-xs text-muted-foreground/60 mt-1">
-            {ANGLE_CONFIG[angle].emoji} {ANGLE_CONFIG[angle].label} · {FORMAT_CONFIG[format].label} · {length}s
+            {ANGLE_CONFIG[angle].label} · {FORMAT_CONFIG[format].label} · {length}s
           </p>
           <Button onClick={generate} className="mt-4 gap-2" size="sm">
             <Zap className="h-3.5 w-3.5" />
@@ -454,26 +575,36 @@ export default function VideoGenerator() {
 
       {generated && selectedPlayer && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline" className="text-xs">{selectedPlayer.player_name}</Badge>
-              <Badge variant="outline" className="text-xs">{ANGLE_CONFIG[angle].emoji} {ANGLE_CONFIG[angle].label}</Badge>
+              <Badge variant="outline" className="text-xs">{ANGLE_CONFIG[angle].label}</Badge>
               <Badge variant="outline" className="text-xs">{FORMAT_CONFIG[format].label}</Badge>
               <Badge variant="outline" className="text-xs">{length}s</Badge>
             </div>
-            <CopyButton
-              text={fullStoryboard}
-              label="Copy All"
-              copyKey="all"
-              copy={copy}
-              copied={copied}
-            />
+            <div className="flex items-center gap-3">
+              <button
+                onClick={toggleVoice}
+                className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border transition-colors ${
+                  voicePlaying
+                    ? "border-red-500/40 text-red-600 bg-red-500/5 hover:bg-red-500/10"
+                    : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                }`}
+              >
+                {voicePlaying ? (
+                  <><Square className="h-3 w-3 fill-current" /> Stop Voice</>
+                ) : (
+                  <><Play className="h-3 w-3 fill-current" /> Play Voice</>
+                )}
+              </button>
+              <CopyBtn text={fullStoryboard} label="Copy All" copyKey="all" copy={copy} copied={copied} />
+            </div>
           </div>
 
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Hook Options</h3>
-              <CopyButton
+              <CopyBtn
                 text={generated.hooks[selectedHook]}
                 label="Copy Hook"
                 copyKey="hook"
@@ -485,7 +616,7 @@ export default function VideoGenerator() {
               {generated.hooks.map((h, i) => (
                 <button
                   key={i}
-                  onClick={() => setSelectedHook(i)}
+                  onClick={() => applyHook(i)}
                   className={`w-full text-left text-sm px-3 py-2.5 rounded-md border transition-colors ${
                     selectedHook === i
                       ? "border-foreground bg-foreground/5 font-medium"
@@ -494,6 +625,9 @@ export default function VideoGenerator() {
                 >
                   <span className="mr-2 text-muted-foreground text-xs">#{i + 1}</span>
                   {h}
+                  {selectedHook === i && (
+                    <span className="ml-2 text-[10px] text-muted-foreground font-normal">active</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -501,14 +635,54 @@ export default function VideoGenerator() {
 
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold">Scene Preview</h3>
+                <span className="text-xs text-muted-foreground">{generated.scenes.length} scenes · {length}s total</span>
+              </div>
+              <div className="flex items-center gap-3">
+                {voicePlaying && (
+                  <span className="flex items-center gap-1 text-xs text-emerald-600 animate-pulse">
+                    <Volume2 className="h-3 w-3" /> Playing...
+                  </span>
+                )}
+                {!voicePlaying && (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <VolumeX className="h-3 w-3" /> Voice ready
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
+              {generated.scenes.map((scene) => (
+                <SceneCard
+                  key={scene.index}
+                  scene={scene}
+                  angle={angle}
+                  isLandscape={isLandscape}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Voiceover Script</h3>
-              <CopyButton
-                text={generated.script}
-                label="Copy Script"
-                copyKey="script"
-                copy={copy}
-                copied={copied}
-              />
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={toggleVoice}
+                  className={`flex items-center gap-1.5 text-xs transition-colors ${
+                    voicePlaying
+                      ? "text-red-500 hover:text-red-600"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {voicePlaying
+                    ? <><Square className="h-3 w-3 fill-current" /> Stop</>
+                    : <><Play className="h-3 w-3 fill-current" /> Preview Voice</>
+                  }
+                </button>
+                <CopyBtn text={generated.script} label="Copy Script" copyKey="script" copy={copy} copied={copied} />
+              </div>
             </div>
             <div className="space-y-2">
               {generated.script.split("\n\n").map((line, i) => (
@@ -527,12 +701,9 @@ export default function VideoGenerator() {
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Scene Storyboard</h3>
-              <CopyButton
+              <CopyBtn
                 text={generated.scenes
-                  .map(
-                    (s) =>
-                      `Scene ${s.index}: ${s.title} (${s.duration}s)\nText: ${s.onScreenText}\nVisual: ${s.visual}`
-                  )
+                  .map((s) => `Scene ${s.index}: ${s.title} (${s.duration}s)\nText: ${s.onScreenText}\nVisual: ${s.visual}`)
                   .join("\n\n")}
                 label="Copy Storyboard"
                 copyKey="storyboard"
@@ -542,10 +713,7 @@ export default function VideoGenerator() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {generated.scenes.map((scene) => (
-                <div
-                  key={scene.index}
-                  className="rounded-md border border-border bg-muted/20 p-3 space-y-2"
-                >
+                <div key={scene.index} className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                       Scene {scene.index}
@@ -557,9 +725,7 @@ export default function VideoGenerator() {
                     <p className="text-xs leading-snug text-foreground/90 bg-background rounded px-2 py-1.5 border border-border">
                       "{scene.onScreenText}"
                     </p>
-                    <p className="text-[11px] text-muted-foreground leading-snug italic">
-                      {scene.visual}
-                    </p>
+                    <p className="text-[11px] text-muted-foreground leading-snug italic">{scene.visual}</p>
                   </div>
                 </div>
               ))}
@@ -569,13 +735,7 @@ export default function VideoGenerator() {
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Captions</h3>
-              <CopyButton
-                text={generated.captions}
-                label="Copy Captions"
-                copyKey="captions"
-                copy={copy}
-                copied={copied}
-              />
+              <CopyBtn text={generated.captions} label="Copy Captions" copyKey="captions" copy={copy} copied={copied} />
             </div>
             <pre className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap font-sans bg-muted/30 rounded-md px-3 py-2.5 border border-border">
               {generated.captions}
