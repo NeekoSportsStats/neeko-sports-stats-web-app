@@ -195,7 +195,12 @@ type ActiveVariation = "main" | "a" | "b" | "c";
 
 declare global {
   interface Window {
-    selectedVoiceScript?: { title: string; content: string };
+    selectedVoiceScript?: {
+      title: string;
+      content: string;
+      hook?: string;
+      variation?: string;
+    } | null;
   }
 }
 
@@ -219,6 +224,7 @@ export default function VoiceStudio() {
   const [playing, setPlaying]                   = useState(false);
   const [savedId, setSavedId]                   = useState<string | null>(null);
   const [variationsGenerated, setVariationsGenerated] = useState(false);
+  const [sentToVideo, setSentToVideo]               = useState(false);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const voicesAvailable = voices.length > 0;
@@ -321,13 +327,24 @@ export default function VoiceStudio() {
     }
   }
 
-  function handleSendToEditor() {
+  function handleSendToVideoGenerator() {
+    const content = activeScript || originalScript;
+    if (!content.trim()) return;
+    const hook = content.split("\n").filter(Boolean)[0] ?? "";
     if (typeof window !== "undefined") {
       window.selectedVoiceScript = {
-        title,
-        content: activeScript || originalScript,
+        title: title || "Voice Script",
+        content,
+        hook,
+        variation: activeVariation,
       };
     }
+    setSentToVideo(true);
+    setTimeout(() => setSentToVideo(false), 3000);
+  }
+
+  function handleSendToEditor() {
+    handleSendToVideoGenerator();
   }
 
   const fullCopyText = [
@@ -613,11 +630,14 @@ export default function VoiceStudio() {
           <CopyButton text={fullCopyText} label="Copy Full Pack" />
 
           <button
-            onClick={handleSendToEditor}
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-border hover:bg-accent transition-colors"
-            title="Stores the script in window.selectedVoiceScript for use by other tools"
+            onClick={handleSendToVideoGenerator}
+            disabled={!activeScript.trim() && !originalScript.trim()}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-border hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            <ExternalLink className="h-3.5 w-3.5" /> Send to Editor
+            {sentToVideo
+              ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Ready in Video Generator</>
+              : <><ExternalLink className="h-3.5 w-3.5" /> Send to Video Generator</>
+            }
           </button>
         </div>
 

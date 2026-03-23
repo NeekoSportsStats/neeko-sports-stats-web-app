@@ -1,11 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import useMarketingPlayers from "./useMarketingPlayers";
 import { cleanAiText, truncateSmart } from "@/utils/cleanAiText";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Copy, Check, RefreshCw, ChevronDown, Search,
-  Clapperboard, Zap, Volume2, VolumeX, Play, Square, BookmarkPlus,
+  Clapperboard, Zap, Volume2, VolumeX, Play, Square, BookmarkPlus, Mic,
 } from "lucide-react";
 import type { MarketingPlayer } from "./types";
 import { addToLibrary } from "./lib/library";
@@ -210,6 +210,45 @@ function buildCaptions(script: string): string {
     .join("\n");
 }
 
+function buildScenesFromVoice(script: string, length: Length): Scene[] {
+  const lines = script.split("\n").filter((l) => l.trim().length > 0);
+  const perScene = Math.floor(length / 5);
+  const scenes: Scene[] = lines.slice(0, 5).map((line, i) => ({
+    index:        i + 1,
+    title:        i === 0 ? "Hook" : i === lines.length - 1 ? "CTA" : `Scene ${i + 1}`,
+    type:         (i === 0 ? "hook" : i === lines.length - 1 ? "cta" : "analysis") as SceneType,
+    onScreenText: line,
+    visual:       i === 0
+      ? "Bold text centred on dark gradient background"
+      : i === lines.length - 1
+      ? "Neeko logo + URL on solid background"
+      : "Branded panel with player name watermark",
+    duration: perScene,
+  }));
+  if (scenes.length < 5) {
+    scenes.push({
+      index:        scenes.length + 1,
+      title:        "CTA",
+      type:         "cta" as SceneType,
+      onScreenText: "See full rankings at neekostats.com.au",
+      visual:       "Neeko logo + URL on solid background",
+      duration:     perScene,
+    });
+  }
+  return scenes.map((s, i) => ({ ...s, index: i + 1 }));
+}
+
+declare global {
+  interface Window {
+    selectedVoiceScript?: {
+      title:     string;
+      content:   string;
+      hook?:     string;
+      variation?: string;
+    } | null;
+  }
+}
+
 function useCopy() {
   const [copied, setCopied] = useState<string | null>(null);
   const copy = (text: string, key: string) => {
@@ -353,6 +392,32 @@ export default function VideoGenerator() {
   const [generated,      setGenerated]      = useState<GeneratedContent | null>(null);
   const [selectedHook,   setSelectedHook]   = useState(0);
   const [voicePlaying,   setVoicePlaying]   = useState(false);
+  const [voiceImportTitle, setVoiceImportTitle] = useState<string | null>(null);
+
+  const stopVoice = () => {
+    speechSynthesis.cancel();
+    setVoicePlaying(false);
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.selectedVoiceScript) return;
+    const vs = window.selectedVoiceScript;
+    const hook    = vs.hook ?? vs.content.split("\n").filter(Boolean)[0] ?? "";
+    const script  = vs.content;
+    const scenes  = buildScenesFromVoice(script, 30);
+    const captions = buildCaptions(script);
+    setGenerated({
+      hooks:    [hook],
+      script,
+      scenes,
+      captions,
+    });
+    setSelectedHook(0);
+    setVoiceImportTitle(vs.title || "Voice Script");
+    stopVoice();
+    window.selectedVoiceScript = null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = players.filter((p) =>
     p.player_name.toLowerCase().includes(search.toLowerCase())
@@ -366,6 +431,7 @@ export default function VideoGenerator() {
     const captions = buildCaptions(script);
     setGenerated({ hooks, script, scenes, captions });
     setSelectedHook(0);
+    setVoiceImportTitle(null);
     stopVoice();
   };
 
@@ -378,11 +444,6 @@ export default function VideoGenerator() {
     const captions = buildCaptions(script);
     setGenerated({ ...generated, script, scenes, captions });
     stopVoice();
-  };
-
-  const stopVoice = () => {
-    speechSynthesis.cancel();
-    setVoicePlaying(false);
   };
 
   const toggleVoice = () => {
@@ -578,12 +639,30 @@ export default function VideoGenerator() {
         </div>
       )}
 
-      {generated && selectedPlayer && (
+      {generated && (
         <div className="space-y-4">
+          {voiceImportTitle && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/40 border border-border">
+              <Mic className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                Imported from Voice Studio — <span className="font-medium text-foreground">{voiceImportTitle}</span>
+              </p>
+              <button
+                onClick={() => setVoiceImportTitle(null)}
+                className="ml-auto text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                dismiss
+              </button>
+            </div>
+          )}
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="outline" className="text-xs">{selectedPlayer.player_name}</Badge>
-              <Badge variant="outline" className="text-xs">{ANGLE_CONFIG[angle].label}</Badge>
+              {selectedPlayer && (
+                <Badge variant="outline" className="text-xs">{selectedPlayer.player_name}</Badge>
+              )}
+              {selectedPlayer && (
+                <Badge variant="outline" className="text-xs">{ANGLE_CONFIG[angle].label}</Badge>
+              )}
               <Badge variant="outline" className="text-xs">{FORMAT_CONFIG[format].label}</Badge>
               <Badge variant="outline" className="text-xs">{length}s</Badge>
             </div>
@@ -688,12 +767,14 @@ export default function VideoGenerator() {
                 </button>
                 <button
                   onClick={() => {
-                    if (!selectedPlayer || !generated) return;
+                    if (!generated) return;
                     addToLibrary({
                       type:    "video",
-                      title:   `${selectedPlayer.player_name} — ${ANGLE_CONFIG[angle].label} script`,
+                      title:   selectedPlayer
+                        ? `${selectedPlayer.player_name} — ${ANGLE_CONFIG[angle].label} script`
+                        : `${voiceImportTitle ?? "Voice"} — video script`,
                       content: generated.script,
-                      player:  selectedPlayer.player_name,
+                      player:  selectedPlayer?.player_name ?? null,
                       tags:    ["video", angle],
                     });
                     setSavedScript(true);
@@ -729,15 +810,17 @@ export default function VideoGenerator() {
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={() => {
-                    if (!selectedPlayer || !generated) return;
+                    if (!generated) return;
                     const storyboardText = generated.scenes
                       .map((s) => `Scene ${s.index}: ${s.title} (${s.duration}s)\nText: ${s.onScreenText}\nVisual: ${s.visual}`)
                       .join("\n\n");
                     addToLibrary({
                       type:    "video",
-                      title:   `${selectedPlayer.player_name} — ${ANGLE_CONFIG[angle].label} storyboard`,
+                      title:   selectedPlayer
+                        ? `${selectedPlayer.player_name} — ${ANGLE_CONFIG[angle].label} storyboard`
+                        : `${voiceImportTitle ?? "Voice"} — storyboard`,
                       content: storyboardText,
-                      player:  selectedPlayer.player_name,
+                      player:  selectedPlayer?.player_name ?? null,
                       tags:    ["storyboard", angle],
                     });
                     setSavedStoryboard(true);
