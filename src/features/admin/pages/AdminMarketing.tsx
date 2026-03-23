@@ -6,6 +6,7 @@ const ContentEngine     = lazy(() => import("@/features/admin/marketing/ContentE
 const AIStudio          = lazy(() => import("@/features/admin/marketing/AIStudio"));
 const Editor            = lazy(() => import("@/features/admin/marketing/Editor"));
 const Library           = lazy(() => import("@/features/admin/marketing/Library"));
+const ImageEngine       = lazy(() => import("@/features/admin/marketing/ImageEngine"));
 const GraphicEngine     = lazy(() => import("@/features/admin/pages/AdminContentEngine"));
 const WeeklyPlanner     = lazy(() => import("@/features/admin/marketing/WeeklyPlanner"));
 const AIMediaLibrary    = lazy(() => import("@/features/admin/marketing/AIVideoLibrary"));
@@ -16,6 +17,7 @@ type Tab =
   | "ai-studio"
   | "editor"
   | "library"
+  | "images"
   | "graphics"
   | "planner"
   | "media"
@@ -26,6 +28,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; group: "scripts" 
   { id: "ai-studio", label: "AI Studio",      icon: Wand2,      group: "scripts"  },
   { id: "editor",    label: "Editor",         icon: Sparkles,   group: "scripts"  },
   { id: "library",   label: "Library",        icon: BookOpen,   group: "scripts"  },
+  { id: "images",    label: "Image Engine",   icon: ImageIcon,  group: "visuals"  },
   { id: "graphics",  label: "Graphic Engine", icon: ImageIcon,  group: "visuals"  },
   { id: "planner",   label: "Weekly Planner", icon: Calendar,   group: "visuals"  },
   { id: "media",     label: "Media Library",  icon: ImageIcon,  group: "visuals"  },
@@ -109,6 +112,7 @@ export default function AdminMarketing() {
         {tab === "ai-studio" && <AIStudio />}
         {tab === "editor"    && <Editor />}
         {tab === "library"   && <Library />}
+        {tab === "images"    && <ImageEngine />}
         {tab === "graphics"  && <GraphicEngine />}
         {tab === "planner"   && <WeeklyPlanner />}
         {tab === "media"     && <AIMediaLibrary />}
