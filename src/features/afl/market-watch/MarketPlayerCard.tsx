@@ -1,4 +1,5 @@
 import { Lock, Flame } from "lucide-react";
+import { cleanAiText } from "@/utils/cleanAiText";
 import { MarketRow } from "./types";
 import { fmtPrice, fmtNum, signalColor, momentumColor, riskColor, positionBadge } from "./helpers";
 import { track } from "@/lib/analytics";
@@ -120,7 +121,7 @@ export function MarketPlayerCard({ row, locked, onUnlock, tab, rank }: Props) {
 
         {row.recommendation_why && (
           <p className="mt-2.5 text-[11px] text-white/35 leading-snug line-clamp-2">
-            {row.recommendation_why}
+            {cleanAiText(row.recommendation_why)}
           </p>
         )}
       </div>

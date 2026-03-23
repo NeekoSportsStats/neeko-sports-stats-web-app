@@ -1,4 +1,5 @@
 import { RankingRow, RankingsTab, SortKey, PositionFilter } from "./types";
+import { cleanAiText } from "../../../../utils/cleanAiText";
 
 // ─── Recommendation label guardrails ─────────────────────────────────────────
 // Captain-tier labels require minimum projection and confidence thresholds.
@@ -347,7 +348,7 @@ export function sharpenAIText(
 ): string | null {
   if (!text) return null;
 
-  let out = text.trim();
+  let out = cleanAiText(text);
 
   if (out.startsWith("{") || out.startsWith("[")) {
     try {

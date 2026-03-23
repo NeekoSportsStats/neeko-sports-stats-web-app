@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { cleanAiText } from "@/utils/cleanAiText";
 import { createPortal } from "react-dom";
 import {
   Lock, Crown, X, ShieldCheck, Zap, Share2, Check,
@@ -617,7 +618,7 @@ function PlayerAnalysisModal({ row, section, isPremium, onClose, onUpgrade }: Pl
             row.ai_summary ? (
               <div>
                 <p className={`text-[9px] font-bold uppercase tracking-widest mb-2 ${cfg.accentText} opacity-70`}>AI Analysis</p>
-                <p className="text-[13px] text-white/75 leading-relaxed">{row.ai_summary}</p>
+                <p className="text-[13px] text-white/75 leading-relaxed">{cleanAiText(row.ai_summary)}</p>
               </div>
             ) : (
               <p className="text-sm text-white/30 italic">No analysis available yet.</p>

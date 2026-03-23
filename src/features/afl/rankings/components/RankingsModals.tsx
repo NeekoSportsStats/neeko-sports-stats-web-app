@@ -985,7 +985,11 @@ export function PlayerDetailModal({
 
             const TRUNCATE_CHARS = 300;
             const isTruncated = !isPremium && hasText && extendedText!.length > TRUNCATE_CHARS;
-            const displayText = isTruncated ? extendedText!.slice(0, TRUNCATE_CHARS).trimEnd() + "…" : extendedText;
+            const truncateBase = isTruncated ? extendedText!.slice(0, TRUNCATE_CHARS) : extendedText!;
+            const lastSpace = isTruncated ? truncateBase.lastIndexOf(" ") : -1;
+            const displayText = isTruncated
+              ? (lastSpace > 0 ? truncateBase.slice(0, lastSpace) : truncateBase)
+              : extendedText;
 
             return (
               <>
@@ -998,7 +1002,12 @@ export function PlayerDetailModal({
                       <div className="h-3 w-3/5 animate-pulse rounded bg-white/5" />
                     </div>
                   ) : hasText ? (
-                    <p className="text-sm text-white/65 leading-relaxed">{displayText}</p>
+                    <div className="relative">
+                      <p className="text-sm text-white/65 leading-relaxed">{displayText}</p>
+                      {isTruncated && (
+                        <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-[#111111] to-transparent pointer-events-none" />
+                      )}
+                    </div>
                   ) : (
                     <p className="text-sm text-white/30 italic">Analysis generating — check back soon.</p>
                   )}
@@ -1014,7 +1023,7 @@ export function PlayerDetailModal({
                     <Lock size={13} className="text-[#F5C84C]/50 shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] text-white/40 leading-snug mb-2">
-                        Unlock full breakdown including matchup insights, role impact, risk factors, and projection reasoning
+                        Unlock full breakdown including matchup, role impact, and projection edge
                       </p>
                       <a
                         href="/neeko-plus"

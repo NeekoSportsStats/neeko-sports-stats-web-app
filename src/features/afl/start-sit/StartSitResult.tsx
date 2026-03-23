@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { cleanAiText } from "@/utils/cleanAiText";
 import { Crown, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Share2, Check, RotateCcw, Sparkles, Shield, Zap, ChartBar as BarChart2, TriangleAlert as AlertTriangle } from "lucide-react";
 import { OutcomeDistributionChart } from "./OutcomeDistributionChart";
 import type { GameContext } from "./GameContextSelector";
@@ -274,8 +275,8 @@ export function StartSitResult({
   const oppIsLeading = oppState === "leading" || oppState === "leading_strong";
   const oppActive = oppState !== "neutral";
 
-  const displaySummary = shortSummary ?? aiSummary ?? null;
-  const fullSummary = longSummary ?? aiSummary ?? null;
+  const displaySummary = cleanAiText(shortSummary ?? aiSummary ?? null) || null;
+  const fullSummary = cleanAiText(longSummary ?? aiSummary ?? null) || null;
 
   const reasons = buildFallbackReasons(winner, loser, aiSummary);
 
