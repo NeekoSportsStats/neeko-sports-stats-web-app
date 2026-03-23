@@ -735,13 +735,38 @@ export default function AdminHealth() {
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <HealthCard icon={TrendingUp} title="Ingestion Stats" status={ingestionStatus} loading={loading}>
-              <StatRow label="Games 2026" value={(ingestion?.games_2026_count ?? 0).toLocaleString()} highlight={(ingestion?.games_2026_count ?? 0) > 0 ? "good" : "warn"} />
-              <StatRow label="Player stats 2026" value={(ingestion?.player_stats_2026 ?? 0).toLocaleString()} highlight={(ingestion?.player_stats_2026 ?? 0) > 0 ? "good" : "warn"} />
-              <StatRow label="Latest round" value={ingestion?.last_stat_week ?? "—"} />
-              <StatRow label="Last game date" value={formatDate(ingestion?.last_game_date ?? null)} />
-              <StatRow label="Last ingest" value={formatDate(ingestion?.last_ingest_at ?? null)} />
-              <StatRow label="Ingest errors" value={ingestion?.ingest_errors ?? 0} highlight={(ingestion?.ingest_errors ?? 0) === 0 ? "good" : "bad"} />
-              <StatRow label="Seasons" value={ingestion?.seasons_covered?.join(", ") ?? "—"} />
+              {(() => {
+                const lastIngestAt = ingestion?.last_ingest_at;
+                const ingestAgeMins = lastIngestAt
+                  ? (Date.now() - new Date(lastIngestAt).getTime()) / 60000
+                  : null;
+                const isStale = ingestAgeMins !== null && ingestAgeMins > 120;
+                return (
+                  <>
+                    {isStale && (
+                      <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-950/20 px-2.5 py-1.5 mb-3">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                        <span className="text-[11px] text-amber-400 font-medium">
+                          Ingestion stale — last seen {ingestAgeMins !== null ? `${Math.round(ingestAgeMins / 60)}h` : "?"} ago
+                        </span>
+                      </div>
+                    )}
+                    {!lastIngestAt && !loading && (
+                      <div className="flex items-center gap-2 rounded-md border border-red-500/30 bg-red-950/20 px-2.5 py-1.5 mb-3">
+                        <XCircle className="h-3.5 w-3.5 text-red-400 shrink-0" />
+                        <span className="text-[11px] text-red-400 font-medium">No ingestion recorded — check pipeline</span>
+                      </div>
+                    )}
+                    <StatRow label="Games 2026" value={(ingestion?.games_2026_count ?? 0).toLocaleString()} highlight={(ingestion?.games_2026_count ?? 0) > 0 ? "good" : "warn"} />
+                    <StatRow label="Player stats 2026" value={(ingestion?.player_stats_2026 ?? 0).toLocaleString()} highlight={(ingestion?.player_stats_2026 ?? 0) > 0 ? "good" : "warn"} />
+                    <StatRow label="Latest round" value={ingestion?.last_stat_week ?? "—"} />
+                    <StatRow label="Last game date" value={formatDate(ingestion?.last_game_date ?? null)} />
+                    <StatRow label="Last ingest" value={formatDate(lastIngestAt ?? null)} highlight={isStale ? "warn" : "good"} />
+                    <StatRow label="Ingest errors" value={ingestion?.ingest_errors ?? 0} highlight={(ingestion?.ingest_errors ?? 0) === 0 ? "good" : "bad"} />
+                    <StatRow label="Seasons" value={ingestion?.seasons_covered?.join(", ") ?? "—"} />
+                  </>
+                );
+              })()}
             </HealthCard>
 
             <HealthCard icon={Target} title="Data Freshness" status={projectionStatus} loading={loading}>
@@ -800,14 +825,47 @@ export default function AdminHealth() {
             <StatRow label="Projections refreshed" value={formatDate(aiStats?.projection_refreshed_at ?? null)} />
           </HealthCard>
 
-          <HealthCard icon={Bot} title="AI Queue" status={cmdStatus?.queue_failed > 10 ? "error" : cmdStatus?.queue_pending > 200 ? "warn" : "ok"} loading={pipelineLoading}>
-            <StatRow label="Pending jobs" value={cmdStatus?.queue_pending?.toLocaleString() ?? "—"} highlight={(cmdStatus?.queue_pending ?? 0) > 100 ? "warn" : "good"} />
-            <StatRow label="Processing" value={cmdStatus?.queue_processing?.toLocaleString() ?? "—"} />
-            <StatRow label="Completed" value={cmdStatus?.queue_complete?.toLocaleString() ?? "—"} highlight={(cmdStatus?.queue_complete ?? 0) > 0 ? "good" : undefined} />
-            <StatRow label="Failed" value={cmdStatus?.queue_failed?.toLocaleString() ?? "—"} highlight={(cmdStatus?.queue_failed ?? 0) === 0 ? "good" : (cmdStatus?.queue_failed ?? 0) < 5 ? "warn" : "bad"} />
-            <StatRow label="Worker last run" value={fmtTs(aiWorker?.last_worker_run)} />
-            <StatRow label="Jobs last 10m" value={aiWorker?.jobs_last_10m?.toLocaleString() ?? "—"} />
-            <StatRow label="Worker errors (1h)" value={aiWorker?.errors_last_hour?.toLocaleString() ?? "—"} highlight={(aiWorker?.errors_last_hour ?? 0) === 0 ? "good" : "bad"} />
+          <HealthCard
+            icon={Bot}
+            title="AI Queue"
+            status={(cmdStatus?.queue_failed ?? 0) > 10 ? "error" : (cmdStatus?.queue_pending ?? 0) > 200 ? "warn" : "ok"}
+            loading={pipelineLoading}
+          >
+            {(() => {
+              const pending = cmdStatus?.queue_pending ?? 0;
+              const failed = cmdStatus?.queue_failed ?? 0;
+              const jobs10m = aiWorker?.jobs_last_10m ?? 0;
+              const rate = jobs10m > 0 ? `${jobs10m} / 10 min` : "0 / 10 min";
+              const workerLastRun = aiWorker?.last_worker_run;
+              const minsAgo = workerLastRun
+                ? (Date.now() - new Date(workerLastRun).getTime()) / 60000
+                : null;
+              const noRecentGen = minsAgo !== null && minsAgo > 10 && pending > 0;
+              const backlogCritical = pending > 300;
+              return (
+                <>
+                  {backlogCritical && (
+                    <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-950/20 px-2.5 py-1.5 mb-3">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                      <span className="text-[11px] text-amber-400 font-medium">Backlog critical — {pending} jobs queued</span>
+                    </div>
+                  )}
+                  {noRecentGen && (
+                    <div className="flex items-center gap-2 rounded-md border border-red-500/30 bg-red-950/20 px-2.5 py-1.5 mb-3">
+                      <XCircle className="h-3.5 w-3.5 text-red-400 shrink-0" />
+                      <span className="text-[11px] text-red-400 font-medium">No generation in 10+ min — worker may be stalled</span>
+                    </div>
+                  )}
+                  <StatRow label="Pending jobs" value={pending.toLocaleString()} highlight={pending > 300 ? "bad" : pending > 100 ? "warn" : "good"} />
+                  <StatRow label="Processing" value={cmdStatus?.queue_processing?.toLocaleString() ?? "—"} />
+                  <StatRow label="Completed" value={cmdStatus?.queue_complete?.toLocaleString() ?? "—"} highlight={(cmdStatus?.queue_complete ?? 0) > 0 ? "good" : undefined} />
+                  <StatRow label="Failed" value={failed.toLocaleString()} highlight={failed === 0 ? "good" : failed < 5 ? "warn" : "bad"} />
+                  <StatRow label="Throughput" value={rate} highlight={jobs10m > 0 ? "good" : pending > 0 ? "warn" : undefined} />
+                  <StatRow label="Worker last run" value={fmtTs(workerLastRun)} highlight={noRecentGen ? "bad" : "good"} />
+                  <StatRow label="Worker errors (1h)" value={aiWorker?.errors_last_hour?.toLocaleString() ?? "—"} highlight={(aiWorker?.errors_last_hour ?? 0) === 0 ? "good" : "bad"} />
+                </>
+              );
+            })()}
           </HealthCard>
 
           <HealthCard icon={ShieldCheck} title="Command Logs" status={commandsStatus} loading={loading}>

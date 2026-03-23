@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
+import { runCommand } from "@/hooks/useAdminCommand";
+import { useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Circle as XCircle, Clock, ChevronRight, HeartPulse, Users, Terminal, FlaskConical, Megaphone, ShieldCheck } from "lucide-react";
+import { RefreshCw, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Circle as XCircle, Clock, ChevronRight, HeartPulse, Users, Terminal, FlaskConical, Megaphone, ShieldCheck, Play, Bot, ChartBar as BarChart2, Zap } from "lucide-react";
 import { formatDate } from "@/features/admin/shared/adminUtils";
 import { AdminSectionIntro } from "@/features/admin/shared/AdminExplain";
 import type { CommandCenterStatus } from "@/features/admin/shared/types";
@@ -65,6 +67,8 @@ function buildAlerts(s: CommandCenterStatus): Alert[] {
     alerts.push({ level: "warn", msg: `${s.ai_missing_players} players missing AI analysis`, route: "/admin/command-center" });
   if ((s.rankings_cache_rows ?? 0) < 300)
     alerts.push({ level: "error", msg: `Rankings cache only has ${s.rankings_cache_rows} rows`, route: "/admin/health" });
+  if ((s.queue_pending ?? 0) > 200)
+    alerts.push({ level: "warn", msg: `AI backlog high — ${s.queue_pending} jobs pending`, route: "/admin/health" });
   return alerts;
 }
 
@@ -111,12 +115,87 @@ const NAV_TILES = [
   { path: "/admin/admin",          label: "Admin",           sub: "Tasks, logs & flags",             icon: ShieldCheck },
 ];
 
+function GlobalStatusBanner({ status, loading }: { status: CommandCenterStatus | null; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="rounded-lg border border-border bg-card px-4 py-3 animate-pulse">
+        <div className="h-4 w-48 bg-muted rounded" />
+      </div>
+    );
+  }
+  if (!status) return null;
+
+  const hasError =
+    (status.queue_failed ?? 0) > 10 ||
+    status.pipeline_status === "failed" ||
+    (status.rankings_cache_rows ?? 0) < 300;
+
+  const hasDegraded =
+    (status.queue_pending ?? 0) > 200 ||
+    (status.ai_missing_players ?? 0) > 100 ||
+    !status.market_watch_last_refresh ||
+    (status.cron_failed_count ?? 0) > 0;
+
+  const state: "error" | "warn" | "ok" = hasError ? "error" : hasDegraded ? "warn" : "ok";
+
+  const cfg = {
+    ok:   { border: "border-emerald-500/25 bg-emerald-950/10", dot: "bg-emerald-500", label: "HEALTHY", text: "text-emerald-300", desc: "All systems are operating normally" },
+    warn: { border: "border-amber-500/25 bg-amber-950/10",    dot: "bg-amber-500",   label: "DEGRADED", text: "text-amber-300", desc: "Some systems need attention" },
+    error:{ border: "border-red-500/25 bg-red-950/10",        dot: "bg-red-500 animate-pulse", label: "ERROR", text: "text-red-300", desc: "Critical issues detected — action required" },
+  }[state];
+
+  return (
+    <div className={`rounded-lg border ${cfg.border} px-4 py-3 flex items-center gap-3`}>
+      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cfg.dot}`} />
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <span className={`text-xs font-bold tracking-widest ${cfg.text}`}>{cfg.label}</span>
+        <span className="text-xs text-muted-foreground">{cfg.desc}</span>
+      </div>
+      {state !== "ok" && (
+        <span className={`text-[11px] font-semibold ${cfg.text}`}>
+          {state === "error" ? "See alerts below" : "Check alerts below"}
+        </span>
+      )}
+    </div>
+  );
+}
+
+interface QuickActionButtonProps {
+  label: string;
+  icon: React.ElementType;
+  command: string;
+  jobType: string;
+  running: string | null;
+  onStart: (jobType: string, label: string, command: string) => void;
+}
+
+function QuickActionButton({ label, icon: Icon, command, jobType, running, onStart }: QuickActionButtonProps) {
+  const isRunning = running === jobType;
+  const anyRunning = running !== null;
+  return (
+    <button
+      onClick={() => onStart(jobType, label, command)}
+      disabled={anyRunning}
+      className="flex flex-col items-start gap-2 rounded-lg border border-border bg-card px-3 py-3 text-left hover:bg-muted/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full"
+    >
+      <div className="flex items-center gap-2 w-full">
+        {isRunning
+          ? <RefreshCw className="h-3.5 w-3.5 text-sky-400 animate-spin shrink-0" />
+          : <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+        <span className="text-xs font-semibold truncate">{isRunning ? "Running…" : label}</span>
+      </div>
+    </button>
+  );
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { dispatch } = useAdminUIState();
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<CommandCenterStatus | null>(null);
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [running, setRunning] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -136,6 +215,19 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  async function handleQuickAction(jobType: string, label: string, command: string) {
+    setRunning(jobType);
+    dispatch({ type: "START_JOB", payload: { jobType, label: `${label}…`, pct: 10 } });
+    try {
+      await runCommand(command);
+      dispatch({ type: "UPDATE_JOB", payload: { pct: 100 } });
+      setTimeout(() => dispatch({ type: "END_JOB" }), 1500);
+      await fetchAll();
+    } finally {
+      setRunning(null);
+    }
+  }
 
   const alerts = status ? buildAlerts(status) : [];
 
@@ -195,6 +287,13 @@ export default function AdminDashboard() {
       : "ok"
     : "loading";
 
+  const QUICK_ACTIONS = [
+    { label: "Run Pipeline", icon: Play,    command: "run_pipeline",       jobType: "pipeline" },
+    { label: "Refresh Rankings", icon: BarChart2, command: "refresh_rankings",   jobType: "rankings" },
+    { label: "Refresh Market Watch", icon: Zap,  command: "refresh_market_watch", jobType: "mw" },
+    { label: "Run AI Regen", icon: Bot,     command: "run_neeko_ai_pipeline", jobType: "ai" },
+  ];
+
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -213,6 +312,8 @@ export default function AdminDashboard() {
           Refresh
         </Button>
       </div>
+
+      <GlobalStatusBanner status={status} loading={loading} />
 
       <AdminSectionIntro
         description="Your 24-hour operator view. Shows system health at a glance, active alerts, and recent pipeline runs. Click any tile to navigate to the relevant section."
@@ -260,6 +361,29 @@ export default function AdminDashboard() {
         <div className="flex items-center gap-3 rounded-lg border border-emerald-500/20 bg-emerald-950/10 px-4 py-3">
           <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
           <span className="text-sm text-emerald-300">All systems operational — no active alerts</span>
+        </div>
+      )}
+
+      {!loading && (
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Actions</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {QUICK_ACTIONS.map(a => (
+              <QuickActionButton
+                key={a.jobType}
+                label={a.label}
+                icon={a.icon}
+                command={a.command}
+                jobType={a.jobType}
+                running={running}
+                onStart={handleQuickAction}
+              />
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-2">
+            For the full command library, go to{" "}
+            <button onClick={() => navigate("/admin/command-center")} className="underline underline-offset-2 hover:text-foreground transition-colors">Command Center</button>.
+          </p>
         </div>
       )}
 
