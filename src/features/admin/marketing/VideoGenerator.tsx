@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { MarketingPlayer } from "./types";
 import { addToLibrary } from "./lib/library";
+import { generateCaptions, formatCaptionsForExport } from "./lib/captions";
 import { useToast } from "@/hooks/use-toast";
 
 type Angle  = "buy" | "sell" | "breakout" | "trap";
@@ -393,6 +394,8 @@ export default function VideoGenerator() {
   const [selectedHook,   setSelectedHook]   = useState(0);
   const [voicePlaying,   setVoicePlaying]   = useState(false);
   const [voiceImportTitle, setVoiceImportTitle] = useState<string | null>(null);
+  const [captionMode, setCaptionMode]           = useState<"short" | "full">("short");
+  const [captionsCopied, setCaptionsCopied]     = useState(false);
 
   const stopVoice = () => {
     speechSynthesis.cancel();
@@ -865,15 +868,69 @@ export default function VideoGenerator() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Captions</h3>
-              <CopyBtn text={generated.captions} label="Copy Captions" copyKey="captions" copy={copy} copied={copied} />
-            </div>
-            <pre className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap font-sans bg-muted/30 rounded-md px-3 py-2.5 border border-border">
-              {generated.captions}
-            </pre>
-          </div>
+          {(() => {
+            const captions   = generateCaptions(generated.script, captionMode);
+            const exportText = formatCaptionsForExport(captions, true);
+            return (
+              <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold">Subtitles</h3>
+                    <span className="text-xs text-muted-foreground">{captions.length} lines</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex rounded-md border border-border overflow-hidden">
+                      <button
+                        onClick={() => setCaptionMode("short")}
+                        className={`text-[10px] font-medium px-2.5 py-1 transition-colors ${
+                          captionMode === "short"
+                            ? "bg-foreground text-background"
+                            : "bg-background text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Short
+                      </button>
+                      <button
+                        onClick={() => setCaptionMode("full")}
+                        className={`text-[10px] font-medium px-2.5 py-1 transition-colors border-l border-border ${
+                          captionMode === "full"
+                            ? "bg-foreground text-background"
+                            : "bg-background text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Full
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(exportText).catch(() => {});
+                        setCaptionsCopied(true);
+                        setTimeout(() => setCaptionsCopied(false), 2000);
+                      }}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {captionsCopied
+                        ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied</>
+                        : <><Copy className="h-3.5 w-3.5" /> Copy Subtitle Format</>
+                      }
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
+                  {captions.map((c, i) => (
+                    <div
+                      key={i}
+                      className="flex items-start gap-2 px-3 py-2 rounded-md bg-zinc-900 text-white text-xs leading-relaxed"
+                    >
+                      <span className="text-white/30 shrink-0 tabular-nums">{i + 1}</span>
+                      <span>{c}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground">TikTok / Reels / Shorts ready · keywords emphasised</p>
+              </div>
+            );
+          })()}
 
           <div className="rounded-lg border border-dashed border-border bg-muted/10 p-3 flex items-center gap-3">
             <div className="w-8 h-8 rounded bg-muted flex items-center justify-center shrink-0">

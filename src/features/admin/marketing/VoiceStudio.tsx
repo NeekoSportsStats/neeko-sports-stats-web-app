@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Play, Square, Copy, Check, BookmarkPlus, ChevronDown, Mic, RefreshCw, Zap, Scissors, AlignLeft, Wand as Wand2, ExternalLink, FileText, TriangleAlert as AlertTriangle } from "lucide-react";
 import { loadLibrary, addToLibrary } from "./lib/library";
+import { generateCaptions, formatCaptionsForExport } from "./lib/captions";
 import type { LibraryItem } from "./lib/library";
 
 // ─── Text transform helpers ─────────────────────────────────────────────────
@@ -225,6 +226,8 @@ export default function VoiceStudio() {
   const [savedId, setSavedId]                   = useState<string | null>(null);
   const [variationsGenerated, setVariationsGenerated] = useState(false);
   const [sentToVideo, setSentToVideo]               = useState(false);
+  const [captionMode, setCaptionMode]               = useState<"short" | "full">("short");
+  const [captionsCopied, setCaptionsCopied]         = useState(false);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const voicesAvailable = voices.length > 0;
@@ -610,6 +613,75 @@ export default function VoiceStudio() {
           </div>
         )}
       </div>
+
+      {/* Captions Preview */}
+      {(activeScript || originalScript) && (() => {
+        const script   = activeScript || originalScript;
+        const captions = generateCaptions(script, captionMode);
+        const copyText = formatCaptionsForExport(captions, true);
+        return (
+          <div className="border rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                Captions Preview
+              </p>
+              <div className="flex items-center gap-2">
+                <div className="flex rounded-md border border-border overflow-hidden">
+                  <button
+                    onClick={() => setCaptionMode("short")}
+                    className={`text-[10px] font-medium px-2.5 py-1 transition-colors ${
+                      captionMode === "short"
+                        ? "bg-foreground text-background"
+                        : "bg-background text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Short
+                  </button>
+                  <button
+                    onClick={() => setCaptionMode("full")}
+                    className={`text-[10px] font-medium px-2.5 py-1 transition-colors border-l border-border ${
+                      captionMode === "full"
+                        ? "bg-foreground text-background"
+                        : "bg-background text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Full
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(copyText).catch(() => {});
+                    setCaptionsCopied(true);
+                    setTimeout(() => setCaptionsCopied(false), 2000);
+                  }}
+                  className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {captionsCopied
+                    ? <><Check className="h-3 w-3 text-emerald-500" /> Copied</>
+                    : <><Copy className="h-3 w-3" /> Copy Captions</>
+                  }
+                </button>
+              </div>
+            </div>
+            {captions.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic">No captions yet — add a script above.</p>
+            ) : (
+              <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
+                {captions.map((c, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-2 px-3 py-2 rounded-md bg-zinc-900 text-white text-xs leading-relaxed"
+                  >
+                    <span className="text-white/30 shrink-0 tabular-nums">{i + 1}</span>
+                    <span>{c}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-[10px] text-muted-foreground">{captions.length} caption{captions.length !== 1 ? "s" : ""} · keywords emphasised</p>
+          </div>
+        );
+      })()}
 
       {/* Save & Export */}
       <div className="border rounded-lg p-4 space-y-3">
