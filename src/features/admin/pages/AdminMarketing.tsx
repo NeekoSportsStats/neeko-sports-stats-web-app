@@ -1,50 +1,45 @@
 import { lazy, Suspense, useState } from "react";
-import {
-  RefreshCw, Sparkles, Calendar, Image as ImageIcon, FileText,
-  Wand as Wand2, BookOpen, Clapperboard, TrendingUp, Compass,
-  Zap, Mic, MessageSquare,
-} from "lucide-react";
+import { RefreshCw, FileText, Image as ImageIcon, Clapperboard, MessageSquare, Calendar } from "lucide-react";
 
-const ContentEngine     = lazy(() => import("@/features/admin/marketing/ContentEngine"));
-const AIStudio          = lazy(() => import("@/features/admin/marketing/AIStudio"));
-const Editor            = lazy(() => import("@/features/admin/marketing/Editor"));
-const Library           = lazy(() => import("@/features/admin/marketing/Library"));
-const ImageEngine       = lazy(() => import("@/features/admin/marketing/ImageEngine"));
-const WeeklyPlanner     = lazy(() => import("@/features/admin/marketing/WeeklyPlanner"));
-const VideoGenerator    = lazy(() => import("@/features/admin/marketing/VideoGenerator"));
-const GrowthInsights    = lazy(() => import("@/features/admin/marketing/GrowthInsights"));
-const ContentRecommender = lazy(() => import("@/features/admin/marketing/ContentRecommender"));
-const OneClickGenerator  = lazy(() => import("@/features/admin/marketing/OneClickGenerator"));
-const VoiceStudio        = lazy(() => import("@/features/admin/marketing/VoiceStudio"));
-const RedditEngine       = lazy(() => import("@/features/admin/marketing/RedditEngine"));
+const ContentEngine  = lazy(() => import("@/features/admin/marketing/ContentEngine"));
+const ImageStudio    = lazy(() => import("@/features/admin/marketing/ImageStudio"));
+const VideoStudio    = lazy(() => import("@/features/admin/marketing/VideoStudio"));
+const RedditEngine   = lazy(() => import("@/features/admin/marketing/RedditEngine"));
+const WeeklyPlanner  = lazy(() => import("@/features/admin/marketing/WeeklyPlanner"));
 
-type Tab =
-  | "scripts"
-  | "generator"
-  | "voice"
-  | "video"
-  | "images"
-  | "reddit"
-  | "editor"
-  | "library"
-  | "planner"
-  | "insights"
-  | "recommender"
-  | "ai-studio";
+type Tab = "script" | "image" | "video" | "reddit" | "planner";
 
-const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: "scripts",     label: "Script Engine",       icon: FileText      },
-  { id: "generator",   label: "One-Click Generator", icon: Zap           },
-  { id: "voice",       label: "Voice Studio",        icon: Mic           },
-  { id: "video",       label: "Video Generator",     icon: Clapperboard  },
-  { id: "images",      label: "Image Engine",        icon: ImageIcon     },
-  { id: "reddit",      label: "Reddit Engine",       icon: MessageSquare },
-  { id: "editor",      label: "Editor",              icon: Sparkles      },
-  { id: "library",     label: "Library",             icon: BookOpen      },
-  { id: "planner",     label: "Planner",             icon: Calendar      },
-  { id: "insights",    label: "Growth Insights",     icon: TrendingUp    },
-  { id: "recommender", label: "Recommender",         icon: Compass       },
-  { id: "ai-studio",   label: "AI Studio",           icon: Wand2         },
+const TABS: { id: Tab; label: string; icon: React.ElementType; description: string }[] = [
+  {
+    id: "script",
+    label: "Script Engine",
+    icon: FileText,
+    description: "Generate hooks, scripts, and content ideas",
+  },
+  {
+    id: "image",
+    label: "Image Studio",
+    icon: ImageIcon,
+    description: "Create social graphics using player images and stats",
+  },
+  {
+    id: "video",
+    label: "Video Studio",
+    icon: Clapperboard,
+    description: "Prepare scripts, voice, captions, and video structure",
+  },
+  {
+    id: "reddit",
+    label: "Reddit Engine",
+    icon: MessageSquare,
+    description: "Generate posts and replies for engagement",
+  },
+  {
+    id: "planner",
+    label: "Planner",
+    icon: Calendar,
+    description: "Plan and execute daily posts",
+  },
 ];
 
 function TabFallback() {
@@ -56,23 +51,21 @@ function TabFallback() {
 }
 
 export default function AdminMarketing() {
-  const [tab, setTab] = useState<Tab>("scripts");
+  const [tab, setTab] = useState<Tab>("script");
+  const activeTab = TABS.find((t) => t.id === tab)!;
 
   return (
     <div>
-      <div className="mb-5">
+      <div className="mb-6">
         <h1 className="text-lg font-semibold">Marketing</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Script generation, AI studio, content scheduling, and media management.
-        </p>
       </div>
 
-      <div className="flex gap-1 overflow-x-auto mb-6 pb-0.5" style={{ scrollbarWidth: "none" }}>
+      <div className="flex gap-1 overflow-x-auto mb-1 pb-0.5" style={{ scrollbarWidth: "none" }}>
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium whitespace-nowrap rounded-md transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-medium whitespace-nowrap rounded-md transition-colors ${
               tab === id
                 ? "bg-foreground text-background"
                 : "text-muted-foreground hover:text-foreground hover:bg-accent"
@@ -84,19 +77,14 @@ export default function AdminMarketing() {
         ))}
       </div>
 
+      <p className="text-xs text-muted-foreground mb-6 px-1">{activeTab.description}</p>
+
       <Suspense fallback={<TabFallback />}>
-        {tab === "scripts"     && <ContentEngine />}
-        {tab === "generator"   && <OneClickGenerator />}
-        {tab === "voice"       && <VoiceStudio />}
-        {tab === "video"       && <VideoGenerator />}
-        {tab === "images"      && <ImageEngine />}
-        {tab === "reddit"      && <RedditEngine />}
-        {tab === "editor"      && <Editor />}
-        {tab === "library"     && <Library />}
-        {tab === "planner"     && <WeeklyPlanner />}
-        {tab === "insights"    && <GrowthInsights />}
-        {tab === "recommender" && <ContentRecommender />}
-        {tab === "ai-studio"   && <AIStudio />}
+        {tab === "script"  && <ContentEngine />}
+        {tab === "image"   && <ImageStudio />}
+        {tab === "video"   && <VideoStudio />}
+        {tab === "reddit"  && <RedditEngine />}
+        {tab === "planner" && <WeeklyPlanner />}
       </Suspense>
     </div>
   );
