@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useSystemHealth, PipelineStep, RecentError } from "@/hooks/useSystemHealth";
 import { supabase } from "@/lib/supabaseClient";
 import { runCommand } from "@/hooks/useAdminCommand";
@@ -309,7 +309,6 @@ export default function AdminHealth() {
   const [cmdStatus, setCmdStatus] = useState<CommandCenterStatus | null>(null);
   const [cronJobs, setCronJobs] = useState<CronJobRow[]>([]);
   const [pipelineLoading, setPipelineLoading] = useState(true);
-  const hasLoaded = useRef(false);
 
   const fetchPipelineData = useCallback(async () => {
     setPipelineLoading(true);
@@ -334,8 +333,6 @@ export default function AdminHealth() {
   }, []);
 
   useEffect(() => {
-    if (hasLoaded.current) return;
-    hasLoaded.current = true;
     fetchPipelineData();
   }, [fetchPipelineData]);
 
@@ -439,7 +436,7 @@ export default function AdminHealth() {
   const flowNodes: FlowNode[] = [
     { id: "pipeline", label: "AFL Pipeline", sublabel: "Ingests & transforms", icon: Activity, status: pipelineRunStatus, confidence: pipelineConfidence, action: { label: "Run now", key: "pipeline" } },
     { id: "rankings", label: "Rankings Cache", sublabel: "Projection engine", icon: Database, status: rankingsCacheStatus, confidence: rankingsConfidence, action: { label: "Refresh", key: "rankings" } },
-    { id: "ai", label: "AI Generation", sublabel: "Analysis & recos", icon: Bot, status: cmdStatus?.queue_failed > 10 ? "error" : cmdStatus?.queue_pending > 200 ? "warn" : "ok", confidence: aiConfidence },
+    { id: "ai", label: "AI Generation", sublabel: "Analysis & recos", icon: Bot, status: (cmdStatus?.queue_failed ?? 0) > 10 ? "error" : (cmdStatus?.queue_pending ?? 0) > 200 ? "warn" : "ok", confidence: aiConfidence },
     { id: "market", label: "Market Watch", sublabel: "Price signals", icon: TrendingUp, status: mwStatus, confidence: mwConfidence, action: { label: "Refresh", key: "mw" } },
     { id: "startsit", label: "Start / Sit", sublabel: "Matchup cache", icon: Zap, status: startSitStatus, confidence: startSitConfidence },
   ];

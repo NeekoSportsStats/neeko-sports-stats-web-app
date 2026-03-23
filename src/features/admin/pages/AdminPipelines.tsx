@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { runCommand } from "@/hooks/useAdminCommand";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -221,7 +221,6 @@ export default function AdminPipelines() {
   const [cmdStatus, setCmdStatus] = useState<CommandCenterStatus | null>(null);
   const [running, setRunning] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const hasLoaded = useRef(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -245,10 +244,7 @@ export default function AdminPipelines() {
   }, []);
 
   useEffect(() => {
-    if (!hasLoaded.current) {
-      hasLoaded.current = true;
-      fetchAll();
-    }
+    fetchAll();
   }, [fetchAll]);
 
   async function runAdminCommand(label: string, jobType: string, command: string) {
@@ -270,8 +266,8 @@ export default function AdminPipelines() {
     : "error";
 
   const aiPipelineStatus: Status = !cmdStatus ? "loading"
-    : cmdStatus.queue_failed > 10 ? "error"
-    : cmdStatus.queue_pending > 200 ? "warn"
+    : (cmdStatus.queue_failed ?? 0) > 10 ? "error"
+    : (cmdStatus.queue_pending ?? 0) > 200 ? "warn"
     : "ok";
 
   const mwStatus: Status = !cmdStatus ? "loading"

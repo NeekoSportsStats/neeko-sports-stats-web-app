@@ -84,8 +84,6 @@ export default function AdminAnalytics() {
   } | null>(null);
   const [liveFunnelLoading, setLiveFunnelLoading] = useState(false);
 
-  const hasLoaded = useRef(false);
-
   const fetchLiveFunnel = useCallback(async () => {
     setLiveFunnelLoading(true);
     try {
@@ -200,15 +198,12 @@ export default function AdminAnalytics() {
     fetchLiveFunnel();
     if (activeTab === "product") fetchProductMetrics();
     if (activeTab === "growth") fetchGrowthMetrics();
-    loadedTabs.current.add(activeTab);
-    if (activeTab === "usage") { loadedTabs.current.add("usage"); }
+    loadedTabs.current.add("usage");
+    if (activeTab !== "usage") loadedTabs.current.add(activeTab);
   }, [activeTab, fetchAnalytics, fetchProductMetrics, fetchV2Metrics, fetchGrowthMetrics, fetchLiveFunnel]);
 
   useEffect(() => {
-    if (!hasLoaded.current) {
-      hasLoaded.current = true;
-      loadTab("usage");
-    }
+    loadTab("usage");
   }, [loadTab]);
 
   useEffect(() => {

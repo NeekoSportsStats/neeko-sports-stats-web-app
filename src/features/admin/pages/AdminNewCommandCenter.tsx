@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { runCommand } from "@/hooks/useAdminCommand";
 import { useAdminUIState } from "@/features/admin/state/AdminUIStateContext";
@@ -158,7 +158,6 @@ export default function AdminNewCommandCenter() {
   const [tab, setTab] = useState<Tab>("pipeline");
   const [status, setStatus] = useState<CommandCenterStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const hasLoaded = useRef(false);
 
   const fetchStatus = useCallback(async () => {
     setLoading(true);
@@ -171,8 +170,6 @@ export default function AdminNewCommandCenter() {
   }, []);
 
   useEffect(() => {
-    if (hasLoaded.current) return;
-    hasLoaded.current = true;
     fetchStatus();
   }, [fetchStatus]);
 
