@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Copy, Check, RefreshCw, ChevronDown, Search,
-  Clapperboard, Zap, Volume2, VolumeX, Play, Square,
+  Clapperboard, Zap, Volume2, VolumeX, Play, Square, BookmarkPlus,
 } from "lucide-react";
 import type { MarketingPlayer } from "./types";
+import { addToLibrary } from "./lib/library";
+import { useToast } from "@/hooks/use-toast";
 
 type Angle  = "buy" | "sell" | "breakout" | "trap";
 type Format = "tiktok" | "story" | "landscape";
@@ -338,6 +340,9 @@ export default function VideoGenerator() {
   const { players, loading } = useMarketingPlayers();
   const { copy, copied }     = useCopy();
   const utteranceRef         = useRef<SpeechSynthesisUtterance | null>(null);
+  const { toast }            = useToast();
+  const [savedScript,    setSavedScript]    = useState(false);
+  const [savedStoryboard, setSavedStoryboard] = useState(false);
 
   const [search,         setSearch]         = useState("");
   const [showDropdown,   setShowDropdown]   = useState(false);
@@ -665,9 +670,9 @@ export default function VideoGenerator() {
           </div>
 
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h3 className="text-sm font-semibold">Voiceover Script</h3>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={toggleVoice}
                   className={`flex items-center gap-1.5 text-xs transition-colors ${
@@ -680,6 +685,26 @@ export default function VideoGenerator() {
                     ? <><Square className="h-3 w-3 fill-current" /> Stop</>
                     : <><Play className="h-3 w-3 fill-current" /> Preview Voice</>
                   }
+                </button>
+                <button
+                  onClick={() => {
+                    if (!selectedPlayer || !generated) return;
+                    addToLibrary({
+                      type:    "video",
+                      title:   `${selectedPlayer.player_name} — ${ANGLE_CONFIG[angle].label} script`,
+                      content: generated.script,
+                      player:  selectedPlayer.player_name,
+                      tags:    ["video", angle],
+                    });
+                    setSavedScript(true);
+                    setTimeout(() => setSavedScript(false), 2000);
+                    toast({ title: "Saved to Library" });
+                  }}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2.5 py-1 transition-colors"
+                >
+                  {savedScript
+                    ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Saved</>
+                    : <><BookmarkPlus className="h-3.5 w-3.5" /> Save to Library</>}
                 </button>
                 <CopyBtn text={generated.script} label="Copy Script" copyKey="script" copy={copy} copied={copied} />
               </div>
@@ -699,17 +724,42 @@ export default function VideoGenerator() {
           </div>
 
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h3 className="text-sm font-semibold">Scene Storyboard</h3>
-              <CopyBtn
-                text={generated.scenes
-                  .map((s) => `Scene ${s.index}: ${s.title} (${s.duration}s)\nText: ${s.onScreenText}\nVisual: ${s.visual}`)
-                  .join("\n\n")}
-                label="Copy Storyboard"
-                copyKey="storyboard"
-                copy={copy}
-                copied={copied}
-              />
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => {
+                    if (!selectedPlayer || !generated) return;
+                    const storyboardText = generated.scenes
+                      .map((s) => `Scene ${s.index}: ${s.title} (${s.duration}s)\nText: ${s.onScreenText}\nVisual: ${s.visual}`)
+                      .join("\n\n");
+                    addToLibrary({
+                      type:    "video",
+                      title:   `${selectedPlayer.player_name} — ${ANGLE_CONFIG[angle].label} storyboard`,
+                      content: storyboardText,
+                      player:  selectedPlayer.player_name,
+                      tags:    ["storyboard", angle],
+                    });
+                    setSavedStoryboard(true);
+                    setTimeout(() => setSavedStoryboard(false), 2000);
+                    toast({ title: "Storyboard saved to Library" });
+                  }}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2.5 py-1 transition-colors"
+                >
+                  {savedStoryboard
+                    ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Saved</>
+                    : <><BookmarkPlus className="h-3.5 w-3.5" /> Save Storyboard</>}
+                </button>
+                <CopyBtn
+                  text={generated.scenes
+                    .map((s) => `Scene ${s.index}: ${s.title} (${s.duration}s)\nText: ${s.onScreenText}\nVisual: ${s.visual}`)
+                    .join("\n\n")}
+                  label="Copy Storyboard"
+                  copyKey="storyboard"
+                  copy={copy}
+                  copied={copied}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {generated.scenes.map((scene) => (

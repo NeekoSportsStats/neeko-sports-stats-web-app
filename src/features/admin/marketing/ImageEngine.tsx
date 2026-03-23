@@ -4,8 +4,10 @@ import useMarketingPlayers from "./useMarketingPlayers";
 import { cleanAiText, truncateSmart } from "@/utils/cleanAiText";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, RefreshCw, ChevronDown, Search } from "lucide-react";
+import { Download, RefreshCw, ChevronDown, Search, BookmarkPlus, Check } from "lucide-react";
 import type { MarketingPlayer } from "./types";
+import { addToLibrary } from "./lib/library";
+import { useToast } from "@/hooks/use-toast";
 
 type Template = "buy" | "sell" | "trap" | "breakout" | "captain" | "value";
 type Size = "square" | "portrait" | "landscape";
@@ -268,13 +270,15 @@ const posDropdownStyle = (pos: string | null) => {
 export default function ImageEngine() {
   const { players, loading } = useMarketingPlayers();
   const cardRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
-  const [search, setSearch] = useState("");
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [search,         setSearch]         = useState("");
+  const [showDropdown,   setShowDropdown]   = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<MarketingPlayer | null>(null);
-  const [template, setTemplate] = useState<Template>("buy");
-  const [size, setSize] = useState<Size>("square");
-  const [downloading, setDownloading] = useState(false);
+  const [template,       setTemplate]       = useState<Template>("buy");
+  const [size,           setSize]           = useState<Size>("square");
+  const [downloading,    setDownloading]    = useState(false);
+  const [savedConcept,   setSavedConcept]   = useState(false);
 
   const filtered = players.filter((p) =>
     p.player_name.toLowerCase().includes(search.toLowerCase())
@@ -423,13 +427,45 @@ export default function ImageEngine() {
             </div>
           )}
 
-          <Button onClick={download} disabled={downloading} className="w-full">
-            {downloading ? (
-              <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Exporting...</>
-            ) : (
-              <><Download className="h-4 w-4 mr-2" /> Download PNG</>
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                if (!selectedPlayer) return;
+                const tmpl = TEMPLATES.find((t) => t.id === template)!;
+                const sz   = SIZES.find((s) => s.id === size)!;
+                const desc = [
+                  `Template: ${tmpl.label}`,
+                  `Size: ${sz.label}`,
+                  selectedPlayer.projection_final != null ? `Projection: ${Math.round(selectedPlayer.projection_final)}pt` : null,
+                  selectedPlayer.price            != null ? `Price: $${(selectedPlayer.price / 1000).toFixed(0)}k` : null,
+                  cleanAiText(selectedPlayer.recommendation_why ?? selectedPlayer.summary_short ?? ""),
+                ].filter(Boolean).join("\n");
+                addToLibrary({
+                  type:    "image",
+                  title:   `${selectedPlayer.player_name} — ${tmpl.label} card`,
+                  content: desc,
+                  player:  selectedPlayer.player_name,
+                  tags:    ["image", template],
+                });
+                setSavedConcept(true);
+                setTimeout(() => setSavedConcept(false), 2000);
+                toast({ title: "Image concept saved to Library" });
+              }}
+              disabled={!selectedPlayer}
+              className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-md text-xs hover:bg-accent transition-colors disabled:opacity-40"
+            >
+              {savedConcept
+                ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Saved!</>
+                : <><BookmarkPlus className="h-3.5 w-3.5" /> Save Concept</>}
+            </button>
+            <Button onClick={download} disabled={downloading} className="flex-1">
+              {downloading ? (
+                <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Exporting...</>
+              ) : (
+                <><Download className="h-4 w-4 mr-2" /> Download PNG</>
+              )}
+            </Button>
+          </div>
         </div>
 
         <div className="flex items-start justify-center">

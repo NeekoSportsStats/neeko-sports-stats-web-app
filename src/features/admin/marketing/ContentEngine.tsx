@@ -11,7 +11,9 @@ import {
   ChevronDown,
   Search,
   Zap,
+  BookmarkPlus,
 } from "lucide-react";
+import { addToLibrary } from "./lib/library";
 
 interface RankingPlayer {
   player_id: number | null;
@@ -214,6 +216,7 @@ export default function ContentEngine() {
   const [script, setScript] = useState("");
   const [hooks, setHooks] = useState<string[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
+  const [savedScript, setSavedScript] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -402,20 +405,44 @@ export default function ContentEngine() {
 
       {script && (
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Full Script
             </p>
-            <button
-              onClick={() => copyText(script, "script")}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs rounded-md transition-colors"
-            >
-              {copied === "script" ? (
-                <><Check className="h-3.5 w-3.5" /> Copied!</>
-              ) : (
-                <><Copy className="h-3.5 w-3.5" /> Copy Script</>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (!selectedPlayer || !script) return;
+                  addToLibrary({
+                    type:    "script",
+                    title:   `${selectedPlayer.player_name} — ${angle}`,
+                    content: script,
+                    player:  selectedPlayer.player_name,
+                    tags:    [angle],
+                  });
+                  setSavedScript(true);
+                  setTimeout(() => setSavedScript(false), 2000);
+                  toast({ title: "Saved to Library" });
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
+              >
+                {savedScript ? (
+                  <><Check className="h-3.5 w-3.5 text-emerald-500" /> Saved!</>
+                ) : (
+                  <><BookmarkPlus className="h-3.5 w-3.5" /> Save to Library</>
+                )}
+              </button>
+              <button
+                onClick={() => copyText(script, "script")}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs rounded-md transition-colors"
+              >
+                {copied === "script" ? (
+                  <><Check className="h-3.5 w-3.5" /> Copied!</>
+                ) : (
+                  <><Copy className="h-3.5 w-3.5" /> Copy Script</>
+                )}
+              </button>
+            </div>
           </div>
           <textarea
             value={script}

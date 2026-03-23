@@ -5,30 +5,15 @@ import {
   Pencil, Tag, User, Plus,
 } from "lucide-react";
 
-export type LibraryItemType = "draft" | "script" | "image" | "video";
-
-export interface LibraryItem {
-  id:        string;
-  type:      LibraryItemType;
-  title:     string;
-  content:   string;
-  player:    string | null;
-  tags:      string[];
-  createdAt: string;
-}
+import {
+  type LibraryItem,
+  type LibraryItemType,
+  loadLibrary as loadFromStorage,
+  saveLibrary,
+  addToLibrary as addToLibraryUtil,
+} from "./lib/library";
 
 type FilterType = "all" | LibraryItemType;
-
-const STORAGE_KEY = "neeko-marketing-library";
-
-function loadLibrary(): LibraryItem[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as LibraryItem[]) : getSeeds();
-  } catch {
-    return getSeeds();
-  }
-}
 
 function getSeeds(): LibraryItem[] {
   return [
@@ -62,14 +47,13 @@ function getSeeds(): LibraryItem[] {
   ];
 }
 
-function persistLibrary(items: LibraryItem[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+function loadLibrary(): LibraryItem[] {
+  const items = loadFromStorage();
+  return items.length > 0 ? items : getSeeds();
 }
 
-declare global {
-  interface Window {
-    addToLibrary?: (item: Omit<LibraryItem, "id" | "createdAt">) => void;
-  }
+function persistLibrary(items: LibraryItem[]) {
+  saveLibrary(items);
 }
 
 const TYPE_META: Record<FilterType, { label: string; icon: React.ElementType; color: string }> = {
@@ -209,22 +193,16 @@ export default function Library() {
   const [showModal,  setShowModal]  = useState(false);
 
   const addItem = useCallback((data: Omit<LibraryItem, "id" | "createdAt">) => {
-    const item: LibraryItem = {
-      ...data,
-      id:        crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-    };
-    setItems((prev) => {
-      const updated = [item, ...prev];
-      persistLibrary(updated);
-      return updated;
-    });
+    const item = addToLibraryUtil(data);
+    setItems((prev) => [item, ...prev.filter((i) => i.id !== item.id)]);
   }, []);
 
   useEffect(() => {
-    window.addToLibrary = addItem;
-    return () => { window.addToLibrary = undefined; };
-  }, [addItem]);
+    window.__onLibraryAdd = (item: LibraryItem) => {
+      setItems((prev) => [item, ...prev.filter((i) => i.id !== item.id)]);
+    };
+    return () => { window.__onLibraryAdd = undefined; };
+  }, []);
 
   const deleteItem = (id: string) => {
     setItems((prev) => {

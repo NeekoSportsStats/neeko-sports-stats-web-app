@@ -4,8 +4,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Save, Trash2, Copy, Check, FileText, Plus,
   CopyPlus, ChevronDown, Link2, User, Image as ImageIcon,
-  Clapperboard, AlignLeft,
+  Clapperboard, AlignLeft, BookmarkPlus,
 } from "lucide-react";
+import { addToLibrary } from "./lib/library";
 
 const CONTENT_TYPES = [
   "Script",
@@ -137,9 +138,10 @@ export default function Editor({ initialHook, initialScript, initialPlayer }: Ed
   const { toast }           = useToast();
   const { copiedKey, trigger } = useCopied();
 
-  const [drafts,       setDrafts]       = useState<Draft[]>(loadDrafts);
-  const [activeId,     setActiveId]     = useState<string | null>(null);
+  const [drafts,        setDrafts]        = useState<Draft[]>(loadDrafts);
+  const [activeId,      setActiveId]      = useState<string | null>(null);
   const [showDraftMenu, setShowDraftMenu] = useState(false);
+  const [savedToLib,    setSavedToLib]    = useState(false);
 
   const [title,              setTitle]              = useState("");
   const [type,               setType]               = useState<ContentType>("Script");
@@ -346,6 +348,28 @@ export default function Editor({ initialHook, initialScript, initialPlayer }: Ed
               copiedKey={copiedKey}
               trigger={trigger}
             />
+          )}
+          {hasContent && (
+            <button
+              onClick={() => {
+                const content = [hook, script, cta].filter(Boolean).join("\n\n");
+                addToLibrary({
+                  type:    "draft",
+                  title:   title || "Untitled Draft",
+                  content,
+                  player:  linkedPlayer || null,
+                  tags:    [type.toLowerCase().replace(/[^a-z0-9]/g, "-")],
+                });
+                setSavedToLib(true);
+                setTimeout(() => setSavedToLib(false), 2000);
+                toast({ title: "Saved to Library" });
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-md text-xs hover:bg-accent transition-colors"
+            >
+              {savedToLib
+                ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Saved!</>
+                : <><BookmarkPlus className="h-3.5 w-3.5" /> Save to Library</>}
+            </button>
           )}
           <Button size="sm" onClick={saveDraft} className="gap-1.5">
             <Save className="h-3.5 w-3.5" />
