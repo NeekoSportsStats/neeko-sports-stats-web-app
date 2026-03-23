@@ -1202,7 +1202,7 @@ function RankingsPreview() {
   useEffect(() => {
     (async () => {
       const { data } = await supabase
-        .from("v_rankings_master")
+        .from("v_rankings_free")
         .select("player_name,team,position,projection_final,neeko_rating,neeko_rating_scaled,projection_confidence,risk_rating,value_score,value_tag")
         .order("neeko_rating_scaled", { ascending: false })
         .limit(5);
