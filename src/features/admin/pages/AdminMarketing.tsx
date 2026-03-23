@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState } from "react";
-import { RefreshCw, Sparkles, Calendar, Image as ImageIcon, ChartBar as BarChart2, FileText, Wand as Wand2, BookOpen } from "lucide-react";
+import { RefreshCw, Sparkles, Calendar, Image as ImageIcon, ChartBar as BarChart2, FileText, Wand as Wand2, BookOpen, Clapperboard } from "lucide-react";
 import { AdminSectionIntro } from "@/features/admin/shared/AdminExplain";
 
 const ContentEngine     = lazy(() => import("@/features/admin/marketing/ContentEngine"));
@@ -11,6 +11,7 @@ const GraphicEngine     = lazy(() => import("@/features/admin/pages/AdminContent
 const WeeklyPlanner     = lazy(() => import("@/features/admin/marketing/WeeklyPlanner"));
 const AIMediaLibrary    = lazy(() => import("@/features/admin/marketing/AIVideoLibrary"));
 const MarketingStats    = lazy(() => import("@/features/admin/marketing/MarketingStatsHub"));
+const VideoGenerator    = lazy(() => import("@/features/admin/marketing/VideoGenerator"));
 
 type Tab =
   | "scripts"
@@ -21,18 +22,20 @@ type Tab =
   | "graphics"
   | "planner"
   | "media"
-  | "stats";
+  | "stats"
+  | "video";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType; group: "scripts" | "visuals" }[] = [
-  { id: "scripts",   label: "Script Engine",  icon: FileText,   group: "scripts"  },
-  { id: "ai-studio", label: "AI Studio",      icon: Wand2,      group: "scripts"  },
-  { id: "editor",    label: "Editor",         icon: Sparkles,   group: "scripts"  },
-  { id: "library",   label: "Library",        icon: BookOpen,   group: "scripts"  },
-  { id: "images",    label: "Image Engine",   icon: ImageIcon,  group: "visuals"  },
-  { id: "graphics",  label: "Graphic Engine", icon: ImageIcon,  group: "visuals"  },
-  { id: "planner",   label: "Weekly Planner", icon: Calendar,   group: "visuals"  },
-  { id: "media",     label: "Media Library",  icon: ImageIcon,  group: "visuals"  },
-  { id: "stats",     label: "Stats Hub",      icon: BarChart2,  group: "visuals"  },
+  { id: "scripts",   label: "Script Engine",    icon: FileText,   group: "scripts"  },
+  { id: "ai-studio", label: "AI Studio",        icon: Wand2,      group: "scripts"  },
+  { id: "editor",    label: "Editor",           icon: Sparkles,   group: "scripts"  },
+  { id: "library",   label: "Library",          icon: BookOpen,   group: "scripts"  },
+  { id: "video",     label: "Video Generator",  icon: Clapperboard, group: "scripts" },
+  { id: "images",    label: "Image Engine",     icon: ImageIcon,  group: "visuals"  },
+  { id: "graphics",  label: "Graphic Engine",   icon: ImageIcon,  group: "visuals"  },
+  { id: "planner",   label: "Weekly Planner",   icon: Calendar,   group: "visuals"  },
+  { id: "media",     label: "Media Library",    icon: ImageIcon,  group: "visuals"  },
+  { id: "stats",     label: "Stats Hub",        icon: BarChart2,  group: "visuals"  },
 ];
 
 function TabFallback() {
@@ -117,6 +120,7 @@ export default function AdminMarketing() {
         {tab === "planner"   && <WeeklyPlanner />}
         {tab === "media"     && <AIMediaLibrary />}
         {tab === "stats"     && <MarketingStats />}
+        {tab === "video"     && <VideoGenerator />}
       </Suspense>
     </div>
   );
