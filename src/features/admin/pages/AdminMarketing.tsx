@@ -1,19 +1,35 @@
 import { lazy, Suspense, useState } from "react";
-import { RefreshCw, Sparkles, Calendar, Image as ImageIcon, FileText, ChartBar as BarChart2 } from "lucide-react";
+import { RefreshCw, Sparkles, Calendar, Image as ImageIcon, ChartBar as BarChart2, FileText, Wand as Wand2, BookOpen } from "lucide-react";
 import { AdminSectionIntro } from "@/features/admin/shared/AdminExplain";
 
-const ContentEngine   = lazy(() => import("@/features/admin/pages/AdminContentEngine"));
-const WeeklyPlanner   = lazy(() => import("@/features/admin/marketing/WeeklyPlanner"));
-const AIMediaLibrary  = lazy(() => import("@/features/admin/marketing/AIVideoLibrary"));
-const MarketingStats  = lazy(() => import("@/features/admin/marketing/MarketingStatsHub"));
+const ContentEngine     = lazy(() => import("@/features/admin/marketing/ContentEngine"));
+const AIStudio          = lazy(() => import("@/features/admin/marketing/AIStudio"));
+const Editor            = lazy(() => import("@/features/admin/marketing/Editor"));
+const Library           = lazy(() => import("@/features/admin/marketing/Library"));
+const GraphicEngine     = lazy(() => import("@/features/admin/pages/AdminContentEngine"));
+const WeeklyPlanner     = lazy(() => import("@/features/admin/marketing/WeeklyPlanner"));
+const AIMediaLibrary    = lazy(() => import("@/features/admin/marketing/AIVideoLibrary"));
+const MarketingStats    = lazy(() => import("@/features/admin/marketing/MarketingStatsHub"));
 
-type Tab = "engine" | "planner" | "media" | "stats";
+type Tab =
+  | "scripts"
+  | "ai-studio"
+  | "editor"
+  | "library"
+  | "graphics"
+  | "planner"
+  | "media"
+  | "stats";
 
-const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: "engine",  label: "Content Engine", icon: Sparkles },
-  { id: "planner", label: "Weekly Planner", icon: Calendar },
-  { id: "media",   label: "Media Library",  icon: ImageIcon },
-  { id: "stats",   label: "Stats Hub",      icon: BarChart2 },
+const TABS: { id: Tab; label: string; icon: React.ElementType; group: "scripts" | "visuals" }[] = [
+  { id: "scripts",   label: "Script Engine",  icon: FileText,   group: "scripts"  },
+  { id: "ai-studio", label: "AI Studio",      icon: Wand2,      group: "scripts"  },
+  { id: "editor",    label: "Editor",         icon: Sparkles,   group: "scripts"  },
+  { id: "library",   label: "Library",        icon: BookOpen,   group: "scripts"  },
+  { id: "graphics",  label: "Graphic Engine", icon: ImageIcon,  group: "visuals"  },
+  { id: "planner",   label: "Weekly Planner", icon: Calendar,   group: "visuals"  },
+  { id: "media",     label: "Media Library",  icon: ImageIcon,  group: "visuals"  },
+  { id: "stats",     label: "Stats Hub",      icon: BarChart2,  group: "visuals"  },
 ];
 
 function TabFallback() {
@@ -25,44 +41,78 @@ function TabFallback() {
 }
 
 export default function AdminMarketing() {
-  const [tab, setTab] = useState<Tab>("engine");
+  const [tab, setTab] = useState<Tab>("scripts");
+
+  const scriptTabs = TABS.filter((t) => t.group === "scripts");
+  const visualTabs = TABS.filter((t) => t.group === "visuals");
 
   return (
     <div>
       <div className="mb-5">
         <h1 className="text-lg font-semibold">Marketing</h1>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Content creation, scheduling, media library, and campaign analytics.
+          Script generation, AI studio, content scheduling, and media management.
         </p>
       </div>
 
       <AdminSectionIntro
         description="Generate and manage all social media content, ad creative, and marketing assets for Neeko Sports."
-        detail="Content Engine = AI-driven post drafts from live data. Weekly Planner = schedule and track posts. Media Library = all generated images and videos. Stats Hub = engagement analytics."
+        detail="Script Engine = AI-driven post scripts from live rankings data. AI Studio = freeform prompts. Editor = draft workspace. Library = saved content. Graphic Engine = visual assets. Planner = weekly schedule."
       />
 
-      <div className="flex gap-1 border-b border-border mb-6 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-        {TABS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
-              tab === id
-                ? "border-foreground text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            {label}
-          </button>
-        ))}
+      <div className="space-y-1 mb-6">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Scripts</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
+        <div className="flex gap-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+          {scriptTabs.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium whitespace-nowrap rounded-md transition-colors ${
+                tab === id
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 mt-3 mb-1">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Visuals</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
+        <div className="flex gap-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+          {visualTabs.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium whitespace-nowrap rounded-md transition-colors ${
+                tab === id
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <Suspense fallback={<TabFallback />}>
-        {tab === "engine"  && <ContentEngine />}
-        {tab === "planner" && <WeeklyPlanner />}
-        {tab === "media"   && <AIMediaLibrary />}
-        {tab === "stats"   && <MarketingStats />}
+        {tab === "scripts"   && <ContentEngine />}
+        {tab === "ai-studio" && <AIStudio />}
+        {tab === "editor"    && <Editor />}
+        {tab === "library"   && <Library />}
+        {tab === "graphics"  && <GraphicEngine />}
+        {tab === "planner"   && <WeeklyPlanner />}
+        {tab === "media"     && <AIMediaLibrary />}
+        {tab === "stats"     && <MarketingStats />}
       </Suspense>
     </div>
   );
