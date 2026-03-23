@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   RefreshCw, Activity, Database, Bot, TrendingUp, Clock, ScrollText, Target,
   ShieldCheck, Zap, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle,
-  Circle as XCircle, ChartBar as BarChart2, List, ChevronRight,
+  Circle as XCircle, ChartBar as BarChart2, List, ChevronRight, Flame,
+  Play, Radio, History,
 } from "lucide-react";
 import { formatDate } from "../shared/adminUtils";
 import { AdminSectionIntro } from "../shared/AdminExplain";
@@ -182,6 +183,172 @@ function ConfidenceBar({ pct, label, note }: { pct: number; label: string; note?
         <span className={`text-xs font-semibold tabular-nums w-10 text-right ${textColor}`}>{pct}%</span>
       </div>
       {note && <p className="text-[11px] text-muted-foreground pl-40">{note}</p>}
+    </div>
+  );
+}
+
+type AlertPriority = "high" | "medium" | "low";
+
+interface PriorityAlert {
+  id: string;
+  priority: AlertPriority;
+  title: string;
+  message: string;
+  action?: { label: string; key: string };
+}
+
+const PRIORITY_CONFIG: Record<AlertPriority, { label: string; cls: string; border: string; dot: string; icon: React.ElementType }> = {
+  high:   { label: "HIGH",   cls: "bg-red-950/30 text-red-300",    border: "border-red-800/50",    dot: "bg-red-500 animate-pulse",    icon: Flame },
+  medium: { label: "MEDIUM", cls: "bg-amber-950/25 text-amber-300", border: "border-amber-800/40",  dot: "bg-amber-500",                icon: AlertTriangle },
+  low:    { label: "LOW",    cls: "bg-muted/40 text-muted-foreground", border: "border-border",     dot: "bg-muted-foreground",          icon: Radio },
+};
+
+function PriorityAlertStrip({ alerts, running, onAction }: {
+  alerts: PriorityAlert[];
+  running: string | null;
+  onAction: (key: string) => void;
+}) {
+  if (alerts.length === 0) return null;
+  const order: AlertPriority[] = ["high", "medium", "low"];
+  const sorted = [...alerts].sort((a, b) => order.indexOf(a.priority) - order.indexOf(b.priority));
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2 mb-0.5">
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Action Required</p>
+        {sorted.some(a => a.priority === "high") && (
+          <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider animate-pulse">⚠ High Priority</span>
+        )}
+      </div>
+      {sorted.map(alert => {
+        const cfg = PRIORITY_CONFIG[alert.priority];
+        const Icon = cfg.icon;
+        return (
+          <div key={alert.id} className={`flex items-start justify-between gap-3 rounded-lg px-3.5 py-2.5 border ${cfg.cls} ${cfg.border}`}>
+            <div className="flex items-start gap-2.5 min-w-0">
+              <div className="flex items-center gap-1.5 mt-0.5 shrink-0">
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
+                <span className={`text-[9px] font-black uppercase tracking-widest opacity-70`}>{cfg.label}</span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold leading-tight">{alert.title}</p>
+                <p className="text-[11px] opacity-60 leading-tight mt-0.5">{alert.message}</p>
+              </div>
+            </div>
+            {alert.action && (
+              <button
+                onClick={() => onAction(alert.action!.key)}
+                disabled={running !== null}
+                className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/15 text-[10px] font-semibold transition-colors disabled:opacity-40 whitespace-nowrap"
+              >
+                <Play className="h-2.5 w-2.5" />
+                {running === alert.action.key ? "Running…" : alert.action.label}
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SystemTimeline({ data }: {
+  data: {
+    lastIngestion: string | null;
+    lastPipelineRun: string | null;
+    lastAiGeneration: string | null;
+    pipelineStatus: string | null;
+  };
+}) {
+  function timelineAge(ts: string | null): { label: string; color: string } {
+    if (!ts) return { label: "Never", color: "text-red-400" };
+    const mins = (Date.now() - new Date(ts).getTime()) / 60000;
+    if (mins < 30)  return { label: `${Math.round(mins)}m ago`, color: "text-emerald-400" };
+    if (mins < 120) return { label: `${Math.round(mins)}m ago`, color: "text-emerald-400" };
+    if (mins < 360) return { label: `${Math.round(mins / 60)}h ago`, color: "text-amber-400" };
+    if (mins < 1440) return { label: `${Math.round(mins / 60)}h ago`, color: "text-red-400" };
+    return { label: `${Math.round(mins / 1440)}d ago`, color: "text-red-400" };
+  }
+
+  const items = [
+    { label: "Last Ingestion",    ts: data.lastIngestion,     icon: Database, warnMins: 360 },
+    { label: "Last Pipeline Run", ts: data.lastPipelineRun,   icon: Activity, warnMins: 720 },
+    { label: "Last AI Generation",ts: data.lastAiGeneration,  icon: Bot,       warnMins: 60  },
+  ];
+
+  return (
+    <div className="rounded-lg border border-border bg-card px-4 py-4">
+      <div className="flex items-center gap-2 mb-3">
+        <History className="h-3.5 w-3.5 text-muted-foreground" />
+        <h3 className="text-xs font-semibold text-foreground">Last Activity</h3>
+        {data.pipelineStatus && (
+          <span className={`ml-auto text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${
+            data.pipelineStatus === "completed" ? "bg-emerald-950 text-emerald-400 border-emerald-900/50"
+            : data.pipelineStatus === "running" ? "bg-sky-950 text-sky-400 border-sky-900/50"
+            : data.pipelineStatus === "failed" ? "bg-red-950 text-red-400 border-red-900/50"
+            : "bg-muted text-muted-foreground border-border"
+          }`}>
+            Pipeline: {data.pipelineStatus}
+          </span>
+        )}
+      </div>
+      <div className="space-y-2.5">
+        {items.map(({ label, ts, icon: Icon }) => {
+          const age = timelineAge(ts);
+          return (
+            <div key={label} className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                <Icon className="h-3 w-3 text-muted-foreground" />
+              </div>
+              <span className="text-xs text-muted-foreground w-36 shrink-0">{label}</span>
+              <div className="flex-1 h-px bg-border/40" />
+              <span className={`text-xs font-semibold tabular-nums ${age.color}`}>{age.label}</span>
+              {ts && (
+                <span className="text-[10px] text-muted-foreground/60 hidden sm:block">
+                  {new Date(ts).toLocaleString("en-AU", { dateStyle: "short", timeStyle: "short" })}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ConfidenceGauge({ score, loading }: { score: number; loading: boolean }) {
+  const color = score >= 80 ? "#10b981" : score >= 50 ? "#f59e0b" : "#ef4444";
+  const label = score >= 80 ? "HEALTHY" : score >= 50 ? "DEGRADED" : "CRITICAL";
+  const labelColor = score >= 80 ? "text-emerald-400" : score >= 50 ? "text-amber-400" : "text-red-400";
+  const ringBg = score >= 80 ? "text-emerald-950" : score >= 50 ? "text-amber-950" : "text-red-950";
+  const radius = 28;
+  const circ = 2 * Math.PI * radius;
+  const dash = loading ? 0 : (score / 100) * circ;
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="relative w-16 h-16 shrink-0">
+        <svg viewBox="0 0 72 72" className="w-full h-full -rotate-90">
+          <circle cx="36" cy="36" r={radius} fill="none" strokeWidth="6" className={ringBg} stroke="currentColor" />
+          <circle
+            cx="36" cy="36" r={radius} fill="none" strokeWidth="6"
+            stroke={color}
+            strokeDasharray={`${dash} ${circ}`}
+            strokeLinecap="round"
+            style={{ transition: "stroke-dasharray 0.8s ease" }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          {loading
+            ? <RefreshCw className="h-4 w-4 text-muted-foreground animate-spin" />
+            : <span className="text-sm font-black tabular-nums" style={{ color }}>{score}</span>
+          }
+        </div>
+      </div>
+      <div>
+        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">System Confidence</p>
+        <p className={`text-sm font-bold ${labelColor}`}>{loading ? "Checking…" : label}</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">Based on pipeline, cache, AI, market freshness</p>
+      </div>
     </div>
   );
 }
@@ -445,28 +612,62 @@ export default function AdminHealth() {
     if (key === "pipeline") runAdminCommand("Running AFL Pipeline…", "pipeline", "run_full_pipeline");
     if (key === "rankings") runAdminCommand("Refreshing Rankings Cache…", "rankings", "refresh_rankings");
     if (key === "mw") runAdminCommand("Refreshing Market Watch…", "mw", "refresh_market_watch");
+    if (key === "ai_wave") runAdminCommand("Firing AI Worker Wave…", "ai_wave", "fire_ai_worker_wave");
   }
 
-  const overallIssues: Array<{ message: string; level: "warn" | "error" }> = [];
-  if (!loading) {
-    if ((freshness?.players_missing_projection ?? 0) > 20)
-      overallIssues.push({ message: `${freshness?.players_missing_projection} players missing projections`, level: "warn" });
-    if ((aiStats?.commands_error_24h ?? 0) > 5)
-      overallIssues.push({ message: `${aiStats?.commands_error_24h} command errors in last 24h`, level: "error" });
+  const priorityAlerts: PriorityAlert[] = [];
+  if (!loading && !pipelineLoading) {
+    const pending = cmdStatus?.queue_pending ?? 0;
+    const workerLastRun = aiWorker?.last_worker_run ?? null;
+    const workerMinsAgo = workerLastRun ? (Date.now() - new Date(workerLastRun).getTime()) / 60000 : null;
+    const pipelineLastRun = pipelineHealth?.last_pipeline_run ?? null;
+    const pipelineMinsAgo = pipelineLastRun ? (Date.now() - new Date(pipelineLastRun).getTime()) / 60000 : null;
+    const lastIngestAt = ingestion?.last_ingest_at ?? null;
+    const ingestMinsAgo = lastIngestAt ? (Date.now() - new Date(lastIngestAt).getTime()) / 60000 : null;
+
     if (pipelineStatus === "error")
-      overallIssues.push({ message: "Last pipeline run failed", level: "error" });
-    if ((freshness?.rankings_cache_age_mins ?? 0) > 480)
-      overallIssues.push({ message: `Rankings cache is ${fmtMins(freshness?.rankings_cache_age_mins)} old`, level: "warn" });
+      priorityAlerts.push({ id: "pipe-fail", priority: "high", title: "Pipeline failed", message: `Last run encountered an error — ${pipelineHealth?.last_error ?? "check logs for details"}`, action: { label: "Re-run pipeline", key: "pipeline" } });
+
+    if (ingestMinsAgo !== null && ingestMinsAgo > 120)
+      priorityAlerts.push({ id: "ingest-stale", priority: "high", title: "Ingestion stale", message: `No new data in ${Math.round(ingestMinsAgo / 60)}h — data may be outdated`, action: { label: "Run pipeline", key: "pipeline" } });
+
     if ((aiStats?.rankings_cache_rows ?? 0) < 100)
-      overallIssues.push({ message: `Rankings cache critically low — ${aiStats?.rankings_cache_rows} players`, level: "error" });
+      priorityAlerts.push({ id: "cache-low", priority: "high", title: "Rankings cache critically low", message: `Only ${aiStats?.rankings_cache_rows ?? 0} players in cache — frontend data is stale`, action: { label: "Refresh cache", key: "rankings" } });
+
+    if (pending > 300)
+      priorityAlerts.push({ id: "ai-backlog", priority: "medium", title: "AI backlog critical", message: `${pending.toLocaleString()} jobs queued — triggering worker wave`, action: { label: "Fire AI wave", key: "ai_wave" } });
+
+    if (workerMinsAgo !== null && workerMinsAgo > 10 && pending > 0)
+      priorityAlerts.push({ id: "ai-stalled", priority: "medium", title: "AI worker stalled", message: `No generation in ${Math.round(workerMinsAgo)}m with ${pending} jobs pending`, action: { label: "Fire AI wave", key: "ai_wave" } });
+
+    if (pipelineMinsAgo !== null && pipelineMinsAgo > 360 && pipelineStatus !== "running")
+      priorityAlerts.push({ id: "pipe-stale", priority: "medium", title: "Pipeline not run in 6+ hours", message: `Last run ${fmtMins(pipelineMinsAgo)} — consider triggering a refresh`, action: { label: "Run pipeline", key: "pipeline" } });
+
+    if ((freshness?.players_missing_projection ?? 0) > 20)
+      priorityAlerts.push({ id: "missing-proj", priority: "medium", title: "Missing projections", message: `${freshness?.players_missing_projection} players have no projection — rankings incomplete`, action: { label: "Refresh cache", key: "rankings" } });
+
+    if ((freshness?.rankings_cache_age_mins ?? 0) > 480)
+      priorityAlerts.push({ id: "cache-age", priority: "low", title: "Rankings cache is old", message: `Cache was last updated ${fmtMins(freshness?.rankings_cache_age_mins)}` });
+
+    if ((aiStats?.commands_error_24h ?? 0) > 5)
+      priorityAlerts.push({ id: "cmd-errors", priority: "low", title: "Command errors elevated", message: `${aiStats?.commands_error_24h} command errors in the last 24h — check Logs tab` });
+
     if (error)
-      overallIssues.push({ message: `Health fetch error: ${error}`, level: "error" });
+      priorityAlerts.push({ id: "health-err", priority: "medium", title: "Health endpoint error", message: error });
   }
 
   const overallHealth: StatusLevel = loading ? "loading"
-    : overallIssues.some(i => i.level === "error") ? "error"
-    : overallIssues.length > 0 ? "warn"
+    : priorityAlerts.some(a => a.priority === "high") ? "error"
+    : priorityAlerts.some(a => a.priority === "medium") ? "warn"
+    : priorityAlerts.length > 0 ? "warn"
     : "ok";
+
+  const timelineData = {
+    lastIngestion: ingestion?.last_ingest_at ?? null,
+    lastPipelineRun: pipelineHealth?.last_pipeline_run ?? null,
+    lastAiGeneration: aiWorker?.last_worker_run ?? null,
+    pipelineStatus: pipelineHealth?.latest_status ?? null,
+  };
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "pipeline", label: "Pipeline" },
@@ -485,45 +686,44 @@ export default function AdminHealth() {
         detail="This page pulls from the admin-health edge function and multiple Supabase views: v_pipeline_health, v_ai_worker_health, v_command_center_status, and more. All checks are live — refresh at any time."
       />
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <StatusChip
-            level={overallHealth}
-            label={
-              overallHealth === "ok" ? "All Systems OK"
-              : overallHealth === "warn" ? "Warnings Active"
-              : overallHealth === "error" ? "Issues Detected"
-              : "Checking…"
-            }
-          />
-          {!isLoading && (
-            <span className={`text-xs font-semibold tabular-nums ${overallConfidence >= 80 ? "text-emerald-400" : overallConfidence >= 50 ? "text-amber-400" : "text-red-400"}`}>
-              {overallConfidence}% confidence
-            </span>
-          )}
-          {lastRefreshed && (
-            <span className="text-[11px] text-muted-foreground">
-              Updated {lastRefreshed.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-            </span>
-          )}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
+          <ConfidenceGauge score={overallConfidence} loading={isLoading} />
+          <div className="flex flex-col gap-1.5">
+            <StatusChip
+              level={overallHealth}
+              label={
+                overallHealth === "ok" ? "All Systems OK"
+                : overallHealth === "warn" ? "Warnings Active"
+                : overallHealth === "error" ? "Action Required"
+                : "Checking…"
+              }
+            />
+            {lastRefreshed && (
+              <span className="text-[11px] text-muted-foreground">
+                Updated {lastRefreshed.toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              </span>
+            )}
+          </div>
         </div>
-        <Button variant="outline" size="sm" onClick={handleRefreshAll} disabled={isLoading}>
+        <Button variant="outline" size="sm" onClick={handleRefreshAll} disabled={isLoading} className="shrink-0">
           <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
       </div>
 
-      {!isLoading && overallIssues.length > 0 && (
-        <div className="space-y-1.5">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Active Issues</p>
-          {overallIssues.map((issue, i) => (
-            <div key={i} className={`flex items-center gap-3 rounded-lg px-3.5 py-2.5 border text-sm font-medium ${
-              issue.level === "error" ? "bg-red-950/20 border-red-900/40 text-red-400" : "bg-amber-950/15 border-amber-900/30 text-amber-400"
-            }`}>
-              {issue.level === "error" ? <XCircle className="h-3.5 w-3.5 shrink-0" /> : <AlertTriangle className="h-3.5 w-3.5 shrink-0" />}
-              {issue.message}
-            </div>
-          ))}
+      {!isLoading && (
+        <SystemTimeline data={timelineData} />
+      )}
+
+      {!isLoading && priorityAlerts.length > 0 && (
+        <PriorityAlertStrip alerts={priorityAlerts} running={running} onAction={handleFlowAction} />
+      )}
+
+      {!isLoading && priorityAlerts.length === 0 && (
+        <div className="flex items-center gap-3 rounded-lg px-3.5 py-2.5 border border-emerald-900/40 bg-emerald-950/20 text-emerald-400 text-sm font-medium">
+          <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+          All systems operating normally — no action required
         </div>
       )}
 
