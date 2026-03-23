@@ -33,7 +33,7 @@ const SCROLL_W =
 const TABLE_W = FIXED_W + SCROLL_W;
 
 const CELL_H = "min-h-[52px]";
-const CELL_BASE = `${CELL_H} flex items-center`;
+const CELL_BASE = `${CELL_H} flex items-center self-stretch`;
 const HEADER_BASE =
   "h-9 flex items-center text-[10px] font-semibold uppercase tracking-wider text-white/35 select-none whitespace-nowrap";
 const PREMIUM_COLS = ["price", "value", "aiRec", "why"] as const;
@@ -133,13 +133,13 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
 
   return (
     <div
-      className="flex border-b border-white/[0.04]"
+      className="flex items-stretch border-b border-white/[0.04]"
       style={{ width: TABLE_W, minWidth: TABLE_W }}
       onClick={onTap}
     >
       {/* Sticky left pane — rank + player only */}
       <div
-        className="flex shrink-0 sticky left-0 z-10 bg-[#070707] cursor-pointer active:bg-white/[0.05] transition-colors"
+        className="flex items-stretch shrink-0 sticky left-0 z-10 bg-[#070707] cursor-pointer active:bg-white/[0.05] transition-colors"
         style={{ width: FIXED_W }}
       >
         <div className={`${CELL_BASE} pl-2 text-[11px] text-white/30 tabular-nums`} style={{ width: COL.rank }}>
@@ -181,7 +181,7 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
 
       {/* Scrollable columns — Neeko first, then stats */}
       <div
-        className="flex cursor-pointer active:bg-white/[0.03] transition-colors"
+        className="flex items-stretch cursor-pointer active:bg-white/[0.03] transition-colors"
         onClick={onTap}
       >
         {/* Neeko rating — no longer sticky */}
@@ -268,11 +268,16 @@ function DataRow({ row, idx, tier, isPremium, activeTab, onTap, onUpgrade }: Dat
             );
           })() : <span className="text-white/20 text-xs">—</span>}
         </div>
-        <div className={`${CELL_BASE} px-3`} style={{ width: COL.why, minWidth: COL.why }}>
+        <div
+          className="flex items-start self-stretch px-3 py-3 min-h-[52px]"
+          style={{ width: COL.why, minWidth: COL.why }}
+        >
           {locked("why") ? (
-            <LockedPlaceholder onUpgrade={onUpgrade} />
+            <div className="flex items-center h-full">
+              <LockedPlaceholder onUpgrade={onUpgrade} />
+            </div>
           ) : (
-            <span className="text-xs text-white/50 leading-snug line-clamp-2 py-2">
+            <span className="text-xs text-white/50 leading-snug break-words whitespace-normal w-full">
               {row.why ?? "—"}
             </span>
           )}
