@@ -1,68 +1,45 @@
-import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Calendar, Video, Image, Monitor, Copy, Check, ChevronDown, ChevronUp, Zap, TriangleAlert as AlertTriangle, Star, TrendingUp, FileText, Eye, Play, Mic, ChevronRight, Brain, Flame, Target, Smartphone, ChartBar as BarChart2, List, GitCompare, BookOpen, Megaphone, Layers, UserRoundCog, Lightbulb, Lock, Clock as Unlock, Copy as CopyIcon, MessageCircle, Trophy, Swords, Users, Ambulance, ThumbsUp, ThumbsDown, Package, Pencil, ShieldCheck, ArrowUpDown } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { RefreshCw, Calendar, Video, Image, Monitor, Copy, Check, ChevronDown, ChevronUp, Zap, TriangleAlert as AlertTriangle, Star, TrendingUp, FileText, Eye, Play, Mic, Brain, Flame, Target, Smartphone, ChartBar as BarChart2, List, GitCompare, BookOpen, Megaphone, Layers, UserRoundCog, Lightbulb, Lock, Clock as Unlock, Copy as CopyIcon, MessageCircle, Trophy, Swords, Users, Ambulance, ThumbsUp, ThumbsDown, Package, Pencil, ShieldCheck, ArrowUpDown, ChevronRight, Loader as Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
-type PostType =
-  | "Video"
-  | "Image"
-  | "Screen Recording"
-  | "Short-form Video"
-  | "Graphic Post"
-  | "Hybrid Video"
-  | "Comparison Post"
-  | "Narrative Post"
-  | "Callout Post"
-  | "Educational Breakdown";
+type PostStatus = "pending" | "generating" | "ready" | "error";
 type PostCategory = "Value" | "Breakout" | "Trap" | "Captain" | "Proof" | "H2H" | "Top3" | "Injury" | "Conversation";
-type PostTab = "voice" | "hooks" | "visual" | "caption" | "ai" | "platform" | "strategy";
-type Platform = "tiktok" | "instagram" | "reddit";
+type PostTab = "voice" | "hooks" | "visual" | "caption" | "ai" | "platform" | "strategy" | "prompt";
 
-interface PlayerAISummary {
-  summary_short: string | null;
-  summary_long: string | null;
-  recommendation: string | null;
-  primary_reason: string | null;
-  generated_at: string | null;
-}
-
-interface PostPlan {
-  day: number;
-  post_number: number;
-  post_type: PostType;
-  content_angle?: string;
-  angle_label?: string;
-  category: PostCategory;
-  player_name: string;
-  player_id: number;
-  team: string;
-  hooks: string[];
-  hook_options?: string[];
-  voice_script: string;
-  full_script?: string;
-  caption_script: string;
-  caption?: string;
-  visual_plan: string;
-  locked?: boolean;
-  player2_name?: string;
-  player2_id?: number;
-  player2_team?: string;
-  ctas?: string[];
-  conversion_score?: number;
-  confidence?: "HIGH" | "MEDIUM" | "LOW";
-  priority?: "must_post" | "good_option" | "optional";
-}
-
-interface DayPlan {
-  day: number;
-  posts: PostPlan[];
-}
-
-interface WeeklyPlan {
-  week_key: string;
-  days: DayPlan[];
+interface WeeklyContentPost {
+  id: string;
+  weekly_plan_id: string;
+  day_key: string;
+  slot_key: string;
+  player_id: number | null;
+  player_name: string | null;
+  player2_id: number | null;
+  player2_name: string | null;
+  team: string | null;
+  category: string;
+  content_type: string;
+  angle: string | null;
+  status: PostStatus;
+  locked: boolean;
+  conversion_score: number | null;
+  confidence_label: string | null;
+  hook_score: number | null;
+  hook_type: string | null;
+  hooks: string[] | null;
+  voice_script: string | null;
+  caption_script: string | null;
+  visual_plan: string | null;
+  ai_image_prompt: string | null;
+  ai_video_prompt: string | null;
+  creative_style: string | null;
+  strategy_json: Record<string, unknown> | null;
+  platform_variants: Record<string, unknown> | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface PlayerOption {
@@ -72,6 +49,14 @@ interface PlayerOption {
   position?: string;
   projection_final?: number | null;
   neeko_rating_scaled: number | null;
+}
+
+interface PlayerAISummary {
+  summary_short: string | null;
+  summary_long: string | null;
+  recommendation: string | null;
+  primary_reason: string | null;
+  generated_at: string | null;
 }
 
 interface TopPostPlayer {
@@ -94,974 +79,450 @@ interface TodayTopPost {
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 
-const CATEGORY_META: Record<PostCategory, { color: string; bg: string; border: string; icon: React.ElementType }> = {
+const DAY_ORDER = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+const DAY_DISPLAY: Record<string, string> = {
+  monday: "Monday", tuesday: "Tuesday", wednesday: "Wednesday",
+  thursday: "Thursday", friday: "Friday", saturday: "Saturday", sunday: "Sunday",
+};
+
+const CATEGORY_META: Record<string, { color: string; bg: string; border: string; icon: React.ElementType }> = {
   Value:        { color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-500/10",  border: "border-emerald-500/30",  icon: TrendingUp },
   Breakout:     { color: "text-orange-700 dark:text-orange-300",  bg: "bg-orange-500/10",   border: "border-orange-500/30",   icon: Zap },
   Trap:         { color: "text-red-700 dark:text-red-300",        bg: "bg-red-500/10",      border: "border-red-500/30",      icon: AlertTriangle },
   Captain:      { color: "text-blue-700 dark:text-blue-300",      bg: "bg-blue-500/10",     border: "border-blue-500/30",     icon: Star },
-  Proof:        { color: "text-slate-700 dark:text-slate-300",    bg: "bg-slate-500/10",    border: "border-slate-500/30",    icon: Eye },
+  Proof:        { color: "text-violet-700 dark:text-violet-300",  bg: "bg-violet-500/10",   border: "border-violet-500/30",   icon: ShieldCheck },
   H2H:          { color: "text-cyan-700 dark:text-cyan-300",      bg: "bg-cyan-500/10",     border: "border-cyan-500/30",     icon: Swords },
-  Top3:         { color: "text-yellow-700 dark:text-yellow-300",  bg: "bg-yellow-500/10",   border: "border-yellow-500/30",   icon: Trophy },
+  Top3:         { color: "text-amber-700 dark:text-amber-300",    bg: "bg-amber-500/10",    border: "border-amber-500/30",    icon: Trophy },
   Injury:       { color: "text-pink-700 dark:text-pink-300",      bg: "bg-pink-500/10",     border: "border-pink-500/30",     icon: Ambulance },
-  Conversation: { color: "text-violet-700 dark:text-violet-300",  bg: "bg-violet-500/10",   border: "border-violet-500/30",   icon: MessageCircle },
+  Conversation: { color: "text-teal-700 dark:text-teal-300",      bg: "bg-teal-500/10",     border: "border-teal-500/30",     icon: MessageCircle },
 };
 
-const POST_TYPE_ICON: Record<PostType, React.ElementType> = {
-  "Video": Video,
-  "Image": Image,
-  "Screen Recording": Monitor,
-  "Short-form Video": Video,
-  "Graphic Post": Image,
-  "Hybrid Video": Layers,
-  "Comparison Post": GitCompare,
-  "Narrative Post": BookOpen,
-  "Callout Post": Megaphone,
+const POST_TYPE_ICON: Record<string, React.ElementType> = {
+  "Video":                 Video,
+  "Image":                 Image,
+  "Screen Recording":      Monitor,
+  "Short-form Video":      Play,
+  "Graphic Post":          Image,
+  "Hybrid Video":          Layers,
+  "H2H Post":              Swords,
+  "Comparison Post":       GitCompare,
+  "Narrative Post":        FileText,
+  "Callout Post":          Megaphone,
   "Educational Breakdown": BookOpen,
-};
-
-const ANGLE_LABELS: Record<string, { label: string; color: string }> = {
-  hidden_edge:         { label: "Hidden Edge",       color: "text-emerald-600 dark:text-emerald-400" },
-  market_inefficiency: { label: "Market Edge",        color: "text-blue-600 dark:text-blue-400" },
-  must_have:           { label: "Must Have",           color: "text-emerald-700 dark:text-emerald-300" },
-  captain_lock:        { label: "Captain Lock",        color: "text-blue-700 dark:text-blue-300" },
-  trap_warning:        { label: "Trap Warning",        color: "text-red-600 dark:text-red-400" },
-  overpriced:          { label: "Overpriced",          color: "text-red-700 dark:text-red-300" },
-  risk_reward:         { label: "Risk/Reward",         color: "text-orange-600 dark:text-orange-400" },
-  contrarian:          { label: "Contrarian",          color: "text-orange-700 dark:text-orange-300" },
-  comparison:          { label: "Comparison",          color: "text-slate-600 dark:text-slate-400" },
-  youre_wrong:         { label: "You're Wrong",        color: "text-red-500 dark:text-red-400" },
-  breakdown:           { label: "Breakdown",           color: "text-blue-500 dark:text-blue-400" },
-  narrative:           { label: "Narrative",           color: "text-slate-500 dark:text-slate-400" },
-  proof:               { label: "Proof",               color: "text-slate-700 dark:text-slate-300" },
-  h2h:                 { label: "Head-to-Head",        color: "text-cyan-600 dark:text-cyan-400" },
-  top3_friday:         { label: "Top 3 Friday",        color: "text-yellow-600 dark:text-yellow-400" },
-  top3_saturday:       { label: "Top 3 Saturday",      color: "text-yellow-600 dark:text-yellow-400" },
-  top3_sunday:         { label: "Top 3 Sunday",        color: "text-yellow-600 dark:text-yellow-400" },
-  top3_mid:            { label: "Top 3 MID",           color: "text-yellow-700 dark:text-yellow-300" },
-  top3_ruck:           { label: "Top 3 RUCK",          color: "text-yellow-700 dark:text-yellow-300" },
-  top3_value:          { label: "Top 3 Value",         color: "text-yellow-700 dark:text-yellow-300" },
-  injury_replacement:  { label: "Injury Replacement",  color: "text-pink-600 dark:text-pink-400" },
-  conversation:        { label: "Conversation",        color: "text-violet-600 dark:text-violet-400" },
-  we_called_it:        { label: "We Called It",        color: "text-slate-600 dark:text-slate-400" },
-  system_works:        { label: "System Works",        color: "text-slate-700 dark:text-slate-300" },
+  "Top 3 Post":            Trophy,
+  "Injury Alert Post":     Ambulance,
+  "Conversation Post":     MessageCircle,
 };
 
 const POST_TABS: { id: PostTab; label: string; icon: React.ElementType }[] = [
-  { id: "voice",    label: "Voice Script",  icon: Mic },
-  { id: "hooks",    label: "Hooks",         icon: Play },
-  { id: "visual",   label: "Visual Plan",   icon: Eye },
-  { id: "caption",  label: "Caption",       icon: FileText },
-  { id: "ai",       label: "AI Summary",    icon: Brain },
-  { id: "platform", label: "Platforms",     icon: Smartphone },
-  { id: "strategy", label: "Strategy",      icon: BarChart2 },
+  { id: "voice",    label: "Script",    icon: Mic },
+  { id: "hooks",    label: "Hooks",     icon: Zap },
+  { id: "caption",  label: "Caption",   icon: FileText },
+  { id: "visual",   label: "Visual",    icon: Eye },
+  { id: "prompt",   label: "AI Prompt", icon: Brain },
+  { id: "platform", label: "Platforms", icon: Smartphone },
+  { id: "strategy", label: "Strategy",  icon: BarChart2 },
+  { id: "ai",       label: "AI Intel",  icon: Brain },
 ];
-
-const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-const CONFIDENCE_META: Record<string, { label: string; color: string; bg: string }> = {
-  HIGH:   { label: "HIGH",   color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-500/15 border-emerald-500/30" },
-  MEDIUM: { label: "MED",    color: "text-amber-700 dark:text-amber-300",     bg: "bg-amber-500/15 border-amber-500/30" },
-  LOW:    { label: "LOW",    color: "text-red-700 dark:text-red-300",         bg: "bg-red-500/15 border-red-500/30" },
-};
-
-const PRIORITY_META: Record<string, { label: string; icon: string; color: string }> = {
-  must_post:   { label: "Must Post",   icon: "🔥", color: "text-red-600 dark:text-red-400" },
-  good_option: { label: "Good Option", icon: "👍", color: "text-emerald-600 dark:text-emerald-400" },
-  optional:    { label: "Optional",    icon: "😐", color: "text-slate-500 dark:text-slate-400" },
-};
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 
 function useCopy() {
   const [copied, setCopied] = useState<string | null>(null);
-  const copy = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(key);
-    setTimeout(() => setCopied(null), 2000);
-  };
+  const copy = useCallback((text: string, key: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1800);
+    });
+  }, []);
   return { copied, copy };
 }
 
-function getVoiceScript(post: PostPlan): string {
-  return post.voice_script || post.full_script || "";
+function getHooks(post: WeeklyContentPost): string[] {
+  if (Array.isArray(post.hooks) && post.hooks.length > 0) return post.hooks;
+  return [];
 }
 
-function getCaptionScript(post: PostPlan): string {
-  return post.caption_script || post.caption || "";
+function getTodayDayKey(): string {
+  const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  return days[new Date().getDay()];
 }
 
-function getHooks(post: PostPlan): string[] {
-  return (post.hooks?.length ? post.hooks : post.hook_options) ?? [];
-}
+// ── SKELETON CARD ─────────────────────────────────────────────────────────────
 
-// ── HOOK SCORING ──────────────────────────────────────────────────────────────
-
-type HookType = "Curiosity" | "Controversy" | "Authority" | "Fear" | "Generic";
-
-interface HookScore {
-  score: number;
-  type: HookType;
-  label: string;
-}
-
-function scoreHook(hook: string): HookScore {
-  let score = 5;
-  const lower = hook.toLowerCase();
-
-  const hasNumbers = /\d+/.test(hook);
-  if (hasNumbers) score += 2;
-
-  const contradictionWords = /\b(wrong|myth|stop|avoid|mistake|actually|truth|lie|real|secret|exposed|hidden)\b/i;
-  if (contradictionWords.test(hook)) score += 2;
-
-  const urgencyWords = /\b(now|today|this week|round \d|before|urgent|don't miss|act fast|immediately)\b/i;
-  if (urgencyWords.test(hook)) score += 2;
-
-  const curiosityGap = /\?|why|how|what if|the reason|you won't believe|here's what/i;
-  if (curiosityGap.test(hook)) score += 2;
-
-  const genericPhrasing = /\b(great player|doing well|good form|nice stats|solid pick)\b/i;
-  if (genericPhrasing.test(hook)) score -= 2;
-
-  score = Math.max(1, Math.min(10, score));
-
-  let type: HookType = "Generic";
-  if (contradictionWords.test(lower)) type = "Controversy";
-  else if (curiosityGap.test(lower)) type = "Curiosity";
-  else if (/\b(data|stats|model|analytics|projec|rank)\b/i.test(lower)) type = "Authority";
-  else if (/\b(risk|trap|danger|avoid|warning|mistake|too late)\b/i.test(lower)) type = "Fear";
-  else if (hasNumbers) type = "Authority";
-
-  const typeColors: Record<HookType, string> = {
-    Curiosity: "text-blue-600 dark:text-blue-400",
-    Controversy: "text-red-600 dark:text-red-400",
-    Authority: "text-emerald-600 dark:text-emerald-400",
-    Fear: "text-orange-600 dark:text-orange-400",
-    Generic: "text-muted-foreground",
-  };
-
-  return { score, type, label: typeColors[type] };
-}
-
-function HookScoreBadge({ hook }: { hook: string }) {
-  const { score, type, label } = scoreHook(hook);
-  const barWidth = `${(score / 10) * 100}%`;
-  const barColor = score >= 8 ? "bg-emerald-500" : score >= 6 ? "bg-blue-500" : score >= 4 ? "bg-orange-400" : "bg-red-400";
-
-  return (
-    <div className="flex items-center gap-2 shrink-0">
-      <span className={`text-[10px] font-semibold ${label}`}>{type}</span>
-      <div className="flex items-center gap-1">
-        <div className="w-14 h-1.5 bg-muted rounded-full overflow-hidden">
-          <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: barWidth }} />
+function PostSkeleton({ status, onGenerate, generating, onRetry }: {
+  status: PostStatus;
+  onGenerate: () => void;
+  generating: boolean;
+  onRetry: () => void;
+}) {
+  if (status === "generating" || generating) {
+    return (
+      <div className="rounded-lg border border-border p-3 bg-muted/10 animate-pulse">
+        <div className="flex items-center gap-2 mb-2">
+          <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
+          <span className="text-xs text-muted-foreground">Generating…</span>
         </div>
-        <span className="text-[10px] font-mono font-bold tabular-nums w-6 text-right">{score}/10</span>
+        <div className="h-3 bg-muted/40 rounded w-3/4 mb-1.5" />
+        <div className="h-3 bg-muted/30 rounded w-1/2" />
       </div>
-    </div>
-  );
-}
-
-// ── STRATEGY LAYER ────────────────────────────────────────────────────────────
-
-interface PostStrategy {
-  goal: string;
-  trigger: string;
-  expectedBehaviour: string;
-  bestTime: string;
-  callToAction: string;
-}
-
-function getPostStrategy(category: PostCategory, postType: PostType): PostStrategy {
-  const strategies: Record<PostCategory, PostStrategy> = {
-    Value: {
-      goal: "Drive Neeko+ conversions by showcasing underpriced player intelligence",
-      trigger: "User sees a player they own or are considering — price data validates the buy",
-      expectedBehaviour: "Comment 'VALUE?' or click the bio link to check rankings",
-      bestTime: "Tuesday–Wednesday (pre-trade week)",
-      callToAction: "Check the full value score in the link in bio",
-    },
-    Breakout: {
-      goal: "Create urgency around an emerging player before the price rises",
-      trigger: "User has the player on their watchlist or just missed their breakout",
-      expectedBehaviour: "Share with their fantasy league group chat or save the post",
-      bestTime: "Monday post-round (price update day)",
-      callToAction: "Grab them NOW before the price rises — link in bio",
-    },
-    Trap: {
-      goal: "Stop users from making a costly mistake — position Neeko as the authority",
-      trigger: "User owns the player and is second-guessing keeping them",
-      expectedBehaviour: "Comment 'I almost traded them in!' or share to warn others",
-      bestTime: "Wednesday–Thursday (trading deadline pressure)",
-      callToAction: "See the full trap analysis before your trade locks in",
-    },
-    Captain: {
-      goal: "Build trust in Neeko AI by showcasing captain confidence scoring",
-      trigger: "User is undecided on captain for the round",
-      expectedBehaviour: "Save the post for round day or check the captain tool",
-      bestTime: "Thursday–Friday (round eve)",
-      callToAction: "Use the Neeko captain tool — link in bio",
-    },
-    Proof: {
-      goal: "Build credibility by showing past prediction accuracy",
-      trigger: "User is sceptical about AI tools and needs social proof",
-      expectedBehaviour: "Follow + save the post as a benchmark of Neeko's accuracy",
-      bestTime: "Saturday–Sunday (post-match results)",
-      callToAction: "See more Neeko AI predictions — follow for weekly breakdowns",
-    },
-    H2H: {
-      goal: "Drive engagement with a head-to-head debate that forces the viewer to pick a side",
-      trigger: "User has one of the players and is deciding whether to trade",
-      expectedBehaviour: "Comment their pick — high engagement, shares to group chats",
-      bestTime: "Tuesday–Wednesday (debate week, pre-trade)",
-      callToAction: "Drop your pick in the comments — see the full data at Neeko",
-    },
-    Top3: {
-      goal: "Position Neeko as the definitive weekly rankings source",
-      trigger: "User is setting their team and wants the top picks validated",
-      expectedBehaviour: "Save the post for round day or share to their league",
-      bestTime: "Friday–Saturday (game day build-up)",
-      callToAction: "See the full Top 10 rankings — link in bio",
-    },
-    Injury: {
-      goal: "Be first with a replacement plan when a key player goes down",
-      trigger: "User has the injured player and needs an immediate alternative",
-      expectedBehaviour: "Comment 'already traded' or 'going with option 2'",
-      bestTime: "Immediately on injury news (Monday–Tuesday)",
-      callToAction: "Full availability + replacement list at Neeko — link in bio",
-    },
-    Conversation: {
-      goal: "Grow community engagement by starting a debate or poll",
-      trigger: "User has a strong opinion and wants to share it",
-      expectedBehaviour: "Comment their answer, tag a friend with a different view",
-      bestTime: "Any day — conversation posts work throughout the week",
-      callToAction: "Drop your take in the comments — follow for weekly debates",
-    },
-  };
-
-  const strategy = strategies[category] ?? strategies.Value;
-
-  if (postType === "Screen Recording" || postType === "Educational Breakdown" || postType === "Hybrid Video") {
-    return {
-      ...strategy,
-      goal: strategy.goal + " (screen recording adds credibility through product demonstration)",
-      callToAction: "Try it yourself — link in bio for free access",
-    };
+    );
   }
-
-  if (postType === "Comparison Post") {
-    return {
-      ...strategy,
-      goal: strategy.goal + " (comparison framing makes the decision obvious for the viewer)",
-      callToAction: "See the full comparison breakdown in the Neeko rankings — link in bio",
-    };
-  }
-
-  if (postType === "Callout Post") {
-    return {
-      ...strategy,
-      goal: strategy.goal + " (callout format is highly shareable — ideal for reach growth)",
-      callToAction: "Share this with your league — they need to see this",
-    };
-  }
-
-  if (postType === "Narrative Post") {
-    return {
-      ...strategy,
-      goal: strategy.goal + " (story-driven format builds emotional connection and saves)",
-      callToAction: "Follow for the full story this week — updated after every round",
-    };
-  }
-
-  return strategy;
-}
-
-function StrategyTabContent({ post }: { post: PostPlan }) {
-  const strategy = getPostStrategy(post.category, post.post_type);
-  const { copied, copy } = useCopy();
-
-  const allText = [
-    `Goal: ${strategy.goal}`,
-    `Trigger: ${strategy.trigger}`,
-    `Expected Behaviour: ${strategy.expectedBehaviour}`,
-    `Best Post Time: ${strategy.bestTime}`,
-    `Call To Action: ${strategy.callToAction}`,
-  ].join("\n");
-
-  const fields: { label: string; value: string; key: keyof PostStrategy }[] = [
-    { label: "Goal", value: strategy.goal, key: "goal" },
-    { label: "Trigger", value: strategy.trigger, key: "trigger" },
-    { label: "Expected Behaviour", value: strategy.expectedBehaviour, key: "expectedBehaviour" },
-    { label: "Best Post Time", value: strategy.bestTime, key: "bestTime" },
-    { label: "Call To Action", value: strategy.callToAction, key: "callToAction" },
-  ];
-
-  return (
-    <div className="p-4 space-y-3">
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Post Strategy</p>
-        <button
-          onClick={() => copy(allText, "strategy-all")}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
-        >
-          {copied === "strategy-all" ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy All</>}
-        </button>
-      </div>
-      <div className="space-y-2">
-        {fields.map(({ label, value, key }) => (
-          <div key={key} className="p-3 bg-muted/20 border border-border rounded-md">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-              <button
-                onClick={() => copy(value, `strategy-${key}`)}
-                className="p-1 rounded hover:bg-accent transition-colors"
-              >
-                {copied === `strategy-${key}` ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
-              </button>
-            </div>
-            <p className="text-sm leading-relaxed">{value}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── PLATFORM VARIANTS ─────────────────────────────────────────────────────────
-
-function generatePlatformVariant(post: PostPlan, platform: Platform): string {
-  const hook = getHooks(post)[0] ?? `${post.player_name} is trending this week`;
-  const caption = getCaptionScript(post);
-  const short = caption.slice(0, 200);
-
-  if (platform === "tiktok") {
-    return [
-      `🔥 ${hook.toUpperCase()}`,
-      ``,
-      `${post.player_name} (${post.team}) — ${post.category} pick`,
-      ``,
-      `${short}${short.length < caption.length ? "…" : ""}`,
-      ``,
-      `👉 Full breakdown in bio`,
-      ``,
-      `#AFL #AFLFantasy #SuperCoach #NeekoAI #${post.player_name.replace(/ /g, "")} #${post.team.replace(/ /g, "")} #FantasyFootball`,
-    ].join("\n");
-  }
-
-  if (platform === "instagram") {
-    return [
-      `${hook}`,
-      ``,
-      `${post.player_name} · ${post.team} · ${post.category} Rating`,
-      ``,
-      `${caption}`,
-      ``,
-      `Tap the link in bio to see the full AI breakdown →`,
-      ``,
-      `• • •`,
-      ``,
-      `#AFL #AFLFantasy #SuperCoach #FantasyFootball #NeekoAI #${post.player_name.split(" ").pop()} #${post.team.replace(/ /g, "")}`,
-    ].join("\n");
-  }
-
-  return [
-    `**${hook}**`,
-    ``,
-    `${post.player_name} is shaping up as a ${post.category.toLowerCase()} this week. Here's what the data says:`,
-    ``,
-    `${caption}`,
-    ``,
-    `I've been using Neeko AI for AFL Fantasy analytics — it's been remarkably accurate for projections. Full breakdown in the link.`,
-    ``,
-    `What do you reckon — are you buying, holding or selling ${post.player_name.split(" ").pop()} this week?`,
-  ].join("\n");
-}
-
-function PlatformVariantsTabContent({ post }: { post: PostPlan }) {
-  const [activePlatform, setActivePlatform] = useState<Platform>("tiktok");
-  const { copied, copy } = useCopy();
-
-  const platforms: { id: Platform; label: string; color: string }[] = [
-    { id: "tiktok",    label: "TikTok",    color: "text-pink-600 dark:text-pink-400" },
-    { id: "instagram", label: "Instagram", color: "text-orange-500 dark:text-orange-400" },
-    { id: "reddit",    label: "Reddit",    color: "text-orange-600 dark:text-orange-400" },
-  ];
-
-  const content = generatePlatformVariant(post, activePlatform);
-
-  return (
-    <div className="p-4 space-y-3">
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex gap-1">
-          {platforms.map(({ id, label, color }) => (
-            <button
-              key={id}
-              onClick={() => setActivePlatform(id)}
-              className={`px-2.5 py-1 text-xs rounded-md border transition-colors ${
-                activePlatform === id
-                  ? `bg-foreground text-background border-foreground`
-                  : `border-border ${color} hover:border-foreground/30`
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+  if (status === "error") {
+    return (
+      <div className="rounded-lg border border-destructive/30 p-3 bg-destructive/5">
+        <div className="flex items-center gap-2 mb-2">
+          <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+          <span className="text-xs text-destructive font-medium">Generation failed</span>
         </div>
         <button
-          onClick={() => copy(content, `platform-${activePlatform}`)}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
+          onClick={onRetry}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 border border-destructive/40 text-destructive text-xs rounded-md hover:bg-destructive/10 transition-colors"
         >
-          {copied === `platform-${activePlatform}` ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy</>}
+          <RefreshCw className="h-3 w-3" /> Retry
         </button>
       </div>
-
-      <textarea
-        value={content}
-        readOnly
-        className="w-full min-h-52 text-sm border border-border rounded-md p-3 bg-muted/10 resize-y leading-relaxed"
-      />
-      <p className="text-[10px] text-muted-foreground">{content.length} characters · optimised for {activePlatform}</p>
-    </div>
-  );
-}
-
-// ── VISUAL PLAN RENDERER ──────────────────────────────────────────────────────
-
-interface SceneBlock {
-  label: string;
-  timing?: string;
-  content: string;
-}
-
-function parseProductionBrief(text: string): SceneBlock[] {
-  const blocks: SceneBlock[] = [];
-  const lines = text.split("\n");
-  let current: SceneBlock | null = null;
-
-  for (const line of lines) {
-    const sceneMatch = line.match(/^(Scene\s*\d+|Step\s*\d+|Hook|Overlay|CTA|Background|Color|Animation|Text|Layout|Design|Production)\s*[\(:]?([\d\-–s]*)\)?:?\s*(.*)/i);
-    if (sceneMatch) {
-      if (current) blocks.push(current);
-      const timing = sceneMatch[2]?.trim() || undefined;
-      const rest = sceneMatch[3]?.trim() || "";
-      current = { label: sceneMatch[1].trim(), timing, content: rest };
-    } else if (current && line.trim()) {
-      current.content += (current.content ? "\n" : "") + line.trim();
-    } else if (!current && line.trim()) {
-      if (blocks.length === 0) {
-        blocks.push({ label: "Brief", content: line.trim() });
-        current = blocks[blocks.length - 1];
-      } else {
-        blocks[blocks.length - 1].content += "\n" + line.trim();
-      }
-    }
+    );
   }
-  if (current && !blocks.includes(current)) blocks.push(current);
-  return blocks.filter((b) => b.content.length > 0);
-}
-
-function isProductionBrief(text: string): boolean {
-  return /scene\s*\d+|step\s*\d+\s*\(/i.test(text);
-}
-
-function VisualPlanTabContent({ post }: { post: PostPlan }) {
-  const { copied, copy } = useCopy();
-  const raw = typeof post.visual_plan === "string" ? post.visual_plan : JSON.stringify(post.visual_plan, null, 2);
-  const isParseable = isProductionBrief(raw);
-  const blocks = isParseable ? parseProductionBrief(raw) : [];
-
-  const sceneColors = [
-    "border-blue-500/30 bg-blue-500/5",
-    "border-emerald-500/30 bg-emerald-500/5",
-    "border-orange-500/30 bg-orange-500/5",
-    "border-slate-500/30 bg-slate-500/5",
-    "border-red-500/30 bg-red-500/5",
-    "border-cyan-500/30 bg-cyan-500/5",
-  ];
-
   return (
-    <div className="p-4 space-y-3">
-      <div className="flex items-center justify-between mb-1">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Visual Plan</p>
-          {isParseable && <p className="text-[10px] text-muted-foreground/70 mt-0.5">{blocks.length} scenes · {post.post_type}</p>}
-        </div>
-        <button
-          onClick={() => copy(raw, "visual-plan")}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
-        >
-          {copied === "visual-plan" ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy</>}
-        </button>
+    <div className="rounded-lg border border-dashed border-border p-3 bg-muted/5">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="h-3 bg-muted/30 rounded w-12" />
+        <div className="h-3 bg-muted/20 rounded w-16" />
       </div>
-
-      {isParseable && blocks.length > 0 ? (
-        <div className="space-y-2">
-          {blocks.map((block, i) => (
-            <div key={i} className={`border rounded-md p-3 ${sceneColors[i % sceneColors.length]}`}>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-foreground/70">{block.label}</span>
-                {block.timing && (
-                  <span className="text-[10px] font-mono text-muted-foreground">({block.timing})</span>
-                )}
-              </div>
-              <p className="text-sm leading-relaxed whitespace-pre-line">{block.content}</p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <textarea
-          value={raw}
-          readOnly
-          className="w-full min-h-48 text-sm border border-border rounded-md p-3 bg-muted/10 resize-y font-mono leading-relaxed"
-        />
-      )}
-      <p className="text-[10px] text-muted-foreground">{raw.length} characters</p>
+      <div className="h-3 bg-muted/30 rounded w-2/3 mb-1.5" />
+      <div className="h-3 bg-muted/20 rounded w-1/3 mb-3" />
+      <button
+        onClick={onGenerate}
+        disabled={generating}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-foreground text-background text-xs rounded-md font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+      >
+        <Zap className="h-3 w-3" /> Generate
+      </button>
     </div>
   );
 }
 
-// ── SCREEN RECORDING GENERATOR ─────────────────────────────────────────────────
+// ── AI INTEL TAB ──────────────────────────────────────────────────────────────
 
-interface RecordingStep {
-  step: number;
-  duration: string;
-  action: string;
-  zoomPoint?: string;
-  pauseSuggestion?: string;
-}
-
-function generateRecordingSteps(post: PostPlan): RecordingStep[] {
-  const name = post.player_name;
-  const hook = getHooks(post)[0] ?? "Open the Neeko rankings";
-  const angle = post.content_angle ?? "";
-
-  const baseSteps: RecordingStep[] = [
-    {
-      step: 1,
-      duration: "0–3s",
-      action: `Hook card or title screen — show text: "${hook.slice(0, 60)}${hook.length > 60 ? "…" : ""}"`,
-      zoomPoint: "Centre screen — large text",
-      pauseSuggestion: "Hold 2s on the title before navigating",
-    },
-    {
-      step: 2,
-      duration: "3–8s",
-      action: `Navigate to ${name}'s player profile or rankings row`,
-      zoomPoint: "Player name and team tag",
-      pauseSuggestion: "Slow scroll — let viewers read the name",
-    },
-    {
-      step: 3,
-      duration: "8–14s",
-      action: `Highlight ${name}'s key stat — projection, price, or value score`,
-      zoomPoint: "Zoom 1.5× on the stat number",
-      pauseSuggestion: "Pause 1.5s on the standout number",
-    },
-    {
-      step: 4,
-      duration: "14–20s",
-      action: `Show the AI recommendation badge and summary for ${name}`,
-      zoomPoint: "Badge + first sentence of summary",
-      pauseSuggestion: "Hold 2s — this is the key credibility moment",
-    },
-    {
-      step: 5,
-      duration: "20–25s",
-      action: `Swipe or scroll to the score history chart for ${name}`,
-      zoomPoint: "Last 5 rounds of sparkline",
-      pauseSuggestion: "Tap each data point slowly",
-    },
-    {
-      step: 6,
-      duration: "25–28s",
-      action: `End screen — CTA overlay: "Full breakdown in bio / Follow for weekly picks"`,
-      zoomPoint: "Bio link or follow button",
-      pauseSuggestion: "Hold 3s on the CTA",
-    },
-  ];
-
-  if (angle === "trap_warning" || angle === "overpriced" || post.category === "Trap") {
-    baseSteps[2].action = `Show the trap signal — price vs projection gap for ${name}. Let the gap speak visually.`;
-    baseSteps[2].zoomPoint = "Price vs projection delta — highlight the overvalued number";
-    baseSteps[3].action = `Reveal the TRAP rating for ${name} — show the AI recommendation badge in red`;
-    baseSteps[3].zoomPoint = "Trap/Sell badge + risk rating";
-  }
-
-  if (angle === "hidden_edge" || angle === "market_inefficiency" || post.category === "Value") {
-    baseSteps[2].action = `Reveal ${name}'s value score — show the underpriced gap between price and projection`;
-    baseSteps[2].zoomPoint = "Value score number — zoom 2× on the digits";
-    baseSteps[3].action = `Show AI BUY recommendation for ${name} — badge plus first line of summary`;
-    baseSteps[3].zoomPoint = "Buy badge highlighted in green";
-  }
-
-  if (angle === "captain_lock" || angle === "must_have" || post.category === "Captain") {
-    baseSteps[2].action = `Show ${name}'s captain score and projected ceiling — lead with the ceiling number`;
-    baseSteps[2].zoomPoint = "Captain score + ceiling score side-by-side";
-    baseSteps[3].action = `Show the confidence rating for captaining ${name} — AI summary first line`;
-    baseSteps[3].zoomPoint = "Confidence bar + summary callout";
-  }
-
-  if (angle === "comparison" || post.post_type === "Comparison Post") {
-    baseSteps[2].action = `Side-by-side: ${name} vs their closest rival — show projection and value columns`;
-    baseSteps[2].zoomPoint = "Both player rows in rankings table";
-    baseSteps[3].action = `Scroll to ${name}'s AI edge — the stat that separates them`;
-    baseSteps[3].zoomPoint = "Differentiating stat highlighted";
-  }
-
-  if (angle === "breakdown" || post.post_type === "Educational Breakdown") {
-    baseSteps[1].action = `Open the Neeko dashboard — start at the Rankings page overview`;
-    baseSteps[1].pauseSuggestion = "Slow pan across the full table — 3s";
-    baseSteps[2].action = `Filter to ${name}'s position group — show how they rank among peers`;
-    baseSteps[2].zoomPoint = "Position rank badge";
-    baseSteps[3].action = `Open ${name}'s full profile — walk through each data point slowly`;
-    baseSteps[3].zoomPoint = "Projection → Value → Consistency — tap each in sequence";
-  }
-
-  return baseSteps;
-}
-
-function ScreenRecordingTabContent({ post }: { post: PostPlan }) {
-  const { copied, copy } = useCopy();
-  const steps = generateRecordingSteps(post);
-
-  const allText = steps.map(s => [
-    `Step ${s.step} (${s.duration}): ${s.action}`,
-    s.zoomPoint ? `  Zoom: ${s.zoomPoint}` : "",
-    s.pauseSuggestion ? `  Pause: ${s.pauseSuggestion}` : "",
-  ].filter(Boolean).join("\n")).join("\n\n");
-
-  return (
-    <div className="p-4 space-y-3">
-      <div className="flex items-center justify-between mb-1">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Screen Recording Script</p>
-          <p className="text-[10px] text-muted-foreground/70 mt-0.5">~28s total · {steps.length} steps</p>
-        </div>
-        <button
-          onClick={() => copy(allText, "recording-all")}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
-        >
-          {copied === "recording-all" ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy Steps</>}
-        </button>
-      </div>
-
-      <div className="space-y-2">
-        {steps.map((step) => (
-          <div key={step.step} className="flex gap-3 p-3 bg-muted/20 border border-border rounded-md">
-            <div className="shrink-0 flex flex-col items-center gap-1">
-              <span className="text-[10px] font-bold text-muted-foreground font-mono">#{step.step}</span>
-              <span className="text-[9px] text-muted-foreground/60 font-mono whitespace-nowrap">{step.duration}</span>
-            </div>
-            <div className="flex-1 min-w-0 space-y-1">
-              <p className="text-sm leading-snug">{step.action}</p>
-              {step.zoomPoint && (
-                <p className="text-[10px] text-blue-600 dark:text-blue-400">
-                  <span className="font-semibold">Zoom:</span> {step.zoomPoint}
-                </p>
-              )}
-              {step.pauseSuggestion && (
-                <p className="text-[10px] text-orange-600 dark:text-orange-400">
-                  <span className="font-semibold">Pause:</span> {step.pauseSuggestion}
-                </p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── AI SUMMARY TAB ────────────────────────────────────────────────────────────
-
-function AIKeywordHighlight({ text }: { text: string }) {
-  const projectionRe = /(\d+\s*(?:pts?|points?|projection)|\bprojec(?:t|tion|ted)\b)/gi;
-  const valueRe = /(\bvalue\b|\bunderpriced\b|\boverpriced\b|\bbreakeven\b|\bbreak.?even\b)/gi;
-  const riskRe = /(\brisk(?:y)?\b|\bdangerous\b|\bavoid\b|\btrap\b|\binjur(?:y|ed|ies)\b|\bbe.?wary\b|\bconcern\b)/gi;
-
-  const parts: { text: string; type: "projection" | "value" | "risk" | null }[] = [];
-  let remaining = text;
-  let safetyCounter = 0;
-
-  while (remaining.length > 0 && safetyCounter++ < 2000) {
-    const projMatch = projectionRe.exec(remaining);
-    const valueMatch = valueRe.exec(remaining);
-    const riskMatch = riskRe.exec(remaining);
-
-    projectionRe.lastIndex = 0;
-    valueRe.lastIndex = 0;
-    riskRe.lastIndex = 0;
-
-    const allMatches = [
-      projMatch ? { index: remaining.toLowerCase().search(projectionRe), type: "projection" as const, match: projMatch[0] } : null,
-      valueMatch ? { index: remaining.toLowerCase().search(valueRe), type: "value" as const, match: valueMatch[0] } : null,
-      riskMatch ? { index: remaining.toLowerCase().search(riskRe), type: "risk" as const, match: riskMatch[0] } : null,
-    ].filter(Boolean).sort((a, b) => (a!.index) - (b!.index));
-
-    if (allMatches.length === 0 || allMatches[0]!.index === -1) {
-      parts.push({ text: remaining, type: null });
-      break;
-    }
-
-    const first = allMatches[0]!;
-    const idx = first.index;
-    if (idx > 0) parts.push({ text: remaining.slice(0, idx), type: null });
-    parts.push({ text: remaining.slice(idx, idx + first.match.length), type: first.type });
-    remaining = remaining.slice(idx + first.match.length);
-  }
-
-  return (
-    <>
-      {parts.map((part, i) => {
-        if (!part.type) return <span key={i}>{part.text}</span>;
-        if (part.type === "projection") return <span key={i} className="text-blue-600 dark:text-blue-400 font-medium">{part.text}</span>;
-        if (part.type === "value")      return <span key={i} className="text-emerald-600 dark:text-emerald-400 font-medium">{part.text}</span>;
-        return <span key={i} className="text-red-600 dark:text-red-400 font-medium">{part.text}</span>;
-      })}
-    </>
-  );
-}
-
-function AIHighlightedParagraphs({ text }: { text: string }) {
-  const paragraphs = text.split(/\n+/).filter((p) => p.trim().length > 0);
-  return (
-    <div className="space-y-3">
-      {paragraphs.map((para, i) => (
-        <p key={i} className="text-sm leading-relaxed">
-          <AIKeywordHighlight text={para} />
-        </p>
-      ))}
-    </div>
-  );
-}
-
-function AISummaryTabContent({ playerId }: { playerId: number }) {
-  const [data, setData] = useState<PlayerAISummary | null>(null);
+function AISummaryTabContent({ playerId }: { playerId: number | null }) {
+  const [summary, setSummary] = useState<PlayerAISummary | null>(null);
   const [loading, setLoading] = useState(false);
-  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
+  const [fetched, setFetched] = useState(false);
+  const { copied, copy } = useCopy();
 
-  useEffect(() => {
+  const fetch = async () => {
     if (!playerId) return;
-    setData(null);
     setLoading(true);
-    console.log("Fetching AI for player:", playerId);
-
-    supabase
-      .schema("ai")
+    const { data } = await supabase
+      .schema("ai" as never)
       .from("player_ai_analysis")
       .select("summary_short, summary_long, recommendation, primary_reason, generated_at")
       .eq("player_id", playerId)
-      .order("generated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data: row, error }) => {
-        if (error) console.error("AI fetch error:", error);
-        console.log("AI response:", row);
-        setData(row ?? null);
-        setLoading(false);
-      });
-  }, [playerId]);
-
-  const copyAll = () => {
-    if (!data) return;
-    const text = [
-      data.recommendation ? `Recommendation: ${data.recommendation}` : "",
-      data.primary_reason ? `Primary Reason: ${data.primary_reason}` : "",
-      data.summary_short  ? `\nSummary:\n${data.summary_short}` : "",
-      data.summary_long   ? `\nFull Analysis:\n${data.summary_long}` : "",
-    ].filter(Boolean).join("\n");
-    navigator.clipboard.writeText(text);
-    setCopyState("copied");
-    setTimeout(() => setCopyState("idle"), 2000);
+      .maybeSingle();
+    setSummary(data ?? null);
+    setFetched(true);
+    setLoading(false);
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-3 p-4">
-        <div className="h-4 rounded bg-muted/40 animate-pulse w-1/3" />
-        <div className="h-3 rounded bg-muted/40 animate-pulse" />
-        <div className="h-3 rounded bg-muted/40 animate-pulse w-5/6" />
-        <div className="h-3 rounded bg-muted/40 animate-pulse w-4/6" />
-      </div>
-    );
+  if (!playerId) {
+    return <div className="p-4 text-xs text-muted-foreground">No player assigned to this post.</div>;
   }
 
-  if (!data || (!data.summary_short && !data.summary_long)) {
+  if (!fetched) {
     return (
-      <div className="p-6 text-center">
-        <Brain className="h-7 w-7 text-muted-foreground/40 mx-auto mb-2" />
-        <p className="text-sm text-muted-foreground font-medium">No AI analysis yet</p>
-        <p className="text-xs text-muted-foreground/60 mt-1">Generate AI or check pipeline — player_id: {playerId}</p>
-      </div>
-    );
-  }
-
-  const genDate = data.generated_at
-    ? new Date(data.generated_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })
-    : null;
-
-  return (
-    <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          {data.recommendation && (
-            <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-              data.recommendation.toLowerCase().includes("buy")  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30" :
-              data.recommendation.toLowerCase().includes("sell") ? "bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/30" :
-              "bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/30"
-            }`}>
-              {data.recommendation}
-            </span>
-          )}
-          {genDate && (
-            <span className="text-[10px] text-muted-foreground">{genDate}</span>
-          )}
-        </div>
+      <div className="p-4">
         <button
-          onClick={copyAll}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
+          onClick={fetch}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors disabled:opacity-40"
         >
-          {copyState === "copied"
-            ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied!</>
-            : <><Copy className="h-3.5 w-3.5" /> Copy</>
-          }
+          <Brain className={`h-3.5 w-3.5 ${loading ? "animate-pulse" : "text-muted-foreground"}`} />
+          {loading ? "Loading AI Intel…" : "Load AI Intel"}
         </button>
       </div>
+    );
+  }
 
-      {data.primary_reason && (
-        <p className="text-xs text-muted-foreground italic border-l-2 border-border pl-3">
-          {data.primary_reason}
-        </p>
-      )}
+  if (!summary) {
+    return <div className="p-4 text-xs text-muted-foreground">No AI analysis found for this player.</div>;
+  }
 
-      {data.summary_short && (
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Summary</p>
-          <div className="p-3 bg-muted/20 border border-border rounded-md">
-            <AIHighlightedParagraphs text={data.summary_short} />
-          </div>
+  return (
+    <div className="p-4 space-y-3">
+      {summary.recommendation && (
+        <div className="flex items-center gap-2 p-2 bg-muted/20 rounded-md border border-border">
+          <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="text-xs font-semibold">{summary.recommendation}</span>
         </div>
       )}
-
-      {data.summary_long && (
+      {summary.primary_reason && (
+        <p className="text-xs text-muted-foreground italic">{summary.primary_reason}</p>
+      )}
+      {summary.summary_short && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Full Analysis</p>
-          <div className="max-h-72 overflow-y-auto p-3 bg-muted/10 border border-border rounded-md">
-            <AIHighlightedParagraphs text={data.summary_long} />
-          </div>
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Summary</p>
+          <p className="text-xs leading-relaxed">{summary.summary_short}</p>
+          <button
+            onClick={() => copy(summary.summary_short ?? "", "ai-short")}
+            className="mt-1.5 flex items-center gap-1 px-2 py-1 text-[10px] border border-border rounded hover:bg-accent transition-colors"
+          >
+            {copied === "ai-short" ? <><Check className="h-3 w-3 text-emerald-500" /> Copied</> : <><Copy className="h-3 w-3" /> Copy</>}
+          </button>
+        </div>
+      )}
+      {summary.summary_long && (
+        <div>
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Full Analysis</p>
+          <textarea
+            readOnly
+            value={summary.summary_long}
+            className="w-full min-h-32 text-xs border border-border rounded-md p-2.5 bg-muted/10 resize-y font-mono leading-relaxed"
+          />
         </div>
       )}
     </div>
   );
 }
 
-// ── TODAY'S TOP 3 POSTS ───────────────────────────────────────────────────────
+// ── PLATFORM VARIANTS TAB ─────────────────────────────────────────────────────
 
-function generateTopPostHook(player: TopPostPlayer, type: "CONTROVERSIAL" | "VALUE" | "PROOF"): string {
-  const name = player.player_name.split(" ").pop() ?? player.player_name;
-  const proj = player.projection_final ? Math.round(player.projection_final) : null;
-  const val = player.value_score != null ? player.value_score.toFixed(1) : null;
+function PlatformVariantsTabContent({ post }: { post: WeeklyContentPost }) {
+  const { copied, copy } = useCopy();
+  const variants = post.platform_variants as Record<string, { caption?: string; hook?: string; hashtags?: string[] }> | null;
 
-  if (type === "CONTROVERSIAL") {
-    return val
-      ? `Everyone is wrong about ${name} — value score ${val} proves it`
-      : `Stop listening to the crowd on ${name}. The data tells a different story.`;
+  if (!variants) {
+    return (
+      <div className="p-4 text-center">
+        <Smartphone className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
+        <p className="text-xs text-muted-foreground">Platform variants are generated with the post. Generate this post to see them.</p>
+      </div>
+    );
   }
-  if (type === "VALUE") {
-    return proj
-      ? `${proj} pts projected. The market hasn't priced in ${name} yet — that's your window.`
-      : `${name} is the most mispriced player in the comp right now. Act before the market corrects.`;
-  }
-  return proj
-    ? `${name} at ${proj} pts. Neeko called it. Here's the proof.`
-    : `This is what winning coaches are looking at. Neeko's model — live data, right now.`;
-}
 
-function generateTopPostCaption(player: TopPostPlayer, type: "CONTROVERSIAL" | "VALUE" | "PROOF"): string {
-  const name = player.player_name;
-  const team = player.team;
-  const proj = player.projection_final ? Math.round(player.projection_final) : null;
-  const val = player.value_score != null ? player.value_score.toFixed(1) : null;
-
-  if (type === "CONTROVERSIAL") {
-    return `The mainstream AFL Fantasy take on ${name} is wrong — and Neeko's data proves it.\n\n${val ? `Value score ${val}. ` : ""}${proj ? `Projection: ${proj} pts this round. ` : ""}The crowd is chasing the wrong picks while the edge sits right here.\n\nFull breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #ContraryData`;
-  }
-  if (type === "VALUE") {
-    return `${name} (${team}) is the most underpriced player in the comp right now.\n\n${proj ? `${proj} pts projected this round. ` : ""}${val ? `Value score ${val} — elite output at a price the market hasn't caught. ` : ""}The window to get them cheap closes when the rest of the comp figures it out.\n\nFull breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #ValueLock`;
-  }
-  return `This is the data your league rivals don't want you to see.\n\n${name} (${team})${proj ? ` — ${proj} pts projected` : ""} on Neeko's live model. This is what winning coaches are acting on right now.\n\nFull access at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #DataDriven`;
-}
-
-function TodayTopPostCard({
-  topPost,
-  onCopy,
-  copied,
-}: {
-  topPost: TodayTopPost;
-  onCopy: (text: string, key: string) => void;
-  copied: string | null;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const typeColors: Record<TodayTopPost["type"], { bg: string; text: string; border: string; label: string }> = {
-    CONTROVERSIAL: { bg: "bg-orange-500/10", text: "text-orange-700 dark:text-orange-300", border: "border-orange-500/30", label: "Controversial" },
-    VALUE:         { bg: "bg-emerald-500/10", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-500/30", label: "Value Lock" },
-    PROOF:         { bg: "bg-blue-500/10",    text: "text-blue-700 dark:text-blue-300",        border: "border-blue-500/30",    label: "Proof Post" },
-  };
-  const meta = typeColors[topPost.type];
-  const allText = `${topPost.hook}\n\n${topPost.caption}`;
+  const platforms = [
+    { key: "tiktok",     label: "TikTok",     Icon: Play },
+    { key: "instagram",  label: "Instagram",  Icon: Image },
+    { key: "reddit",     label: "Reddit",     Icon: MessageCircle },
+  ];
 
   return (
-    <div className={`rounded-lg border ${meta.border} ${meta.bg} overflow-hidden`}>
-      <div className="px-3 py-2.5 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${meta.bg} ${meta.text} ${meta.border}`}>
-            {meta.label}
-          </span>
-          <span className="font-semibold text-sm truncate">{topPost.player.player_name}</span>
-          <span className="text-xs text-muted-foreground shrink-0">{topPost.player.team}</span>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={() => onCopy(allText, `top-${topPost.type}`)}
-            className="flex items-center gap-1 px-2 py-1 border border-border text-[10px] rounded hover:bg-background/50 transition-colors"
-          >
-            {copied === `top-${topPost.type}` ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-            Copy
-          </button>
-          <button
-            onClick={() => setExpanded((v) => !v)}
-            className="p-1 rounded hover:bg-background/50 transition-colors"
-          >
-            {expanded ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
-          </button>
-        </div>
-      </div>
-
-      {expanded && (
-        <div className="px-3 pb-3 border-t border-border/50 space-y-2 pt-2 bg-background/40">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Hook</p>
-            <p className="text-sm font-medium leading-snug">{topPost.hook}</p>
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Caption</p>
-            <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-line">{topPost.caption}</p>
-          </div>
-          {topPost.player.projection_final && (
-            <div className="flex gap-3 pt-1">
-              <div className="text-center">
-                <p className="text-[10px] text-muted-foreground">Projection</p>
-                <p className="text-sm font-bold font-mono">{Math.round(topPost.player.projection_final)} pts</p>
+    <div className="p-4 space-y-4">
+      {platforms.map(({ key, label, Icon }) => {
+        const v = variants[key];
+        if (!v) return null;
+        const text = [v.hook, v.caption, ...(v.hashtags ?? [])].filter(Boolean).join("\n\n");
+        return (
+          <div key={key} className="border border-border rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 bg-muted/20 border-b border-border">
+              <div className="flex items-center gap-2">
+                <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs font-semibold">{label}</span>
               </div>
-              {topPost.player.value_score !== null && (
-                <div className="text-center">
-                  <p className="text-[10px] text-muted-foreground">Value Score</p>
-                  <p className="text-sm font-bold font-mono">{topPost.player.value_score?.toFixed(1)}</p>
-                </div>
+              <button
+                onClick={() => copy(text, key)}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] border border-border rounded hover:bg-accent transition-colors"
+              >
+                {copied === key ? <><Check className="h-3 w-3 text-emerald-500" /> Copied</> : <><Copy className="h-3 w-3" /> Copy</>}
+              </button>
+            </div>
+            <div className="p-3 space-y-2">
+              {v.hook && <p className="text-xs font-semibold leading-snug">{v.hook}</p>}
+              {v.caption && <p className="text-xs text-muted-foreground leading-relaxed">{v.caption}</p>}
+              {v.hashtags && v.hashtags.length > 0 && (
+                <p className="text-[10px] text-blue-600 dark:text-blue-400 font-mono">{v.hashtags.join(" ")}</p>
               )}
             </div>
-          )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── STRATEGY TAB ──────────────────────────────────────────────────────────────
+
+function StrategyTabContent({ post }: { post: WeeklyContentPost }) {
+  const strategy = post.strategy_json as Record<string, unknown> | null;
+
+  if (!strategy) {
+    return (
+      <div className="p-4 text-center">
+        <BarChart2 className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
+        <p className="text-xs text-muted-foreground">Strategy analysis is generated with the post.</p>
+      </div>
+    );
+  }
+
+  const fields: { label: string; key: string }[] = [
+    { label: "Objective",      key: "objective" },
+    { label: "Target Audience", key: "target_audience" },
+    { label: "Tone",           key: "tone" },
+    { label: "CTA",            key: "cta" },
+    { label: "Best Time",      key: "best_time" },
+    { label: "Predicted Reach", key: "predicted_reach" },
+  ];
+
+  return (
+    <div className="p-4 space-y-3">
+      {post.conversion_score != null && (
+        <div className="flex items-center gap-3 p-3 bg-muted/20 border border-border rounded-lg">
+          <div className="text-center">
+            <p className="text-2xl font-bold font-mono">{post.conversion_score.toFixed(1)}</p>
+            <p className="text-[10px] text-muted-foreground">/ 10</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold">Conversion Score</p>
+            {post.confidence_label && <p className="text-[10px] text-muted-foreground">{post.confidence_label} confidence</p>}
+            {post.creative_style && <p className="text-[10px] text-muted-foreground">{post.creative_style}</p>}
+          </div>
         </div>
       )}
+      <div className="grid grid-cols-2 gap-2">
+        {fields.map(({ label, key }) => {
+          const val = strategy[key];
+          if (!val) return null;
+          return (
+            <div key={key} className="p-2.5 bg-muted/10 border border-border rounded-md">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">{label}</p>
+              <p className="text-xs font-medium">{String(val)}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── AI PROMPT TAB ─────────────────────────────────────────────────────────────
+
+function AIPromptTabContent({ post }: { post: WeeklyContentPost }) {
+  const { copied, copy } = useCopy();
+
+  const hasPrompts = post.ai_image_prompt || post.ai_video_prompt;
+
+  if (!hasPrompts) {
+    return (
+      <div className="p-4 text-center">
+        <Brain className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
+        <p className="text-xs text-muted-foreground">AI prompts are generated with the post. Generate this post to see Midjourney and Runway prompts.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      {post.ai_image_prompt && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Image className="h-3.5 w-3.5 text-muted-foreground" />
+              <p className="text-xs font-semibold">Image Prompt</p>
+              <span className="text-[10px] text-muted-foreground border border-border rounded px-1.5 py-0.5">Midjourney / DALL-E</span>
+            </div>
+            <button
+              onClick={() => copy(post.ai_image_prompt!, "img-prompt")}
+              className="flex items-center gap-1 px-2 py-1 text-[10px] border border-border rounded hover:bg-accent transition-colors"
+            >
+              {copied === "img-prompt" ? <><Check className="h-3 w-3 text-emerald-500" /> Copied</> : <><Copy className="h-3 w-3" /> Copy</>}
+            </button>
+          </div>
+          <textarea
+            readOnly
+            value={post.ai_image_prompt}
+            className="w-full min-h-24 text-xs border border-border rounded-md p-2.5 bg-muted/10 resize-y font-mono leading-relaxed"
+          />
+        </div>
+      )}
+      {post.ai_video_prompt && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Video className="h-3.5 w-3.5 text-muted-foreground" />
+              <p className="text-xs font-semibold">Video Prompt</p>
+              <span className="text-[10px] text-muted-foreground border border-border rounded px-1.5 py-0.5">Runway / Sora</span>
+            </div>
+            <button
+              onClick={() => copy(post.ai_video_prompt!, "vid-prompt")}
+              className="flex items-center gap-1 px-2 py-1 text-[10px] border border-border rounded hover:bg-accent transition-colors"
+            >
+              {copied === "vid-prompt" ? <><Check className="h-3 w-3 text-emerald-500" /> Copied</> : <><Copy className="h-3 w-3" /> Copy</>}
+            </button>
+          </div>
+          <textarea
+            readOnly
+            value={post.ai_video_prompt}
+            className="w-full min-h-24 text-xs border border-border rounded-md p-2.5 bg-muted/10 resize-y font-mono leading-relaxed"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── VISUAL PLAN TAB ───────────────────────────────────────────────────────────
+
+function VisualPlanTabContent({ post }: { post: WeeklyContentPost }) {
+  const { copied, copy } = useCopy();
+  const visualPlan = post.visual_plan;
+
+  if (!visualPlan) {
+    return (
+      <div className="p-4 text-center">
+        <Eye className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
+        <p className="text-xs text-muted-foreground">Visual plan is generated with the post.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold flex items-center gap-1.5">
+          <Eye className="h-3.5 w-3.5 text-muted-foreground" /> Visual Production Brief
+        </p>
+        <button
+          onClick={() => copy(visualPlan, "visual")}
+          className="flex items-center gap-1 px-2 py-1 text-[10px] border border-border rounded hover:bg-accent transition-colors"
+        >
+          {copied === "visual" ? <><Check className="h-3 w-3 text-emerald-500" /> Copied</> : <><Copy className="h-3 w-3" /> Copy</>}
+        </button>
+      </div>
+      <textarea
+        readOnly
+        value={visualPlan}
+        className="w-full min-h-40 text-xs border border-border rounded-md p-2.5 bg-muted/10 resize-y font-mono leading-relaxed"
+      />
+    </div>
+  );
+}
+
+// ── TODAY'S TOP POSTS ─────────────────────────────────────────────────────────
+
+function TodayTopPostCard({ topPost, onCopy, copied }: { topPost: TodayTopPost; onCopy: (text: string, key: string) => void; copied: string | null }) {
+  const typeColors: Record<string, string> = {
+    CONTROVERSIAL: "bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/30",
+    VALUE:         "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+    PROOF:         "bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/30",
+  };
+
+  return (
+    <div className="border border-border rounded-lg p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${typeColors[topPost.type] ?? ""}`}>
+          {topPost.type}
+        </span>
+        <span className="text-xs font-semibold">{topPost.player.player_name}</span>
+        <span className="text-[10px] text-muted-foreground">{topPost.player.team}</span>
+      </div>
+      <p className="text-xs font-medium leading-snug">{topPost.hook}</p>
+      <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2">{topPost.caption}</p>
+      <button
+        onClick={() => onCopy(`${topPost.hook}\n\n${topPost.caption}`, topPost.type)}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
+      >
+        {copied === topPost.type ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy</>}
+      </button>
     </div>
   );
 }
@@ -1075,60 +536,44 @@ function TodayTopPostsSection() {
   const generate = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .schema("afl")
+      const { data } = await supabase
+        .schema("afl" as never)
         .from("player_rankings_cache")
         .select("player_id, player_name, team, value_score, projection_final, consistency_score, neeko_rating_scaled, recommendation")
         .eq("is_available", true)
         .not("projection_final", "is", null)
-        .not("value_score", "is", null)
-        .order("value_score", { ascending: false, nullsFirst: false })
-        .limit(50);
+        .order("neeko_rating_scaled", { ascending: false, nullsFirst: false })
+        .limit(30);
 
-      if (error || !data || data.length === 0) {
-        setLoading(false);
-        return;
-      }
+      if (!data || data.length === 0) return;
 
-      const pool = data as TopPostPlayer[];
+      const players = data as TopPostPlayer[];
+      const valuePlayer = [...players].sort((a, b) => (b.value_score ?? 0) - (a.value_score ?? 0))[0];
+      const controversialPlayer = players[Math.floor(Math.random() * Math.min(players.length, 10))];
+      const proofPlayer = players.find((p) => p.recommendation?.toLowerCase().includes("buy") || p.recommendation?.toLowerCase().includes("strong")) ?? players[2];
 
-      // CONTROVERSIAL: player where crowd expectation vs data creates biggest gap
-      // Pick a high-neeko-rating player that isn't #1 value (surprising pick)
-      const controversialPlayer = [...pool]
-        .sort((a, b) => (b.neeko_rating_scaled ?? 0) - (a.neeko_rating_scaled ?? 0))
-        .slice(2, 15)
-        .sort(() => Math.random() - 0.5)[0] ?? pool[3];
-
-      // VALUE: highest value_score player
-      const valuePlayer = pool.find((p) => p.player_id !== controversialPlayer.player_id) ?? pool[0];
-
-      // PROOF: highest projection player not already used
-      const proofPlayer = [...pool]
-        .filter((p) => p.player_id !== controversialPlayer.player_id && p.player_id !== valuePlayer.player_id)
-        .sort((a, b) => (b.projection_final ?? 0) - (a.projection_final ?? 0))[0] ?? pool[2];
-
-      const result: TodayTopPost[] = [
+      const results: TodayTopPost[] = [
         {
           type: "CONTROVERSIAL",
           player: controversialPlayer,
-          hook: generateTopPostHook(controversialPlayer, "CONTROVERSIAL"),
-          caption: generateTopPostCaption(controversialPlayer, "CONTROVERSIAL"),
+          hook: `Unpopular opinion: ${controversialPlayer.player_name} is the most underrated pick this round`,
+          caption: `Everyone's looking at the obvious picks. But ${controversialPlayer.player_name} from ${controversialPlayer.team} is quietly sitting at ${Math.round(controversialPlayer.projection_final ?? 0)} projected — with ownership that doesn't reflect their ceiling. This is the move.`,
         },
         {
           type: "VALUE",
           player: valuePlayer,
-          hook: generateTopPostHook(valuePlayer, "VALUE"),
-          caption: generateTopPostCaption(valuePlayer, "VALUE"),
+          hook: `${valuePlayer.player_name} is $450k cheaper than players with the same projection`,
+          caption: `Pure value math: ${valuePlayer.player_name} (${valuePlayer.team}) is projecting ${Math.round(valuePlayer.projection_final ?? 0)} pts this round. Players at this output level average 15-20% more in price. This is the window to get in.`,
         },
         {
           type: "PROOF",
           player: proofPlayer,
-          hook: generateTopPostHook(proofPlayer, "PROOF"),
-          caption: generateTopPostCaption(proofPlayer, "PROOF"),
+          hook: `We said to pick ${proofPlayer.player_name} last round. Here's what happened.`,
+          caption: `${proofPlayer.player_name} from ${proofPlayer.team} delivered. The model flagged them early — the data was clear. Now the market is catching up. ${proofPlayer.recommendation ?? "The edge is still there this week."}`
         },
       ];
 
-      setPosts(result);
+      setPosts(results);
       setGenerated(true);
     } finally {
       setLoading(false);
@@ -1136,14 +581,12 @@ function TodayTopPostsSection() {
   };
 
   return (
-    <div className="rounded-lg border border-border bg-muted/10 overflow-hidden">
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
+    <div className="border border-border rounded-lg overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/10">
         <div className="flex items-center gap-2">
-          <Flame className="h-4 w-4 text-orange-500" />
-          <div>
-            <p className="text-sm font-semibold">Today's Best Posts</p>
-            <p className="text-[10px] text-muted-foreground">Auto-selected from live rankings data</p>
-          </div>
+          <Target className="h-4 w-4 text-muted-foreground" />
+          <p className="text-sm font-semibold">Today's 3 Picks</p>
+          <span className="text-[10px] text-muted-foreground border border-border px-1.5 py-0.5 rounded">Quick generates</span>
         </div>
         <button
           onClick={generate}
@@ -1154,127 +597,17 @@ function TodayTopPostsSection() {
           {loading ? "Generating…" : generated ? "Regenerate" : "Generate Today's Content"}
         </button>
       </div>
-
       {posts && (
         <div className="p-3 space-y-2">
           {posts.map((p) => (
-            <TodayTopPostCard
-              key={p.type}
-              topPost={p}
-              onCopy={copy}
-              copied={copied}
-            />
+            <TodayTopPostCard key={p.type} topPost={p} onCopy={copy} copied={copied} />
           ))}
         </div>
       )}
-
       {!posts && !loading && (
         <div className="px-4 py-5 text-center">
           <Target className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
           <p className="text-xs text-muted-foreground">Click generate to get 3 high-conversion posts — Controversial, Value, and Proof</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── SWAP PLAYER PANEL ─────────────────────────────────────────────────────────
-
-function SwapPlayerPanel({
-  post,
-  availablePlayers,
-  onSwap,
-  swapping,
-  onSuggestBetter,
-  suggesting,
-  suggestedPlayer,
-}: {
-  post: PostPlan;
-  availablePlayers: PlayerOption[];
-  onSwap: (post: PostPlan, playerId: number) => void;
-  swapping: boolean;
-  onSuggestBetter: (post: PostPlan) => void;
-  suggesting: boolean;
-  suggestedPlayer: PlayerOption | null;
-}) {
-  const [selectedId, setSelectedId] = useState<number>(post.player_id);
-
-  useEffect(() => {
-    setSelectedId(post.player_id);
-  }, [post.player_id]);
-
-  const isDifferent = selectedId !== post.player_id;
-  const selected = availablePlayers.find((p) => p.player_id === selectedId);
-
-  return (
-    <div className="border border-dashed border-border rounded-lg p-3 space-y-3 bg-muted/5">
-      <div className="flex items-center gap-2">
-        <UserRoundCog className="h-3.5 w-3.5 text-muted-foreground" />
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Swap Player</p>
-      </div>
-
-      <div className="flex items-center gap-2 flex-wrap">
-        <select
-          value={selectedId}
-          onChange={(e) => setSelectedId(Number(e.target.value))}
-          disabled={swapping || availablePlayers.length === 0}
-          className="flex-1 min-w-0 text-xs border border-border rounded-md px-2 py-1.5 bg-background text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50"
-        >
-          {availablePlayers.map((p) => (
-            <option key={p.player_id} value={p.player_id}>
-              {p.player_name} · {p.team}{p.position ? ` · ${p.position}` : ""}{p.projection_final ? ` · ${Math.round(p.projection_final)}pts` : ""}
-            </option>
-          ))}
-        </select>
-
-        <button
-          onClick={() => onSwap(post, selectedId)}
-          disabled={swapping || !isDifferent}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background text-xs rounded-md font-medium hover:opacity-90 transition-opacity disabled:opacity-40 shrink-0"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${swapping ? "animate-spin" : ""}`} />
-          {swapping ? "Regenerating…" : "Apply Player"}
-        </button>
-
-        <button
-          onClick={() => onSuggestBetter(post)}
-          disabled={suggesting || swapping}
-          title="Suggest a player that better fits this post's angle and category"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors disabled:opacity-40 shrink-0"
-        >
-          <Lightbulb className={`h-3.5 w-3.5 ${suggesting ? "animate-pulse text-yellow-500" : "text-muted-foreground"}`} />
-          {suggesting ? "Finding…" : "Suggest Better"}
-        </button>
-      </div>
-
-      {selected && isDifferent && (
-        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-          <span className="text-foreground font-medium">{selected.player_name}</span>
-          <span>·</span>
-          <span>{selected.team}</span>
-          {selected.position && <><span>·</span><span>{selected.position}</span></>}
-          {selected.projection_final && <><span>·</span><span className="font-mono font-bold text-blue-600 dark:text-blue-400">{Math.round(selected.projection_final)} pts proj</span></>}
-        </div>
-      )}
-
-      {suggestedPlayer && (
-        <div className="flex items-center gap-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-md">
-          <Lightbulb className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-semibold text-yellow-700 dark:text-yellow-300">Suggested: {suggestedPlayer.player_name}</p>
-            <p className="text-[10px] text-yellow-600/80 dark:text-yellow-400/80">{suggestedPlayer.team}{suggestedPlayer.position ? ` · ${suggestedPlayer.position}` : ""}{suggestedPlayer.projection_final ? ` · ${Math.round(suggestedPlayer.projection_final)} pts` : ""}</p>
-          </div>
-          <button
-            onClick={() => {
-              setSelectedId(suggestedPlayer.player_id);
-              onSwap(post, suggestedPlayer.player_id);
-            }}
-            disabled={swapping}
-            className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 border border-yellow-500/40 text-yellow-700 dark:text-yellow-300 text-[10px] font-semibold rounded hover:bg-yellow-500/30 transition-colors disabled:opacity-40 shrink-0"
-          >
-            <Check className="h-3 w-3" />
-            Use
-          </button>
         </div>
       )}
     </div>
@@ -1287,85 +620,72 @@ function PostDetailPanel({
   post,
   onRegenerate,
   regenerating,
-  onAggressiveRewrite,
-  rewriting,
-  rewriteCount,
-  availablePlayers,
-  onSwapPlayer,
-  swappingPost,
-  onSuggestBetter,
-  suggestingPost,
-  suggestedPlayers,
   onToggleLock,
   onDuplicate,
+  availablePlayers,
+  onSwapPlayer,
+  swapping,
 }: {
-  post: PostPlan;
-  onRegenerate: (post: PostPlan) => void;
+  post: WeeklyContentPost;
+  onRegenerate: (post: WeeklyContentPost) => void;
   regenerating: boolean;
-  onAggressiveRewrite: (post: PostPlan) => void;
-  rewriting: boolean;
-  rewriteCount: number;
+  onToggleLock: (post: WeeklyContentPost) => void;
+  onDuplicate: (post: WeeklyContentPost) => void;
   availablePlayers: PlayerOption[];
-  onSwapPlayer: (post: PostPlan, playerId: number) => void;
-  swappingPost: string | null;
-  onSuggestBetter: (post: PostPlan) => void;
-  suggestingPost: string | null;
-  suggestedPlayers: Record<string, PlayerOption>;
-  onToggleLock: (post: PostPlan) => void;
-  onDuplicate: (post: PostPlan) => void;
+  onSwapPlayer: (post: WeeklyContentPost, newPlayerId: number) => void;
+  swapping: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<PostTab>("voice");
   const [editMode, setEditMode] = useState(false);
-  const [editScript, setEditScript] = useState(getVoiceScript(post));
-  const [editCaption, setEditCaption] = useState(getCaptionScript(post));
-  const [editHook, setEditHook] = useState(getHooks(post)[0] ?? "");
+  const [editScript, setEditScript] = useState(post.voice_script ?? "");
+  const [editCaption, setEditCaption] = useState(post.caption_script ?? "");
+  const [swapPlayerId, setSwapPlayerId] = useState<number>(post.player_id ?? 0);
   const [submittingFeedback, setSubmittingFeedback] = useState<string | null>(null);
   const [feedbackDone, setFeedbackDone] = useState<string | null>(null);
   const { copied, copy } = useCopy();
-  const catMeta = CATEGORY_META[post.category] ?? CATEGORY_META.Value;
-  const confidenceMeta = CONFIDENCE_META[post.confidence ?? "MEDIUM"];
-  const priorityMeta = PRIORITY_META[post.priority ?? "good_option"];
+  const catMeta = CATEGORY_META[post.category] ?? CATEGORY_META["Value"];
 
-  const isScreenRecording = post.post_type === "Screen Recording";
+  useEffect(() => {
+    setEditScript(post.voice_script ?? "");
+    setEditCaption(post.caption_script ?? "");
+    setSwapPlayerId(post.player_id ?? 0);
+  }, [post.id, post.voice_script, post.caption_script, post.player_id]);
 
-  const visibleTabs = POST_TABS;
+  const hooks = getHooks(post);
 
   const getTabContent = (): string => {
     switch (activeTab) {
-      case "voice":   return getVoiceScript(post);
-      case "hooks":   return getHooks(post).join("\n\n");
-      case "visual":  return typeof post.visual_plan === "string" ? post.visual_plan : JSON.stringify(post.visual_plan, null, 2);
-      case "caption": return getCaptionScript(post);
-      case "ai":      return "";
+      case "voice":   return post.voice_script ?? "";
+      case "hooks":   return hooks.join("\n\n");
+      case "caption": return post.caption_script ?? "";
+      case "visual":  return "";
+      case "prompt":  return "";
       case "platform": return "";
       case "strategy": return "";
+      case "ai":       return "";
     }
   };
 
   const copyAll = () => {
-    const hooks = getHooks(post);
-    const ctas = post.ctas ?? [];
-    const all = [
-      `HOOK\n${hooks[0] ?? ""}`,
-      `SCRIPT\n${getVoiceScript(post)}`,
-      `CAPTION\n${getCaptionScript(post)}`,
-      `CTA\n${ctas[0] ?? ""}`,
-      `VISUAL PLAN\n${typeof post.visual_plan === "string" ? post.visual_plan : JSON.stringify(post.visual_plan, null, 2)}`,
-      `STRATEGY\n${post.content_angle ?? ""} | ${post.angle_label ?? ""} | Confidence: ${post.confidence ?? "MEDIUM"} | Score: ${post.conversion_score ?? "—"}/10`,
-    ].join("\n\n---\n\n");
-    copy(all, "all");
+    const parts = [
+      hooks[0] ? `HOOK\n${hooks[0]}` : null,
+      post.voice_script ? `SCRIPT\n${post.voice_script}` : null,
+      post.caption_script ? `CAPTION\n${post.caption_script}` : null,
+      post.visual_plan ? `VISUAL PLAN\n${post.visual_plan}` : null,
+    ].filter(Boolean);
+    copy(parts.join("\n\n---\n\n"), "all");
   };
 
   const submitFeedback = async (feedbackType: string) => {
-    const key = `${post.day}-${post.post_number}-${feedbackType}`;
+    const key = `${post.id}-${feedbackType}`;
     setSubmittingFeedback(key);
     try {
       await supabase.schema("marketing" as never).from("post_feedback").insert({
-        post_id: `${post.day}-${post.post_number}`,
-        player_id: post.player_id || null,
-        content_type: post.post_type,
-        hook: getHooks(post)[0] ?? "",
-        angle: post.content_angle ?? "",
+        post_id: post.id,
+        player_id: post.player_id ?? null,
+        content_type: post.content_type,
+        hook: hooks[0] ?? "",
+        angle: post.angle ?? "",
         feedback_type: feedbackType,
       });
       setFeedbackDone(feedbackType);
@@ -1376,42 +696,27 @@ function PostDetailPanel({
     }
   };
 
-  const isCustomTab = activeTab === "ai" || activeTab === "platform" || activeTab === "strategy" || activeTab === "visual" || (activeTab === "hooks" && isScreenRecording);
-  const postKey = `${post.day}-${post.post_number}`;
+  const isTextTab = activeTab === "voice" || activeTab === "caption" || activeTab === "hooks";
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden bg-background">
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-muted/20">
+    <div className="border border-border rounded-lg overflow-hidden bg-background mt-3">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-muted/20 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${catMeta.bg} ${catMeta.color}`}>
             {(() => { const Icon = catMeta.icon; return <Icon className="h-3 w-3" />; })()}
             {post.category}
           </span>
-          {post.angle_label ? (
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/50 bg-muted/30 text-foreground/70">
-              {post.angle_label}
-            </span>
-          ) : post.content_angle && ANGLE_LABELS[post.content_angle] && (
-            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/50 bg-muted/30 ${ANGLE_LABELS[post.content_angle].color}`}>
-              {ANGLE_LABELS[post.content_angle].label}
-            </span>
-          )}
-          <span className="text-sm font-semibold">{post.player_name}</span>
-          <span className="text-xs text-muted-foreground">{post.team}</span>
-          {confidenceMeta && (
-            <span className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${confidenceMeta.bg} ${confidenceMeta.color}`}>
-              <ShieldCheck className="h-2.5 w-2.5" />
-              {confidenceMeta.label}
-            </span>
-          )}
+          <span className="text-sm font-semibold">{post.player_name ?? "—"}</span>
+          <span className="text-xs text-muted-foreground">{post.team ?? ""}</span>
           {post.conversion_score != null && (
             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-foreground/10 text-foreground">
               {post.conversion_score.toFixed(1)}/10
             </span>
           )}
-          <span className={`text-[10px] font-medium ${priorityMeta.color}`}>
-            {priorityMeta.icon} {priorityMeta.label}
-          </span>
+          {post.confidence_label && (
+            <span className="text-[10px] text-muted-foreground">{post.confidence_label}</span>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -1421,7 +726,7 @@ function PostDetailPanel({
             {copied === "all" ? <><Check className="h-3.5 w-3.5" /> Copied!</> : <><Package className="h-3.5 w-3.5" /> Post Pack</>}
           </button>
           <button
-            onClick={() => { setEditMode(v => !v); setEditScript(getVoiceScript(post)); setEditCaption(getCaptionScript(post)); setEditHook(getHooks(post)[0] ?? ""); }}
+            onClick={() => { setEditMode(v => !v); setEditScript(post.voice_script ?? ""); setEditCaption(post.caption_script ?? ""); }}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 border text-xs rounded-md transition-colors ${editMode ? "border-blue-500/40 bg-blue-500/10 text-blue-600 dark:text-blue-400" : "border-border text-muted-foreground hover:bg-accent"}`}
           >
             <Pencil className="h-3.5 w-3.5" />
@@ -1429,18 +734,15 @@ function PostDetailPanel({
           </button>
           <button
             onClick={() => onDuplicate(post)}
-            title="Duplicate this post"
             className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
           >
-            <CopyIcon className="h-3.5 w-3.5" />
-            Duplicate
+            <CopyIcon className="h-3.5 w-3.5" /> Duplicate
           </button>
           <button
             onClick={() => onToggleLock(post)}
-            title={post.locked ? "Unlock this post — allow regeneration" : "Lock this post — prevent overwrite"}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 border text-xs rounded-md transition-colors ${
               post.locked
-                ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+                ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
                 : "border-border text-muted-foreground hover:bg-accent"
             }`}
           >
@@ -1448,28 +750,20 @@ function PostDetailPanel({
             {post.locked ? "Locked" : "Lock"}
           </button>
           <button
-            onClick={() => onAggressiveRewrite(post)}
-            disabled={rewriting || regenerating || rewriteCount >= 2 || post.locked}
-            title={post.locked ? "Post is locked" : rewriteCount >= 2 ? "Max 2 rewrites reached" : "Rewrite hooks, script & caption to be more aggressive"}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 border border-orange-500/40 text-orange-600 dark:text-orange-400 text-xs rounded-md hover:bg-orange-500/10 transition-colors disabled:opacity-40"
-          >
-            <Flame className={`h-3.5 w-3.5 ${rewriting ? "animate-pulse" : ""}`} />
-            {rewriting ? "Rewriting…" : rewriteCount >= 2 ? "Max rewrites" : "Make Aggressive"}
-          </button>
-          <button
             onClick={() => onRegenerate(post)}
-            disabled={regenerating || rewriting || post.locked}
+            disabled={regenerating || post.locked}
             title={post.locked ? "Post is locked — unlock to regenerate" : "Regenerate this post"}
             className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${regenerating ? "animate-spin" : ""}`} />
-            Regen
+            {regenerating ? "Regen…" : "Regen"}
           </button>
         </div>
       </div>
 
+      {/* Tabs */}
       <div className="flex gap-1 px-4 pt-3 pb-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-        {visibleTabs.map(({ id, label, icon: Icon }) => (
+        {POST_TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
@@ -1485,6 +779,7 @@ function PostDetailPanel({
         ))}
       </div>
 
+      {/* Tab Content */}
       {activeTab === "ai" ? (
         <AISummaryTabContent playerId={post.player_id} />
       ) : activeTab === "platform" ? (
@@ -1493,49 +788,35 @@ function PostDetailPanel({
         <StrategyTabContent post={post} />
       ) : activeTab === "visual" ? (
         <VisualPlanTabContent post={post} />
-      ) : activeTab === "hooks" && (isScreenRecording || post.post_type === "Educational Breakdown" || post.post_type === "Hybrid Video") ? (
-        <ScreenRecordingTabContent post={post} />
+      ) : activeTab === "prompt" ? (
+        <AIPromptTabContent post={post} />
       ) : (
         <div className="p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
               {POST_TABS.find((t) => t.id === activeTab)?.label}
             </p>
-            <button
-              onClick={() => copy(getTabContent(), activeTab)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
-            >
-              {copied === activeTab ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy</>}
-            </button>
+            {isTextTab && (
+              <button
+                onClick={() => copy(getTabContent(), activeTab)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
+              >
+                {copied === activeTab ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy</>}
+              </button>
+            )}
           </div>
 
           {activeTab === "hooks" ? (
             <div className="space-y-2">
-              {getHooks(post).map((hook, i) => (
-                <div key={i} className={`flex items-start gap-2 p-3 border rounded-md transition-colors ${i === 0 ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/30 border-border"}`}>
+              {hooks.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No hooks generated yet.</p>
+              ) : hooks.map((hook, i) => (
+                <div key={i} className={`flex items-start gap-2 p-3 border rounded-md ${i === 0 ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/30 border-border"}`}>
                   <span className="text-xs text-muted-foreground font-mono shrink-0 mt-0.5">{i + 1}.</span>
                   <p className="text-sm flex-1 leading-relaxed">{hook}</p>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <HookScoreBadge hook={hook} />
-                    {i > 0 && (
-                      <button
-                        onClick={() => {
-                          const newHooks = [hook, ...post.hooks.filter((_, idx) => idx !== i)];
-                          Object.assign(post, { hooks: newHooks, hook_options: newHooks });
-                          setEditHook(hook);
-                        }}
-                        className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium border border-blue-500/30 text-blue-600 dark:text-blue-400 rounded hover:bg-blue-500/10 transition-colors"
-                      >
-                        Use
-                      </button>
-                    )}
-                    {i === 0 && (
-                      <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 bg-emerald-500/10 rounded border border-emerald-500/20">Active</span>
-                    )}
-                    <button
-                      onClick={() => copy(hook, `hook-${i}`)}
-                      className="p-1 rounded hover:bg-accent transition-colors"
-                    >
+                  <div className="flex items-center gap-1 shrink-0">
+                    {i === 0 && <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 bg-emerald-500/10 rounded border border-emerald-500/20">Active</span>}
+                    <button onClick={() => copy(hook, `hook-${i}`)} className="p-1 rounded hover:bg-accent transition-colors">
                       {copied === `hook-${i}` ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
                     </button>
                   </div>
@@ -1546,10 +827,6 @@ function PostDetailPanel({
             <textarea
               value={activeTab === "voice" ? editScript : editCaption}
               onChange={e => activeTab === "voice" ? setEditScript(e.target.value) : setEditCaption(e.target.value)}
-              onBlur={() => {
-                if (activeTab === "voice") Object.assign(post, { voice_script: editScript, full_script: editScript });
-                else Object.assign(post, { caption_script: editCaption, caption: editCaption });
-              }}
               className="w-full min-h-48 text-sm border border-blue-500/30 rounded-md p-3 bg-background resize-y font-mono leading-relaxed"
             />
           ) : (
@@ -1559,95 +836,29 @@ function PostDetailPanel({
               className="w-full min-h-48 text-sm border border-border rounded-md p-3 bg-muted/10 resize-y font-mono leading-relaxed"
             />
           )}
-          {!isCustomTab && <p className="text-[10px] text-muted-foreground mt-1.5">{getTabContent().length} characters</p>}
+          {isTextTab && <p className="text-[10px] text-muted-foreground mt-1.5">{getTabContent().length} characters</p>}
         </div>
       )}
 
-      {editMode && (
-        <div className="p-4 border-t border-border space-y-3 bg-blue-500/5">
-          <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
-            <Pencil className="h-3.5 w-3.5" /> Quick Edit Mode — changes apply instantly
-          </p>
-          <div>
-            <label className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium block mb-1">Hook (Active)</label>
-            <textarea
-              value={editHook}
-              onChange={e => { setEditHook(e.target.value); }}
-              onBlur={() => {
-                const updated = { ...post, hooks: [editHook, ...(post.hooks ?? []).slice(1)], hook_options: [editHook, ...(post.hook_options ?? []).slice(1)] };
-                Object.assign(post, updated);
-              }}
-              className="w-full text-sm border border-blue-500/30 rounded-md p-2.5 bg-background resize-none leading-relaxed"
-              rows={2}
-            />
-          </div>
-          <div>
-            <label className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium block mb-1">Voice Script</label>
-            <textarea
-              value={editScript}
-              onChange={e => setEditScript(e.target.value)}
-              onBlur={() => { Object.assign(post, { voice_script: editScript, full_script: editScript }); }}
-              className="w-full text-sm border border-blue-500/30 rounded-md p-2.5 bg-background resize-y leading-relaxed"
-              rows={5}
-            />
-          </div>
-          <div>
-            <label className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium block mb-1">Caption</label>
-            <textarea
-              value={editCaption}
-              onChange={e => setEditCaption(e.target.value)}
-              onBlur={() => { Object.assign(post, { caption_script: editCaption, caption: editCaption }); }}
-              className="w-full text-sm border border-blue-500/30 rounded-md p-2.5 bg-background resize-y leading-relaxed"
-              rows={4}
-            />
-          </div>
-        </div>
-      )}
-
-      {(post.ctas ?? []).length > 0 && (
-        <div className="p-4 border-t border-border">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-2 flex items-center gap-1.5">
-            <Target className="h-3 w-3" /> CTA Options — click to copy
-          </p>
-          <div className="space-y-2">
-            {(post.ctas ?? []).map((cta, i) => (
-              <div key={i} className="flex items-start gap-2 p-2.5 bg-muted/20 border border-border rounded-md">
-                <span className="text-[10px] font-bold text-muted-foreground shrink-0 mt-0.5">CTA {i + 1}</span>
-                <p className="text-xs flex-1 leading-relaxed">{cta}</p>
-                <button
-                  onClick={() => copy(cta, `cta-${i}`)}
-                  className="shrink-0 p-1 rounded hover:bg-accent transition-colors"
-                >
-                  {copied === `cta-${i}` ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
+      {/* Feedback */}
       <div className="p-4 border-t border-border">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-2.5">
-          Post Feedback
-        </p>
+        <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-2.5">Post Feedback</p>
         <div className="flex flex-wrap gap-2">
           {[
-            { type: "performed_well",  icon: <ThumbsUp className="h-3.5 w-3.5" />,    label: "Performed Well" },
-            { type: "didnt_perform",   icon: <ThumbsDown className="h-3.5 w-3.5" />,   label: "Didn't Perform" },
-            { type: "high_engagement", icon: <Flame className="h-3.5 w-3.5" />,        label: "High Engagement" },
-            { type: "got_clicks",      icon: <ArrowUpDown className="h-3.5 w-3.5" />,  label: "Got Clicks" },
+            { type: "performed_well",  icon: <ThumbsUp className="h-3.5 w-3.5" />,   label: "Performed Well" },
+            { type: "didnt_perform",   icon: <ThumbsDown className="h-3.5 w-3.5" />,  label: "Didn't Perform" },
+            { type: "high_engagement", icon: <Flame className="h-3.5 w-3.5" />,       label: "High Engagement" },
+            { type: "got_clicks",      icon: <ArrowUpDown className="h-3.5 w-3.5" />, label: "Got Clicks" },
           ].map(({ type, icon, label }) => {
             const isDone = feedbackDone === type;
-            const isLoading = submittingFeedback === `${post.day}-${post.post_number}-${type}`;
+            const isSubmitting = submittingFeedback === `${post.id}-${type}`;
             return (
               <button
                 key={type}
                 onClick={() => submitFeedback(type)}
-                disabled={!!feedbackDone || isLoading}
+                disabled={!!feedbackDone || isSubmitting}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md border transition-colors ${
-                  isDone
-                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                    : "border-border text-muted-foreground hover:bg-accent disabled:opacity-50"
+                  isDone ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-border text-muted-foreground hover:bg-accent disabled:opacity-50"
                 }`}
               >
                 {icon}
@@ -1658,17 +869,37 @@ function PostDetailPanel({
         </div>
       </div>
 
-      {availablePlayers.length > 0 && (
+      {/* Swap Player */}
+      {availablePlayers.length > 0 && post.status === "ready" && (
         <div className="p-4 border-t border-border">
-          <SwapPlayerPanel
-            post={post}
-            availablePlayers={availablePlayers}
-            onSwap={onSwapPlayer}
-            swapping={swappingPost === postKey}
-            onSuggestBetter={onSuggestBetter}
-            suggesting={suggestingPost === postKey}
-            suggestedPlayer={suggestedPlayers[postKey] ?? null}
-          />
+          <div className="border border-dashed border-border rounded-lg p-3 space-y-3 bg-muted/5">
+            <div className="flex items-center gap-2">
+              <UserRoundCog className="h-3.5 w-3.5 text-muted-foreground" />
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Swap Player</p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={swapPlayerId}
+                onChange={e => setSwapPlayerId(Number(e.target.value))}
+                disabled={swapping}
+                className="flex-1 min-w-0 text-xs border border-border rounded-md px-2 py-1.5 bg-background text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50"
+              >
+                {availablePlayers.map(p => (
+                  <option key={p.player_id} value={p.player_id}>
+                    {p.player_name} · {p.team}{p.position ? ` · ${p.position}` : ""}{p.projection_final ? ` · ${Math.round(p.projection_final)}pts` : ""}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => onSwapPlayer(post, swapPlayerId)}
+                disabled={swapping || swapPlayerId === (post.player_id ?? 0)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background text-xs rounded-md font-medium hover:opacity-90 transition-opacity disabled:opacity-40 shrink-0"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${swapping ? "animate-spin" : ""}`} />
+                {swapping ? "Regenerating…" : "Apply Player"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -1681,16 +912,30 @@ function PostCard({
   post,
   isSelected,
   onSelect,
+  onGenerate,
+  generating,
 }: {
-  post: PostPlan;
+  post: WeeklyContentPost;
   isSelected: boolean;
   onSelect: () => void;
+  onGenerate: () => void;
+  generating: boolean;
 }) {
-  const catMeta = CATEGORY_META[post.category] ?? CATEGORY_META.Value;
-  const TypeIcon = POST_TYPE_ICON[post.post_type] ?? Video;
+  const catMeta = CATEGORY_META[post.category] ?? CATEGORY_META["Value"];
   const CatIcon = catMeta.icon;
+  const TypeIcon = POST_TYPE_ICON[post.content_type] ?? Video;
   const hooks = getHooks(post);
-  const topHookScore = hooks.length > 0 ? scoreHook(hooks[0]).score : null;
+
+  if (post.status === "pending" || post.status === "generating" || (post.status === "error" && !post.voice_script)) {
+    return (
+      <PostSkeleton
+        status={generating ? "generating" : post.status}
+        onGenerate={onGenerate}
+        generating={generating}
+        onRetry={onGenerate}
+      />
+    );
+  }
 
   return (
     <button
@@ -1708,47 +953,23 @@ function PostCard({
         </span>
         <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
           <TypeIcon className="h-2.5 w-2.5" />
-          {post.post_type}
+          {post.content_type}
         </span>
-        {post.content_angle && ANGLE_LABELS[post.content_angle] && (
-          <span className={`text-[10px] font-semibold ${ANGLE_LABELS[post.content_angle].color}`}>
-            {ANGLE_LABELS[post.content_angle].label}
-          </span>
-        )}
         {post.conversion_score != null && (
           <span className={`text-[10px] font-mono font-bold ${post.conversion_score >= 8 ? "text-emerald-600 dark:text-emerald-400" : post.conversion_score >= 6 ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"}`}>
             {post.conversion_score.toFixed(1)}/10
           </span>
         )}
-        {post.confidence && CONFIDENCE_META[post.confidence] && (
-          <span className={`inline-flex items-center text-[9px] font-bold uppercase px-1 py-0.5 rounded border ${CONFIDENCE_META[post.confidence].bg} ${CONFIDENCE_META[post.confidence].color}`}>
-            {CONFIDENCE_META[post.confidence].label}
-          </span>
-        )}
-        {post.priority && PRIORITY_META[post.priority] && (
-          <span className={`text-[10px] ${PRIORITY_META[post.priority].color}`}>
-            {PRIORITY_META[post.priority].icon}
-          </span>
-        )}
         {post.locked && (
           <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-            <Lock className="h-2.5 w-2.5" />
-            Locked
+            <Lock className="h-2.5 w-2.5" /> Locked
           </span>
         )}
       </div>
-      <p className="font-semibold text-sm leading-tight truncate">{post.player_name}</p>
-      <p className="text-xs text-muted-foreground truncate mb-1.5">{post.team}</p>
+      <p className="font-semibold text-sm leading-tight truncate">{post.player_name ?? "—"}</p>
+      <p className="text-xs text-muted-foreground truncate mb-1.5">{post.team ?? ""}</p>
       {hooks[0] && (
-        <p className="text-[10px] text-muted-foreground/80 leading-snug line-clamp-2 font-mono">
-          {hooks[0]}
-        </p>
-      )}
-      {isSelected && (
-        <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground">
-          <ChevronRight className="h-3 w-3" />
-          <span>Tap to view content</span>
-        </div>
+        <p className="text-[10px] text-muted-foreground/80 leading-snug line-clamp-2 font-mono">{hooks[0]}</p>
       )}
     </button>
   );
@@ -1757,104 +978,116 @@ function PostCard({
 // ── DAY ROW ───────────────────────────────────────────────────────────────────
 
 function DayRow({
-  dayPlan,
-  selectedPost,
+  dayKey,
+  posts,
+  selectedPostId,
   onSelectPost,
-  onRegenerate,
-  regeneratingPost,
-  onAggressiveRewrite,
-  aggressivePost,
-  rewriteCounts,
-  availablePlayers,
-  onSwapPlayer,
-  swappingPost,
-  onSuggestBetter,
-  suggestingPost,
-  suggestedPlayers,
+  onGeneratePost,
+  generatingPostId,
   onToggleLock,
   onDuplicate,
+  onSwapPlayer,
+  swappingPostId,
+  availablePlayers,
 }: {
-  dayPlan: DayPlan;
-  selectedPost: PostPlan | null;
-  onSelectPost: (post: PostPlan) => void;
-  onRegenerate: (post: PostPlan) => void;
-  regeneratingPost: string | null;
-  onAggressiveRewrite: (post: PostPlan) => void;
-  aggressivePost: string | null;
-  rewriteCounts: Record<string, number>;
+  dayKey: string;
+  posts: WeeklyContentPost[];
+  selectedPostId: string | null;
+  onSelectPost: (post: WeeklyContentPost | null) => void;
+  onGeneratePost: (post: WeeklyContentPost) => void;
+  generatingPostId: string | null;
+  onToggleLock: (post: WeeklyContentPost) => void;
+  onDuplicate: (post: WeeklyContentPost) => void;
+  onSwapPlayer: (post: WeeklyContentPost, newPlayerId: number) => void;
+  swappingPostId: string | null;
   availablePlayers: PlayerOption[];
-  onSwapPlayer: (post: PostPlan, playerId: number) => void;
-  swappingPost: string | null;
-  onSuggestBetter: (post: PostPlan) => void;
-  suggestingPost: string | null;
-  suggestedPlayers: Record<string, PlayerOption>;
-  onToggleLock: (post: PostPlan) => void;
-  onDuplicate: (post: PostPlan) => void;
 }) {
-  const [expanded, setExpanded] = useState(dayPlan.day === 1);
-  const dayLabel = DAY_LABELS[(dayPlan.day - 1) % 7];
-  const isSelectedDay = selectedPost?.day === dayPlan.day;
+  const todayKey = getTodayDayKey();
+  const isToday = dayKey === todayKey;
+  const [expanded, setExpanded] = useState(isToday);
+
+  const selectedPost = posts.find(p => p.id === selectedPostId) ?? null;
+  const readyCount = posts.filter(p => p.status === "ready").length;
+  const errorCount = posts.filter(p => p.status === "error").length;
+
+  const handleGenerateDay = () => {
+    const toGenerate = posts.filter(p => p.status === "pending" || p.status === "error");
+    toGenerate.forEach(p => onGeneratePost(p));
+  };
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
+    <div className={`border rounded-lg overflow-hidden ${isToday ? "border-foreground/30" : "border-border"}`}>
       <button
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => setExpanded(v => !v)}
         className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/20 transition-colors"
       >
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
             <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span className="font-semibold text-sm">Day {dayPlan.day}</span>
-            <span className="text-xs text-muted-foreground">— {dayLabel}</span>
+            <span className="font-semibold text-sm">{DAY_DISPLAY[dayKey] ?? dayKey}</span>
+            {isToday && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-foreground/10 text-foreground">Today</span>}
           </div>
-          <div className="flex gap-1.5">
-            {dayPlan.posts.map((post) => {
-              const catMeta = CATEGORY_META[post.category] ?? CATEGORY_META.Value;
-              const Icon = catMeta.icon;
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-muted-foreground">{readyCount}/{posts.length} ready</span>
+            {errorCount > 0 && <span className="text-[10px] text-destructive font-semibold">{errorCount} error</span>}
+          </div>
+          <div className="flex gap-1">
+            {posts.map(p => {
+              const meta = CATEGORY_META[p.category] ?? CATEGORY_META["Value"];
+              const Icon = meta.icon;
               return (
-                <span
-                  key={post.post_number}
-                  className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded ${catMeta.bg} ${catMeta.color}`}
-                >
+                <span key={p.id} className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded ${meta.bg} ${meta.color}`}>
                   <Icon className="h-2.5 w-2.5" />
-                  {post.category}
+                  {p.category}
                 </span>
               );
             })}
           </div>
         </div>
-        {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        <div className="flex items-center gap-2">
+          {readyCount < posts.length && (
+            <button
+              onClick={e => { e.stopPropagation(); handleGenerateDay(); }}
+              className="flex items-center gap-1 px-2 py-1 text-[10px] border border-border rounded hover:bg-accent transition-colors"
+            >
+              <Zap className="h-3 w-3" /> Generate Day
+            </button>
+          )}
+          {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        </div>
       </button>
 
       {expanded && (
-        <div className="border-t border-border p-4 space-y-4">
+        <div className="border-t border-border p-4 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {dayPlan.posts.map((post) => (
+            {posts.map(post => (
               <PostCard
-                key={`${post.day}-${post.post_number}`}
+                key={post.id}
                 post={post}
-                isSelected={selectedPost?.day === post.day && selectedPost?.post_number === post.post_number}
-                onSelect={() => onSelectPost(post)}
+                isSelected={selectedPostId === post.id}
+                onSelect={() => {
+                  if (selectedPostId === post.id) {
+                    onSelectPost(null);
+                  } else {
+                    onSelectPost(post);
+                  }
+                }}
+                onGenerate={() => onGeneratePost(post)}
+                generating={generatingPostId === post.id}
               />
             ))}
           </div>
 
-          {isSelectedDay && selectedPost && (
+          {selectedPost && selectedPost.status === "ready" && (
             <PostDetailPanel
               post={selectedPost}
-              onRegenerate={onRegenerate}
-              regenerating={regeneratingPost === `${selectedPost.day}-${selectedPost.post_number}`}
-              onAggressiveRewrite={onAggressiveRewrite}
-              rewriting={aggressivePost === `${selectedPost.day}-${selectedPost.post_number}`}
-              rewriteCount={rewriteCounts[`${selectedPost.day}-${selectedPost.post_number}`] ?? 0}
-              availablePlayers={availablePlayers}
-              onSwapPlayer={onSwapPlayer}
-              swappingPost={swappingPost}
-              onSuggestBetter={onSuggestBetter}
-              suggestingPost={suggestingPost}
-              suggestedPlayers={suggestedPlayers}
+              onRegenerate={onGeneratePost}
+              regenerating={generatingPostId === selectedPost.id}
               onToggleLock={onToggleLock}
               onDuplicate={onDuplicate}
+              availablePlayers={availablePlayers}
+              onSwapPlayer={onSwapPlayer}
+              swapping={swappingPostId === selectedPost.id}
             />
           )}
         </div>
@@ -1863,118 +1096,24 @@ function DayRow({
   );
 }
 
-// ── PLAYER SELECTOR ───────────────────────────────────────────────────────────
-
-function PlayerSelector({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (name: string) => void;
-}) {
-  const [players, setPlayers] = useState<PlayerOption[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    supabase
-      .schema("afl")
-      .from("player_rankings_cache")
-      .select("player_id, player_name, team, neeko_rating_scaled")
-      .eq("is_available", true)
-      .not("projection_final", "is", null)
-      .order("neeko_rating_scaled", { ascending: false, nullsFirst: false })
-      .limit(50)
-      .then(({ data }) => {
-        if (data) setPlayers(data as PlayerOption[]);
-        setLoading(false);
-      });
-  }, []);
-
-  return (
-    <div className="flex items-center gap-2">
-      <label className="text-xs text-muted-foreground whitespace-nowrap">Focus player</label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={loading}
-        className="text-xs border border-border rounded-md px-2 py-1.5 bg-background text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50 max-w-[200px]"
-      >
-        <option value="">Auto (AI picks)</option>
-        {players.map((p) => (
-          <option key={p.player_id} value={p.player_name}>
-            {p.player_name} ({p.team})
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
 // ── MAIN PAGE ─────────────────────────────────────────────────────────────────
 
 export default function AdminContentEngine() {
-  const [plan, setPlan] = useState<WeeklyPlan | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState(false);
+  const [planId, setPlanId] = useState<string | null>(null);
   const [weekKey, setWeekKey] = useState<string>("");
-  const [isCached, setIsCached] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedPost, setSelectedPost] = useState<PostPlan | null>(null);
-  const [regeneratingPost, setRegeneratingPost] = useState<string | null>(null);
-  const [aggressivePost, setAggressivePost] = useState<string | null>(null);
-  const [rewriteCounts, setRewriteCounts] = useState<Record<string, number>>({});
-  const [focusPlayer, setFocusPlayer] = useState<string>("");
+  const [posts, setPosts] = useState<WeeklyContentPost[]>([]);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
+  const [generatingPostId, setGeneratingPostId] = useState<string | null>(null);
+  const [swappingPostId, setSwappingPostId] = useState<string | null>(null);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [availablePlayers, setAvailablePlayers] = useState<PlayerOption[]>([]);
-  const [swappingPost, setSwappingPost] = useState<string | null>(null);
-  const [suggestingPost, setSuggestingPost] = useState<string | null>(null);
-  const [suggestedPlayers, setSuggestedPlayers] = useState<Record<string, PlayerOption>>({});
+  const activeGenerations = useRef<Set<string>>(new Set());
   const { toast } = useToast();
-
-  const updatePostInPlan = (updatedPost: PostPlan) => {
-    setPlan((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        days: prev.days.map((d) =>
-          d.day !== updatedPost.day ? d : {
-            ...d,
-            posts: d.posts.map((p) => p.post_number !== updatedPost.post_number ? p : updatedPost),
-          }
-        ),
-      };
-    });
-  };
-
-  const handleToggleLock = (post: PostPlan) => {
-    const newLocked = !post.locked;
-    const updatedPost: PostPlan = { ...post, locked: newLocked };
-    updatePostInPlan(updatedPost);
-    if (selectedPost?.day === post.day && selectedPost?.post_number === post.post_number) {
-      setSelectedPost(updatedPost);
-    }
-    toast({ title: newLocked ? `Post locked — ${post.player_name}` : `Post unlocked — ${post.player_name}` });
-  };
-
-  const handleDuplicate = (post: PostPlan) => {
-    setPlan((prev) => {
-      if (!prev) return prev;
-      const dayPlan = prev.days.find((d) => d.day === post.day);
-      if (!dayPlan) return prev;
-      const maxPostNumber = Math.max(...dayPlan.posts.map((p) => p.post_number));
-      const duplicate: PostPlan = { ...post, post_number: maxPostNumber + 1, locked: false };
-      return {
-        ...prev,
-        days: prev.days.map((d) =>
-          d.day !== post.day ? d : { ...d, posts: [...d.posts, duplicate] }
-        ),
-      };
-    });
-    toast({ title: `Duplicated — ${post.player_name}`, description: "New post added to the same day." });
-  };
 
   useEffect(() => {
     supabase
-      .schema("afl")
+      .schema("afl" as never)
       .from("player_rankings_cache")
       .select("player_id, player_name, team, position, projection_final, neeko_rating_scaled")
       .eq("is_available", true)
@@ -1986,477 +1125,315 @@ export default function AdminContentEngine() {
       });
   }, []);
 
-  const fetchPlan = useCallback(async (force = false) => {
-    setLoading(true);
-    setError(null);
+  const updatePost = useCallback((updated: WeeklyContentPost) => {
+    setPosts(prev => prev.map(p => p.id === updated.id ? updated : p));
+    setSelectedPostId(prev => prev === updated.id ? updated.id : prev);
+  }, []);
 
-    const timeoutId = setTimeout(() => {
-      setLoading(false);
-      setError("Request timed out — the plan generator took too long. Click Retry to try again.");
-    }, 90000);
+  const fetchPlan = useCallback(async (force = false) => {
+    setPlanLoading(true);
+    setPlanError(null);
+    console.log("[ContentEngine] Fetching plan — force:", force);
 
     try {
-      console.log("[ContentEngine] Fetching plan — force:", force, "focusPlayer:", focusPlayer);
-      const body: Record<string, unknown> = { force };
-      if (focusPlayer) body.player_name = focusPlayer;
-
       const { data, error: fnError } = await supabase.functions.invoke(
         "generate-weekly-content",
-        { body }
+        { body: { force } }
       );
 
-      clearTimeout(timeoutId);
-
-      console.log("[ContentEngine] Response received:", { ok: data?.ok, cached: data?.cached, error: fnError });
-
       if (fnError) throw new Error(fnError.message ?? "Edge function error");
-      if (!data?.ok) throw new Error(data?.error ?? "Function returned not-ok");
+      if (!data?.plan_id) throw new Error(data?.error ?? "No plan_id returned");
 
-      const rawPlan = data.plan as WeeklyPlan;
+      console.log("[ContentEngine] Plan received:", { plan_id: data.plan_id, posts: data.posts?.length });
 
-      if (!rawPlan?.days || rawPlan.days.length === 0) {
-        throw new Error("Plan returned with no days — check edge function logs");
-      }
-
-      setPlan(rawPlan);
+      setPlanId(data.plan_id);
       setWeekKey(data.week_key ?? "");
-      setIsCached(data.cached === true);
-      setSelectedPost(null);
+      setPosts((data.posts as WeeklyContentPost[]) ?? []);
+      setSelectedPostId(null);
 
-      if (force) {
-        toast({ title: "New weekly plan generated" });
-      }
+      if (force) toast({ title: "New weekly plan built" });
     } catch (e) {
-      clearTimeout(timeoutId);
       const msg = e instanceof Error ? e.message : "Unknown error loading plan";
       console.error("[ContentEngine] Load failed:", msg);
-      setError(msg);
-      toast({
-        title: "Failed to load plan",
-        description: msg,
-        variant: "destructive",
-      });
+      setPlanError(msg);
+      toast({ title: "Failed to load plan", description: msg, variant: "destructive" });
     } finally {
-      clearTimeout(timeoutId);
-      setLoading(false);
-      setGenerating(false);
+      setPlanLoading(false);
     }
-  }, [toast, focusPlayer]);
+  }, [toast]);
 
   useEffect(() => {
     fetchPlan(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleRegenerateWeek = () => {
-    setGenerating(true);
-    fetchPlan(true);
-  };
-
-  const handleRegeneratePost = async (post: PostPlan) => {
+  const generatePost = useCallback(async (post: WeeklyContentPost) => {
+    if (activeGenerations.current.has(post.id)) return;
     if (post.locked) {
-      toast({ title: "Post is locked", description: "Unlock this post before regenerating.", variant: "destructive" });
+      toast({ title: "Post is locked", description: "Unlock before regenerating.", variant: "destructive" });
       return;
     }
-    const key = `${post.day}-${post.post_number}`;
-    setRegeneratingPost(key);
+
+    activeGenerations.current.add(post.id);
+    setGeneratingPostId(post.id);
+    updatePost({ ...post, status: "generating" });
+
+    console.log("[ContentEngine] Generating post:", post.id, post.category, post.player_name);
+
     try {
       const { data, error: fnError } = await supabase.functions.invoke(
-        "generate-content-pack",
-        {
-          body: {
-            player_id: post.player_id,
-            category: post.category.toLowerCase(),
-          },
-        }
+        "generate-content-post",
+        { body: { post_id: post.id } }
       );
 
-      if (fnError) throw new Error(fnError.message ?? "Regeneration failed");
-      if (!data?.ok) throw new Error(data?.error ?? "Regeneration returned not-ok");
+      if (fnError) throw new Error(fnError.message ?? "Post generation failed");
+      if (!data?.post) throw new Error(data?.error ?? "No post returned");
 
-      const newPack = data.pack;
-      const updatedPost: PostPlan = {
-        ...post,
-        voice_script:   newPack.voice_script ?? newPack.video_script ?? post.voice_script,
-        full_script:    newPack.voice_script ?? newPack.video_script ?? post.full_script,
-        hooks:          newPack.hooks ?? post.hooks,
-        hook_options:   newPack.hooks ?? post.hook_options,
-        visual_plan:    typeof newPack.visual_plan === "string"
-                          ? newPack.visual_plan
-                          : newPack.visual_plan
-                          ? JSON.stringify(newPack.visual_plan, null, 2)
-                          : post.visual_plan,
-        caption_script: newPack.caption_script ?? newPack.caption ?? post.caption_script,
-        caption:        newPack.caption_script ?? newPack.caption ?? post.caption,
-      };
-
-      setPlan((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          days: prev.days.map((d) =>
-            d.day !== post.day ? d : {
-              ...d,
-              posts: d.posts.map((p) =>
-                p.post_number !== post.post_number ? p : updatedPost
-              ),
-            }
-          ),
-        };
-      });
-
-      setSelectedPost(updatedPost);
-      toast({ title: `Post regenerated — ${post.player_name}` });
+      console.log("[ContentEngine] Post generated:", post.id, "status:", data.post.status);
+      updatePost(data.post as WeeklyContentPost);
     } catch (e) {
-      toast({
-        title: "Regeneration failed",
-        description: e instanceof Error ? e.message : "Unknown error",
-        variant: "destructive",
-      });
+      const msg = e instanceof Error ? e.message : "Generation failed";
+      console.error("[ContentEngine] Post generation failed:", post.id, msg);
+      updatePost({ ...post, status: "error", error_message: msg });
+      toast({ title: `Failed: ${post.player_name ?? post.category}`, description: msg, variant: "destructive" });
     } finally {
-      setRegeneratingPost(null);
+      activeGenerations.current.delete(post.id);
+      setGeneratingPostId(null);
     }
-  };
+  }, [toast, updatePost]);
 
-  const handleAggressiveRewrite = async (post: PostPlan) => {
+  const handleToggleLock = useCallback(async (post: WeeklyContentPost) => {
+    const newLocked = !post.locked;
+    updatePost({ ...post, locked: newLocked });
+
+    await supabase
+      .schema("marketing" as never)
+      .from("weekly_content_posts")
+      .update({ locked: newLocked })
+      .eq("id", post.id);
+
+    toast({ title: newLocked ? `Locked — ${post.player_name}` : `Unlocked — ${post.player_name}` });
+  }, [updatePost, toast]);
+
+  const handleDuplicate = useCallback(async (post: WeeklyContentPost) => {
+    if (!planId) return;
+    const { data, error } = await supabase
+      .schema("marketing" as never)
+      .from("weekly_content_posts")
+      .insert({
+        weekly_plan_id: planId,
+        day_key: post.day_key,
+        slot_key: `${post.slot_key}-dup-${Date.now()}`,
+        player_id: post.player_id,
+        player_name: post.player_name,
+        player2_id: post.player2_id,
+        player2_name: post.player2_name,
+        team: post.team,
+        category: post.category,
+        content_type: post.content_type,
+        angle: post.angle,
+        status: post.status,
+        locked: false,
+        hooks: post.hooks,
+        voice_script: post.voice_script,
+        caption_script: post.caption_script,
+        visual_plan: post.visual_plan,
+        ai_image_prompt: post.ai_image_prompt,
+        ai_video_prompt: post.ai_video_prompt,
+        creative_style: post.creative_style,
+        conversion_score: post.conversion_score,
+        confidence_label: post.confidence_label,
+        hook_score: post.hook_score,
+        hook_type: post.hook_type,
+        strategy_json: post.strategy_json,
+        platform_variants: post.platform_variants,
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      setPosts(prev => [...prev, data as WeeklyContentPost]);
+      toast({ title: `Duplicated — ${post.player_name}`, description: "New post added to the same day." });
+    }
+  }, [planId, toast]);
+
+  const handleSwapPlayer = useCallback(async (post: WeeklyContentPost, newPlayerId: number) => {
     if (post.locked) {
-      toast({ title: "Post is locked", description: "Unlock this post before rewriting.", variant: "destructive" });
+      toast({ title: "Post is locked", description: "Unlock before swapping.", variant: "destructive" });
       return;
     }
-    const key = `${post.day}-${post.post_number}`;
-    const count = rewriteCounts[key] ?? 0;
-    if (count >= 2) {
-      toast({ title: "Max rewrites reached", description: "This post has already been rewritten 2 times.", variant: "destructive" });
-      return;
-    }
-
-    setAggressivePost(key);
-
-    const originalContent = [
-      `HOOKS:\n${(post.hooks ?? post.hook_options ?? []).join("\n")}`,
-      `VOICE SCRIPT:\n${post.voice_script ?? post.full_script ?? ""}`,
-      `CAPTION:\n${post.caption_script ?? post.caption ?? ""}`,
-    ].join("\n\n---\n\n");
-
-    const prompt = `You are an elite sports marketing copywriter.
-
-Rewrite the following content to be:
-- more aggressive
-- more opinionated
-- more direct
-- more emotionally engaging
-
-RULES:
-- remove all soft language (could, might, maybe)
-- shorten sentences
-- increase punch
-- add tension or challenge
-- make reader feel they are missing out
-
-DO NOT:
-- change core data
-- hallucinate stats
-- change the player name or team
-
-OUTPUT FORMAT (JSON only, no markdown):
-{
-  "hooks": ["hook 1", "hook 2", "hook 3"],
-  "voice_script": "rewritten script here",
-  "caption": "rewritten caption here"
-}
-
-CONTENT:
-${originalContent}`;
-
-    try {
-      const { data, error: fnError } = await supabase.functions.invoke("generate-player-ai", {
-        body: { prompt, mode: "raw" },
-      });
-
-      if (fnError) throw new Error(fnError.message ?? "Rewrite failed");
-
-      const raw: string = data?.result ?? data?.content ?? data?.text ?? "";
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("Could not parse rewrite response");
-
-      const parsed = JSON.parse(jsonMatch[0]);
-      const newHooks: string[] = Array.isArray(parsed.hooks) ? parsed.hooks : (post.hooks ?? []);
-      const newScript: string = parsed.voice_script ?? post.voice_script;
-      const newCaption: string = parsed.caption ?? post.caption_script;
-
-      const updatedPost: PostPlan = {
-        ...post,
-        hooks: newHooks,
-        hook_options: newHooks,
-        voice_script: newScript,
-        full_script: newScript,
-        caption_script: newCaption,
-        caption: newCaption,
-      };
-
-      setPlan((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          days: prev.days.map((d) =>
-            d.day !== post.day ? d : {
-              ...d,
-              posts: d.posts.map((p) => p.post_number !== post.post_number ? p : updatedPost),
-            }
-          ),
-        };
-      });
-
-      setSelectedPost(updatedPost);
-      setRewriteCounts((prev) => ({ ...prev, [key]: (prev[key] ?? 0) + 1 }));
-      toast({ title: `Rewritten — ${post.player_name}`, description: "Content is now more aggressive." });
-    } catch (e) {
-      toast({
-        title: "Rewrite failed",
-        description: e instanceof Error ? e.message : "Unknown error",
-        variant: "destructive",
-      });
-    } finally {
-      setAggressivePost(null);
-    }
-  };
-
-  const handleSwapPlayer = async (post: PostPlan, newPlayerId: number) => {
-    if (post.locked) {
-      toast({ title: "Post is locked", description: "Unlock this post before swapping the player.", variant: "destructive" });
-      return;
-    }
-    const key = `${post.day}-${post.post_number}`;
-    const newPlayer = availablePlayers.find((p) => p.player_id === newPlayerId);
+    const newPlayer = availablePlayers.find(p => p.player_id === newPlayerId);
     if (!newPlayer) return;
 
-    setSwappingPost(key);
+    setSwappingPostId(post.id);
 
-    const prompt = `You are regenerating a single marketing post for a new player.
+    const { error } = await supabase
+      .schema("marketing" as never)
+      .from("weekly_content_posts")
+      .update({
+        player_id: newPlayer.player_id,
+        player_name: newPlayer.player_name,
+        team: newPlayer.team,
+        status: "pending",
+        hooks: null,
+        voice_script: null,
+        caption_script: null,
+        visual_plan: null,
+        ai_image_prompt: null,
+        ai_video_prompt: null,
+        strategy_json: null,
+        platform_variants: null,
+        error_message: null,
+      })
+      .eq("id", post.id);
 
-CONTEXT:
-- Original player: ${post.player_name} (${post.team})
-- New player: ${newPlayer.player_name} (${newPlayer.team}${newPlayer.position ? `, ${newPlayer.position}` : ""})${newPlayer.projection_final ? `, projected ${Math.round(newPlayer.projection_final)} pts` : ""}
-- Post category: ${post.category}
-- Post type: ${post.post_type}
-- Content angle: ${post.content_angle ?? "hidden_edge"}
-
-TASK:
-Rebuild the ENTIRE post for the new player. Keep the same post category and type. Adapt the angle to fit the new player's profile.
-
-REQUIREMENTS:
-- Reference the new player's real data (projection, team, position)
-- Do NOT reuse any content from the original post
-- Make it feel like it was originally designed for this player
-- Use specific numbers, not generic praise
-- Match the tone: ${post.category === "Trap" ? "warning, urgency, risk" : post.category === "Captain" ? "confidence, authority, lock" : post.category === "Breakout" ? "excitement, urgency, upside" : "data-driven, value-focused"}
-
-OUTPUT (JSON only, no markdown):
-{
-  "hooks": ["hook 1", "hook 2", "hook 3"],
-  "voice_script": "full script here",
-  "caption": "caption here",
-  "visual_plan": "Scene 1 (0-3s): [describe] Scene 2 (3-8s): [describe] Scene 3 (8-15s): [describe] Scene 4 (15-20s): [describe] Scene 5 (20-25s): [CTA]"
-}`;
-
-    try {
-      const { data, error: fnError } = await supabase.functions.invoke("generate-player-ai", {
-        body: { prompt, mode: "raw" },
-      });
-
-      if (fnError) throw new Error(fnError.message ?? "Swap regen failed");
-
-      const raw: string = data?.result ?? data?.content ?? data?.text ?? "";
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("Could not parse regenerated post");
-
-      const parsed = JSON.parse(jsonMatch[0]);
-
-      const updatedPost: PostPlan = {
+    if (!error) {
+      const updated: WeeklyContentPost = {
         ...post,
         player_id: newPlayer.player_id,
         player_name: newPlayer.player_name,
         team: newPlayer.team,
-        hooks: Array.isArray(parsed.hooks) ? parsed.hooks : post.hooks,
-        hook_options: Array.isArray(parsed.hooks) ? parsed.hooks : post.hook_options,
-        voice_script: parsed.voice_script ?? post.voice_script,
-        full_script: parsed.voice_script ?? post.full_script,
-        caption_script: parsed.caption ?? post.caption_script,
-        caption: parsed.caption ?? post.caption,
-        visual_plan: parsed.visual_plan ?? post.visual_plan,
+        status: "pending",
+        hooks: null,
+        voice_script: null,
+        caption_script: null,
+        visual_plan: null,
+        ai_image_prompt: null,
+        ai_video_prompt: null,
+        strategy_json: null,
+        platform_variants: null,
+        error_message: null,
       };
-
-      setPlan((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          days: prev.days.map((d) =>
-            d.day !== post.day ? d : {
-              ...d,
-              posts: d.posts.map((p) => p.post_number !== post.post_number ? p : updatedPost),
-            }
-          ),
-        };
-      });
-
-      setSelectedPost(updatedPost);
-      setSuggestedPlayers((prev) => { const next = { ...prev }; delete next[key]; return next; });
-      toast({ title: `Swapped to ${newPlayer.player_name}`, description: `Post regenerated for ${newPlayer.team}` });
-    } catch (e) {
-      toast({
-        title: "Swap failed",
-        description: e instanceof Error ? e.message : "Unknown error",
-        variant: "destructive",
-      });
-    } finally {
-      setSwappingPost(null);
+      updatePost(updated);
+      setSwappingPostId(null);
+      await generatePost(updated);
+    } else {
+      setSwappingPostId(null);
+      toast({ title: "Swap failed", description: error.message, variant: "destructive" });
     }
-  };
+  }, [availablePlayers, updatePost, generatePost, toast]);
 
-  const handleSuggestBetter = async (post: PostPlan) => {
-    const key = `${post.day}-${post.post_number}`;
-    setSuggestingPost(key);
+  const postsByDay = DAY_ORDER.reduce<Record<string, WeeklyContentPost[]>>((acc, day) => {
+    acc[day] = posts.filter(p => p.day_key === day);
+    return acc;
+  }, {});
 
-    try {
-      const angleToCategory: Record<string, string> = {
-        hidden_edge: "value", market_inefficiency: "value", must_have: "captain",
-        captain_lock: "captain", trap_warning: "trap", overpriced: "trap",
-        risk_reward: "breakout", contrarian: "value", comparison: "value",
-        youre_wrong: "trap", breakdown: "value", narrative: "value", proof: "proof",
-      };
-      const targetCategory = angleToCategory[post.content_angle ?? ""] ?? post.category.toLowerCase();
-
-      const pool = availablePlayers.filter((p) => p.player_id !== post.player_id);
-
-      let suggested: PlayerOption | undefined;
-
-      if (targetCategory === "value") {
-        suggested = pool.sort((a, b) => (b.projection_final ?? 0) - (a.projection_final ?? 0))[Math.floor(Math.random() * 5)];
-      } else if (targetCategory === "captain") {
-        suggested = pool.sort((a, b) => (b.projection_final ?? 0) - (a.projection_final ?? 0))[0];
-      } else if (targetCategory === "trap") {
-        suggested = pool.sort((a, b) => (b.neeko_rating_scaled ?? 0) - (a.neeko_rating_scaled ?? 0)).slice(15, 30)[Math.floor(Math.random() * 5)];
-      } else if (targetCategory === "breakout") {
-        suggested = pool.slice(5, 20)[Math.floor(Math.random() * 5)];
-      } else {
-        suggested = pool[Math.floor(Math.random() * 10)];
-      }
-
-      if (suggested) {
-        setSuggestedPlayers((prev) => ({ ...prev, [key]: suggested! }));
-      }
-    } finally {
-      setSuggestingPost(null);
-    }
-  };
-
-  const totalPosts = plan?.days?.reduce((acc, d) => acc + d.posts.length, 0) ?? 0;
+  const totalReady = posts.filter(p => p.status === "ready").length;
+  const totalPosts = posts.length;
 
   return (
     <div className="space-y-5">
-      {/* ── TODAY'S TOP 3 POSTS ────────────────────────────────────────────── */}
+      {/* Today's Top 3 */}
       <TodayTopPostsSection />
 
-      {/* ── HEADER ────────────────────────────────────────────────────────── */}
+      {/* Header */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h3 className="text-sm font-semibold">Weekly Content Plan</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {loading
-              ? "Loading plan…"
-              : plan
-              ? `${weekKey} · ${totalPosts} posts ready${isCached ? " · cached" : " · freshly generated"}`
+            {planLoading
+              ? "Building plan…"
+              : planId
+              ? `${weekKey} · ${totalReady}/${totalPosts} posts ready`
               : "No plan loaded"}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <PlayerSelector value={focusPlayer} onChange={setFocusPlayer} />
-          {isCached && (
-            <span className="text-[10px] text-muted-foreground border border-border px-2 py-1 rounded-md">
-              Cached · regenerates weekly
-            </span>
-          )}
           <button
-            onClick={handleRegenerateWeek}
-            disabled={loading || generating}
+            onClick={() => fetchPlan(true)}
+            disabled={planLoading}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background rounded-md text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${generating || loading ? "animate-spin" : ""}`} />
-            {generating ? "Generating…" : "Regenerate Week"}
+            <RefreshCw className={`h-3.5 w-3.5 ${planLoading ? "animate-spin" : ""}`} />
+            {planLoading ? "Building…" : "Rebuild Week"}
           </button>
+          {totalPosts > 0 && totalReady < totalPosts && (
+            <button
+              onClick={() => {
+                const pending = posts.filter(p => p.status === "pending" || p.status === "error");
+                pending.forEach((p, i) => {
+                  setTimeout(() => generatePost(p), i * 800);
+                });
+              }}
+              disabled={planLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-md text-xs font-medium hover:bg-accent transition-colors disabled:opacity-40"
+            >
+              <Zap className="h-3.5 w-3.5" />
+              Generate All ({totalPosts - totalReady} pending)
+            </button>
+          )}
         </div>
       </div>
 
-      {/* ── ERROR BANNER ──────────────────────────────────────────────────── */}
-      {error && (
+      {/* Error Banner */}
+      {planError && (
         <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-destructive">Failed to load plan</p>
-            <p className="text-xs text-destructive/80 mt-0.5 break-all">{error}</p>
+            <p className="text-xs text-destructive/80 mt-0.5 break-all">{planError}</p>
           </div>
           <button
             onClick={() => fetchPlan(true)}
-            disabled={loading}
+            disabled={planLoading}
             className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-destructive/40 text-destructive text-xs rounded-md hover:bg-destructive/10 transition-colors disabled:opacity-40"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            {loading ? "Retrying…" : "Retry"}
+            <RefreshCw className={`h-3.5 w-3.5 ${planLoading ? "animate-spin" : ""}`} />
+            {planLoading ? "Retrying…" : "Retry"}
           </button>
         </div>
       )}
 
-      {/* ── LOADING STATE ─────────────────────────────────────────────────── */}
-      {loading && (
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-16 rounded-lg border border-border animate-pulse bg-muted/20" />
+      {/* Plan Loading Skeleton */}
+      {planLoading && (
+        <div className="space-y-2">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="h-12 rounded-lg border border-border animate-pulse bg-muted/20" />
           ))}
           <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2">
-            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-            {generating ? "AI is writing 21 posts — this takes 30–60 seconds…" : "Loading cached plan…"}
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Building plan structure…
           </div>
         </div>
       )}
 
-      {/* ── PLAN DAYS ─────────────────────────────────────────────────────── */}
-      {!loading && plan?.days && (
+      {/* Day Rows */}
+      {!planLoading && planId && (
         <div className="space-y-2">
-          {plan.days.map((dayPlan) => (
-            <DayRow
-              key={dayPlan.day}
-              dayPlan={dayPlan}
-              selectedPost={selectedPost?.day === dayPlan.day ? selectedPost : null}
-              onSelectPost={setSelectedPost}
-              onRegenerate={handleRegeneratePost}
-              regeneratingPost={regeneratingPost}
-              onAggressiveRewrite={handleAggressiveRewrite}
-              aggressivePost={aggressivePost}
-              rewriteCounts={rewriteCounts}
-              availablePlayers={availablePlayers}
-              onSwapPlayer={handleSwapPlayer}
-              swappingPost={swappingPost}
-              onSuggestBetter={handleSuggestBetter}
-              suggestingPost={suggestingPost}
-              suggestedPlayers={suggestedPlayers}
-              onToggleLock={handleToggleLock}
-              onDuplicate={handleDuplicate}
-            />
-          ))}
+          {DAY_ORDER.map(dayKey => {
+            const dayPosts = postsByDay[dayKey] ?? [];
+            if (dayPosts.length === 0) return null;
+            return (
+              <DayRow
+                key={dayKey}
+                dayKey={dayKey}
+                posts={dayPosts}
+                selectedPostId={selectedPostId}
+                onSelectPost={post => setSelectedPostId(post?.id ?? null)}
+                onGeneratePost={generatePost}
+                generatingPostId={generatingPostId}
+                onToggleLock={handleToggleLock}
+                onDuplicate={handleDuplicate}
+                onSwapPlayer={handleSwapPlayer}
+                swappingPostId={swappingPostId}
+                availablePlayers={availablePlayers}
+              />
+            );
+          })}
         </div>
       )}
 
-      {/* ── EMPTY STATE ───────────────────────────────────────────────────── */}
-      {!loading && !plan && !error && (
+      {/* Empty State */}
+      {!planLoading && !planId && !planError && (
         <div className="text-center py-16 border border-dashed border-border rounded-lg">
           <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
           <p className="text-sm font-medium mb-1">No plan generated yet</p>
-          <p className="text-xs text-muted-foreground mb-4">Generate your first weekly content plan — takes 30–60 seconds</p>
+          <p className="text-xs text-muted-foreground mb-4">Build this week's plan instantly — no AI wait time</p>
           <button
-            onClick={handleRegenerateWeek}
+            onClick={() => fetchPlan(true)}
             className="flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity mx-auto"
           >
             <Zap className="h-4 w-4" />
-            Generate This Week's Plan
+            Build This Week's Plan
           </button>
         </div>
       )}
