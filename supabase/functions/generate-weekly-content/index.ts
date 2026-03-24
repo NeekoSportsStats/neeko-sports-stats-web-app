@@ -43,6 +43,13 @@ interface ProofPlayer {
   accuracy_gap: number;
 }
 
+interface FeedbackPattern {
+  content_type: string;
+  hook: string;
+  angle: string;
+  feedback_type: string;
+}
+
 type ContentType =
   | "Short-form Video"
   | "Graphic Post"
@@ -312,13 +319,58 @@ UNIQUENESS ENFORCER:
 - Conversation posts: 1 per week.
 - Each player used maximum ONCE across the entire week.
 
+ANGLE LABEL (human-readable, assign one per post):
+- "Contrarian" — challenges mainstream opinion
+- "Value Edge" — price/output inefficiency story
+- "Fear" — trap warning, avoid, danger signal
+- "Proof" — credibility through accuracy data
+- "Debate" — forces audience to pick a side
+- "Breakout" — player trending up, act now
+- "Captain Lock" — elite pick, no debate
+
+CTA ENGINE — generate 3 distinct CTAs per post:
+- CTA 1: Direct conversion — "Get the full analysis at Neeko Sports — link in bio."
+- CTA 2: Engagement-first — "Drop your take below 👇 — agree or disagree?"
+- CTA 3: FOMO-driven — "Save this before the price changes. Full rankings — Neeko Sports."
+Vary tone, urgency, and format across all 3. Do NOT repeat the same CTA structure.
+
+CONVERSION SCORE — assign X.X out of 10 per post based on:
+- Strong hook (opens with tension/controversy/numbers): +2
+- Clear angle/edge (unique insight not available elsewhere): +2
+- Includes specific proof/data (real numbers, not generic): +2
+- Strong CTA (clear next action): +2
+- Emotional trigger (FOMO, fear, pride, identity): +2
+Minimum score: 1.0. Maximum: 10.0.
+
+CONFIDENCE SIGNAL — assign HIGH / MEDIUM / LOW per post based on the primary player's data:
+- HIGH: consistency >= 70 AND projection >= 100 AND risk_rating <= 5
+- MEDIUM: consistency >= 50 OR projection >= 80
+- LOW: all other cases (volatile, limited data, high risk)
+
+POST PRIORITY — assign one per post:
+- "must_post": conversion_score >= 8 AND confidence = "HIGH"
+- "good_option": conversion_score >= 6 OR confidence = "HIGH"
+- "optional": all other cases
+
 OUTPUT: Valid JSON only. No markdown code fences. No extra text before or after the JSON.`;
+}
+
+function buildFeedbackSection(patterns: FeedbackPattern[]): string {
+  if (patterns.length === 0) return "";
+  const lines = patterns.slice(0, 10).map(p =>
+    `- Type: ${p.content_type} | Angle: ${p.angle} | Hook: "${p.hook.slice(0, 80)}" | Result: ${p.feedback_type}`
+  ).join("\n");
+  return `\nSUCCESSFUL CONTENT PATTERNS (from real audience feedback — prioritise similar approaches):
+${lines}
+
+Apply the patterns above: favour similar content types, angles, and hook styles where they fit the player data this week.\n`;
 }
 
 function buildUserPrompt(
   players: PlayerData[],
   sel: ReturnType<typeof selectPlayers>,
   focusPlayerName?: string,
+  feedbackPatterns: FeedbackPattern[] = [],
 ): string {
   const { valuePlayers, breakoutPlayers, trapPlayers, captainPlayers, proofPlayers, h2hPairs, comparisonPairs } = sel;
 
@@ -329,6 +381,8 @@ function buildUserPrompt(
   const focusNote = focusPlayerName
     ? `\n\nFOCUS PLAYER: Prioritise "${focusPlayerName}" — build at least one post directly around their data story.\n`
     : "";
+
+  const feedbackSection = buildFeedbackSection(feedbackPatterns);
 
   const compList = comparisonPairs.length > 0
     ? comparisonPairs.slice(0, 3).map((pair, i) =>
@@ -350,7 +404,7 @@ NOTE: Proof posts MUST use the exact fantasy_score and projection_final numbers 
     : `PROOF PLAYERS: None available this round — do NOT include any proof posts this week.`;
 
   return `Generate a FULL 7-DAY AFL Fantasy content plan (21 posts total: 3 per day).
-${focusNote}
+${focusNote}${feedbackSection}
 PLAYER POOL — use ONLY these players, no invented names:
 
 VALUE / EDGE PLAYERS (underpriced relative to output):
@@ -428,6 +482,7 @@ OUTPUT (strict JSON, no markdown):
           "post_type": "Short-form Video",
           "category": "Value",
           "content_angle": "hidden_edge",
+          "angle_label": "Value Edge",
           "player_name": "...",
           "player_id": 123,
           "team": "...",
@@ -437,7 +492,15 @@ OUTPUT (strict JSON, no markdown):
           "hooks": ["...", "...", "..."],
           "voice_script": "...",
           "caption_script": "...",
-          "visual_plan": "Scene 1 (0-3s): [background, text, animation]. Scene 2 (3-8s): ..."
+          "visual_plan": "Scene 1 (0-3s): [background, text, animation]. Scene 2 (3-8s): ...",
+          "ctas": [
+            "Get the full analysis at Neeko Sports — link in bio.",
+            "Drop your take below 👇 — agree or disagree?",
+            "Save this before the price changes. Full rankings — Neeko Sports."
+          ],
+          "conversion_score": 7.5,
+          "confidence": "HIGH",
+          "priority": "good_option"
         }
       ]
     }
@@ -446,6 +509,11 @@ OUTPUT (strict JSON, no markdown):
 
 For H2H posts, set player2_name, player2_id, player2_team to the second player's data.
 For all other posts, set player2_name, player2_id, player2_team to null.
+angle_label must be one of: "Contrarian", "Value Edge", "Fear", "Proof", "Debate", "Breakout", "Captain Lock".
+confidence must be one of: "HIGH", "MEDIUM", "LOW".
+priority must be one of: "must_post", "good_option", "optional".
+ctas must be an array of exactly 3 distinct strings.
+conversion_score must be a number between 1.0 and 10.0.
 
 Generate ALL 7 days = 21 posts. Every post must be COMPLETE — no blanks, no placeholders.
 Visual plans must be detailed enough for a designer to execute without asking a single question.
@@ -469,29 +537,58 @@ function normalisePost(raw: Record<string, unknown>, day: number, postNumber: nu
   const validCategories = ["Value", "Breakout", "Trap", "Captain", "Proof", "H2H", "Top3", "Injury", "Conversation"];
   const category = validCategories.includes(rawCategory) ? rawCategory : "Value";
 
+  const rawCtas = Array.isArray(raw.ctas)
+    ? (raw.ctas as unknown[]).map((c) => ensureString(c)).filter(Boolean)
+    : [];
+  const ctas = rawCtas.length >= 3 ? rawCtas.slice(0, 3) : [
+    "Get the full analysis at Neeko Sports — link in bio.",
+    "Drop your take below 👇 — agree or disagree?",
+    "Save this before the price changes. Full rankings — Neeko Sports.",
+  ];
+
+  const validConfidence = ["HIGH", "MEDIUM", "LOW"];
+  const rawConfidence = ensureString(raw.confidence || "");
+  const confidence = validConfidence.includes(rawConfidence) ? rawConfidence : "MEDIUM";
+
+  const validPriority = ["must_post", "good_option", "optional"];
+  const rawPriority = ensureString(raw.priority || "");
+  const priority = validPriority.includes(rawPriority) ? rawPriority : "good_option";
+
+  const validAngleLabels = ["Contrarian", "Value Edge", "Fear", "Proof", "Debate", "Breakout", "Captain Lock"];
+  const rawAngleLabel = ensureString(raw.angle_label || "");
+  const angle_label = validAngleLabels.includes(rawAngleLabel) ? rawAngleLabel : "Value Edge";
+
+  const rawScore = Number(raw.conversion_score ?? 0);
+  const conversion_score = rawScore >= 1 && rawScore <= 10 ? Math.round(rawScore * 10) / 10 : 6.0;
+
   return {
-    day:            Number(raw.day ?? day),
-    post_number:    Number(raw.post_number ?? postNumber),
-    post_type:      ensureString(raw.post_type || "Short-form Video"),
+    day:              Number(raw.day ?? day),
+    post_number:      Number(raw.post_number ?? postNumber),
+    post_type:        ensureString(raw.post_type || "Short-form Video"),
     category,
-    content_angle:  ensureString(raw.content_angle || "hidden_edge"),
-    player_name:    ensureString(raw.player_name || "Unknown"),
-    player_id:      Number(raw.player_id ?? 0),
-    team:           ensureString(raw.team || "Unknown"),
-    player2_name:   raw.player2_name != null ? ensureString(raw.player2_name) : null,
-    player2_id:     raw.player2_id != null ? Number(raw.player2_id) : null,
-    player2_team:   raw.player2_team != null ? ensureString(raw.player2_team) : null,
+    content_angle:    ensureString(raw.content_angle || "hidden_edge"),
+    angle_label,
+    player_name:      ensureString(raw.player_name || "Unknown"),
+    player_id:        Number(raw.player_id ?? 0),
+    team:             ensureString(raw.team || "Unknown"),
+    player2_name:     raw.player2_name != null ? ensureString(raw.player2_name) : null,
+    player2_id:       raw.player2_id != null ? Number(raw.player2_id) : null,
+    player2_team:     raw.player2_team != null ? ensureString(raw.player2_team) : null,
     hooks,
-    voice_script:   ensureString(raw.voice_script || raw.full_script || ""),
-    caption_script: ensureString(raw.caption_script || raw.caption || ""),
-    visual_plan:    ensureString(raw.visual_plan || ""),
-    hook_options:   hooks,
-    full_script:    ensureString(raw.voice_script || raw.full_script || ""),
-    caption:        ensureString(raw.caption_script || raw.caption || ""),
+    voice_script:     ensureString(raw.voice_script || raw.full_script || ""),
+    caption_script:   ensureString(raw.caption_script || raw.caption || ""),
+    visual_plan:      ensureString(raw.visual_plan || ""),
+    hook_options:     hooks,
+    full_script:      ensureString(raw.voice_script || raw.full_script || ""),
+    caption:          ensureString(raw.caption_script || raw.caption || ""),
+    ctas,
+    confidence,
+    priority,
+    conversion_score,
   };
 }
 
-async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<object> {
+async function callOpenAI(systemPrompt: string, userPrompt: string, _feedbackPatterns?: FeedbackPattern[]): Promise<object> {
   const apiKey = Deno.env.get("OPENAI_API_KEY");
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
 
@@ -537,6 +634,49 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<obj
 
   return parsed;
 }
+
+function deriveConfidence(p: PlayerData): "HIGH" | "MEDIUM" | "LOW" {
+  if (p.consistency >= 70 && p.projection >= 100 && p.risk_rating <= 5) return "HIGH";
+  if (p.consistency >= 50 || p.projection >= 80) return "MEDIUM";
+  return "LOW";
+}
+
+function deriveConversionScore(category: string, confidence: string): number {
+  let score = 4.0;
+  if (category === "Captain" || category === "Proof") score += 2;
+  else if (category === "Value" || category === "Breakout") score += 1.5;
+  else if (category === "Trap") score += 1;
+  if (confidence === "HIGH") score += 2;
+  else if (confidence === "MEDIUM") score += 1;
+  return Math.min(10, Math.max(1, Math.round(score * 10) / 10));
+}
+
+function derivePriority(conversionScore: number, confidence: string): "must_post" | "good_option" | "optional" {
+  if (conversionScore >= 8 && confidence === "HIGH") return "must_post";
+  if (conversionScore >= 6 || confidence === "HIGH") return "good_option";
+  return "optional";
+}
+
+function deriveAngleLabel(category: string): string {
+  const map: Record<string, string> = {
+    Value: "Value Edge",
+    Breakout: "Breakout",
+    Trap: "Fear",
+    Captain: "Captain Lock",
+    Proof: "Proof",
+    H2H: "Debate",
+    Top3: "Value Edge",
+    Injury: "Fear",
+    Conversation: "Debate",
+  };
+  return map[category] ?? "Value Edge";
+}
+
+const DEFAULT_CTAS = [
+  "Get the full analysis at Neeko Sports — link in bio.",
+  "Drop your take below 👇 — agree or disagree?",
+  "Save this before the price changes. Full rankings — Neeko Sports.",
+];
 
 function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectPlayers>): object {
   const { valuePlayers, breakoutPlayers, trapPlayers, captainPlayers, proofPlayers, h2hPairs } = sel;
@@ -601,12 +741,23 @@ function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectP
         const pair = h2hPairs[0];
         usedPlayerIds.add(pair[0].player_id);
         usedPlayerIds.add(pair[1].player_id);
+        const h2hConf = deriveConfidence(pair[0]);
+        const h2hScore = deriveConversionScore("H2H", h2hConf);
         posts.push({
           day,
           post_number: postIdx + 1,
           post_type: postType,
           category: "H2H",
           content_angle: angle,
+          angle_label: "Debate",
+          confidence: h2hConf,
+          conversion_score: h2hScore,
+          priority: derivePriority(h2hScore, h2hConf),
+          ctas: [
+            `See the full ${pair[0].player_name.split(" ").pop()} vs ${pair[1].player_name.split(" ").pop()} data breakdown — Neeko Sports, link in bio.`,
+            `Drop your pick below 👇 — who are you going with?`,
+            `Save this before you lock your team. Full comparison — Neeko Sports.`,
+          ],
           player_name: pair[0].player_name,
           player_id: pair[0].player_id,
           team: pair[0].team,
@@ -640,6 +791,15 @@ function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectP
           post_type: postType,
           category: "Conversation",
           content_angle: angle,
+          angle_label: "Debate",
+          confidence: "MEDIUM",
+          conversion_score: 6.0,
+          priority: "good_option",
+          ctas: [
+            "Drop your answer below 👇",
+            "Tag a league mate who needs to see this.",
+            "Follow for weekly AFL Fantasy intel — Neeko Sports.",
+          ],
           player_name: topCaptain?.player_name ?? "Unknown",
           player_id: topCaptain?.player_id ?? 0,
           team: topCaptain?.team ?? "Unknown",
@@ -676,6 +836,15 @@ function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectP
           post_type: postType,
           category: "Injury",
           content_angle: angle,
+          angle_label: "Fear",
+          confidence: "HIGH",
+          conversion_score: 8.0,
+          priority: "must_post",
+          ctas: [
+            "Full replacement list live now — Neeko Sports, link in bio.",
+            "Save this immediately — your trade window is closing.",
+            "Drop your replacement pick below 👇 — what are you doing?",
+          ],
           player_name: injuredPlayer.player_name,
           player_id: injuredPlayer.player_id,
           team: injuredPlayer.team,
@@ -707,12 +876,23 @@ function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectP
         const t3 = pickFromPool(breakoutPlayers, valuePlayers);
         const dayLabel = day === 5 ? "FRIDAY" : day === 6 ? "SATURDAY" : "SUNDAY";
         const topAngle = day === 5 ? "top3_friday" : day === 6 ? "top3_saturday" : "top3_sunday";
+        const t3Conf = deriveConfidence(t1);
+        const t3Score = deriveConversionScore("Top3", t3Conf);
         posts.push({
           day,
           post_number: postIdx + 1,
           post_type: postType,
           category: "Top3",
           content_angle: topAngle,
+          angle_label: "Value Edge",
+          confidence: t3Conf,
+          conversion_score: t3Score,
+          priority: derivePriority(t3Score, t3Conf),
+          ctas: [
+            `Save this before you lock your ${dayLabel.toLowerCase()} team — Neeko Sports.`,
+            "Full top 10 rankings live now — link in bio.",
+            "Tag a mate who needs to see these picks 👇",
+          ],
           player_name: t1.player_name,
           player_id: t1.player_id,
           team: t1.team,
@@ -747,6 +927,15 @@ function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectP
             post_type: "Screen Recording" as ContentType,
             category: "Proof",
             content_angle: "proof" as ContentAngle,
+            angle_label: "Proof",
+            confidence: "HIGH",
+            conversion_score: 9.0,
+            priority: "must_post",
+            ctas: [
+              "Full accuracy stats live now — Neeko Sports, link in bio.",
+              "This round's projections are live — get them before everyone else.",
+              "Save this as proof the model works 👇",
+            ],
             player_name: pp.player_name,
             player_id: pp.player_id,
             team: pp.team,
@@ -785,12 +974,33 @@ function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectP
       const isTrap = catStr === "Trap";
       const isBreakout = catStr === "Breakout";
 
+      const defConf = deriveConfidence(p);
+      const defScore = deriveConversionScore(catStr, defConf);
+      const defCtas = isTrap ? [
+        `Full trap breakdown at Neeko Sports — don't get caught out, link in bio.`,
+        `Drop your take below 👇 — are you still holding ${p.player_name.split(" ").pop()}?`,
+        `Save this warning before your trade deadline closes.`,
+      ] : isBreakout ? [
+        `Get the full breakout breakdown at Neeko Sports — link in bio.`,
+        `Drop your trade plan below 👇 — are you bringing ${p.player_name.split(" ").pop()} in?`,
+        `Save this before the price rises — full rankings at Neeko Sports.`,
+      ] : [
+        `Full edge breakdown at Neeko Sports — link in bio.`,
+        `Drop your take below 👇 — are you backing ${p.player_name.split(" ").pop()} this round?`,
+        `Save this before the window closes. Full value rankings — Neeko Sports.`,
+      ];
+
       posts.push({
         day,
         post_number: postIdx + 1,
         post_type: postType,
         category: catStr,
         content_angle: angle,
+        angle_label: deriveAngleLabel(catStr),
+        confidence: defConf,
+        conversion_score: defScore,
+        priority: derivePriority(defScore, defConf),
+        ctas: defCtas,
         player_name: p.player_name,
         player_id: p.player_id,
         team: p.team,
@@ -989,6 +1199,29 @@ Deno.serve(async (req: Request) => {
     const selections = selectPlayers(mappedPlayers, proofPlayers);
     console.log(`Selections: ${selections.valuePlayers.length} value, ${selections.breakoutPlayers.length} breakout, ${selections.trapPlayers.length} trap, ${proofPlayers.length} proof`);
 
+    console.log("Fetching successful feedback patterns...");
+    let feedbackPatterns: FeedbackPattern[] = [];
+    try {
+      const { data: feedbackData } = await db
+        .schema("marketing")
+        .from("post_feedback")
+        .select("content_type, hook, angle, feedback_type")
+        .in("feedback_type", ["performed_well", "high_engagement"])
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (feedbackData && Array.isArray(feedbackData)) {
+        feedbackPatterns = feedbackData.map((r: Record<string, unknown>) => ({
+          content_type: String(r.content_type ?? ""),
+          hook:         String(r.hook ?? ""),
+          angle:        String(r.angle ?? ""),
+          feedback_type: String(r.feedback_type ?? ""),
+        }));
+      }
+      console.log(`Fetched ${feedbackPatterns.length} feedback patterns`);
+    } catch (fbErr) {
+      console.warn("Feedback fetch failed (non-fatal):", String(fbErr));
+    }
+
     let planData: object;
     const hasOpenAI = !!Deno.env.get("OPENAI_API_KEY");
 
@@ -997,7 +1230,7 @@ Deno.serve(async (req: Request) => {
         console.log("Calling OpenAI gpt-4o...");
         planData = await callOpenAI(
           buildSystemPrompt(),
-          buildUserPrompt(mappedPlayers, selections, focusPlayerName),
+          buildUserPrompt(mappedPlayers, selections, focusPlayerName, feedbackPatterns),
         );
         console.log("OpenAI response received and normalised");
       } catch (aiError) {

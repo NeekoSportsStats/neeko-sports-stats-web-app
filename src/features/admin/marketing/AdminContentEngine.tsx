@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Calendar, Video, Image, Monitor, Copy, Check, ChevronDown, ChevronUp, Zap, TriangleAlert as AlertTriangle, Star, TrendingUp, FileText, Eye, Play, Mic, ChevronRight, Brain, Flame, Target, Smartphone, ChartBar as BarChart2, List, GitCompare, BookOpen, Megaphone, Layers, UserRoundCog, Lightbulb, Lock, Clock as Unlock, Copy as CopyIcon, MessageCircle, Trophy, Swords, Users, Ambulance } from "lucide-react";
+import { RefreshCw, Calendar, Video, Image, Monitor, Copy, Check, ChevronDown, ChevronUp, Zap, TriangleAlert as AlertTriangle, Star, TrendingUp, FileText, Eye, Play, Mic, ChevronRight, Brain, Flame, Target, Smartphone, ChartBar as BarChart2, List, GitCompare, BookOpen, Megaphone, Layers, UserRoundCog, Lightbulb, Lock, Clock as Unlock, Copy as CopyIcon, MessageCircle, Trophy, Swords, Users, Ambulance, ThumbsUp, ThumbsDown, Package, Pencil, ShieldCheck, ArrowUpDown } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -33,6 +33,7 @@ interface PostPlan {
   post_number: number;
   post_type: PostType;
   content_angle?: string;
+  angle_label?: string;
   category: PostCategory;
   player_name: string;
   player_id: number;
@@ -48,6 +49,10 @@ interface PostPlan {
   player2_name?: string;
   player2_id?: number;
   player2_team?: string;
+  ctas?: string[];
+  conversion_score?: number;
+  confidence?: "HIGH" | "MEDIUM" | "LOW";
+  priority?: "must_post" | "good_option" | "optional";
 }
 
 interface DayPlan {
@@ -152,6 +157,18 @@ const POST_TABS: { id: PostTab; label: string; icon: React.ElementType }[] = [
 ];
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const CONFIDENCE_META: Record<string, { label: string; color: string; bg: string }> = {
+  HIGH:   { label: "HIGH",   color: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-500/15 border-emerald-500/30" },
+  MEDIUM: { label: "MED",    color: "text-amber-700 dark:text-amber-300",     bg: "bg-amber-500/15 border-amber-500/30" },
+  LOW:    { label: "LOW",    color: "text-red-700 dark:text-red-300",         bg: "bg-red-500/15 border-red-500/30" },
+};
+
+const PRIORITY_META: Record<string, { label: string; icon: string; color: string }> = {
+  must_post:   { label: "Must Post",   icon: "🔥", color: "text-red-600 dark:text-red-400" },
+  good_option: { label: "Good Option", icon: "👍", color: "text-emerald-600 dark:text-emerald-400" },
+  optional:    { label: "Optional",    icon: "😐", color: "text-slate-500 dark:text-slate-400" },
+};
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 
@@ -1298,8 +1315,16 @@ function PostDetailPanel({
   onDuplicate: (post: PostPlan) => void;
 }) {
   const [activeTab, setActiveTab] = useState<PostTab>("voice");
+  const [editMode, setEditMode] = useState(false);
+  const [editScript, setEditScript] = useState(getVoiceScript(post));
+  const [editCaption, setEditCaption] = useState(getCaptionScript(post));
+  const [editHook, setEditHook] = useState(getHooks(post)[0] ?? "");
+  const [submittingFeedback, setSubmittingFeedback] = useState<string | null>(null);
+  const [feedbackDone, setFeedbackDone] = useState<string | null>(null);
   const { copied, copy } = useCopy();
   const catMeta = CATEGORY_META[post.category] ?? CATEGORY_META.Value;
+  const confidenceMeta = CONFIDENCE_META[post.confidence ?? "MEDIUM"];
+  const priorityMeta = PRIORITY_META[post.priority ?? "good_option"];
 
   const isScreenRecording = post.post_type === "Screen Recording";
 
@@ -1319,13 +1344,36 @@ function PostDetailPanel({
 
   const copyAll = () => {
     const hooks = getHooks(post);
+    const ctas = post.ctas ?? [];
     const all = [
-      `=== VOICE SCRIPT ===\n${getVoiceScript(post)}`,
-      `=== HOOKS ===\n${hooks.join("\n\n")}`,
-      `=== VISUAL PLAN ===\n${typeof post.visual_plan === "string" ? post.visual_plan : JSON.stringify(post.visual_plan, null, 2)}`,
-      `=== CAPTION ===\n${getCaptionScript(post)}`,
+      `HOOK\n${hooks[0] ?? ""}`,
+      `SCRIPT\n${getVoiceScript(post)}`,
+      `CAPTION\n${getCaptionScript(post)}`,
+      `CTA\n${ctas[0] ?? ""}`,
+      `VISUAL PLAN\n${typeof post.visual_plan === "string" ? post.visual_plan : JSON.stringify(post.visual_plan, null, 2)}`,
+      `STRATEGY\n${post.content_angle ?? ""} | ${post.angle_label ?? ""} | Confidence: ${post.confidence ?? "MEDIUM"} | Score: ${post.conversion_score ?? "—"}/10`,
     ].join("\n\n---\n\n");
     copy(all, "all");
+  };
+
+  const submitFeedback = async (feedbackType: string) => {
+    const key = `${post.day}-${post.post_number}-${feedbackType}`;
+    setSubmittingFeedback(key);
+    try {
+      await supabase.schema("marketing" as never).from("post_feedback").insert({
+        post_id: `${post.day}-${post.post_number}`,
+        player_id: post.player_id || null,
+        content_type: post.post_type,
+        hook: getHooks(post)[0] ?? "",
+        angle: post.content_angle ?? "",
+        feedback_type: feedbackType,
+      });
+      setFeedbackDone(feedbackType);
+    } catch (_e) {
+      // non-fatal
+    } finally {
+      setSubmittingFeedback(null);
+    }
   };
 
   const isCustomTab = activeTab === "ai" || activeTab === "platform" || activeTab === "strategy" || activeTab === "visual" || (activeTab === "hooks" && isScreenRecording);
@@ -1339,20 +1387,45 @@ function PostDetailPanel({
             {(() => { const Icon = catMeta.icon; return <Icon className="h-3 w-3" />; })()}
             {post.category}
           </span>
-          {post.content_angle && ANGLE_LABELS[post.content_angle] && (
+          {post.angle_label ? (
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/50 bg-muted/30 text-foreground/70">
+              {post.angle_label}
+            </span>
+          ) : post.content_angle && ANGLE_LABELS[post.content_angle] && (
             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/50 bg-muted/30 ${ANGLE_LABELS[post.content_angle].color}`}>
               {ANGLE_LABELS[post.content_angle].label}
             </span>
           )}
           <span className="text-sm font-semibold">{post.player_name}</span>
           <span className="text-xs text-muted-foreground">{post.team}</span>
+          {confidenceMeta && (
+            <span className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${confidenceMeta.bg} ${confidenceMeta.color}`}>
+              <ShieldCheck className="h-2.5 w-2.5" />
+              {confidenceMeta.label}
+            </span>
+          )}
+          {post.conversion_score != null && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-foreground/10 text-foreground">
+              {post.conversion_score.toFixed(1)}/10
+            </span>
+          )}
+          <span className={`text-[10px] font-medium ${priorityMeta.color}`}>
+            {priorityMeta.icon} {priorityMeta.label}
+          </span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={copyAll}
             className="flex items-center gap-1.5 px-2.5 py-1.5 bg-foreground text-background text-xs rounded-md hover:opacity-90 transition-opacity"
           >
-            {copied === "all" ? <><Check className="h-3.5 w-3.5" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy All</>}
+            {copied === "all" ? <><Check className="h-3.5 w-3.5" /> Copied!</> : <><Package className="h-3.5 w-3.5" /> Post Pack</>}
+          </button>
+          <button
+            onClick={() => { setEditMode(v => !v); setEditScript(getVoiceScript(post)); setEditCaption(getCaptionScript(post)); setEditHook(getHooks(post)[0] ?? ""); }}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 border text-xs rounded-md transition-colors ${editMode ? "border-blue-500/40 bg-blue-500/10 text-blue-600 dark:text-blue-400" : "border-border text-muted-foreground hover:bg-accent"}`}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            {editMode ? "Done" : "Edit"}
           </button>
           <button
             onClick={() => onDuplicate(post)}
@@ -1439,11 +1512,26 @@ function PostDetailPanel({
           {activeTab === "hooks" ? (
             <div className="space-y-2">
               {getHooks(post).map((hook, i) => (
-                <div key={i} className="flex items-start gap-2 p-3 bg-muted/30 border border-border rounded-md">
+                <div key={i} className={`flex items-start gap-2 p-3 border rounded-md transition-colors ${i === 0 ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/30 border-border"}`}>
                   <span className="text-xs text-muted-foreground font-mono shrink-0 mt-0.5">{i + 1}.</span>
                   <p className="text-sm flex-1 leading-relaxed">{hook}</p>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <HookScoreBadge hook={hook} />
+                    {i > 0 && (
+                      <button
+                        onClick={() => {
+                          const newHooks = [hook, ...post.hooks.filter((_, idx) => idx !== i)];
+                          Object.assign(post, { hooks: newHooks, hook_options: newHooks });
+                          setEditHook(hook);
+                        }}
+                        className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium border border-blue-500/30 text-blue-600 dark:text-blue-400 rounded hover:bg-blue-500/10 transition-colors"
+                      >
+                        Use
+                      </button>
+                    )}
+                    {i === 0 && (
+                      <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 bg-emerald-500/10 rounded border border-emerald-500/20">Active</span>
+                    )}
                     <button
                       onClick={() => copy(hook, `hook-${i}`)}
                       className="p-1 rounded hover:bg-accent transition-colors"
@@ -1454,6 +1542,16 @@ function PostDetailPanel({
                 </div>
               ))}
             </div>
+          ) : editMode && (activeTab === "voice" || activeTab === "caption") ? (
+            <textarea
+              value={activeTab === "voice" ? editScript : editCaption}
+              onChange={e => activeTab === "voice" ? setEditScript(e.target.value) : setEditCaption(e.target.value)}
+              onBlur={() => {
+                if (activeTab === "voice") Object.assign(post, { voice_script: editScript, full_script: editScript });
+                else Object.assign(post, { caption_script: editCaption, caption: editCaption });
+              }}
+              className="w-full min-h-48 text-sm border border-blue-500/30 rounded-md p-3 bg-background resize-y font-mono leading-relaxed"
+            />
           ) : (
             <textarea
               value={getTabContent()}
@@ -1464,6 +1562,101 @@ function PostDetailPanel({
           {!isCustomTab && <p className="text-[10px] text-muted-foreground mt-1.5">{getTabContent().length} characters</p>}
         </div>
       )}
+
+      {editMode && (
+        <div className="p-4 border-t border-border space-y-3 bg-blue-500/5">
+          <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+            <Pencil className="h-3.5 w-3.5" /> Quick Edit Mode — changes apply instantly
+          </p>
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium block mb-1">Hook (Active)</label>
+            <textarea
+              value={editHook}
+              onChange={e => { setEditHook(e.target.value); }}
+              onBlur={() => {
+                const updated = { ...post, hooks: [editHook, ...(post.hooks ?? []).slice(1)], hook_options: [editHook, ...(post.hook_options ?? []).slice(1)] };
+                Object.assign(post, updated);
+              }}
+              className="w-full text-sm border border-blue-500/30 rounded-md p-2.5 bg-background resize-none leading-relaxed"
+              rows={2}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium block mb-1">Voice Script</label>
+            <textarea
+              value={editScript}
+              onChange={e => setEditScript(e.target.value)}
+              onBlur={() => { Object.assign(post, { voice_script: editScript, full_script: editScript }); }}
+              className="w-full text-sm border border-blue-500/30 rounded-md p-2.5 bg-background resize-y leading-relaxed"
+              rows={5}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium block mb-1">Caption</label>
+            <textarea
+              value={editCaption}
+              onChange={e => setEditCaption(e.target.value)}
+              onBlur={() => { Object.assign(post, { caption_script: editCaption, caption: editCaption }); }}
+              className="w-full text-sm border border-blue-500/30 rounded-md p-2.5 bg-background resize-y leading-relaxed"
+              rows={4}
+            />
+          </div>
+        </div>
+      )}
+
+      {(post.ctas ?? []).length > 0 && (
+        <div className="p-4 border-t border-border">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-2 flex items-center gap-1.5">
+            <Target className="h-3 w-3" /> CTA Options — click to copy
+          </p>
+          <div className="space-y-2">
+            {(post.ctas ?? []).map((cta, i) => (
+              <div key={i} className="flex items-start gap-2 p-2.5 bg-muted/20 border border-border rounded-md">
+                <span className="text-[10px] font-bold text-muted-foreground shrink-0 mt-0.5">CTA {i + 1}</span>
+                <p className="text-xs flex-1 leading-relaxed">{cta}</p>
+                <button
+                  onClick={() => copy(cta, `cta-${i}`)}
+                  className="shrink-0 p-1 rounded hover:bg-accent transition-colors"
+                >
+                  {copied === `cta-${i}` ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="p-4 border-t border-border">
+        <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-2.5">
+          Post Feedback
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { type: "performed_well",  icon: <ThumbsUp className="h-3.5 w-3.5" />,    label: "Performed Well" },
+            { type: "didnt_perform",   icon: <ThumbsDown className="h-3.5 w-3.5" />,   label: "Didn't Perform" },
+            { type: "high_engagement", icon: <Flame className="h-3.5 w-3.5" />,        label: "High Engagement" },
+            { type: "got_clicks",      icon: <ArrowUpDown className="h-3.5 w-3.5" />,  label: "Got Clicks" },
+          ].map(({ type, icon, label }) => {
+            const isDone = feedbackDone === type;
+            const isLoading = submittingFeedback === `${post.day}-${post.post_number}-${type}`;
+            return (
+              <button
+                key={type}
+                onClick={() => submitFeedback(type)}
+                disabled={!!feedbackDone || isLoading}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md border transition-colors ${
+                  isDone
+                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                    : "border-border text-muted-foreground hover:bg-accent disabled:opacity-50"
+                }`}
+              >
+                {icon}
+                {isDone ? "Saved!" : label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {availablePlayers.length > 0 && (
         <div className="p-4 border-t border-border">
@@ -1522,9 +1715,19 @@ function PostCard({
             {ANGLE_LABELS[post.content_angle].label}
           </span>
         )}
-        {topHookScore !== null && (
-          <span className={`text-[10px] font-mono font-bold ${topHookScore >= 8 ? "text-emerald-600" : topHookScore >= 6 ? "text-blue-600" : "text-muted-foreground"}`}>
-            {topHookScore}/10
+        {post.conversion_score != null && (
+          <span className={`text-[10px] font-mono font-bold ${post.conversion_score >= 8 ? "text-emerald-600 dark:text-emerald-400" : post.conversion_score >= 6 ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"}`}>
+            {post.conversion_score.toFixed(1)}/10
+          </span>
+        )}
+        {post.confidence && CONFIDENCE_META[post.confidence] && (
+          <span className={`inline-flex items-center text-[9px] font-bold uppercase px-1 py-0.5 rounded border ${CONFIDENCE_META[post.confidence].bg} ${CONFIDENCE_META[post.confidence].color}`}>
+            {CONFIDENCE_META[post.confidence].label}
+          </span>
+        )}
+        {post.priority && PRIORITY_META[post.priority] && (
+          <span className={`text-[10px] ${PRIORITY_META[post.priority].color}`}>
+            {PRIORITY_META[post.priority].icon}
           </span>
         )}
         {post.locked && (
