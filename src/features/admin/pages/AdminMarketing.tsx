@@ -1,20 +1,39 @@
 import { lazy, Suspense, useState } from "react";
-import { RefreshCw, FileText, Image as ImageIcon, Clapperboard, MessageSquare, Calendar } from "lucide-react";
+import { RefreshCw, Zap, FileText, MessageSquare, Calendar, Image as ImageIcon, Clapperboard } from "lucide-react";
 
-const ContentEngine  = lazy(() => import("@/features/admin/marketing/ContentEngine"));
-const ImageStudio    = lazy(() => import("@/features/admin/marketing/ImageStudio"));
-const VideoStudio    = lazy(() => import("@/features/admin/marketing/VideoStudio"));
-const RedditEngine   = lazy(() => import("@/features/admin/marketing/RedditEngine"));
-const WeeklyPlanner  = lazy(() => import("@/features/admin/marketing/WeeklyPlanner"));
+const ContentDashboard = lazy(() => import("@/features/admin/marketing/ContentDashboard"));
+const ContentEngine    = lazy(() => import("@/features/admin/marketing/ContentEngine"));
+const RedditEngine     = lazy(() => import("@/features/admin/marketing/RedditEngine"));
+const WeeklyPlanner    = lazy(() => import("@/features/admin/marketing/WeeklyPlanner"));
+const ImageStudio      = lazy(() => import("@/features/admin/marketing/ImageStudio"));
+const VideoStudio      = lazy(() => import("@/features/admin/marketing/VideoStudio"));
 
-type Tab = "script" | "image" | "video" | "reddit" | "planner";
+type Tab = "opportunities" | "script" | "reddit" | "planner" | "image" | "video";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType; description: string }[] = [
+  {
+    id: "opportunities",
+    label: "Content Engine",
+    icon: Zap,
+    description: "Data-driven content opportunities — one click to a full content pack",
+  },
   {
     id: "script",
     label: "Script Engine",
     icon: FileText,
-    description: "Generate hooks, scripts, and content ideas",
+    description: "Manually build scripts and hooks for any player and angle",
+  },
+  {
+    id: "reddit",
+    label: "Reddit",
+    icon: MessageSquare,
+    description: "Generate posts and replies for Reddit engagement",
+  },
+  {
+    id: "planner",
+    label: "Planner",
+    icon: Calendar,
+    description: "Plan and execute daily posts across platforms",
   },
   {
     id: "image",
@@ -28,18 +47,6 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; description: stri
     icon: Clapperboard,
     description: "Prepare scripts, voice, captions, and video structure",
   },
-  {
-    id: "reddit",
-    label: "Reddit Engine",
-    icon: MessageSquare,
-    description: "Generate posts and replies for engagement",
-  },
-  {
-    id: "planner",
-    label: "Planner",
-    icon: Calendar,
-    description: "Plan and execute daily posts",
-  },
 ];
 
 function TabFallback() {
@@ -51,7 +58,7 @@ function TabFallback() {
 }
 
 export default function AdminMarketing() {
-  const [tab, setTab] = useState<Tab>("script");
+  const [tab, setTab] = useState<Tab>("opportunities");
   const activeTab = TABS.find((t) => t.id === tab)!;
 
   return (
@@ -80,11 +87,12 @@ export default function AdminMarketing() {
       <p className="text-xs text-muted-foreground mb-6 px-1">{activeTab.description}</p>
 
       <Suspense fallback={<TabFallback />}>
-        {tab === "script"  && <ContentEngine />}
-        {tab === "image"   && <ImageStudio />}
-        {tab === "video"   && <VideoStudio />}
-        {tab === "reddit"  && <RedditEngine />}
-        {tab === "planner" && <WeeklyPlanner />}
+        {tab === "opportunities" && <ContentDashboard />}
+        {tab === "script"        && <ContentEngine />}
+        {tab === "reddit"        && <RedditEngine />}
+        {tab === "planner"       && <WeeklyPlanner />}
+        {tab === "image"         && <ImageStudio />}
+        {tab === "video"         && <VideoStudio />}
       </Suspense>
     </div>
   );
