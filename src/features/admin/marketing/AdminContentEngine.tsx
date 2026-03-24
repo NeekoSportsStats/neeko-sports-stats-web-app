@@ -1,9 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  RefreshCw, Calendar, Video, Image, Monitor, Copy, Check,
-  ChevronDown, ChevronUp, Zap, TriangleAlert as AlertTriangle,
-  Star, TrendingUp, FileText, Eye, Play, Mic, ChevronRight, Brain,
-} from "lucide-react";
+import { RefreshCw, Calendar, Video, Image, Monitor, Copy, Check, ChevronDown, ChevronUp, Zap, TriangleAlert as AlertTriangle, Star, TrendingUp, FileText, Eye, Play, Mic, ChevronRight, Brain, Flame, Target, Smartphone, ChartBar as BarChart2, List } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -11,7 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 
 type PostType = "Video" | "Image" | "Screen Recording";
 type PostCategory = "Value" | "Breakout" | "Trap" | "Captain" | "Proof";
-type PostTab = "voice" | "hooks" | "visual" | "caption" | "ai";
+type PostTab = "voice" | "hooks" | "visual" | "caption" | "ai" | "platform" | "strategy";
+type Platform = "tiktok" | "instagram" | "reddit";
 
 interface PlayerAISummary {
   summary_short: string | null;
@@ -55,6 +52,24 @@ interface PlayerOption {
   neeko_rating_scaled: number | null;
 }
 
+interface TopPostPlayer {
+  player_id: number;
+  player_name: string;
+  team: string;
+  value_score: number | null;
+  projection_final: number | null;
+  consistency_score: number | null;
+  neeko_rating_scaled: number | null;
+  recommendation: string | null;
+}
+
+interface TodayTopPost {
+  type: "VALUE" | "TRAP" | "PROOF";
+  player: TopPostPlayer;
+  hook: string;
+  caption: string;
+}
+
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 
 const CATEGORY_META: Record<PostCategory, { color: string; bg: string; border: string; icon: React.ElementType }> = {
@@ -72,11 +87,13 @@ const POST_TYPE_ICON: Record<PostType, React.ElementType> = {
 };
 
 const POST_TABS: { id: PostTab; label: string; icon: React.ElementType }[] = [
-  { id: "voice",   label: "Voice Script",  icon: Mic },
-  { id: "hooks",   label: "Hooks",         icon: Play },
-  { id: "visual",  label: "Visual Plan",   icon: Eye },
-  { id: "caption", label: "Caption",       icon: FileText },
-  { id: "ai",      label: "AI Summary",    icon: Brain },
+  { id: "voice",    label: "Voice Script",  icon: Mic },
+  { id: "hooks",    label: "Hooks",         icon: Play },
+  { id: "visual",   label: "Visual Plan",   icon: Eye },
+  { id: "caption",  label: "Caption",       icon: FileText },
+  { id: "ai",       label: "AI Summary",    icon: Brain },
+  { id: "platform", label: "Platforms",     icon: Smartphone },
+  { id: "strategy", label: "Strategy",      icon: BarChart2 },
 ];
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -103,6 +120,409 @@ function getCaptionScript(post: PostPlan): string {
 
 function getHooks(post: PostPlan): string[] {
   return (post.hooks?.length ? post.hooks : post.hook_options) ?? [];
+}
+
+// ── HOOK SCORING ──────────────────────────────────────────────────────────────
+
+type HookType = "Curiosity" | "Controversy" | "Authority" | "Fear" | "Generic";
+
+interface HookScore {
+  score: number;
+  type: HookType;
+  label: string;
+}
+
+function scoreHook(hook: string): HookScore {
+  let score = 5;
+  const lower = hook.toLowerCase();
+
+  const hasNumbers = /\d+/.test(hook);
+  if (hasNumbers) score += 2;
+
+  const contradictionWords = /\b(wrong|myth|stop|avoid|mistake|actually|truth|lie|real|secret|exposed|hidden)\b/i;
+  if (contradictionWords.test(hook)) score += 2;
+
+  const urgencyWords = /\b(now|today|this week|round \d|before|urgent|don't miss|act fast|immediately)\b/i;
+  if (urgencyWords.test(hook)) score += 2;
+
+  const curiosityGap = /\?|why|how|what if|the reason|you won't believe|here's what/i;
+  if (curiosityGap.test(hook)) score += 2;
+
+  const genericPhrasing = /\b(great player|doing well|good form|nice stats|solid pick)\b/i;
+  if (genericPhrasing.test(hook)) score -= 2;
+
+  score = Math.max(1, Math.min(10, score));
+
+  let type: HookType = "Generic";
+  if (contradictionWords.test(lower)) type = "Controversy";
+  else if (curiosityGap.test(lower)) type = "Curiosity";
+  else if (/\b(data|stats|model|analytics|projec|rank)\b/i.test(lower)) type = "Authority";
+  else if (/\b(risk|trap|danger|avoid|warning|mistake|too late)\b/i.test(lower)) type = "Fear";
+  else if (hasNumbers) type = "Authority";
+
+  const typeColors: Record<HookType, string> = {
+    Curiosity: "text-blue-600 dark:text-blue-400",
+    Controversy: "text-red-600 dark:text-red-400",
+    Authority: "text-emerald-600 dark:text-emerald-400",
+    Fear: "text-orange-600 dark:text-orange-400",
+    Generic: "text-muted-foreground",
+  };
+
+  return { score, type, label: typeColors[type] };
+}
+
+function HookScoreBadge({ hook }: { hook: string }) {
+  const { score, type, label } = scoreHook(hook);
+  const barWidth = `${(score / 10) * 100}%`;
+  const barColor = score >= 8 ? "bg-emerald-500" : score >= 6 ? "bg-blue-500" : score >= 4 ? "bg-orange-400" : "bg-red-400";
+
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      <span className={`text-[10px] font-semibold ${label}`}>{type}</span>
+      <div className="flex items-center gap-1">
+        <div className="w-14 h-1.5 bg-muted rounded-full overflow-hidden">
+          <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: barWidth }} />
+        </div>
+        <span className="text-[10px] font-mono font-bold tabular-nums w-6 text-right">{score}/10</span>
+      </div>
+    </div>
+  );
+}
+
+// ── STRATEGY LAYER ────────────────────────────────────────────────────────────
+
+interface PostStrategy {
+  goal: string;
+  trigger: string;
+  expectedBehaviour: string;
+  bestTime: string;
+  callToAction: string;
+}
+
+function getPostStrategy(category: PostCategory, postType: PostType): PostStrategy {
+  const strategies: Record<PostCategory, PostStrategy> = {
+    Value: {
+      goal: "Drive Neeko+ conversions by showcasing underpriced player intelligence",
+      trigger: "User sees a player they own or are considering — price data validates the buy",
+      expectedBehaviour: "Comment 'VALUE?' or click the bio link to check rankings",
+      bestTime: "Tuesday–Wednesday (pre-trade week)",
+      callToAction: "Check the full value score in the link in bio",
+    },
+    Breakout: {
+      goal: "Create urgency around an emerging player before the price rises",
+      trigger: "User has the player on their watchlist or just missed their breakout",
+      expectedBehaviour: "Share with their fantasy league group chat or save the post",
+      bestTime: "Monday post-round (price update day)",
+      callToAction: "Grab them NOW before the price rises — link in bio",
+    },
+    Trap: {
+      goal: "Stop users from making a costly mistake — position Neeko as the authority",
+      trigger: "User owns the player and is second-guessing keeping them",
+      expectedBehaviour: "Comment 'I almost traded them in!' or share to warn others",
+      bestTime: "Wednesday–Thursday (trading deadline pressure)",
+      callToAction: "See the full trap analysis before your trade locks in",
+    },
+    Captain: {
+      goal: "Build trust in Neeko AI by showcasing captain confidence scoring",
+      trigger: "User is undecided on captain for the round",
+      expectedBehaviour: "Save the post for round day or check the captain tool",
+      bestTime: "Thursday–Friday (round eve)",
+      callToAction: "Use the Neeko captain tool — link in bio",
+    },
+    Proof: {
+      goal: "Build credibility by showing past prediction accuracy",
+      trigger: "User is sceptical about AI tools and needs social proof",
+      expectedBehaviour: "Follow + save the post as a benchmark of Neeko's accuracy",
+      bestTime: "Saturday–Sunday (post-match results)",
+      callToAction: "See more Neeko AI predictions — follow for weekly breakdowns",
+    },
+  };
+
+  const strategy = strategies[category] ?? strategies.Value;
+
+  if (postType === "Screen Recording") {
+    return {
+      ...strategy,
+      goal: strategy.goal + " (screen recording adds credibility through product demonstration)",
+      callToAction: "Try it yourself — link in bio for free access",
+    };
+  }
+
+  return strategy;
+}
+
+function StrategyTabContent({ post }: { post: PostPlan }) {
+  const strategy = getPostStrategy(post.category, post.post_type);
+  const { copied, copy } = useCopy();
+
+  const allText = [
+    `Goal: ${strategy.goal}`,
+    `Trigger: ${strategy.trigger}`,
+    `Expected Behaviour: ${strategy.expectedBehaviour}`,
+    `Best Post Time: ${strategy.bestTime}`,
+    `Call To Action: ${strategy.callToAction}`,
+  ].join("\n");
+
+  const fields: { label: string; value: string; key: keyof PostStrategy }[] = [
+    { label: "Goal", value: strategy.goal, key: "goal" },
+    { label: "Trigger", value: strategy.trigger, key: "trigger" },
+    { label: "Expected Behaviour", value: strategy.expectedBehaviour, key: "expectedBehaviour" },
+    { label: "Best Post Time", value: strategy.bestTime, key: "bestTime" },
+    { label: "Call To Action", value: strategy.callToAction, key: "callToAction" },
+  ];
+
+  return (
+    <div className="p-4 space-y-3">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Post Strategy</p>
+        <button
+          onClick={() => copy(allText, "strategy-all")}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
+        >
+          {copied === "strategy-all" ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy All</>}
+        </button>
+      </div>
+      <div className="space-y-2">
+        {fields.map(({ label, value, key }) => (
+          <div key={key} className="p-3 bg-muted/20 border border-border rounded-md">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+              <button
+                onClick={() => copy(value, `strategy-${key}`)}
+                className="p-1 rounded hover:bg-accent transition-colors"
+              >
+                {copied === `strategy-${key}` ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+              </button>
+            </div>
+            <p className="text-sm leading-relaxed">{value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── PLATFORM VARIANTS ─────────────────────────────────────────────────────────
+
+function generatePlatformVariant(post: PostPlan, platform: Platform): string {
+  const hook = getHooks(post)[0] ?? `${post.player_name} is trending this week`;
+  const caption = getCaptionScript(post);
+  const short = caption.slice(0, 200);
+
+  if (platform === "tiktok") {
+    return [
+      `🔥 ${hook.toUpperCase()}`,
+      ``,
+      `${post.player_name} (${post.team}) — ${post.category} pick`,
+      ``,
+      `${short}${short.length < caption.length ? "…" : ""}`,
+      ``,
+      `👉 Full breakdown in bio`,
+      ``,
+      `#AFL #AFLFantasy #SuperCoach #NeekoAI #${post.player_name.replace(/ /g, "")} #${post.team.replace(/ /g, "")} #FantasyFootball`,
+    ].join("\n");
+  }
+
+  if (platform === "instagram") {
+    return [
+      `${hook}`,
+      ``,
+      `${post.player_name} · ${post.team} · ${post.category} Rating`,
+      ``,
+      `${caption}`,
+      ``,
+      `Tap the link in bio to see the full AI breakdown →`,
+      ``,
+      `• • •`,
+      ``,
+      `#AFL #AFLFantasy #SuperCoach #FantasyFootball #NeekoAI #${post.player_name.split(" ").pop()} #${post.team.replace(/ /g, "")}`,
+    ].join("\n");
+  }
+
+  return [
+    `**${hook}**`,
+    ``,
+    `${post.player_name} is shaping up as a ${post.category.toLowerCase()} this week. Here's what the data says:`,
+    ``,
+    `${caption}`,
+    ``,
+    `I've been using Neeko AI for AFL Fantasy analytics — it's been remarkably accurate for projections. Full breakdown in the link.`,
+    ``,
+    `What do you reckon — are you buying, holding or selling ${post.player_name.split(" ").pop()} this week?`,
+  ].join("\n");
+}
+
+function PlatformVariantsTabContent({ post }: { post: PostPlan }) {
+  const [activePlatform, setActivePlatform] = useState<Platform>("tiktok");
+  const { copied, copy } = useCopy();
+
+  const platforms: { id: Platform; label: string; color: string }[] = [
+    { id: "tiktok",    label: "TikTok",    color: "text-pink-600 dark:text-pink-400" },
+    { id: "instagram", label: "Instagram", color: "text-orange-500 dark:text-orange-400" },
+    { id: "reddit",    label: "Reddit",    color: "text-orange-600 dark:text-orange-400" },
+  ];
+
+  const content = generatePlatformVariant(post, activePlatform);
+
+  return (
+    <div className="p-4 space-y-3">
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex gap-1">
+          {platforms.map(({ id, label, color }) => (
+            <button
+              key={id}
+              onClick={() => setActivePlatform(id)}
+              className={`px-2.5 py-1 text-xs rounded-md border transition-colors ${
+                activePlatform === id
+                  ? `bg-foreground text-background border-foreground`
+                  : `border-border ${color} hover:border-foreground/30`
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => copy(content, `platform-${activePlatform}`)}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
+        >
+          {copied === `platform-${activePlatform}` ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy</>}
+        </button>
+      </div>
+
+      <textarea
+        value={content}
+        readOnly
+        className="w-full min-h-52 text-sm border border-border rounded-md p-3 bg-muted/10 resize-y leading-relaxed"
+      />
+      <p className="text-[10px] text-muted-foreground">{content.length} characters · optimised for {activePlatform}</p>
+    </div>
+  );
+}
+
+// ── SCREEN RECORDING GENERATOR ─────────────────────────────────────────────────
+
+interface RecordingStep {
+  step: number;
+  duration: string;
+  action: string;
+  zoomPoint?: string;
+  pauseSuggestion?: string;
+}
+
+function generateRecordingSteps(post: PostPlan): RecordingStep[] {
+  const name = post.player_name;
+  const hook = getHooks(post)[0] ?? "Open the Neeko rankings";
+
+  const baseSteps: RecordingStep[] = [
+    {
+      step: 1,
+      duration: "0–3s",
+      action: `Hook card or title screen — show text: "${hook.slice(0, 60)}${hook.length > 60 ? "…" : ""}"`,
+      zoomPoint: "Centre screen — large text",
+      pauseSuggestion: "Hold 2s on the title before navigating",
+    },
+    {
+      step: 2,
+      duration: "3–8s",
+      action: `Navigate to ${name}'s player profile or rankings row`,
+      zoomPoint: "Player name and team tag",
+      pauseSuggestion: "Slow scroll — let viewers read the name",
+    },
+    {
+      step: 3,
+      duration: "8–14s",
+      action: `Highlight ${name}'s key stat — projection, price, or value score`,
+      zoomPoint: "Zoom 1.5× on the stat number",
+      pauseSuggestion: "Pause 1.5s on the standout number",
+    },
+    {
+      step: 4,
+      duration: "14–20s",
+      action: `Show the AI recommendation badge and summary for ${name}`,
+      zoomPoint: "Badge + first sentence of summary",
+      pauseSuggestion: "Hold 2s — this is the key credibility moment",
+    },
+    {
+      step: 5,
+      duration: "20–25s",
+      action: `Swipe or scroll to the score history chart for ${name}`,
+      zoomPoint: "Last 5 rounds of sparkline",
+      pauseSuggestion: "Tap each data point slowly",
+    },
+    {
+      step: 6,
+      duration: "25–28s",
+      action: `End screen — CTA overlay: "Full breakdown in bio / Follow for weekly picks"`,
+      zoomPoint: "Bio link or follow button",
+      pauseSuggestion: "Hold 3s on the CTA",
+    },
+  ];
+
+  if (post.category === "Trap") {
+    baseSteps[2].action = `Show the trap signal — overpriced vs projection gap for ${name}`;
+    baseSteps[2].zoomPoint = "Price vs projection delta";
+    baseSteps[3].action = `Reveal why ${name} is rated as a TRAP this week — AI summary`;
+  }
+
+  if (post.category === "Value") {
+    baseSteps[2].action = `Show ${name}'s value score — highlight the underpriced gap`;
+    baseSteps[2].zoomPoint = "Value score vs market price";
+  }
+
+  return baseSteps;
+}
+
+function ScreenRecordingTabContent({ post }: { post: PostPlan }) {
+  const { copied, copy } = useCopy();
+  const steps = generateRecordingSteps(post);
+
+  const allText = steps.map(s => [
+    `Step ${s.step} (${s.duration}): ${s.action}`,
+    s.zoomPoint ? `  Zoom: ${s.zoomPoint}` : "",
+    s.pauseSuggestion ? `  Pause: ${s.pauseSuggestion}` : "",
+  ].filter(Boolean).join("\n")).join("\n\n");
+
+  return (
+    <div className="p-4 space-y-3">
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Screen Recording Script</p>
+          <p className="text-[10px] text-muted-foreground/70 mt-0.5">~28s total · {steps.length} steps</p>
+        </div>
+        <button
+          onClick={() => copy(allText, "recording-all")}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
+        >
+          {copied === "recording-all" ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy Steps</>}
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {steps.map((step) => (
+          <div key={step.step} className="flex gap-3 p-3 bg-muted/20 border border-border rounded-md">
+            <div className="shrink-0 flex flex-col items-center gap-1">
+              <span className="text-[10px] font-bold text-muted-foreground font-mono">#{step.step}</span>
+              <span className="text-[9px] text-muted-foreground/60 font-mono whitespace-nowrap">{step.duration}</span>
+            </div>
+            <div className="flex-1 min-w-0 space-y-1">
+              <p className="text-sm leading-snug">{step.action}</p>
+              {step.zoomPoint && (
+                <p className="text-[10px] text-blue-600 dark:text-blue-400">
+                  <span className="font-semibold">Zoom:</span> {step.zoomPoint}
+                </p>
+              )}
+              {step.pauseSuggestion && (
+                <p className="text-[10px] text-orange-600 dark:text-orange-400">
+                  <span className="font-semibold">Pause:</span> {step.pauseSuggestion}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // ── AI SUMMARY TAB ────────────────────────────────────────────────────────────
@@ -233,7 +653,6 @@ function AISummaryTabContent({ playerId }: { playerId: number }) {
 
   return (
     <div className="p-4 space-y-4">
-      {/* Header row */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           {data.recommendation && (
@@ -260,14 +679,12 @@ function AISummaryTabContent({ playerId }: { playerId: number }) {
         </button>
       </div>
 
-      {/* Primary reason pill */}
       {data.primary_reason && (
         <p className="text-xs text-muted-foreground italic border-l-2 border-border pl-3">
           {data.primary_reason}
         </p>
       )}
 
-      {/* Short summary */}
       {data.summary_short && (
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Summary</p>
@@ -277,13 +694,225 @@ function AISummaryTabContent({ playerId }: { playerId: number }) {
         </div>
       )}
 
-      {/* Full analysis */}
       {data.summary_long && (
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Full Analysis</p>
           <div className="max-h-72 overflow-y-auto p-3 bg-muted/10 border border-border rounded-md">
             <AIHighlightedParagraphs text={data.summary_long} />
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── TODAY'S TOP 3 POSTS ───────────────────────────────────────────────────────
+
+function generateTopPostHook(player: TopPostPlayer, type: "VALUE" | "TRAP" | "PROOF"): string {
+  const name = player.player_name.split(" ").pop() ?? player.player_name;
+  const proj = player.projection_final ? Math.round(player.projection_final) : null;
+
+  if (type === "VALUE") {
+    return proj
+      ? `${name} is projecting ${proj} pts this round — but the market hasn't noticed yet`
+      : `${name} is massively underpriced right now — the model has him rated much higher than his price`;
+  }
+  if (type === "TRAP") {
+    return `Everyone is trading in ${name} this week — but Neeko AI says avoid him`;
+  }
+  return proj
+    ? `Neeko called ${name} at ${proj} pts — here's the proof`
+    : `${name} delivered exactly what Neeko AI predicted — here's the data`;
+}
+
+function generateTopPostCaption(player: TopPostPlayer, type: "VALUE" | "TRAP" | "PROOF"): string {
+  const name = player.player_name;
+  const team = player.team;
+  const proj = player.projection_final ? Math.round(player.projection_final) : null;
+
+  if (type === "VALUE") {
+    return `${name} (${team}) is currently one of the highest-value picks in the competition according to Neeko AI's ranking engine.\n\nThe model rates him well above his current price point — which means fantasy coaches who act now could gain a significant price advantage before the market corrects.\n\n${proj ? `Current projection: ${proj} pts this round.\n\n` : ""}Full breakdown in the link in bio. #AFLFantasy #SuperCoach #NeekoAI`;
+  }
+  if (type === "TRAP") {
+    return `${name} (${team}) is attracting heavy trade-in traffic this week — but Neeko AI is flagging a TRAP.\n\nThe model is detecting a mismatch between public sentiment and the underlying data. Before you bring him in, check the full analysis.\n\nDon't let the crowd lead you into a costly mistake. Full breakdown in bio. #AFLFantasy #SuperCoach #NeekoAI`;
+  }
+  return `${name} (${team}) was flagged by Neeko AI heading into this round${proj ? ` with a ${proj} pt projection` : ""}.\n\nHere's how the model performed. This is the kind of data-driven edge that separates winning fantasy coaches from the rest.\n\nSee more AI-powered picks in the link in bio. #AFLFantasy #SuperCoach #NeekoAI`;
+}
+
+function TodayTopPostCard({
+  topPost,
+  onCopy,
+  copied,
+}: {
+  topPost: TodayTopPost;
+  onCopy: (text: string, key: string) => void;
+  copied: string | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const typeColors: Record<TodayTopPost["type"], { bg: string; text: string; border: string; label: string }> = {
+    VALUE: { bg: "bg-emerald-500/10", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-500/30", label: "Value Post" },
+    TRAP:  { bg: "bg-red-500/10",     text: "text-red-700 dark:text-red-300",         border: "border-red-500/30",     label: "Trap Warning" },
+    PROOF: { bg: "bg-blue-500/10",    text: "text-blue-700 dark:text-blue-300",        border: "border-blue-500/30",    label: "Proof Post" },
+  };
+  const meta = typeColors[topPost.type];
+  const allText = `${topPost.hook}\n\n${topPost.caption}`;
+
+  return (
+    <div className={`rounded-lg border ${meta.border} ${meta.bg} overflow-hidden`}>
+      <div className="px-3 py-2.5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${meta.bg} ${meta.text} ${meta.border}`}>
+            {meta.label}
+          </span>
+          <span className="font-semibold text-sm truncate">{topPost.player.player_name}</span>
+          <span className="text-xs text-muted-foreground shrink-0">{topPost.player.team}</span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => onCopy(allText, `top-${topPost.type}`)}
+            className="flex items-center gap-1 px-2 py-1 border border-border text-[10px] rounded hover:bg-background/50 transition-colors"
+          >
+            {copied === `top-${topPost.type}` ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+            Copy
+          </button>
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="p-1 rounded hover:bg-background/50 transition-colors"
+          >
+            {expanded ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="px-3 pb-3 border-t border-border/50 space-y-2 pt-2 bg-background/40">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Hook</p>
+            <p className="text-sm font-medium leading-snug">{topPost.hook}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Caption</p>
+            <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-line">{topPost.caption}</p>
+          </div>
+          {topPost.player.projection_final && (
+            <div className="flex gap-3 pt-1">
+              <div className="text-center">
+                <p className="text-[10px] text-muted-foreground">Projection</p>
+                <p className="text-sm font-bold font-mono">{Math.round(topPost.player.projection_final)} pts</p>
+              </div>
+              {topPost.player.value_score !== null && (
+                <div className="text-center">
+                  <p className="text-[10px] text-muted-foreground">Value Score</p>
+                  <p className="text-sm font-bold font-mono">{topPost.player.value_score?.toFixed(1)}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TodayTopPostsSection() {
+  const [posts, setPosts] = useState<TodayTopPost[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [generated, setGenerated] = useState(false);
+  const { copied, copy } = useCopy();
+
+  const generate = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .schema("afl")
+        .from("player_rankings_cache")
+        .select("player_id, player_name, team, value_score, projection_final, consistency_score, neeko_rating_scaled, recommendation")
+        .eq("is_available", true)
+        .not("projection_final", "is", null)
+        .not("value_score", "is", null)
+        .order("value_score", { ascending: false, nullsFirst: false })
+        .limit(50);
+
+      if (error || !data || data.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      const pool = data as TopPostPlayer[];
+
+      const valuePlayer = pool[0];
+      const trapPlayer = [...pool]
+        .sort((a, b) => (a.value_score ?? 0) - (b.value_score ?? 0))
+        .find((p) => p.player_id !== valuePlayer.player_id) ?? pool[pool.length - 1];
+      const proofPlayer = [...pool]
+        .filter((p) => p.player_id !== valuePlayer.player_id && p.player_id !== trapPlayer.player_id)
+        .sort((a, b) => (b.projection_final ?? 0) - (a.projection_final ?? 0))[0] ?? pool[2];
+
+      const result: TodayTopPost[] = [
+        {
+          type: "VALUE",
+          player: valuePlayer,
+          hook: generateTopPostHook(valuePlayer, "VALUE"),
+          caption: generateTopPostCaption(valuePlayer, "VALUE"),
+        },
+        {
+          type: "TRAP",
+          player: trapPlayer,
+          hook: generateTopPostHook(trapPlayer, "TRAP"),
+          caption: generateTopPostCaption(trapPlayer, "TRAP"),
+        },
+        {
+          type: "PROOF",
+          player: proofPlayer,
+          hook: generateTopPostHook(proofPlayer, "PROOF"),
+          caption: generateTopPostCaption(proofPlayer, "PROOF"),
+        },
+      ];
+
+      setPosts(result);
+      setGenerated(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-border bg-muted/10 overflow-hidden">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Flame className="h-4 w-4 text-orange-500" />
+          <div>
+            <p className="text-sm font-semibold">Today's Best Posts</p>
+            <p className="text-[10px] text-muted-foreground">Auto-selected from live rankings data</p>
+          </div>
+        </div>
+        <button
+          onClick={generate}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background rounded-md text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+        >
+          <Zap className={`h-3.5 w-3.5 ${loading ? "animate-pulse" : ""}`} />
+          {loading ? "Generating…" : generated ? "Regenerate" : "Generate Today's Content"}
+        </button>
+      </div>
+
+      {posts && (
+        <div className="p-3 space-y-2">
+          {posts.map((p) => (
+            <TodayTopPostCard
+              key={p.type}
+              topPost={p}
+              onCopy={copy}
+              copied={copied}
+            />
+          ))}
+        </div>
+      )}
+
+      {!posts && !loading && (
+        <div className="px-4 py-5 text-center">
+          <Target className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
+          <p className="text-xs text-muted-foreground">Click generate to get 3 data-driven posts — VALUE, TRAP, and PROOF</p>
         </div>
       )}
     </div>
@@ -305,6 +934,12 @@ function PostDetailPanel({
   const { copied, copy } = useCopy();
   const catMeta = CATEGORY_META[post.category] ?? CATEGORY_META.Value;
 
+  const isScreenRecording = post.post_type === "Screen Recording";
+
+  const visibleTabs = isScreenRecording
+    ? POST_TABS
+    : POST_TABS.filter((t) => t.id !== "strategy" || true);
+
   const getTabContent = (): string => {
     switch (activeTab) {
       case "voice":   return getVoiceScript(post);
@@ -312,6 +947,8 @@ function PostDetailPanel({
       case "visual":  return typeof post.visual_plan === "string" ? post.visual_plan : JSON.stringify(post.visual_plan, null, 2);
       case "caption": return getCaptionScript(post);
       case "ai":      return "";
+      case "platform": return "";
+      case "strategy": return "";
     }
   };
 
@@ -325,6 +962,8 @@ function PostDetailPanel({
     ].join("\n\n---\n\n");
     copy(all, "all");
   };
+
+  const isCustomTab = activeTab === "ai" || activeTab === "platform" || activeTab === "strategy" || (activeTab === "hooks" && isScreenRecording);
 
   return (
     <div className="border border-border rounded-lg overflow-hidden bg-background">
@@ -355,8 +994,8 @@ function PostDetailPanel({
         </div>
       </div>
 
-      <div className="flex gap-1 px-4 pt-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-        {POST_TABS.map(({ id, label, icon: Icon }) => (
+      <div className="flex gap-1 px-4 pt-3 pb-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+        {visibleTabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
@@ -374,6 +1013,12 @@ function PostDetailPanel({
 
       {activeTab === "ai" ? (
         <AISummaryTabContent playerId={post.player_id} />
+      ) : activeTab === "platform" ? (
+        <PlatformVariantsTabContent post={post} />
+      ) : activeTab === "strategy" ? (
+        <StrategyTabContent post={post} />
+      ) : activeTab === "hooks" && isScreenRecording ? (
+        <ScreenRecordingTabContent post={post} />
       ) : (
         <div className="p-4">
           <div className="flex items-center justify-between mb-2">
@@ -394,12 +1039,15 @@ function PostDetailPanel({
                 <div key={i} className="flex items-start gap-2 p-3 bg-muted/30 border border-border rounded-md">
                   <span className="text-xs text-muted-foreground font-mono shrink-0 mt-0.5">{i + 1}.</span>
                   <p className="text-sm flex-1 leading-relaxed">{hook}</p>
-                  <button
-                    onClick={() => copy(hook, `hook-${i}`)}
-                    className="shrink-0 p-1 rounded hover:bg-accent transition-colors"
-                  >
-                    {copied === `hook-${i}` ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <HookScoreBadge hook={hook} />
+                    <button
+                      onClick={() => copy(hook, `hook-${i}`)}
+                      className="p-1 rounded hover:bg-accent transition-colors"
+                    >
+                      {copied === `hook-${i}` ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -410,7 +1058,7 @@ function PostDetailPanel({
               className="w-full min-h-48 text-sm border border-border rounded-md p-3 bg-muted/10 resize-y font-mono leading-relaxed"
             />
           )}
-          <p className="text-[10px] text-muted-foreground mt-1.5">{getTabContent().length} characters</p>
+          {!isCustomTab && <p className="text-[10px] text-muted-foreground mt-1.5">{getTabContent().length} characters</p>}
         </div>
       )}
     </div>
@@ -432,6 +1080,7 @@ function PostCard({
   const TypeIcon = POST_TYPE_ICON[post.post_type] ?? Video;
   const CatIcon = catMeta.icon;
   const hooks = getHooks(post);
+  const topHookScore = hooks.length > 0 ? scoreHook(hooks[0]).score : null;
 
   return (
     <button
@@ -451,6 +1100,11 @@ function PostCard({
           <TypeIcon className="h-2.5 w-2.5" />
           {post.post_type}
         </span>
+        {topHookScore !== null && (
+          <span className={`text-[10px] font-mono font-bold ${topHookScore >= 8 ? "text-emerald-600" : topHookScore >= 6 ? "text-blue-600" : "text-muted-foreground"}`}>
+            {topHookScore}/10
+          </span>
+        )}
       </div>
       <p className="font-semibold text-sm leading-tight truncate">{post.player_name}</p>
       <p className="text-xs text-muted-foreground truncate mb-1.5">{post.team}</p>
@@ -723,6 +1377,9 @@ export default function AdminContentEngine() {
 
   return (
     <div className="space-y-5">
+      {/* ── TODAY'S TOP 3 POSTS ────────────────────────────────────────────── */}
+      <TodayTopPostsSection />
+
       {/* ── HEADER ────────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
