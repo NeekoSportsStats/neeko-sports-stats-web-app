@@ -331,42 +331,43 @@ export default function AdminContentEngine() {
   const [generating, setGenerating] = useState(false);
   const [weekKey, setWeekKey] = useState<string>("");
   const [isCached, setIsCached] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedPost, setSelectedPost] = useState<PostPlan | null>(null);
   const [regeneratingPost, setRegeneratingPost] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchPlan = useCallback(async (force = false) => {
     setLoading(true);
+    setError(null);
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-      const anonKey     = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token ?? anonKey;
+      const { data, error: fnError } = await supabase.functions.invoke(
+        "generate-weekly-content",
+        { body: { force } }
+      );
 
-      const res = await fetch(`${supabaseUrl}/functions/v1/generate-weekly-content`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ force }),
-      });
+      if (fnError) throw new Error(fnError.message ?? "Edge function error");
+      if (!data?.ok) throw new Error(data?.error ?? "Function returned not-ok");
 
-      const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error ?? "Failed to load plan");
+      const rawPlan = data.plan as WeeklyPlan;
 
-      setPlan(json.plan as WeeklyPlan);
-      setWeekKey(json.week_key ?? "");
-      setIsCached(json.cached === true);
+      if (!rawPlan?.days || rawPlan.days.length === 0) {
+        throw new Error("Plan returned with no days — check edge function logs");
+      }
+
+      setPlan(rawPlan);
+      setWeekKey(data.week_key ?? "");
+      setIsCached(data.cached === true);
       setSelectedPost(null);
 
       if (force) {
         toast({ title: "New weekly plan generated" });
       }
     } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      setError(msg);
       toast({
         title: "Failed to load plan",
-        description: e instanceof Error ? e.message : "Unknown error",
+        description: msg,
         variant: "destructive",
       });
     } finally {
@@ -478,6 +479,23 @@ export default function AdminContentEngine() {
         </div>
       </div>
 
+      {/* ── ERROR BANNER ──────────────────────────────────────────────────── */}
+      {error && !loading && (
+        <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-destructive">Generation failed</p>
+            <p className="text-xs text-destructive/80 mt-0.5 font-mono break-all">{error}</p>
+          </div>
+          <button
+            onClick={() => fetchPlan(true)}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-destructive/40 text-destructive text-xs rounded-md hover:bg-destructive/10 transition-colors"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* ── LOADING STATE ─────────────────────────────────────────────────── */}
       {loading && (
         <div className="space-y-3">
@@ -508,11 +526,11 @@ export default function AdminContentEngine() {
       )}
 
       {/* ── EMPTY STATE ───────────────────────────────────────────────────── */}
-      {!loading && !plan && (
+      {!loading && !plan && !error && (
         <div className="text-center py-16 border border-dashed border-border rounded-lg">
           <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
           <p className="text-sm font-medium mb-1">No plan generated yet</p>
-          <p className="text-xs text-muted-foreground mb-4">Generate your first weekly content plan</p>
+          <p className="text-xs text-muted-foreground mb-4">Generate your first weekly content plan — takes 30–60 seconds</p>
           <button
             onClick={handleRegenerateWeek}
             className="flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity mx-auto"
