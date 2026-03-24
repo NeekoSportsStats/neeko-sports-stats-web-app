@@ -936,10 +936,16 @@ function PostDetailPanel({
   post,
   onRegenerate,
   regenerating,
+  onAggressiveRewrite,
+  rewriting,
+  rewriteCount,
 }: {
   post: PostPlan;
   onRegenerate: (post: PostPlan) => void;
   regenerating: boolean;
+  onAggressiveRewrite: (post: PostPlan) => void;
+  rewriting: boolean;
+  rewriteCount: number;
 }) {
   const [activeTab, setActiveTab] = useState<PostTab>("voice");
   const { copied, copy } = useCopy();
@@ -995,8 +1001,17 @@ function PostDetailPanel({
             {copied === "all" ? <><Check className="h-3.5 w-3.5" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy All</>}
           </button>
           <button
+            onClick={() => onAggressiveRewrite(post)}
+            disabled={rewriting || regenerating || rewriteCount >= 2}
+            title={rewriteCount >= 2 ? "Max 2 rewrites reached" : "Rewrite hooks, script & caption to be more aggressive"}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 border border-orange-500/40 text-orange-600 dark:text-orange-400 text-xs rounded-md hover:bg-orange-500/10 transition-colors disabled:opacity-40"
+          >
+            <Flame className={`h-3.5 w-3.5 ${rewriting ? "animate-pulse" : ""}`} />
+            {rewriting ? "Rewriting…" : rewriteCount >= 2 ? "Max rewrites" : "Make Aggressive"}
+          </button>
+          <button
             onClick={() => onRegenerate(post)}
-            disabled={regenerating}
+            disabled={regenerating || rewriting}
             className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${regenerating ? "animate-spin" : ""}`} />
@@ -1142,12 +1157,18 @@ function DayRow({
   onSelectPost,
   onRegenerate,
   regeneratingPost,
+  onAggressiveRewrite,
+  aggressivePost,
+  rewriteCounts,
 }: {
   dayPlan: DayPlan;
   selectedPost: PostPlan | null;
   onSelectPost: (post: PostPlan) => void;
   onRegenerate: (post: PostPlan) => void;
   regeneratingPost: string | null;
+  onAggressiveRewrite: (post: PostPlan) => void;
+  aggressivePost: string | null;
+  rewriteCounts: Record<string, number>;
 }) {
   const [expanded, setExpanded] = useState(dayPlan.day === 1);
   const dayLabel = DAY_LABELS[(dayPlan.day - 1) % 7];
@@ -1202,6 +1223,9 @@ function DayRow({
               post={selectedPost}
               onRegenerate={onRegenerate}
               regenerating={regeneratingPost === `${selectedPost.day}-${selectedPost.post_number}`}
+              onAggressiveRewrite={onAggressiveRewrite}
+              rewriting={aggressivePost === `${selectedPost.day}-${selectedPost.post_number}`}
+              rewriteCount={rewriteCounts[`${selectedPost.day}-${selectedPost.post_number}`] ?? 0}
             />
           )}
         </div>
@@ -1268,6 +1292,8 @@ export default function AdminContentEngine() {
   const [error, setError] = useState<string | null>(null);
   const [selectedPost, setSelectedPost] = useState<PostPlan | null>(null);
   const [regeneratingPost, setRegeneratingPost] = useState<string | null>(null);
+  const [aggressivePost, setAggressivePost] = useState<string | null>(null);
+  const [rewriteCounts, setRewriteCounts] = useState<Record<string, number>>({});
   const [focusPlayer, setFocusPlayer] = useState<string>("");
   const { toast } = useToast();
 
@@ -1399,6 +1425,105 @@ export default function AdminContentEngine() {
     }
   };
 
+  const handleAggressiveRewrite = async (post: PostPlan) => {
+    const key = `${post.day}-${post.post_number}`;
+    const count = rewriteCounts[key] ?? 0;
+    if (count >= 2) {
+      toast({ title: "Max rewrites reached", description: "This post has already been rewritten 2 times.", variant: "destructive" });
+      return;
+    }
+
+    setAggressivePost(key);
+
+    const originalContent = [
+      `HOOKS:\n${(post.hooks ?? post.hook_options ?? []).join("\n")}`,
+      `VOICE SCRIPT:\n${post.voice_script ?? post.full_script ?? ""}`,
+      `CAPTION:\n${post.caption_script ?? post.caption ?? ""}`,
+    ].join("\n\n---\n\n");
+
+    const prompt = `You are an elite sports marketing copywriter.
+
+Rewrite the following content to be:
+- more aggressive
+- more opinionated
+- more direct
+- more emotionally engaging
+
+RULES:
+- remove all soft language (could, might, maybe)
+- shorten sentences
+- increase punch
+- add tension or challenge
+- make reader feel they are missing out
+
+DO NOT:
+- change core data
+- hallucinate stats
+- change the player name or team
+
+OUTPUT FORMAT (JSON only, no markdown):
+{
+  "hooks": ["hook 1", "hook 2", "hook 3"],
+  "voice_script": "rewritten script here",
+  "caption": "rewritten caption here"
+}
+
+CONTENT:
+${originalContent}`;
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("generate-player-ai", {
+        body: { prompt, mode: "raw" },
+      });
+
+      if (fnError) throw new Error(fnError.message ?? "Rewrite failed");
+
+      const raw: string = data?.result ?? data?.content ?? data?.text ?? "";
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("Could not parse rewrite response");
+
+      const parsed = JSON.parse(jsonMatch[0]);
+      const newHooks: string[] = Array.isArray(parsed.hooks) ? parsed.hooks : (post.hooks ?? []);
+      const newScript: string = parsed.voice_script ?? post.voice_script;
+      const newCaption: string = parsed.caption ?? post.caption_script;
+
+      const updatedPost: PostPlan = {
+        ...post,
+        hooks: newHooks,
+        hook_options: newHooks,
+        voice_script: newScript,
+        full_script: newScript,
+        caption_script: newCaption,
+        caption: newCaption,
+      };
+
+      setPlan((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          days: prev.days.map((d) =>
+            d.day !== post.day ? d : {
+              ...d,
+              posts: d.posts.map((p) => p.post_number !== post.post_number ? p : updatedPost),
+            }
+          ),
+        };
+      });
+
+      setSelectedPost(updatedPost);
+      setRewriteCounts((prev) => ({ ...prev, [key]: (prev[key] ?? 0) + 1 }));
+      toast({ title: `Rewritten — ${post.player_name}`, description: "Content is now more aggressive." });
+    } catch (e) {
+      toast({
+        title: "Rewrite failed",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setAggressivePost(null);
+    }
+  };
+
   const totalPosts = plan?.days?.reduce((acc, d) => acc + d.posts.length, 0) ?? 0;
 
   return (
@@ -1478,6 +1603,9 @@ export default function AdminContentEngine() {
               onSelectPost={setSelectedPost}
               onRegenerate={handleRegeneratePost}
               regeneratingPost={regeneratingPost}
+              onAggressiveRewrite={handleAggressiveRewrite}
+              aggressivePost={aggressivePost}
+              rewriteCounts={rewriteCounts}
             />
           ))}
         </div>
