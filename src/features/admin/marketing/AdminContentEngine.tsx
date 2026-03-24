@@ -591,13 +591,13 @@ function AIHighlightedParagraphs({ text }: { text: string }) {
 function AISummaryTabContent({ playerId }: { playerId: number }) {
   const [data, setData] = useState<PlayerAISummary | null>(null);
   const [loading, setLoading] = useState(false);
-  const [fetched, setFetched] = useState(false);
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
 
   useEffect(() => {
-    if (fetched || !playerId) return;
-    setFetched(true);
+    if (!playerId) return;
+    setData(null);
     setLoading(true);
+    console.log("Fetching AI for player:", playerId);
 
     supabase
       .schema("ai")
@@ -607,11 +607,13 @@ function AISummaryTabContent({ playerId }: { playerId: number }) {
       .order("generated_at", { ascending: false })
       .limit(1)
       .maybeSingle()
-      .then(({ data: row }) => {
+      .then(({ data: row, error }) => {
+        if (error) console.error("AI fetch error:", error);
+        console.log("AI response:", row);
         setData(row ?? null);
         setLoading(false);
       });
-  }, [playerId, fetched]);
+  }, [playerId]);
 
   const copyAll = () => {
     if (!data) return;
@@ -641,8 +643,8 @@ function AISummaryTabContent({ playerId }: { playerId: number }) {
     return (
       <div className="p-6 text-center">
         <Brain className="h-7 w-7 text-muted-foreground/40 mx-auto mb-2" />
-        <p className="text-sm text-muted-foreground">No AI analysis available for this player yet.</p>
-        <p className="text-xs text-muted-foreground/60 mt-1">Analysis is generated weekly by the pipeline.</p>
+        <p className="text-sm text-muted-foreground font-medium">No AI analysis yet</p>
+        <p className="text-xs text-muted-foreground/60 mt-1">Generate AI or check pipeline — player_id: {playerId}</p>
       </div>
     );
   }
