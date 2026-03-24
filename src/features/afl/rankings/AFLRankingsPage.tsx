@@ -328,7 +328,7 @@ export default function AFLRankingsPage() {
       const { data, error } = await supabase
         .from("v_rankings_master")
         .select(PREMIUM_COLUMNS)
-        .order("neeko_rating_scaled", { ascending: false });
+        .order("neeko_rating_scaled", { ascending: false, nullsFirst: false });
 
       if (error) {
         console.error("Rankings fetch error (premium):", error);
@@ -341,7 +341,7 @@ export default function AFLRankingsPage() {
       const { data, error } = await supabase
         .from("v_rankings_free")
         .select(FREE_COLUMNS)
-        .order("neeko_rating_scaled", { ascending: false });
+        .order("neeko_rating_scaled", { ascending: false, nullsFirst: false });
 
       if (error) {
         console.error("Rankings fetch error (free):", error);

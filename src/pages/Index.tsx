@@ -1204,7 +1204,7 @@ function RankingsPreview() {
       const { data } = await supabase
         .from("v_rankings_free")
         .select("player_name,team,position,projection_final,neeko_rating,neeko_rating_scaled,projection_confidence,risk_rating,value_score,value_tag")
-        .order("neeko_rating_scaled", { ascending: false })
+        .order("neeko_rating_scaled", { ascending: false, nullsFirst: false })
         .limit(5);
       const mapped = (data ?? []).map((r: Record<string, unknown>) => ({
         player_name: r.player_name as string,
