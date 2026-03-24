@@ -1261,7 +1261,7 @@ function PlayerSelector({
 
 export default function AdminContentEngine() {
   const [plan, setPlan] = useState<WeeklyPlan | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [weekKey, setWeekKey] = useState<string>("");
   const [isCached, setIsCached] = useState(false);
@@ -1274,7 +1274,14 @@ export default function AdminContentEngine() {
   const fetchPlan = useCallback(async (force = false) => {
     setLoading(true);
     setError(null);
+
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      setError("Request timed out — the plan generator took too long. Click Retry to try again.");
+    }, 90000);
+
     try {
+      console.log("[ContentEngine] Fetching plan — force:", force, "focusPlayer:", focusPlayer);
       const body: Record<string, unknown> = { force };
       if (focusPlayer) body.player_name = focusPlayer;
 
@@ -1282,6 +1289,10 @@ export default function AdminContentEngine() {
         "generate-weekly-content",
         { body }
       );
+
+      clearTimeout(timeoutId);
+
+      console.log("[ContentEngine] Response received:", { ok: data?.ok, cached: data?.cached, error: fnError });
 
       if (fnError) throw new Error(fnError.message ?? "Edge function error");
       if (!data?.ok) throw new Error(data?.error ?? "Function returned not-ok");
@@ -1301,7 +1312,9 @@ export default function AdminContentEngine() {
         toast({ title: "New weekly plan generated" });
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Unknown error";
+      clearTimeout(timeoutId);
+      const msg = e instanceof Error ? e.message : "Unknown error loading plan";
+      console.error("[ContentEngine] Load failed:", msg);
       setError(msg);
       toast({
         title: "Failed to load plan",
@@ -1309,6 +1322,7 @@ export default function AdminContentEngine() {
         variant: "destructive",
       });
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
       setGenerating(false);
     }
@@ -1316,6 +1330,7 @@ export default function AdminContentEngine() {
 
   useEffect(() => {
     fetchPlan(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRegenerateWeek = () => {
@@ -1422,18 +1437,19 @@ export default function AdminContentEngine() {
       </div>
 
       {/* ── ERROR BANNER ──────────────────────────────────────────────────── */}
-      {error && !loading && (
+      {error && (
         <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-destructive">Generation failed</p>
-            <p className="text-xs text-destructive/80 mt-0.5 font-mono break-all">{error}</p>
+            <p className="text-sm font-medium text-destructive">Failed to load plan</p>
+            <p className="text-xs text-destructive/80 mt-0.5 break-all">{error}</p>
           </div>
           <button
             onClick={() => fetchPlan(true)}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-destructive/40 text-destructive text-xs rounded-md hover:bg-destructive/10 transition-colors"
+            disabled={loading}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-destructive/40 text-destructive text-xs rounded-md hover:bg-destructive/10 transition-colors disabled:opacity-40"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Retry
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            {loading ? "Retrying…" : "Retry"}
           </button>
         </div>
       )}
