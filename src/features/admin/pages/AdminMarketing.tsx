@@ -1,27 +1,18 @@
 import { lazy, Suspense, useState } from "react";
-import { RefreshCw, Zap, MessageSquare, Calendar, Image as ImageIcon, Clapperboard, FileText } from "lucide-react";
+import { RefreshCw, Zap, MessageSquare, Calendar } from "lucide-react";
 
-const AdminContentEngineV3 = lazy(() => import("@/features/admin/marketing/AdminContentEngineV3"));
-const ContentEngine         = lazy(() => import("@/features/admin/marketing/ContentEngine"));
-const RedditEngine          = lazy(() => import("@/features/admin/marketing/RedditEngine"));
-const WeeklyPlanner         = lazy(() => import("@/features/admin/marketing/WeeklyPlanner"));
-const ImageStudio           = lazy(() => import("@/features/admin/marketing/ImageStudio"));
-const VideoStudio           = lazy(() => import("@/features/admin/marketing/VideoStudio"));
+const AdminContentEngine = lazy(() => import("@/features/admin/marketing/AdminContentEngine"));
+const RedditEngine       = lazy(() => import("@/features/admin/marketing/RedditEngine"));
+const WeeklyPlanner      = lazy(() => import("@/features/admin/marketing/WeeklyPlanner"));
 
-type Tab = "engine" | "script" | "reddit" | "planner" | "image" | "video";
+type Tab = "engine" | "reddit" | "planner";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType; description: string }[] = [
   {
     id: "engine",
     label: "Content Engine",
     icon: Zap,
-    description: "AI-powered content from live rankings — click any opportunity to generate a full pack instantly",
-  },
-  {
-    id: "script",
-    label: "Script Builder",
-    icon: FileText,
-    description: "Manually build scripts and hooks for any player and angle",
+    description: "AI-generated 7-day content plan — 21 complete posts with scripts, hooks, and visual directions",
   },
   {
     id: "reddit",
@@ -33,19 +24,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; description: stri
     id: "planner",
     label: "Planner",
     icon: Calendar,
-    description: "Plan and execute daily posts across platforms",
-  },
-  {
-    id: "image",
-    label: "Image Studio",
-    icon: ImageIcon,
-    description: "Create social graphics using player images and stats",
-  },
-  {
-    id: "video",
-    label: "Video Studio",
-    icon: Clapperboard,
-    description: "Prepare scripts, voice, captions, and video structure",
+    description: "Plan and schedule daily posts across platforms",
   },
 ];
 
@@ -87,12 +66,9 @@ export default function AdminMarketing() {
       <p className="text-xs text-muted-foreground mb-6 px-1">{activeTab.description}</p>
 
       <Suspense fallback={<TabFallback />}>
-        {tab === "engine"  && <AdminContentEngineV3 />}
-        {tab === "script"  && <ContentEngine />}
+        {tab === "engine"  && <AdminContentEngine />}
         {tab === "reddit"  && <RedditEngine />}
         {tab === "planner" && <WeeklyPlanner />}
-        {tab === "image"   && <ImageStudio />}
-        {tab === "video"   && <VideoStudio />}
       </Suspense>
     </div>
   );
