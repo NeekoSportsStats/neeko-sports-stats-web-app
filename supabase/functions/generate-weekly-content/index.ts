@@ -90,6 +90,57 @@ type ContentAngle =
   | "we_called_it"
   | "system_works";
 
+const VALID_CREATIVE_STYLES = [
+  "pov_stadium",
+  "screen_proof",
+  "data_graphic",
+  "debate_post",
+  "reaction_take",
+  "comparison_reveal",
+  "countdown_urgency",
+  "narrative_arc",
+] as const;
+
+type CreativeStyle = typeof VALID_CREATIVE_STYLES[number];
+
+const DAY_CONFIGS = [
+  {
+    label: "Monday",
+    structure: "Post 1 = Value/edge player (hidden_edge or market_inefficiency angle, Graphic Post or Short-form Video). Post 2 = Trap/callout (trap_warning or overpriced angle, Callout Post). Post 3 = Breakout or second value (market_inefficiency or risk_reward angle, Short-form Video or Graphic Post). Goal: data-first, aggressive — set the week's tone.",
+    categoryTypes: ["Value", "Trap", "Breakout"] as const,
+  },
+  {
+    label: "Tuesday",
+    structure: "Post 1 = Breakout player (market_inefficiency or risk_reward angle, Short-form Video). Post 2 = H2H debate (h2h angle, H2H Post — use h2hPairs provided, force audience to pick a side). Post 3 = Value play (hidden_edge angle, Graphic Post). Goal: debate and engagement — drive comments.",
+    categoryTypes: ["Breakout", "H2H", "Value"] as const,
+  },
+  {
+    label: "Wednesday",
+    structure: "Post 1 = Conversation/poll (conversation angle, Conversation Post — ask a sharp question, NO player stats). Post 2 = Position breakdown or educational (breakdown angle, Educational Breakdown). Post 3 = Breakout player (market_inefficiency angle, Short-form Video or Hybrid Video). Goal: community engagement + authority building.",
+    categoryTypes: ["Conversation", "Value", "Breakout"] as const,
+  },
+  {
+    label: "Thursday",
+    structure: "Post 1 = Injury Alert (injury_replacement angle, Injury Alert Post — pick a top-ranked player as 'injured', give 3 replacements from the pool). Post 2 = Value play (hidden_edge or market_inefficiency, Graphic Post). Post 3 = Trap warning (trap_warning or contrarian, Callout Post). Goal: urgency + opportunity — drive saves.",
+    categoryTypes: ["Injury", "Value", "Trap"] as const,
+  },
+  {
+    label: "Friday",
+    structure: "All 3 posts = Top 3 picks for Friday game-day (top3_friday angle, Top 3 Post each). Each post is a different angle: Post 1 = overall Top 3 picks, Post 2 = Top 3 midfielders, Post 3 = Top 3 value plays under a price threshold. Goal: saves and shares — definitive pre-game content.",
+    categoryTypes: ["Top3", "Top3", "Top3"] as const,
+  },
+  {
+    label: "Saturday",
+    structure: "All 3 posts = Top 3 picks for Saturday game-day (top3_saturday angle, Top 3 Post each). Post 1 = Top 3 captains, Post 2 = Top 3 breakouts, Post 3 = Top 3 differential picks. Goal: saves and shares — game-day lock-in content.",
+    categoryTypes: ["Top3", "Top3", "Top3"] as const,
+  },
+  {
+    label: "Sunday",
+    structure: "Post 1 = Top 3 Sunday picks (top3_sunday angle, Top 3 Post). Post 2 = Proof post (proof angle, Screen Recording — MUST use real proof player accuracy data provided). Post 3 = Second proof post OR a value player if only 1 proof player available (proof or hidden_edge angle). Goal: credibility through accuracy — close the week with evidence.",
+    categoryTypes: ["Top3", "Proof", "Proof"] as const,
+  },
+];
+
 function getWeekKey(): string {
   const now = new Date();
   const year = now.getFullYear();
@@ -299,14 +350,29 @@ VISUAL PLAN RULES — THIS IS THE MOST IMPORTANT FIELD:
 - Colour logic: GREEN (#00C853) = value/breakout/buy/captain. RED (#D32F2F) = trap/sell/avoid/injury. AMBER (#FF8F00) = risk/neutral. WHITE on BLACK for authority. GOLD (#FFD700) for #1 rank.
 - Must be a single STRING. Detailed enough that a designer could execute it without asking questions.
 
-WEEKLY STRUCTURE (follow this day-by-day guide):
-Day 1 (Monday): Value + Trap — data-first, aggressive
-Day 2 (Tuesday): Breakout + H2H — debate and engagement
-Day 3 (Wednesday): Conversation + Position breakdown
-Day 4 (Thursday): Injury Alert + Value — urgent + opportunity
-Day 5 (Friday): Top 3 (Friday picks) — saves and shares
-Day 6 (Saturday): Top 3 (Saturday game-day) — saves and shares
-Day 7 (Sunday): Top 3 + Proof — credibility through accuracy
+IMAGE PROMPT RULES (image_prompt field):
+- Write a Midjourney/DALL-E/Ideogram-ready image generation brief.
+- Format: "Style: [photorealistic/illustration/graphic design]. Subject: [exact scene description]. Colours: [hex codes + purpose]. Text overlay: [exact words to display]. Composition: [layout description]. Mood: [urgent/celebratory/analytical/dramatic]."
+- Always reference the player name, team colours, and Neeko Sports brand (dark background, green #00C853 as primary).
+- Keep it under 120 words. Specific enough that the image engine doesn't need to guess.
+
+VIDEO PROMPT RULES (video_prompt field):
+- Write a Runway/Sora/Kling-ready video generation brief.
+- Format: Scene-by-scene. Each scene: "Scene [N] (timing): [visual description], camera movement, text overlay, transition to next scene."
+- Include: opening hook visual, data reveal moment, CTA end card.
+- Total duration: 15-25 seconds.
+- Reference Neeko Sports branding: dark background, green accent, bold typography.
+- Keep it under 150 words.
+
+CREATIVE STYLE — assign one per post from this exact list:
+- pov_stadium: first-person stadium/game-day perspective, creates immersion
+- screen_proof: shows live Neeko UI, data-proof credibility post
+- data_graphic: bold numbers-first graphic design, analytical authority
+- debate_post: split-screen or VS format, forces audience to pick a side
+- reaction_take: quick face-to-camera or animated reaction, casual and relatable
+- comparison_reveal: side-by-side data comparison, data picks a winner
+- countdown_urgency: countdown or deadline visual, creates FOMO
+- narrative_arc: story progression, before/after or trending arc visual
 
 UNIQUENESS ENFORCER:
 - Across the 7-day plan: rotate hook types, tone (aggressive / analytical / storytelling / educational), visual format, and content type.
@@ -318,6 +384,15 @@ UNIQUENESS ENFORCER:
 - Injury Alert: 1 per week (Thursday preferred).
 - Conversation posts: 1 per week.
 - Each player used maximum ONCE across the entire week.
+
+CONTENT DISTRIBUTION (enforce across the full week):
+- Value posts: 6-7 total
+- Trap posts: 4-5 total
+- Breakout posts: 3-4 total
+- Proof posts: 2-3 total (Day 7 only)
+- H2H posts: 2 total (Days 2-3)
+- Injury Alert: 1 total (Day 4)
+- Conversation: 1 total (Day 3)
 
 ANGLE LABEL (human-readable, assign one per post):
 - "Contrarian" — challenges mainstream opinion
@@ -366,60 +441,71 @@ ${lines}
 Apply the patterns above: favour similar content types, angles, and hook styles where they fit the player data this week.\n`;
 }
 
-function buildUserPrompt(
-  players: PlayerData[],
+function buildDayUserPrompt(
+  dayNumber: number,
+  dayLabel: string,
+  dayStructure: string,
   sel: ReturnType<typeof selectPlayers>,
-  focusPlayerName?: string,
-  feedbackPatterns: FeedbackPattern[] = [],
+  weekKey: string,
+  usedPlayerIds: Set<number>,
+  feedbackSection: string,
+  focusNote: string,
 ): string {
   const { valuePlayers, breakoutPlayers, trapPlayers, captainPlayers, proofPlayers, h2hPairs, comparisonPairs } = sel;
 
-  const trapList = trapPlayers.length > 0
-    ? trapPlayers.map((p) => fmtPlayer(p, p.rank)).join("\n")
-    : "Select top-ranked players with value_score below 5 from the pool above";
+  const availableValue = valuePlayers.filter(p => !usedPlayerIds.has(p.player_id));
+  const availableBreakout = breakoutPlayers.filter(p => !usedPlayerIds.has(p.player_id));
+  const availableTrap = trapPlayers.filter(p => !usedPlayerIds.has(p.player_id));
+  const availableCaptain = captainPlayers.filter(p => !usedPlayerIds.has(p.player_id));
 
-  const focusNote = focusPlayerName
-    ? `\n\nFOCUS PLAYER: Prioritise "${focusPlayerName}" — build at least one post directly around their data story.\n`
-    : "";
+  const trapList = availableTrap.length > 0
+    ? availableTrap.map((p) => fmtPlayer(p, p.rank)).join("\n")
+    : "Select top-ranked players with value_score below 5 from the value pool above";
 
-  const feedbackSection = buildFeedbackSection(feedbackPatterns);
+  const h2hList = h2hPairs
+    .filter(pair => !usedPlayerIds.has(pair[0].player_id) && !usedPlayerIds.has(pair[1].player_id))
+    .slice(0, 3)
+    .map((pair, i) =>
+      `H2H ${i + 1}: ${pair[0].player_name} (proj ${Math.round(pair[0].projection)}pts, captain ${Math.round(pair[0].captain_score)}) vs ${pair[1].player_name} (proj ${Math.round(pair[1].projection)}pts, captain ${Math.round(pair[1].captain_score)})`
+    ).join("\n") || "Choose two captain-tier players with similar projections from the pool";
 
-  const compList = comparisonPairs.length > 0
-    ? comparisonPairs.slice(0, 3).map((pair, i) =>
-        `Pair ${i + 1}: ${pair[0].player_name} vs ${pair[1].player_name}`
-      ).join("\n")
-    : "Choose two value players with contrasting signals";
-
-  const h2hList = h2hPairs.length > 0
-    ? h2hPairs.slice(0, 3).map((pair, i) =>
-        `H2H ${i + 1}: ${pair[0].player_name} (proj ${Math.round(pair[0].projection)}pts, captain ${Math.round(pair[0].captain_score)}) vs ${pair[1].player_name} (proj ${Math.round(pair[1].projection)}pts, captain ${Math.round(pair[1].captain_score)})`
-      ).join("\n")
-    : "Choose two captain-tier players with similar projections";
+  const compList = comparisonPairs
+    .filter(pair => !usedPlayerIds.has(pair[0].player_id) && !usedPlayerIds.has(pair[1].player_id))
+    .slice(0, 3)
+    .map((pair, i) => `Pair ${i + 1}: ${pair[0].player_name} vs ${pair[1].player_name}`)
+    .join("\n") || "Choose two value players with contrasting signals";
 
   const proofSection = proofPlayers.length > 0
-    ? `PROOF PLAYERS (real last-round accuracy data — use ONLY these for proof posts, max 2 proof posts total):
+    ? `PROOF PLAYERS (real last-round accuracy data — use ONLY these for proof posts):
 ${proofPlayers.map(p => fmtProofPlayer(p)).join("\n")}
 
 NOTE: Proof posts MUST use the exact fantasy_score and projection_final numbers above. Do NOT invent accuracy data.`
-    : `PROOF PLAYERS: None available this round — do NOT include any proof posts this week.`;
+    : `PROOF PLAYERS: None available this round — do NOT include any proof posts today. Use Screen Recording type instead.`;
 
-  return `Generate a FULL 7-DAY AFL Fantasy content plan (21 posts total: 3 per day).
-${focusNote}${feedbackSection}
-PLAYER POOL — use ONLY these players, no invented names:
+  const alreadyUsed = usedPlayerIds.size > 0
+    ? `\nALREADY USED PLAYERS (player IDs already assigned earlier in the week — DO NOT use these again): ${[...usedPlayerIds].join(", ")}\n`
+    : "";
 
-VALUE / EDGE PLAYERS (underpriced relative to output):
-${valuePlayers.map((p, i) => fmtPlayer(p, i + 1)).join("\n")}
+  return `Generate EXACTLY 3 posts for Day ${dayNumber} (${dayLabel}) of a 7-day AFL Fantasy content plan.
+${focusNote}${feedbackSection}${alreadyUsed}
+DAY ${dayNumber} STRUCTURE — follow this exactly:
+${dayStructure}
 
-BREAKOUT / HIGH-UPSIDE PLAYERS:
-${breakoutPlayers.slice(0, 8).map((p, i) => fmtPlayer(p, i + 1)).join("\n")}
+PLAYER POOL — use ONLY these players, no invented names. Each player can only be used ONCE across the entire week.
 
-TRAP / OVERPRICED PLAYERS:
+VALUE / EDGE PLAYERS (available, not yet used):
+${availableValue.slice(0, 10).map((p, i) => fmtPlayer(p, i + 1)).join("\n")}
+
+BREAKOUT / HIGH-UPSIDE PLAYERS (available):
+${availableBreakout.slice(0, 8).map((p, i) => fmtPlayer(p, i + 1)).join("\n")}
+
+TRAP / OVERPRICED PLAYERS (available):
 ${trapList}
 
-CAPTAIN PICKS (elite score potential):
-${captainPlayers.map((p, i) => fmtPlayer(p, i + 1)).join("\n")}
+CAPTAIN PICKS (available, elite score potential):
+${availableCaptain.slice(0, 6).map((p, i) => fmtPlayer(p, i + 1)).join("\n")}
 
-SUGGESTED H2H MATCHUPS (for H2H posts — force a pick):
+SUGGESTED H2H MATCHUPS:
 ${h2hList}
 
 SUGGESTED COMPARISON PAIRS:
@@ -429,95 +515,66 @@ ${proofSection}
 
 ---
 
-REQUIREMENTS FOR THE 7-DAY PLAN:
+REQUIREMENTS FOR TODAY'S 3 POSTS:
 
-1. CONTENT TYPE: Choose dynamically per post — do NOT follow a fixed pattern. Use the full set including new types:
-   "Short-form Video", "Graphic Post", "Screen Recording", "Hybrid Video", "Comparison Post", "Narrative Post", "Callout Post", "Educational Breakdown", "H2H Post", "Top 3 Post", "Injury Alert Post", "Conversation Post"
-   Max 2 of any one type across the full week.
-
-2. ANGLE: Assign one angle per post from:
-   hidden_edge, market_inefficiency, must_have, captain_lock, trap_warning, overpriced, risk_reward, contrarian, comparison, youre_wrong, breakdown, narrative, proof, h2h, top3_friday, top3_saturday, top3_sunday, top3_mid, top3_ruck, top3_value, injury_replacement, conversation, we_called_it, system_works
-   Max 2 of any one angle across the full week.
-
-3. WEEKLY STRUCTURE — follow this exactly:
-   Day 1 (Mon): Post 1 = Value/edge, Post 2 = Trap/callout, Post 3 = Value/breakout
-   Day 2 (Tue): Post 1 = Breakout, Post 2 = H2H (use H2H matchup pairs above), Post 3 = Value
-   Day 3 (Wed): Post 1 = Conversation (ask a question — no player stats), Post 2 = Position breakdown, Post 3 = Breakout
-   Day 4 (Thu): Post 1 = Injury Alert (pick any top-ranked player as the "injured" player, give 3 replacements from the pool), Post 2 = Value, Post 3 = Trap
-   Day 5 (Fri): All 3 posts = Top 3 picks (Friday game-day, different positions/angles)
-   Day 6 (Sat): All 3 posts = Top 3 picks (Saturday game-day, different positions/angles)
-   Day 7 (Sun): Post 1 = Top 3 (Sunday picks), Post 2 = Proof (use real proof player data above), Post 3 = Proof OR Value (if 2 proof players available use 2nd proof, else value)
-
-4. PROOF POSTS — STRICT RULES:
-   - Max 2 proof posts across the full week (Days 1-7)
-   - ONLY on Day 7 (Sunday)
-   - MUST use the exact numbers from the PROOF PLAYERS section above
-   - If no proof players are available, use "Screen Recording" type showing the live Neeko rankings board instead
-
-5. H2H POST RULES:
-   - 1 H2H post in the week (Day 2)
-   - Must include player2_name, player2_id, player2_team fields in the JSON
-   - Force a winner — "The data says pick [name]"
-
-6. PLAYER DATA USAGE: Every script, hook, caption, and visual plan must reference SPECIFIC NUMBERS from the player data provided. No generic phrasing. The player's exact projection, price, value_score, ceiling, floor, consistency, form, matchup, price_change — use them.
-
-7. VISUAL PLANS: Full production brief for every post. Video = scene-by-scene with timing. Graphic = design layout brief. Screen recording = step-by-step flow. Comparison/H2H = table layout. Top 3 = stacked rank layout. Injury = breaking news layout. Conversation = bold text layout.
-
-8. HOOKS: 3 per post. Hook 1: most aggressive / controversy. Hook 2: data-first with specific numbers. Hook 3: fear of missing out or challenge. Each under 20 words.
-
-9. UNIQUENESS: No two posts in the week should use the same hook structure or visual format.
+1. CONTENT TYPE: Choose dynamically per post. Max 2 of any one type across the full week.
+2. ANGLE: Assign one angle per post. Max 2 of any one angle across the full week.
+3. PLAYER DATA USAGE: Every script, hook, caption must reference SPECIFIC NUMBERS.
+4. VISUAL PLANS: Full production brief — video = scene-by-scene, graphic = layout brief, screen recording = step-by-step.
+5. HOOKS: 3 per post. Hook 1: controversy/tension. Hook 2: data-first with numbers. Hook 3: FOMO/challenge. Each under 20 words.
+6. IMAGE PROMPT: Write a 60-100 word Midjourney/DALL-E brief for the hero image.
+7. VIDEO PROMPT: Write a 80-120 word scene-by-scene Runway/Sora brief.
+8. CREATIVE STYLE: Assign one of: pov_stadium, screen_proof, data_graphic, debate_post, reaction_take, comparison_reveal, countdown_urgency, narrative_arc.
 
 ---
 
-OUTPUT (strict JSON, no markdown):
+OUTPUT (strict JSON, no markdown, no extra text):
 {
-  "week_key": "${getWeekKey()}",
-  "days": [
+  "day": ${dayNumber},
+  "posts": [
     {
-      "day": 1,
-      "posts": [
-        {
-          "day": 1,
-          "post_number": 1,
-          "post_type": "Short-form Video",
-          "category": "Value",
-          "content_angle": "hidden_edge",
-          "angle_label": "Value Edge",
-          "player_name": "...",
-          "player_id": 123,
-          "team": "...",
-          "player2_name": null,
-          "player2_id": null,
-          "player2_team": null,
-          "hooks": ["...", "...", "..."],
-          "voice_script": "...",
-          "caption_script": "...",
-          "visual_plan": "Scene 1 (0-3s): [background, text, animation]. Scene 2 (3-8s): ...",
-          "ctas": [
-            "Get the full analysis at Neeko Sports — link in bio.",
-            "Drop your take below 👇 — agree or disagree?",
-            "Save this before the price changes. Full rankings — Neeko Sports."
-          ],
-          "conversion_score": 7.5,
-          "confidence": "HIGH",
-          "priority": "good_option"
-        }
-      ]
+      "day": ${dayNumber},
+      "post_number": 1,
+      "post_type": "Short-form Video",
+      "category": "Value",
+      "content_angle": "hidden_edge",
+      "angle_label": "Value Edge",
+      "creative_style": "data_graphic",
+      "player_name": "...",
+      "player_id": 123,
+      "team": "...",
+      "player2_name": null,
+      "player2_id": null,
+      "player2_team": null,
+      "hooks": ["...", "...", "..."],
+      "voice_script": "...",
+      "caption_script": "...",
+      "visual_plan": "Scene 1 (0-3s): ...",
+      "image_prompt": "Style: ... Subject: ... Colours: ... Text overlay: ... Composition: ... Mood: ...",
+      "video_prompt": "Scene 1 (0-3s): ... Scene 2 (3-8s): ... Scene 3 (8-15s): ...",
+      "ctas": [
+        "Get the full analysis at Neeko Sports — link in bio.",
+        "Drop your take below 👇 — agree or disagree?",
+        "Save this before the price changes. Full rankings — Neeko Sports."
+      ],
+      "conversion_score": 7.5,
+      "confidence": "HIGH",
+      "priority": "good_option"
     }
   ]
 }
 
-For H2H posts, set player2_name, player2_id, player2_team to the second player's data.
-For all other posts, set player2_name, player2_id, player2_team to null.
+For H2H posts: set player2_name, player2_id, player2_team to the second player's data.
+For all other posts: set player2_name, player2_id, player2_team to null.
 angle_label must be one of: "Contrarian", "Value Edge", "Fear", "Proof", "Debate", "Breakout", "Captain Lock".
 confidence must be one of: "HIGH", "MEDIUM", "LOW".
 priority must be one of: "must_post", "good_option", "optional".
 ctas must be an array of exactly 3 distinct strings.
 conversion_score must be a number between 1.0 and 10.0.
+creative_style must be one of: pov_stadium, screen_proof, data_graphic, debate_post, reaction_take, comparison_reveal, countdown_urgency, narrative_arc.
 
-Generate ALL 7 days = 21 posts. Every post must be COMPLETE — no blanks, no placeholders.
-Visual plans must be detailed enough for a designer to execute without asking a single question.
-Every hook must be so sharp it could not be published by a generic sports account.`;
+Generate ALL 3 posts for Day ${dayNumber}. Every post must be COMPLETE — no blanks, no placeholders.
+week_key for reference: "${weekKey}"`;
 }
 
 function ensureString(val: unknown): string {
@@ -561,6 +618,11 @@ function normalisePost(raw: Record<string, unknown>, day: number, postNumber: nu
   const rawScore = Number(raw.conversion_score ?? 0);
   const conversion_score = rawScore >= 1 && rawScore <= 10 ? Math.round(rawScore * 10) / 10 : 6.0;
 
+  const rawCreativeStyle = ensureString(raw.creative_style || "");
+  const creative_style: CreativeStyle = (VALID_CREATIVE_STYLES as readonly string[]).includes(rawCreativeStyle)
+    ? rawCreativeStyle as CreativeStyle
+    : "data_graphic";
+
   return {
     day:              Number(raw.day ?? day),
     post_number:      Number(raw.post_number ?? postNumber),
@@ -568,6 +630,7 @@ function normalisePost(raw: Record<string, unknown>, day: number, postNumber: nu
     category,
     content_angle:    ensureString(raw.content_angle || "hidden_edge"),
     angle_label,
+    creative_style,
     player_name:      ensureString(raw.player_name || "Unknown"),
     player_id:        Number(raw.player_id ?? 0),
     team:             ensureString(raw.team || "Unknown"),
@@ -578,6 +641,8 @@ function normalisePost(raw: Record<string, unknown>, day: number, postNumber: nu
     voice_script:     ensureString(raw.voice_script || raw.full_script || ""),
     caption_script:   ensureString(raw.caption_script || raw.caption || ""),
     visual_plan:      ensureString(raw.visual_plan || ""),
+    image_prompt:     ensureString(raw.image_prompt || ""),
+    video_prompt:     ensureString(raw.video_prompt || ""),
     hook_options:     hooks,
     full_script:      ensureString(raw.voice_script || raw.full_script || ""),
     caption:          ensureString(raw.caption_script || raw.caption || ""),
@@ -588,51 +653,96 @@ function normalisePost(raw: Record<string, unknown>, day: number, postNumber: nu
   };
 }
 
-async function callOpenAI(systemPrompt: string, userPrompt: string, _feedbackPatterns?: FeedbackPattern[]): Promise<object> {
+async function callOpenAIWithTimeout(
+  systemPrompt: string,
+  userPrompt: string,
+  timeoutMs = 55000,
+): Promise<object> {
   const apiKey = Deno.env.get("OPENAI_API_KEY");
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      response_format: { type: "json_object" },
-      temperature: 0.92,
-      max_tokens: 16000,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user",   content: userPrompt },
-      ],
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenAI API error ${res.status}: ${err.slice(0, 300)}`);
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        response_format: { type: "json_object" },
+        temperature: 0.88,
+        max_tokens: 4000,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user",   content: userPrompt },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`OpenAI API error ${res.status}: ${err.slice(0, 300)}`);
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error("Empty response from OpenAI");
+
+    const parsed = JSON.parse(content);
+
+    if (parsed?.posts && Array.isArray(parsed.posts)) {
+      const dayNum = Number(parsed.day ?? 1);
+      parsed.posts = parsed.posts.map((p: Record<string, unknown>, i: number) =>
+        normalisePost(p, dayNum, i + 1)
+      );
+    }
+
+    return parsed;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function generateDayWithRetry(
+  dayNumber: number,
+  dayLabel: string,
+  dayStructure: string,
+  sel: ReturnType<typeof selectPlayers>,
+  weekKey: string,
+  usedPlayerIds: Set<number>,
+  feedbackSection: string,
+  focusNote: string,
+  fallbackDay: object,
+  maxRetries = 2,
+): Promise<object> {
+  const systemPrompt = buildSystemPrompt();
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Day ${dayNumber} attempt ${attempt + 1}/${maxRetries + 1}...`);
+      const result = await callOpenAIWithTimeout(
+        systemPrompt,
+        buildDayUserPrompt(dayNumber, dayLabel, dayStructure, sel, weekKey, usedPlayerIds, feedbackSection, focusNote),
+      );
+      console.log(`Day ${dayNumber} generated successfully`);
+      return result;
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.warn(`Day ${dayNumber} attempt ${attempt + 1} failed: ${errMsg}`);
+      if (attempt === maxRetries) {
+        console.warn(`Day ${dayNumber} all retries exhausted — using fallback`);
+        return fallbackDay;
+      }
+      await new Promise(r => setTimeout(r, 1200));
+    }
   }
 
-  const data = await res.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("Empty response from OpenAI");
-
-  const parsed = JSON.parse(content);
-
-  if (parsed?.days && Array.isArray(parsed.days)) {
-    parsed.days = parsed.days.map((d: Record<string, unknown>) => ({
-      ...d,
-      posts: Array.isArray(d.posts)
-        ? d.posts.map((p: Record<string, unknown>, i: number) =>
-            normalisePost(p, Number(d.day), i + 1)
-          )
-        : [],
-    }));
-  }
-
-  return parsed;
+  return fallbackDay;
 }
 
 function deriveConfidence(p: PlayerData): "HIGH" | "MEDIUM" | "LOW" {
@@ -678,31 +788,29 @@ const DEFAULT_CTAS = [
   "Save this before the price changes. Full rankings — Neeko Sports.",
 ];
 
-function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectPlayers>): object {
+function buildFallbackDay(
+  dayNumber: number,
+  players: PlayerData[],
+  sel: ReturnType<typeof selectPlayers>,
+  existingUsedIds: Set<number>,
+): object {
   const { valuePlayers, breakoutPlayers, trapPlayers, captainPlayers, proofPlayers, h2hPairs } = sel;
 
-  const priceChangeStr = (p: PlayerData) =>
-    p.price_change !== 0 ? ` (${p.price_change > 0 ? "up" : "down"} $${Math.abs(Math.round(p.price_change / 1000))}k)` : "";
+  const localUsed = new Set<number>(existingUsedIds);
 
-  const days = [];
-
-  const usedPlayerIds = new Set<number>();
   const pickFromPool = (pool: PlayerData[], fallback: PlayerData[]): PlayerData => {
-    const avail = pool.find(p => !usedPlayerIds.has(p.player_id));
-    const p = avail ?? fallback.find(p => !usedPlayerIds.has(p.player_id)) ?? pool[0] ?? fallback[0];
-    if (p) usedPlayerIds.add(p.player_id);
+    const avail = pool.find(p => !localUsed.has(p.player_id));
+    const p = avail ?? fallback.find(p => !localUsed.has(p.player_id)) ?? pool[0] ?? fallback[0] ?? players[0];
+    if (p) localUsed.add(p.player_id);
     return p;
   };
 
-  const weeklyStructure = [
-    { label: "Value + Trap", types: ["Value", "Trap", "Breakout"] as const },
-    { label: "Breakout + H2H", types: ["Breakout", "H2H", "Value"] as const },
-    { label: "Conversation + Position", types: ["Conversation", "Value", "Breakout"] as const },
-    { label: "Injury + Value", types: ["Injury", "Value", "Trap"] as const },
-    { label: "Top 3 Friday", types: ["Top3", "Top3", "Top3"] as const },
-    { label: "Top 3 Saturday", types: ["Top3", "Top3", "Top3"] as const },
-    { label: "Top 3 + Proof", types: ["Top3", "Proof", "Proof"] as const },
-  ];
+  const dayConfig = DAY_CONFIGS[dayNumber - 1];
+  const categoryTypes = dayConfig.categoryTypes;
+  const dayLabel = dayConfig.label;
+
+  const priceChangeStr = (p: PlayerData) =>
+    p.price_change !== 0 ? ` (${p.price_change > 0 ? "up" : "down"} $${Math.abs(Math.round(p.price_change / 1000))}k)` : "";
 
   const contentTypeMap: Record<string, ContentType> = {
     Value: "Graphic Post",
@@ -728,343 +836,381 @@ function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectP
     Conversation: "conversation",
   };
 
-  for (let day = 1; day <= 7; day++) {
-    const structure = weeklyStructure[day - 1];
-    const posts = [];
+  const creativeStyleMap: Record<string, CreativeStyle> = {
+    Value: "data_graphic",
+    Breakout: "countdown_urgency",
+    Trap: "reaction_take",
+    Captain: "data_graphic",
+    Proof: "screen_proof",
+    H2H: "debate_post",
+    Top3: "data_graphic",
+    Injury: "countdown_urgency",
+    Conversation: "debate_post",
+  };
 
-    for (let postIdx = 0; postIdx < 3; postIdx++) {
-      const catStr = structure.types[postIdx];
-      const postType = contentTypeMap[catStr];
-      const angle = day === 5 ? "top3_friday" : day === 6 ? "top3_saturday" : day === 7 && catStr === "Top3" ? "top3_sunday" : angleMap[catStr];
+  const posts = [];
 
-      if (catStr === "H2H" && h2hPairs.length > 0) {
-        const pair = h2hPairs[0];
-        usedPlayerIds.add(pair[0].player_id);
-        usedPlayerIds.add(pair[1].player_id);
-        const h2hConf = deriveConfidence(pair[0]);
-        const h2hScore = deriveConversionScore("H2H", h2hConf);
-        posts.push({
-          day,
-          post_number: postIdx + 1,
-          post_type: postType,
-          category: "H2H",
-          content_angle: angle,
-          angle_label: "Debate",
-          confidence: h2hConf,
-          conversion_score: h2hScore,
-          priority: derivePriority(h2hScore, h2hConf),
-          ctas: [
-            `See the full ${pair[0].player_name.split(" ").pop()} vs ${pair[1].player_name.split(" ").pop()} data breakdown — Neeko Sports, link in bio.`,
-            `Drop your pick below 👇 — who are you going with?`,
-            `Save this before you lock your team. Full comparison — Neeko Sports.`,
-          ],
-          player_name: pair[0].player_name,
-          player_id: pair[0].player_id,
-          team: pair[0].team,
-          player2_name: pair[1].player_name,
-          player2_id: pair[1].player_id,
-          player2_team: pair[1].team,
-          hooks: [
-            `${pair[0].player_name.split(" ").pop()} or ${pair[1].player_name.split(" ").pop()} — who are you picking this round?`,
-            `${Math.round(pair[0].projection)}pts vs ${Math.round(pair[1].projection)}pts projected. The data picks a clear winner — and it's not who you think.`,
-            `Most coaches are getting this call wrong. Drop your pick below.`,
-          ],
-          hook_options: [
-            `${pair[0].player_name.split(" ").pop()} or ${pair[1].player_name.split(" ").pop()} — who are you picking this round?`,
-            `${Math.round(pair[0].projection)}pts vs ${Math.round(pair[1].projection)}pts projected. The data picks a clear winner — and it's not who you think.`,
-            `Most coaches are getting this call wrong. Drop your pick below.`,
-          ],
-          voice_script: `${pair[0].player_name} or ${pair[1].player_name} — this is the debate everyone in your league is having. ${pair[0].player_name.split(" ").pop()}... projecting ${Math.round(pair[0].projection)} points... captain score ${Math.round(pair[0].captain_score)}. ${pair[1].player_name.split(" ").pop()}... projecting ${Math.round(pair[1].projection)} points... value score ${pair[1].value_score.toFixed(1)}. The data has a clear winner. Who are you picking — drop it in the comments. Full comparison at Neeko Sports — link in bio.`,
-          full_script: `${pair[0].player_name} or ${pair[1].player_name} — this is the debate everyone in your league is having. ${pair[0].player_name.split(" ").pop()}... projecting ${Math.round(pair[0].projection)} points... captain score ${Math.round(pair[0].captain_score)}. ${pair[1].player_name.split(" ").pop()}... projecting ${Math.round(pair[1].projection)} points... value score ${pair[1].value_score.toFixed(1)}. The data has a clear winner. Who are you picking — drop it in the comments. Full comparison at Neeko Sports — link in bio.`,
-          caption_script: `${pair[0].player_name} vs ${pair[1].player_name} — who are you going with this round?\n\n${pair[0].player_name.split(" ").pop()}: ${Math.round(pair[0].projection)}pts projected | Captain score ${Math.round(pair[0].captain_score)}\n${pair[1].player_name.split(" ").pop()}: ${Math.round(pair[1].projection)}pts projected | Value score ${pair[1].value_score.toFixed(1)}\n\nDrop your pick below — full data at Neeko Sports. #AFLFantasy #AFLSupercoach #NeekoSports #H2H`,
-          caption: `${pair[0].player_name} vs ${pair[1].player_name} — who are you going with this round?\n\n${pair[0].player_name.split(" ").pop()}: ${Math.round(pair[0].projection)}pts projected | Captain score ${Math.round(pair[0].captain_score)}\n${pair[1].player_name.split(" ").pop()}: ${Math.round(pair[1].projection)}pts projected | Value score ${pair[1].value_score.toFixed(1)}\n\nDrop your pick below — full data at Neeko Sports. #AFLFantasy #AFLSupercoach #NeekoSports #H2H`,
-          visual_plan: `Split-screen layout. Left half: GREEN tint background (#00C853 at 15% opacity). Player name "${pair[0].player_name}" in large bold white text. Below: "PROJ ${Math.round(pair[0].projection)} PTS" in green. Captain score "${pair[0].captain_score}" in smaller grey. Right half: AMBER tint background (#FF8F00 at 15% opacity). Player name "${pair[1].player_name}" in large bold white text. Below: "PROJ ${Math.round(pair[1].projection)} PTS" in amber. Value score "${pair[1].value_score.toFixed(1)}" in smaller grey. Centre: Bold "VS" in white, large condensed font, overlapping the split line. Top banner: "WHO ARE YOU PICKING?" in heavy all-caps white on black strip. Bottom: "Comment below 👇 | Neeko Sports" in small white. Background: #0D0D0D. Shake animation on the VS text when the post opens (0.3s). Each player name slides in from its respective side (0.4s delay).`,
-        });
-        continue;
-      }
+  for (let postIdx = 0; postIdx < 3; postIdx++) {
+    const catStr = categoryTypes[postIdx];
+    const postType = contentTypeMap[catStr];
+    const angle: ContentAngle = dayNumber === 5 ? "top3_friday" : dayNumber === 6 ? "top3_saturday" : dayNumber === 7 && catStr === "Top3" ? "top3_sunday" : angleMap[catStr];
+    const creativeStyle: CreativeStyle = creativeStyleMap[catStr] ?? "data_graphic";
 
-      if (catStr === "Conversation") {
-        const topCaptain = captainPlayers[0] ?? valuePlayers[0];
-        posts.push({
-          day,
-          post_number: postIdx + 1,
-          post_type: postType,
-          category: "Conversation",
-          content_angle: angle,
-          angle_label: "Debate",
-          confidence: "MEDIUM",
-          conversion_score: 6.0,
-          priority: "good_option",
-          ctas: [
-            "Drop your answer below 👇",
-            "Tag a league mate who needs to see this.",
-            "Follow for weekly AFL Fantasy intel — Neeko Sports.",
-          ],
-          player_name: topCaptain?.player_name ?? "Unknown",
-          player_id: topCaptain?.player_id ?? 0,
-          team: topCaptain?.team ?? "Unknown",
-          player2_name: null,
-          player2_id: null,
-          player2_team: null,
-          hooks: [
-            `Who are you captain-ing this round — and why?`,
-            `Most coaches in your league are picking the wrong captain. Drop yours below.`,
-            `The captain decision that's splitting every AFL Fantasy league this week.`,
-          ],
-          hook_options: [
-            `Who are you captain-ing this round — and why?`,
-            `Most coaches in your league are picking the wrong captain. Drop yours below.`,
-            `The captain decision that's splitting every AFL Fantasy league this week.`,
-          ],
-          voice_script: `Captain decision time — and the group chat is going to be divided on this one. Who are you locking in? Drop your captain pick in the comments — let's see who the Neeko community is backing this round.`,
-          full_script: `Captain decision time — and the group chat is going to be divided on this one. Who are you locking in? Drop your captain pick in the comments — let's see who the Neeko community is backing this round.`,
-          caption_script: `Captain pick this round — who are you going with?\n\nA) An elite premium\nB) A premium on the rise\nC) A value captain play\n\nDrop your answer below 👇 — see the full data-backed captain rankings at Neeko Sports. #AFLFantasy #AFLSupercoach #NeekoSports #Captain`,
-          caption: `Captain pick this round — who are you going with?\n\nA) An elite premium\nB) A premium on the rise\nC) A value captain play\n\nDrop your answer below 👇 — see the full data-backed captain rankings at Neeko Sports. #AFLFantasy #AFLSupercoach #NeekoSports #Captain`,
-          visual_plan: `Clean bold text post. Black background (#0D0D0D). Centre-aligned text layout. Top: Neeko logo small, white, top-left. Hero text: "WHO'S YOUR CAPTAIN THIS ROUND?" in heavy condensed white all-caps, 48pt equivalent, centred, takes up middle 60% of frame. Below hero: Three options in smaller white text — "A) Elite Premium" / "B) Rising Premium" / "C) Value Play" — each on its own line with 1.2x line spacing. Bottom: "Drop your answer 👇" in amber (#FF8F00) bold, centred. No stat cards. No player names. Pure engagement format. Minimal animation: fade in 0.4s, hero text scale from 95% → 100%.`,
-        });
-        continue;
-      }
-
-      if (catStr === "Injury") {
-        const injuredPlayer = pickFromPool(captainPlayers, valuePlayers);
-        const rep1 = pickFromPool(valuePlayers, breakoutPlayers);
-        const rep2 = pickFromPool(breakoutPlayers, valuePlayers);
-        const rep3 = pickFromPool(valuePlayers, players);
-        posts.push({
-          day,
-          post_number: postIdx + 1,
-          post_type: postType,
-          category: "Injury",
-          content_angle: angle,
-          angle_label: "Fear",
-          confidence: "HIGH",
-          conversion_score: 8.0,
-          priority: "must_post",
-          ctas: [
-            "Full replacement list live now — Neeko Sports, link in bio.",
-            "Save this immediately — your trade window is closing.",
-            "Drop your replacement pick below 👇 — what are you doing?",
-          ],
-          player_name: injuredPlayer.player_name,
-          player_id: injuredPlayer.player_id,
-          team: injuredPlayer.team,
-          player2_name: null,
-          player2_id: null,
-          player2_team: null,
-          hooks: [
-            `${injuredPlayer.player_name.split(" ").pop()} is OUT — here are your 3 best replacements right now.`,
-            `Don't panic. If ${injuredPlayer.player_name.split(" ").pop()} misses this round, the data has your back.`,
-            `Injury replacement intel — the 3 moves coaches in the top 10% are already making.`,
-          ],
-          hook_options: [
-            `${injuredPlayer.player_name.split(" ").pop()} is OUT — here are your 3 best replacements right now.`,
-            `Don't panic. If ${injuredPlayer.player_name.split(" ").pop()} misses this round, the data has your back.`,
-            `Injury replacement intel — the 3 moves coaches in the top 10% are already making.`,
-          ],
-          voice_script: `If ${injuredPlayer.player_name} misses this round, here are your three best replacement options right now. Option 1: ${rep1.player_name} — ${rep1.team}, projecting ${Math.round(rep1.projection)} points at $${Math.round(rep1.price / 1000)}k. Option 2: ${rep2.player_name} — ${rep2.team}, projecting ${Math.round(rep2.projection)} points, value score ${rep2.value_score.toFixed(1)}. Option 3: ${rep3.player_name} — ${rep3.team}, ceiling ${Math.round(rep3.ceiling)} points. Full availability list live at Neeko Sports — link in bio.`,
-          full_script: `If ${injuredPlayer.player_name} misses this round, here are your three best replacement options right now. Option 1: ${rep1.player_name} — ${rep1.team}, projecting ${Math.round(rep1.projection)} points at $${Math.round(rep1.price / 1000)}k. Option 2: ${rep2.player_name} — ${rep2.team}, projecting ${Math.round(rep2.projection)} points, value score ${rep2.value_score.toFixed(1)}. Option 3: ${rep3.player_name} — ${rep3.team}, ceiling ${Math.round(rep3.ceiling)} points. Full availability list live at Neeko Sports — link in bio.`,
-          caption_script: `${injuredPlayer.player_name} might miss this round — 3 replacement options:\n\n1. ${rep1.player_name} (${rep1.team}) — ${Math.round(rep1.projection)}pts proj | $${Math.round(rep1.price / 1000)}k\n2. ${rep2.player_name} (${rep2.team}) — ${Math.round(rep2.projection)}pts proj | Value ${rep2.value_score.toFixed(1)}\n3. ${rep3.player_name} (${rep3.team}) — Ceil ${Math.round(rep3.ceiling)}pts\n\nFull availability + replacement list at Neeko Sports — link in bio. #AFLFantasy #InjuryAlert #AFLSupercoach #NeekoSports`,
-          caption: `${injuredPlayer.player_name} might miss this round — 3 replacement options:\n\n1. ${rep1.player_name} (${rep1.team}) — ${Math.round(rep1.projection)}pts proj | $${Math.round(rep1.price / 1000)}k\n2. ${rep2.player_name} (${rep2.team}) — ${Math.round(rep2.projection)}pts proj | Value ${rep2.value_score.toFixed(1)}\n3. ${rep3.player_name} (${rep3.team}) — Ceil ${Math.round(rep3.ceiling)}pts\n\nFull availability + replacement list at Neeko Sports — link in bio. #AFLFantasy #InjuryAlert #AFLSupercoach #NeekoSports`,
-          visual_plan: `Red "BREAKING" banner at very top (full width, #D32F2F background, white bold text "BREAKING"). Below banner: Player name "${injuredPlayer.player_name}" in large grey-strikethrough text (crossed out), team "${injuredPlayer.team}" in small red text below. Injury icon (X or cross) in red to the right of name. Divider line. Three replacement rows stacked vertically: Row 1 (green #00C853 left border): "1. ${rep1.player_name} — ${Math.round(rep1.projection)} PTS PROJ | $${Math.round(rep1.price / 1000)}K". Row 2 (green): "2. ${rep2.player_name} — ${Math.round(rep2.projection)} PTS PROJ | VALUE ${rep2.value_score.toFixed(1)}". Row 3 (amber #FF8F00 left border): "3. ${rep3.player_name} — CEIL ${Math.round(rep3.ceiling)} PTS". Bottom: "FULL LIST — NEEKO SPORTS | LINK IN BIO" in small white. Background: #0D0D0D. Animation: BREAKING banner slides down from top (0.3s), each replacement row slides in from right with 0.2s stagger.`,
-        });
-        continue;
-      }
-
-      if (catStr === "Top3") {
-        const t1 = pickFromPool(captainPlayers, valuePlayers);
-        const t2 = pickFromPool(valuePlayers, breakoutPlayers);
-        const t3 = pickFromPool(breakoutPlayers, valuePlayers);
-        const dayLabel = day === 5 ? "FRIDAY" : day === 6 ? "SATURDAY" : "SUNDAY";
-        const topAngle = day === 5 ? "top3_friday" : day === 6 ? "top3_saturday" : "top3_sunday";
-        const t3Conf = deriveConfidence(t1);
-        const t3Score = deriveConversionScore("Top3", t3Conf);
-        posts.push({
-          day,
-          post_number: postIdx + 1,
-          post_type: postType,
-          category: "Top3",
-          content_angle: topAngle,
-          angle_label: "Value Edge",
-          confidence: t3Conf,
-          conversion_score: t3Score,
-          priority: derivePriority(t3Score, t3Conf),
-          ctas: [
-            `Save this before you lock your ${dayLabel.toLowerCase()} team — Neeko Sports.`,
-            "Full top 10 rankings live now — link in bio.",
-            "Tag a mate who needs to see these picks 👇",
-          ],
-          player_name: t1.player_name,
-          player_id: t1.player_id,
-          team: t1.team,
-          player2_name: null,
-          player2_id: null,
-          player2_team: null,
-          hooks: [
-            `My top 3 ${dayLabel.toLowerCase()} picks — save this before you lock your team.`,
-            `${Math.round(t1.projection)}pts, ${Math.round(t2.projection)}pts, ${Math.round(t3.projection)}pts projected. These 3 are the ${dayLabel.toLowerCase()} locks.`,
-            `If you're not in on these 3 picks for ${dayLabel.toLowerCase()}, you're already behind.`,
-          ],
-          hook_options: [
-            `My top 3 ${dayLabel.toLowerCase()} picks — save this before you lock your team.`,
-            `${Math.round(t1.projection)}pts, ${Math.round(t2.projection)}pts, ${Math.round(t3.projection)}pts projected. These 3 are the ${dayLabel.toLowerCase()} locks.`,
-            `If you're not in on these 3 picks for ${dayLabel.toLowerCase()}, you're already behind.`,
-          ],
-          voice_script: `Top 3 picks for ${dayLabel.toLowerCase()} — and the data backs every single one. Number 1: ${t1.player_name}... ${t1.team}... projecting ${Math.round(t1.projection)} points... ceiling ${Math.round(t1.ceiling)}. Number 2: ${t2.player_name}... ${t2.team}... projecting ${Math.round(t2.projection)} points... value score ${t2.value_score.toFixed(1)}. Number 3: ${t3.player_name}... ${t3.team}... form score ${Math.round(t3.form_score)}... ceiling ${Math.round(t3.ceiling)} points. Full rankings and data at Neeko Sports — link in bio.`,
-          full_script: `Top 3 picks for ${dayLabel.toLowerCase()} — and the data backs every single one. Number 1: ${t1.player_name}... ${t1.team}... projecting ${Math.round(t1.projection)} points... ceiling ${Math.round(t1.ceiling)}. Number 2: ${t2.player_name}... ${t2.team}... projecting ${Math.round(t2.projection)} points... value score ${t2.value_score.toFixed(1)}. Number 3: ${t3.player_name}... ${t3.team}... form score ${Math.round(t3.form_score)}... ceiling ${Math.round(t3.ceiling)} points. Full rankings and data at Neeko Sports — link in bio.`,
-          caption_script: `Top 3 ${dayLabel.toLowerCase()} picks — data-backed by Neeko:\n\n🥇 ${t1.player_name} (${t1.team}) — ${Math.round(t1.projection)}pts proj\n🥈 ${t2.player_name} (${t2.team}) — ${Math.round(t2.projection)}pts proj\n🥉 ${t3.player_name} (${t3.team}) — ${Math.round(t3.projection)}pts proj\n\nSave this post. Full top 10 at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #Top3`,
-          caption: `Top 3 ${dayLabel.toLowerCase()} picks — data-backed by Neeko:\n\n🥇 ${t1.player_name} (${t1.team}) — ${Math.round(t1.projection)}pts proj\n🥈 ${t2.player_name} (${t2.team}) — ${Math.round(t2.projection)}pts proj\n🥉 ${t3.player_name} (${t3.team}) — ${Math.round(t3.projection)}pts proj\n\nSave this post. Full top 10 at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #Top3`,
-          visual_plan: `Stacked rank list layout. Black background (#0D0D0D). Top banner: "TOP 3 ${dayLabel} PICKS" in bold all-caps white, heavy condensed font, centred. Three rows stacked vertically (equal height, 28% each): Row 1 — GOLD (#FFD700) rank badge "01" on left, player name "${t1.player_name}" in large white bold, team "${t1.team}" in small grey below name, right side: "${Math.round(t1.projection)} PTS PROJ" in gold. Row 2 — SILVER (#C0C0C0) rank badge "02", player "${t2.player_name}", team "${t2.team}", "${Math.round(t2.projection)} PTS PROJ" in silver. Row 3 — BRONZE (#CD7F32) rank badge "03", player "${t3.player_name}", team "${t3.team}", "${Math.round(t3.projection)} PTS PROJ" in bronze. Each row has a thin horizontal divider above it. Bottom strip: "SAVE FOR ROUND DAY | NEEKO SPORTS" in small white. Animation: each row slides in from the bottom with 0.25s stagger, rank badge pops in 0.1s after row.`,
-        });
-        continue;
-      }
-
-      if (catStr === "Proof") {
-        if (proofPlayers.length > 0) {
-          const pp = proofPlayers[postIdx === 1 ? 0 : Math.min(1, proofPlayers.length - 1)];
-          posts.push({
-            day,
-            post_number: postIdx + 1,
-            post_type: "Screen Recording" as ContentType,
-            category: "Proof",
-            content_angle: "proof" as ContentAngle,
-            angle_label: "Proof",
-            confidence: "HIGH",
-            conversion_score: 9.0,
-            priority: "must_post",
-            ctas: [
-              "Full accuracy stats live now — Neeko Sports, link in bio.",
-              "This round's projections are live — get them before everyone else.",
-              "Save this as proof the model works 👇",
-            ],
-            player_name: pp.player_name,
-            player_id: pp.player_id,
-            team: pp.team,
-            player2_name: null,
-            player2_id: null,
-            player2_team: null,
-            hooks: [
-              `We projected ${pp.player_name.split(" ").pop()} at ${Math.round(pp.projection_final)} pts last round — they scored ${Math.round(pp.fantasy_score)} pts. The model works.`,
-              `${pp.accuracy_gap.toFixed(1)} pts accuracy gap. This is not luck — this is the Neeko projection model.`,
-              `Proof the system works: ${pp.player_name.split(" ").pop()} called within ${Math.round(pp.accuracy_gap)} pts. Full access — link in bio.`,
-            ],
-            hook_options: [
-              `We projected ${pp.player_name.split(" ").pop()} at ${Math.round(pp.projection_final)} pts last round — they scored ${Math.round(pp.fantasy_score)} pts. The model works.`,
-              `${pp.accuracy_gap.toFixed(1)} pts accuracy gap. This is not luck — this is the Neeko projection model.`,
-              `Proof the system works: ${pp.player_name.split(" ").pop()} called within ${Math.round(pp.accuracy_gap)} pts. Full access — link in bio.`,
-            ],
-            voice_script: `This is proof the Neeko model works. Last round... we projected ${pp.player_name} at ${Math.round(pp.projection_final)} points. They scored ${Math.round(pp.fantasy_score)} points. That is ${pp.accuracy_gap.toFixed(1)} points off — ${pp.accuracy_gap <= 5 ? "virtually spot on" : pp.accuracy_gap <= 10 ? "well within range" : "a near miss"}. This is not a guess. This is a data model running on real AFL stats, built to give you the edge every single round. Full access at Neeko Sports — link in bio.`,
-            full_script: `This is proof the Neeko model works. Last round... we projected ${pp.player_name} at ${Math.round(pp.projection_final)} points. They scored ${Math.round(pp.fantasy_score)} points. That is ${pp.accuracy_gap.toFixed(1)} points off — ${pp.accuracy_gap <= 5 ? "virtually spot on" : pp.accuracy_gap <= 10 ? "well within range" : "a near miss"}. This is not a guess. This is a data model running on real AFL stats, built to give you the edge every single round. Full access at Neeko Sports — link in bio.`,
-            caption_script: `We called it last round.\n\n${pp.player_name} — Projected: ${Math.round(pp.projection_final)}pts | Actual: ${Math.round(pp.fantasy_score)}pts | Gap: ${pp.accuracy_gap.toFixed(1)}pts\n\nThis is the Neeko projection model running live. Full accuracy stats + this round's projections at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #WeCalledIt`,
-            caption: `We called it last round.\n\n${pp.player_name} — Projected: ${Math.round(pp.projection_final)}pts | Actual: ${Math.round(pp.fantasy_score)}pts | Gap: ${pp.accuracy_gap.toFixed(1)}pts\n\nThis is the Neeko projection model running live. Full accuracy stats + this round's projections at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #WeCalledIt`,
-            visual_plan: `Side-by-side comparison graphic. Black background (#0D0D0D). Top: "WE CALLED IT" in heavy bold green (#00C853) all-caps, centred, 42pt, slides in from top. Player name "${pp.player_name}" in white bold below, team "${pp.team}" in small grey. Two stat columns centred: Left column — "PROJECTED" label in small grey all-caps, "${Math.round(pp.projection_final)} PTS" in large amber (#FF8F00) bold. Right column — "ACTUAL" label in small grey all-caps, "${Math.round(pp.fantasy_score)} PTS" in large green (#00C853) bold. Between them: thin vertical divider. Below columns: "ACCURACY GAP: ${pp.accuracy_gap.toFixed(1)} PTS" in small white, green checkmark icon to the left. Bottom strip: "NEEKO SPORTS | LINK IN BIO" in small white. Animation: both stat columns count up from 0 (0.8s duration), "WE CALLED IT" appears after stats reveal.`,
-          });
-          continue;
-        }
-      }
-
-      const p = pickFromPool(
-        catStr === "Trap" ? trapPlayers :
-        catStr === "Captain" ? captainPlayers :
-        catStr === "Breakout" ? breakoutPlayers :
-        valuePlayers,
-        players
-      );
-
-      const isValue = catStr === "Value";
-      const isTrap = catStr === "Trap";
-      const isBreakout = catStr === "Breakout";
-
-      const defConf = deriveConfidence(p);
-      const defScore = deriveConversionScore(catStr, defConf);
-      const defCtas = isTrap ? [
-        `Full trap breakdown at Neeko Sports — don't get caught out, link in bio.`,
-        `Drop your take below 👇 — are you still holding ${p.player_name.split(" ").pop()}?`,
-        `Save this warning before your trade deadline closes.`,
-      ] : isBreakout ? [
-        `Get the full breakout breakdown at Neeko Sports — link in bio.`,
-        `Drop your trade plan below 👇 — are you bringing ${p.player_name.split(" ").pop()} in?`,
-        `Save this before the price rises — full rankings at Neeko Sports.`,
-      ] : [
-        `Full edge breakdown at Neeko Sports — link in bio.`,
-        `Drop your take below 👇 — are you backing ${p.player_name.split(" ").pop()} this round?`,
-        `Save this before the window closes. Full value rankings — Neeko Sports.`,
-      ];
-
+    if (catStr === "H2H" && h2hPairs.length > 0) {
+      const availPair = h2hPairs.find(pair => !localUsed.has(pair[0].player_id) && !localUsed.has(pair[1].player_id));
+      const pair = availPair ?? h2hPairs[0];
+      localUsed.add(pair[0].player_id);
+      localUsed.add(pair[1].player_id);
+      const h2hConf = deriveConfidence(pair[0]);
+      const h2hScore = deriveConversionScore("H2H", h2hConf);
       posts.push({
-        day,
+        day: dayNumber,
         post_number: postIdx + 1,
         post_type: postType,
-        category: catStr,
+        category: "H2H",
         content_angle: angle,
-        angle_label: deriveAngleLabel(catStr),
-        confidence: defConf,
-        conversion_score: defScore,
-        priority: derivePriority(defScore, defConf),
-        ctas: defCtas,
-        player_name: p.player_name,
-        player_id: p.player_id,
-        team: p.team,
+        angle_label: "Debate",
+        creative_style: "debate_post",
+        confidence: h2hConf,
+        conversion_score: h2hScore,
+        priority: derivePriority(h2hScore, h2hConf),
+        ctas: [
+          `See the full ${pair[0].player_name.split(" ").pop()} vs ${pair[1].player_name.split(" ").pop()} data breakdown — Neeko Sports, link in bio.`,
+          `Drop your pick below 👇 — who are you going with?`,
+          `Save this before you lock your team. Full comparison — Neeko Sports.`,
+        ],
+        player_name: pair[0].player_name,
+        player_id: pair[0].player_id,
+        team: pair[0].team,
+        player2_name: pair[1].player_name,
+        player2_id: pair[1].player_id,
+        player2_team: pair[1].team,
+        hooks: [
+          `${pair[0].player_name.split(" ").pop()} or ${pair[1].player_name.split(" ").pop()} — who are you picking this round?`,
+          `${Math.round(pair[0].projection)}pts vs ${Math.round(pair[1].projection)}pts projected. The data picks a clear winner.`,
+          `Most coaches are getting this call wrong. Drop your pick below.`,
+        ],
+        hook_options: [
+          `${pair[0].player_name.split(" ").pop()} or ${pair[1].player_name.split(" ").pop()} — who are you picking this round?`,
+          `${Math.round(pair[0].projection)}pts vs ${Math.round(pair[1].projection)}pts projected. The data picks a clear winner.`,
+          `Most coaches are getting this call wrong. Drop your pick below.`,
+        ],
+        voice_script: `${pair[0].player_name} or ${pair[1].player_name} — this is the debate everyone in your league is having. ${pair[0].player_name.split(" ").pop()}... projecting ${Math.round(pair[0].projection)} points... captain score ${Math.round(pair[0].captain_score)}. ${pair[1].player_name.split(" ").pop()}... projecting ${Math.round(pair[1].projection)} points... value score ${pair[1].value_score.toFixed(1)}. The data has a clear winner. Who are you picking — drop it in the comments. Full comparison at Neeko Sports — link in bio.`,
+        full_script: `${pair[0].player_name} or ${pair[1].player_name} — this is the debate everyone in your league is having. ${pair[0].player_name.split(" ").pop()}... projecting ${Math.round(pair[0].projection)} points... captain score ${Math.round(pair[0].captain_score)}. ${pair[1].player_name.split(" ").pop()}... projecting ${Math.round(pair[1].projection)} points... value score ${pair[1].value_score.toFixed(1)}. The data has a clear winner. Who are you picking — drop it in the comments. Full comparison at Neeko Sports — link in bio.`,
+        caption_script: `${pair[0].player_name} vs ${pair[1].player_name} — who are you going with this round?\n\n${pair[0].player_name.split(" ").pop()}: ${Math.round(pair[0].projection)}pts projected | Captain score ${Math.round(pair[0].captain_score)}\n${pair[1].player_name.split(" ").pop()}: ${Math.round(pair[1].projection)}pts projected | Value score ${pair[1].value_score.toFixed(1)}\n\nDrop your pick below — full data at Neeko Sports. #AFLFantasy #AFLSupercoach #NeekoSports #H2H`,
+        caption: `${pair[0].player_name} vs ${pair[1].player_name} — who are you going with this round?\n\n${pair[0].player_name.split(" ").pop()}: ${Math.round(pair[0].projection)}pts projected | Captain score ${Math.round(pair[0].captain_score)}\n${pair[1].player_name.split(" ").pop()}: ${Math.round(pair[1].projection)}pts projected | Value score ${pair[1].value_score.toFixed(1)}\n\nDrop your pick below — full data at Neeko Sports. #AFLFantasy #AFLSupercoach #NeekoSports #H2H`,
+        visual_plan: `Split-screen layout. Left half: GREEN tint (#00C853 at 15% opacity). Player name "${pair[0].player_name}" large bold white. Below: "PROJ ${Math.round(pair[0].projection)} PTS" in green. Right half: AMBER tint (#FF8F00 at 15% opacity). Player name "${pair[1].player_name}" large bold white. Below: "PROJ ${Math.round(pair[1].projection)} PTS" in amber. Centre: Bold "VS" in white overlapping the split. Top: "WHO ARE YOU PICKING?" all-caps white on black strip. Background: #0D0D0D.`,
+        image_prompt: `Style: graphic design. Subject: Split-screen H2H player debate card, ${pair[0].player_name} on left (green #00C853 accent) vs ${pair[1].player_name} on right (amber #FF8F00 accent). Bold VS text center. Colours: #0D0D0D background, #00C853 left, #FF8F00 right. Text overlay: "WHO ARE YOU PICKING?" at top. Composition: portrait, equal halves. Mood: confrontational, debate-driven.`,
+        video_prompt: `Scene 1 (0-2s): Black screen, "WHO ARE YOU PICKING?" slams in from top. Scene 2 (2-6s): Split-screen reveals — left side ${pair[0].player_name} slides in from left with green border, right side ${pair[1].player_name} slides from right with amber border. Scene 3 (6-12s): Stats pop in — left: ${Math.round(pair[0].projection)}pts proj, right: ${Math.round(pair[1].projection)}pts proj. Scene 4 (12-18s): "Drop your pick below 👇" pulses in centre. Scene 5 (18-22s): Neeko Sports logo end card.`,
+      });
+      continue;
+    }
+
+    if (catStr === "Conversation") {
+      const topCaptain = captainPlayers.find(p => !localUsed.has(p.player_id)) ?? valuePlayers[0];
+      posts.push({
+        day: dayNumber,
+        post_number: postIdx + 1,
+        post_type: postType,
+        category: "Conversation",
+        content_angle: angle,
+        angle_label: "Debate",
+        creative_style: "debate_post",
+        confidence: "MEDIUM",
+        conversion_score: 6.0,
+        priority: "good_option",
+        ctas: [
+          "Drop your answer below 👇",
+          "Tag a league mate who needs to see this.",
+          "Follow for weekly AFL Fantasy intel — Neeko Sports.",
+        ],
+        player_name: topCaptain?.player_name ?? "Unknown",
+        player_id: topCaptain?.player_id ?? 0,
+        team: topCaptain?.team ?? "Unknown",
         player2_name: null,
         player2_id: null,
         player2_team: null,
-        hooks: isTrap ? [
-          `You're about to make a $${Math.round(p.price / 1000)}k mistake — ${p.player_name.split(" ").pop()} is a trap.`,
-          `Value score ${p.value_score.toFixed(1)} at rank ${p.rank}. The data says avoid — are you listening?`,
-          `Everyone is trading in ${p.player_name.split(" ").pop()} this week. That's exactly the problem.`,
-        ] : isBreakout ? [
-          `${p.player_name.split(" ").pop()} is about to explode — upside ${p.upside_pct?.toFixed(0) ?? "?"}%, ceiling ${Math.round(p.ceiling)} pts.`,
-          `Form ${Math.round(p.form_score)}. Projection ${Math.round(p.projection)} pts. The breakout is already happening.`,
-          `Get ${p.player_name.split(" ").pop()} before the price rises — this window won't last.`,
-        ] : [
-          `${Math.round(p.projection)} pts projected. $${Math.round(p.price / 1000)}k. The market still hasn't noticed ${p.player_name.split(" ").pop()}.`,
-          `Value score ${p.value_score.toFixed(1)}. Ceiling ${Math.round(p.ceiling)} pts. This is the most mispriced player in the comp.`,
-          `Stop sleeping on ${p.player_name.split(" ").pop()} — the window to buy cheap closes this week.`,
+        hooks: [
+          `Who are you captain-ing this round — and why?`,
+          `Most coaches in your league are picking the wrong captain. Drop yours below.`,
+          `The captain decision that's splitting every AFL Fantasy league this week.`,
         ],
-        hook_options: isTrap ? [
-          `You're about to make a $${Math.round(p.price / 1000)}k mistake — ${p.player_name.split(" ").pop()} is a trap.`,
-          `Value score ${p.value_score.toFixed(1)} at rank ${p.rank}. The data says avoid — are you listening?`,
-          `Everyone is trading in ${p.player_name.split(" ").pop()} this week. That's exactly the problem.`,
-        ] : isBreakout ? [
-          `${p.player_name.split(" ").pop()} is about to explode — upside ${p.upside_pct?.toFixed(0) ?? "?"}%, ceiling ${Math.round(p.ceiling)} pts.`,
-          `Form ${Math.round(p.form_score)}. Projection ${Math.round(p.projection)} pts. The breakout is already happening.`,
-          `Get ${p.player_name.split(" ").pop()} before the price rises — this window won't last.`,
-        ] : [
-          `${Math.round(p.projection)} pts projected. $${Math.round(p.price / 1000)}k. The market still hasn't noticed ${p.player_name.split(" ").pop()}.`,
-          `Value score ${p.value_score.toFixed(1)}. Ceiling ${Math.round(p.ceiling)} pts. This is the most mispriced player in the comp.`,
-          `Stop sleeping on ${p.player_name.split(" ").pop()} — the window to buy cheap closes this week.`,
+        hook_options: [
+          `Who are you captain-ing this round — and why?`,
+          `Most coaches in your league are picking the wrong captain. Drop yours below.`,
+          `The captain decision that's splitting every AFL Fantasy league this week.`,
         ],
-        voice_script: isTrap
-          ? `Stop. Before you trade in ${p.player_name} — look at the data. ${p.team}... rank ${p.rank}... looks solid on the surface. But value score? ${p.value_score.toFixed(1)}. That means you are paying $${Math.round(p.price / 1000)}k for output that does not justify it. Floor sits at ${Math.round(p.floor)} points — that is your downside risk. The coaches who win their leagues check Neeko before they pull the trigger. Full breakdown at Neeko Sports — link in bio.`
-          : isBreakout
-          ? `${p.player_name} is in the middle of a breakout — and most coaches have missed it. ${p.team}... form score ${Math.round(p.form_score)}... projecting ${Math.round(p.projection)} points with a ceiling of ${Math.round(p.ceiling)}. Upside rating ${p.upside_pct?.toFixed(0) ?? "?"}% — this is a player trending the right way at a price that hasn't caught up yet. The window to get them cheap is closing fast. Full breakdown at Neeko Sports — link in bio.`
-          : `The market hasn't caught up to ${p.player_name} yet — and that is your edge. ${p.team}... projecting ${Math.round(p.projection)} points... ceiling ${Math.round(p.ceiling)}... priced at $${Math.round(p.price / 1000)}k${priceChangeStr(p)}. Value score ${p.value_score.toFixed(1)} — that is elite output at a price that doesn't match. ${p.consistency >= 65 ? `Consistency at ${Math.round(p.consistency)}% — this is not a fluke.` : `High upside at ${p.upside_pct?.toFixed(0) ?? "?"}% — the ceiling is real.`} The window is now. Full breakdown at Neeko Sports — link in bio.`,
-        full_script: isTrap
-          ? `Stop. Before you trade in ${p.player_name} — look at the data. ${p.team}... rank ${p.rank}... looks solid on the surface. But value score? ${p.value_score.toFixed(1)}. That means you are paying $${Math.round(p.price / 1000)}k for output that does not justify it. Floor sits at ${Math.round(p.floor)} points — that is your downside risk. The coaches who win their leagues check Neeko before they pull the trigger. Full breakdown at Neeko Sports — link in bio.`
-          : isBreakout
-          ? `${p.player_name} is in the middle of a breakout — and most coaches have missed it. ${p.team}... form score ${Math.round(p.form_score)}... projecting ${Math.round(p.projection)} points with a ceiling of ${Math.round(p.ceiling)}. Upside rating ${p.upside_pct?.toFixed(0) ?? "?"}% — this is a player trending the right way at a price that hasn't caught up yet. The window to get them cheap is closing fast. Full breakdown at Neeko Sports — link in bio.`
-          : `The market hasn't caught up to ${p.player_name} yet — and that is your edge. ${p.team}... projecting ${Math.round(p.projection)} points... ceiling ${Math.round(p.ceiling)}... priced at $${Math.round(p.price / 1000)}k${priceChangeStr(p)}. Value score ${p.value_score.toFixed(1)} — that is elite output at a price that doesn't match. ${p.consistency >= 65 ? `Consistency at ${Math.round(p.consistency)}% — this is not a fluke.` : `High upside at ${p.upside_pct?.toFixed(0) ?? "?"}% — the ceiling is real.`} The window is now. Full breakdown at Neeko Sports — link in bio.`,
-        caption_script: isTrap
-          ? `${p.player_name} is the most dangerous trade this week — the data is clear.\n\nValue score ${p.value_score.toFixed(1)} at rank ${p.rank}. $${Math.round(p.price / 1000)}k for a floor of just ${Math.round(p.floor)} pts. The risk-reward is wrong.\n\nFull trap breakdown live at Neeko Sports — don't say we didn't warn you. #AFLFantasy #TrapAlert #AFLSupercoach #NeekoSports`
-          : isBreakout
-          ? `${p.player_name} is breaking out — and the price hasn't caught up yet.\n\nForm score ${Math.round(p.form_score)}. Ceiling ${Math.round(p.ceiling)} pts. Upside ${p.upside_pct?.toFixed(0) ?? "?"}% at $${Math.round(p.price / 1000)}k${priceChangeStr(p)}.\n\nFull breakout breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #Breakout`
-          : `${p.player_name} is the most mispriced player in the comp right now — and most coaches haven't noticed yet.\n\n${Math.round(p.projection)} pts projected this round. Value score ${p.value_score.toFixed(1)}. Ceiling ${Math.round(p.ceiling)} pts at $${Math.round(p.price / 1000)}k${priceChangeStr(p)}.\n\nFull edge breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #ValueLock`,
-        caption: isTrap
-          ? `${p.player_name} is the most dangerous trade this week — the data is clear.\n\nValue score ${p.value_score.toFixed(1)} at rank ${p.rank}. $${Math.round(p.price / 1000)}k for a floor of just ${Math.round(p.floor)} pts. The risk-reward is wrong.\n\nFull trap breakdown live at Neeko Sports — don't say we didn't warn you. #AFLFantasy #TrapAlert #AFLSupercoach #NeekoSports`
-          : isBreakout
-          ? `${p.player_name} is breaking out — and the price hasn't caught up yet.\n\nForm score ${Math.round(p.form_score)}. Ceiling ${Math.round(p.ceiling)} pts. Upside ${p.upside_pct?.toFixed(0) ?? "?"}% at $${Math.round(p.price / 1000)}k${priceChangeStr(p)}.\n\nFull breakout breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #Breakout`
-          : `${p.player_name} is the most mispriced player in the comp right now — and most coaches haven't noticed yet.\n\n${Math.round(p.projection)} pts projected this round. Value score ${p.value_score.toFixed(1)}. Ceiling ${Math.round(p.ceiling)} pts at $${Math.round(p.price / 1000)}k${priceChangeStr(p)}.\n\nFull edge breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #ValueLock`,
-        visual_plan: isTrap
-          ? `Top zone: "TRAP ALERT" in heavy all-caps red (#D32F2F) with a caution triangle icon — slam-in animation with a brief shake (0.15s). Middle zone: Player name "${p.player_name}" in large white text. Below name: "${p.team}" in smaller grey text. Left zone: vertical red warning bar. Bottom zone: Two stat pills — "VALUE ${p.value_score.toFixed(1)}" in red pill, "FLOOR ${Math.round(p.floor)} PTS" in amber pill (#FF8F00). Below stats: "DON'T FOLLOW THE CROWD" in bold white italic. Background: Near-black (#0D0D0D) with a subtle red radial glow. Font: Heavy condensed all-caps for headline.`
-          : isBreakout
-          ? `Scene 1 (0-2s): Dark background. "BREAKOUT IN PROGRESS" in amber-to-green gradient text, slides in from left. Scene 2 (2-6s): Player name "${p.player_name}" in large white text. Team "${p.team}" below in smaller grey. Thin green left-border accent panel. Scene 3 (6-12s): Animated stats — "FORM ${Math.round(p.form_score)}" flashes green, "CEILING ${Math.round(p.ceiling)} PTS" appears below, "UPSIDE ${p.upside_pct?.toFixed(0) ?? "?"}%" in amber — each with 0.3s delay. Scene 4 (12-20s): "GET ON BEFORE THE PRICE RISES" in bold white, green underline pulse. Scene 5 (20-25s): End card — Neeko logo on black.`
-          : `Scene 1 (0-2s): Black background. Bold "MISPRICED" text slams in from bottom with a hard green glow (#00C853). Scene 2 (2-5s): Player name "${p.player_name}" in large white text, team "${p.team}" in smaller grey below. Scene 3 (5-11s): Three stat cards pop in sequentially — "PROJ ${Math.round(p.projection)} PTS" (green), "VALUE ${p.value_score.toFixed(1)}" (green), "CEIL ${Math.round(p.ceiling)} PTS" (green). Scene 4 (11-18s): "BUY BEFORE THE MARKET CORRECTS" in bold white. Scene 5 (18-22s): Dark end card, Neeko Sports logo.`,
+        voice_script: `Captain decision time — and the group chat is going to be divided on this one. Who are you locking in? Drop your captain pick in the comments — let's see who the Neeko community is backing this round.`,
+        full_script: `Captain decision time — and the group chat is going to be divided on this one. Who are you locking in? Drop your captain pick in the comments — let's see who the Neeko community is backing this round.`,
+        caption_script: `Captain pick this round — who are you going with?\n\nA) An elite premium\nB) A premium on the rise\nC) A value captain play\n\nDrop your answer below 👇 — see the full data-backed captain rankings at Neeko Sports. #AFLFantasy #AFLSupercoach #NeekoSports #Captain`,
+        caption: `Captain pick this round — who are you going with?\n\nA) An elite premium\nB) A premium on the rise\nC) A value captain play\n\nDrop your answer below 👇 — see the full data-backed captain rankings at Neeko Sports. #AFLFantasy #AFLSupercoach #NeekoSports #Captain`,
+        visual_plan: `Clean bold text post. Black background (#0D0D0D). Hero text: "WHO'S YOUR CAPTAIN THIS ROUND?" heavy condensed white all-caps centred. Below: three options — "A) Elite Premium / B) Rising Premium / C) Value Play". Bottom: "Drop your answer 👇" in amber (#FF8F00). No stats. Pure engagement format.`,
+        image_prompt: `Style: graphic design, bold typography. Subject: Clean dark background with single powerful question text as hero. Colours: #0D0D0D background, white primary text, #FF8F00 amber accent for CTA. Text overlay: "WHO'S YOUR CAPTAIN?" as hero, three A/B/C options below. Composition: portrait, centered text hierarchy. Mood: engaging, community-driven.`,
+        video_prompt: `Scene 1 (0-2s): Black background, Neeko logo fades in top-left. Scene 2 (2-5s): "WHO'S YOUR CAPTAIN THIS ROUND?" fades in centre, scale from 95% to 100%. Scene 3 (5-12s): Three options slide in from bottom — "A) Elite Premium", "B) Rising Premium", "C) Value Play" staggered 0.3s each. Scene 4 (12-20s): "Drop your answer 👇" pulses in amber. Scene 5 (20-25s): End card with Neeko URL.`,
       });
+      continue;
     }
 
-    days.push({ day, posts });
+    if (catStr === "Injury") {
+      const injuredPlayer = pickFromPool(captainPlayers, valuePlayers);
+      const rep1 = pickFromPool(valuePlayers, breakoutPlayers);
+      const rep2 = pickFromPool(breakoutPlayers, valuePlayers);
+      const rep3 = pickFromPool(valuePlayers, players);
+      posts.push({
+        day: dayNumber,
+        post_number: postIdx + 1,
+        post_type: postType,
+        category: "Injury",
+        content_angle: angle,
+        angle_label: "Fear",
+        creative_style: "countdown_urgency",
+        confidence: "HIGH",
+        conversion_score: 8.0,
+        priority: "must_post",
+        ctas: [
+          "Full replacement list live now — Neeko Sports, link in bio.",
+          "Save this immediately — your trade window is closing.",
+          "Drop your replacement pick below 👇 — what are you doing?",
+        ],
+        player_name: injuredPlayer.player_name,
+        player_id: injuredPlayer.player_id,
+        team: injuredPlayer.team,
+        player2_name: null,
+        player2_id: null,
+        player2_team: null,
+        hooks: [
+          `${injuredPlayer.player_name.split(" ").pop()} is OUT — here are your 3 best replacements right now.`,
+          `Don't panic. If ${injuredPlayer.player_name.split(" ").pop()} misses this round, the data has your back.`,
+          `Injury replacement intel — the 3 moves coaches in the top 10% are already making.`,
+        ],
+        hook_options: [
+          `${injuredPlayer.player_name.split(" ").pop()} is OUT — here are your 3 best replacements right now.`,
+          `Don't panic. If ${injuredPlayer.player_name.split(" ").pop()} misses this round, the data has your back.`,
+          `Injury replacement intel — the 3 moves coaches in the top 10% are already making.`,
+        ],
+        voice_script: `If ${injuredPlayer.player_name} misses this round, here are your three best replacement options right now. Option 1: ${rep1.player_name} — ${rep1.team}, projecting ${Math.round(rep1.projection)} points at $${Math.round(rep1.price / 1000)}k. Option 2: ${rep2.player_name} — ${rep2.team}, projecting ${Math.round(rep2.projection)} points, value score ${rep2.value_score.toFixed(1)}. Option 3: ${rep3.player_name} — ${rep3.team}, ceiling ${Math.round(rep3.ceiling)} points. Full availability list live at Neeko Sports — link in bio.`,
+        full_script: `If ${injuredPlayer.player_name} misses this round, here are your three best replacement options right now. Option 1: ${rep1.player_name} — ${rep1.team}, projecting ${Math.round(rep1.projection)} points at $${Math.round(rep1.price / 1000)}k. Option 2: ${rep2.player_name} — ${rep2.team}, projecting ${Math.round(rep2.projection)} points, value score ${rep2.value_score.toFixed(1)}. Option 3: ${rep3.player_name} — ${rep3.team}, ceiling ${Math.round(rep3.ceiling)} points. Full availability list live at Neeko Sports — link in bio.`,
+        caption_script: `${injuredPlayer.player_name} might miss this round — 3 replacement options:\n\n1. ${rep1.player_name} (${rep1.team}) — ${Math.round(rep1.projection)}pts proj | $${Math.round(rep1.price / 1000)}k\n2. ${rep2.player_name} (${rep2.team}) — ${Math.round(rep2.projection)}pts proj | Value ${rep2.value_score.toFixed(1)}\n3. ${rep3.player_name} (${rep3.team}) — Ceil ${Math.round(rep3.ceiling)}pts\n\nFull availability + replacement list at Neeko Sports — link in bio. #AFLFantasy #InjuryAlert #AFLSupercoach #NeekoSports`,
+        caption: `${injuredPlayer.player_name} might miss this round — 3 replacement options:\n\n1. ${rep1.player_name} (${rep1.team}) — ${Math.round(rep1.projection)}pts proj | $${Math.round(rep1.price / 1000)}k\n2. ${rep2.player_name} (${rep2.team}) — ${Math.round(rep2.projection)}pts proj | Value ${rep2.value_score.toFixed(1)}\n3. ${rep3.player_name} (${rep3.team}) — Ceil ${Math.round(rep3.ceiling)}pts\n\nFull availability + replacement list at Neeko Sports — link in bio. #AFLFantasy #InjuryAlert #AFLSupercoach #NeekoSports`,
+        visual_plan: `Red "BREAKING" banner full-width top (#D32F2F, white bold "BREAKING"). Below: "${injuredPlayer.player_name}" large grey-strikethrough text, team "${injuredPlayer.team}" in small red. Injury X icon in red. Divider. Three replacement rows: Row 1 (green #00C853 left border): "1. ${rep1.player_name} — ${Math.round(rep1.projection)} PTS | $${Math.round(rep1.price / 1000)}K". Row 2 (green): "2. ${rep2.player_name} — ${Math.round(rep2.projection)} PTS | VALUE ${rep2.value_score.toFixed(1)}". Row 3 (amber): "3. ${rep3.player_name} — CEIL ${Math.round(rep3.ceiling)} PTS". Bottom: "FULL LIST — NEEKO SPORTS". Background: #0D0D0D.`,
+        image_prompt: `Style: breaking news broadcast graphic. Subject: Injury alert card — player ${injuredPlayer.player_name} crossed out at top, three replacement option rows below. Colours: #D32F2F red breaking banner, #00C853 green for replacement options, #0D0D0D background, white text. Text overlay: "BREAKING" top banner, player name struck through, three numbered replacement options. Composition: portrait, stacked rows. Mood: urgent, breaking news.`,
+        video_prompt: `Scene 1 (0-2s): Red "BREAKING" banner crashes down from top with sound-effect impact feel. Scene 2 (2-5s): "${injuredPlayer.player_name}" appears with a red X striking through it. Scene 3 (5-15s): Three replacement rows slide in from right with 0.3s stagger — each shows name, projection, price. Scene 4 (15-20s): "FULL LIST — NEEKO SPORTS" fades in at bottom in green. Scene 5 (20-25s): End card.`,
+      });
+      continue;
+    }
+
+    if (catStr === "Top3") {
+      const t1 = pickFromPool(captainPlayers, valuePlayers);
+      const t2 = pickFromPool(valuePlayers, breakoutPlayers);
+      const t3 = pickFromPool(breakoutPlayers, valuePlayers);
+      const dayLabelUpper = dayLabel.toUpperCase();
+      const topAngle: ContentAngle = dayNumber === 5 ? "top3_friday" : dayNumber === 6 ? "top3_saturday" : "top3_sunday";
+      const t3Conf = deriveConfidence(t1);
+      const t3Score = deriveConversionScore("Top3", t3Conf);
+      posts.push({
+        day: dayNumber,
+        post_number: postIdx + 1,
+        post_type: postType,
+        category: "Top3",
+        content_angle: topAngle,
+        angle_label: "Value Edge",
+        creative_style: "data_graphic",
+        confidence: t3Conf,
+        conversion_score: t3Score,
+        priority: derivePriority(t3Score, t3Conf),
+        ctas: [
+          `Save this before you lock your ${dayLabel.toLowerCase()} team — Neeko Sports.`,
+          "Full top 10 rankings live now — link in bio.",
+          "Tag a mate who needs to see these picks 👇",
+        ],
+        player_name: t1.player_name,
+        player_id: t1.player_id,
+        team: t1.team,
+        player2_name: null,
+        player2_id: null,
+        player2_team: null,
+        hooks: [
+          `My top 3 ${dayLabel.toLowerCase()} picks — save this before you lock your team.`,
+          `${Math.round(t1.projection)}pts, ${Math.round(t2.projection)}pts, ${Math.round(t3.projection)}pts projected. These 3 are the ${dayLabel.toLowerCase()} locks.`,
+          `If you're not in on these 3 picks for ${dayLabel.toLowerCase()}, you're already behind.`,
+        ],
+        hook_options: [
+          `My top 3 ${dayLabel.toLowerCase()} picks — save this before you lock your team.`,
+          `${Math.round(t1.projection)}pts, ${Math.round(t2.projection)}pts, ${Math.round(t3.projection)}pts projected. These 3 are the ${dayLabel.toLowerCase()} locks.`,
+          `If you're not in on these 3 picks for ${dayLabel.toLowerCase()}, you're already behind.`,
+        ],
+        voice_script: `Top 3 picks for ${dayLabel.toLowerCase()} — and the data backs every single one. Number 1: ${t1.player_name}... ${t1.team}... projecting ${Math.round(t1.projection)} points... ceiling ${Math.round(t1.ceiling)}. Number 2: ${t2.player_name}... ${t2.team}... projecting ${Math.round(t2.projection)} points... value score ${t2.value_score.toFixed(1)}. Number 3: ${t3.player_name}... ${t3.team}... form score ${Math.round(t3.form_score)}... ceiling ${Math.round(t3.ceiling)} points. Full rankings and data at Neeko Sports — link in bio.`,
+        full_script: `Top 3 picks for ${dayLabel.toLowerCase()} — and the data backs every single one. Number 1: ${t1.player_name}... ${t1.team}... projecting ${Math.round(t1.projection)} points... ceiling ${Math.round(t1.ceiling)}. Number 2: ${t2.player_name}... ${t2.team}... projecting ${Math.round(t2.projection)} points... value score ${t2.value_score.toFixed(1)}. Number 3: ${t3.player_name}... ${t3.team}... form score ${Math.round(t3.form_score)}... ceiling ${Math.round(t3.ceiling)} points. Full rankings and data at Neeko Sports — link in bio.`,
+        caption_script: `Top 3 ${dayLabel.toLowerCase()} picks — data-backed by Neeko:\n\n🥇 ${t1.player_name} (${t1.team}) — ${Math.round(t1.projection)}pts proj\n🥈 ${t2.player_name} (${t2.team}) — ${Math.round(t2.projection)}pts proj\n🥉 ${t3.player_name} (${t3.team}) — ${Math.round(t3.projection)}pts proj\n\nSave this post. Full top 10 at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #Top3`,
+        caption: `Top 3 ${dayLabel.toLowerCase()} picks — data-backed by Neeko:\n\n🥇 ${t1.player_name} (${t1.team}) — ${Math.round(t1.projection)}pts proj\n🥈 ${t2.player_name} (${t2.team}) — ${Math.round(t2.projection)}pts proj\n🥉 ${t3.player_name} (${t3.team}) — ${Math.round(t3.projection)}pts proj\n\nSave this post. Full top 10 at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #Top3`,
+        visual_plan: `Stacked rank list. Black background (#0D0D0D). Top banner: "TOP 3 ${dayLabelUpper} PICKS" bold all-caps white centred. Three rows: Row 1 — GOLD (#FFD700) rank "01", "${t1.player_name}", "${t1.team}", "${Math.round(t1.projection)} PTS PROJ" in gold. Row 2 — SILVER (#C0C0C0) rank "02", "${t2.player_name}", "${t2.team}", "${Math.round(t2.projection)} PTS PROJ". Row 3 — BRONZE (#CD7F32) rank "03", "${t3.player_name}", "${t3.team}", "${Math.round(t3.projection)} PTS PROJ". Bottom: "SAVE FOR ROUND DAY | NEEKO SPORTS".`,
+        image_prompt: `Style: graphic design, ranked list card. Subject: Top 3 ${dayLabel} AFL Fantasy picks — stacked gold/silver/bronze rank card with player names and projections. Colours: #0D0D0D background, #FFD700 gold for #1, #C0C0C0 silver for #2, #CD7F32 bronze for #3, white text. Text overlay: "TOP 3 ${dayLabelUpper} PICKS" banner, three ranked rows with names and ${Math.round(t1.projection)}/${Math.round(t2.projection)}/${Math.round(t3.projection)} pts. Composition: portrait, three equal rows. Mood: definitive, authoritative.`,
+        video_prompt: `Scene 1 (0-2s): "TOP 3 ${dayLabelUpper} PICKS" banner drops from top on black. Scene 2 (2-8s): Row 1 slides up from bottom — gold "01" badge pops in 0.1s after, "${t1.player_name}" name and "${Math.round(t1.projection)} PTS" in gold. Scene 3 (8-13s): Row 2 slides up — silver "02", "${t2.player_name}". Scene 4 (13-18s): Row 3 — bronze "03", "${t3.player_name}". Scene 5 (18-22s): "SAVE THIS POST" flashes. Scene 6 (22-25s): Neeko end card.`,
+      });
+      continue;
+    }
+
+    if (catStr === "Proof") {
+      if (proofPlayers.length > 0) {
+        const ppIdx = postIdx === 1 ? 0 : Math.min(1, proofPlayers.length - 1);
+        const pp = proofPlayers[ppIdx];
+        posts.push({
+          day: dayNumber,
+          post_number: postIdx + 1,
+          post_type: "Screen Recording" as ContentType,
+          category: "Proof",
+          content_angle: "proof" as ContentAngle,
+          angle_label: "Proof",
+          creative_style: "screen_proof",
+          confidence: "HIGH",
+          conversion_score: 9.0,
+          priority: "must_post",
+          ctas: [
+            "Full accuracy stats live now — Neeko Sports, link in bio.",
+            "This round's projections are live — get them before everyone else.",
+            "Save this as proof the model works 👇",
+          ],
+          player_name: pp.player_name,
+          player_id: pp.player_id,
+          team: pp.team,
+          player2_name: null,
+          player2_id: null,
+          player2_team: null,
+          hooks: [
+            `We projected ${pp.player_name.split(" ").pop()} at ${Math.round(pp.projection_final)} pts last round — they scored ${Math.round(pp.fantasy_score)} pts. The model works.`,
+            `${pp.accuracy_gap.toFixed(1)} pts accuracy gap. This is not luck — this is the Neeko projection model.`,
+            `Proof the system works: ${pp.player_name.split(" ").pop()} called within ${Math.round(pp.accuracy_gap)} pts. Full access — link in bio.`,
+          ],
+          hook_options: [
+            `We projected ${pp.player_name.split(" ").pop()} at ${Math.round(pp.projection_final)} pts last round — they scored ${Math.round(pp.fantasy_score)} pts. The model works.`,
+            `${pp.accuracy_gap.toFixed(1)} pts accuracy gap. This is not luck — this is the Neeko projection model.`,
+            `Proof the system works: ${pp.player_name.split(" ").pop()} called within ${Math.round(pp.accuracy_gap)} pts. Full access — link in bio.`,
+          ],
+          voice_script: `This is proof the Neeko model works. Last round... we projected ${pp.player_name} at ${Math.round(pp.projection_final)} points. They scored ${Math.round(pp.fantasy_score)} points. That is ${pp.accuracy_gap.toFixed(1)} points off — ${pp.accuracy_gap <= 5 ? "virtually spot on" : pp.accuracy_gap <= 10 ? "well within range" : "a near miss"}. This is not a guess. This is a data model running on real AFL stats. Full access at Neeko Sports — link in bio.`,
+          full_script: `This is proof the Neeko model works. Last round... we projected ${pp.player_name} at ${Math.round(pp.projection_final)} points. They scored ${Math.round(pp.fantasy_score)} points. That is ${pp.accuracy_gap.toFixed(1)} points off — ${pp.accuracy_gap <= 5 ? "virtually spot on" : pp.accuracy_gap <= 10 ? "well within range" : "a near miss"}. This is not a guess. This is a data model running on real AFL stats. Full access at Neeko Sports — link in bio.`,
+          caption_script: `We called it last round.\n\n${pp.player_name} — Projected: ${Math.round(pp.projection_final)}pts | Actual: ${Math.round(pp.fantasy_score)}pts | Gap: ${pp.accuracy_gap.toFixed(1)}pts\n\nThis is the Neeko projection model running live. Full accuracy stats + this round's projections at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #WeCalledIt`,
+          caption: `We called it last round.\n\n${pp.player_name} — Projected: ${Math.round(pp.projection_final)}pts | Actual: ${Math.round(pp.fantasy_score)}pts | Gap: ${pp.accuracy_gap.toFixed(1)}pts\n\nThis is the Neeko projection model running live. Full accuracy stats + this round's projections at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #WeCalledIt`,
+          visual_plan: `Side-by-side comparison. Black background (#0D0D0D). Top: "WE CALLED IT" bold green (#00C853) all-caps. Player "${pp.player_name}" white bold, team "${pp.team}" small grey. Two columns: Left — "PROJECTED" grey label, "${Math.round(pp.projection_final)} PTS" large amber. Right — "ACTUAL" grey label, "${Math.round(pp.fantasy_score)} PTS" large green. Thin vertical divider between. Below: "ACCURACY GAP: ${pp.accuracy_gap.toFixed(1)} PTS" small white with green checkmark. Bottom: "NEEKO SPORTS | LINK IN BIO".`,
+          image_prompt: `Style: data comparison graphic. Subject: Proof card showing ${pp.player_name} projected ${Math.round(pp.projection_final)}pts vs actual ${Math.round(pp.fantasy_score)}pts last round. Colours: #0D0D0D background, #00C853 green for "WE CALLED IT" and actual score, #FF8F00 amber for projected score, white text. Text overlay: "WE CALLED IT" top, two stat columns below. Composition: portrait, centered columns. Mood: authoritative, credibility-building.`,
+          video_prompt: `Scene 1 (0-2s): Black screen, "WE CALLED IT" in bold green crashes in from top. Scene 2 (2-5s): Player name "${pp.player_name}" fades in below. Scene 3 (5-12s): Two stat columns count up from zero — left "PROJECTED ${Math.round(pp.projection_final)}" in amber, right "ACTUAL ${Math.round(pp.fantasy_score)}" in green, 0.8s count animation. Scene 4 (12-17s): "ACCURACY GAP: ${pp.accuracy_gap.toFixed(1)} PTS" with green checkmark appears. Scene 5 (17-22s): "Full access — Neeko Sports" CTA. Scene 6 (22-25s): End card.`,
+        });
+        continue;
+      }
+    }
+
+    const p = pickFromPool(
+      catStr === "Trap" ? trapPlayers :
+      catStr === "Captain" ? captainPlayers :
+      catStr === "Breakout" ? breakoutPlayers :
+      valuePlayers,
+      players
+    );
+
+    const isValue = catStr === "Value";
+    const isTrap = catStr === "Trap";
+    const isBreakout = catStr === "Breakout";
+
+    const defConf = deriveConfidence(p);
+    const defScore = deriveConversionScore(catStr, defConf);
+    const defCtas = isTrap ? [
+      `Full trap breakdown at Neeko Sports — don't get caught out, link in bio.`,
+      `Drop your take below 👇 — are you still holding ${p.player_name.split(" ").pop()}?`,
+      `Save this warning before your trade deadline closes.`,
+    ] : isBreakout ? [
+      `Get the full breakout breakdown at Neeko Sports — link in bio.`,
+      `Drop your trade plan below 👇 — are you bringing ${p.player_name.split(" ").pop()} in?`,
+      `Save this before the price rises — full rankings at Neeko Sports.`,
+    ] : [
+      `Full edge breakdown at Neeko Sports — link in bio.`,
+      `Drop your take below 👇 — are you backing ${p.player_name.split(" ").pop()} this round?`,
+      `Save this before the window closes. Full value rankings — Neeko Sports.`,
+    ];
+
+    const fallbackStyle: CreativeStyle = isTrap ? "reaction_take" : isBreakout ? "countdown_urgency" : "data_graphic";
+
+    posts.push({
+      day: dayNumber,
+      post_number: postIdx + 1,
+      post_type: postType,
+      category: catStr,
+      content_angle: angle,
+      angle_label: deriveAngleLabel(catStr),
+      creative_style: fallbackStyle,
+      confidence: defConf,
+      conversion_score: defScore,
+      priority: derivePriority(defScore, defConf),
+      ctas: defCtas,
+      player_name: p.player_name,
+      player_id: p.player_id,
+      team: p.team,
+      player2_name: null,
+      player2_id: null,
+      player2_team: null,
+      hooks: isTrap ? [
+        `You're about to make a $${Math.round(p.price / 1000)}k mistake — ${p.player_name.split(" ").pop()} is a trap.`,
+        `Value score ${p.value_score.toFixed(1)} at rank ${p.rank}. The data says avoid — are you listening?`,
+        `Everyone is trading in ${p.player_name.split(" ").pop()} this week. That's exactly the problem.`,
+      ] : isBreakout ? [
+        `${p.player_name.split(" ").pop()} is about to explode — upside ${p.upside_pct?.toFixed(0) ?? "?"}%, ceiling ${Math.round(p.ceiling)} pts.`,
+        `Form ${Math.round(p.form_score)}. Projection ${Math.round(p.projection)} pts. The breakout is already happening.`,
+        `Get ${p.player_name.split(" ").pop()} before the price rises — this window won't last.`,
+      ] : [
+        `${Math.round(p.projection)} pts projected. $${Math.round(p.price / 1000)}k. The market still hasn't noticed ${p.player_name.split(" ").pop()}.`,
+        `Value score ${p.value_score.toFixed(1)}. Ceiling ${Math.round(p.ceiling)} pts. This is the most mispriced player in the comp.`,
+        `Stop sleeping on ${p.player_name.split(" ").pop()} — the window to buy cheap closes this week.`,
+      ],
+      hook_options: isTrap ? [
+        `You're about to make a $${Math.round(p.price / 1000)}k mistake — ${p.player_name.split(" ").pop()} is a trap.`,
+        `Value score ${p.value_score.toFixed(1)} at rank ${p.rank}. The data says avoid — are you listening?`,
+        `Everyone is trading in ${p.player_name.split(" ").pop()} this week. That's exactly the problem.`,
+      ] : isBreakout ? [
+        `${p.player_name.split(" ").pop()} is about to explode — upside ${p.upside_pct?.toFixed(0) ?? "?"}%, ceiling ${Math.round(p.ceiling)} pts.`,
+        `Form ${Math.round(p.form_score)}. Projection ${Math.round(p.projection)} pts. The breakout is already happening.`,
+        `Get ${p.player_name.split(" ").pop()} before the price rises — this window won't last.`,
+      ] : [
+        `${Math.round(p.projection)} pts projected. $${Math.round(p.price / 1000)}k. The market still hasn't noticed ${p.player_name.split(" ").pop()}.`,
+        `Value score ${p.value_score.toFixed(1)}. Ceiling ${Math.round(p.ceiling)} pts. This is the most mispriced player in the comp.`,
+        `Stop sleeping on ${p.player_name.split(" ").pop()} — the window to buy cheap closes this week.`,
+      ],
+      voice_script: isTrap
+        ? `Stop. Before you trade in ${p.player_name} — look at the data. ${p.team}... rank ${p.rank}... looks solid on the surface. But value score? ${p.value_score.toFixed(1)}. That means you are paying $${Math.round(p.price / 1000)}k for output that does not justify it. Floor sits at ${Math.round(p.floor)} points — that is your downside risk. The coaches who win their leagues check Neeko before they pull the trigger. Full breakdown at Neeko Sports — link in bio.`
+        : isBreakout
+        ? `${p.player_name} is in the middle of a breakout — and most coaches have missed it. ${p.team}... form score ${Math.round(p.form_score)}... projecting ${Math.round(p.projection)} points with a ceiling of ${Math.round(p.ceiling)}. Upside rating ${p.upside_pct?.toFixed(0) ?? "?"}% — this is a player trending the right way at a price that hasn't caught up yet. The window to get them cheap is closing fast. Full breakdown at Neeko Sports — link in bio.`
+        : `The market hasn't caught up to ${p.player_name} yet — and that is your edge. ${p.team}... projecting ${Math.round(p.projection)} points... ceiling ${Math.round(p.ceiling)}... priced at $${Math.round(p.price / 1000)}k${priceChangeStr(p)}. Value score ${p.value_score.toFixed(1)} — that is elite output at a price that doesn't match. ${p.consistency >= 65 ? `Consistency at ${Math.round(p.consistency)}% — this is not a fluke.` : `High upside at ${p.upside_pct?.toFixed(0) ?? "?"}% — the ceiling is real.`} The window is now. Full breakdown at Neeko Sports — link in bio.`,
+      full_script: isTrap
+        ? `Stop. Before you trade in ${p.player_name} — look at the data. ${p.team}... rank ${p.rank}... looks solid on the surface. But value score? ${p.value_score.toFixed(1)}. That means you are paying $${Math.round(p.price / 1000)}k for output that does not justify it. Floor sits at ${Math.round(p.floor)} points — that is your downside risk. The coaches who win their leagues check Neeko before they pull the trigger. Full breakdown at Neeko Sports — link in bio.`
+        : isBreakout
+        ? `${p.player_name} is in the middle of a breakout — and most coaches have missed it. ${p.team}... form score ${Math.round(p.form_score)}... projecting ${Math.round(p.projection)} points with a ceiling of ${Math.round(p.ceiling)}. Upside rating ${p.upside_pct?.toFixed(0) ?? "?"}% — this is a player trending the right way at a price that hasn't caught up yet. The window to get them cheap is closing fast. Full breakdown at Neeko Sports — link in bio.`
+        : `The market hasn't caught up to ${p.player_name} yet — and that is your edge. ${p.team}... projecting ${Math.round(p.projection)} points... ceiling ${Math.round(p.ceiling)}... priced at $${Math.round(p.price / 1000)}k${priceChangeStr(p)}. Value score ${p.value_score.toFixed(1)} — that is elite output at a price that doesn't match. ${p.consistency >= 65 ? `Consistency at ${Math.round(p.consistency)}% — this is not a fluke.` : `High upside at ${p.upside_pct?.toFixed(0) ?? "?"}% — the ceiling is real.`} The window is now. Full breakdown at Neeko Sports — link in bio.`,
+      caption_script: isTrap
+        ? `${p.player_name} is the most dangerous trade this week — the data is clear.\n\nValue score ${p.value_score.toFixed(1)} at rank ${p.rank}. $${Math.round(p.price / 1000)}k for a floor of just ${Math.round(p.floor)} pts. The risk-reward is wrong.\n\nFull trap breakdown live at Neeko Sports — don't say we didn't warn you. #AFLFantasy #TrapAlert #AFLSupercoach #NeekoSports`
+        : isBreakout
+        ? `${p.player_name} is breaking out — and the price hasn't caught up yet.\n\nForm score ${Math.round(p.form_score)}. Ceiling ${Math.round(p.ceiling)} pts. Upside ${p.upside_pct?.toFixed(0) ?? "?"}% at $${Math.round(p.price / 1000)}k${priceChangeStr(p)}.\n\nFull breakout breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #Breakout`
+        : `${p.player_name} is the most mispriced player in the comp right now — and most coaches haven't noticed yet.\n\n${Math.round(p.projection)} pts projected this round. Value score ${p.value_score.toFixed(1)}. Ceiling ${Math.round(p.ceiling)} pts at $${Math.round(p.price / 1000)}k${priceChangeStr(p)}.\n\nFull edge breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #ValueLock`,
+      caption: isTrap
+        ? `${p.player_name} is the most dangerous trade this week — the data is clear.\n\nValue score ${p.value_score.toFixed(1)} at rank ${p.rank}. $${Math.round(p.price / 1000)}k for a floor of just ${Math.round(p.floor)} pts. The risk-reward is wrong.\n\nFull trap breakdown live at Neeko Sports — don't say we didn't warn you. #AFLFantasy #TrapAlert #AFLSupercoach #NeekoSports`
+        : isBreakout
+        ? `${p.player_name} is breaking out — and the price hasn't caught up yet.\n\nForm score ${Math.round(p.form_score)}. Ceiling ${Math.round(p.ceiling)} pts. Upside ${p.upside_pct?.toFixed(0) ?? "?"}% at $${Math.round(p.price / 1000)}k${priceChangeStr(p)}.\n\nFull breakout breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #Breakout`
+        : `${p.player_name} is the most mispriced player in the comp right now — and most coaches haven't noticed yet.\n\n${Math.round(p.projection)} pts projected this round. Value score ${p.value_score.toFixed(1)}. Ceiling ${Math.round(p.ceiling)} pts at $${Math.round(p.price / 1000)}k${priceChangeStr(p)}.\n\nFull edge breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #ValueLock`,
+      visual_plan: isTrap
+        ? `Top: "TRAP ALERT" heavy all-caps red (#D32F2F) with caution triangle, shake animation. Middle: "${p.player_name}" large white, "${p.team}" smaller grey. Left: vertical red warning bar. Bottom: "VALUE ${p.value_score.toFixed(1)}" red pill, "FLOOR ${Math.round(p.floor)} PTS" amber pill. Below: "DON'T FOLLOW THE CROWD" bold white italic. Background: #0D0D0D with subtle red radial glow.`
+        : isBreakout
+        ? `Scene 1 (0-2s): "BREAKOUT IN PROGRESS" amber-to-green gradient slides in from left. Scene 2 (2-6s): "${p.player_name}" large white, "${p.team}" small grey, thin green left-border accent. Scene 3 (6-12s): "FORM ${Math.round(p.form_score)}" flashes green, "CEILING ${Math.round(p.ceiling)} PTS" below, "UPSIDE ${p.upside_pct?.toFixed(0) ?? "?"}%" amber, each 0.3s delay. Scene 4 (12-20s): "GET ON BEFORE THE PRICE RISES" bold white, green underline pulse. Scene 5 (20-25s): Neeko logo on black.`
+        : `Scene 1 (0-2s): "MISPRICED" slams in from bottom with green glow. Scene 2 (2-5s): "${p.player_name}" large white, "${p.team}" smaller grey. Scene 3 (5-11s): Three stat cards pop in — "PROJ ${Math.round(p.projection)} PTS" green, "VALUE ${p.value_score.toFixed(1)}" green, "CEIL ${Math.round(p.ceiling)} PTS" green. Scene 4 (11-18s): "BUY BEFORE THE MARKET CORRECTS" bold white. Scene 5 (18-22s): Dark end card, Neeko Sports logo.`,
+      image_prompt: isTrap
+        ? `Style: bold graphic, warning card. Subject: Trap alert for ${p.player_name}, ${p.team} — danger signal card. Colours: #0D0D0D background, #D32F2F red for warning elements, #FF8F00 amber for stats, white text. Text overlay: "TRAP ALERT" at top, player name centre, value ${p.value_score.toFixed(1)} and floor ${Math.round(p.floor)}pts stats below. Composition: portrait, warning-first design. Mood: urgent, cautionary.`
+        : isBreakout
+        ? `Style: dynamic graphic with motion feel. Subject: ${p.player_name} breakout alert card — upward momentum visual. Colours: #0D0D0D background, #00C853 green for growth, #FF8F00 amber for upside numbers, white text. Text overlay: "BREAKOUT IN PROGRESS", player name, form ${Math.round(p.form_score)} and ceiling ${Math.round(p.ceiling)}pts stats. Composition: portrait, upward energy. Mood: exciting, FOMO-driven.`
+        : `Style: data-forward graphic design. Subject: ${p.player_name} value edge card — mispriced player alert. Colours: #0D0D0D background, #00C853 green for value stats, white text. Text overlay: "MISPRICED" hero text, player name, projection ${Math.round(p.projection)}pts, value ${p.value_score.toFixed(1)}, ceiling ${Math.round(p.ceiling)}pts. Composition: portrait, clean stat layout. Mood: analytical, authoritative.`,
+      video_prompt: isTrap
+        ? `Scene 1 (0-2s): Red "#D32F2F" flash, "TRAP ALERT" crashes in with shake effect. Scene 2 (2-6s): "${p.player_name}" fades in with red left-border accent. Scene 3 (6-12s): Stats pop in — "VALUE ${p.value_score.toFixed(1)}" in red, "FLOOR ${Math.round(p.floor)} PTS" in amber. Scene 4 (12-18s): "DON'T FOLLOW THE CROWD" appears in white italic. Scene 5 (18-22s): "Full breakdown — Neeko Sports" CTA. Scene 6 (22-25s): End card.`
+        : isBreakout
+        ? `Scene 1 (0-2s): Dark background, "BREAKOUT IN PROGRESS" slides in left-to-right in amber-green gradient. Scene 2 (2-6s): "${p.player_name}" fades in, green left-border accent panel. Scene 3 (6-12s): Stats animate in — "FORM ${Math.round(p.form_score)}", "CEILING ${Math.round(p.ceiling)} PTS", "UPSIDE ${p.upside_pct?.toFixed(0) ?? "?"}%" each with 0.3s stagger, in green. Scene 4 (12-18s): "GET ON BEFORE THE PRICE RISES" pulses. Scene 5 (18-22s): CTA and Neeko end card.`
+        : `Scene 1 (0-2s): "MISPRICED" slams in from bottom with green glow effect. Scene 2 (2-6s): "${p.player_name}" and "${p.team}" fade in. Scene 3 (6-12s): Three stat cards pop in sequentially — "PROJ ${Math.round(p.projection)} PTS", "VALUE ${p.value_score.toFixed(1)}", "CEIL ${Math.round(p.ceiling)} PTS" all in green. Scene 4 (12-18s): "BUY BEFORE THE MARKET CORRECTS" bold white. Scene 5 (18-22s): Neeko Sports end card.`,
+    });
   }
 
-  return { week_key: getWeekKey(), days };
+  return { day: dayNumber, posts };
 }
 
 Deno.serve(async (req: Request) => {
@@ -1080,9 +1226,14 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}));
     const forceRegenerate = body?.force === true;
     const focusPlayerName: string | undefined = body?.player_name ?? undefined;
+    const targetDay: number | undefined = typeof body?.day === "number" ? body.day : undefined;
     const weekKey = getWeekKey();
 
-    if (!forceRegenerate) {
+    const daysToGenerate = targetDay != null
+      ? [targetDay]
+      : [1, 2, 3, 4, 5, 6, 7];
+
+    if (!forceRegenerate && targetDay == null) {
       const { data: existing } = await db
         .schema("marketing")
         .from("weekly_content_plans")
@@ -1211,9 +1362,9 @@ Deno.serve(async (req: Request) => {
         .limit(20);
       if (feedbackData && Array.isArray(feedbackData)) {
         feedbackPatterns = feedbackData.map((r: Record<string, unknown>) => ({
-          content_type: String(r.content_type ?? ""),
-          hook:         String(r.hook ?? ""),
-          angle:        String(r.angle ?? ""),
+          content_type:  String(r.content_type ?? ""),
+          hook:          String(r.hook ?? ""),
+          angle:         String(r.angle ?? ""),
           feedback_type: String(r.feedback_type ?? ""),
         }));
       }
@@ -1222,24 +1373,108 @@ Deno.serve(async (req: Request) => {
       console.warn("Feedback fetch failed (non-fatal):", String(fbErr));
     }
 
-    let planData: object;
-    const hasOpenAI = !!Deno.env.get("OPENAI_API_KEY");
+    const feedbackSection = buildFeedbackSection(feedbackPatterns);
+    const focusNote = focusPlayerName
+      ? `\nFOCUS PLAYER: Prioritise "${focusPlayerName}" — build at least one post directly around their data story.\n`
+      : "";
 
-    if (hasOpenAI) {
-      try {
-        console.log("Calling OpenAI gpt-4o...");
-        planData = await callOpenAI(
-          buildSystemPrompt(),
-          buildUserPrompt(mappedPlayers, selections, focusPlayerName, feedbackPatterns),
-        );
-        console.log("OpenAI response received and normalised");
-      } catch (aiError) {
-        console.warn("OpenAI failed, using fallback:", String(aiError));
-        planData = buildFallbackPlan(mappedPlayers, selections);
+    const hasOpenAI = !!Deno.env.get("OPENAI_API_KEY");
+    const usedPlayerIds = new Set<number>();
+    const generatedDays: object[] = [];
+
+    let existingPlan: { days?: object[] } | null = null;
+    if (targetDay != null) {
+      const { data: existing } = await db
+        .schema("marketing")
+        .from("weekly_content_plans")
+        .select("plan_json")
+        .eq("week_key", weekKey)
+        .maybeSingle();
+      existingPlan = existing?.plan_json ?? null;
+
+      if (existingPlan?.days && Array.isArray(existingPlan.days)) {
+        for (const d of existingPlan.days) {
+          const dayObj = d as { day?: number; posts?: Array<{ player_id?: number; player2_id?: number }> };
+          if (dayObj.day !== targetDay && Array.isArray(dayObj.posts)) {
+            for (const post of dayObj.posts) {
+              if (post.player_id) usedPlayerIds.add(Number(post.player_id));
+              if (post.player2_id) usedPlayerIds.add(Number(post.player2_id));
+            }
+          }
+        }
       }
+    }
+
+    console.log(`Generating days: [${daysToGenerate.join(", ")}] | usedPlayerIds so far: ${usedPlayerIds.size}`);
+
+    for (const dayNum of daysToGenerate) {
+      const dayConfig = DAY_CONFIGS[dayNum - 1];
+      const fallbackDay = buildFallbackDay(dayNum, mappedPlayers, selections, new Set(usedPlayerIds));
+
+      let dayResult: object;
+      if (hasOpenAI) {
+        dayResult = await generateDayWithRetry(
+          dayNum,
+          dayConfig.label,
+          dayConfig.structure,
+          selections,
+          weekKey,
+          usedPlayerIds,
+          feedbackSection,
+          focusNote,
+          fallbackDay,
+        );
+      } else {
+        console.log(`Day ${dayNum}: no OpenAI key — using fallback`);
+        dayResult = fallbackDay;
+      }
+
+      const dayObj = dayResult as { day?: number; posts?: Array<{ player_id?: number; player2_id?: number }> };
+      if (Array.isArray(dayObj.posts)) {
+        for (const post of dayObj.posts) {
+          if (post.player_id) usedPlayerIds.add(Number(post.player_id));
+          if (post.player2_id) usedPlayerIds.add(Number(post.player2_id));
+        }
+      }
+
+      generatedDays.push(dayResult);
+
+      try {
+        await db
+          .schema("marketing")
+          .from("weekly_plans_cache")
+          .upsert(
+            {
+              week_key:     weekKey,
+              day_number:   dayNum,
+              chunk_data:   dayResult,
+              status:       "complete",
+              generated_at: new Date().toISOString(),
+            },
+            { onConflict: "week_key,day_number" }
+          );
+        console.log(`Day ${dayNum} cached to weekly_plans_cache`);
+      } catch (cacheErr) {
+        console.warn(`Day ${dayNum} cache write failed (non-fatal):`, String(cacheErr));
+      }
+    }
+
+    let planData: object;
+
+    if (targetDay != null && existingPlan?.days && Array.isArray(existingPlan.days)) {
+      const days = [...existingPlan.days] as object[];
+      const idx = days.findIndex((d) => {
+        const dayObj = d as { day?: number };
+        return Number(dayObj.day) === targetDay;
+      });
+      if (idx >= 0) {
+        days[idx] = generatedDays[0];
+      } else {
+        days.push(generatedDays[0]);
+      }
+      planData = { week_key: weekKey, days };
     } else {
-      console.log("No OpenAI key — using fallback plan");
-      planData = buildFallbackPlan(mappedPlayers, selections);
+      planData = { week_key: weekKey, days: generatedDays };
     }
 
     const { error: upsertError } = await db
