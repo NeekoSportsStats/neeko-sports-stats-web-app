@@ -64,6 +64,7 @@ function buildScript(player: RankingPlayer, angle: Angle): string {
   const risk = fmtDec(player.risk_rating, 0);
   const value = fmtDec(player.value_score, 1);
   const price = fmtPrice(player.price);
+  const upside = "—";
   const ai = player.summary_short ?? player.summary_long ?? "";
   const aiLong = player.summary_long ?? "";
 

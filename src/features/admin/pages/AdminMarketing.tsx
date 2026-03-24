@@ -1,25 +1,25 @@
 import { lazy, Suspense, useState } from "react";
-import { RefreshCw, Zap, FileText, MessageSquare, Calendar, Image as ImageIcon, Clapperboard } from "lucide-react";
+import { RefreshCw, Zap, MessageSquare, Calendar, Image as ImageIcon, Clapperboard, FileText } from "lucide-react";
 
-const ContentDashboard = lazy(() => import("@/features/admin/marketing/ContentDashboard"));
-const ContentEngine    = lazy(() => import("@/features/admin/marketing/ContentEngine"));
-const RedditEngine     = lazy(() => import("@/features/admin/marketing/RedditEngine"));
-const WeeklyPlanner    = lazy(() => import("@/features/admin/marketing/WeeklyPlanner"));
-const ImageStudio      = lazy(() => import("@/features/admin/marketing/ImageStudio"));
-const VideoStudio      = lazy(() => import("@/features/admin/marketing/VideoStudio"));
+const AdminContentEngineV3 = lazy(() => import("@/features/admin/marketing/AdminContentEngineV3"));
+const ContentEngine         = lazy(() => import("@/features/admin/marketing/ContentEngine"));
+const RedditEngine          = lazy(() => import("@/features/admin/marketing/RedditEngine"));
+const WeeklyPlanner         = lazy(() => import("@/features/admin/marketing/WeeklyPlanner"));
+const ImageStudio           = lazy(() => import("@/features/admin/marketing/ImageStudio"));
+const VideoStudio           = lazy(() => import("@/features/admin/marketing/VideoStudio"));
 
-type Tab = "opportunities" | "script" | "reddit" | "planner" | "image" | "video";
+type Tab = "engine" | "script" | "reddit" | "planner" | "image" | "video";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType; description: string }[] = [
   {
-    id: "opportunities",
+    id: "engine",
     label: "Content Engine",
     icon: Zap,
-    description: "Data-driven content opportunities — one click to a full content pack",
+    description: "AI-powered content from live rankings — click any opportunity to generate a full pack instantly",
   },
   {
     id: "script",
-    label: "Script Engine",
+    label: "Script Builder",
     icon: FileText,
     description: "Manually build scripts and hooks for any player and angle",
   },
@@ -58,12 +58,12 @@ function TabFallback() {
 }
 
 export default function AdminMarketing() {
-  const [tab, setTab] = useState<Tab>("opportunities");
+  const [tab, setTab] = useState<Tab>("engine");
   const activeTab = TABS.find((t) => t.id === tab)!;
 
   return (
     <div>
-      <div className="mb-6">
+      <div className="mb-5">
         <h1 className="text-lg font-semibold">Marketing</h1>
       </div>
 
@@ -87,12 +87,12 @@ export default function AdminMarketing() {
       <p className="text-xs text-muted-foreground mb-6 px-1">{activeTab.description}</p>
 
       <Suspense fallback={<TabFallback />}>
-        {tab === "opportunities" && <ContentDashboard />}
-        {tab === "script"        && <ContentEngine />}
-        {tab === "reddit"        && <RedditEngine />}
-        {tab === "planner"       && <WeeklyPlanner />}
-        {tab === "image"         && <ImageStudio />}
-        {tab === "video"         && <VideoStudio />}
+        {tab === "engine"  && <AdminContentEngineV3 />}
+        {tab === "script"  && <ContentEngine />}
+        {tab === "reddit"  && <RedditEngine />}
+        {tab === "planner" && <WeeklyPlanner />}
+        {tab === "image"   && <ImageStudio />}
+        {tab === "video"   && <VideoStudio />}
       </Suspense>
     </div>
   );
