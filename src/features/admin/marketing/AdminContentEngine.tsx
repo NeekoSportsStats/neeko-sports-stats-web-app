@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Calendar, Video, Image, Monitor, Copy, Check, ChevronDown, ChevronUp, Zap, TriangleAlert as AlertTriangle, Star, TrendingUp, FileText, Eye, Play, Mic, ChevronRight, Brain, Flame, Target, Smartphone, ChartBar as BarChart2, List, GitCompare, BookOpen, Megaphone, Layers } from "lucide-react";
+import { RefreshCw, Calendar, Video, Image, Monitor, Copy, Check, ChevronDown, ChevronUp, Zap, TriangleAlert as AlertTriangle, Star, TrendingUp, FileText, Eye, Play, Mic, ChevronRight, Brain, Flame, Target, Smartphone, ChartBar as BarChart2, List, GitCompare, BookOpen, Megaphone, Layers, UserRoundCog, Lightbulb } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -60,6 +60,8 @@ interface PlayerOption {
   player_id: number;
   player_name: string;
   team: string;
+  position?: string;
+  projection_final?: number | null;
   neeko_rating_scaled: number | null;
 }
 
@@ -1112,6 +1114,109 @@ function TodayTopPostsSection() {
   );
 }
 
+// ── SWAP PLAYER PANEL ─────────────────────────────────────────────────────────
+
+function SwapPlayerPanel({
+  post,
+  availablePlayers,
+  onSwap,
+  swapping,
+  onSuggestBetter,
+  suggesting,
+  suggestedPlayer,
+}: {
+  post: PostPlan;
+  availablePlayers: PlayerOption[];
+  onSwap: (post: PostPlan, playerId: number) => void;
+  swapping: boolean;
+  onSuggestBetter: (post: PostPlan) => void;
+  suggesting: boolean;
+  suggestedPlayer: PlayerOption | null;
+}) {
+  const [selectedId, setSelectedId] = useState<number>(post.player_id);
+
+  useEffect(() => {
+    setSelectedId(post.player_id);
+  }, [post.player_id]);
+
+  const isDifferent = selectedId !== post.player_id;
+  const selected = availablePlayers.find((p) => p.player_id === selectedId);
+
+  return (
+    <div className="border border-dashed border-border rounded-lg p-3 space-y-3 bg-muted/5">
+      <div className="flex items-center gap-2">
+        <UserRoundCog className="h-3.5 w-3.5 text-muted-foreground" />
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Swap Player</p>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <select
+          value={selectedId}
+          onChange={(e) => setSelectedId(Number(e.target.value))}
+          disabled={swapping || availablePlayers.length === 0}
+          className="flex-1 min-w-0 text-xs border border-border rounded-md px-2 py-1.5 bg-background text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50"
+        >
+          {availablePlayers.map((p) => (
+            <option key={p.player_id} value={p.player_id}>
+              {p.player_name} · {p.team}{p.position ? ` · ${p.position}` : ""}{p.projection_final ? ` · ${Math.round(p.projection_final)}pts` : ""}
+            </option>
+          ))}
+        </select>
+
+        <button
+          onClick={() => onSwap(post, selectedId)}
+          disabled={swapping || !isDifferent}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background text-xs rounded-md font-medium hover:opacity-90 transition-opacity disabled:opacity-40 shrink-0"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${swapping ? "animate-spin" : ""}`} />
+          {swapping ? "Regenerating…" : "Apply Player"}
+        </button>
+
+        <button
+          onClick={() => onSuggestBetter(post)}
+          disabled={suggesting || swapping}
+          title="Suggest a player that better fits this post's angle and category"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors disabled:opacity-40 shrink-0"
+        >
+          <Lightbulb className={`h-3.5 w-3.5 ${suggesting ? "animate-pulse text-yellow-500" : "text-muted-foreground"}`} />
+          {suggesting ? "Finding…" : "Suggest Better"}
+        </button>
+      </div>
+
+      {selected && isDifferent && (
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          <span className="text-foreground font-medium">{selected.player_name}</span>
+          <span>·</span>
+          <span>{selected.team}</span>
+          {selected.position && <><span>·</span><span>{selected.position}</span></>}
+          {selected.projection_final && <><span>·</span><span className="font-mono font-bold text-blue-600 dark:text-blue-400">{Math.round(selected.projection_final)} pts proj</span></>}
+        </div>
+      )}
+
+      {suggestedPlayer && (
+        <div className="flex items-center gap-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-md">
+          <Lightbulb className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-semibold text-yellow-700 dark:text-yellow-300">Suggested: {suggestedPlayer.player_name}</p>
+            <p className="text-[10px] text-yellow-600/80 dark:text-yellow-400/80">{suggestedPlayer.team}{suggestedPlayer.position ? ` · ${suggestedPlayer.position}` : ""}{suggestedPlayer.projection_final ? ` · ${Math.round(suggestedPlayer.projection_final)} pts` : ""}</p>
+          </div>
+          <button
+            onClick={() => {
+              setSelectedId(suggestedPlayer.player_id);
+              onSwap(post, suggestedPlayer.player_id);
+            }}
+            disabled={swapping}
+            className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 border border-yellow-500/40 text-yellow-700 dark:text-yellow-300 text-[10px] font-semibold rounded hover:bg-yellow-500/30 transition-colors disabled:opacity-40 shrink-0"
+          >
+            <Check className="h-3 w-3" />
+            Use
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── POST DETAIL PANEL ─────────────────────────────────────────────────────────
 
 function PostDetailPanel({
@@ -1121,6 +1226,12 @@ function PostDetailPanel({
   onAggressiveRewrite,
   rewriting,
   rewriteCount,
+  availablePlayers,
+  onSwapPlayer,
+  swappingPost,
+  onSuggestBetter,
+  suggestingPost,
+  suggestedPlayers,
 }: {
   post: PostPlan;
   onRegenerate: (post: PostPlan) => void;
@@ -1128,6 +1239,12 @@ function PostDetailPanel({
   onAggressiveRewrite: (post: PostPlan) => void;
   rewriting: boolean;
   rewriteCount: number;
+  availablePlayers: PlayerOption[];
+  onSwapPlayer: (post: PostPlan, playerId: number) => void;
+  swappingPost: string | null;
+  onSuggestBetter: (post: PostPlan) => void;
+  suggestingPost: string | null;
+  suggestedPlayers: Record<string, PlayerOption>;
 }) {
   const [activeTab, setActiveTab] = useState<PostTab>("voice");
   const { copied, copy } = useCopy();
@@ -1161,6 +1278,7 @@ function PostDetailPanel({
   };
 
   const isCustomTab = activeTab === "ai" || activeTab === "platform" || activeTab === "strategy" || activeTab === "visual" || (activeTab === "hooks" && isScreenRecording);
+  const postKey = `${post.day}-${post.post_number}`;
 
   return (
     <div className="border border-border rounded-lg overflow-hidden bg-background">
@@ -1274,6 +1392,20 @@ function PostDetailPanel({
           {!isCustomTab && <p className="text-[10px] text-muted-foreground mt-1.5">{getTabContent().length} characters</p>}
         </div>
       )}
+
+      {availablePlayers.length > 0 && (
+        <div className="p-4 border-t border-border">
+          <SwapPlayerPanel
+            post={post}
+            availablePlayers={availablePlayers}
+            onSwap={onSwapPlayer}
+            swapping={swappingPost === postKey}
+            onSuggestBetter={onSuggestBetter}
+            suggesting={suggestingPost === postKey}
+            suggestedPlayer={suggestedPlayers[postKey] ?? null}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -1352,6 +1484,12 @@ function DayRow({
   onAggressiveRewrite,
   aggressivePost,
   rewriteCounts,
+  availablePlayers,
+  onSwapPlayer,
+  swappingPost,
+  onSuggestBetter,
+  suggestingPost,
+  suggestedPlayers,
 }: {
   dayPlan: DayPlan;
   selectedPost: PostPlan | null;
@@ -1361,6 +1499,12 @@ function DayRow({
   onAggressiveRewrite: (post: PostPlan) => void;
   aggressivePost: string | null;
   rewriteCounts: Record<string, number>;
+  availablePlayers: PlayerOption[];
+  onSwapPlayer: (post: PostPlan, playerId: number) => void;
+  swappingPost: string | null;
+  onSuggestBetter: (post: PostPlan) => void;
+  suggestingPost: string | null;
+  suggestedPlayers: Record<string, PlayerOption>;
 }) {
   const [expanded, setExpanded] = useState(dayPlan.day === 1);
   const dayLabel = DAY_LABELS[(dayPlan.day - 1) % 7];
@@ -1418,6 +1562,12 @@ function DayRow({
               onAggressiveRewrite={onAggressiveRewrite}
               rewriting={aggressivePost === `${selectedPost.day}-${selectedPost.post_number}`}
               rewriteCount={rewriteCounts[`${selectedPost.day}-${selectedPost.post_number}`] ?? 0}
+              availablePlayers={availablePlayers}
+              onSwapPlayer={onSwapPlayer}
+              swappingPost={swappingPost}
+              onSuggestBetter={onSuggestBetter}
+              suggestingPost={suggestingPost}
+              suggestedPlayers={suggestedPlayers}
             />
           )}
         </div>
@@ -1487,7 +1637,25 @@ export default function AdminContentEngine() {
   const [aggressivePost, setAggressivePost] = useState<string | null>(null);
   const [rewriteCounts, setRewriteCounts] = useState<Record<string, number>>({});
   const [focusPlayer, setFocusPlayer] = useState<string>("");
+  const [availablePlayers, setAvailablePlayers] = useState<PlayerOption[]>([]);
+  const [swappingPost, setSwappingPost] = useState<string | null>(null);
+  const [suggestingPost, setSuggestingPost] = useState<string | null>(null);
+  const [suggestedPlayers, setSuggestedPlayers] = useState<Record<string, PlayerOption>>({});
   const { toast } = useToast();
+
+  useEffect(() => {
+    supabase
+      .schema("afl")
+      .from("player_rankings_cache")
+      .select("player_id, player_name, team, position, projection_final, neeko_rating_scaled")
+      .eq("is_available", true)
+      .not("projection_final", "is", null)
+      .order("projection_final", { ascending: false, nullsFirst: false })
+      .limit(80)
+      .then(({ data }) => {
+        if (data) setAvailablePlayers(data as PlayerOption[]);
+      });
+  }, []);
 
   const fetchPlan = useCallback(async (force = false) => {
     setLoading(true);
@@ -1716,6 +1884,131 @@ ${originalContent}`;
     }
   };
 
+  const handleSwapPlayer = async (post: PostPlan, newPlayerId: number) => {
+    const key = `${post.day}-${post.post_number}`;
+    const newPlayer = availablePlayers.find((p) => p.player_id === newPlayerId);
+    if (!newPlayer) return;
+
+    setSwappingPost(key);
+
+    const prompt = `You are regenerating a single marketing post for a new player.
+
+CONTEXT:
+- Original player: ${post.player_name} (${post.team})
+- New player: ${newPlayer.player_name} (${newPlayer.team}${newPlayer.position ? `, ${newPlayer.position}` : ""})${newPlayer.projection_final ? `, projected ${Math.round(newPlayer.projection_final)} pts` : ""}
+- Post category: ${post.category}
+- Post type: ${post.post_type}
+- Content angle: ${post.content_angle ?? "hidden_edge"}
+
+TASK:
+Rebuild the ENTIRE post for the new player. Keep the same post category and type. Adapt the angle to fit the new player's profile.
+
+REQUIREMENTS:
+- Reference the new player's real data (projection, team, position)
+- Do NOT reuse any content from the original post
+- Make it feel like it was originally designed for this player
+- Use specific numbers, not generic praise
+- Match the tone: ${post.category === "Trap" ? "warning, urgency, risk" : post.category === "Captain" ? "confidence, authority, lock" : post.category === "Breakout" ? "excitement, urgency, upside" : "data-driven, value-focused"}
+
+OUTPUT (JSON only, no markdown):
+{
+  "hooks": ["hook 1", "hook 2", "hook 3"],
+  "voice_script": "full script here",
+  "caption": "caption here",
+  "visual_plan": "Scene 1 (0-3s): [describe] Scene 2 (3-8s): [describe] Scene 3 (8-15s): [describe] Scene 4 (15-20s): [describe] Scene 5 (20-25s): [CTA]"
+}`;
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("generate-player-ai", {
+        body: { prompt, mode: "raw" },
+      });
+
+      if (fnError) throw new Error(fnError.message ?? "Swap regen failed");
+
+      const raw: string = data?.result ?? data?.content ?? data?.text ?? "";
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("Could not parse regenerated post");
+
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      const updatedPost: PostPlan = {
+        ...post,
+        player_id: newPlayer.player_id,
+        player_name: newPlayer.player_name,
+        team: newPlayer.team,
+        hooks: Array.isArray(parsed.hooks) ? parsed.hooks : post.hooks,
+        hook_options: Array.isArray(parsed.hooks) ? parsed.hooks : post.hook_options,
+        voice_script: parsed.voice_script ?? post.voice_script,
+        full_script: parsed.voice_script ?? post.full_script,
+        caption_script: parsed.caption ?? post.caption_script,
+        caption: parsed.caption ?? post.caption,
+        visual_plan: parsed.visual_plan ?? post.visual_plan,
+      };
+
+      setPlan((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          days: prev.days.map((d) =>
+            d.day !== post.day ? d : {
+              ...d,
+              posts: d.posts.map((p) => p.post_number !== post.post_number ? p : updatedPost),
+            }
+          ),
+        };
+      });
+
+      setSelectedPost(updatedPost);
+      setSuggestedPlayers((prev) => { const next = { ...prev }; delete next[key]; return next; });
+      toast({ title: `Swapped to ${newPlayer.player_name}`, description: `Post regenerated for ${newPlayer.team}` });
+    } catch (e) {
+      toast({
+        title: "Swap failed",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setSwappingPost(null);
+    }
+  };
+
+  const handleSuggestBetter = async (post: PostPlan) => {
+    const key = `${post.day}-${post.post_number}`;
+    setSuggestingPost(key);
+
+    try {
+      const angleToCategory: Record<string, string> = {
+        hidden_edge: "value", market_inefficiency: "value", must_have: "captain",
+        captain_lock: "captain", trap_warning: "trap", overpriced: "trap",
+        risk_reward: "breakout", contrarian: "value", comparison: "value",
+        youre_wrong: "trap", breakdown: "value", narrative: "value", proof: "proof",
+      };
+      const targetCategory = angleToCategory[post.content_angle ?? ""] ?? post.category.toLowerCase();
+
+      const pool = availablePlayers.filter((p) => p.player_id !== post.player_id);
+
+      let suggested: PlayerOption | undefined;
+
+      if (targetCategory === "value") {
+        suggested = pool.sort((a, b) => (b.projection_final ?? 0) - (a.projection_final ?? 0))[Math.floor(Math.random() * 5)];
+      } else if (targetCategory === "captain") {
+        suggested = pool.sort((a, b) => (b.projection_final ?? 0) - (a.projection_final ?? 0))[0];
+      } else if (targetCategory === "trap") {
+        suggested = pool.sort((a, b) => (b.neeko_rating_scaled ?? 0) - (a.neeko_rating_scaled ?? 0)).slice(15, 30)[Math.floor(Math.random() * 5)];
+      } else if (targetCategory === "breakout") {
+        suggested = pool.slice(5, 20)[Math.floor(Math.random() * 5)];
+      } else {
+        suggested = pool[Math.floor(Math.random() * 10)];
+      }
+
+      if (suggested) {
+        setSuggestedPlayers((prev) => ({ ...prev, [key]: suggested! }));
+      }
+    } finally {
+      setSuggestingPost(null);
+    }
+  };
+
   const totalPosts = plan?.days?.reduce((acc, d) => acc + d.posts.length, 0) ?? 0;
 
   return (
@@ -1798,6 +2091,12 @@ ${originalContent}`;
               onAggressiveRewrite={handleAggressiveRewrite}
               aggressivePost={aggressivePost}
               rewriteCounts={rewriteCounts}
+              availablePlayers={availablePlayers}
+              onSwapPlayer={handleSwapPlayer}
+              swappingPost={swappingPost}
+              onSuggestBetter={handleSuggestBetter}
+              suggestingPost={suggestingPost}
+              suggestedPlayers={suggestedPlayers}
             />
           ))}
         </div>
