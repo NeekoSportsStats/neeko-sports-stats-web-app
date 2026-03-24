@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   RefreshCw, Calendar, Video, Image, Monitor, Copy, Check,
   ChevronDown, ChevronUp, Zap, TriangleAlert as AlertTriangle,
-  Star, TrendingUp, FileText, Eye, Play, Mic, ChevronRight,
+  Star, TrendingUp, FileText, Eye, Play, Mic, ChevronRight, Brain,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
@@ -11,7 +11,15 @@ import { useToast } from "@/hooks/use-toast";
 
 type PostType = "Video" | "Image" | "Screen Recording";
 type PostCategory = "Value" | "Breakout" | "Trap" | "Captain" | "Proof";
-type PostTab = "voice" | "hooks" | "visual" | "caption";
+type PostTab = "voice" | "hooks" | "visual" | "caption" | "ai";
+
+interface PlayerAISummary {
+  summary_short: string | null;
+  summary_long: string | null;
+  recommendation: string | null;
+  primary_reason: string | null;
+  generated_at: string | null;
+}
 
 interface PostPlan {
   day: number;
@@ -68,6 +76,7 @@ const POST_TABS: { id: PostTab; label: string; icon: React.ElementType }[] = [
   { id: "hooks",   label: "Hooks",         icon: Play },
   { id: "visual",  label: "Visual Plan",   icon: Eye },
   { id: "caption", label: "Caption",       icon: FileText },
+  { id: "ai",      label: "AI Summary",    icon: Brain },
 ];
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -96,6 +105,191 @@ function getHooks(post: PostPlan): string[] {
   return (post.hooks?.length ? post.hooks : post.hook_options) ?? [];
 }
 
+// ── AI SUMMARY TAB ────────────────────────────────────────────────────────────
+
+function AIKeywordHighlight({ text }: { text: string }) {
+  const projectionRe = /(\d+\s*(?:pts?|points?|projection)|\bprojec(?:t|tion|ted)\b)/gi;
+  const valueRe = /(\bvalue\b|\bunderpriced\b|\boverpriced\b|\bbreakeven\b|\bbreak.?even\b)/gi;
+  const riskRe = /(\brisk(?:y)?\b|\bdangerous\b|\bavoid\b|\btrap\b|\binjur(?:y|ed|ies)\b|\bbe.?wary\b|\bconcern\b)/gi;
+
+  const parts: { text: string; type: "projection" | "value" | "risk" | null }[] = [];
+  let remaining = text;
+  let safetyCounter = 0;
+
+  while (remaining.length > 0 && safetyCounter++ < 2000) {
+    const projMatch = projectionRe.exec(remaining);
+    const valueMatch = valueRe.exec(remaining);
+    const riskMatch = riskRe.exec(remaining);
+
+    projectionRe.lastIndex = 0;
+    valueRe.lastIndex = 0;
+    riskRe.lastIndex = 0;
+
+    const allMatches = [
+      projMatch ? { index: remaining.toLowerCase().search(projectionRe), type: "projection" as const, match: projMatch[0] } : null,
+      valueMatch ? { index: remaining.toLowerCase().search(valueRe), type: "value" as const, match: valueMatch[0] } : null,
+      riskMatch ? { index: remaining.toLowerCase().search(riskRe), type: "risk" as const, match: riskMatch[0] } : null,
+    ].filter(Boolean).sort((a, b) => (a!.index) - (b!.index));
+
+    if (allMatches.length === 0 || allMatches[0]!.index === -1) {
+      parts.push({ text: remaining, type: null });
+      break;
+    }
+
+    const first = allMatches[0]!;
+    const idx = first.index;
+    if (idx > 0) parts.push({ text: remaining.slice(0, idx), type: null });
+    parts.push({ text: remaining.slice(idx, idx + first.match.length), type: first.type });
+    remaining = remaining.slice(idx + first.match.length);
+  }
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (!part.type) return <span key={i}>{part.text}</span>;
+        if (part.type === "projection") return <span key={i} className="text-blue-600 dark:text-blue-400 font-medium">{part.text}</span>;
+        if (part.type === "value")      return <span key={i} className="text-emerald-600 dark:text-emerald-400 font-medium">{part.text}</span>;
+        return <span key={i} className="text-red-600 dark:text-red-400 font-medium">{part.text}</span>;
+      })}
+    </>
+  );
+}
+
+function AIHighlightedParagraphs({ text }: { text: string }) {
+  const paragraphs = text.split(/\n+/).filter((p) => p.trim().length > 0);
+  return (
+    <div className="space-y-3">
+      {paragraphs.map((para, i) => (
+        <p key={i} className="text-sm leading-relaxed">
+          <AIKeywordHighlight text={para} />
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function AISummaryTabContent({ playerId }: { playerId: number }) {
+  const [data, setData] = useState<PlayerAISummary | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [fetched, setFetched] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
+
+  useEffect(() => {
+    if (fetched || !playerId) return;
+    setFetched(true);
+    setLoading(true);
+
+    supabase
+      .schema("ai")
+      .from("player_ai_analysis")
+      .select("summary_short, summary_long, recommendation, primary_reason, generated_at")
+      .eq("player_id", playerId)
+      .order("generated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data: row }) => {
+        setData(row ?? null);
+        setLoading(false);
+      });
+  }, [playerId, fetched]);
+
+  const copyAll = () => {
+    if (!data) return;
+    const text = [
+      data.recommendation ? `Recommendation: ${data.recommendation}` : "",
+      data.primary_reason ? `Primary Reason: ${data.primary_reason}` : "",
+      data.summary_short  ? `\nSummary:\n${data.summary_short}` : "",
+      data.summary_long   ? `\nFull Analysis:\n${data.summary_long}` : "",
+    ].filter(Boolean).join("\n");
+    navigator.clipboard.writeText(text);
+    setCopyState("copied");
+    setTimeout(() => setCopyState("idle"), 2000);
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-3 p-4">
+        <div className="h-4 rounded bg-muted/40 animate-pulse w-1/3" />
+        <div className="h-3 rounded bg-muted/40 animate-pulse" />
+        <div className="h-3 rounded bg-muted/40 animate-pulse w-5/6" />
+        <div className="h-3 rounded bg-muted/40 animate-pulse w-4/6" />
+      </div>
+    );
+  }
+
+  if (!data || (!data.summary_short && !data.summary_long)) {
+    return (
+      <div className="p-6 text-center">
+        <Brain className="h-7 w-7 text-muted-foreground/40 mx-auto mb-2" />
+        <p className="text-sm text-muted-foreground">No AI analysis available for this player yet.</p>
+        <p className="text-xs text-muted-foreground/60 mt-1">Analysis is generated weekly by the pipeline.</p>
+      </div>
+    );
+  }
+
+  const genDate = data.generated_at
+    ? new Date(data.generated_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })
+    : null;
+
+  return (
+    <div className="p-4 space-y-4">
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {data.recommendation && (
+            <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+              data.recommendation.toLowerCase().includes("buy")  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30" :
+              data.recommendation.toLowerCase().includes("sell") ? "bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/30" :
+              "bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/30"
+            }`}>
+              {data.recommendation}
+            </span>
+          )}
+          {genDate && (
+            <span className="text-[10px] text-muted-foreground">{genDate}</span>
+          )}
+        </div>
+        <button
+          onClick={copyAll}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
+        >
+          {copyState === "copied"
+            ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied!</>
+            : <><Copy className="h-3.5 w-3.5" /> Copy</>
+          }
+        </button>
+      </div>
+
+      {/* Primary reason pill */}
+      {data.primary_reason && (
+        <p className="text-xs text-muted-foreground italic border-l-2 border-border pl-3">
+          {data.primary_reason}
+        </p>
+      )}
+
+      {/* Short summary */}
+      {data.summary_short && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Summary</p>
+          <div className="p-3 bg-muted/20 border border-border rounded-md">
+            <AIHighlightedParagraphs text={data.summary_short} />
+          </div>
+        </div>
+      )}
+
+      {/* Full analysis */}
+      {data.summary_long && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Full Analysis</p>
+          <div className="max-h-72 overflow-y-auto p-3 bg-muted/10 border border-border rounded-md">
+            <AIHighlightedParagraphs text={data.summary_long} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── POST DETAIL PANEL ─────────────────────────────────────────────────────────
 
 function PostDetailPanel({
@@ -117,6 +311,7 @@ function PostDetailPanel({
       case "hooks":   return getHooks(post).join("\n\n");
       case "visual":  return typeof post.visual_plan === "string" ? post.visual_plan : JSON.stringify(post.visual_plan, null, 2);
       case "caption": return getCaptionScript(post);
+      case "ai":      return "";
     }
   };
 
@@ -177,43 +372,47 @@ function PostDetailPanel({
         ))}
       </div>
 
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
-            {POST_TABS.find((t) => t.id === activeTab)?.label}
-          </p>
-          <button
-            onClick={() => copy(getTabContent(), activeTab)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
-          >
-            {copied === activeTab ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy</>}
-          </button>
-        </div>
-
-        {activeTab === "hooks" ? (
-          <div className="space-y-2">
-            {getHooks(post).map((hook, i) => (
-              <div key={i} className="flex items-start gap-2 p-3 bg-muted/30 border border-border rounded-md">
-                <span className="text-xs text-muted-foreground font-mono shrink-0 mt-0.5">{i + 1}.</span>
-                <p className="text-sm flex-1 leading-relaxed">{hook}</p>
-                <button
-                  onClick={() => copy(hook, `hook-${i}`)}
-                  className="shrink-0 p-1 rounded hover:bg-accent transition-colors"
-                >
-                  {copied === `hook-${i}` ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
-                </button>
-              </div>
-            ))}
+      {activeTab === "ai" ? (
+        <AISummaryTabContent playerId={post.player_id} />
+      ) : (
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
+              {POST_TABS.find((t) => t.id === activeTab)?.label}
+            </p>
+            <button
+              onClick={() => copy(getTabContent(), activeTab)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border text-xs rounded-md hover:bg-accent transition-colors"
+            >
+              {copied === activeTab ? <><Check className="h-3.5 w-3.5 text-emerald-500" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy</>}
+            </button>
           </div>
-        ) : (
-          <textarea
-            value={getTabContent()}
-            readOnly
-            className="w-full min-h-48 text-sm border border-border rounded-md p-3 bg-muted/10 resize-y font-mono leading-relaxed"
-          />
-        )}
-        <p className="text-[10px] text-muted-foreground mt-1.5">{getTabContent().length} characters</p>
-      </div>
+
+          {activeTab === "hooks" ? (
+            <div className="space-y-2">
+              {getHooks(post).map((hook, i) => (
+                <div key={i} className="flex items-start gap-2 p-3 bg-muted/30 border border-border rounded-md">
+                  <span className="text-xs text-muted-foreground font-mono shrink-0 mt-0.5">{i + 1}.</span>
+                  <p className="text-sm flex-1 leading-relaxed">{hook}</p>
+                  <button
+                    onClick={() => copy(hook, `hook-${i}`)}
+                    className="shrink-0 p-1 rounded hover:bg-accent transition-colors"
+                  >
+                    {copied === `hook-${i}` ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <textarea
+              value={getTabContent()}
+              readOnly
+              className="w-full min-h-48 text-sm border border-border rounded-md p-3 bg-muted/10 resize-y font-mono leading-relaxed"
+            />
+          )}
+          <p className="text-[10px] text-muted-foreground mt-1.5">{getTabContent().length} characters</p>
+        </div>
+      )}
     </div>
   );
 }
