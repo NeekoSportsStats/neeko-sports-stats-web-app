@@ -61,24 +61,53 @@ function fmtPlayer(p: PlayerData, rank: number): string {
 }
 
 function buildSystemPrompt(): string {
-  return `You are an elite AFL Fantasy analyst AND high-converting sports content creator for Neeko Sports.
+  return `You are an elite AFL Fantasy strategist, performance marketer, and content creator for Neeko Sports. You do NOT create generic content. Every post must stop scroll, challenge the audience, create urgency, and make the user feel they are missing out if they don't follow Neeko.
 
-You write two distinct scripts per post:
+CONTENT PHILOSOPHY:
+- Every post must have a STRONG OPINION. No neutral takes. Take a side.
+- Every post must feel like INSIDER KNOWLEDGE the audience doesn't have yet.
+- Every post must create either URGENCY ("act now"), FEAR OF MISSING OUT, or CONTROVERSY ("everyone else is wrong").
+- Proof posts establish credibility. Opinion posts drive engagement. Value posts drive subscriptions.
 
-1. VOICE SCRIPT — written to be READ OUT LOUD by AI voice (ElevenLabs). Natural speech rhythm. Use "..." for pauses and "—" for emphasis breaks. No bullet points. 20-30 seconds when spoken aloud.
+THINK BEFORE YOU WRITE (apply to every post):
+1. What is the mainstream AFL Fantasy opinion on this player?
+2. Where is the DATA creating an edge the crowd hasn't found?
+3. What would make someone feel behind if they didn't see this post?
+4. What one-line contrarian take would make someone stop scrolling?
 
-2. CAPTION SCRIPT — written for TikTok/Instagram caption. Punchy, scroll-stopping. Includes hashtags.
+HOOK RULES — NON-NEGOTIABLE:
+- Every hook must be emotionally triggering, slightly aggressive, or sharply contrarian.
+- FORBIDDEN hooks: "Here's why...", "Did you know...", "This player is...", "Check out...", passive informational openers.
+- REQUIRED: tension, challenge, a mistake being called out, or urgency.
+- Hook types to rotate: Controversy ("Everyone's wrong about X"), Fear ("You're about to make a $500k mistake"), Data-first ("97 pts. $432k. Still sleeping?"), Contrarian ("Stop listening to the experts"), Challenge ("Prove me wrong — bring in X"), Identity ("Real coaches already know this").
 
-You also write:
-- 3 HOOKS — one emotional, one data-driven, one aggressive/controversial
-- VISUAL PLAN — plain text scene-by-scene breakdown (Scene 1, Scene 2, etc.) — NEVER an object, always a string
+VOICE SCRIPT RULES:
+- 20-30 seconds spoken aloud at natural pace (~55-80 words).
+- Structure: Hook (tension) → Setup (what everyone thinks) → Data pivot (what the numbers say) → Strong take (your call) → CTA (Neeko Sports — link in bio).
+- Use "..." for natural pauses. Use "—" for hard emphasis breaks.
+- Sound like a sharp analyst who has already made the decision — not someone exploring options.
+- No hedging: NEVER use "might", "could", "perhaps", "possibly", "worth watching".
 
-RULES:
-- Voice scripts must sound like a confident analyst speaking, not reading
-- No weak takes, no hedging ("might", "could", "perhaps")
-- Every piece of content must feel like insider knowledge
-- Neeko Sports CTA in every voice script
-- Never start with "Hey guys" or "What's up"
+CAPTION RULES:
+- 2-4 punchy lines. Strong opinion. Slight controversy or urgency.
+- Line 1: The take (bold opinion).
+- Line 2-3: 1-2 specific data points that back it up.
+- Line 4: CTA + 3-4 hashtags (#AFLFantasy #SuperCoach #NeekoSports + one specific).
+- No fluff, no "great player", no "solid option".
+
+VISUAL PLAN RULES:
+- Professional creative brief format. Scene-by-scene (Scene 1, Scene 2, etc.) with exact timing.
+- Specify: exact text overlays (word-for-word), stat cards to show, colour scheme (green for buy/value/breakout/captain, red/amber for trap/sell), animation style (pop-in, zoom, flash, shake).
+- Must be a single STRING — never an object.
+
+CONTENT MIX — rotate across the 7-day plan:
+- Value Lock: "Buy this player NOW before the price rises"
+- Trap Alert: "Everyone is bringing X in — here's why that's a mistake"
+- Breakout: "X is about to explode — here's what the data shows"
+- Contrarian: "The crowd is wrong. Here's why."
+- Comparison: "X vs Y — the data picks a clear winner"
+- You're Wrong: "Stop doing this. It's costing you rankings."
+- Proof: Screen recording showing Neeko's prediction accuracy
 
 OUTPUT: Valid JSON only. No markdown code fences. No extra text before or after the JSON.`;
 }
@@ -100,48 +129,50 @@ function buildUserPrompt(
 
   return `Generate a FULL 7-DAY AFL Fantasy content plan (21 posts total: 3 per day).
 ${focusNote}
-PLAYER POOL:
+PLAYER POOL (use ONLY these players — no invented names):
 
-VALUE CANDIDATES:
+VALUE CANDIDATES (underpriced relative to output — lead with the price gap):
 ${valuePlayers.map((p, i) => fmtPlayer(p, i + 1)).join("\n")}
 
-BREAKOUT/FORM CANDIDATES:
+BREAKOUT/FORM CANDIDATES (high form, high upside — lead with the ceiling):
 ${breakoutPlayers.slice(0, 7).map((p, i) => fmtPlayer(p, i + 1)).join("\n")}
 
-TRAP CANDIDATES (high profile, low value — dangerous picks):
+TRAP CANDIDATES (popular picks but dangerous — lead with the warning):
 ${trapList}
 
-CAPTAIN PICKS:
+CAPTAIN PICKS (elite score potential — lead with confidence and the projection):
 ${captainPlayers.map((p, i) => fmtPlayer(p, i + 1)).join("\n")}
 
-TOP 10 FOR PROOF POSTS:
+TOP PLAYERS FOR PROOF POSTS (showing Neeko's live rankings data):
 ${proofPlayers.map((p, i) => fmtPlayer(p, i + 1)).join("\n")}
 
 ---
 
 DAILY STRUCTURE (ALL 7 DAYS):
-Post 1: VALUE or BREAKOUT — Video
-Post 2: TRAP or CONTROVERSIAL — Image or Video
-Post 3: SCREEN RECORD / PROOF — Video (always)
+Post 1 (Video): Rotate through — Value Lock / Breakout / Contrarian / Comparison / Captain
+Post 2 (Image or Video): Rotate through — Trap Alert / "You're Wrong" / Controversial Opinion
+Post 3 (Screen Recording): ALWAYS Proof — show Neeko live rankings data
 
-RULES:
+CONTENT MIX RULES:
+- Each player used maximum ONCE across the entire week
 - No duplicate players on the same day
-- Rotate players across the week (each player used max once)
-- Alternate Value/Breakout for Post 1 each day
-- Post 2 must be spicy/controversial — challenge popular opinion
+- Post 2 must be the spiciest, most scroll-stopping post of the day — challenge the mainstream view
+- Day 1 Post 1: Value Lock. Day 2 Post 1: Breakout. Day 3 Post 1: Contrarian. Day 4 Post 1: Value Lock. Day 5 Post 1: Breakout. Day 6 Post 1: Captain. Day 7 Post 1: Comparison.
+- Every voice script must follow: Hook → Setup → Data pivot → Strong take → Neeko CTA
+- Every hook must create tension, challenge a belief, or invoke urgency — NO passive informational hooks
 
 ---
 
-FOR EACH POST, OUTPUT EXACTLY:
+FOR EACH POST, OUTPUT EXACTLY THESE FIELDS:
 - post_type: "Video", "Image", or "Screen Recording"
 - category: "Value", "Breakout", "Trap", "Captain", or "Proof"
-- player_name: string
-- player_id: number
+- player_name: string (must match player pool exactly)
+- player_id: number (must match player pool exactly)
 - team: string
-- hooks: array of exactly 3 strings (emotional / data-driven / aggressive)
-- voice_script: 20-30 second spoken script for ElevenLabs — natural pauses with "..." and emphasis with "—"
-- caption_script: TikTok/Instagram caption with relevant hashtags
-- visual_plan: PLAIN TEXT scene-by-scene breakdown — Scene 1 (0-3s): ..., Scene 2 (3-6s): ..., etc. Must be a STRING not an object.
+- hooks: array of exactly 3 strings — Hook 1: Controversy or "You're Wrong" style, Hook 2: Data-first with specific numbers, Hook 3: Challenge or Fear-of-missing-out. Each under 20 words. NO passive openers.
+- voice_script: 55-80 words. Spoken aloud = 20-30 seconds. Structure: tension hook → what everyone thinks → data pivot → strong call → Neeko CTA. Use "..." for pauses, "—" for emphasis.
+- caption_script: 2-4 lines. Line 1 is a strong opinion or bold claim. Lines 2-3 are specific data points. Final line: CTA + 3-4 hashtags. No fluff.
+- visual_plan: STRING (not object). Scene-by-scene creative brief. Include exact text overlays word-for-word, which stats to show, colour scheme (green for value/breakout/captain, red/amber for trap), animation notes. 4-6 sentences.
 
 ---
 
@@ -163,14 +194,14 @@ OUTPUT (strict JSON, no markdown fences):
           "hooks": ["...", "...", "..."],
           "voice_script": "...",
           "caption_script": "...",
-          "visual_plan": "Scene 1 (0-3s): ... Scene 2 (3-6s): ..."
+          "visual_plan": "Scene 1 (0-3s): ... Scene 2 (3-7s): ..."
         }
       ]
     }
   ]
 }
 
-Generate ALL 7 days = 21 posts total. Every post must be COMPLETE — nothing left blank.`;
+Generate ALL 7 days = 21 posts total. Every post must be COMPLETE — nothing left blank. Every hook must pass the quality filter: if it could be published by a generic sports account, rewrite it until it couldn't.`;
 }
 
 function ensureString(val: unknown): string {
@@ -277,20 +308,20 @@ function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectP
           player_id: p1.player_id,
           team: p1.team,
           hooks: [
-            `${p1.player_name} is the most underpriced player in AFL Fantasy right now.`,
-            `Rank ${p1.rank}... projecting ${Math.round(p1.projection)} pts... value score ${p1.value_score.toFixed(1)}. The market hasn't caught up yet.`,
-            `Everyone's sleeping on ${p1.player_name}. That's a mistake.`,
+            `The crowd hasn't found ${p1.player_name} yet — that's your window.`,
+            `${Math.round(p1.projection)} pts projected. Value score ${p1.value_score.toFixed(1)}. At rank ${p1.rank}... this is mispriced.`,
+            `Stop overthinking it. ${p1.player_name} is the best value play this round.`,
           ],
           hook_options: [
-            `${p1.player_name} is the most underpriced player in AFL Fantasy right now.`,
-            `Rank ${p1.rank}... projecting ${Math.round(p1.projection)} pts... value score ${p1.value_score.toFixed(1)}. The market hasn't caught up yet.`,
-            `Everyone's sleeping on ${p1.player_name}. That's a mistake.`,
+            `The crowd hasn't found ${p1.player_name} yet — that's your window.`,
+            `${Math.round(p1.projection)} pts projected. Value score ${p1.value_score.toFixed(1)}. At rank ${p1.rank}... this is mispriced.`,
+            `Stop overthinking it. ${p1.player_name} is the best value play this round.`,
           ],
-          voice_script: `${p1.player_name}... ${p1.team}. Ranked ${p1.rank} in the competition — projecting ${Math.round(p1.projection)} points... ceiling of ${Math.round(p1.ceiling)}. Value score? ${p1.value_score.toFixed(1)}. That is elite output at a price the market hasn't caught yet. This is exactly the kind of pick that separates the good teams from the great ones. Full breakdown at Neeko Sports — link in bio.`,
-          full_script: `${p1.player_name}... ${p1.team}. Ranked ${p1.rank} in the competition — projecting ${Math.round(p1.projection)} points... ceiling of ${Math.round(p1.ceiling)}. Value score? ${p1.value_score.toFixed(1)}. That is elite output at a price the market hasn't caught yet. This is exactly the kind of pick that separates the good teams from the great ones. Full breakdown at Neeko Sports — link in bio.`,
-          caption_script: `${p1.player_name} is a MUST-OWN this week. Proj ${Math.round(p1.projection)}pts, value score ${p1.value_score.toFixed(1)} — one of the best in the comp. Full analysis at Neeko Sports.\n\n#AFLFantasy #AFLSupercoach #ValuePick #${p1.team.replace(/\s+/g, "")}`,
-          caption: `${p1.player_name} is a MUST-OWN this week. Proj ${Math.round(p1.projection)}pts, value score ${p1.value_score.toFixed(1)} — one of the best in the comp. Full analysis at Neeko Sports.\n\n#AFLFantasy #AFLSupercoach #ValuePick #${p1.team.replace(/\s+/g, "")}`,
-          visual_plan: `Scene 1 (0-3s): "${p1.player_name.toUpperCase()}" bold white text on black, green glow, fast zoom in.\nScene 2 (3-6s): Team color background, player name + team overlay, fade in.\nScene 3 (6-12s): Stat cards slide in from left — "Proj: ${Math.round(p1.projection)}pts", "Value: ${p1.value_score.toFixed(1)}", "Ceiling: ${Math.round(p1.ceiling)}pts".\nScene 4 (12-20s): "VALUE PICK" in bold green — pulse animation, highlight border.\nScene 5 (20-30s): Neeko Sports wordmark on dark bg, "Get the edge — link in bio".\nColors: #00C853 green on #0D0D0D. Font: Heavy sans-serif, all caps. Motion: 2-3s hard cuts, fast zoom transitions.`,
+          voice_script: `The crowd hasn't found ${p1.player_name} yet — and that is exactly your advantage. ${p1.team}... ranked ${p1.rank}... projecting ${Math.round(p1.projection)} points with a ceiling of ${Math.round(p1.ceiling)}. Value score ${p1.value_score.toFixed(1)} — that number means he is producing well above what his price demands. When the market corrects... it will be too late. Get on now. Full breakdown at Neeko Sports — link in bio.`,
+          full_script: `The crowd hasn't found ${p1.player_name} yet — and that is exactly your advantage. ${p1.team}... ranked ${p1.rank}... projecting ${Math.round(p1.projection)} points with a ceiling of ${Math.round(p1.ceiling)}. Value score ${p1.value_score.toFixed(1)} — that number means he is producing well above what his price demands. When the market corrects... it will be too late. Get on now. Full breakdown at Neeko Sports — link in bio.`,
+          caption_script: `${p1.player_name} is the most mispriced player in the comp right now.\n\n${Math.round(p1.projection)} pts projected. Value score ${p1.value_score.toFixed(1)}. The coaches winning their leagues already own him.\n\nDon't wait for the price rise — get the full breakdown at Neeko Sports. #AFLFantasy #AFLSupercoach #ValueLock #${p1.team.replace(/\s+/g, "")}`,
+          caption: `${p1.player_name} is the most mispriced player in the comp right now.\n\n${Math.round(p1.projection)} pts projected. Value score ${p1.value_score.toFixed(1)}. The coaches winning their leagues already own him.\n\nDon't wait for the price rise — get the full breakdown at Neeko Sports. #AFLFantasy #AFLSupercoach #ValueLock #${p1.team.replace(/\s+/g, "")}`,
+          visual_plan: `Scene 1 (0-2s): Bold "MISPRICED" text slams in on black background — green glow, fast zoom. Scene 2 (2-5s): Player name + team in large white text, dark gradient bg with green accent border. Scene 3 (5-12s): Three stat cards pop in from bottom — "PROJ: ${Math.round(p1.projection)} PTS", "VALUE: ${p1.value_score.toFixed(1)}", "CEILING: ${Math.round(p1.ceiling)} PTS" — each with 0.3s delay, sharp pop animation. Scene 4 (12-20s): "BUY BEFORE THE MARKET CATCHES UP" in bold green, pulse effect. Scene 5 (20-30s): Neeko Sports logo on dark bg, "Link in bio — get the edge". Colour scheme: #00C853 green on #0D0D0D. Font: Heavy condensed sans-serif, all caps. Motion: Hard cuts, fast zoom transitions, stat cards pop-in.`,
         },
         {
           day,
@@ -301,20 +332,20 @@ function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectP
           player_id: p2.player_id,
           team: p2.team,
           hooks: [
-            `Stop bringing in ${p2.player_name}. The data doesn't support it.`,
-            `${p2.player_name}... value score ${p2.value_score.toFixed(1)}... that's a red flag at that price.`,
-            `Everyone's picking ${p2.player_name} — that's exactly why you shouldn't.`,
+            `You're about to make a costly mistake bringing in ${p2.player_name}.`,
+            `Value score ${p2.value_score.toFixed(1)}. At rank ${p2.rank}... that is a trap. The data is clear.`,
+            `Everyone is trading in ${p2.player_name} this week — which is exactly the problem.`,
           ],
           hook_options: [
-            `Stop bringing in ${p2.player_name}. The data doesn't support it.`,
-            `${p2.player_name}... value score ${p2.value_score.toFixed(1)}... that's a red flag at that price.`,
-            `Everyone's picking ${p2.player_name} — that's exactly why you shouldn't.`,
+            `You're about to make a costly mistake bringing in ${p2.player_name}.`,
+            `Value score ${p2.value_score.toFixed(1)}. At rank ${p2.rank}... that is a trap. The data is clear.`,
+            `Everyone is trading in ${p2.player_name} this week — which is exactly the problem.`,
           ],
-          voice_script: `${p2.player_name}... everyone's bringing him in. I get it — the name is familiar, the ranking looks fine. But the value score is ${p2.value_score.toFixed(1)}. At that price... you are overpaying. There are five better options available right now that the crowd hasn't found yet. Don't follow the herd — use the data. Neeko Sports — link in bio.`,
-          full_script: `${p2.player_name}... everyone's bringing him in. I get it — the name is familiar, the ranking looks fine. But the value score is ${p2.value_score.toFixed(1)}. At that price... you are overpaying. There are five better options available right now that the crowd hasn't found yet. Don't follow the herd — use the data. Neeko Sports — link in bio.`,
-          caption_script: `TRAP ALERT: ${p2.player_name} looks tempting but the data says avoid. Value score ${p2.value_score.toFixed(1)} — overpriced and over-hyped. Full trap breakdown at Neeko Sports.\n\n#AFLFantasy #TrapAlert #AFLSupercoach`,
-          caption: `TRAP ALERT: ${p2.player_name} looks tempting but the data says avoid. Value score ${p2.value_score.toFixed(1)} — overpriced and over-hyped. Full trap breakdown at Neeko Sports.\n\n#AFLFantasy #TrapAlert #AFLSupercoach`,
-          visual_plan: `Scene 1 (0-3s): Red "TRAP ALERT" text with shake animation on dark background.\nScene 2 (3-6s): Player name in red overlay, caution icon, hard cut.\nScene 3 (6-12s): Stat card — "Value: ${p2.value_score.toFixed(1)}" highlighted in red with "LOW" badge.\nScene 4 (12-20s): "AVOID" in bold red, X mark overlay.\nScene 5 (20-30s): Neeko Sports logo — "Better picks inside — link in bio".\nColors: #D32F2F red on #0D0D0D. Font: Heavy bold, aggressive. Motion: Shake on reveal, hard cuts.`,
+          voice_script: `You're about to make a costly mistake. ${p2.player_name}... the name looks fine, the rank seems solid — but the value score is ${p2.value_score.toFixed(1)}. That means you are paying a premium for output that doesn't justify it. While everyone follows the herd... smart coaches are already in better positions. The data called it. Don't ignore it. Full breakdown at Neeko Sports — link in bio.`,
+          full_script: `You're about to make a costly mistake. ${p2.player_name}... the name looks fine, the rank seems solid — but the value score is ${p2.value_score.toFixed(1)}. That means you are paying a premium for output that doesn't justify it. While everyone follows the herd... smart coaches are already in better positions. The data called it. Don't ignore it. Full breakdown at Neeko Sports — link in bio.`,
+          caption_script: `${p2.player_name} is the most dangerous trade this week — and most coaches don't see it yet.\n\nValue score ${p2.value_score.toFixed(1)} at rank ${p2.rank}. Overpriced. Over-traded. Underperforming relative to cost.\n\nThe full trap breakdown is live at Neeko Sports. Don't say we didn't warn you. #AFLFantasy #TrapAlert #AFLSupercoach #NeekoSports`,
+          caption: `${p2.player_name} is the most dangerous trade this week — and most coaches don't see it yet.\n\nValue score ${p2.value_score.toFixed(1)} at rank ${p2.rank}. Overpriced. Over-traded. Underperforming relative to cost.\n\nThe full trap breakdown is live at Neeko Sports. Don't say we didn't warn you. #AFLFantasy #TrapAlert #AFLSupercoach #NeekoSports`,
+          visual_plan: `Scene 1 (0-2s): "TRAP" in bold red slams in with a shake animation on black — caution icon flashes. Scene 2 (2-5s): Player name in large red text with a red border overlay, hard cut. Scene 3 (5-12s): Stat card crashes in — "VALUE SCORE: ${p2.value_score.toFixed(1)}" with a red "DANGER" badge next to it, then "RANK: ${p2.rank}" below. Scene 4 (12-20s): "EVERYONE'S WRONG" flashes in amber, then cuts to "DON'T FOLLOW THE HERD" in red bold. Scene 5 (20-30s): Neeko Sports logo — "Better picks inside — link in bio". Colour scheme: #D32F2F red and #FF8F00 amber on #0D0D0D. Motion: Shake on open, hard cuts, stat card crash-in.`,
         },
         {
           day,
@@ -325,20 +356,20 @@ function buildFallbackPlan(players: PlayerData[], sel: ReturnType<typeof selectP
           player_id: p3.player_id,
           team: p3.team,
           hooks: [
-            `This is the rankings data most AFL Fantasy coaches never see.`,
-            `Here's what Neeko's algorithm flagged this week — before anyone else.`,
-            `The algorithm called it. Here's the proof.`,
+            `This data is what separates the coaches winning their leagues from everyone else.`,
+            `${Math.round(p3.projection)} pts projected. Rank #${p3.rank}. This is what Neeko's model sees — right now.`,
+            `${p3.player_name} is ranked #${p3.rank} on Neeko. Most coaches have no idea.`,
           ],
           hook_options: [
-            `This is the rankings data most AFL Fantasy coaches never see.`,
-            `Here's what Neeko's algorithm flagged this week — before anyone else.`,
-            `The algorithm called it. Here's the proof.`,
+            `This data is what separates the coaches winning their leagues from everyone else.`,
+            `${Math.round(p3.projection)} pts projected. Rank #${p3.rank}. This is what Neeko's model sees — right now.`,
+            `${p3.player_name} is ranked #${p3.rank} on Neeko. Most coaches have no idea.`,
           ],
-          voice_script: `This is the Neeko live rankings board. ${p3.player_name} — ranked ${p3.rank} — projecting ${Math.round(p3.projection)} points... captain score of ${Math.round(p3.captain_score)}. This is the exact data our members are using to make trade decisions every single round. If you're building your team without this... you're working blind. Neeko Sports — link in bio.`,
-          full_script: `This is the Neeko live rankings board. ${p3.player_name} — ranked ${p3.rank} — projecting ${Math.round(p3.projection)} points... captain score of ${Math.round(p3.captain_score)}. This is the exact data our members are using to make trade decisions every single round. If you're building your team without this... you're working blind. Neeko Sports — link in bio.`,
-          caption_script: `This is what Neeko's live rankings look like. ${p3.player_name} at #${p3.rank} — the algorithm doesn't miss. Get full access at Neeko Sports.\n\n#AFLFantasy #DataDriven #NeekoSports #AFLSupercoach`,
-          caption: `This is what Neeko's live rankings look like. ${p3.player_name} at #${p3.rank} — the algorithm doesn't miss. Get full access at Neeko Sports.\n\n#AFLFantasy #DataDriven #NeekoSports #AFLSupercoach`,
-          visual_plan: `Screen recording of Neeko rankings table, zoomed to show top 10 clearly.\nCursor hovers and highlights ${p3.player_name}'s row.\nSlow scroll down the table pausing on key stats.\nOverlay text top-left: "LIVE RANKINGS DATA — NEEKO SPORTS".\nEnd card: Neeko logo + "Try it free — link in bio" on dark background.\nStyle: Clean minimal, green accents on key stats, let the data sell itself.`,
+          voice_script: `This is the Neeko live rankings board — the exact data our members use to make trade decisions every single round. ${p3.player_name}... rank ${p3.rank}... projecting ${Math.round(p3.projection)} points... captain score ${Math.round(p3.captain_score)}. Every number you see here is updated in real time. If you are building your AFL Fantasy team without this... you are working blind while everyone else has the answers. Neeko Sports — link in bio.`,
+          full_script: `This is the Neeko live rankings board — the exact data our members use to make trade decisions every single round. ${p3.player_name}... rank ${p3.rank}... projecting ${Math.round(p3.projection)} points... captain score ${Math.round(p3.captain_score)}. Every number you see here is updated in real time. If you are building your AFL Fantasy team without this... you are working blind while everyone else has the answers. Neeko Sports — link in bio.`,
+          caption_script: `This is the data your league rivals don't want you to see.\n\n${p3.player_name} ranked #${p3.rank} on Neeko's live model — ${Math.round(p3.projection)} pts projected, captain score ${Math.round(p3.captain_score)}. This is what winning coaches are acting on right now.\n\nFull access at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #DataDriven`,
+          caption: `This is the data your league rivals don't want you to see.\n\n${p3.player_name} ranked #${p3.rank} on Neeko's live model — ${Math.round(p3.projection)} pts projected, captain score ${Math.round(p3.captain_score)}. This is what winning coaches are acting on right now.\n\nFull access at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #DataDriven`,
+          visual_plan: `Screen recording of Neeko live rankings table — zoom in slowly to show top 10 clearly. Cursor moves to highlight ${p3.player_name}'s row, pausing on projection and captain score stats. Scroll down slowly past 3-4 more players to show depth of data. Overlay text pinned top-left: "LIVE RANKINGS — NEEKO SPORTS" in small white bold text. End with a slow zoom-out, then cut to dark end card: Neeko logo centred, "Try it free — link in bio" below. Style: clean minimal UI, green highlights on key stats, let the data do the selling.`,
         },
       ],
     });

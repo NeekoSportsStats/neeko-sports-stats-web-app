@@ -64,7 +64,7 @@ interface TopPostPlayer {
 }
 
 interface TodayTopPost {
-  type: "VALUE" | "TRAP" | "PROOF";
+  type: "CONTROVERSIAL" | "VALUE" | "PROOF";
   player: TopPostPlayer;
   hook: string;
   caption: string;
@@ -708,35 +708,39 @@ function AISummaryTabContent({ playerId }: { playerId: number }) {
 
 // ── TODAY'S TOP 3 POSTS ───────────────────────────────────────────────────────
 
-function generateTopPostHook(player: TopPostPlayer, type: "VALUE" | "TRAP" | "PROOF"): string {
+function generateTopPostHook(player: TopPostPlayer, type: "CONTROVERSIAL" | "VALUE" | "PROOF"): string {
   const name = player.player_name.split(" ").pop() ?? player.player_name;
   const proj = player.projection_final ? Math.round(player.projection_final) : null;
+  const val = player.value_score != null ? player.value_score.toFixed(1) : null;
 
+  if (type === "CONTROVERSIAL") {
+    return val
+      ? `Everyone is wrong about ${name} — value score ${val} proves it`
+      : `Stop listening to the crowd on ${name}. The data tells a different story.`;
+  }
   if (type === "VALUE") {
     return proj
-      ? `${name} is projecting ${proj} pts this round — but the market hasn't noticed yet`
-      : `${name} is massively underpriced right now — the model has him rated much higher than his price`;
-  }
-  if (type === "TRAP") {
-    return `Everyone is trading in ${name} this week — but Neeko AI says avoid him`;
+      ? `${proj} pts projected. The market hasn't priced in ${name} yet — that's your window.`
+      : `${name} is the most mispriced player in the comp right now. Act before the market corrects.`;
   }
   return proj
-    ? `Neeko called ${name} at ${proj} pts — here's the proof`
-    : `${name} delivered exactly what Neeko AI predicted — here's the data`;
+    ? `${name} at ${proj} pts. Neeko called it. Here's the proof.`
+    : `This is what winning coaches are looking at. Neeko's model — live data, right now.`;
 }
 
-function generateTopPostCaption(player: TopPostPlayer, type: "VALUE" | "TRAP" | "PROOF"): string {
+function generateTopPostCaption(player: TopPostPlayer, type: "CONTROVERSIAL" | "VALUE" | "PROOF"): string {
   const name = player.player_name;
   const team = player.team;
   const proj = player.projection_final ? Math.round(player.projection_final) : null;
+  const val = player.value_score != null ? player.value_score.toFixed(1) : null;
 
+  if (type === "CONTROVERSIAL") {
+    return `The mainstream AFL Fantasy take on ${name} is wrong — and Neeko's data proves it.\n\n${val ? `Value score ${val}. ` : ""}${proj ? `Projection: ${proj} pts this round. ` : ""}The crowd is chasing the wrong picks while the edge sits right here.\n\nFull breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #ContraryData`;
+  }
   if (type === "VALUE") {
-    return `${name} (${team}) is currently one of the highest-value picks in the competition according to Neeko AI's ranking engine.\n\nThe model rates him well above his current price point — which means fantasy coaches who act now could gain a significant price advantage before the market corrects.\n\n${proj ? `Current projection: ${proj} pts this round.\n\n` : ""}Full breakdown in the link in bio. #AFLFantasy #SuperCoach #NeekoAI`;
+    return `${name} (${team}) is the most underpriced player in the comp right now.\n\n${proj ? `${proj} pts projected this round. ` : ""}${val ? `Value score ${val} — elite output at a price the market hasn't caught. ` : ""}The window to get them cheap closes when the rest of the comp figures it out.\n\nFull breakdown at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #ValueLock`;
   }
-  if (type === "TRAP") {
-    return `${name} (${team}) is attracting heavy trade-in traffic this week — but Neeko AI is flagging a TRAP.\n\nThe model is detecting a mismatch between public sentiment and the underlying data. Before you bring him in, check the full analysis.\n\nDon't let the crowd lead you into a costly mistake. Full breakdown in bio. #AFLFantasy #SuperCoach #NeekoAI`;
-  }
-  return `${name} (${team}) was flagged by Neeko AI heading into this round${proj ? ` with a ${proj} pt projection` : ""}.\n\nHere's how the model performed. This is the kind of data-driven edge that separates winning fantasy coaches from the rest.\n\nSee more AI-powered picks in the link in bio. #AFLFantasy #SuperCoach #NeekoAI`;
+  return `This is the data your league rivals don't want you to see.\n\n${name} (${team})${proj ? ` — ${proj} pts projected` : ""} on Neeko's live model. This is what winning coaches are acting on right now.\n\nFull access at Neeko Sports — link in bio. #AFLFantasy #AFLSupercoach #NeekoSports #DataDriven`;
 }
 
 function TodayTopPostCard({
@@ -750,9 +754,9 @@ function TodayTopPostCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const typeColors: Record<TodayTopPost["type"], { bg: string; text: string; border: string; label: string }> = {
-    VALUE: { bg: "bg-emerald-500/10", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-500/30", label: "Value Post" },
-    TRAP:  { bg: "bg-red-500/10",     text: "text-red-700 dark:text-red-300",         border: "border-red-500/30",     label: "Trap Warning" },
-    PROOF: { bg: "bg-blue-500/10",    text: "text-blue-700 dark:text-blue-300",        border: "border-blue-500/30",    label: "Proof Post" },
+    CONTROVERSIAL: { bg: "bg-orange-500/10", text: "text-orange-700 dark:text-orange-300", border: "border-orange-500/30", label: "Controversial" },
+    VALUE:         { bg: "bg-emerald-500/10", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-500/30", label: "Value Lock" },
+    PROOF:         { bg: "bg-blue-500/10",    text: "text-blue-700 dark:text-blue-300",        border: "border-blue-500/30",    label: "Proof Post" },
   };
   const meta = typeColors[topPost.type];
   const allText = `${topPost.hook}\n\n${topPost.caption}`;
@@ -840,26 +844,33 @@ function TodayTopPostsSection() {
 
       const pool = data as TopPostPlayer[];
 
-      const valuePlayer = pool[0];
-      const trapPlayer = [...pool]
-        .sort((a, b) => (a.value_score ?? 0) - (b.value_score ?? 0))
-        .find((p) => p.player_id !== valuePlayer.player_id) ?? pool[pool.length - 1];
+      // CONTROVERSIAL: player where crowd expectation vs data creates biggest gap
+      // Pick a high-neeko-rating player that isn't #1 value (surprising pick)
+      const controversialPlayer = [...pool]
+        .sort((a, b) => (b.neeko_rating_scaled ?? 0) - (a.neeko_rating_scaled ?? 0))
+        .slice(2, 15)
+        .sort(() => Math.random() - 0.5)[0] ?? pool[3];
+
+      // VALUE: highest value_score player
+      const valuePlayer = pool.find((p) => p.player_id !== controversialPlayer.player_id) ?? pool[0];
+
+      // PROOF: highest projection player not already used
       const proofPlayer = [...pool]
-        .filter((p) => p.player_id !== valuePlayer.player_id && p.player_id !== trapPlayer.player_id)
+        .filter((p) => p.player_id !== controversialPlayer.player_id && p.player_id !== valuePlayer.player_id)
         .sort((a, b) => (b.projection_final ?? 0) - (a.projection_final ?? 0))[0] ?? pool[2];
 
       const result: TodayTopPost[] = [
+        {
+          type: "CONTROVERSIAL",
+          player: controversialPlayer,
+          hook: generateTopPostHook(controversialPlayer, "CONTROVERSIAL"),
+          caption: generateTopPostCaption(controversialPlayer, "CONTROVERSIAL"),
+        },
         {
           type: "VALUE",
           player: valuePlayer,
           hook: generateTopPostHook(valuePlayer, "VALUE"),
           caption: generateTopPostCaption(valuePlayer, "VALUE"),
-        },
-        {
-          type: "TRAP",
-          player: trapPlayer,
-          hook: generateTopPostHook(trapPlayer, "TRAP"),
-          caption: generateTopPostCaption(trapPlayer, "TRAP"),
         },
         {
           type: "PROOF",
@@ -912,7 +923,7 @@ function TodayTopPostsSection() {
       {!posts && !loading && (
         <div className="px-4 py-5 text-center">
           <Target className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
-          <p className="text-xs text-muted-foreground">Click generate to get 3 data-driven posts — VALUE, TRAP, and PROOF</p>
+          <p className="text-xs text-muted-foreground">Click generate to get 3 high-conversion posts — Controversial, Value, and Proof</p>
         </div>
       )}
     </div>
